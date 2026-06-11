@@ -2,15 +2,12 @@ package com.example.ui
 
 import androidx.lifecycle.ViewModel
 import com.example.data.*
-import com.example.FirebaseManager
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 class MainViewModel : ViewModel() {
-    private val firestore: FirebaseFirestore? = FirebaseManager.firestore
 
     // ------------------- StateFlows -------------------
     private val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
@@ -89,15 +86,6 @@ class MainViewModel : ViewModel() {
 
     init {
         loadFallbackMockData()
-        listenToCategories()
-        listenToProviders()
-        listenToPendingRequests()
-        listenToBanners()
-        listenToSettings()
-        listenToCities()
-        listenToReports()
-        listenToActivityLogs()
-        listenToChatMessages()
         loadUserPoints()
     }
 
@@ -143,165 +131,6 @@ class MainViewModel : ViewModel() {
         )
 
         applyFilters()
-    }
-
-    // ------------------- Firestore Listeners -------------------
-    private fun listenToCategories() {
-        try {
-            firestore?.collection("categories")
-                ?.orderBy("order")
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(CategoryEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _categories.value = list
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToProviders() {
-        try {
-            firestore?.collection("service_providers")
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(ProviderEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _providers.value = list
-                        applyFilters()
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToPendingRequests() {
-        try {
-            firestore?.collection("pending_providers")
-                ?.whereEqualTo("status", "PENDING")
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(PendingProviderEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _pendingProviders.value = list
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToBanners() {
-        try {
-            firestore?.collection("banners")
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(BannerEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _banners.value = list
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToSettings() {
-        try {
-            firestore?.collection("admin_settings")?.document("main_settings")
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val settings = snapshot.toObject(AdminSettingsEntity::class.java)
-                    if (settings != null) {
-                        _settings.value = settings
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToCities() {
-        try {
-            firestore?.collection("cities")
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(CityEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _cities.value = list
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToReports() {
-        try {
-            firestore?.collection("reports")
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(ReportEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _reports.value = list
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToActivityLogs() {
-        try {
-            firestore?.collection("activity_logs")
-                ?.orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                ?.limit(100)
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(ActivityLogEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _activityLogs.value = list
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun listenToChatMessages() {
-        try {
-            firestore?.collection("chat_messages")
-                ?.orderBy("timestamp")
-                ?.limit(50)
-                ?.addSnapshotListener { snapshot, error ->
-                    if (error != null || snapshot == null) return@addSnapshotListener
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(ChatMessageEntity::class.java)?.copy(id = doc.id)
-                    }
-                    if (list.isNotEmpty()) {
-                        _chatMessages.value = list
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
     }
 
     // ------------------- Filters Engine -------------------
