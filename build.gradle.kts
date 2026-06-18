@@ -4,3 +4,9 @@ plugins {
   alias(libs.plugins.kotlin.compose) apply false
   alias(libs.plugins.secrets) apply false
 }
+
+tasks.register<Copy>("copyApk") {
+    from(file(".build-outputs/app-debug.apk"))
+    into(rootDir)
+}
+

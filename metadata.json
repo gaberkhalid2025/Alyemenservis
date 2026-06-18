@@ -1,6 +1,6 @@
 {
-  "name": "اليمن الخدمات",
-  "description": "تطبيق اليمن الخدمات لعرض وتصفح مقدمي الخدمات في اليمن بشتى المجالات.",
+  "name": "دليل خدمات اليمن",
+  "description": "تطبيق يمني فاخر يربط المستخدمين بمقدمي الخدمات في اليمن بشتى المجالات.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
