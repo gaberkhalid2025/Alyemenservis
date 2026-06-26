@@ -772,26 +772,50 @@ fun AppHeaderBar(viewModel: MainViewModel, themeColors: VisualThemePalette) {
 fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onInfoClick: () -> Unit) {
     val settingsState by viewModel.settings.collectAsState()
 
-    if (!settingsState.hidePromoFooter) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(themeColors.secondary)
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .testTag("app_footer_bar"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp)
+    val footerBg = remember(settingsState.footerBgColorHex, themeColors.secondary) {
+        try {
+            Color(android.graphics.Color.parseColor(settingsState.footerBgColorHex))
+        } catch (e: Exception) {
+            themeColors.secondary
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(footerBg)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .testTag("app_footer_bar"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        val infoIconItem = @Composable {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                IconButton(
+                    onClick = { onInfoClick() },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "معلومات عن الصفحة",
+                        tint = themeColors.accent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        val centerTextItem = @Composable {
+            Box(
+                modifier = Modifier.weight(1.5f),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = settingsState.footerMessage,
+                    text = settingsState.footerMessage.ifBlank { "wam777644" },
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = themeColors.accent,
@@ -799,27 +823,38 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.width(6.dp))
-                IconButton(
-                    onClick = { viewModel.navigateTo("ABOUT_APP") },
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "حول التطبيق",
-                        tint = themeColors.accent,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
             }
+        }
 
-            Text(
-                text = "الإصدار: ${settingsState.appVersion}",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.85f),
-                textAlign = TextAlign.End
-            )
+        val versionItem = @Composable {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Text(
+                    text = settingsState.appVersion.ifBlank { "v2.2026" },
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.End
+                )
+            }
+        }
+
+        // Parse layout ordering
+        val order = settingsState.footerItemsOrder.split(",").map { it.trim().uppercase() }
+        val itemsToRender = if (order.size == 3 && order.contains("INFO") && order.contains("TEXT") && order.contains("VERSION")) {
+            order
+        } else {
+            listOf("INFO", "TEXT", "VERSION")
+        }
+
+        itemsToRender.forEach { item ->
+            when (item) {
+                "INFO" -> infoIconItem()
+                "TEXT" -> centerTextItem()
+                "VERSION" -> versionItem()
+            }
         }
     }
 }
@@ -7015,6 +7050,9 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     var appName by remember { mutableStateOf(settingsState.appName) }
     var welcomeMessage by remember { mutableStateOf(settingsState.welcomeMessage) }
     var footerMessage by remember { mutableStateOf(settingsState.footerMessage) }
+    var footerBgColorHex by remember { mutableStateOf(settingsState.footerBgColorHex) }
+    var footerItemsOrder by remember { mutableStateOf(settingsState.footerItemsOrder) }
+    var appVersion by remember { mutableStateOf(settingsState.appVersion) }
     var supportPhone by remember { mutableStateOf(settingsState.supportPhone) }
     var supportEmail by remember { mutableStateOf(settingsState.supportEmail) }
     var supportWhatsapp by remember { mutableStateOf(settingsState.supportWhatsapp) }
@@ -7108,10 +7146,48 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
         OutlinedTextField(
             value = footerMessage,
             onValueChange = { footerMessage = it },
-            label = { Text("رسالة الفوتر") },
+            label = { Text("نص الفوتر الأوسط (افتراضي: wam777644)") },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
         )
+
+        OutlinedTextField(
+            value = footerBgColorHex,
+            onValueChange = { footerBgColorHex = it },
+            label = { Text("لون خلفية الفوتر (كود Hex مثل #115E59)") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+        )
+
+        OutlinedTextField(
+            value = appVersion,
+            onValueChange = { appVersion = it },
+            label = { Text("رقم إصدار التطبيق بالفوتر (مثل v2.2026)") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+        )
+
+        Text("تنسيق وترتيب شريط التذييل (الفوتر):", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+            val layouts = listOf(
+                "INFO,TEXT,VERSION" to "الأيقونة يسار | النص وسط | الإصدار يمين",
+                "VERSION,TEXT,INFO" to "الإصدار يسار | النص وسط | الأيقونة يمين",
+                "TEXT,VERSION,INFO" to "النص يسار | الإصدار وسط | الأيقونة يمين"
+            )
+            layouts.forEach { (order, label) ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (footerItemsOrder == order) themeColors.accent else themeColors.surface)
+                        .clickable { footerItemsOrder = order }
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, fontSize = 8.sp, color = if (footerItemsOrder == order) Color.Black else Color.White, textAlign = TextAlign.Center)
+                }
+            }
+        }
 
         OutlinedTextField(
             value = supportPhone,
@@ -7389,6 +7465,9 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     appName = appName,
                     welcomeMessage = welcomeMessage,
                     footerMessage = footerMessage,
+                    footerBgColorHex = footerBgColorHex,
+                    footerItemsOrder = footerItemsOrder,
+                    appVersion = appVersion,
                     activeThemeId = activeThemeId,
                     isMaintenanceActive = isMaintenanceActive,
                     hidePromoFooter = hidePromoFooter,
@@ -7424,6 +7503,25 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("💾 حفظ إعدادات البوابة والتخزين والتطبيق", color = Color.Black, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = {
+                viewModel.wipeAllMockAndTemporaryData()
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "حذف البيانات الوهمية",
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("🧹 حذف الفنيين والرسائل والإشعارات الوهمية", color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
 }

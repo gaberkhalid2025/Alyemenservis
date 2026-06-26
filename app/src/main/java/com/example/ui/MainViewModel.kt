@@ -365,10 +365,28 @@ class MainViewModel : ViewModel() {
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(PendingProviderEntity::class.java)
+                        val parsed = doc.toObject(PendingProviderEntity::class.java)
+                        parsed?.copy(id = doc.id)
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        null
+                        try {
+                            PendingProviderEntity(
+                                id = doc.id,
+                                name = doc.getString("name") ?: "",
+                                phone = doc.getString("phone") ?: "",
+                                categoryId = doc.getString("categoryId") ?: "",
+                                area = doc.getString("area") ?: doc.getString("localArea") ?: "",
+                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
+                                status = doc.getString("status") ?: "PENDING",
+                                reason = doc.getString("reason") ?: "",
+                                idPhotoBase64 = doc.getString("idPhotoBase64") ?: "",
+                                selfiePhotoBase64 = doc.getString("selfiePhotoBase64") ?: "",
+                                workPhotosBase64 = (doc.get("workPhotosBase64") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                            )
+                        } catch (e2: java.lang.Exception) {
+                            e2.printStackTrace()
+                            null
+                        }
                     }
                 }
                 _pendingProviders.value = fetched
@@ -1566,7 +1584,31 @@ class MainViewModel : ViewModel() {
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) return@addSnapshotListener
                     if (snapshot != null) {
-                        _pendingTechnicians.value = snapshot.toObjects(PendingProviderEntity::class.java)
+                        val fetched = snapshot.documents.mapNotNull { doc ->
+                            try {
+                                val parsed = doc.toObject(PendingProviderEntity::class.java)
+                                parsed?.copy(id = doc.id)
+                            } catch (e: Exception) {
+                                try {
+                                    PendingProviderEntity(
+                                        id = doc.id,
+                                        name = doc.getString("name") ?: "",
+                                        phone = doc.getString("phone") ?: "",
+                                        categoryId = doc.getString("categoryId") ?: "",
+                                        area = doc.getString("area") ?: doc.getString("localArea") ?: "",
+                                        localNeighborhood = doc.getString("localNeighborhood") ?: "",
+                                        status = doc.getString("status") ?: "PENDING",
+                                        reason = doc.getString("reason") ?: "",
+                                        idPhotoBase64 = doc.getString("idPhotoBase64") ?: "",
+                                        selfiePhotoBase64 = doc.getString("selfiePhotoBase64") ?: "",
+                                        workPhotosBase64 = (doc.get("workPhotosBase64") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                                    )
+                                } catch (e2: Exception) {
+                                    null
+                                }
+                            }
+                        }
+                        _pendingTechnicians.value = fetched
                     }
                 }
         } catch (e: Exception) {}
@@ -1663,6 +1705,40 @@ class MainViewModel : ViewModel() {
                 try {
                     autoCleanupData(days)
                 } catch (e: Exception) {}
+            }
+        }
+    }
+
+    fun wipeAllMockAndTemporaryData() {
+        viewModelScope.launch {
+            try {
+                // 1. Delete all notifications
+                db.collection("notifications").get().addOnSuccessListener { snapshot ->
+                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+                }
+                // 2. Delete all chat channels (messages)
+                db.collection("chat_channels").get().addOnSuccessListener { snapshot ->
+                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+                }
+                // 3. Delete all reports
+                db.collection("reports").get().addOnSuccessListener { snapshot ->
+                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+                }
+                // 4. Delete all bookings
+                db.collection("bookings").get().addOnSuccessListener { snapshot ->
+                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+                }
+                // 5. Delete all providers except "p_maher"
+                db.collection("providers").get().addOnSuccessListener { snapshot ->
+                    snapshot?.documents?.forEach { doc ->
+                        if (doc.id != "p_maher") {
+                            doc.reference.delete()
+                        }
+                    }
+                }
+                triggerNotification("🧹 تم تنظيف وحذف كافة البيانات والرسائل والإشعارات والفنيين الوهميين بنجاح!")
+            } catch (e: Exception) {
+                triggerNotification("❌ حدث خطأ أثناء عملية التنظيف")
             }
         }
     }
