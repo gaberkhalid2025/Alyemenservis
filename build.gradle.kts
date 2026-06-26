@@ -6,7 +6,17 @@ plugins {
 }
 
 tasks.register<Copy>("copyApk") {
-    from(file(".build-outputs/app-debug.apk"))
+    from("app/build/outputs/apk/debug") {
+        include("app-debug.apk")
+    }
     into(rootDir)
+    doLast {
+        copy {
+            from("app/build/outputs/apk/debug") {
+                include("app-debug.apk")
+            }
+            into(file(".build-outputs"))
+        }
+    }
 }
 
