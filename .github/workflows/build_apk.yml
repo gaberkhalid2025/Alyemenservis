@@ -27,6 +27,41 @@ jobs:
         gradle wrapper --gradle-version 9.3.1
         chmod +x gradlew
 
+    - name: Create google-services.json
+      run: |
+        mkdir -p app
+        cat << 'EOF' > app/google-services.json
+        {
+          "project_info": {
+            "project_number": "896795585945",
+            "project_id": "al-yemen-services",
+            "storage_bucket": "al-yemen-services.firebasestorage.app"
+          },
+          "client": [
+            {
+              "client_info": {
+                "mobilesdk_app_id": "1:896795585945:android:fa9e452a045b811dca7708",
+                "android_client_info": {
+                  "package_name": "com.alyemenservices"
+                }
+              },
+              "oauth_client": [],
+              "api_key": [
+                {
+                  "current_key": "AIzaSyBfVDnH4FfA_lR6HQFwOWSSBRcN__InczE"
+                }
+              ],
+              "services": {
+                "appinvite_service": {
+                  "other_platform_oauth_client": []
+                }
+              }
+            }
+          ],
+          "configuration_version": "1"
+        }
+        EOF
+
     - name: Build Release APK
       run: ./gradlew :app:assembleRelease --no-daemon
 
