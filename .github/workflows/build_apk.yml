@@ -24,7 +24,9 @@ jobs:
 
     - name: Ensure Gradle Wrapper
       run: |
-        gradle wrapper --gradle-version 8.11.1
+        if [ ! -f ./gradlew ]; then
+          gradle wrapper --gradle-version 9.3.1
+        fi
         chmod +x gradlew
 
     - name: Build Release APK
