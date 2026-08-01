@@ -1,21 +1,39 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# R8 / ProGuard Configuration Rules for Yemen Services Platform
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep Kotlin reflect and serializable models
+-keepclassmembers class * {
+    @com.squareup.moshi.Json *;
+}
+-keep class com.example.model.** { *; }
+-keep class com.example.entity.** { *; }
+-keep class com.example.data.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Security, Hashing, and Anti-Tampering Protection Rules
+-keep class com.example.util.PasswordHasher { *; }
+-keep class com.example.util.SecurityManager { *; }
+-keep class com.example.util.SecurityCryptoUtils { *; }
+-keep class com.example.util.FirestoreLocalBackupWorker { *; }
+-keep class com.example.util.Validators { *; }
+-keep class com.example.ui.MainViewModel { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Firebase Rules
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keepclassmembers class * extends com.google.firebase.firestore.EventListener { *; }
+
+# Compose Rules
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+
+# Kotlin Coroutines
+-keepclassmembers class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
+
+# Moshi & OkHttp / Retrofit
+-keep class com.squareup.moshi.** { *; }
+-keep interface com.squareup.moshi.** { *; }
+-dontwarn com.squareup.moshi.**
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+
+

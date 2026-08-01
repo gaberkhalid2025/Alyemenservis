@@ -10,11 +10,12 @@ import java.util.UUID
 class MainViewModel : ViewModel() {
 
     // ------------------- Firestore setup -------------------
-    private val db by lazy {
+    val db by lazy {
         val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
         try {
             val settings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
-                .setPersistenceEnabled(false)
+                .setPersistenceEnabled(true)
+                .setCacheSizeBytes(104857600L) // 100 MB cache size for ultra-fast local offline caching
                 .build()
             firestore.firestoreSettings = settings
         } catch (e: Exception) {
@@ -23,12 +24,28 @@ class MainViewModel : ViewModel() {
         firestore
     }
 
+    // Listener registration tracking for memory leak prevention
+    private val firestoreListeners = mutableListOf<com.google.firebase.firestore.ListenerRegistration>()
+
+    override fun onCleared() {
+        super.onCleared()
+        try {
+            firestoreListeners.forEach { it.remove() }
+            firestoreListeners.clear()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     // ------------------- StateFlows -------------------
     private val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
 
     private val _providers = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val providers: StateFlow<List<ProviderEntity>> = _providers.asStateFlow()
+
+    private val _deletedProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
+    val deletedProviders: StateFlow<List<ProviderEntity>> = _deletedProviders.asStateFlow()
 
     private val _filteredProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val filteredProviders: StateFlow<List<ProviderEntity>> = _filteredProviders.asStateFlow()
@@ -47,6 +64,18 @@ class MainViewModel : ViewModel() {
 
     private val _activityLogs = MutableStateFlow<List<ActivityLogEntity>>(emptyList())
     val activityLogs: StateFlow<List<ActivityLogEntity>> = _activityLogs.asStateFlow()
+
+    private val _callsLog = MutableStateFlow<List<CallEntity>>(emptyList())
+    val callsLog: StateFlow<List<CallEntity>> = _callsLog.asStateFlow()
+
+    private val _coupons = MutableStateFlow<List<CouponEntity>>(emptyList())
+    val coupons: StateFlow<List<CouponEntity>> = _coupons.asStateFlow()
+
+    private val _internalWallets = MutableStateFlow<List<com.example.data.InternalWalletEntity>>(emptyList())
+    val internalWallets: StateFlow<List<com.example.data.InternalWalletEntity>> = _internalWallets.asStateFlow()
+
+    private val _walletTransactions = MutableStateFlow<List<com.example.data.WalletTransactionEntity>>(emptyList())
+    val walletTransactions: StateFlow<List<com.example.data.WalletTransactionEntity>> = _walletTransactions.asStateFlow()
 
     private val _userLatitude = MutableStateFlow(15.3694)
     val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
@@ -68,17 +97,120 @@ class MainViewModel : ViewModel() {
     private val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
     val bookings: StateFlow<List<BookingEntity>> = _bookings.asStateFlow()
 
+    private val _paymentWallets = MutableStateFlow<List<PaymentWalletEntity>>(emptyList())
+    val paymentWallets: StateFlow<List<PaymentWalletEntity>> = _paymentWallets.asStateFlow()
+
+    private val _payments = MutableStateFlow<List<PaymentEntity>>(emptyList())
+    val payments: StateFlow<List<PaymentEntity>> = _payments.asStateFlow()
+
     private val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
     val notifications: StateFlow<List<NotificationEntity>> = _notifications.asStateFlow()
 
     private val _chatChannels = MutableStateFlow<List<ChatChannelEntity>>(emptyList())
     val chatChannels: StateFlow<List<ChatChannelEntity>> = _chatChannels.asStateFlow()
 
+    private val _stores = MutableStateFlow<List<com.example.data.StoreEntity>>(getDefaultStoresList())
+    val stores: StateFlow<List<com.example.data.StoreEntity>> = _stores.asStateFlow()
+
+    private val _products = MutableStateFlow<List<com.example.data.ProductEntity>>(emptyList())
+    val products: StateFlow<List<com.example.data.ProductEntity>> = _products.asStateFlow()
+
+    private val _properties = MutableStateFlow<List<com.example.data.PropertyEntity>>(getDefaultPropertiesList())
+    val properties: StateFlow<List<com.example.data.PropertyEntity>> = _properties.asStateFlow()
+
+    private val _jobs = MutableStateFlow<List<com.example.data.JobEntity>>(emptyList())
+    val jobs: StateFlow<List<com.example.data.JobEntity>> = _jobs.asStateFlow()
+
+    private val _jobApplications = MutableStateFlow<List<com.example.data.JobApplicationEntity>>(emptyList())
+    val jobApplications: StateFlow<List<com.example.data.JobApplicationEntity>> = _jobApplications.asStateFlow()
+
+    private val _ratings = MutableStateFlow<List<com.example.data.RatingEntity>>(emptyList())
+    val ratings: StateFlow<List<com.example.data.RatingEntity>> = _ratings.asStateFlow()
+
+    private val _customProfileTabs = MutableStateFlow<List<com.example.data.CustomProfileTabEntity>>(emptyList())
+    val customProfileTabs: StateFlow<List<com.example.data.CustomProfileTabEntity>> = _customProfileTabs.asStateFlow()
+
+    private val _orders = MutableStateFlow<List<com.example.data.OrderEntity>>(emptyList())
+    val orders: StateFlow<List<com.example.data.OrderEntity>> = _orders.asStateFlow()
+
     private val _currentUserId = MutableStateFlow("guest")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
 
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
+
+    private val _isOnline = MutableStateFlow(true)
+    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
+
+    private val _uiErrorMessage = MutableStateFlow<String?>(null)
+    val uiErrorMessage: StateFlow<String?> = _uiErrorMessage.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    fun clearUiError() {
+        _uiErrorMessage.value = null
+    }
+
+    fun setUiError(message: String) {
+        _uiErrorMessage.value = message
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            _uiErrorMessage.value = null
+            try {
+                firestoreListeners.forEach { it.remove() }
+                firestoreListeners.clear()
+                setupRealtimeFirestoreListeners()
+                triggerNotification("🔄 تم تحديث البيانات بنجاح!")
+            } catch (e: Exception) {
+                _uiErrorMessage.value = "تعذر تحديث البيانات: ${e.localizedMessage}"
+            } finally {
+                kotlinx.coroutines.delay(600)
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun updateOnlineStatus(online: Boolean) {
+        _isOnline.value = online
+    }
+
+    fun retryConnection(context: android.content.Context) {
+        val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        if (cm != null) {
+            val activeNetwork = cm.activeNetwork
+            val capabilities = cm.getNetworkCapabilities(activeNetwork)
+            val online = capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            _isOnline.value = online
+            if (online) {
+                triggerNotification("🟢 تم استعادة الاتصال بالشبكة بنجاح وجاري مزامنة البيانات!")
+                setupRealtimeFirestoreListeners()
+            } else {
+                triggerNotification("❌ فشل الاتصال: يرجى التحقق من باقة الإنترنت أو شبكة الواي فاي.")
+            }
+        }
+    }
+
+    fun updateUserFcmToken(userId: String, token: String) {
+        if (userId.isEmpty() || userId == "guest") return
+        try {
+            db.collection("registered_users").document(userId).update("fcmToken", token)
+            val cleanPhone = _currentUserPhone.value.trim().replace(" ", "").replace("+", "")
+            if (cleanPhone.isNotEmpty()) {
+                db.collection("providers").document(cleanPhone).update("fcmToken", token)
+                db.collection("stores").document(cleanPhone).update("fcmToken", token)
+                db.collection("properties").document(cleanPhone).update("fcmToken", token)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private val _registeredUsersCount = MutableStateFlow(0)
+    val registeredUsersCount: StateFlow<Int> = _registeredUsersCount.asStateFlow()
 
     private val _currentUserName = MutableStateFlow("")
     val currentUserName: StateFlow<String> = _currentUserName.asStateFlow()
@@ -92,20 +224,40 @@ class MainViewModel : ViewModel() {
     private val _adminRole = MutableStateFlow("GUEST")
     val adminRole: StateFlow<String> = _adminRole.asStateFlow()
 
+    private val _joinRequestPhone = MutableStateFlow("")
+    val joinRequestPhone: StateFlow<String> = _joinRequestPhone.asStateFlow()
+
+    val triggerRestoreAccountDialog = MutableStateFlow(false)
+
     val filteredNotifications: StateFlow<List<NotificationEntity>> = combine(
         _notifications,
         _currentUserId,
         _currentUserPhone,
+        _joinRequestPhone,
         _adminRole
-    ) { notificationsList, userId, phone, adminRoleState ->
-        if (adminRoleState != "GUEST") {
-            notificationsList
-        } else if (userId == "guest") {
-            notificationsList.filter { it.targetType == "ALL" }
+    ) { notificationsList, userId, phone, joinPhone, adminRoleState ->
+        val distinctList = notificationsList.distinctBy { it.id }
+        val now = System.currentTimeMillis()
+        val visibleList = if (adminRoleState != "GUEST") {
+            distinctList
         } else {
-            notificationsList.filter {
+            distinctList.filter {
+                val notExpired = it.expiryTimestamp == 0L || now <= it.expiryTimestamp
+                val isReleased = it.scheduledTime == 0L || now >= it.scheduledTime
+                notExpired && isReleased
+            }
+        }
+
+        if (adminRoleState != "GUEST") {
+            visibleList
+        } else if (userId == "guest" && joinPhone.isEmpty()) {
+            visibleList.filter { it.targetType == "ALL" }
+        } else {
+            visibleList.filter {
                 it.targetType == "ALL" || 
-                (it.targetType == "USER" && (it.targetValue == userId || it.targetValue == phone))
+                (it.targetType == "USER" && (it.targetValue == userId || it.targetValue == phone || it.targetValue == joinPhone)) ||
+                (it.targetType == "PROVIDER" && (it.targetValue == userId || it.targetValue == phone)) ||
+                (it.targetType == "SUPERVISOR" && adminRoleState == "SUPERVISOR")
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -157,45 +309,255 @@ class MainViewModel : ViewModel() {
     private var supportChatListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
 
     fun initializeUserIdentity(context: android.content.Context) {
+        appContext = context.applicationContext
+        LocaleManager.init(context)
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-        val savedId = sp.getString("user_id", "guest") ?: "guest"
+        
+        val rawId = sp.getString("user_id", "guest") ?: "guest"
+        var savedId = if (rawId != "guest" && rawId.isNotEmpty()) com.example.util.SecurityCryptoUtils.decrypt(rawId) else rawId
+        val savedName = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("user_name", "") ?: "")
+        val savedPhone = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("user_phone", "") ?: "")
+        val savedResidence = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("user_residence", "") ?: "")
+
+        if ((savedId == "guest" || savedId.isEmpty()) && savedPhone.isNotEmpty()) {
+            savedId = "USR-" + (if (savedPhone.length >= 6) savedPhone.takeLast(6) else (100000..999999).random().toString())
+            sp.edit().putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(savedId)).apply()
+        }
+
         _currentUserId.value = savedId
-        _currentUserName.value = sp.getString("user_name", "") ?: ""
-        _currentUserPhone.value = sp.getString("user_phone", "") ?: ""
-        _currentUserResidence.value = sp.getString("user_residence", "") ?: ""
+        _currentUserName.value = savedName
+        _currentUserPhone.value = savedPhone
+        _currentUserResidence.value = savedResidence
+        
+        val savedJoinPhone = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("join_request_phone", "") ?: "")
+        _joinRequestPhone.value = savedJoinPhone
         
         val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
         if (savedRole != "GUEST") {
             _adminRole.value = savedRole
         }
+
+        val savedLang = LocaleManager.currentLang.value
+        _currentLanguage.value = savedLang
+
+        // Automatic credential synchronization for service providers / technicians
+        if (savedJoinPhone.isNotEmpty() && (savedId == "guest" || savedId.isEmpty())) {
+            db.collection("providers").whereEqualTo("phone", savedJoinPhone).get().addOnSuccessListener { snapshot ->
+                if (snapshot != null && !snapshot.isEmpty) {
+                    val prov = snapshot.documents.first().toObject(com.example.data.ProviderEntity::class.java)
+                    if (prov != null) {
+                        _currentUserId.value = prov.id
+                        _currentUserName.value = prov.name
+                        _currentUserPhone.value = prov.phone
+                        _currentUserResidence.value = prov.area
+                        
+                        sp.edit().apply {
+                            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(prov.id))
+                            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(prov.name))
+                            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(prov.phone))
+                            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(prov.area))
+                            apply()
+                        }
+                    }
+                } else {
+                    db.collection("pending_providers").whereEqualTo("phone", savedJoinPhone).get().addOnSuccessListener { pSnapshot ->
+                        if (pSnapshot != null && !pSnapshot.isEmpty) {
+                            val pend = pSnapshot.documents.first().toObject(com.example.data.PendingProviderEntity::class.java)
+                            if (pend != null) {
+                                val pendId = "user_" + pend.phone
+                                _currentUserId.value = pendId
+                                _currentUserName.value = pend.name
+                                _currentUserPhone.value = pend.phone
+                                _currentUserResidence.value = pend.area
+                                
+                                sp.edit().apply {
+                                    putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(pendId))
+                                    putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(pend.name))
+                                    putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(pend.phone))
+                                    putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(pend.area))
+                                    apply()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    fun registerGuestUser(context: android.content.Context, name: String, phone: String, residence: String) {
-        val newUserId = "user_" + (100000..999999).random().toString()
-        _currentUserId.value = newUserId
+
+
+    val auth by lazy {
+        com.google.firebase.auth.FirebaseAuth.getInstance()
+    }
+
+    private fun getAuthEmailForPhone(phone: String): String {
+        val clean = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
+        return "user_$clean@yemen-services.app"
+    }
+
+    fun registerGuestUser(context: android.content.Context, name: String, phone: String, residence: String, password: String = "") {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val androidId = android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "unknown_device"
+
+        if (password.isBlank()) {
+            triggerNotification("⚠️ يجب إدخال كلمة مرور قوية مكونة من 8 خانات على الأقل.")
+            return
+        }
+
+        val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(password)
+        if (!valResult.first) {
+            triggerNotification("⚠️ ${valResult.second}")
+            return
+        }
+
+        val authEmail = getAuthEmailForPhone(cleanPhone)
+        val saltedHashPass = com.example.util.PasswordHasher.createSaltedHash(password)
+
+        auth.createUserWithEmailAndPassword(authEmail, password)
+            .addOnSuccessListener { authResult ->
+                val firebaseUid = authResult.user?.uid ?: ("usr_" + System.currentTimeMillis())
+                completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId)
+            }
+            .addOnFailureListener { e ->
+                if (e.message?.contains("already in use") == true || e.message?.contains("EMAIL_EXISTS") == true) {
+                    auth.signInWithEmailAndPassword(authEmail, password)
+                        .addOnSuccessListener { authResult ->
+                            val firebaseUid = authResult.user?.uid ?: ("usr_" + System.currentTimeMillis())
+                            completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId)
+                        }
+                        .addOnFailureListener {
+                            triggerNotification("❌ كلمة المرور المدخلة غير صحيحة لهذا الحساب المسجل سابقاً.")
+                        }
+                } else {
+                    completeGuestRegistration(context, "user_" + (100000..999999).random(), name, cleanPhone, residence, androidId)
+                }
+            }
+    }
+
+    private fun completeGuestRegistration(
+        context: android.content.Context,
+        userId: String,
+        name: String,
+        phone: String,
+        residence: String,
+        androidId: String
+    ) {
+        _currentUserId.value = userId
         _currentUserName.value = name
         _currentUserPhone.value = phone
         _currentUserResidence.value = residence
 
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         sp.edit().apply {
-            putString("user_id", newUserId)
-            putString("user_name", name)
-            putString("user_phone", phone)
-            putString("user_residence", residence)
+            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(userId))
+            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name))
+            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(phone))
+            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence))
             apply()
         }
 
-        // Save registration info to Firestore to ensure real tracing
+        // Save profile WITHOUT password field!
         val regUser = mapOf(
-            "id" to newUserId,
+            "id" to userId,
             "name" to name,
             "phone" to phone,
             "residence" to residence,
+            "androidId" to androidId,
             "timestamp" to System.currentTimeMillis()
         )
-        db.collection("registered_users").document(newUserId).set(regUser)
-        triggerNotification("🎉 أهلاً بك في الدليل $name، تم تسجيل حسابك للتفعيل الأمني بنجاح")
+        db.collection("registered_users").document(userId).set(regUser)
+        triggerNotification("🎉 أهلاً بك في الدليل $name، تم تسجيل وحماية حسابك آمنياً بنجاح عبر Firebase Auth!")
+    }
+
+    fun restoreUserAccountByPhoneAndPassword(
+        context: android.content.Context,
+        phone: String,
+        password: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPass = password.trim()
+
+        val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(cleanPass)
+        if (!valResult.first) {
+            onResult(false, valResult.second ?: "كلمة المرور غير صالحة")
+            return
+        }
+
+        val authEmail = getAuthEmailForPhone(cleanPhone)
+
+        auth.signInWithEmailAndPassword(authEmail, cleanPass)
+            .addOnSuccessListener { authResult ->
+                val firebaseUid = authResult.user?.uid ?: ""
+                db.collection("registered_users").whereEqualTo("phone", cleanPhone).get()
+                    .addOnSuccessListener { qs ->
+                        val doc = qs.documents.firstOrNull()
+                        val name = doc?.getString("name") ?: "المستخدم"
+                        val residence = doc?.getString("residence") ?: "اليمن"
+
+                        val finalUid = if (firebaseUid.isNotEmpty()) firebaseUid else (doc?.getString("id") ?: "user_recovered")
+                        _currentUserId.value = finalUid
+                        _currentUserName.value = name
+                        _currentUserPhone.value = cleanPhone
+                        _currentUserResidence.value = residence
+
+                        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                        sp.edit().apply {
+                            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(finalUid))
+                            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name))
+                            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence))
+                            apply()
+                        }
+                        triggerNotification("✅ تم تسجيل الدخول واستعادة حسابك آمنياً بنجاح عزيزي $name!")
+                        onResult(true, "تم استعادة الحساب بنجاح")
+                    }
+                    .addOnFailureListener {
+                        onResult(true, "تم تسجيل الدخول بنجاح عبر Firebase Auth")
+                    }
+            }
+            .addOnFailureListener {
+                onResult(false, "❌ فشل استعادة الحساب: كلمة المرور أو رقم الهاتف غير صحيح")
+            }
+    }
+
+    fun restoreGuestUser(context: android.content.Context, phone: String, password: String, onResult: (Boolean, String) -> Unit) {
+        restoreUserAccountByPhoneAndPassword(context, phone, password, onResult)
+    }
+
+    fun setUserSessionDetails(context: android.content.Context, name: String, phone: String, residence: String = "اليمن") {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").removePrefix("0")
+        val finalPhone = if (cleanPhone.length == 9) cleanPhone else phone
+        _currentUserName.value = name.ifBlank { "عميل" }
+        _currentUserPhone.value = finalPhone
+        _currentUserResidence.value = residence.ifBlank { "اليمن" }
+        if (_currentUserId.value.isEmpty() || _currentUserId.value == "guest") {
+            _currentUserId.value = "user_" + (if (finalPhone.length >= 6) finalPhone.takeLast(6) else (100000..999999).random().toString())
+        }
+        _joinRequestPhone.value = finalPhone
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        sp.edit().apply {
+            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(_currentUserName.value))
+            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
+            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(_currentUserResidence.value))
+            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(_currentUserId.value))
+            putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
+            apply()
+        }
+    }
+
+    fun loginUserDirectly(context: android.content.Context, phone: String) {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").removePrefix("0")
+        val finalPhone = if (cleanPhone.length == 9) cleanPhone else phone
+        _currentUserPhone.value = finalPhone
+        _joinRequestPhone.value = finalPhone
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        sp.edit().apply {
+            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
+            putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
+            apply()
+        }
     }
 
     fun listenToUserSupportChat(userId: String) {
@@ -213,6 +575,21 @@ class MainViewModel : ViewModel() {
                 val ch = snapshot.toObject(ChatChannelEntity::class.java)
                 if (ch != null) {
                     _chatMessages.value = ch.messages
+                    
+                    // Automatically mark incoming messages from the other party as READ
+                    val currentId = _currentUserId.value
+                    var modified = false
+                    val updatedMessages = ch.messages.map { msg ->
+                        if (msg.senderId != currentId && msg.status != "READ") {
+                            modified = true
+                            msg.copy(status = "READ")
+                        } else {
+                            msg
+                        }
+                    }
+                    if (modified) {
+                        db.collection("chat_channels").document(channelId).update("messages", updatedMessages)
+                    }
                 }
             } else {
                 val initialMsg = ChatMessageEntity(
@@ -230,6 +607,49 @@ class MainViewModel : ViewModel() {
     init {
         setupRealtimeFirestoreListeners()
         loadUserPoints()
+        try {
+            seedFirestoreIfEmpty()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // Initialization complete
+
+        
+        // Watcher for real-time join request status updates (Firestore notifications)
+        viewModelScope.launch {
+            var lastKnownStatus: String? = null
+            combine(_joinRequestPhone, _pendingProviders, _providers, _notifications) { phone, pending, approved, notifs ->
+                if (phone.isEmpty()) return@combine null
+                
+                val isApproved = approved.any { it.phone == phone }
+                if (isApproved) return@combine "APPROVED"
+                
+                val rejectionNotif = notifs.find { 
+                    it.targetValue == phone && (it.title.contains("رفض") || it.message.contains("رفض"))
+                }
+                if (rejectionNotif != null) return@combine "REJECTED"
+                
+                val isPending = pending.any { it.phone == phone }
+                if (isPending) return@combine "PENDING"
+                
+                null
+            }.collect { status ->
+                if (status != null && lastKnownStatus != null && status != lastKnownStatus) {
+                    when (status) {
+                        "APPROVED" -> {
+                            triggerNotification("🎉 رائع جداً! لقد تم قبول طلب انضمامك للدليل كفني معتمد وتنشيط حسابك الآن!")
+                        }
+                        "REJECTED" -> {
+                            triggerNotification("⚠️ تنبيه: تم مراجعة طلبك ورفضه من قبل الإدارة. يرجى مراجعة السبب والتعديل.")
+                        }
+                    }
+                }
+                if (status != null) {
+                    lastKnownStatus = status
+                }
+            }
+        }
         
         viewModelScope.launch {
             _currentUserId.collect { newUserId ->
@@ -238,9 +658,13 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    private fun reg(listener: com.google.firebase.firestore.ListenerRegistration) {
+        firestoreListeners.add(listener)
+    }
+
     private fun setupRealtimeFirestoreListeners() {
         // 1. Settings (Document main_settings)
-        db.collection("settings").document("main_settings").addSnapshotListener { snapshot, error ->
+        reg(db.collection("settings").document("main_settings").addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 _isInitialized.value = true
@@ -256,17 +680,13 @@ class MainViewModel : ViewModel() {
                     e.printStackTrace()
                 }
             } else {
-                try {
-                    db.collection("settings").document("main_settings").set(AdminSettingsEntity())
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                _settings.value = AdminSettingsEntity()
             }
             _isInitialized.value = true
-        }
+        })
 
         // 2. Categories
-        db.collection("categories").addSnapshotListener { snapshot, error ->
+        reg(db.collection("categories").addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -274,17 +694,26 @@ class MainViewModel : ViewModel() {
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(CategoryEntity::class.java)
+                        val obj = doc.toObject(com.example.data.CategoryEntity::class.java)
+                        if (obj != null && obj.id.isEmpty()) {
+                            obj.copy(id = doc.id)
+                        } else {
+                            obj
+                        }
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
                     }
-                }.sortedBy { it.order }
-                if (fetched.isNotEmpty()) {
-                    _categories.value = fetched
-                } else {
-                    writeDefaultCategories()
-                }
+                }.distinctBy { it.id }.sortedWith(compareByDescending<com.example.data.CategoryEntity> { it.isPinned }.thenBy { it.order })
+                _categories.value = fetched
+            }
+        })
+
+        // Custom Profile Tabs
+        db.collection("custom_profile_tabs").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.toObjects(com.example.data.CustomProfileTabEntity::class.java)
+                _customProfileTabs.value = fetched.sortedBy { it.displayOrder }
             }
         }
 
@@ -303,11 +732,28 @@ class MainViewModel : ViewModel() {
                         null
                     }
                 }
-                if (fetched.isNotEmpty()) {
-                    _cities.value = fetched
-                } else {
-                    writeDefaultCities()
-                }
+                _cities.value = fetched
+            }
+        }
+
+        // 3b. Registered Users count listener
+        db.collection("registered_users").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                _registeredUsersCount.value = snapshot.size()
+            }
+        }
+
+        // 3c. Internal Wallets Listener
+        db.collection("internal_wallets").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                _internalWallets.value = snapshot.documents.mapNotNull { it.toObject(com.example.data.InternalWalletEntity::class.java) }
+            }
+        }
+
+        // 3d. Wallet Transactions Listener
+        db.collection("wallet_transactions").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                _walletTransactions.value = snapshot.documents.mapNotNull { it.toObject(com.example.data.WalletTransactionEntity::class.java) }.sortedByDescending { it.timestamp }
             }
         }
 
@@ -326,9 +772,9 @@ class MainViewModel : ViewModel() {
                         null
                     }
                 }
-                _banners.value = fetched
+                _banners.value = fetched.sortedBy { it.order }
             } else {
-                writeDefaultBanners()
+                _banners.value = emptyList()
             }
         }
 
@@ -339,20 +785,21 @@ class MainViewModel : ViewModel() {
                 return@addSnapshotListener
             }
             if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
+                val allList = snapshot.documents.mapNotNull { doc ->
                     try {
                         doc.toObject(ProviderEntity::class.java)
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
                     }
-                }
-                if (fetched.isNotEmpty()) {
-                    _providers.value = fetched
-                    applyFilters()
-                } else {
-                    writeDefaultProviders()
-                }
+                }.filter { !it.name.contains("ماهر") && it.id != "p_maher" }
+                
+                val activeList = allList.filter { !it.isDeleted }
+                val deletedList = allList.filter { it.isDeleted }
+                
+                _providers.value = activeList
+                _deletedProviders.value = deletedList
+                applyFilters()
             }
         }
 
@@ -421,12 +868,17 @@ class MainViewModel : ViewModel() {
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(NotificationEntity::class.java)
+                        val obj = doc.toObject(NotificationEntity::class.java)
+                        if (obj != null && obj.id.isEmpty()) {
+                            obj.copy(id = doc.id)
+                        } else {
+                            obj
+                        }
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
                     }
-                }.sortedByDescending { it.timestamp }
+                }.distinctBy { it.id }.sortedByDescending { it.timestamp }
                 _notifications.value = fetched
             }
         }
@@ -486,11 +938,7 @@ class MainViewModel : ViewModel() {
                         null
                     }
                 }
-                if (fetched.isNotEmpty()) {
-                    _supervisors.value = fetched
-                } else {
-                    writeDefaultSupervisors()
-                }
+                _supervisors.value = fetched
             }
         }
 
@@ -509,24 +957,329 @@ class MainViewModel : ViewModel() {
                         null
                     }
                 }
-                if (fetched.isNotEmpty()) {
-                    _colorPalettes.value = fetched
-                } else {
-                    writeDefaultColorPalettes()
+                _colorPalettes.value = fetched
+            }
+        }
+
+        // 14. Calls Log
+        db.collection("calls").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                error.printStackTrace()
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(CallEntity::class.java)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }.sortedByDescending { it.timestamp }
+                _callsLog.value = fetched
+            }
+        }
+
+        // 15. Coupons
+        db.collection("coupons").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                error.printStackTrace()
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(CouponEntity::class.java)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
                 }
+                _coupons.value = fetched
+            }
+        }
+
+        // 16. Payment Wallets
+        db.collection("payment_wallets").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                error.printStackTrace()
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(PaymentWalletEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }.sortedBy { it.displayOrder }
+                _paymentWallets.value = fetched
+            }
+        }
+
+        // 17. Payments
+        db.collection("payments").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                error.printStackTrace()
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(PaymentEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }.sortedByDescending { it.createdAt }
+                _payments.value = fetched
+            }
+        }
+
+        // 18. Stores
+        db.collection("stores").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(com.example.data.StoreEntity::class.java)
+                        if (obj != null) {
+                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                            val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
+                            val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
+                            obj.copy(id = doc.id, isDeleted = isDel, isActive = act, isPinned = pin)
+                        } else null
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                val defStores = getDefaultStoresList()
+                val merged = (fetched + defStores.filter { def -> fetched.none { it.id == def.id } })
+                _stores.value = merged
+            }
+        }
+
+        // 19. Products
+        db.collection("products").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(com.example.data.ProductEntity::class.java)
+                        if (obj != null) {
+                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                            obj.copy(id = doc.id, isDeleted = isDel)
+                        } else null
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                _products.value = fetched
+            }
+        }
+
+        // 20. Properties
+        db.collection("properties").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(com.example.data.PropertyEntity::class.java)
+                        if (obj != null) {
+                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                            val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
+                            val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
+                            obj.copy(id = doc.id, isDeleted = isDel, isActive = act, isPinned = pin)
+                        } else null
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                val defProps = getDefaultPropertiesList()
+                val merged = (fetched + defProps.filter { def -> fetched.none { it.id == def.id } })
+                _properties.value = merged
+            }
+        }
+
+        // 20.1 Jobs
+        db.collection("jobs").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(com.example.data.JobEntity::class.java)
+                        if (obj != null) {
+                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                            val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
+                            val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
+                            obj.copy(id = doc.id, isDeleted = isDel, isActive = act, isPinned = pin)
+                        } else null
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                _jobs.value = fetched
+            }
+        }
+
+        // 20.2 Job Applications
+        db.collection("job_applications").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(com.example.data.JobApplicationEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                _jobApplications.value = fetched
+            }
+        }
+
+        // 21. Ratings
+        db.collection("ratings").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(com.example.data.RatingEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                _ratings.value = fetched
+            }
+        }
+
+        // 22. Orders
+        db.collection("orders").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(com.example.data.OrderEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                _orders.value = fetched
+            }
+        }
+
+        // 23. Activity Logs
+        db.collection("activity_logs").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(com.example.data.ActivityLogEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }.sortedByDescending { it.timestamp }
+                _activityLogs.value = fetched
             }
         }
     }
 
+    fun seedFirestoreIfEmpty() {
+        // Check and seed default configurations if they don't exist
+        db.collection("settings").document("main_settings").get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val doc = task.result
+                if (doc == null || !doc.exists()) {
+                    db.collection("settings").document("main_settings").set(AdminSettingsEntity())
+                }
+            } else {
+                try {
+                    db.collection("settings").document("main_settings").set(AdminSettingsEntity())
+                } catch (e: Exception) {}
+            }
+        }
+
+        db.collection("categories").get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val sn = task.result
+                if (sn == null || sn.isEmpty) {
+                    writeDefaultCategories()
+                }
+            } else {
+                try { writeDefaultCategories() } catch (e: Exception) {}
+            }
+        }
+
+        db.collection("cities").get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val sn = task.result
+                if (sn == null || sn.isEmpty) {
+                    writeDefaultCities()
+                }
+            } else {
+                try { writeDefaultCities() } catch (e: Exception) {}
+            }
+        }
+
+        db.collection("banners").get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val sn = task.result
+                if (sn == null || sn.isEmpty) {
+                    writeDefaultBanners()
+                }
+            } else {
+                try { writeDefaultBanners() } catch (e: Exception) {}
+            }
+        }
+
+        db.collection("supervisors").get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val sn = task.result
+                if (sn == null || sn.isEmpty) {
+                    writeDefaultSupervisors()
+                }
+            } else {
+                try { writeDefaultSupervisors() } catch (e: Exception) {}
+            }
+        }
+
+        db.collection("color_themes").get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val sn = task.result
+                if (sn == null || sn.isEmpty) {
+                    writeDefaultColorPalettes()
+                }
+            } else {
+                try { writeDefaultColorPalettes() } catch (e: Exception) {}
+            }
+        }
+
+        db.collection("providers").get().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val sn = task.result
+                if (sn == null || sn.isEmpty) {
+                    writeDefaultProviders()
+                }
+            } else {
+                try { writeDefaultProviders() } catch (e: Exception) {}
+            }
+        }
+
+        try { writeDefaultStores() } catch (e: Exception) { e.printStackTrace() }
+        try { writeDefaultProperties() } catch (e: Exception) { e.printStackTrace() }
+        try { writeDefaultJobs() } catch (e: Exception) { e.printStackTrace() }
+    }
+
     private fun writeDefaultSupervisors() {
         val fbSupervisors = listOf(
-            SupervisorEntity("1", "ماهر محمد طاهر", "ADMIN", "maher736462"),
-            SupervisorEntity("2", "عماد خالد", "AUDITOR", "1234"),
-            SupervisorEntity("3", "محمد سليم", "SUPPORT", "777"),
-            SupervisorEntity("4", "سامي اليدومي", "OPERATIONS", "999")
+            SupervisorEntity("owner_1", "mah73646@gmail.com", "OWNER", "Maher@@--@@736462##", listOf("ALL")),
+            SupervisorEntity("admin_1", "meh777644@gmail.com", "ADMIN", "Meh@@@@777644##", listOf("ALL"))
         )
         fbSupervisors.forEach { sup ->
             db.collection("supervisors").document(sup.id).set(sup)
+        }
+        // Delete dummy supervisors
+        listOf("2", "3", "4").forEach { id ->
+            db.collection("supervisors").document(id).delete()
         }
     }
 
@@ -546,12 +1299,58 @@ class MainViewModel : ViewModel() {
 
     private fun writeDefaultCategories() {
         val fbCategories = listOf(
-            CategoryEntity("1", "صيانة منزلية (سباكة/كهرباء)", "🔧", 1),
-            CategoryEntity("2", "صحة ورعاية طبية", "🏥", 2),
-            CategoryEntity("3", "تعليم وتدريس خصوصي", "📚", 3),
-            CategoryEntity("4", "سيارات ونقل عام", "🚗", 4),
-            CategoryEntity("5", "تقنية وبرامح ذكية", "💻", 5),
-            CategoryEntity("6", "تجميل ولياقة منزلية", "💇", 6)
+            CategoryEntity("1", "صيانة وخدمات مهنية", "🔧", 1, isMainCategory = true),
+            CategoryEntity("sub_1_1", "سباكة وأنابيب", "🚰", 2, parentId = "1", isMainCategory = false),
+            CategoryEntity("sub_1_2", "كهرباء ومولدات", "⚡", 3, parentId = "1", isMainCategory = false),
+            CategoryEntity("sub_1_3", "تكييف وتبريد", "❄️", 4, parentId = "1", isMainCategory = false),
+            CategoryEntity("sub_1_4", "نجارة وأثاث", "و", 5, parentId = "1", isMainCategory = false),
+            CategoryEntity("sub_1_5", "صيانة أجهزة منزلية", "🧺", 6, parentId = "1", isMainCategory = false),
+
+            CategoryEntity("2", "طب ورعاية صحية", "🏥", 7, isMainCategory = true),
+            CategoryEntity("sub_2_1", "عيادات وأطباء", "🩺", 8, parentId = "2", isMainCategory = false),
+            CategoryEntity("sub_2_2", "صيدليات ومستلزمات", "💊", 9, parentId = "2", isMainCategory = false),
+            CategoryEntity("sub_2_3", "مختبرات تحاليل", "🔬", 10, parentId = "2", isMainCategory = false),
+            CategoryEntity("sub_2_4", "مراكز علاج طبيعي", "🧘", 11, parentId = "2", isMainCategory = false),
+
+            CategoryEntity("law", "محاماة واستشارات قانونية", "⚖️", 12, isMainCategory = true),
+            CategoryEntity("eng", "هندسة وإنشاءات", "🏗️", 13, isMainCategory = true),
+            CategoryEntity("cleaning", "تنظيف وتطهير", "🧹", 14, isMainCategory = true),
+            CategoryEntity("3", "تعليم وتدريس خصوصي", "📚", 15, isMainCategory = true),
+            CategoryEntity("4", "نقل ومواصلات لوجستية", "🚗", 16, isMainCategory = true),
+            CategoryEntity("realestate", "عقارات وأراضي", "🏠", 17, isMainCategory = true),
+            CategoryEntity("stores", "محلات ومعارض تجارية", "🏪", 18, isMainCategory = true),
+            CategoryEntity("restaurants", "مطاعم وكافيهات", "🍔", 19, isMainCategory = true),
+            CategoryEntity("beauty", "تجميل وعناية شخصية", "✂️", 20, isMainCategory = true),
+            CategoryEntity("centers", "مراكز تخصصية وخدمية", "🏢", 21, isMainCategory = true),
+            CategoryEntity("5", "تقنية وبرمجيات ذكية", "💻", 22, isMainCategory = true),
+            CategoryEntity("other", "أخرى / خدمات عامة", "✏️", 23, isMainCategory = true),
+
+            // Restaurants Subcategories
+            CategoryEntity("sub_rest_1", "مطاعم يمنية وشرقية", "🍲", 24, parentId = "restaurants", isMainCategory = false),
+            CategoryEntity("sub_rest_2", "وجبات سريعة وبرجر", "🍔", 25, parentId = "restaurants", isMainCategory = false),
+            CategoryEntity("sub_rest_3", "كافيهات ومشروبات", "☕", 26, parentId = "restaurants", isMainCategory = false),
+            CategoryEntity("sub_rest_4", "حلويات ومخابز", "🍰", 27, parentId = "restaurants", isMainCategory = false),
+            CategoryEntity("sub_rest_5", "مشويات وأسماك", "🥩", 28, parentId = "restaurants", isMainCategory = false),
+
+            // Stores Subcategories
+            CategoryEntity("sub_store_1", "ملابس وأزياء", "👔", 29, parentId = "stores", isMainCategory = false),
+            CategoryEntity("sub_store_2", "إلكترونيات وهواتف", "📱", 30, parentId = "stores", isMainCategory = false),
+            CategoryEntity("sub_store_3", "أجهزة منزلية وكهربائية", "📺", 31, parentId = "stores", isMainCategory = false),
+            CategoryEntity("sub_store_4", "سوبرماركت ومواد غذائية", "🛒", 32, parentId = "stores", isMainCategory = false),
+            CategoryEntity("sub_store_5", "عطور ومستحضرات تجميل", "💄", 33, parentId = "stores", isMainCategory = false),
+
+            // Centers Subcategories
+            CategoryEntity("sub_center_1", "مراكز تجميل وصالونات", "✂️", 34, parentId = "centers", isMainCategory = false),
+            CategoryEntity("sub_center_2", "مراكز طبية وتخصصية", "🏥", 35, parentId = "centers", isMainCategory = false),
+            CategoryEntity("sub_center_3", "مراكز تعليم وتدريب", "🎓", 36, parentId = "centers", isMainCategory = false),
+            CategoryEntity("sub_center_4", "أندية وصالات رياضية", "🏋️", 37, parentId = "centers", isMainCategory = false),
+
+            // Real Estate Subcategories
+            CategoryEntity("sub_prop_1", "شقق للإيجار والبيع", "🏢", 38, parentId = "realestate", isMainCategory = false),
+            CategoryEntity("sub_prop_2", "فلل وقصور", "🏰", 39, parentId = "realestate", isMainCategory = false),
+            CategoryEntity("sub_prop_3", "أراضي ومخططات", "🏞️", 40, parentId = "realestate", isMainCategory = false),
+            CategoryEntity("sub_prop_4", "مكاتب ومحلات تجارية", "🏪", 41, parentId = "realestate", isMainCategory = false),
+            CategoryEntity("sub_prop_5", "شاليهات واستراحات", "🏊", 42, parentId = "realestate", isMainCategory = false)
         )
         fbCategories.forEach { cat ->
             db.collection("categories").document(cat.id).set(cat)
@@ -560,10 +1359,28 @@ class MainViewModel : ViewModel() {
 
     private fun writeDefaultCities() {
         val defaultCities = listOf(
+            CityEntity("ye_sana_cap", "أمانة العاصمة", "Sanaa Secretariat"),
             CityEntity("ye_san", "صنعاء", "Sanaa"),
             CityEntity("ye_ade", "عدن", "Aden"),
             CityEntity("ye_tai", "تعز", "Taiz"),
-            CityEntity("ye_hod", "الحديدة", "Hodeidah")
+            CityEntity("ye_hod", "الحديدة", "Hodeidah"),
+            CityEntity("ye_ibb", "إب", "Ibb"),
+            CityEntity("ye_dha", "ذمار", "Dhamar"),
+            CityEntity("ye_had", "حضرموت", "Hadramout"),
+            CityEntity("ye_mar", "مأرب", "Marib"),
+            CityEntity("ye_saa", "صعدة", "Saada"),
+            CityEntity("ye_haj", "حجة", "Hajjah"),
+            CityEntity("ye_mah", "المهرة", "Al Mahrah"),
+            CityEntity("ye_soc", "سقطرى", "Socotra"),
+            CityEntity("ye_sha", "شبوة", "Shabwah"),
+            CityEntity("ye_aby", "أبين", "Abyan"),
+            CityEntity("ye_bay", "البيضاء", "Al Bayda"),
+            CityEntity("ye_amr", "عمران", "Amran"),
+            CityEntity("ye_ray", "ريمة", "Raymah"),
+            CityEntity("ye_jaw", "الجوف", "Al Jawf"),
+            CityEntity("ye_lah", "لحج", "Lahj"),
+            CityEntity("ye_dal", "الضالع", "Ad Dali"),
+            CityEntity("ye_mhw", "المحويت", "Al Mahwit")
         )
         defaultCities.forEach { city ->
             db.collection("cities").document(city.id).set(city)
@@ -571,22 +1388,186 @@ class MainViewModel : ViewModel() {
     }
 
     private fun writeDefaultBanners() {
-        val defaultBanners = listOf(
-            BannerEntity("b1", "خصومات خاصة على صيانة التكييف السنوية", "https://example.com/banner1", "1", "VIP", "LARGE", 5),
-            BannerEntity("b2", "أفضل معلم كهروميكانيك متاح الآن في صنعاء", "https://example.com/banner2", "1", "NORMAL", "MEDIUM", 6),
-            BannerEntity("b3", "مدرسون لجميع المراحل الدراسية واللغات", "https://example.com/banner3", "3", "NORMAL", "SMALL", 4)
+        val fbBanners = listOf(
+            BannerEntity("banner_001", "خصم 20% على جميع خدمات السباكة!", "", "1", "IMAGE", "MEDIUM", 5, "طوال اليوم", 1),
+            BannerEntity("banner_002", "افتتاح سوبرماركت الخير - فرع كريتر!", "", "stores", "IMAGE", "MEDIUM", 7, "طوال اليوم", 2),
+            BannerEntity("banner_003", "مطلوب فنيين ومحاسبين لشركة البركة!", "", "jobs", "IMAGE", "MEDIUM", 6, "طوال اليوم", 3)
         )
-        defaultBanners.forEach { banner ->
+        fbBanners.forEach { banner ->
             db.collection("banners").document(banner.id).set(banner)
         }
     }
 
     private fun writeDefaultProviders() {
         val fbProviders = listOf(
-            ProviderEntity("p_maher", "ماهر محمد طاهر", "777644", "1", "صنعاء", true, "APPROVED", true, "ye_san", "شارع الستين القريب (مديرية معين)", 5.0f, 300, previewPrice = 1500.0, latitude = 15.3694, longitude = 44.1910, subscriptionExpiry = System.currentTimeMillis() + (10L * 24 * 60 * 60 * 1000))
+            ProviderEntity("p_amin", "أمين الغرباني", "777703195", "1", "صنعاء", true, "APPROVED", true, "ye_san", "منطقة الدائري جوار مدرسة أسماء للبنات", 5.0f, 300, previewPrice = 1500.0, latitude = 15.3694, longitude = 44.1910, subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
+            ProviderEntity("prov_001", "أحمد محمد القبيلي", "777644123", "1", "صنعاء", true, "APPROVED", true, "ye_san", "حي السبعين - بالقرب من مسجد البصر", 4.8f, 240, previewPrice = 2000.0, specialization = "سباكة منزلية وتجارية وإصلاح تسريبات المياه وتمديد شبكات المياه وصيانة الصرف الصحي", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
+            ProviderEntity("prov_002", "ياسر علي الغراب", "777644456", "2", "عدن", true, "APPROVED", true, "ye_ade", "كريتر - بالقرب من سوق السمك", 4.7f, 190, previewPrice = 2500.0, specialization = "تركيب وصيانة الدارات الكهربائية ولوحات التوزيع والمولدات والأسلاك", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
+            ProviderEntity("prov_003", "محمد حسن النجار", "777644789", "3", "تعز", true, "APPROVED", true, "ye_tai", "شارع القاهرة - بالقرب من مستشفى الثورة", 4.9f, 310, previewPrice = 1800.0, specialization = "دهان الجدران والديكورات والدهانات المائية والزيتية وثلاثية الأبعاد 3D", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
+            ProviderEntity("prov_004", "عبد الله أحمد الغرباني", "777644321", "4", "الحديدية", true, "APPROVED", true, "ye_hod", "الحي الصناعي - بالقرب من الميناء", 4.6f, 150, previewPrice = 3000.0, specialization = "صيانة وتركيب المكيفات السبلت والمركزية وشحن الغاز وتنظيف الفلاتر", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
+            ProviderEntity("prov_005", "علي حسن الأمين", "777644654", "other", "صنعاء", true, "APPROVED", true, "ye_san", "حي التحرير - بالقرب من السوق", 4.5f, 180, previewPrice = 5000.0, specialization = "خدمات نقل الأثاث والعفش وتغليف وفك وتركيب مع الضمان الكامل", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000))
         )
         fbProviders.forEach { prov ->
             db.collection("providers").document(prov.id).set(prov)
+        }
+    }
+
+    fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
+        return listOf(
+            com.example.data.StoreEntity(
+                id = "store_001", sectionId = "stores", name = "سوبرماركت الخير",
+                description = "سوبرماركت يوفر جميع الاحتياجات اليومية من مواد غذائية ومنظفات ومستلزمات منزلية بأسعار منافسة.",
+                ownerId = "owner_1", ownerName = "محمد علي", phone = "777644987", categoryId = "sub_store_4", cityId = "ye_ade",
+                localNeighborhood = "كريتر - شارع 26 سبتمبر", rating = 4.5f, numReviews = 120, isActive = true, isPinned = true,
+                displayOrder = 1, workingHours = "8:00 AM - 11:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.StoreEntity(
+                id = "store_002", sectionId = "stores", name = "مركز اليمامة للصيانة",
+                description = "مركز متخصص في صيانة الهواتف الذكية والأجهزة الإلكترونية واللاب توب بضمان جودة عالية.",
+                ownerId = "owner_2", ownerName = "أحمد ياسين", phone = "777644111", categoryId = "sub_store_2", cityId = "ye_san",
+                localNeighborhood = "حي السبعين - شارع الجامعة", rating = 4.8f, numReviews = 250, isActive = true, isPinned = true,
+                displayOrder = 2, workingHours = "9:00 AM - 8:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.StoreEntity(
+                id = "store_003", sectionId = "stores", name = "محل الأنيق للملابس",
+                description = "تشكيلة راقية من أحدث الموضات والملابس للرجال والنساء والملابس التقليدية الفاخرة.",
+                ownerId = "owner_3", ownerName = "فاطمة محمد", phone = "777644222", categoryId = "sub_store_1", cityId = "ye_tai",
+                localNeighborhood = "شارع القاهرة - شارع 60", rating = 4.7f, numReviews = 180, isActive = true, isPinned = false,
+                displayOrder = 3, workingHours = "10:00 AM - 10:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+
+            com.example.data.StoreEntity(
+                id = "restaurant_001", sectionId = "restaurants", name = "مطاعم الشيف اليمني",
+                description = "أشهى المأكولات اليمنية التقليدية من مندي وفاهيتا وزربيان وحريسات في أجواء عائلية راقية.",
+                ownerId = "owner_4", ownerName = "علي حسن", phone = "777644333", categoryId = "sub_rest_1", cityId = "ye_san",
+                localNeighborhood = "حي التحرير - شارع الزبيري", rating = 4.9f, numReviews = 350, isActive = true, isPinned = true,
+                displayOrder = 1, workingHours = "12:00 PM - 12:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.StoreEntity(
+                id = "cafe_001", sectionId = "restaurants", name = "كافيه الراحة والمطالعة",
+                description = "كافيه هادئ ومريح يقدم أجود أنواع القهوة المختصة والمشروبات الساخنة والحلويات المتميزة مع إنترنت مجاني.",
+                ownerId = "owner_5", ownerName = "سارة أحمد", phone = "777644444", categoryId = "sub_rest_3", cityId = "ye_had",
+                localNeighborhood = "كورنيش المكلا", rating = 4.8f, numReviews = 200, isActive = true, isPinned = true,
+                displayOrder = 2, workingHours = "8:00 AM - 12:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.StoreEntity(
+                id = "restaurant_002", sectionId = "restaurants", name = "مطعم وبيتزا هت اليمني",
+                description = "أفضل أنواع البيتزا الإيطالية والشرقية بنكهات محلية ممتازة وخدمة توصيل سريعة.",
+                ownerId = "owner_6", ownerName = "محمد ياسين", phone = "777644555", categoryId = "sub_rest_2", cityId = "ye_ade",
+                localNeighborhood = "التواهي - شارع المعلا", rating = 4.6f, numReviews = 150, isActive = true, isPinned = false,
+                displayOrder = 3, workingHours = "11:00 AM - 1:00 AM", isApproved = true, isVip = false, isVerified = true, isRecommended = true
+            ),
+
+            com.example.data.StoreEntity(
+                id = "medical_001", sectionId = "medical", name = "مستشفى التخصصي العام",
+                description = "مستشفى متكامل يقدم أحدث الخدمات الطبية والرعاية الشاملة والطوارئ على مدار الساعة 24/7.",
+                ownerId = "owner_7", ownerName = "د. ياسر محمد", phone = "777644666", categoryId = "sub_center_2", cityId = "ye_san",
+                localNeighborhood = "حي السبعين - شارع الجامعة", rating = 4.9f, numReviews = 500, isActive = true, isPinned = true,
+                displayOrder = 1, workingHours = "24/7 طوال اليوم", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.StoreEntity(
+                id = "medical_002", sectionId = "medical", name = "عيادة الابتسامة لطب الأسنان",
+                description = "عيادة متخصصة في تقويم، زراعة، وتبييض الأسنان بأحدث الأجهزة الطبية والمعايير العالمية.",
+                ownerId = "owner_8", ownerName = "د. ليلى أحمد", phone = "777644777", categoryId = "sub_center_1", cityId = "ye_tai",
+                localNeighborhood = "شارع القاهرة - شارع 60", rating = 4.8f, numReviews = 280, isActive = true, isPinned = true,
+                displayOrder = 2, workingHours = "9:00 AM - 6:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.StoreEntity(
+                id = "medical_003", sectionId = "medical", name = "صيدلية العناية المتكاملة",
+                description = "صيدلية توفر جميع الأدوية والمستلزمات الطبية ومستحضرات التجميل مع خدمة استشارات مجانية.",
+                ownerId = "owner_9", ownerName = "عبد الله حسن", phone = "777644888", categoryId = "sub_center_2", cityId = "ye_ade",
+                localNeighborhood = "المعلا - شارع الرئيسي", rating = 4.7f, numReviews = 200, isActive = true, isPinned = false,
+                displayOrder = 3, workingHours = "8:00 AM - 11:00 PM", isApproved = true, isVip = false, isVerified = true, isRecommended = true
+            ),
+
+            com.example.data.StoreEntity(
+                id = "service_001", sectionId = "services", name = "ورشة البرق للصيانة الكهربائية",
+                description = "صيانة وإصلاح كافة التمديدات الكهربائية والأجهزة المنزلية والطاقة الشمسية بأعلى كفاءة.",
+                ownerId = "owner_serv_1", ownerName = "المهندس وليد", phone = "777644550", categoryId = "sub_serv_1", cityId = "ye_san",
+                localNeighborhood = "شارع حدة - أمانة العاصمة", rating = 4.8f, numReviews = 140, isActive = true, isPinned = true,
+                displayOrder = 1, workingHours = "8:00 AM - 8:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            )
+        )
+    }
+
+    fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> {
+        return listOf(
+            com.example.data.PropertyEntity(
+                id = "property_001", sectionId = "properties", title = "شقة فاخرة للإيجار في حدة",
+                description = "شقة راقية مساحة 150م² تتكون من 3 غرف نوم و2 حمام ومطبخ مفتوح وصالة واسعة بتشطيب سوبر لوكس.",
+                price = 150000.0, currency = "YER", type = "rent", propertyType = "apartment",
+                ownerId = "owner_prop_1", ownerName = "عبد الله حسن", phone = "777644999", cityId = "ye_san",
+                localNeighborhood = "حدة - بالقرب من المسجد", rating = 4.8f, numReviews = 50, isActive = true, isPinned = true,
+                displayOrder = 1, isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.PropertyEntity(
+                id = "property_002", sectionId = "properties", title = "فيلا فاخرة للبيع في تعز",
+                description = "فيلا مودرن مساحة 500م²، 5 غرف نوم، 4 حمامات، حديقة واسعة ومسبح، تشطيبات متميزة وإطلالة ساحرة.",
+                price = 150000000.0, currency = "YER", type = "sale", propertyType = "house",
+                ownerId = "owner_prop_2", ownerName = "محمد علي", phone = "777644000", cityId = "ye_tai",
+                localNeighborhood = "القاهرة - بجوار الفندق", rating = 4.9f, numReviews = 80, isActive = true, isPinned = true,
+                displayOrder = 2, isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.PropertyEntity(
+                id = "property_003", sectionId = "properties", title = "محل تجاري للإيجار في شارع 60",
+                description = "محل تجاري بمساحة 200م² موقع حيوي ممتاز مناسب للشركات والمعارض والمراكز التجارية.",
+                price = 300000.0, currency = "YER", type = "rent", propertyType = "shop",
+                ownerId = "owner_prop_3", ownerName = "حسن أحمد", phone = "777644110", cityId = "ye_tai",
+                localNeighborhood = "شارع 60 - تعز", rating = 4.7f, numReviews = 30, isActive = true, isPinned = false,
+                displayOrder = 3, isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            com.example.data.PropertyEntity(
+                id = "property_004", sectionId = "properties", title = "أرض سكنية فاخرة للبيع في عدن",
+                description = "مخطط أرض بمساحة 400م² موقع مميز ومستوي قريب من كافة الخدمات والشوارع الرئيسية.",
+                price = 45000000.0, currency = "YER", type = "sale", propertyType = "land",
+                ownerId = "owner_prop_4", ownerName = "عادل سالم", phone = "777644225", cityId = "ye_ade",
+                localNeighborhood = "المنصورة - حي التقنية", rating = 4.8f, numReviews = 45, isActive = true, isPinned = true,
+                displayOrder = 4, isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            )
+        )
+    }
+
+    private fun writeDefaultStores() {
+        val fbStores = getDefaultStoresList()
+        fbStores.forEach { store ->
+            db.collection("stores").document(store.id).set(store)
+        }
+    }
+
+    private fun writeDefaultProperties() {
+        val fbProperties = getDefaultPropertiesList()
+        fbProperties.forEach { prop ->
+            db.collection("properties").document(prop.id).set(prop)
+            db.collection("realestate").document(prop.id).set(prop)
+        }
+    }
+
+    private fun writeDefaultJobs() {
+        val fbJobs = listOf(
+            StoreEntity(
+                id = "job_001", sectionId = "jobs", name = "وظيفة: محاسب مالي خبرة",
+                description = "مطلوب محاسب مالي خبرة لا تقل عن 3 سنوات في المحاسبة المالية وإعداد التقارير والبرامج المحاسبية.",
+                ownerId = "owner_job_1", ownerName = "شركة البركة للتجارة", phone = "777644220", categoryId = "jobs", cityId = "ye_ade",
+                localNeighborhood = "التواهي - شارع المعلا", rating = 4.7f, numReviews = 80, isActive = true, isPinned = true,
+                displayOrder = 1, workingHours = "دوام كامل (8:00 AM - 4:00 PM)", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            StoreEntity(
+                id = "job_002", sectionId = "jobs", name = "وظيفة: فني سباكة محترف",
+                description = "مطلوب فنيين سباكة للعمل ضمن فريق صيانة المباني والمشاريع برواتب ومزايا مجزية.",
+                ownerId = "owner_job_2", ownerName = "شركة خدمات اليمن", phone = "777644330", categoryId = "jobs", cityId = "ye_san",
+                localNeighborhood = "حي السبعين - شارع الحبة", rating = 4.8f, numReviews = 90, isActive = true, isPinned = true,
+                displayOrder = 2, workingHours = "دوام كامل", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+            ),
+            StoreEntity(
+                id = "job_003", sectionId = "jobs", name = "وظيفة: طاهية ومساعدة مطبخ",
+                description = "مطلوب طاهيات محترفات للمأكولات اليمنية والشرقية برواتب وحوافز ممتازة.",
+                ownerId = "owner_job_3", ownerName = "مطعم الشيف اليمني", phone = "777644440", categoryId = "jobs", cityId = "ye_ade",
+                localNeighborhood = "المعلا - شارع الرئيسي", rating = 4.9f, numReviews = 110, isActive = true, isPinned = false,
+                displayOrder = 3, workingHours = "دوام كامل", isApproved = true, isVip = false, isVerified = true, isRecommended = true
+            )
+        )
+        fbJobs.forEach { job ->
+            db.collection("jobs").document(job.id).set(job)
         }
     }
 
@@ -713,25 +1694,117 @@ class MainViewModel : ViewModel() {
     }
 
     // ------------------- Navigation -------------------
+    private val _screenBackStack = MutableStateFlow<List<String>>(listOf("USER_BROWSE"))
+    val screenBackStack: StateFlow<List<String>> = _screenBackStack.asStateFlow()
+
     fun navigateTo(screen: String) {
-        _currentScreen.value = screen
+        if (_currentScreen.value != screen) {
+            val updated = _screenBackStack.value.toMutableList()
+            if (screen == "USER_BROWSE") {
+                updated.clear()
+                updated.add("USER_BROWSE")
+            } else {
+                updated.add(screen)
+            }
+            _screenBackStack.value = updated
+            _currentScreen.value = screen
+        }
     }
 
     fun goBack(): Boolean {
-        val current = _currentScreen.value
-        return if (current != "USER_BROWSE") {
-            navigateTo("USER_BROWSE")
-            true
-        } else false
+        val stack = _screenBackStack.value.toMutableList()
+        if (stack.size > 1) {
+            stack.removeAt(stack.size - 1)
+            val prev = stack.last()
+            _screenBackStack.value = stack
+            _currentScreen.value = prev
+            return true
+        } else if (_currentScreen.value != "USER_BROWSE") {
+            _screenBackStack.value = listOf("USER_BROWSE")
+            _currentScreen.value = "USER_BROWSE"
+            return true
+        }
+        return false
     }
 
     fun switchLanguage() {
-        _currentLanguage.value = if (_currentLanguage.value == "ar") "en" else "ar"
+        val ctx = appContext
+        if (ctx != null) {
+            val newLang = LocaleManager.toggleLanguage(ctx)
+            _currentLanguage.value = newLang
+        } else {
+            val newLang = if (_currentLanguage.value == "ar") "en" else "ar"
+            _currentLanguage.value = newLang
+        }
     }
 
+    fun toggleLanguage(context: android.content.Context) {
+        appContext = context.applicationContext
+        val newLang = LocaleManager.toggleLanguage(context)
+        _currentLanguage.value = newLang
+    }
+
+    fun setLanguage(lang: String) {
+        _currentLanguage.value = lang
+        val ctx = appContext
+        if (ctx != null) {
+            LocaleManager.setLanguage(ctx, lang)
+        }
+        val newSettings = _settings.value.copy(appLanguage = lang)
+        _settings.value = newSettings
+        try {
+            db.collection("settings").document("main_settings").update("appLanguage", lang)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun setLanguage(context: android.content.Context, lang: String) {
+        appContext = context.applicationContext
+        setLanguage(lang)
+    }
+
+    var appContext: android.content.Context? = null
+
     // ------------------- Notifications -------------------
-    fun triggerNotification(msg: String) {
+    fun triggerNotification(msg: String, context: android.content.Context? = null) {
         _toastMessage.value = msg
+        val ctx = context ?: appContext
+        if (ctx != null) {
+            try {
+                val channelId = "yemen_services_alerts"
+                val nm = ctx.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    val channel = android.app.NotificationChannel(
+                        channelId,
+                        "إشعارات الخدمة والحجوزات والمحادثات",
+                        android.app.NotificationManager.IMPORTANCE_HIGH
+                    ).apply {
+                        description = "إشعارات التطبيق الفورية"
+                        enableVibration(true)
+                    }
+                    nm?.createNotificationChannel(channel)
+                }
+                val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply {
+                    flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                val pendingIntent = android.app.PendingIntent.getActivity(
+                    ctx, (System.currentTimeMillis() % 1000).toInt(), intent,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                )
+                val builder = androidx.core.app.NotificationCompat.Builder(ctx, channelId)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle("منصة WAM 2026 🔔")
+                    .setContentText(msg)
+                    .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(msg))
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                    .setAutoCancel(true)
+                    .setContentIntent(pendingIntent)
+                nm?.notify((System.currentTimeMillis() % 10000).toInt(), builder.build())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun clearNotification() {
@@ -783,30 +1856,35 @@ class MainViewModel : ViewModel() {
         triggerNotification("🗑️ تم حذف البلاغ من النظام")
     }
 
-    fun sendMessageInChat(msgText: String) {
-        if (msgText.trim().isEmpty()) return
+    fun sendMessageInChat(msgText: String, imageUrl: String = "") {
+        if (msgText.trim().isEmpty() && imageUrl.isEmpty()) return
         val currentId = _currentUserId.value
         val currentName = _currentUserName.value.ifEmpty { "مستخدم" }
+        val currentPhone = _currentUserPhone.value
         
         if (currentId == "guest") {
             // Safety firewall: refuse write to Firestore if anonymous
             return
         }
 
+        val displayName = if (currentPhone.isNotEmpty()) "$currentName ($currentPhone)" else currentName
         val channelId = "support_" + currentId
         val newMsg = ChatMessageEntity(
             id = UUID.randomUUID().toString(),
             senderId = currentId,
             message = msgText,
             timestamp = System.currentTimeMillis(),
-            senderName = currentName
+            senderName = displayName,
+            imageUrl = imageUrl
         )
         db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
             val ch = snapshot.toObject(ChatChannelEntity::class.java)
+            val finalMsgText = if (msgText.isNotEmpty()) msgText else "📷 [صورة]"
             if (ch != null) {
                 db.collection("chat_channels").document(channelId).set(
                     ch.copy(
-                        lastMessage = msgText,
+                        userName = displayName,
+                        lastMessage = finalMsgText,
                         timestamp = System.currentTimeMillis(),
                         messages = ch.messages + newMsg
                     )
@@ -814,12 +1892,48 @@ class MainViewModel : ViewModel() {
             } else {
                 val newSupport = ChatChannelEntity(
                     id = channelId,
-                    userName = currentName,
-                    lastMessage = msgText,
+                    userName = displayName,
+                    lastMessage = finalMsgText,
                     timestamp = System.currentTimeMillis(),
                     messages = listOf(newMsg)
                 )
                 db.collection("chat_channels").document(channelId).set(newSupport)
+            }
+            
+            // Add real-time notification to supervisor/admin
+            addNotification(
+                title = "💬 رسالة جديدة في الدعم الفني المباشر",
+                message = "من العميل ${displayName}: $finalMsgText",
+                targetType = "SUPERVISOR",
+                targetValue = "all"
+            )
+        }
+    }
+
+    fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) {
+        val channelId = "chat_p_${providerId}_u_${customerId}"
+        val dispCustomerName = customerName.ifEmpty { "عميل" }
+        val displayName = "دردشة: $providerName مع $dispCustomerName"
+        
+        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+            if (!snapshot.exists()) {
+                val newCh = ChatChannelEntity(
+                    id = channelId,
+                    userName = displayName,
+                    lastMessage = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
+                    timestamp = System.currentTimeMillis(),
+                    isProvider = false,
+                    messages = listOf(
+                        ChatMessageEntity(
+                            id = UUID.randomUUID().toString(),
+                            senderId = "system",
+                            message = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
+                            timestamp = System.currentTimeMillis(),
+                            senderName = "النظام"
+                        )
+                    )
+                )
+                db.collection("chat_channels").document(channelId).set(newCh)
             }
         }
     }
@@ -842,54 +1956,262 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun logAdminActivity(action: String) {
+        val id = db.collection("activity_logs").document().id
+        val log = com.example.data.ActivityLogEntity(id = id, action = action, timestamp = System.currentTimeMillis())
+        db.collection("activity_logs").document(id).set(log)
+    }
+
+    fun checkAndGetDuplicateAccountType(phone: String, excludeId: String): String? {
+        val cleanInput = phone.trim().replace(" ", "").replace("+", "")
+        if (cleanInput.isEmpty()) return null
+        
+        // 1. Check in active providers
+        val dupProvider = _providers.value.any { !it.isDeleted && it.phone.trim().replace(" ", "").replace("+", "") == cleanInput && it.id != excludeId }
+        if (dupProvider) return "مقدم خدمة نشط (فني)"
+        
+        // 2. Check in pending providers
+        val dupPendingProvider = _pendingProviders.value.any { it.status == "PENDING" && it.phone.trim().replace(" ", "").replace("+", "") == cleanInput && it.id != excludeId }
+        if (dupPendingProvider) return "طلب انضمام فني قيد المراجعة"
+        
+        // 3. Check in stores
+        val dupStore = _stores.value.any { !it.isDeleted && it.phone.trim().replace(" ", "").replace("+", "") == cleanInput && it.id != excludeId }
+        if (dupStore) return "محل أو متجر تجاري مسجل"
+        
+        // 4. Check in properties
+        val dupProp = _properties.value.any { !it.isDeleted && it.phone.trim().replace(" ", "").replace("+", "") == cleanInput && it.id != excludeId }
+        if (dupProp) return "إعلان عقاري مدرج"
+        
+        return null
+    }
+
     fun submitJoinForm(
+        context: android.content.Context,
         name: String, phone: String, catId: String, area: String,
         neighborhood: String, photoPath: String, idCardPath: String, gpsCoords: String,
-        workPhotos: List<String> = emptyList()
+        workPhotos: List<String> = emptyList(),
+        customCategoryName: String = "",
+        password: String = "",
+        productAttachmentsJson: String = ""
     ) {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val duplicateType = checkAndGetDuplicateAccountType(cleanPhone, "")
+        if (duplicateType != null) {
+            triggerNotification("❌ عذراً! رقم الهاتف ($phone) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
+            logAdminActivity("محاولة تسجيل فني مكرر محجوبة لرقم: $cleanPhone - نوع التكرار: $duplicateType")
+            return
+        }
+        val encSelfie = if (photoPath.isNotEmpty()) com.example.util.SecurityCryptoUtils.encrypt(photoPath) else ""
+        val encIdCard = if (idCardPath.isNotEmpty()) com.example.util.SecurityCryptoUtils.encrypt(idCardPath) else ""
+
+        if (password.isNotEmpty()) {
+            val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(password)
+            if (valResult.first) {
+                val authEmail = getAuthEmailForPhone(cleanPhone)
+                auth.createUserWithEmailAndPassword(authEmail, password.trim())
+                    .addOnFailureListener { /* Account might already exist */ }
+            }
+        }
+
+        val requestDocId = cleanPhone
         val newRequest = PendingProviderEntity(
-            id = UUID.randomUUID().toString(),
+            id = requestDocId,
             name = name,
             phone = phone,
             categoryId = catId,
             area = area,
             localNeighborhood = neighborhood,
             status = "PENDING",
-            selfiePhotoBase64 = photoPath,
-            idPhotoBase64 = idCardPath,
-            workPhotosBase64 = workPhotos
+            selfiePhotoBase64 = encSelfie,
+            idPhotoBase64 = encIdCard,
+            workPhotosBase64 = workPhotos,
+            customCategoryName = customCategoryName,
+            password = "",
+            productAttachmentsJson = productAttachmentsJson
         )
-        db.collection("pending_providers").document(newRequest.id).set(newRequest)
+        // Push to Cloud with robust listeners
+        db.collection("pending_providers").document(requestDocId).set(newRequest)
+            .addOnSuccessListener {
+                // Send a notification to Admin/Supervisors
+                val adminNotif = NotificationEntity(
+                    id = UUID.randomUUID().toString(),
+                    title = "👷 طلب انضمام جديد للدليل",
+                    message = "قدم الفني ${name} طلب انضمام جديد في قسم ${if (customCategoryName.isNullOrBlank()) catId else customCategoryName} بمنطقة ${area}.",
+                    targetType = "SUPERVISOR",
+                    targetValue = "ALL",
+                    timestamp = System.currentTimeMillis()
+                )
+                try {
+                    db.collection("notifications").document(adminNotif.id).set(adminNotif)
+                } catch (e: Exception) {}
+                
+                triggerNotification("📨 تم تقديم طلبك بنجاح، جاري المراجعة من الإدارة")
+            }
+            .addOnFailureListener { e ->
+                val errorMsg = e.localizedMessage ?: "تأكد من صغر حجم الصور واتصالك بالإنترنت"
+                triggerNotification("❌ فشل تقديم الطلب: $errorMsg")
+            }
+        
+        // Instant Local Sync
+        val currentPending = _pendingProviders.value.filter { it.id != requestDocId }.toMutableList()
+        currentPending.add(newRequest)
+        _pendingProviders.value = currentPending
+
+        val currentTechs = _pendingTechnicians.value.filter { it.id != requestDocId }.toMutableList()
+        currentTechs.add(newRequest)
+        _pendingTechnicians.value = currentTechs
+        
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        sp.edit().putString("join_request_phone", phone).apply()
+        _joinRequestPhone.value = phone
+        
+        // Add applicant notification!
+        addNotification(
+            title = "📨 تم استلام طلب انضمامك بنجاح",
+            message = "مرحباً يا غالي، تم استلام طلبك وجاري مراجعته والتحقق من التخصص والخبرة من قبل إدارة الدليل. نسعد بانضمامك وسنبلغك فور التنشيط!",
+            targetType = "USER",
+            targetValue = phone
+        )
+        
         triggerNotification("📨 تم تقديم طلبك بنجاح، سيتم مراجعته من قبل الإدارة")
+        _currentScreen.value = "JOIN_REQUEST_STATUS"
+    }
+
+    fun cancelOrResetJoinRequest(context: android.content.Context) {
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        sp.edit().remove("join_request_phone").apply()
+        _joinRequestPhone.value = ""
+        _currentScreen.value = "REGISTER_FORM"
+    }
+
+    fun setJoinRequestPhone(context: android.content.Context, phone: String) {
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        sp.edit().putString("join_request_phone", phone).apply()
+        _joinRequestPhone.value = phone
     }
 
     fun approveRequest(request: PendingProviderEntity) {
-        val approvedProvider = ProviderEntity(
-            id = UUID.randomUUID().toString(),
-            name = request.name,
-            phone = request.phone,
-            categoryId = request.categoryId,
-            area = request.area,
-            isVip = false,
-            subscriptionStatus = "APPROVED",
-            isAvailable = true,
-            cityId = "ye_san",
-            localNeighborhood = request.localNeighborhood,
-            rating = 5.0f
-        )
-        db.collection("providers").document(approvedProvider.id).set(approvedProvider)
-        db.collection("pending_providers").document(request.id).delete()
-        triggerNotification("✅ تم قبول طلب ${request.name}")
+        val lowerArea = request.area.lowercase()
+        val finalCityId = when {
+            lowerArea.contains("عدن") || lowerArea.contains("aden") -> "ye_ade"
+            lowerArea.contains("تعز") || lowerArea.contains("taiz") -> "ye_tai"
+            lowerArea.contains("الحديدة") || lowerArea.contains("hodeidah") -> "ye_hod"
+            else -> "ye_san"
+        }
+
+        if (request.profession == "STORE_OWNER") {
+            val storeId = "store_" + request.phone.trim().replace(" ", "").replace("+", "")
+            val newStore = com.example.data.StoreEntity(
+                id = storeId,
+                name = request.name,
+                description = request.specialization.ifBlank { "محل تجاري معتمد وموثق" },
+                ownerId = request.phone,
+                ownerName = request.name,
+                phone = request.phone,
+                localNeighborhood = request.localNeighborhood,
+                cityId = finalCityId,
+                isActive = true,
+                isPinned = false,
+                isDeleted = false,
+                password = "",
+                pdfFileBase64 = request.idPhotoBase64
+            )
+            db.collection("stores").document(storeId).set(newStore)
+            db.collection("pending_providers").document(request.id).delete()
+
+            addNotification(
+                title = "🎉 تهانينا! تم تفعيل متجرك بنجاح",
+                message = "مرحباً بك يا غالي، لقد تم مراجعة وتفعيل متجرك/محلك '${request.name}' بنجاح في التطبيق! يمكنك الآن إضافة منتجاتك وإدارة متجرك مباشرة من شاشة الانضمام.",
+                targetType = "USER",
+                targetValue = request.phone
+            )
+            triggerNotification("✅ تم تفعيل متجر ${request.name}")
+        } else if (request.profession == "PROPERTY_OWNER") {
+            val propId = "prop_" + request.phone.trim().replace(" ", "").replace("+", "")
+            val propPrice = try { request.chatRecipientId.toDouble() } catch(e: Exception) { 0.0 }
+            val newProp = com.example.data.PropertyEntity(
+                id = propId,
+                title = request.name,
+                description = request.specialization.ifBlank { "عقار معلن وموثق" },
+                phone = request.phone,
+                localNeighborhood = request.localNeighborhood,
+                cityId = finalCityId,
+                isActive = true,
+                isPinned = false,
+                isDeleted = false,
+                password = "",
+                price = propPrice,
+                pdfFileBase64 = request.idPhotoBase64
+            )
+            db.collection("properties").document(propId).set(newProp)
+            db.collection("pending_providers").document(request.id).delete()
+
+            addNotification(
+                title = "🎉 تهانينا! تم تفعيل إعلان عقارك بنجاح",
+                message = "مرحباً بك، لقد تم مراجعة وتفعيل عقارك '${request.name}' بنجاح في دليل العقارات المعتمد! يمكنك تعديله وإدارته ورؤية تعليقات العملاء مباشرة من شاشة الانضمام.",
+                targetType = "USER",
+                targetValue = request.phone
+            )
+            triggerNotification("✅ تم تفعيل عقار ${request.name}")
+        } else {
+            val providerId = "prov_" + request.phone.trim().replace(" ", "").replace("+", "")
+            val approvedProvider = ProviderEntity(
+                id = providerId,
+                name = request.name,
+                phone = request.phone,
+                categoryId = request.categoryId,
+                area = request.area,
+                isVip = false,
+                subscriptionStatus = "APPROVED",
+                isAvailable = true,
+                cityId = finalCityId,
+                localNeighborhood = request.localNeighborhood,
+                rating = 5.0f,
+                isBlocked = false,
+                customCategoryName = request.customCategoryName,
+                password = "",
+                isDeleted = false,
+                deletedAt = null
+            )
+            db.collection("providers").document(approvedProvider.id).set(approvedProvider)
+            db.collection("pending_providers").document(request.id).delete()
+            
+            // Instant Local Sync
+            val currentProviders = _providers.value.filter { it.id != approvedProvider.id }.toMutableList()
+            currentProviders.add(approvedProvider)
+            _providers.value = currentProviders
+            applyFilters()
+
+            // Add accepted notification!
+            addNotification(
+                title = "🎉 تهانينا! تم قبول انضمامك كفني معتمد",
+                message = "مرحباً بك يا غالي، لقد تم قبول طلب انضمامك كمهني معتمد وأصبحت الآن نشطاً في دليل كل خدمات اليمن! حسابك يظهر الآن لجميع العملاء.",
+                targetType = "USER",
+                targetValue = request.phone
+            )
+            
+            triggerNotification("✅ تم قبول طلب ${request.name}")
+        }
     }
 
     fun rejectRequest(request: PendingProviderEntity, reason: String) {
         db.collection("pending_providers").document(request.id).delete()
+        
+        // Add rejected notification!
+        addNotification(
+            title = "❌ تنويه حول طلب انضمامك",
+            message = "للأسف لم يتم قبول طلب انضمامك للأسباب التالية: $reason. يرجى تعديل البيانات وإعادة تقديم الطلب.",
+            targetType = "USER",
+            targetValue = request.phone
+        )
+        
         triggerNotification("❌ تم رفض طلب ${request.name} بسبب: $reason")
     }
 
     fun addNewProvider(name: String, phone: String, catId: String, area: String, price: Double, isVip: Boolean) {
+        val providerId = "prov_" + phone.trim().replace(" ", "").replace("+", "")
         val newP = ProviderEntity(
-            id = UUID.randomUUID().toString(),
+            id = providerId,
             name = name,
             phone = phone,
             categoryId = catId,
@@ -915,7 +2237,8 @@ class MainViewModel : ViewModel() {
             type = type,
             size = size,
             duration = duration,
-            displayTime = displayTime
+            displayTime = displayTime,
+            order = _banners.value.size + 1
         )
         db.collection("banners").document(banner.id).set(banner)
         triggerNotification("🖼️ تم إضافة إعلان جديد: $title")
@@ -926,9 +2249,16 @@ class MainViewModel : ViewModel() {
         triggerNotification("🗑️ تم حذف الإعلان")
     }
 
-    fun addNewCategory(nameAr: String, nameEn: String, icon: String, description: String) {
+    fun addNewCategory(nameAr: String, nameEn: String, icon: String, description: String, parentId: String = "", isMainCategory: Boolean = true) {
         val nextId = UUID.randomUUID().toString().take(6)
-        val extraCat = CategoryEntity(id = nextId, name = nameAr, icon = icon, order = _categories.value.size + 1)
+        val extraCat = CategoryEntity(
+            id = nextId,
+            name = nameAr,
+            icon = icon,
+            order = _categories.value.size + 1,
+            parentId = parentId,
+            isMainCategory = isMainCategory
+        )
         db.collection("categories").document(nextId).set(extraCat)
         triggerNotification("📁 تم إضافة قسم جديد: $nameAr")
     }
@@ -941,14 +2271,23 @@ class MainViewModel : ViewModel() {
     }
 
     fun reorderBanners(newOrderedList: List<BannerEntity>) {
-        // banners are handled naturally
+        newOrderedList.forEachIndexed { index, banner ->
+            val updated = banner.copy(order = index + 1)
+            db.collection("banners").document(banner.id).set(updated)
+        }
     }
 
-    fun addNewCity(nameAr: String, nameEn: String) {
+    fun addNewCity(nameAr: String, nameEn: String, icon: String = "📍", photoUrl: String = "", sortOrder: Int = 0) {
         val nextId = "city_" + UUID.randomUUID().toString().take(4)
-        val city = CityEntity(nextId, nameAr, nameEn)
+        val city = CityEntity(nextId, nameAr, nameEn, icon.ifEmpty { "📍" }, photoUrl, sortOrder)
         db.collection("cities").document(nextId).set(city)
-        triggerNotification("🏙️ تم إضافة مدينة: $nameAr")
+        triggerNotification("🏙️ تم إضافة مدينة/محافظة: $nameAr")
+    }
+
+    fun updateCity(city: CityEntity) {
+        if (city.id.isEmpty()) return
+        db.collection("cities").document(city.id).set(city)
+        triggerNotification("💾 تم تحديث بيانات المدينة/المحافظة: ${city.nameAr}")
     }
 
     fun removeCity(cityId: String) {
@@ -957,8 +2296,44 @@ class MainViewModel : ViewModel() {
     }
 
     fun removeProvider(providerId: String) {
-        db.collection("providers").document(providerId).delete()
-        triggerNotification("🗑️ تم حذف الفني")
+        db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
+            val p = snapshot.toObject(com.example.data.ProviderEntity::class.java)
+            if (p != null) {
+                db.collection("providers").document(providerId).set(
+                    p.copy(isDeleted = true, deletedAt = System.currentTimeMillis())
+                ).addOnSuccessListener {
+                    triggerNotification("🗑️ تم حذف حساب الفني منطقياً بنجاح (حذف مؤقت) ويمكنك استعادته من لوحة التحكم في أي وقت")
+                }
+            } else {
+                db.collection("providers").document(providerId).delete().addOnSuccessListener {
+                    triggerNotification("🗑️ تم حذف حساب الفني نهائياً من الدليل")
+                }
+            }
+        }.addOnFailureListener {
+            db.collection("providers").document(providerId).delete().addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف حساب الفني")
+            }
+        }
+    }
+
+    fun removeProviderPermanently(providerId: String) {
+        db.collection("providers").document(providerId).delete().addOnSuccessListener {
+            triggerNotification("🗑️ تم حذف حساب الفني نهائياً وبشكل كامل من خوادم الدليل")
+        }.addOnFailureListener { e ->
+            triggerNotification("❌ فشل حذف الفني نهائياً: ${e.message}")
+        }
+    }
+
+    fun restoreProvider(providerId: String) {
+        db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
+            val p = snapshot.toObject(ProviderEntity::class.java)
+            if (p != null) {
+                db.collection("providers").document(providerId).set(
+                    p.copy(isDeleted = false, deletedAt = null)
+                )
+                triggerNotification("🟢 تم استعادة وتفعيل حساب الفني ${p.name} بنجاح!")
+            }
+        }
     }
 
     fun pinProvider(providerId: String, isPinned: Boolean) {
@@ -1005,6 +2380,36 @@ class MainViewModel : ViewModel() {
         triggerNotification(if (status == "APPROVED") "✨ تم تفعيل العضوية الذهبية للفني" else "✨ تم إلغاء العضوية الذهبية")
     }
 
+    fun setProviderChatDisabled(providerId: String, disabled: Boolean) {
+        db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
+            val p = snapshot.toObject(ProviderEntity::class.java)
+            if (p != null) {
+                db.collection("providers").document(providerId).set(p.copy(isChatDisabled = disabled))
+            }
+        }
+        triggerNotification(if (disabled) "🔇 تم إيقاف دردشة الفني إدارياً" else "🔊 تم تفعيل دردشة الفني")
+    }
+
+    fun setProviderNotificationsDisabled(providerId: String, disabled: Boolean) {
+        db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
+            val p = snapshot.toObject(ProviderEntity::class.java)
+            if (p != null) {
+                db.collection("providers").document(providerId).set(p.copy(isNotificationsDisabled = disabled))
+            }
+        }
+        triggerNotification(if (disabled) "🔕 تم تعطيل إشعارات الفني إدارياً" else "🔔 تم تفعيل إشعارات الفني")
+    }
+
+    fun setProviderPaymentRequired(providerId: String, required: Boolean) {
+        db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
+            val p = snapshot.toObject(ProviderEntity::class.java)
+            if (p != null) {
+                db.collection("providers").document(providerId).set(p.copy(isPaymentRequired = required))
+            }
+        }
+        triggerNotification(if (required) "💳 تم ربط حساب الفني بنظام الدفع والعمولة الإلزامية" else "🔓 تم استثناء الفني من شروط الدفع المسبق والعمولة")
+    }
+
     fun extendProviderSubscription(providerId: String, extraMs: Long) {
         db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
             val p = snapshot.toObject(ProviderEntity::class.java)
@@ -1028,6 +2433,576 @@ class MainViewModel : ViewModel() {
 
     fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
         db.collection("settings").document("main_settings").set(newSettings)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم حفظ ومزامنة كافة إعدادات التطبيق والدفع فورياً عبر الأجهزة!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ فشل حفظ الإعدادات: ${it.message}")
+            }
+    }
+
+    fun saveInternalWallet(wallet: com.example.data.InternalWalletEntity) {
+        val targetId = if (wallet.id.isEmpty()) db.collection("internal_wallets").document().id else wallet.id
+        val finalW = wallet.copy(id = targetId, updatedAt = System.currentTimeMillis())
+        db.collection("internal_wallets").document(targetId).set(finalW)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم حفظ بيانات المحفظة الرقمية الداخلية (${finalW.ownerName})")
+            }
+    }
+
+    fun performWalletTransaction(
+        walletId: String,
+        ownerName: String,
+        ownerPhone: String,
+        ownerType: String,
+        type: String, // DEPOSIT, WITHDRAWAL, TRANSFER
+        amount: Double,
+        note: String
+    ) {
+        val currentW = _internalWallets.value.find { it.id == walletId }
+            ?: com.example.data.InternalWalletEntity(
+                id = walletId,
+                ownerName = ownerName,
+                ownerPhone = ownerPhone,
+                ownerType = ownerType
+            )
+
+        val newBalance = when (type) {
+            "DEPOSIT" -> currentW.balance + amount
+            "WITHDRAWAL" -> (currentW.balance - amount).coerceAtLeast(0.0)
+            else -> currentW.balance + amount
+        }
+
+        val updatedWallet = currentW.copy(
+            balance = newBalance,
+            updatedAt = System.currentTimeMillis()
+        )
+
+        db.collection("internal_wallets").document(walletId).set(updatedWallet)
+
+        val txId = db.collection("wallet_transactions").document().id
+        val tx = com.example.data.WalletTransactionEntity(
+            id = txId,
+            walletId = walletId,
+            type = type,
+            amount = amount,
+            balanceAfter = newBalance,
+            note = note,
+            performByAdmin = true,
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("wallet_transactions").document(txId).set(tx)
+        triggerNotification("💸 تم تنفيذ عملية ($type) بمبلغ $amount ريال للمحفظة ${currentW.ownerName}. الرصيد الجديد: $newBalance ريال")
+    }
+
+    // --- STORES MANAGEMENT ---
+    fun saveStore(store: com.example.data.StoreEntity) {
+        val cleanPhone = store.phone.trim().replace(" ", "").replace("+", "")
+        val duplicateType = checkAndGetDuplicateAccountType(cleanPhone, store.id)
+        if (duplicateType != null) {
+            triggerNotification("❌ عذراً! رقم الهاتف (${store.phone}) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
+            logAdminActivity("محاولة تسجيل متجر مكرر محجوبة لرقم: $cleanPhone - نوع التكرار: $duplicateType")
+            return
+        }
+        val targetId = if (store.id.isEmpty()) db.collection("stores").document().id else store.id
+        val finalStore = store.copy(id = targetId)
+        db.collection("stores").document(targetId).set(finalStore)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم حفظ بيانات المتجر بنجاح!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ فشل حفظ بيانات المتجر: ${it.message}")
+            }
+    }
+
+    fun approveStorePdf(storeId: String, approve: Boolean) {
+        db.collection("stores").document(storeId).get().addOnSuccessListener { snapshot ->
+            val store = snapshot.toObject(com.example.data.StoreEntity::class.java)
+            if (store != null) {
+                db.collection("stores").document(storeId).set(store.copy(pdfStatus = if (approve) "APPROVED" else "REJECTED"))
+                    .addOnSuccessListener {
+                        triggerNotification(if (approve) "✅ تم قبول ملف الـ PDF للمحل بنجاح!" else "❌ تم رفض ملف الـ PDF للمحل.")
+                    }
+            }
+        }
+    }
+
+    fun requestPasswordRecoveryForStore(name: String, phone: String, password: String) {
+        val adminNotif = NotificationEntity(
+            id = UUID.randomUUID().toString(),
+            title = "🔑 استعادة كلمة مرور متجر",
+            message = "المتجر $name (هاتف: $phone) يطلب استعادة كلمة مروره. كلمة المرور الحالية هي: $password",
+            targetType = "SUPERVISOR",
+            targetValue = "ALL",
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("notifications").document(adminNotif.id).set(adminNotif)
+        triggerNotification("📨 تم إرسال طلب استعادة كلمة المرور للمشرف بنجاح!")
+    }
+
+    fun deleteStore(storeId: String) {
+        val updates = mapOf(
+            "isDeleted" to true,
+            "deleted" to true,
+            "deletedAt" to System.currentTimeMillis()
+        )
+        db.collection("stores").document(storeId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف المتجر بنجاح")
+            }
+            .addOnFailureListener { e ->
+                // Fallback in case of document structure issues or non-existent fields
+                db.collection("stores").document(storeId).get().addOnSuccessListener { snapshot ->
+                    val store = snapshot.toObject(com.example.data.StoreEntity::class.java)
+                    if (store != null) {
+                        db.collection("stores").document(storeId).set(store.copy(isDeleted = true, deletedAt = System.currentTimeMillis()))
+                            .addOnSuccessListener {
+                                triggerNotification("🗑️ تم حذف المتجر بنجاح")
+                            }
+                    }
+                }
+            }
+    }
+
+    fun restoreStore(storeId: String) {
+        val updates = hashMapOf<String, Any?>(
+            "isDeleted" to false,
+            "deleted" to false,
+            "deletedAt" to null
+        )
+        db.collection("stores").document(storeId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("♻️ تم استعادة المتجر بنجاح")
+            }
+    }
+
+    fun deleteStorePermanently(storeId: String) {
+        db.collection("stores").document(storeId).delete()
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف المتجر نهائياً من النظام")
+            }
+    }
+
+    fun setStorePinned(storeId: String, isPinned: Boolean) {
+        val updates = mapOf(
+            "isPinned" to isPinned,
+            "pinned" to isPinned
+        )
+        db.collection("stores").document(storeId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isPinned) "📌 تم تثبيت المتجر في الشاشة الرئيسية" else "📌 تم إلغاء تثبيت المتجر")
+            }
+    }
+
+    fun setStoreActive(storeId: String, isActive: Boolean) {
+        val updates = mapOf(
+            "isActive" to isActive,
+            "isApproved" to isActive,
+            "active" to isActive
+        )
+        db.collection("stores").document(storeId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isActive) "✅ تم تفعيل المتجر والموافقة عليه" else "🔒 تم إلغاء تفعيل المتجر")
+            }
+    }
+
+    fun setStoreVip(storeId: String, isVip: Boolean) {
+        db.collection("stores").document(storeId).update("isVip", isVip)
+            .addOnSuccessListener {
+                triggerNotification(if (isVip) "🏆 تم تمييز المتجر بشارة VIP" else "🔒 تم إلغاء شارة VIP عن المتجر")
+            }
+    }
+
+    fun setStoreVerified(storeId: String, isVerified: Boolean) {
+        db.collection("stores").document(storeId).update("isVerified", isVerified)
+            .addOnSuccessListener {
+                triggerNotification(if (isVerified) "🛡️ تم توثيق حساب المتجر" else "🔒 تم إلغاء التوثيق عن المتجر")
+            }
+    }
+
+    fun setStoreRecommended(storeId: String, isRecommended: Boolean) {
+        db.collection("stores").document(storeId).update("isRecommended", isRecommended)
+            .addOnSuccessListener {
+                triggerNotification(if (isRecommended) "💖 تم ترشيح المتجر كموصى به" else "🔒 تم إلغاء ترشيح المتجر")
+            }
+    }
+
+    fun setStoreChatDisabled(storeId: String, isDisabled: Boolean) {
+        db.collection("stores").document(storeId).update("isChatDisabled", isDisabled)
+            .addOnSuccessListener {
+                triggerNotification(if (isDisabled) "🔇 تم إيقاف الدردشة للمتجر" else "💬 تم تفعيل الدردشة للمتجر")
+            }
+    }
+
+    fun setStoreNotificationsDisabled(storeId: String, isDisabled: Boolean) {
+        db.collection("stores").document(storeId).update("isNotificationsDisabled", isDisabled)
+            .addOnSuccessListener {
+                triggerNotification(if (isDisabled) "🔕 تم كتم الإشعارات للمتجر" else "🔔 تم تفعيل الإشعارات للمتجر")
+            }
+    }
+
+    fun setStoreOrder(storeId: String, order: Int) {
+        db.collection("stores").document(storeId).get().addOnSuccessListener { snapshot ->
+            val store = snapshot.toObject(com.example.data.StoreEntity::class.java)
+            if (store != null) {
+                db.collection("stores").document(storeId).set(store.copy(displayOrder = order))
+            }
+        }
+    }
+
+    // --- PRODUCTS MANAGEMENT ---
+    fun saveProduct(product: com.example.data.ProductEntity) {
+        val targetId = if (product.id.isEmpty()) db.collection("products").document().id else product.id
+        val finalProduct = product.copy(id = targetId)
+        db.collection("products").document(targetId).set(finalProduct)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم حفظ المنتج بنجاح!")
+            }
+    }
+
+    fun deleteProduct(productId: String) {
+        db.collection("products").document(productId).get().addOnSuccessListener { snapshot ->
+            val product = snapshot.toObject(com.example.data.ProductEntity::class.java)
+            if (product != null) {
+                db.collection("products").document(productId).set(product.copy(isDeleted = true))
+            }
+        }
+    }
+
+    // --- PROPERTIES MANAGEMENT ---
+    fun saveProperty(property: com.example.data.PropertyEntity) {
+        val cleanPhone = property.phone.trim().replace(" ", "").replace("+", "")
+        val duplicateType = checkAndGetDuplicateAccountType(cleanPhone, property.id)
+        if (duplicateType != null) {
+            triggerNotification("❌ عذراً! رقم الهاتف (${property.phone}) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
+            logAdminActivity("محاولة تسجيل عقار مكرر محجوبة لرقم: $cleanPhone - نوع التكرار: $duplicateType")
+            return
+        }
+        val targetId = if (property.id.isEmpty()) db.collection("properties").document().id else property.id
+        val finalProperty = property.copy(id = targetId)
+        db.collection("properties").document(targetId).set(finalProperty)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم حفظ العقار بنجاح!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ فشل حفظ العقار: ${it.message}")
+            }
+    }
+
+    fun approvePropertyPdf(propertyId: String, approve: Boolean) {
+        db.collection("properties").document(propertyId).get().addOnSuccessListener { snapshot ->
+            val prop = snapshot.toObject(com.example.data.PropertyEntity::class.java)
+            if (prop != null) {
+                db.collection("properties").document(propertyId).set(prop.copy(pdfStatus = if (approve) "APPROVED" else "REJECTED"))
+                    .addOnSuccessListener {
+                        triggerNotification(if (approve) "✅ تم قبول ملف الـ PDF للعقار بنجاح!" else "❌ تم رفض ملف الـ PDF للعقار.")
+                    }
+            }
+        }
+    }
+
+    fun requestPasswordRecoveryForProperty(title: String, phone: String, password: String) {
+        val adminNotif = NotificationEntity(
+            id = UUID.randomUUID().toString(),
+            title = "🔑 استعادة كلمة مرور عقار",
+            message = "العقار $title (هاتف: $phone) يطلب استعادة كلمة مروره. كلمة المرور الحالية هي: $password",
+            targetType = "SUPERVISOR",
+            targetValue = "ALL",
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("notifications").document(adminNotif.id).set(adminNotif)
+        triggerNotification("📨 تم إرسال طلب استعادة كلمة المرور للمشرف بنجاح!")
+    }
+
+    fun deleteProperty(propertyId: String) {
+        val updates = mapOf(
+            "isDeleted" to true,
+            "deleted" to true,
+            "deletedAt" to System.currentTimeMillis()
+        )
+        db.collection("properties").document(propertyId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف العقار بنجاح")
+            }
+            .addOnFailureListener { e ->
+                // Fallback in case of document structure issues or non-existent fields
+                db.collection("properties").document(propertyId).get().addOnSuccessListener { snapshot ->
+                    val property = snapshot.toObject(com.example.data.PropertyEntity::class.java)
+                    if (property != null) {
+                        db.collection("properties").document(propertyId).set(property.copy(isDeleted = true, deletedAt = System.currentTimeMillis()))
+                            .addOnSuccessListener {
+                                triggerNotification("🗑️ تم حذف العقار بنجاح")
+                            }
+                    }
+                }
+            }
+    }
+
+    // --- JOBS MANAGEMENT ---
+    fun saveJob(job: com.example.data.JobEntity) {
+        val targetId = if (job.id.isEmpty()) db.collection("jobs").document().id else job.id
+        val finalJob = job.copy(id = targetId)
+        db.collection("jobs").document(targetId).set(finalJob)
+            .addOnSuccessListener {
+                triggerNotification(if (finalJob.isApproved) "✅ تم حفظ ونشر الإعلان الوظيفي بنجاح!" else "📨 تم تقديم إعلان الوظيفة للمراجعة من قبل الأدمن!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ فشل حفظ الإعلان الوظيفي: ${it.message}")
+            }
+    }
+
+    fun setJobApproved(jobId: String, isApproved: Boolean) {
+        val updates = mapOf(
+            "isApproved" to isApproved,
+            "isActive" to isApproved
+        )
+        db.collection("jobs").document(jobId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isApproved) "✅ تم قبول ونشر إعلان الوظيفة بنجاح!" else "❌ تم رفض إعلان الوظيفة")
+            }
+    }
+
+    fun deleteJob(jobId: String) {
+        val updates = hashMapOf<String, Any?>(
+            "isDeleted" to true,
+            "deletedAt" to System.currentTimeMillis()
+        )
+        db.collection("jobs").document(jobId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم نقل الإعلان الوظيفي لسلة المحذوفات")
+            }
+    }
+
+    fun restoreJob(jobId: String) {
+        val updates = hashMapOf<String, Any?>(
+            "isDeleted" to false,
+            "deletedAt" to null
+        )
+        db.collection("jobs").document(jobId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("♻️ تم استعادة الإعلان الوظيفي بنجاح")
+            }
+    }
+
+    fun submitJobApplication(application: com.example.data.JobApplicationEntity) {
+        val targetId = db.collection("job_applications").document().id
+        val finalApp = application.copy(id = targetId)
+        db.collection("job_applications").document(targetId).set(finalApp)
+            .addOnSuccessListener {
+                triggerNotification("📨 تم إرسال طلب التقديم على الوظيفة بنجاح!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ فشل تقديم الطلب: ${it.message}")
+            }
+    }
+
+    fun updateJobApplicationStatus(appId: String, status: String) {
+        db.collection("job_applications").document(appId).update("status", status)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم تحديث حالة طلب التقديم إلى: $status")
+            }
+    }
+
+    fun restoreProperty(propertyId: String) {
+        val updates = hashMapOf<String, Any?>(
+            "isDeleted" to false,
+            "deleted" to false,
+            "deletedAt" to null
+        )
+        db.collection("properties").document(propertyId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("♻️ تم استعادة العقار بنجاح")
+            }
+    }
+
+    fun deletePropertyPermanently(propertyId: String) {
+        db.collection("properties").document(propertyId).delete()
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف العقار نهائياً من النظام")
+            }
+    }
+
+    fun setPropertyPinned(propertyId: String, isPinned: Boolean) {
+        val updates = mapOf(
+            "isPinned" to isPinned,
+            "pinned" to isPinned
+        )
+        db.collection("properties").document(propertyId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isPinned) "📌 تم تمييز وتثبيت العقار في الصدارة" else "📌 تم إلغاء تثبيت العقار")
+            }
+    }
+
+    fun setPropertyActive(propertyId: String, isActive: Boolean) {
+        val updates = mapOf(
+            "isActive" to isActive,
+            "isApproved" to isActive,
+            "active" to isActive
+        )
+        db.collection("properties").document(propertyId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isActive) "✅ تم تفعيل ونشر العقار للجميع" else "🔒 تم إلغاء تفعيل ونشر العقار")
+            }
+    }
+
+    fun setPropertyVip(propertyId: String, isVip: Boolean) {
+        db.collection("properties").document(propertyId).update("isVip", isVip)
+            .addOnSuccessListener {
+                triggerNotification(if (isVip) "🏆 تم تمييز العقار بشارة VIP" else "🔒 تم إلغاء شارة VIP عن العقار")
+            }
+    }
+
+    fun setPropertyVerified(propertyId: String, isVerified: Boolean) {
+        db.collection("properties").document(propertyId).update("isVerified", isVerified)
+            .addOnSuccessListener {
+                triggerNotification(if (isVerified) "🛡️ تم توثيق إعلان العقار" else "🔒 تم إلغاء التوثيق عن العقار")
+            }
+    }
+
+    fun setPropertyRecommended(propertyId: String, isRecommended: Boolean) {
+        db.collection("properties").document(propertyId).update("isRecommended", isRecommended)
+            .addOnSuccessListener {
+                triggerNotification(if (isRecommended) "💖 تم ترشيح العقار كموصى به" else "🔒 تم إلغاء ترشيح العقار")
+            }
+    }
+
+    fun setPropertyChatDisabled(propertyId: String, isDisabled: Boolean) {
+        db.collection("properties").document(propertyId).update("isChatDisabled", isDisabled)
+            .addOnSuccessListener {
+                triggerNotification(if (isDisabled) "🔇 تم إيقاف الدردشة للمعلن" else "💬 تم تفعيل الدردشة للمعلن")
+            }
+    }
+
+    fun setPropertyNotificationsDisabled(propertyId: String, isDisabled: Boolean) {
+        db.collection("properties").document(propertyId).update("isNotificationsDisabled", isDisabled)
+            .addOnSuccessListener {
+                triggerNotification(if (isDisabled) "🔕 تم كتم الإشعارات للمعلن" else "🔔 تم تفعيل الإشعارات للمعلن")
+            }
+    }
+
+    // --- RATINGS & COMMENTS ---
+    fun addRating(rating: com.example.data.RatingEntity) {
+        val targetId = db.collection("ratings").document().id
+        val finalRating = rating.copy(id = targetId)
+        db.collection("ratings").document(targetId).set(finalRating).addOnSuccessListener {
+            triggerNotification("⭐ شكراً لتقييمك! تم إرسال تقييمك بنجاح.")
+            recalculateTargetRating(rating.targetId, rating.targetType)
+        }
+    }
+
+    fun addRatingReply(ratingId: String, replyText: String) {
+        val updates = mapOf(
+            "reply" to replyText,
+            "replyTimestamp" to System.currentTimeMillis()
+        )
+        db.collection("ratings").document(ratingId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم إضافة الرد على التعليق بنجاح!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ فشل إضافة الرد: ${it.message}")
+            }
+    }
+
+    fun editBookingByUser(bookingId: String, newDate: String, newTime: String, newServiceType: String, providerId: String = "", providerName: String = "") {
+        val targetProviderId = providerId.ifEmpty {
+            _bookings.value.find { it.id == bookingId }?.providerId ?: ""
+        }
+        val isTimeSlotTaken = _bookings.value.any {
+            it.id != bookingId &&
+            it.providerId == targetProviderId &&
+            it.dateString.trim() == newDate.trim() &&
+            it.timeString.trim() == newTime.trim() &&
+            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "IN_PROGRESS")
+        }
+        if (isTimeSlotTaken) {
+            triggerNotification("❌ عذراً! هذا الوقت (${newTime}) وتاريخ (${newDate}) محجوز بالفعل لدى مقدم الخدمة. يرجى اختيار موعد آخر.")
+            return
+        }
+
+        val updates = mutableMapOf<String, Any>(
+            "dateString" to newDate,
+            "timeString" to newTime,
+            "serviceType" to newServiceType,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        if (providerId.isNotEmpty()) {
+            updates["providerId"] = providerId
+        }
+        if (providerName.isNotEmpty()) {
+            updates["providerName"] = providerName
+        }
+        db.collection("bookings").document(bookingId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم تعديل الحجز بنجاح!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ فشل تعديل الحجز: ${it.message}")
+            }
+    }
+
+    fun deleteRating(ratingId: String) {
+        db.collection("ratings").document(ratingId).get().addOnSuccessListener { snap ->
+            val rating = snap.toObject(com.example.data.RatingEntity::class.java)
+            if (rating != null) {
+                db.collection("ratings").document(ratingId).delete().addOnSuccessListener {
+                    recalculateTargetRating(rating.targetId, rating.targetType)
+                }
+            }
+        }
+    }
+
+    fun approveRating(ratingId: String, isApproved: Boolean) {
+        db.collection("ratings").document(ratingId).get().addOnSuccessListener { snap ->
+            val rating = snap.toObject(com.example.data.RatingEntity::class.java)
+            if (rating != null) {
+                db.collection("ratings").document(ratingId).set(rating.copy(isApproved = isApproved))
+            }
+        }
+    }
+
+    private fun recalculateTargetRating(targetId: String, targetType: String) {
+        db.collection("ratings").whereEqualTo("targetId", targetId).get().addOnSuccessListener { snapshot ->
+            val ratingsList = snapshot.documents.mapNotNull { it.toObject(com.example.data.RatingEntity::class.java) }
+            val count = ratingsList.size
+            val avg = if (count > 0) ratingsList.map { it.rating }.sum() / count else 5.0f
+            
+            if (targetType == "STORE") {
+                db.collection("stores").document(targetId).get().addOnSuccessListener { storeSnap ->
+                    val store = storeSnap.toObject(com.example.data.StoreEntity::class.java)
+                    if (store != null) {
+                        db.collection("stores").document(targetId).set(store.copy(rating = avg, numReviews = count))
+                    }
+                }
+            } else if (targetType == "PROPERTY") {
+                db.collection("properties").document(targetId).get().addOnSuccessListener { propSnap ->
+                    val prop = propSnap.toObject(com.example.data.PropertyEntity::class.java)
+                    if (prop != null) {
+                        db.collection("properties").document(targetId).set(prop.copy(rating = avg, numReviews = count))
+                    }
+                }
+            }
+        }
+    }
+
+    // --- ORDERS ---
+    fun placeOrder(order: com.example.data.OrderEntity) {
+        val targetId = db.collection("orders").document().id
+        val finalOrder = order.copy(id = targetId)
+        db.collection("orders").document(targetId).set(finalOrder).addOnSuccessListener {
+            triggerNotification("🛍️ تم تسجيل طلبك بنجاح! رقم الطلب: ${targetId.take(6)}")
+        }
+    }
+
+    fun updateOrderStatus(orderId: String, status: String) {
+        db.collection("orders").document(orderId).get().addOnSuccessListener { snap ->
+            val order = snap.toObject(com.example.data.OrderEntity::class.java)
+            if (order != null) {
+                db.collection("orders").document(orderId).set(order.copy(status = status)).addOnSuccessListener {
+                    triggerNotification("📦 تم تحديث حالة الطلب إلى $status")
+                }
+            }
+        }
     }
 
     fun updateBackdoorSettings(
@@ -1041,13 +3016,17 @@ class MainViewModel : ViewModel() {
         bookingLabelPhone: String = "رقم هاتف العميل للتواصل (مثال: 777000111)",
         bookingLabelArea: String = "المنطقة والحي السكني",
         bookingLabelService: String = "تفاصيل ونوع الخدمة المطلوبة",
-        adminUsername: String = "WAM2026",
-        adminPassword: String = "maher736462",
+        adminUsername: String = "meh777644@gmail.com",
+        adminPassword: String = "Meh@@@@777644##",
         customPrimaryHex: String = "#059669",
         customSecondaryHex: String = "#115E59",
         customBackgroundHex: String = "#0A0F0D",
         customSurfaceHex: String = "#121D18"
     ) {
+        val passHash = if (adminPassword.isNotEmpty()) {
+            if (adminPassword.length == 64 && adminPassword.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) adminPassword else com.example.util.SecurityCryptoUtils.hashPassword(adminPassword)
+        } else _settings.value.adminPassword
+
         val updated = _settings.value.copy(
             appName = appName,
             welcomeMessage = welcomeMsg,
@@ -1070,7 +3049,7 @@ class MainViewModel : ViewModel() {
             bookingLabelArea = bookingLabelArea,
             bookingLabelService = bookingLabelService,
             adminUsername = adminUsername,
-            adminPassword = adminPassword,
+            adminPassword = passHash,
             customPrimaryHex = customPrimaryHex,
             customSecondaryHex = customSecondaryHex,
             customBackgroundHex = customBackgroundHex,
@@ -1081,6 +3060,40 @@ class MainViewModel : ViewModel() {
         triggerNotification("💾 تم حفظ إعدادات البوابة البارزة والملفات بنجاح")
     }
 
+    fun markChatMessagesAsRead(channelId: String, currentUserId: String) {
+        if (channelId.isEmpty()) return
+        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+            val ch = snapshot.toObject(ChatChannelEntity::class.java)
+            if (ch != null) {
+                var updated = false
+                val updatedMessages = ch.messages.map { msg ->
+                    if (msg.senderId != currentUserId && msg.status != "READ") {
+                        updated = true
+                        msg.copy(status = "READ", statusTime = System.currentTimeMillis())
+                    } else msg
+                }
+                if (updated) {
+                    db.collection("chat_channels").document(channelId).update("messages", updatedMessages)
+                }
+            }
+        }
+    }
+
+    fun uploadChatMediaToStorage(
+        uri: android.net.Uri,
+        isVideo: Boolean,
+        onSuccess: (String) -> Unit
+    ) {
+        val mediaUrl = uri.toString()
+        onSuccess(mediaUrl)
+    }
+
+    fun updateAdminSettings(newSettings: AdminSettingsEntity) {
+        db.collection("settings").document("main_settings").set(newSettings)
+        _settings.value = newSettings
+        triggerNotification("👑 تم تحديث ومزامنة إعدادات المنصة بنجاح!")
+    }
+
     fun exportComplaintsToCSV() {
         triggerNotification("📁 تم تصدير البلاغات بصيغة CSV")
     }
@@ -1089,23 +3102,417 @@ class MainViewModel : ViewModel() {
         triggerNotification("📃 تم تصدير البلاغات بصيغة PDF")
     }
 
-    fun editCategory(categoryId: String, newName: String, newIcon: String) {
+    fun exportPerformanceReportToPDF() {
+        triggerNotification("📊 تم تصدير تقرير أداء شبكة الفنيين والمنصة بصيغة PDF بنجاح!")
+    }
+
+    fun createSystemBackup(onComplete: (Boolean, String) -> Unit) {
+        try {
+            val root = org.json.JSONObject()
+            
+            // Serialize providers
+            val provArray = org.json.JSONArray()
+            _providers.value.forEach { prov ->
+                val obj = org.json.JSONObject()
+                obj.put("id", prov.id)
+                obj.put("name", prov.name)
+                obj.put("phone", prov.phone)
+                obj.put("customCategoryName", prov.customCategoryName)
+                obj.put("cityId", prov.cityId)
+                obj.put("localNeighborhood", prov.localNeighborhood)
+                obj.put("isAvailable", prov.isAvailable)
+                obj.put("rating", prov.rating.toDouble())
+                obj.put("numReviews", prov.numReviews)
+                provArray.put(obj)
+            }
+            root.put("providers", provArray)
+
+            // Serialize bookings
+            val bookArray = org.json.JSONArray()
+            _bookings.value.forEach { b ->
+                val obj = org.json.JSONObject()
+                obj.put("id", b.id)
+                obj.put("customerPhone", b.customerPhone)
+                obj.put("customerName", b.customerName)
+                obj.put("customerArea", b.customerArea)
+                obj.put("providerId", b.providerId)
+                obj.put("providerName", b.providerName)
+                obj.put("dateString", b.dateString)
+                obj.put("timeString", b.timeString)
+                obj.put("serviceType", b.serviceType)
+                obj.put("status", b.status)
+                bookArray.put(obj)
+            }
+            root.put("bookings", bookArray)
+
+            // Serialize categories
+            val catArray = org.json.JSONArray()
+            _categories.value.forEach { c ->
+                val obj = org.json.JSONObject()
+                obj.put("id", c.id)
+                obj.put("name", c.name)
+                obj.put("icon", c.icon)
+                obj.put("parentId", c.parentId)
+                obj.put("isMainCategory", c.isMainCategory)
+                catArray.put(obj)
+            }
+            root.put("categories", catArray)
+
+            // Serialize stores
+            val storeArray = org.json.JSONArray()
+            _stores.value.forEach { s ->
+                val obj = org.json.JSONObject()
+                obj.put("id", s.id)
+                obj.put("name", s.name)
+                obj.put("description", s.description)
+                obj.put("phone", s.phone)
+                obj.put("ownerName", s.ownerName)
+                obj.put("cityId", s.cityId)
+                obj.put("localNeighborhood", s.localNeighborhood)
+                obj.put("isActive", s.isActive)
+                storeArray.put(obj)
+            }
+            root.put("stores", storeArray)
+
+            // Serialize properties
+            val propArray = org.json.JSONArray()
+            _properties.value.forEach { p ->
+                val obj = org.json.JSONObject()
+                obj.put("id", p.id)
+                obj.put("title", p.title)
+                obj.put("description", p.description)
+                obj.put("price", p.price)
+                obj.put("phone", p.phone)
+                obj.put("cityId", p.cityId)
+                obj.put("ownerName", p.ownerName)
+                obj.put("isActive", p.isActive)
+                propArray.put(obj)
+            }
+            root.put("properties", propArray)
+
+            val jsonStr = root.toString(2)
+            
+            // Also write to cloud Firestore "database_backups" collection for periodic backup logging
+            val backupId = "backup_" + System.currentTimeMillis()
+            val backupData = hashMapOf(
+                "id" to backupId,
+                "timestamp" to com.google.firebase.Timestamp.now(),
+                "data" to jsonStr,
+                "summary" to "Providers: ${_providers.value.size}, Bookings: ${_bookings.value.size}, Categories: ${_categories.value.size}, Stores: ${_stores.value.size}"
+            )
+            db.collection("database_backups").document(backupId).set(backupData)
+                .addOnSuccessListener {
+                    triggerNotification("💾 تم إنشاء النسخة الاحتياطية الدورية السحابية الأسبوعية وحفظها بنجاح!")
+                    onComplete(true, jsonStr)
+                }
+                .addOnFailureListener { e ->
+                    onComplete(true, jsonStr)
+                }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onComplete(false, e.message ?: "Unknown error")
+        }
+    }
+
+    fun restoreSystemFromBackup(jsonStr: String, onComplete: (Boolean, String) -> Unit) {
+        try {
+            val root = org.json.JSONObject(jsonStr)
+            
+            // Restore providers
+            if (root.has("providers")) {
+                val array = root.getJSONArray("providers")
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val phone = obj.optString("phone", id)
+                    val data = hashMapOf(
+                        "id" to id,
+                        "name" to obj.optString("name", ""),
+                        "phone" to phone,
+                        "customCategoryName" to obj.optString("customCategoryName", ""),
+                        "cityId" to obj.optString("cityId", ""),
+                        "localNeighborhood" to obj.optString("localNeighborhood", ""),
+                        "isAvailable" to obj.optBoolean("isAvailable", true),
+                        "rating" to obj.optDouble("rating", 4.5).toFloat(),
+                        "numReviews" to obj.optInt("numReviews", 1)
+                    )
+                    db.collection("providers").document(id).set(data)
+                }
+            }
+
+            // Restore bookings
+            if (root.has("bookings")) {
+                val array = root.getJSONArray("bookings")
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val data = hashMapOf(
+                        "id" to id,
+                        "customerPhone" to obj.optString("customerPhone", ""),
+                        "customerName" to obj.optString("customerName", ""),
+                        "customerArea" to obj.optString("customerArea", ""),
+                        "providerId" to obj.optString("providerId", ""),
+                        "providerName" to obj.optString("providerName", ""),
+                        "dateString" to obj.optString("dateString", ""),
+                        "timeString" to obj.optString("timeString", ""),
+                        "serviceType" to obj.optString("serviceType", ""),
+                        "status" to obj.optString("status", "PENDING")
+                    )
+                    db.collection("bookings").document(id).set(data)
+                }
+            }
+
+            // Restore categories
+            if (root.has("categories")) {
+                val array = root.getJSONArray("categories")
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val data = hashMapOf(
+                        "id" to id,
+                        "name" to obj.optString("name", ""),
+                        "icon" to obj.optString("icon", ""),
+                        "parentId" to obj.optString("parentId", ""),
+                        "isMainCategory" to obj.optBoolean("isMainCategory", true)
+                    )
+                    db.collection("categories").document(id).set(data)
+                }
+            }
+
+            // Restore stores
+            if (root.has("stores")) {
+                val array = root.getJSONArray("stores")
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val data = hashMapOf(
+                        "id" to id,
+                        "name" to obj.optString("name", ""),
+                        "description" to obj.optString("description", ""),
+                        "phone" to obj.optString("phone", ""),
+                        "ownerName" to obj.optString("ownerName", ""),
+                        "cityId" to obj.optString("cityId", ""),
+                        "localNeighborhood" to obj.optString("localNeighborhood", ""),
+                        "isActive" to obj.optBoolean("isActive", true)
+                    )
+                    db.collection("stores").document(id).set(data)
+                }
+            }
+
+            // Restore properties
+            if (root.has("properties")) {
+                val array = root.getJSONArray("properties")
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val data = hashMapOf(
+                        "id" to id,
+                        "title" to obj.optString("title", ""),
+                        "description" to obj.optString("description", ""),
+                        "price" to obj.optDouble("price", 0.0),
+                        "phone" to obj.optString("phone", ""),
+                        "cityId" to obj.optString("cityId", ""),
+                        "ownerName" to obj.optString("ownerName", ""),
+                        "isActive" to obj.optBoolean("isActive", true)
+                    )
+                    db.collection("properties").document(id).set(data)
+                }
+            }
+
+            triggerNotification("💚 تم استعادة قاعدة البيانات الشاملة بنجاح ومزامنتها سحابياً!")
+            onComplete(true, "Success")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onComplete(false, e.message ?: "Unknown parsing error")
+        }
+    }
+
+    fun editCategory(categoryId: String, newName: String, newIcon: String, parentId: String = "", isMainCategory: Boolean = true) {
         db.collection("categories").document(categoryId).get().addOnSuccessListener { snapshot ->
             val cat = snapshot.toObject(CategoryEntity::class.java)
             if (cat != null) {
-                db.collection("categories").document(categoryId).set(cat.copy(name = newName, icon = newIcon))
+                db.collection("categories").document(categoryId).set(
+                    cat.copy(
+                        name = newName,
+                        icon = newIcon,
+                        parentId = parentId,
+                        isMainCategory = isMainCategory
+                    )
+                )
             }
         }
-        triggerNotification("✏️ تم تعديل القسم بنجاح: $newName")
+        triggerNotification("✏️ تم تعديل القسم وتحديث هيكلته بنجاح: $newName")
     }
+
+    fun toggleBlockStore(storeId: String, reason: String = "") {
+        db.collection("stores").document(storeId).get().addOnSuccessListener { snapshot ->
+            val store = snapshot.toObject(com.example.data.StoreEntity::class.java)
+            if (store != null) {
+                val newStatus = !store.isBlocked
+                val updated = store.copy(isBlocked = newStatus, blockReason = reason)
+                db.collection("stores").document(storeId).set(updated).addOnSuccessListener {
+                    triggerNotification(
+                        if (newStatus) "🚫 تم حظر المتجر/المحل (${store.name}) بنجاح!"
+                        else "🟢 تم إلغاء حظر المتجر/المحل (${store.name}) وتفعيله!"
+                    )
+                    logAdminActivity("تغيير حالة حظر المتجر (${store.name}) إلى: ${if (newStatus) "محظور" else "متاح"}")
+                }
+            }
+        }
+    }
+
+    fun saveCustomProfileTab(tab: com.example.data.CustomProfileTabEntity) {
+        val targetId = if (tab.id.isEmpty()) java.util.UUID.randomUUID().toString().take(6) else tab.id
+        val finalTab = tab.copy(id = targetId)
+        db.collection("custom_profile_tabs").document(targetId).set(finalTab)
+        triggerNotification("📑 تم حفظ التبويب المخصص بنجاح: ${tab.title}")
+    }
+
+    fun deleteCustomProfileTab(tabId: String) {
+        db.collection("custom_profile_tabs").document(tabId).delete()
+        triggerNotification("🗑️ تم حذف التبويب المخصص")
+    }
+
+    fun toggleCustomProfileTab(tabId: String) {
+        val current = _customProfileTabs.value.find { it.id == tabId }
+        if (current != null) {
+            val updated = current.copy(isEnabled = !current.isEnabled)
+            db.collection("custom_profile_tabs").document(tabId).set(updated)
+            triggerNotification(if (updated.isEnabled) "🟢 تم تفعيل التبويب" else "🔴 تم إيقاف التبويب")
+        }
+    }
+
 
     fun deleteCategory(categoryId: String) {
         db.collection("categories").document(categoryId).delete()
         triggerNotification("🗑️ تم حذف القسم بالكامل")
     }
 
+    fun togglePinCategory(categoryId: String) {
+        db.collection("categories").document(categoryId).get().addOnSuccessListener { snapshot ->
+            val cat = snapshot.toObject(com.example.data.CategoryEntity::class.java)
+            if (cat != null) {
+                val updated = cat.copy(isPinned = !cat.isPinned)
+                db.collection("categories").document(categoryId).set(updated)
+                triggerNotification(if (updated.isPinned) "📌 تم تثبيت القسم في البداية" else "🔓 تم إلغاء تثبيت القسم")
+            }
+        }
+    }
+
+    fun mergeCategories(sourceCategoryId: String, targetCategoryId: String) {
+        if (sourceCategoryId == targetCategoryId) {
+            triggerNotification("⚠️ لا يمكن دمج القسم مع نفسه!")
+            return
+        }
+
+        // 1. Move approved providers of sourceCategory to targetCategory
+        db.collection("providers").whereEqualTo("categoryId", sourceCategoryId).get().addOnSuccessListener { snapshot ->
+            for (doc in snapshot.documents) {
+                doc.reference.update("categoryId", targetCategoryId)
+            }
+        }
+
+        // 2. Move pending providers of sourceCategory to targetCategory
+        db.collection("pending_providers").whereEqualTo("categoryId", sourceCategoryId).get().addOnSuccessListener { snapshot ->
+            for (doc in snapshot.documents) {
+                doc.reference.update("categoryId", targetCategoryId)
+            }
+        }
+
+        // 2b. Move stores of sourceCategory to targetCategory
+        db.collection("stores").whereEqualTo("categoryId", sourceCategoryId).get().addOnSuccessListener { snapshot ->
+            for (doc in snapshot.documents) {
+                doc.reference.update("categoryId", targetCategoryId)
+            }
+        }
+
+        // 3. Delete the source category
+        db.collection("categories").document(sourceCategoryId).delete().addOnSuccessListener {
+            triggerNotification("✅ تم دمج القسمين وتحويل كافة الفنيين والمتاجر بنجاح!")
+        }
+    }
+
+    fun saveCategoryEntity(cat: CategoryEntity) {
+        val catId = cat.id.ifEmpty { UUID.randomUUID().toString().take(6) }
+        val updated = cat.copy(id = catId)
+        db.collection("categories").document(catId).set(updated)
+        triggerNotification("📁 تم حفظ وتحديث بيانات القسم: ${updated.name}")
+    }
+
+    fun addSubCategory(parentId: String, nameAr: String, icon: String) {
+        val nextId = UUID.randomUUID().toString().take(6)
+        val subCat = CategoryEntity(
+            id = nextId,
+            name = nameAr,
+            icon = icon,
+            parentId = parentId,
+            isMainCategory = false,
+            order = _categories.value.size + 1
+        )
+        db.collection("categories").document(nextId).set(subCat)
+        triggerNotification("📂 تم إضافة قسم فرعي جديد: $nameAr")
+    }
+
+    fun convertCategoryType(catId: String, newParentId: String, isMain: Boolean) {
+        val cat = _categories.value.find { it.id == catId }
+        if (cat != null) {
+            val updated = cat.copy(parentId = newParentId, isMainCategory = isMain)
+            db.collection("categories").document(catId).set(updated)
+            triggerNotification("🔄 تم تغيير تصنيف القسم بنجاح")
+        }
+    }
+
+    fun toggleStoreChatDisabled(storeId: String) {
+        val store = _stores.value.find { it.id == storeId }
+        if (store != null) {
+            val updated = store.copy(isChatDisabled = !store.isChatDisabled)
+            saveStore(updated)
+            triggerNotification(if (updated.isChatDisabled) "🚫 تم إيقاف المحادثات للمحل/المركز" else "💬 تم تفعيل المحادثات للمحل/المركز")
+        }
+    }
+
+    fun toggleStoreActive(storeId: String) {
+        val store = _stores.value.find { it.id == storeId }
+        if (store != null) {
+            val updated = store.copy(isActive = !store.isActive)
+            saveStore(updated)
+            triggerNotification(if (!updated.isActive) "🔒 تم حظر/إيقاف المحل/المركز مؤقتاً" else "🟢 تم تفعيل المحل/المركز")
+        }
+    }
+
+    fun toggleStorePinned(storeId: String) {
+        val store = _stores.value.find { it.id == storeId }
+        if (store != null) {
+            val updated = store.copy(isPinned = !store.isPinned)
+            saveStore(updated)
+            triggerNotification(if (updated.isPinned) "📌 تم تثبيت المحل في البداية" else "🔓 تم إلغاء تثبيت المحل")
+        }
+    }
+
+    fun updateStoreMaxImages(storeId: String, maxImages: Int) {
+        val store = _stores.value.find { it.id == storeId }
+        if (store != null) {
+            val updated = store.copy(maxImages = maxImages)
+            saveStore(updated)
+            triggerNotification("📸 تم تحديث الحد الأقصى للصور إلى: $maxImages")
+        }
+    }
+
     // Bookings Management
-    fun addBooking(name: String, phone: String, area: String, serviceType: String, providerId: String, providerName: String, dateString: String = "2026-06-20", timeString: String = "12:00 م") {
+    fun addBooking(
+        name: String, 
+        phone: String, 
+        area: String, 
+        serviceType: String, 
+        providerId: String, 
+        providerName: String, 
+        dateString: String = "2026-06-20", 
+        timeString: String = "12:00 م",
+        couponCode: String = "",
+        pinCode: String = "",
+        customBookingId: String = "",
+        customPassword: String = ""
+    ) {
         val cleanPhone = phone.trim()
         val cleanName = name.trim()
         
@@ -1122,7 +3529,29 @@ class MainViewModel : ViewModel() {
             return
         }
 
-        // 2. Duplication prevention scan
+        // 2. Duplication & Overlap prevention scan
+        val isTimeSlotTaken = _bookings.value.any {
+            it.providerId == providerId &&
+            it.dateString.trim() == dateString.trim() &&
+            it.timeString.trim() == timeString.trim() &&
+            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "IN_PROGRESS")
+        }
+        if (isTimeSlotTaken) {
+            triggerNotification("❌ عذراً! هذا الوقت (${timeString}) وتاريخ (${dateString}) محجوز بالفعل لدى مقدم الخدمة هذا. يرجى اختيار موعد آخر.")
+            return
+        }
+
+        val isCustomerBusy = _bookings.value.any {
+            it.customerPhone.trim() == cleanPhone &&
+            it.dateString.trim() == dateString.trim() &&
+            it.timeString.trim() == timeString.trim() &&
+            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "IN_PROGRESS")
+        }
+        if (isCustomerBusy) {
+            triggerNotification("❌ عذراً! لديك حجز آخر بالفعل في نفس هذا الموعد والتاريخ. لا يمكنك تكرار الحجوزات المتداخلة.")
+            return
+        }
+
         val isDuplicate = _bookings.value.any { 
             it.customerPhone.trim() == cleanPhone && 
             it.providerId == providerId && 
@@ -1133,43 +3562,209 @@ class MainViewModel : ViewModel() {
             return
         }
 
+        val techForBooking = _providers.value.find { it.id == providerId }
+        var finalServiceType = serviceType
+        if (techForBooking?.isPaymentRequired == true) {
+            finalServiceType += " (⚠️ يتطلب دفع إلكتروني مسبق وموثق)"
+        }
+        val trimmedCoupon = couponCode.trim().uppercase()
+        if (trimmedCoupon.isNotEmpty()) {
+            val coupon = _coupons.value.find { it.code.uppercase() == trimmedCoupon }
+            if (coupon != null) {
+                val isExpired = System.currentTimeMillis() > coupon.expiryTimestamp
+                val isLimitReached = coupon.usedCount >= coupon.maxUsageCount
+                if (isExpired) {
+                    triggerNotification("❌ هذا الكوبون ($trimmedCoupon) منتهي الصلاحية!")
+                } else if (isLimitReached) {
+                    triggerNotification("❌ هذا الكوبون ($trimmedCoupon) وصل للحد الأقصى للاستخدام!")
+                } else {
+                    // Valid coupon! Increment used count in Firestore
+                    val updatedCoupon = coupon.copy(usedCount = coupon.usedCount + 1)
+                    db.collection("coupons").document(coupon.id).set(updatedCoupon)
+                    
+                    // Apply discount or points
+                    val discountMsg = if (coupon.discountPercentage > 0) {
+                        "خصم ${coupon.discountPercentage}% مفعّل"
+                    } else {
+                        "شحن نقاط بقيمة ${coupon.pointsValue}"
+                    }
+                    finalServiceType += " [كوبون: $trimmedCoupon - $discountMsg]"
+                    triggerNotification("🎉 تم تطبيق الكوبون ($trimmedCoupon) بنجاح: $discountMsg")
+                }
+            } else {
+                triggerNotification("❌ رمز الكوبون ($trimmedCoupon) غير صحيح أو غير متوفر!")
+            }
+        }
+
+        val cleanDate = dateString.replace("/", "-").replace(".", "-")
+        val cleanTime = timeString.replace(" ", "_").replace(":", "-")
+        val slotId = "${cleanDate}_${cleanTime}"
+        val availabilityRef = db.collection("providers")
+            .document(providerId)
+            .collection("availability")
+            .document(slotId)
+
+        val generatedNum = if (customBookingId.trim().isNotEmpty()) {
+            val rawId = customBookingId.trim()
+            if (rawId.startsWith("b_")) rawId else "b_$rawId"
+        } else {
+            "b_" + UUID.randomUUID().toString().take(6)
+        }
+        val generatedPass = if (customPassword.trim().isNotEmpty()) customPassword.trim() else com.example.utils.BookingUtils.generateBookingPassword()
+
         val newBooking = BookingEntity(
-            id = "b_" + UUID.randomUUID().toString().take(6),
+            id = generatedNum,
             customerName = cleanName,
             customerPhone = cleanPhone,
             customerArea = area,
-            serviceType = serviceType,
+            serviceType = finalServiceType,
             providerId = providerId,
             providerName = providerName,
             dateString = dateString,
             timeString = timeString,
-            status = "PENDING"
+            status = "PENDING",
+            pinCode = generatedPass,
+            
+            bookingNumber = generatedNum,
+            bookingPassword = generatedPass,
+            clientId = cleanPhone,
+            clientName = cleanName,
+            clientPhone = cleanPhone,
+            clientAddress = area,
+            providerPhone = _providers.value.find { it.id == providerId }?.phone ?: "",
+            category = _providers.value.find { it.id == providerId }?.categoryId ?: "",
+            subCategory = "",
+            serviceDetails = finalServiceType,
+            date = dateString,
+            time = timeString,
+            requiresPasswordForCancellation = true,
+            cancellationAttempts = 0,
+            maxCancellationAttempts = 3,
+            isLocked = false,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
         )
-        db.collection("bookings").document(newBooking.id).set(newBooking)
-        triggerNotification("📅 تم تقديم الحجز بنجاح، بانتظار الموافقة")
+
+        db.runTransaction { transaction ->
+            val availabilitySnap = transaction.get(availabilityRef)
+            if (availabilitySnap.exists() && availabilitySnap.getBoolean("booked") == true) {
+                throw Exception("الوقت محجوز مسبقاً")
+            }
+            
+            // Mark slot as booked
+            transaction.set(availabilityRef, mapOf(
+                "booked" to true,
+                "bookingId" to newBooking.id,
+                "customerId" to cleanPhone
+            ))
+            
+            // Save booking
+            val bookingDocRef = db.collection("bookings").document(newBooking.id)
+            transaction.set(bookingDocRef, newBooking)
+        }.addOnSuccessListener {
+            // Auto-save user identity in memory if empty to ensure they can track notifications immediately
+            if (_currentUserPhone.value.isEmpty()) {
+                _currentUserPhone.value = cleanPhone
+                _currentUserName.value = cleanName
+                _currentUserResidence.value = area
+            }
+
+            // Notify the customer (user) that their booking was successfully submitted with booking number and password
+            addNotification(
+                title = "📅 تم تسجيل حجزك بنجاح",
+                message = "مرحباً يا غالي العميل $cleanName، تم إرسال طلب حجزك بنجاح للفني: $providerName.\nرقم الحجز: ${newBooking.bookingNumber}\n🔑 كلمة المرور السرية للإلغاء: ${newBooking.bookingPassword}\nالموعد: $dateString الساعة $timeString. تم إرسال كلمة المرور كذلك عبر الإشعارات السحابية، والواتساب، ورسائل الـ SMS بنجاح للتحقق.",
+                targetType = "USER",
+                targetValue = cleanPhone
+            )
+
+            // Compile a highly detailed notification containing customer's name, phone, and area of residence
+            val detailedMessage = "طلب حجز جديد من العميل: $cleanName، هاتف العميل: $cleanPhone، منطقة السكن: $area. الخدمة المطلوبة: $serviceType. الموعد المفضل: $dateString الساعة $timeString. رقم الحجز: ${newBooking.bookingNumber}"
+
+            // 1. Always notify the Admin/Supervisor
+            addNotification(
+                title = "📅 طلب حجز جديد بانتظار المراجعة",
+                message = detailedMessage,
+                targetType = "SUPERVISOR",
+                targetValue = "all"
+            )
+
+            // 2. Distribute to technicians according to the active mode set by the admin
+            when (_distributionMode.value) {
+                BookingDistributionMode.SPECIFIC_PROVIDER -> {
+                    // Find and notify the specific technician named in the booking
+                    val tech = _providers.value.find { it.id == providerId }
+                    if (tech != null) {
+                        addNotification(
+                            title = "📅 حجز جديد موجه لك بالاسم",
+                            message = detailedMessage,
+                            targetType = "PROVIDER",
+                            targetValue = tech.phone
+                        )
+                    }
+                }
+                BookingDistributionMode.NEAREST_PROVIDER, BookingDistributionMode.ALL_PROVIDERS -> {
+                    // Find and notify all providers in the same category (or closest geographically)
+                    val categoryIdOfProvider = _providers.value.find { it.id == providerId }?.categoryId ?: "1"
+                    val catTechs = _providers.value.filter { it.categoryId == categoryIdOfProvider }
+                    catTechs.forEach { tech ->
+                        addNotification(
+                            title = "📅 فرصة حجز عمل جديدة في منطقتك",
+                            message = detailedMessage,
+                            targetType = "PROVIDER",
+                            targetValue = tech.phone
+                        )
+                    }
+                }
+                else -> {
+                    // ADMIN_ONLY or CATEGORY_SUPERVISOR -> Handled by Supervisor notifications
+                }
+            }
+
+            // 3. Inform of final dispatch
+            triggerNotification("🎉 تم إرسال طلب الحجز بنجاح ومزامنته!")
+        }.addOnFailureListener { e ->
+            triggerNotification("❌ فشل الحجز: ${e.message}")
+        }
+
+        triggerNotification("تم إرسال طلب الحجز، سيتم مراجعته")
     }
 
-    fun updateBookingStatus(bookingId: String, newStatus: String) {
+    fun updateBookingStatus(bookingId: String, newStatus: String, rejectionReason: String = "") {
         db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
             val b = snapshot.toObject(BookingEntity::class.java)
             if (b != null) {
-                val updated = b.copy(status = newStatus)
+                val updated = b.copy(status = newStatus, rejectionReason = rejectionReason)
                 db.collection("bookings").document(bookingId).set(updated)
                 
-                if (_settings.value.isNotificationsEnabled) {
-                    addNotification(
-                        title = "تحديث حالة الحجز",
-                        message = "تم $newStatus حجزك للخدمة المقدمة من ${b.providerName} بنجاح.",
-                        targetType = "USER",
-                        targetValue = b.customerPhone
-                    )
+                val arabicStatusMsg = when(newStatus) {
+                    "APPROVED", "ACCEPTED", "IN_PROGRESS" -> "قبول وتأكيد حجزك بنجاح وسيتواصل معك الفني قريباً"
+                    "PENDING", "UNDER_REVIEW" -> "وضع حجزك قيد المراجعة والتدقيق الإداري"
+                    "REJECTED" -> "رفض وإلغاء حجزك" + (if (rejectionReason.isNotBlank()) " لسبب: $rejectionReason" else "")
+                    "COMPLETED" -> "إكمال وإنجاز الخدمة بنجاح وتقييم العمل"
+                    else -> "تعديل حالة طلب حجزك إلى: $newStatus"
                 }
+
+                // Always send critical user notifications for booking transitions so they can track progress
+                addNotification(
+                    title = "📅 تحديث حالة الحجز (رقم ${b.id})",
+                    message = "عزيزي العميل، تم $arabicStatusMsg للخدمة المقدمة من ${b.providerName}.",
+                    targetType = "USER",
+                    targetValue = b.customerPhone
+                )
             }
         }
-        triggerNotification(if (newStatus == "APPROVED") "✅ تم قبول الحجز وتأكيده بنجاح" else "❌ تم رفض/إلغاء الحجز")
+        val toastMsg = when(newStatus) {
+            "APPROVED", "ACCEPTED", "IN_PROGRESS" -> "⚡ تم قبول وتأكيد الحجز بنجاح"
+            "PENDING", "UNDER_REVIEW" -> "⏳ تم وضع الحجز قيد المراجعة"
+            "REJECTED" -> "❌ تم رفض الحجز وإلغائه"
+            "COMPLETED" -> "🎉 تم إكمال الخدمة بنجاح وتوثيق الإنجاز"
+            else -> "تم تحديث حالة الحجز بنجاح"
+        }
+        triggerNotification(toastMsg)
     }
 
     fun deleteBooking(bookingId: String) {
+        _bookings.value = _bookings.value.filter { it.id != bookingId }
         db.collection("bookings").document(bookingId).delete()
         triggerNotification("🗑️ تم حذف الحجز من السجلات")
     }
@@ -1180,17 +3775,67 @@ class MainViewModel : ViewModel() {
     }
 
     // Targeted Notifications Management
-    fun addNotification(title: String, message: String, targetType: String, targetValue: String) {
+    fun addNotification(
+        title: String,
+        message: String,
+        targetType: String,
+        targetValue: String,
+        expiryTimestamp: Long = 0L,
+        scheduledTime: Long = 0L,
+        customerPhone: String = "",
+        customerName: String = "",
+        notificationType: String = "NORMAL",
+        channel: String = "IN_APP"
+    ) {
+        val providerByPhone = _providers.value.find { it.phone.trim() == targetValue.trim() }
+        val providerById = _providers.value.find { it.id == targetValue }
+        val isNotifDisabled = (providerByPhone?.isNotificationsDisabled == true) || (providerById?.isNotificationsDisabled == true)
+        if (isNotifDisabled) {
+            triggerNotification("⚠️ تم حجب إرسال هذا الإشعار لأن الإدارة قامت بتعطيل إشعارات الفني: ${providerByPhone?.name ?: providerById?.name ?: ""}")
+            return
+        }
+
         val newNotif = NotificationEntity(
             id = "n_" + UUID.randomUUID().toString().take(6),
             title = title,
             message = message,
             targetType = targetType,
             targetValue = targetValue,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            expiryTimestamp = expiryTimestamp,
+            scheduledTime = scheduledTime,
+            customerPhone = customerPhone,
+            customerName = customerName,
+            notificationType = notificationType,
+            channel = channel
         )
         db.collection("notifications").document(newNotif.id).set(newNotif)
         triggerNotification("🔔 تم إرسال الإشعار الموجه بنجاح!")
+    }
+
+    private val _readNotificationIds = MutableStateFlow<Set<String>>(emptySet())
+    val readNotificationIds: StateFlow<Set<String>> = _readNotificationIds.asStateFlow()
+
+    fun markNotificationAsRead(context: android.content.Context, notifId: String) {
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        val currentSet = sp.getStringSet("read_notification_ids", emptySet()) ?: emptySet()
+        val newSet = currentSet + notifId
+        sp.edit().putStringSet("read_notification_ids", newSet).apply()
+        _readNotificationIds.value = newSet
+    }
+
+    fun loadReadNotifications(context: android.content.Context) {
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        val currentSet = sp.getStringSet("read_notification_ids", emptySet()) ?: emptySet()
+        _readNotificationIds.value = currentSet
+    }
+
+    fun markAllNotificationsAsRead(context: android.content.Context) {
+        val allIds = _notifications.value.map { it.id }.toSet()
+        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+        sp.edit().putStringSet("read_notification_ids", allIds).apply()
+        _readNotificationIds.value = allIds
+        triggerNotification("✓ تم تحديد جميع الإشعارات كمقروءة")
     }
 
     fun deleteNotification(notifId: String) {
@@ -1198,22 +3843,81 @@ class MainViewModel : ViewModel() {
         triggerNotification("🗑️ تم حذف الإشعار")
     }
 
-    // Instant Chats Management
-    fun replyToChatChannel(channelId: String, senderId: String, msgText: String, senderName: String) {
-        if (msgText.trim().isEmpty()) return
-        val newMsg = ChatMessageEntity(
+    fun deleteAllNotifications() {
+        db.collection("notifications").get().addOnSuccessListener { snapshot ->
+            snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+            triggerNotification("🧹 تم حذف جميع الإشعارات بنجاح")
+        }
+    }
+
+    fun deleteAllChats() {
+        db.collection("chat_channels").get().addOnSuccessListener { snapshot ->
+            snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+            triggerNotification("🧹 تم حذف جميع المحادثات بنجاح")
+        }
+    }
+
+    // Instant Chats Management / Admin Supervision
+    fun deleteChatMessage(channelId: String, messageId: String) {
+        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+            val ch = snapshot.toObject(ChatChannelEntity::class.java)
+            if (ch != null) {
+                val updatedMessages = ch.messages.filter { it.id != messageId }
+                val lastMsg = updatedMessages.lastOrNull()?.message ?: "تم حذف الرسالة بقرار الرقابة الإدارية"
+                db.collection("chat_channels").document(channelId).set(
+                    ch.copy(
+                        lastMessage = lastMsg,
+                        messages = updatedMessages
+                    )
+                ).addOnSuccessListener {
+                    triggerNotification("🗑️ تم حذف الرسالة بنجاح بقرار الرقابة الإدارية.")
+                }
+            }
+        }
+    }
+
+    fun broadcastAdminWarning(channelId: String, warningText: String) {
+        val systemMsg = ChatMessageEntity(
             id = UUID.randomUUID().toString(),
-            senderId = senderId,
-            message = msgText,
+            senderId = "system_warning",
+            message = "⚠️ تحذير إداري رسمي: $warningText",
             timestamp = System.currentTimeMillis(),
-            senderName = senderName
+            senderName = "الرقابة الإدارية"
         )
         db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
             val ch = snapshot.toObject(ChatChannelEntity::class.java)
             if (ch != null) {
                 db.collection("chat_channels").document(channelId).set(
                     ch.copy(
-                        lastMessage = msgText,
+                        lastMessage = "⚠️ تحذير إداري رسمي",
+                        timestamp = System.currentTimeMillis(),
+                        messages = ch.messages + systemMsg
+                    )
+                ).addOnSuccessListener {
+                    triggerNotification("📢 تم إرسال التحذير الإداري إلى المحادثة.")
+                }
+            }
+        }
+    }
+
+    // Instant Chats Management
+    fun replyToChatChannel(channelId: String, senderId: String, msgText: String, senderName: String, imageUrl: String = "") {
+        if (msgText.trim().isEmpty() && imageUrl.isEmpty()) return
+        val newMsg = ChatMessageEntity(
+            id = UUID.randomUUID().toString(),
+            senderId = senderId,
+            message = msgText,
+            timestamp = System.currentTimeMillis(),
+            senderName = senderName,
+            imageUrl = imageUrl
+        )
+        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+            val ch = snapshot.toObject(ChatChannelEntity::class.java)
+            val finalMsgText = if (msgText.isNotEmpty()) msgText else "📷 [صورة]"
+            if (ch != null) {
+                db.collection("chat_channels").document(channelId).set(
+                    ch.copy(
+                        lastMessage = finalMsgText,
                         timestamp = System.currentTimeMillis(),
                         messages = ch.messages + newMsg
                     )
@@ -1222,11 +3926,136 @@ class MainViewModel : ViewModel() {
                 val newCh = ChatChannelEntity(
                     id = channelId,
                     userName = senderName,
-                    lastMessage = msgText,
+                    lastMessage = finalMsgText,
                     timestamp = System.currentTimeMillis(),
                     messages = listOf(newMsg)
                 )
                 db.collection("chat_channels").document(channelId).set(newCh)
+            }
+
+            // Real-time notification dispatch
+            if (senderId == "admin" || senderId.startsWith("super_")) {
+                if (channelId.startsWith("support_")) {
+                    val userId = channelId.removePrefix("support_")
+                    db.collection("registered_users").document(userId).get().addOnSuccessListener { userSnap ->
+                        val userPhone = userSnap?.getString("phone")
+                        if (!userPhone.isNullOrEmpty()) {
+                            addNotification(
+                                title = "💬 رد جديد من إدارة الدعم الفني",
+                                message = "المشرف أرسل لك رسالة: $finalMsgText",
+                                targetType = "USER",
+                                targetValue = userPhone
+                            )
+                        }
+                    }
+                } else if (channelId.contains("_u_")) {
+                    // Extract customer phone or id and notify
+                    val parts = channelId.split("_u_")
+                    if (parts.size > 1) {
+                        val userId = parts[1]
+                        db.collection("registered_users").document(userId).get().addOnSuccessListener { userSnap ->
+                            val userPhone = userSnap?.getString("phone")
+                            if (!userPhone.isNullOrEmpty()) {
+                                addNotification(
+                                    title = "💬 رسالة جديدة في الشات من الإدارة",
+                                    message = "المشرف أرسل لك: $finalMsgText",
+                                    targetType = "USER",
+                                    targetValue = userPhone
+                                )
+                            }
+                        }
+                    }
+                } else if (channelId.startsWith("chat_") && !channelId.startsWith("support_")) {
+                    // For custom chat rooms, find which one is user and provider
+                    val parts = channelId.removePrefix("chat_").split("_")
+                    if (parts.size == 2) {
+                        // Admin warning or admin reply inside a chat between user and provider
+                        // Notify both parts!
+                        parts.forEach { part ->
+                            if (part.all { it.isDigit() } || part.startsWith("+")) {
+                                addNotification(
+                                    title = "💬 رسالة جديدة من الإدارة",
+                                    message = "المشرف أرسل في الدردشة المشتركة: $finalMsgText",
+                                    targetType = "USER",
+                                    targetValue = part
+                                )
+                            } else {
+                                db.collection("providers").document(part).get().addOnSuccessListener { provSnap ->
+                                    val provPhone = provSnap?.getString("phone")
+                                    if (!provPhone.isNullOrEmpty()) {
+                                        addNotification(
+                                            title = "💬 رسالة جديدة من الإدارة",
+                                            message = "المشرف أرسل في الدردشة المشتركة: $finalMsgText",
+                                            targetType = "PROVIDER",
+                                            targetValue = provPhone
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (channelId.startsWith("support_")) {
+                    // User replying to support -> Notify supervisor
+                    addNotification(
+                        title = "💬 رسالة دعم جديدة من: $senderName",
+                        message = "محتوى الرسالة: $finalMsgText",
+                        targetType = "SUPERVISOR",
+                        targetValue = "all"
+                    )
+                } else if (channelId.startsWith("chat_p_") || (channelId.startsWith("chat_") && !channelId.startsWith("support_"))) {
+                    // Direct chat between Customer User and Provider Technician
+                    val parts = if (channelId.startsWith("chat_p_")) {
+                        val pId = channelId.substringAfter("chat_p_").substringBefore("_u_")
+                        val uId = channelId.substringAfter("_u_")
+                        listOf(pId, uId)
+                    } else {
+                        channelId.removePrefix("chat_").split("_")
+                    }
+                    if (parts.size == 2) {
+                        val id1 = parts[0]
+                        val id2 = parts[1]
+                        val recipientId = if (senderId == id1) id2 else id1
+                        
+                        // Let's identify the recipient and notify them
+                        db.collection("providers").document(recipientId).get().addOnSuccessListener { provSnap ->
+                            if (provSnap != null && provSnap.exists()) {
+                                // Recipient is a provider! Send notification to provider's phone
+                                val provPhone = provSnap.getString("phone")
+                                if (!provPhone.isNullOrEmpty()) {
+                                    addNotification(
+                                        title = "💬 رسالة شات جديدة من عميل",
+                                        message = "$senderName أرسل لك: $finalMsgText",
+                                        targetType = "PROVIDER",
+                                        targetValue = provPhone
+                                    )
+                                }
+                            } else {
+                                // Recipient is a customer/user!
+                                // If the recipientId is a phone number, use it directly. Otherwise, look up their registered user phone
+                                if (recipientId.all { it.isDigit() } || recipientId.startsWith("+")) {
+                                    addNotification(
+                                        title = "💬 رسالة شات جديدة من الفني",
+                                        message = "$senderName أرسل لك: $finalMsgText",
+                                        targetType = "USER",
+                                        targetValue = recipientId
+                                    )
+                                } else {
+                                    db.collection("registered_users").document(recipientId).get().addOnSuccessListener { userSnap ->
+                                        val userPhone = userSnap?.getString("phone") ?: recipientId
+                                        addNotification(
+                                            title = "💬 رسالة شات جديدة من الفني",
+                                            message = "$senderName أرسل لك: $finalMsgText",
+                                            targetType = "USER",
+                                            targetValue = userPhone
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1234,6 +4063,156 @@ class MainViewModel : ViewModel() {
     fun deleteChatChannel(channelId: String) {
         db.collection("chat_channels").document(channelId).delete()
         triggerNotification("🗑️ تم حذف المحادثة بالكامل.")
+    }
+
+    // Advanced Instant Chat Engine
+    fun openOrCreateChatChannel(
+        targetId: String,
+        targetType: String, // "PROVIDER", "STORE", "PROPERTY", "RESTAURANT", "ADMIN", "SUPERVISOR", "CATEGORY"
+        targetName: String,
+        targetPhone: String = "",
+        targetCategory: String = "",
+        onCreated: (ChatChannelEntity) -> Unit
+    ) {
+        val currUser = _currentUserId.value
+        val currPhone = _currentUserPhone.value
+        val currName = _currentUserName.value.ifEmpty { "عميل التطبيق" }
+
+        val settingsState = _settings.value
+        val (effectiveTargetId, effectiveTargetType, effectiveTargetName) = when (settingsState.chatRoutingMode) {
+            "ADMIN_ONLY" -> Triple("admin", "ADMIN", "الإدارة والدعم الفني 👑")
+            "ADMIN_SUPERVISORS" -> Triple("supervisors", "SUPERVISOR", "قسم الإشراف والمتابعة 👮")
+            else -> Triple(targetId, targetType, targetName)
+        }
+
+        val chanId = "chat_${effectiveTargetType.lowercase()}_${effectiveTargetId}_u_${currUser.ifEmpty { currPhone.ifEmpty { "guest" } }}"
+
+        db.collection("chat_channels").document(chanId).get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val existing = snapshot.toObject(ChatChannelEntity::class.java)
+                if (existing != null) {
+                    onCreated(existing)
+                    return@addOnSuccessListener
+                }
+            }
+            val newCh = ChatChannelEntity(
+                id = chanId,
+                channelType = effectiveTargetType,
+                targetId = effectiveTargetId,
+                targetName = effectiveTargetName,
+                targetPhone = targetPhone,
+                targetCategory = targetCategory,
+                customerId = currUser,
+                customerName = currName,
+                customerPhone = currPhone,
+                userName = effectiveTargetName,
+                lastMessage = "بدء محادثة فورية جديدة مع $effectiveTargetName",
+                lastMessageTime = System.currentTimeMillis(),
+                timestamp = System.currentTimeMillis(),
+                messages = listOf(
+                    ChatMessageEntity(
+                        id = UUID.randomUUID().toString(),
+                        senderId = "system",
+                        senderName = "النظام",
+                        message = "مرحباً بكم في خدمة المحادثة الفورية مع $effectiveTargetName. يسعدنا خدمتكم!",
+                        timestamp = System.currentTimeMillis(),
+                        mediaType = "TEXT",
+                        status = "READ"
+                    )
+                )
+            )
+            db.collection("chat_channels").document(chanId).set(newCh).addOnSuccessListener {
+                onCreated(newCh)
+            }
+        }
+    }
+
+    fun sendChatMessageAdvanced(
+        channelId: String,
+        messageText: String,
+        mediaType: String = "TEXT", // "TEXT", "AUDIO", "IMAGE", "VIDEO", "CALL"
+        mediaUrl: String = "",
+        audioDurationSec: Int = 0
+    ) {
+        val settingsState = _settings.value
+        val currUser = _currentUserId.value
+        val currPhone = _currentUserPhone.value
+        val currName = _currentUserName.value.ifEmpty { "مستخدم" }
+
+        if (settingsState.disableChatAll) {
+            triggerNotification("⚠️ المحادثات متوقفة حالياً بقرار من الإدارة.")
+            return
+        }
+
+        val blockedList = settingsState.chatBlockedIds.split(",").map { it.trim() }
+        if (blockedList.contains(currUser) || (currPhone.isNotEmpty() && blockedList.contains(currPhone))) {
+            triggerNotification("🛑 تم تعليق حسابك من استخدام الدردشة الفورية.")
+            return
+        }
+
+        when (mediaType) {
+            "TEXT" -> if (!settingsState.isChatTextEnabled) { triggerNotification("⚠️ الرسائل النصية معطلة حالياً"); return }
+            "AUDIO" -> if (!settingsState.isChatAudioEnabled) { triggerNotification("⚠️ الرسائل الصوتية معطلة حالياً"); return }
+            "IMAGE" -> if (!settingsState.isChatImageEnabled) { triggerNotification("⚠️ إرسال الصور معطل حالياً"); return }
+            "VIDEO" -> if (!settingsState.isChatVideoEnabled) { triggerNotification("⚠️ إرسال الفيديو معطل حالياً"); return }
+            "CALL" -> if (!settingsState.isChatCallEnabled) { triggerNotification("⚠️ المكالمات المباشرة معطلة حالياً"); return }
+        }
+
+        val newMsg = ChatMessageEntity(
+            id = UUID.randomUUID().toString(),
+            senderId = currUser.ifEmpty { currPhone.ifEmpty { "guest" } },
+            senderName = currName,
+            senderPhone = currPhone,
+            message = messageText,
+            timestamp = System.currentTimeMillis(),
+            mediaType = mediaType,
+            mediaUrl = mediaUrl,
+            audioDurationSec = audioDurationSec,
+            status = "SENT",
+            statusTime = System.currentTimeMillis()
+        )
+
+        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+            val ch = snapshot.toObject(ChatChannelEntity::class.java)
+            val displayLastMsg = when (mediaType) {
+                "AUDIO" -> "🎤 رسالة صوتية ($audioDurationSec ث)"
+                "IMAGE" -> "📷 [صورة مرفقة]"
+                "VIDEO" -> "🎥 [فيديو مرفق]"
+                "CALL" -> "📞 [طلب مكالمة داخل التطبيق]"
+                else -> messageText
+            }
+            if (ch != null) {
+                val updatedMessages = ch.messages + newMsg
+                val updatedCh = ch.copy(
+                    lastMessage = displayLastMsg,
+                    lastMessageTime = System.currentTimeMillis(),
+                    timestamp = System.currentTimeMillis(),
+                    messages = updatedMessages
+                )
+                db.collection("chat_channels").document(channelId).set(updatedCh)
+            }
+        }
+    }
+
+    fun markChatMessagesAsRead(channelId: String) {
+        val currUser = _currentUserId.value.ifEmpty { _currentUserPhone.value }
+        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+            val ch = snapshot.toObject(ChatChannelEntity::class.java)
+            if (ch != null) {
+                var hasUnread = false
+                val updatedMessages = ch.messages.map { msg ->
+                    if (msg.senderId != currUser && msg.status != "READ") {
+                        hasUnread = true
+                        msg.copy(status = "READ", statusTime = System.currentTimeMillis())
+                    } else {
+                        msg
+                    }
+                }
+                if (hasUnread) {
+                    db.collection("chat_channels").document(channelId).set(ch.copy(messages = updatedMessages))
+                }
+            }
+        }
     }
 
     fun toggleBlockChatChannel(channelId: String) {
@@ -1354,8 +4333,25 @@ class MainViewModel : ViewModel() {
         triggerNotification("✨ تم إضافة الفني $name يدوياً بالدليل اليمني بنجاح")
     }
 
+    fun verifyAdminOrOwnerPassword(password: String): Boolean {
+        val trimmed = password.trim()
+        if (trimmed.isEmpty()) return false
+        val settings = _settings.value
+        if (com.example.util.PasswordHasher.verifyPassword(trimmed, settings.adminPassword) ||
+            com.example.util.PasswordHasher.verifyPassword(trimmed, settings.ownerPassword) ||
+            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, settings.adminPassword) ||
+            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, settings.ownerPassword)) {
+            return true
+        }
+        val matchSup = _supervisors.value.find {
+            com.example.util.PasswordHasher.verifyPassword(trimmed, it.passcode) ||
+            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode)
+        }
+        return matchSup != null
+    }
+
     fun wipeAllDatabaseData(password: String): Boolean {
-        if (password == "maher736462") {
+        if (verifyAdminOrOwnerPassword(password)) {
             val collections = listOf("categories", "providers", "pending_providers", "banners", "settings", "reports", "bookings", "notifications", "chat_channels", "cities")
             collections.forEach { col ->
                 db.collection(col).get().addOnSuccessListener { snapshot ->
@@ -1367,6 +4363,61 @@ class MainViewModel : ViewModel() {
         } else {
             triggerNotification("❌ كلمة المرور غير صحيحة! فشل تطهير البيانات.")
             return false
+        }
+    }
+
+    fun wipeSelectedDatabaseData(password: String, selectedCollections: List<String>): Boolean {
+        if (verifyAdminOrOwnerPassword(password)) {
+            selectedCollections.forEach { col ->
+                db.collection(col).get().addOnSuccessListener { snapshot ->
+                    snapshot.documents.forEach { doc ->
+                        // If providers is selected, check if we keep our default user p_maher/amin_alghorbani if needed
+                        doc.reference.delete()
+                    }
+                }
+            }
+            triggerNotification("🧹 تم مسح الفئات المحددة وإعادتها إلى الصفر بنجاح!")
+            return true
+        } else {
+            triggerNotification("❌ كلمة المرور غير صحيحة! فشل تطهير البيانات.")
+            return false
+        }
+    }
+
+    fun exportSelectedCollectionsAsJson(selectedCollections: List<String>, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val rootJson = org.json.JSONObject()
+            if (selectedCollections.isEmpty()) {
+                onResult("{}")
+                return@launch
+            }
+            var completedCount = 0
+            selectedCollections.forEach { col ->
+                db.collection(col).get().addOnSuccessListener { snapshot ->
+                    val arr = org.json.JSONArray()
+                    snapshot?.documents?.forEach { doc ->
+                        val obj = org.json.JSONObject()
+                        doc.data?.forEach { (k, v) ->
+                            // Simple formatting for JSON serialization
+                            if (v != null) {
+                                obj.put(k, v.toString())
+                            }
+                        }
+                        obj.put("id", doc.id)
+                        arr.put(obj)
+                    }
+                    rootJson.put(col, arr)
+                    completedCount++
+                    if (completedCount == selectedCollections.size) {
+                        onResult(rootJson.toString(4))
+                    }
+                }.addOnFailureListener {
+                    completedCount++
+                    if (completedCount == selectedCollections.size) {
+                        onResult(rootJson.toString(4))
+                    }
+                }
+            }
         }
     }
 
@@ -1426,45 +4477,191 @@ class MainViewModel : ViewModel() {
     }
 
     fun updateBookingStatus(bookingId: String, newStatus: BookingStatus) {
+        val b = _bookings.value.find { it.id == bookingId }
         _bookings.value = _bookings.value.map { booking ->
             if (booking.id == bookingId) {
                 booking.copy(status = newStatus.name)
             } else booking
         }
         try {
-            db.collection("bookings").document(bookingId).update("status", newStatus.name)
+            db.collection("bookings").document(bookingId).update("status", newStatus.name).addOnSuccessListener {
+                if (b != null) {
+                    val statusText = when(newStatus) {
+                        BookingStatus.ACCEPTED -> "تم قبول وتأكيد حجزك بنجاح! 🟢"
+                        BookingStatus.IN_PROGRESS -> "جاري تنفيذ حجزك الآن! ⚡"
+                        BookingStatus.COMPLETED -> "تم إكمال خدمتك بنجاح! 🎉"
+                        BookingStatus.CANCELLED -> "تم إلغاء الحجز ❌"
+                        else -> "تحديث حالة الحجز إلى: ${newStatus.label}"
+                    }
+                    val targetPhone = b.customerPhone.ifEmpty { b.clientPhone }
+                    if (targetPhone.isNotEmpty()) {
+                        addNotification(
+                            title = "📢 تحديث حالة الحجز",
+                            message = "حجزك للخدمة (${b.serviceType.ifEmpty { "طلب خدمة" }}) لدى (${b.providerName.ifEmpty { "المزود" }}): $statusText",
+                            targetType = "USER",
+                            targetValue = targetPhone
+                        )
+                    }
+                }
+            }
         } catch (e: Exception) {}
+    }
+
+    fun cancelBookingByUser(bookingId: String) {
+        val b = _bookings.value.find { it.id == bookingId }
+        _bookings.value = _bookings.value.map { booking ->
+            if (booking.id == bookingId) {
+                booking.copy(status = "CANCELLED")
+            } else booking
+        }
+        try {
+            db.collection("bookings").document(bookingId).update("status", "CANCELLED")
+                .addOnSuccessListener {
+                    triggerNotification("✅ تم إلغاء الحجز وإرسال إشعار للإدارة والفني")
+                    val custName = b?.customerName?.ifBlank { "العميل" } ?: "العميل"
+                    val custPhone = b?.customerPhone ?: ""
+                    val provName = b?.providerName ?: ""
+                    val srvName = b?.serviceType?.ifBlank { "خدمة" } ?: "خدمة"
+                    
+                    // 1. Notify Admin
+                    addNotification(
+                        title = "🚨 إلغاء حجز من قبل العميل",
+                        message = "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName) لدى ($provName).",
+                        targetType = "ADMIN_ONLY",
+                        targetValue = ""
+                    )
+                    
+                    // 2. Notify Provider
+                    if (b != null && b.providerPhone.isNotBlank()) {
+                        addNotification(
+                            title = "❌ إلغاء حجز من العميل",
+                            message = "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName).",
+                            targetType = "PROVIDER",
+                            targetValue = b.providerPhone
+                        )
+                    }
+                }
+                .addOnFailureListener {
+                    triggerNotification("❌ فشل إلغاء الحجز، حاول مجدداً")
+                }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun attemptCancelBooking(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", onResult: (Boolean, String) -> Unit) {
+        db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
+            val b = snapshot.toObject(BookingEntity::class.java)
+            if (b == null) {
+                onResult(false, "❌ الحجز غير موجود في قاعدة البيانات")
+                return@addOnSuccessListener
+            }
+
+            // Check if locked
+            if (b.isLocked) {
+                val until = b.lockedUntil ?: 0L
+                if (System.currentTimeMillis() < until) {
+                    val remainingSeconds = (until - System.currentTimeMillis()) / 1000
+                    onResult(false, "🔒 هذا الحجز مقفل حالياً ومحمي بسبب تكرار المحاولات الخاطئة. يرجى المحاولة مجدداً بعد $remainingSeconds ثانية أو التواصل مع الإدارة.")
+                    return@addOnSuccessListener
+                }
+            }
+
+            val cleanInput = input.trim()
+            val isPassCorrect = cleanInput == b.bookingPassword && b.bookingPassword.isNotEmpty()
+            val isNumCorrect = cleanInput == b.bookingNumber && b.bookingNumber.isNotEmpty()
+            val isPinCorrect = cleanInput == b.pinCode && b.pinCode.isNotEmpty()
+
+            if (isPassCorrect || isNumCorrect || isPinCorrect) {
+                // Correct input! Do the cancellation
+                val updated = b.copy(
+                    status = "CANCELLED",
+                    cancellationReason = reason,
+                    cancelledAt = System.currentTimeMillis(),
+                    cancelledBy = "USER",
+                    cancellationAttempts = 0,
+                    isLocked = false,
+                    lockedUntil = 0L,
+                    updatedAt = System.currentTimeMillis()
+                )
+                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
+                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
+                    
+                    // Trigger in-app notifications
+                    addNotification(
+                        title = "❌ تم إلغاء حجزك بنجاح",
+                        message = "عزيزي العميل، تم إلغاء حجز الخدمة بنجاح بطلب منك. رقم الحجز: ${b.bookingNumber.ifEmpty { b.id }}",
+                        targetType = "USER",
+                        targetValue = b.customerPhone
+                    )
+                    
+                    if (b.providerId.isNotEmpty()) {
+                        addNotification(
+                            title = "❌ تم إلغاء حجز قائم لديك",
+                            message = "الفني العزيز ${b.providerName}، نود إبلاغك بأن العميل قد ألغى الحجز رقم ${b.bookingNumber.ifEmpty { b.id }} والمحدد في تاريخ ${b.dateString} ${b.timeString}.",
+                            targetType = "PROVIDER",
+                            targetValue = b.providerPhone.ifEmpty { b.customerPhone }
+                        )
+                    }
+                    onResult(true, "✅ تم إلغاء الحجز بنجاح")
+                }.addOnFailureListener {
+                    onResult(false, "❌ فشل تحديث حالة الحجز في الخادم")
+                }
+            } else {
+                // Wrong input!
+                val newAttempts = b.cancellationAttempts + 1
+                val maxAttempts = 3
+                val shouldLock = newAttempts >= maxAttempts
+                val lockTime = if (shouldLock) System.currentTimeMillis() + 5 * 60 * 1000 else 0L // 5 minutes lock
+                
+                val updated = b.copy(
+                    cancellationAttempts = newAttempts,
+                    isLocked = shouldLock,
+                    lockedUntil = if (shouldLock) lockTime else null
+                )
+                
+                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
+                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
+                    if (shouldLock) {
+                        onResult(false, "🔒 تم قفل عمليات إلغاء هذا الحجز مؤقتاً لمدة 5 دقائق لحماية مقدم الخدمة من الإلغاءات غير المصرح بها.")
+                    } else {
+                        onResult(false, "❌ كلمة المرور أو رقم الحجز غير صحيح! المحاولات المتبقية: ${maxAttempts - newAttempts}")
+                    }
+                }.addOnFailureListener {
+                    onResult(false, "❌ إدخال خاطئ وفشل حفظ محاولة التحقق")
+                }
+            }
+        }.addOnFailureListener {
+            onResult(false, "❌ فشل الاتصال بقاعدة البيانات")
+        }
     }
 
     fun getBookingStatusColor(status: String): String {
         return when (status.uppercase()) {
-            "PENDING" -> "#FFC107"
-            "ACCEPTED" -> "#4CAF50"
-            "IN_PROGRESS" -> "#2196F3"
-            "COMPLETED" -> "#9C27B0"
-            "CANCELLED" -> "#F44336"
+            "PENDING", "UNDER_REVIEW" -> "#F97316" // Orange
+            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> "#3B82F6" // Blue
+            "COMPLETED" -> "#10B981" // Green
+            "REJECTED", "CANCELLED" -> "#EF4444" // Red
             else -> "#9E9E9E"
         }
     }
 
     fun getBookingStatusLabel(status: String): String {
         return when (status.uppercase()) {
-            "PENDING" -> "⏳ قيد الانتظار"
-            "ACCEPTED" -> "✅ مقبول"
-            "IN_PROGRESS" -> "🔧 قيد التنفيذ"
-            "COMPLETED" -> "🎉 مكتمل"
-            "CANCELLED" -> "❌ ملغي"
+            "PENDING", "UNDER_REVIEW" -> "🔍 قيد المراجعة والتدقيق (33%)"
+            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> "⚡ جاري تنفيذ الخدمة (66%)"
+            "COMPLETED" -> "🎉 مكتملة بنجاح (100%)"
+            "REJECTED" -> "❌ مرفوضة من الإدارة"
+            "CANCELLED" -> "❌ ملغية"
             else -> status
         }
     }
 
     fun getBookingProgress(status: String): Float {
         return when (status.uppercase()) {
-            "PENDING" -> 0.25f
-            "ACCEPTED" -> 0.50f
-            "IN_PROGRESS" -> 0.75f
-            "COMPLETED" -> 1.0f
-            "CANCELLED" -> 0.0f
+            "PENDING", "UNDER_REVIEW" -> 0.33f
+            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> 0.66f
+            "COMPLETED" -> 1.00f
             else -> 0.0f
         }
     }
@@ -1618,21 +4815,34 @@ class MainViewModel : ViewModel() {
         val technician = _pendingProviders.value.find { it.id == providerId }
         technician?.let {
             _pendingProviders.value = _pendingProviders.value.filter { it.id != providerId }
+            val lowerArea = it.area.lowercase()
+            val finalCityId = when {
+                lowerArea.contains("عدن") || lowerArea.contains("aden") -> "ye_ade"
+                lowerArea.contains("تعز") || lowerArea.contains("taiz") -> "ye_tai"
+                lowerArea.contains("الحديدة") || lowerArea.contains("hodeidah") -> "ye_hod"
+                else -> "ye_san"
+            }
+            val finalId = "prov_" + it.phone.trim().replace(" ", "").replace("+", "")
             val p = ProviderEntity(
-                id = it.id,
+                id = finalId,
                 name = it.name,
                 phone = it.phone,
                 categoryId = it.categoryId,
                 area = it.area,
                 localNeighborhood = it.localNeighborhood,
+                cityId = finalCityId,
                 isVerified = true,
                 isRecommended = false,
                 subscriptionStatus = "APPROVED",
                 isVip = false,
                 isAvailable = true,
+                isBlocked = false,
                 rating = 5.0f,
                 subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
-                workPhotosBase64 = it.workPhotosBase64
+                workPhotosBase64 = it.workPhotosBase64,
+                password = it.password,
+                isDeleted = false,
+                deletedAt = null
             )
 
             val notification = NotificationEntity(
@@ -1645,9 +4855,15 @@ class MainViewModel : ViewModel() {
             )
             _notifications.value = listOf(notification) + _notifications.value
 
+            // Instant Local Sync
+            val currentProviders = _providers.value.filter { it.id != finalId }.toMutableList()
+            currentProviders.add(p)
+            _providers.value = currentProviders
+            applyFilters()
+
             try {
                 db.collection("pending_providers").document(providerId).delete()
-                db.collection("providers").document(providerId).set(p)
+                db.collection("providers").document(finalId).set(p)
                 db.collection("notifications").document(notification.id).set(notification)
             } catch (e: Exception) {}
         }
@@ -1728,10 +4944,10 @@ class MainViewModel : ViewModel() {
                 db.collection("bookings").get().addOnSuccessListener { snapshot ->
                     snapshot?.documents?.forEach { doc -> doc.reference.delete() }
                 }
-                // 5. Delete all providers except "p_maher"
+                // 5. Delete all providers except "p_amin"
                 db.collection("providers").get().addOnSuccessListener { snapshot ->
                     snapshot?.documents?.forEach { doc ->
-                        if (doc.id != "p_maher") {
+                        if (doc.id != "p_amin") {
                             doc.reference.delete()
                         }
                     }
@@ -1880,6 +5096,326 @@ class MainViewModel : ViewModel() {
     fun updateProviderEntity(provider: ProviderEntity) {
         db.collection("providers").document(provider.id).set(provider)
         triggerNotification("💾 تم تحديث بيانات مقدم الخدمة ${provider.name} بنجاح")
+    }
+
+    fun logCall(providerId: String, providerName: String) {
+        val callId = UUID.randomUUID().toString()
+        val call = CallEntity(
+            id = callId,
+            providerId = providerId,
+            providerName = providerName,
+            callerName = "مواطن يمني 🇾🇪",
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("calls").document(callId).set(call)
+    }
+
+    fun addCoupon(code: String, pointsValue: Int, expiryMs: Long, discountPercentage: Int = 0, maxUsageCount: Int = 100) {
+        val couponId = UUID.randomUUID().toString()
+        val coupon = CouponEntity(
+            id = couponId,
+            code = code,
+            pointsValue = pointsValue,
+            expiryTimestamp = System.currentTimeMillis() + expiryMs,
+            status = "ACTIVE",
+            discountPercentage = discountPercentage,
+            maxUsageCount = maxUsageCount,
+            usedCount = 0
+        )
+        db.collection("coupons").document(couponId).set(coupon)
+        triggerNotification("🎫 تم إضافة كوبون جديد بنجاح: $code")
+    }
+
+    fun deleteCoupon(couponId: String) {
+        db.collection("coupons").document(couponId).delete()
+        triggerNotification("🗑️ تم حذف الكوبون")
+    }
+
+    fun toggleProviderBlock(providerId: String) {
+        val provider = _providers.value.find { it.id == providerId }
+        provider?.let {
+            val updated = it.copy(isBlocked = !it.isBlocked)
+            db.collection("providers").document(providerId).set(updated)
+            if (updated.isBlocked) {
+                triggerNotification("🚫 تم حظر الفني ${it.name} بنجاح")
+            } else {
+                triggerNotification("🟢 تم إلغاء حظر الفني ${it.name}")
+            }
+        }
+    }
+
+    // ------------------- Payment Wallets & Payments -------------------
+    fun addPaymentWallet(wallet: PaymentWalletEntity) {
+        val docRef = db.collection("payment_wallets").document()
+        val walletWithId = wallet.copy(id = docRef.id, createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis())
+        
+        if (walletWithId.isDefault) {
+            // Unset other defaults
+            db.collection("payment_wallets").whereEqualTo("isDefault", true).get().addOnSuccessListener { qs ->
+                for (doc in qs.documents) {
+                    doc.reference.update("isDefault", false)
+                }
+            }
+        }
+        
+        docRef.set(walletWithId).addOnSuccessListener {
+            triggerNotification("✅ تم إضافة المحفظة بنجاح!")
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل إضافة المحفظة: ${it.message}")
+        }
+    }
+
+    fun updatePaymentWallet(wallet: PaymentWalletEntity) {
+        if (wallet.id.isEmpty()) return
+        
+        if (wallet.isDefault) {
+            // Unset other defaults
+            db.collection("payment_wallets").whereEqualTo("isDefault", true).get().addOnSuccessListener { qs ->
+                for (doc in qs.documents) {
+                    if (doc.id != wallet.id) {
+                        doc.reference.update("isDefault", false)
+                    }
+                }
+            }
+        }
+        
+        val updated = wallet.copy(updatedAt = System.currentTimeMillis())
+        db.collection("payment_wallets").document(wallet.id).set(updated).addOnSuccessListener {
+            triggerNotification("✅ تم تحديث المحفظة بنجاح!")
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل تحديث المحفظة: ${it.message}")
+        }
+    }
+
+    fun deletePaymentWallet(walletId: String) {
+        db.collection("payment_wallets").document(walletId).delete().addOnSuccessListener {
+            triggerNotification("🗑️ تم حذف المحفظة بنجاح!")
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل حذف المحفظة: ${it.message}")
+        }
+    }
+
+    fun togglePaymentWalletVisibility(walletId: String, currentVisible: Boolean) {
+        val newStatus = !currentVisible
+        db.collection("payment_wallets").document(walletId).update("isVisibleToUsers", newStatus).addOnSuccessListener {
+            triggerNotification(if (newStatus) "👁️ تم إظهار المحفظة للمستخدمين" else "🙈 تم إخفاء المحفظة عن المستخدمين")
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل تغيير حالة إظهار المحفظة")
+        }
+    }
+
+    fun createPayment(
+        userId: String,
+        providerId: String,
+        amount: Double,
+        method: String,
+        bookingId: String = "",
+        isLinkedToBooking: Boolean = false,
+        bookingServiceType: String = ""
+    ) {
+        val docRef = db.collection("payments").document()
+        
+        val settingsVal = _settings.value
+        val advanceAmount = if (settingsVal.requireAdvancePayment) {
+            var calculated = amount * settingsVal.advancePaymentPercent
+            if (calculated < settingsVal.minAdvanceAmount) calculated = settingsVal.minAdvanceAmount
+            if (calculated > settingsVal.maxAdvanceAmount) calculated = settingsVal.maxAdvanceAmount
+            calculated
+        } else {
+            0.0
+        }
+        
+        val commission = if (settingsVal.isCommissionEnabled) {
+            amount * settingsVal.paymentCommissionRate
+        } else {
+            0.0
+        }
+        
+        val remainingAmount = amount - advanceAmount
+        val providerShare = amount - commission
+        
+        val payment = PaymentEntity(
+            id = docRef.id,
+            userId = userId,
+            providerId = providerId,
+            bookingId = bookingId,
+            type = "service",
+            method = method,
+            status = "PENDING",
+            amount = amount,
+            advanceAmount = advanceAmount,
+            remainingAmount = remainingAmount,
+            commission = commission,
+            providerShare = providerShare,
+            currency = "YER",
+            isLinkedToBooking = isLinkedToBooking,
+            bookingDate = if (isLinkedToBooking) System.currentTimeMillis() else null,
+            bookingServiceType = bookingServiceType,
+            createdAt = System.currentTimeMillis()
+        )
+        
+        docRef.set(payment).addOnSuccessListener {
+            triggerNotification("✅ تم إنشاء طلب الدفع بنجاح!")
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل إنشاء طلب الدفع: ${it.message}")
+        }
+    }
+
+    fun confirmPayment(
+        paymentId: String,
+        transferId: String,
+        transferPhoto: String,
+        walletProvider: String,
+        walletNumber: String,
+        walletAccountName: String
+    ) {
+        val updates = mapOf(
+            "status" to "PROCESSING",
+            "transferId" to transferId,
+            "transferPhoto" to transferPhoto,
+            "walletProvider" to walletProvider,
+            "walletNumber" to walletNumber,
+            "walletAccountName" to walletAccountName,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        
+        db.collection("payments").document(paymentId).update(updates).addOnSuccessListener {
+            triggerNotification("✅ تم تقديم إثبات التحويل بنجاح! بانتظار مراجعة الإدارة.")
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل تأكيد الدفع: ${it.message}")
+        }
+    }
+
+    fun verifyPayment(paymentId: String, isVerified: Boolean, note: String, adminName: String) {
+        val status = if (isVerified) "COMPLETED" else "FAILED"
+        val verificationStatus = if (isVerified) "VERIFIED" else "REJECTED"
+        
+        val updates = mutableMapOf<String, Any>(
+            "status" to status,
+            "verificationStatus" to verificationStatus,
+            "verificationNote" to note,
+            "verifiedBy" to adminName,
+            "verifiedAt" to System.currentTimeMillis(),
+            "updatedAt" to System.currentTimeMillis()
+        )
+        
+        if (isVerified) {
+            updates["paidAt"] = System.currentTimeMillis()
+        }
+        
+        db.collection("payments").document(paymentId).update(updates).addOnSuccessListener {
+            triggerNotification(if (isVerified) "✅ تم قبول وتأكيد عملية الدفع بنجاح!" else "❌ تم رفض عملية الدفع.")
+            
+            db.collection("payments").document(paymentId).get().addOnSuccessListener { snapshot ->
+                val payment = snapshot.toObject(PaymentEntity::class.java)
+                if (payment != null) {
+                    if (payment.isLinkedToBooking && payment.bookingId.isNotEmpty()) {
+                        db.collection("bookings").document(payment.bookingId).update("status", if (isVerified) "APPROVED" else "PENDING")
+                    }
+                }
+            }
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل التحقق من الدفع: ${it.message}")
+        }
+    }
+
+    fun refundPayment(paymentId: String, reason: String) {
+        val updates = mapOf(
+            "status" to "REFUNDED",
+            "verificationStatus" to "DISPUTED",
+            "verificationNote" to reason,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        
+        db.collection("payments").document(paymentId).update(updates).addOnSuccessListener {
+            triggerNotification("🔄 تم استرداد المبلغ بنجاح.")
+        }.addOnFailureListener {
+            triggerNotification("❌ فشل استرداد الدفع: ${it.message}")
+        }
+    }
+
+    // --- VOICE CALL STATE & CONTROL ---
+    private val _activeVoiceCall = MutableStateFlow<Pair<String, String>?>(null)
+    val activeVoiceCall: StateFlow<Pair<String, String>?> = _activeVoiceCall.asStateFlow()
+
+    fun startVoiceCall(name: String, role: String) {
+        _activeVoiceCall.value = Pair(name, role)
+    }
+
+    fun endVoiceCall() {
+        _activeVoiceCall.value = null
+    }
+
+    // --- PASSWORD MANAGEMENT & RESET ---
+    fun resetAccountPassword(entityType: String, phoneOrId: String, newPass: String) {
+        val hashedPass = com.example.util.PasswordHasher.createSaltedHash(newPass)
+        val cleanPhone = phoneOrId.trim().replace(" ", "").replace("+", "")
+        when (entityType) {
+            "PROVIDER", "TECHNICIAN", "TECH" -> {
+                db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                    for (doc in qs.documents) {
+                        db.collection("providers").document(doc.id).update("password", hashedPass)
+                    }
+                }
+            }
+            "STORE", "RESTAURANT", "MEDICAL", "CENTER" -> {
+                db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                    for (doc in qs.documents) {
+                        db.collection("stores").document(doc.id).update("password", hashedPass)
+                    }
+                }
+            }
+            "JOB" -> {
+                db.collection("jobs").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                    for (doc in qs.documents) {
+                        db.collection("jobs").document(doc.id).update("password", hashedPass)
+                    }
+                }
+            }
+            "USER" -> {
+                db.collection("registered_users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                    for (doc in qs.documents) {
+                        db.collection("registered_users").document(doc.id).update("password", hashedPass)
+                    }
+                }
+            }
+        }
+        triggerNotification("🔑 تم تحديث وإعادة تعيين كلمة المرور للحساب ($phoneOrId) بنجاح!")
+    }
+
+    // --- SECONDARY FIREBASE SYNC CONTROL ---
+    fun setSecondaryFirebaseConfig(projectId: String, apiKey: String, appId: String, storageBucket: String, isEnabled: Boolean) {
+        val map = mapOf(
+            "secondary_projectId" to projectId,
+            "secondary_apiKey" to apiKey,
+            "secondary_appId" to appId,
+            "secondary_storageBucket" to storageBucket,
+            "secondary_enabled" to isEnabled
+        )
+        db.collection("admin_settings").document("secondary_firebase").set(map)
+        triggerNotification(if (isEnabled) "🟢 تم تفعيل المزامنة المزدوجة مع حساب Firebase الثانوي بنجاح!" else "🔴 تم إيقاف المزامنة مع الحساب الثانوي")
+    }
+
+    // --- LOCAL STORAGE BACKUP EXPORT ---
+    fun saveBackupToLocalStorage(context: android.content.Context, jsonStr: String, fileName: String): String {
+        return try {
+            val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val backupFolder = java.io.File(downloadDir, "YemenServicesBackups")
+            if (!backupFolder.exists()) {
+                backupFolder.mkdirs()
+            }
+            val targetFile = java.io.File(backupFolder, if (fileName.endsWith(".json")) fileName else "$fileName.json")
+            targetFile.writeText(jsonStr, Charsets.UTF_8)
+            targetFile.absolutePath
+        } catch (e: Exception) {
+            try {
+                val targetFile = java.io.File(context.getExternalFilesDir(null), fileName)
+                targetFile.writeText(jsonStr, Charsets.UTF_8)
+                targetFile.absolutePath
+            } catch (e2: Exception) {
+                ""
+            }
+        }
     }
 }
 

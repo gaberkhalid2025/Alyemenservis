@@ -17,4 +17,10 @@ local.properties
 .env
 debug.keystore
 !app-debug.apk
+!app-release.apk
+!app-release-full.apk
+!AlyemenServices-release.apk
+!app/src/main/assets/app-release.apk
+!assets/app-release.apk
+
 
