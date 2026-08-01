@@ -22,11 +22,9 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Ensure Gradle Wrapper
+    - name: Ensure Gradle Wrapper 9.3.1
       run: |
-        if [ ! -f ./gradlew ]; then
-          gradle wrapper --gradle-version 9.3.1
-        fi
+        gradle wrapper --gradle-version 9.3.1
         chmod +x gradlew
 
     - name: Build Release APK
