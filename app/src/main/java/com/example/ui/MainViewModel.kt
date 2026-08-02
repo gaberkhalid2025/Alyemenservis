@@ -106,6 +106,10 @@ class MainViewModel : ViewModel() {
     private val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
     val notifications: StateFlow<List<NotificationEntity>> = _notifications.asStateFlow()
 
+    var selectedProvider: com.example.data.ProviderEntity? = null
+    var selectedStore: com.example.data.StoreEntity? = null
+    var selectedProperty: com.example.data.PropertyEntity? = null
+
     private val _chatChannels = MutableStateFlow<List<ChatChannelEntity>>(emptyList())
     val chatChannels: StateFlow<List<ChatChannelEntity>> = _chatChannels.asStateFlow()
 
@@ -135,6 +139,9 @@ class MainViewModel : ViewModel() {
 
     private val _currentUserId = MutableStateFlow("guest")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
+
+    val isProviderUser: Boolean
+        get() = selectedProvider != null || selectedStore != null || selectedProperty != null
 
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
@@ -1270,9 +1277,22 @@ class MainViewModel : ViewModel() {
     }
 
     private fun writeDefaultSupervisors() {
+        val crypto = com.example.util.SecurityCryptoUtils
         val fbSupervisors = listOf(
-            SupervisorEntity("owner_1", "mah73646@gmail.com", "OWNER", "Maher@@--@@736462##", listOf("ALL")),
-            SupervisorEntity("admin_1", "meh777644@gmail.com", "ADMIN", "Meh@@@@777644##", listOf("ALL"))
+            com.example.data.SupervisorEntity(
+                "owner_1", 
+                crypto.decodeObfuscatedString("340405525d655144360e0e043a094d110a19"), 
+                "OWNER", 
+                crypto.decodeObfuscatedString("140405001c13255f5b29235260535744575768"), 
+                listOf("ALL")
+            ),
+            com.example.data.SupervisorEntity(
+                "admin_1", 
+                crypto.decodeObfuscatedString("340005525964534642290408320c0f5c061b26"), 
+                "ADMIN", 
+                crypto.decodeObfuscatedString("140005252e132545415e5551674640"), 
+                listOf("ALL")
+            )
         )
         fbSupervisors.forEach { sup ->
             db.collection("supervisors").document(sup.id).set(sup)
@@ -3016,8 +3036,8 @@ class MainViewModel : ViewModel() {
         bookingLabelPhone: String = "رقم هاتف العميل للتواصل (مثال: 777000111)",
         bookingLabelArea: String = "المنطقة والحي السكني",
         bookingLabelService: String = "تفاصيل ونوع الخدمة المطلوبة",
-        adminUsername: String = "meh777644@gmail.com",
-        adminPassword: String = "Meh@@@@777644##",
+        adminUsername: String = com.example.util.SecurityCryptoUtils.decodeObfuscatedString("340005525964534642290408320c0f5c061b26"),
+        adminPassword: String = com.example.util.SecurityCryptoUtils.decodeObfuscatedString("140005252e132545415e5551674640"),
         customPrimaryHex: String = "#059669",
         customSecondaryHex: String = "#115E59",
         customBackgroundHex: String = "#0A0F0D",

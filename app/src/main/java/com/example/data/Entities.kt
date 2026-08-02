@@ -230,7 +230,14 @@ data class AdminSettingsEntity(
 
     // Map feature switches
     val isMapFeatureEnabled: Boolean = true,
+    val mapProvider: String = "MAPLIBRE", // "MAPLIBRE", "GOOGLE", "MAPBOX"
+    val mapDefaultZoom: Float = 14f,
+    val mapMaxDistanceKm: Int = 20,
     val mapPrecisionDigits: Int = 1, // 1 or 2 digits after decimal
+
+    // Assistant controls
+    val isAssistantEnabled: Boolean = true,
+    val isAssistantIconVisible: Boolean = true,
 
     // Card dimensions styles
     val coverHeight: Int = 0,
