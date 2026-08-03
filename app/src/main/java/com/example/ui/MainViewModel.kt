@@ -4091,6 +4091,21 @@ class MainViewModel : ViewModel() {
     }
 
     // Advanced Instant Chat Engine
+    fun openDirectChatWithEntity(
+        targetId: String,
+        targetName: String,
+        targetPhone: String = "",
+        targetType: String = "PROVIDER"
+    ) {
+        openOrCreateChatChannel(
+            targetId = targetId,
+            targetType = targetType,
+            targetName = targetName,
+            targetPhone = targetPhone,
+            onCreated = { }
+        )
+    }
+
     fun openOrCreateChatChannel(
         targetId: String,
         targetType: String, // "PROVIDER", "STORE", "PROPERTY", "RESTAURANT", "ADMIN", "SUPERVISOR", "CATEGORY"

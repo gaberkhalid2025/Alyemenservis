@@ -542,7 +542,7 @@ fun StoresTabContent(
             }
         } else {
             activeStores.take(itemsToShowLimit).forEach { store ->
-                StoreListItemCard(store = store, themeColors = themeColors, onClick = { onStoreClick(store) })
+                StoreListItemCard(store = store, themeColors = themeColors, onClick = { onStoreClick(store) }, viewModel = viewModel)
             }
             if (activeStores.size > itemsToShowLimit) {
                 Button(
@@ -564,168 +564,30 @@ fun StoreListItemCard(
     onClick: () -> Unit,
     viewModel: MainViewModel? = null
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .border(
-                1.dp,
-                if (store.isPinned) themeColors.accent else themeColors.accent.copy(alpha = 0.08f),
-                RoundedCornerShape(12.dp)
-            )
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(110.dp)
-                    .background(Color.DarkGray)
-            ) {
-                // Background Cover Photo
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(themeColors.primary.copy(alpha = 0.1f))
-                ) {
-                    Text("📸 غلاف المتجر", modifier = Modifier.align(Alignment.Center), color = Color.Gray, fontSize = 12.sp)
-                }
-
-                if (store.isPinned) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .background(themeColors.accent, RoundedCornerShape(bottomEnd = 12.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text("📌 مثبت في الصدارة", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                    }
-                }
-
-                if (!store.isActive) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .background(Color.Red, RoundedCornerShape(bottomStart = 12.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text("قيد المراجعة والتحقق", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
+    com.example.ui.CompactStoreCard(
+        store = store,
+        onOpenDetails = onClick,
+        onOpenReviews = onClick,
+        onAddReview = onClick,
+        onRequestBooking = {
+            if (viewModel != null) {
+                viewModel.selectedStore = store
+                viewModel.navigateTo("CREATE_BOOKING")
+            } else {
+                onClick()
             }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Logo placeholder
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(themeColors.accent.copy(alpha = 0.2f))
-                        .border(1.5.dp, themeColors.accent, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🏪", fontSize = 24.sp)
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(store.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        if (store.isVip) {
-                            Box(
-                                modifier = Modifier
-                                    .background(Color(0xFFD97706), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text("🏆 VIP", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(3.dp))
-                        }
-                        if (store.isVerified) {
-                            Box(
-                                modifier = Modifier
-                                    .background(Color(0xFF3B82F6), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text("✅ موثق", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(3.dp))
-                        }
-                        if (store.isRecommended) {
-                            Box(
-                                modifier = Modifier
-                                    .background(Color(0xFFEC4899), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text("💖 موصى به", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(3.dp))
-                        }
-                    }
-                    Text(store.description, fontSize = 10.sp, color = themeColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("🕒 ${store.workingHours}", fontSize = 9.sp, color = themeColors.textSecondary)
-                        Text("📍 الحي: ${store.localNeighborhood}", fontSize = 9.sp, color = themeColors.textSecondary)
-                    }
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("⭐", fontSize = 11.sp)
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(String.format("%.1f", store.rating), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    }
-                    Text("(${store.numReviews} تقييم)", fontSize = 8.sp, color = themeColors.textSecondary)
-                }
+        },
+        onDirectChat = {
+            if (viewModel != null) {
+                viewModel.openDirectChatWithEntity(store.id, store.name, store.phone, "STORE")
+            } else {
+                onClick()
             }
-
-            Divider(color = Color.Gray.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                Button(
-                    onClick = {
-                        val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${store.phone}"))
-                        context.startActivity(u)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    modifier = Modifier.weight(1f).height(30.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("📞 اتصال مباشر", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = {
-                        if (viewModel != null) {
-                            viewModel.startVoiceCall(store.name, "متجر / مركز تجاري HD")
-                        } else {
-                            val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${store.phone}"))
-                            context.startActivity(u)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                    modifier = Modifier.weight(1f).height(30.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("🎙️ مكالمة صوتية", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
+        },
+        onAgoraCall = {
+            viewModel?.startVoiceCall(store.name, "متجر / مركز تجاري HD")
         }
-    }
+    )
 }
 
 // --------------------------------------------------------

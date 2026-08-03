@@ -35,6 +35,7 @@ fun CompactStoreCard(
     onAddReview: () -> Unit,
     onRequestBooking: () -> Unit,
     onDirectChat: () -> Unit,
+    onAgoraCall: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -260,6 +261,19 @@ fun CompactStoreCard(
                             .background(Color(0xFF3B82F6))
                     ) {
                         Icon(Icons.Default.Email, contentDescription = "محادثة", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+
+                    // In-App Voice Call (Agora HD)
+                    if (onAgoraCall != null) {
+                        IconButton(
+                            onClick = onAgoraCall,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF8B5CF6))
+                        ) {
+                            Icon(Icons.Default.Call, contentDescription = "مكالمة صوتية", tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
                     }
 
                     // Browse Store Profile Button

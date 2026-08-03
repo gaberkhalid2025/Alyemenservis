@@ -1083,6 +1083,10 @@ fun AppNavigator(
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                                 "BOOKINGS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
+                                "MY_URGENT_REQUESTS" -> com.example.ui.MyUrgentRequestsScreen(
+                                    viewModel = viewModel,
+                                    onBackClick = { viewModel.navigateTo("HOME") }
+                                )
                                 "MAP_VIEW" -> com.example.ui.MapScreen(
                                     viewModel = viewModel,
                                     onBackClick = { viewModel.navigateTo("HOME") },
@@ -1118,6 +1122,7 @@ fun AppNavigator(
                             }
 
                             FloatingIconsOverlay(
+                                currentScreen = currentScreen,
                                 settings = settingsState,
                                 themeColors = themeColors,
                                 onAssistantClick = { showAssistantDialog = true },
@@ -1760,7 +1765,7 @@ fun AppHeaderBar(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(themeColors.accent)
-                        .clickable { viewModel.navigateTo("BOOKINGS_VIEW") }
+                        .clickable { viewModel.navigateTo("MY_URGENT_REQUESTS") }
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Row(
@@ -2025,56 +2030,74 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 // ------ Floating Icons Overlay Container ------
 @Composable
 fun BoxScope.FloatingIconsOverlay(
+    currentScreen: String = "",
     settings: AdminSettingsEntity,
     themeColors: VisualThemePalette,
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن" (Instant Request Service / Reverse Marketplace FAB)
-    Box(
-        modifier = Modifier
-            .align(Alignment.BottomStart)
-            .padding(start = 16.dp, bottom = 18.dp)
-            .clip(RoundedCornerShape(30.dp))
-            .background(
-                Brush.horizontalGradient(
-                    listOf(Color(0xFF10B981), Color(0xFF059669))
+    // Screen Guard: HIDE FABs on Forms, Auth screens, Active Calls, or when disabled in Admin settings
+    val guardedScreens = remember {
+        listOf("REGISTER_FORM", "JOIN_REQUEST_STATUS", "CALL_SCREEN", "EDIT_PROFILE", "LOGIN", "REGISTER", "CREATE_BOOKING")
+    }
+    if (guardedScreens.any { currentScreen.contains(it, ignoreCase = true) }) {
+        return
+    }
+
+    val shape = when (settings.avatarShape.uppercase()) {
+        "SQUARE" -> RoundedCornerShape(12.dp)
+        "ROUNDED" -> RoundedCornerShape(20.dp)
+        "CIRCLE" -> CircleShape
+        else -> RoundedCornerShape(30.dp)
+    }
+
+    // 1. Primary Action FAB: "اطلب خدمتك الآن ⚡"
+    if (!settings.assistantHidden) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 18.dp)
+                .clip(shape)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF10B981), Color(0xFF059669))
+                    )
                 )
-            )
-            .clickable { onRequestServiceClick() }
-            .border(1.5.dp, Color.White, RoundedCornerShape(30.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .clickable { onRequestServiceClick() }
+                .border(1.5.dp, Color.White, shape)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "اطلب خدمتك الآن",
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = "اطلب خدمتك الآن ⚡",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "اطلب خدمتك الآن",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "اطلب خدمتك الآن ⚡",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
         }
     }
 
-    // 2. Secondary FAB: "المساعد الذكي" (Offline Local AI Assistant FAB)
-    if (!settings.assistantHidden) {
+    // 2. Secondary FAB: "المساعد الذكي 🤖"
+    if (!settings.assistantHidden && settings.isAssistantIconVisible) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 18.dp)
-                .clip(RoundedCornerShape(30.dp))
+                .clip(shape)
                 .background(themeColors.accent)
                 .clickable { onAssistantClick() }
-                .border(1.5.dp, Color.White, RoundedCornerShape(30.dp))
+                .border(1.5.dp, Color.White, shape)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -3915,6 +3938,40 @@ fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
 
 @Composable
 fun ProviderCard(
+    provider: ProviderEntity,
+    themeColors: VisualThemePalette,
+    viewModel: MainViewModel,
+    onChatOpen: (String) -> Unit
+) {
+    com.example.ui.CompactProviderCard(
+        provider = provider,
+        onOpenDetails = {
+            viewModel.selectedProvider = provider
+            viewModel.navigateTo("PROVIDER_DETAILS")
+        },
+        onOpenReviews = {
+            viewModel.selectedProvider = provider
+            viewModel.navigateTo("PROVIDER_DETAILS")
+        },
+        onAddReview = {
+            viewModel.selectedProvider = provider
+            viewModel.navigateTo("PROVIDER_DETAILS")
+        },
+        onRequestBooking = {
+            viewModel.selectedProvider = provider
+            viewModel.navigateTo("CREATE_BOOKING")
+        },
+        onDirectChat = {
+            viewModel.openDirectChatWithEntity(provider.id, provider.name, provider.phone, "PROVIDER")
+        },
+        onAgoraCall = {
+            viewModel.startVoiceCall(provider.name, provider.specialization.ifEmpty { "فني معتمد" })
+        }
+    )
+}
+
+@Composable
+fun ProviderCardLegacy(
     provider: ProviderEntity,
     themeColors: VisualThemePalette,
     viewModel: MainViewModel,
