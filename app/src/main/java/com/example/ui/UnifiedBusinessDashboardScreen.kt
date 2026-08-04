@@ -38,15 +38,14 @@ fun UnifiedBusinessDashboardScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
-    var activeTab by remember { mutableStateOf(0) } // 0: Profile, 1: Settings, 2: Products/Services, 3: Offers, 4: Ratings, 5: Bookings, 6: Attachments
+    var activeTab by remember { mutableStateOf(0) } // 0: Overview, 1: Products/Services, 2: Offers, 3: Ratings/Reviews, 4: Gallery/Photos, 5: Settings/Orders
     val tabsList = listOf(
-        Pair("📋", "الملف الشخصي"),
-        Pair("⚙️", "الإعدادات والصلاحيات"),
-        Pair("🛒", "المنتجات والخدمات"),
-        Pair("🎁", "العروض والخصومات"),
-        Pair("⭐", "التقييمات والمراجعات"),
-        Pair("📅", "الحجوزات والمواعيد"),
-        Pair("📎", "الملفات والمرفقات")
+        Pair("📊", "نظرة عامة"),
+        Pair("🛒", "المنتجات / الخدمات"),
+        Pair("🎁", "العروض"),
+        Pair("⭐", "التقييمات والتعليقات"),
+        Pair("🖼️", "الصور والمعرض"),
+        Pair("⚙️", "الإعدادات والطلبات")
     )
 
     Column(
@@ -126,12 +125,11 @@ fun UnifiedBusinessDashboardScreen(
         Box(modifier = Modifier.weight(1f).padding(12.dp)) {
             when (activeTab) {
                 0 -> UnifiedProfileSection(account, viewModel, themeColors)
-                1 -> UnifiedSettingsSection(account, viewModel, themeColors)
-                2 -> UnifiedProductsServicesSection(account, viewModel, themeColors)
-                3 -> UnifiedOffersSection(account, viewModel, themeColors)
-                4 -> UnifiedRatingsSection(account, viewModel, themeColors)
-                5 -> UnifiedBookingsSection(account, viewModel, themeColors)
-                6 -> UnifiedAttachmentsSection(account, viewModel, themeColors)
+                1 -> UnifiedProductsServicesSection(account, viewModel, themeColors)
+                2 -> UnifiedOffersSection(account, viewModel, themeColors)
+                3 -> UnifiedRatingsSection(account, viewModel, themeColors)
+                4 -> UnifiedAttachmentsSection(account, viewModel, themeColors)
+                5 -> UnifiedSettingsSection(account, viewModel, themeColors)
             }
         }
     }

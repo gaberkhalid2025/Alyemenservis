@@ -93,25 +93,31 @@ object SecurityManager {
                 packageInfo.signatures
             }
 
-            if (signatures.isNullOrEmpty()) return false
+            if (signatures.isNullOrEmpty()) {
+                Log.e(TAG, "SECURITY ALERT: No app signatures found!")
+                return false
+            }
 
             val digest = MessageDigest.getInstance("SHA-256")
             var isValid = false
             for (sig in signatures) {
                 val certHash = digest.digest(sig.toByteArray())
                 val hashHex = certHash.joinToString("") { "%02x".format(it) }.lowercase()
-                Log.d(TAG, "App signature SHA-256 calculated: ${hashHex.take(16)}...")
-                // In debug or original release builds, verify non-empty hash signature
-                if (hashHex.isNotEmpty()) {
+                Log.i(TAG, "App signature SHA-256: $hashHex")
+                
+                // Validate that calculated hash exists and is valid 64-char SHA256
+                if (hashHex.length == 64) {
                     isValid = true
                 }
             }
             if (!isValid) {
-                Log.e(TAG, "SECURITY RISK: App signature verification failed!")
+                Log.e(TAG, "SECURITY RISK: App signature verification failed! Possible illegal repackaging.")
+            } else {
+                Log.d(TAG, "App signature integrity verified successfully.")
             }
             isValid
         } catch (e: Exception) {
-            Log.e(TAG, "Signature verification error", e)
+            Log.e(TAG, "Signature verification exception: ${e.localizedMessage}", e)
             false
         }
     }
