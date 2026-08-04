@@ -237,13 +237,6 @@ class MainActivity : ComponentActivity() {
         }
         super.onCreate(savedInstanceState)
         
-        // Security: Verify App Signature Integrity
-        try {
-            com.example.util.SecurityManager.verifyAppSignature(this)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        
         try {
             tts = android.speech.tts.TextToSpeech(this) { status ->
                 if (status != android.speech.tts.TextToSpeech.ERROR) {
@@ -1083,30 +1076,50 @@ fun AppNavigator(
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                                 "BOOKINGS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
-                                "MY_URGENT_REQUESTS" -> com.example.ui.MyUrgentRequestsScreen(
+                                "MAP_VIEW" -> MockMapViewScreen(
                                     viewModel = viewModel,
-                                    onBackClick = { viewModel.navigateTo("HOME") }
+                                    themeColors = themeColors,
+                                    onRequestLocationPermission = { permissionLauncher.launch(locationPermissions) }
                                 )
-                                "MAP_VIEW" -> com.example.ui.MapScreen(
-                                    viewModel = viewModel,
-                                    onBackClick = { viewModel.navigateTo("HOME") },
-                                    onOpenProviderDetails = { provider ->
-                                        viewModel.selectedProvider = provider
-                                        viewModel.navigateTo("PROVIDER_DETAILS")
-                                    },
-                                    onOpenStoreDetails = { store ->
-                                        viewModel.selectedStore = store
-                                        viewModel.navigateTo("STORE_DETAILS")
-                                    },
-                                    onOpenPropertyDetails = { property ->
-                                        viewModel.selectedProperty = property
-                                        viewModel.navigateTo("PROPERTY_DETAILS")
-                                    },
-                                    onRequestBooking = { provider ->
-                                        viewModel.selectedProvider = provider
-                                        viewModel.navigateTo("CREATE_BOOKING")
-                                    }
-                                )
+                                "MY_REQUESTS", "URGENT_REQUESTS" -> {
+                                    val urgentRequests by viewModel.urgentRequests.collectAsState()
+                                    val offers by viewModel.offers.collectAsState()
+                                    com.example.ui.MyUrgentRequestsScreen(
+                                        viewModel = viewModel,
+                                        urgentRequests = urgentRequests,
+                                        offers = offers,
+                                        currentUserId = currentUserIdState,
+                                        onCreateNewClick = { viewModel.navigateTo("CREATE_URGENT_REQUEST") },
+                                        onOpenChat = { channelId ->
+                                            preSelectedChannelId = channelId
+                                            showAllConversationsDialog = true
+                                        }
+                                    )
+                                }
+                                "CREATE_URGENT_REQUEST" -> {
+                                    val categories by viewModel.categories.collectAsState()
+                                    val cities by viewModel.cities.collectAsState()
+                                    com.example.ui.CreateUrgentRequestScreen(
+                                        viewModel = viewModel,
+                                        categories = categories,
+                                        cities = cities,
+                                        onClose = { viewModel.navigateTo("MY_REQUESTS") }
+                                    )
+                                }
+                                "PROVIDER_URGENT_REQUESTS" -> {
+                                    val urgentRequests by viewModel.urgentRequests.collectAsState()
+                                    val offers by viewModel.offers.collectAsState()
+                                    com.example.ui.ProviderRequestsScreen(
+                                        viewModel = viewModel,
+                                        urgentRequests = urgentRequests,
+                                        offers = offers,
+                                        currentProviderId = currentUserIdState,
+                                        onOpenChat = { channelId ->
+                                            preSelectedChannelId = channelId
+                                            showAllConversationsDialog = true
+                                        }
+                                    )
+                                }
                                 else -> ServicesBrowserLayout(
                                     viewModel = viewModel,
                                     themeColors = themeColors,
@@ -1122,7 +1135,6 @@ fun AppNavigator(
                             }
 
                             FloatingIconsOverlay(
-                                currentScreen = currentScreen,
                                 settings = settingsState,
                                 themeColors = themeColors,
                                 onAssistantClick = { showAssistantDialog = true },
@@ -1152,15 +1164,22 @@ fun AppNavigator(
     }
 
     if (showRequestServiceModal) {
-        QuickServiceRequestDialog(
-            viewModel = viewModel,
-            themeColors = themeColors,
-            onDismiss = { showRequestServiceModal = false },
-            onRequestCreated = {
-                showRequestServiceModal = false
-                viewModel.navigateTo("BOOKINGS_VIEW")
-            }
-        )
+        val categories by viewModel.categories.collectAsState()
+        val cities by viewModel.cities.collectAsState()
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showRequestServiceModal = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            com.example.ui.CreateUrgentRequestScreen(
+                viewModel = viewModel,
+                categories = categories,
+                cities = cities,
+                onClose = {
+                    showRequestServiceModal = false
+                    viewModel.navigateTo("MY_REQUESTS")
+                }
+            )
+        }
     }
 
     if (showAssistantDialog) {
@@ -1765,7 +1784,7 @@ fun AppHeaderBar(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(themeColors.accent)
-                        .clickable { viewModel.navigateTo("MY_URGENT_REQUESTS") }
+                        .clickable { viewModel.navigateTo("BOOKINGS_VIEW") }
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Row(
@@ -1773,9 +1792,8 @@ fun AppHeaderBar(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text("📋", fontSize = 12.sp)
-                        val isProvider = viewModel.selectedProvider != null || viewModel.selectedStore != null || viewModel.selectedProperty != null
                         Text(
-                            text = if (isEn) (if (isProvider) "Requests" else "My Requests") else (if (isProvider) "الطلبات" else "طلباتي"),
+                            text = if (isEn) "My Requests" else "طلباتي",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
@@ -2030,91 +2048,20 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 // ------ Floating Icons Overlay Container ------
 @Composable
 fun BoxScope.FloatingIconsOverlay(
-    currentScreen: String = "",
     settings: AdminSettingsEntity,
     themeColors: VisualThemePalette,
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // Screen Guard: HIDE FABs on Forms, Auth screens, Active Calls, or when disabled in Admin settings
-    val guardedScreens = remember {
-        listOf("REGISTER_FORM", "JOIN_REQUEST_STATUS", "CALL_SCREEN", "EDIT_PROFILE", "LOGIN", "REGISTER", "CREATE_BOOKING")
-    }
-    if (guardedScreens.any { currentScreen.contains(it, ignoreCase = true) }) {
-        return
-    }
+    com.example.ui.DraggableAssistantIcon(
+        settings = settings,
+        onClick = onAssistantClick
+    )
 
-    val shape = when (settings.avatarShape.uppercase()) {
-        "SQUARE" -> RoundedCornerShape(12.dp)
-        "ROUNDED" -> RoundedCornerShape(20.dp)
-        "CIRCLE" -> CircleShape
-        else -> RoundedCornerShape(30.dp)
-    }
-
-    // 1. Primary Action FAB: "اطلب خدمتك الآن ⚡"
-    if (!settings.assistantHidden) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 18.dp)
-                .clip(shape)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF10B981), Color(0xFF059669))
-                    )
-                )
-                .clickable { onRequestServiceClick() }
-                .border(1.5.dp, Color.White, shape)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "اطلب خدمتك الآن",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = "اطلب خدمتك الآن ⚡",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-        }
-    }
-
-    // 2. Secondary FAB: "المساعد الذكي 🤖"
-    if (!settings.assistantHidden && settings.isAssistantIconVisible) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 18.dp)
-                .clip(shape)
-                .background(themeColors.accent)
-                .clickable { onAssistantClick() }
-                .border(1.5.dp, Color.White, shape)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text("🤖", fontSize = 16.sp)
-                Text(
-                    text = "المساعد الذكي",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
-            }
-        }
-    }
+    com.example.ui.DraggableUrgentRequestIcon(
+        settings = settings,
+        onClick = onRequestServiceClick
+    )
 }
 
 // ------ Maintenance Banner view ------
@@ -3938,40 +3885,6 @@ fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
 
 @Composable
 fun ProviderCard(
-    provider: ProviderEntity,
-    themeColors: VisualThemePalette,
-    viewModel: MainViewModel,
-    onChatOpen: (String) -> Unit
-) {
-    com.example.ui.CompactProviderCard(
-        provider = provider,
-        onOpenDetails = {
-            viewModel.selectedProvider = provider
-            viewModel.navigateTo("PROVIDER_DETAILS")
-        },
-        onOpenReviews = {
-            viewModel.selectedProvider = provider
-            viewModel.navigateTo("PROVIDER_DETAILS")
-        },
-        onAddReview = {
-            viewModel.selectedProvider = provider
-            viewModel.navigateTo("PROVIDER_DETAILS")
-        },
-        onRequestBooking = {
-            viewModel.selectedProvider = provider
-            viewModel.navigateTo("CREATE_BOOKING")
-        },
-        onDirectChat = {
-            viewModel.openDirectChatWithEntity(provider.id, provider.name, provider.phone, "PROVIDER")
-        },
-        onAgoraCall = {
-            viewModel.startVoiceCall(provider.name, provider.specialization.ifEmpty { "فني معتمد" })
-        }
-    )
-}
-
-@Composable
-fun ProviderCardLegacy(
     provider: ProviderEntity,
     themeColors: VisualThemePalette,
     viewModel: MainViewModel,
@@ -8632,7 +8545,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
     var inputPasscode by remember { mutableStateOf("") }
     var isAuthorized by remember(adminRole) { mutableStateOf(adminRole != "GUEST") }
-    var activeSubTab by remember(adminRole) { mutableStateOf(if (adminRole == "OWNER") "BACKDOOR" else "REG_REQ") }
+    var activeSubTab by remember { mutableStateOf("REG_REQ") }
     var adminReqSubTab by remember { mutableStateOf("SERVICES") } // SERVICES, PROPERTIES, STORES, MEDICAL, RESTAURANTS, JOBS
     var adminAddSubTab by remember { mutableStateOf("SERVICES") } // SERVICES, PROPERTIES, STORES, MEDICAL, RESTAURANTS, JOBS
 
@@ -8916,12 +8829,10 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 onClick = {
                     val trimmedUser = inputUsername.trim()
                     val trimmedPass = inputPassword.trim()
-                    val crypto = com.example.util.SecurityCryptoUtils
-                    
-                    val isOwner = (trimmedUser == crypto.decodeObfuscatedString("340405525d655144360e0e043a094d110a19") || trimmedUser == settingsState.ownerEmail || trimmedUser == "WAM2026") &&
-                            crypto.verifyAdminPassword(trimmedPass, settingsState.ownerPassword)
-                    val isAdmin = (trimmedUser == crypto.decodeObfuscatedString("340005525964534642290408320c0f5c061b26") || trimmedUser == settingsState.adminUsername) &&
-                            crypto.verifyAdminPassword(trimmedPass, settingsState.adminPassword)
+                    val isOwner = (trimmedUser == "mah73646@gmail.com" || trimmedUser == settingsState.ownerEmail || trimmedUser == "WAM2026") &&
+                            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword)
+                    val isAdmin = (trimmedUser == "meh777644@gmail.com" || trimmedUser == settingsState.adminUsername) &&
+                            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword)
 
                     if (isOwner) {
                         isAuthorized = true
@@ -8980,42 +8891,37 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
             // High aesthetic Horizontal Tab Bar matching screenshots
             item {
-                val tabs = remember(adminRole) {
-                    val baseTabs = mutableListOf(
-                        Pair("REG_REQ", "⌛ طلبات الانضمام والاعتماد (جديد)"),
-                        Pair("MANUAL_ADD", "➕ الإضافة اليدوية للإدارة (جديد)"),
-                        Pair("STORES", "🏪 إدارة المحلات والعقارات والطبية"),
-                        Pair("JOBS", "💼 قسم الوظائف والتقديم"),
-                        Pair("STATS", "📊 الإحصائيات الشاملة"),
-                        Pair("BOOKINGS", "📅 الحجوزات والطلبات"),
-                        Pair("CHATS", "💬 رقابة وصلاحيات الدردشات"),
-                        Pair("PROVIDERS", "👥 أعضاء الدليل والتميز"),
-                        Pair("PASSWORDS_RESET", "🔑 إعادة تعيين كلمات المرور"),
-                        Pair("BANNERS", "📢 البنرات الترويجية"),
-                        Pair("CATEGORIES", "🗂️ تحكم الأقسام"),
-                        Pair("CITIES", "🗺️ تحكم المدن"),
-                        Pair("COMPLAINTS", "⚠️ الشكاوى والبلاغات"),
-                        Pair("VIP", "🏆 ترقيات VIP والدليل"),
-                        Pair("SUPERVISORS", "🛡️ المشرفين والصلاحيات"),
-                        Pair("COLORS", "🎨 الهوية والألوان"),
-                        Pair("NOTIFICATIONS", "🔔 بث الإشعارات"),
-                        Pair("BACKUP", "💾 النسخ والجدولة والمزامنة"),
-                        Pair("CLEAN", "🧹 تهيئة البيانات"),
-                        Pair("REVIEWS", "⭐ إدارة التقييمات والتعليقات"),
-                        Pair("CALLS", "📞 مراقبة المكالمات"),
-                        Pair("COUPONS", "🎫 إدارة الكوبونات"),
-                        Pair("BLOCKED", "🚫 القائمة المحظورة"),
-                        Pair("DELETED", "🗑️ الفنيين والجهات المحذوفة"),
-                        Pair("PAYMENTS", "💳 نظام الدفع والتحقق والمحافظ"),
-                        Pair("CUSTOM_TABS", "📑 تخصيص تبويبات الملفات"),
-                        Pair("GOLDEN_ICONS", "👑 الأيقونات وحجم الخط"),
-                        Pair("ADVANCED_CHAT", "⚡ صلاحيات وتوجيه الدردشات")
-                    )
-                    if (adminRole == "OWNER") {
-                        baseTabs.add(0, Pair("BACKDOOR", "⚙️ إعدادات البوابة الخلفية المتقدمة"))
-                    }
-                    baseTabs
-                }
+                val tabs = listOf(
+                    Pair("REG_REQ", "⌛ طلبات الانضمام والاعتماد (جديد)"),
+                    Pair("MANUAL_ADD", "➕ الإضافة اليدوية للإدارة (جديد)"),
+                    Pair("STORES", "🏪 إدارة المحلات والعقارات والطبية"),
+                    Pair("JOBS", "💼 قسم الوظائف والتقديم"),
+                    Pair("STATS", "📊 الإحصائيات الشاملة"),
+                    Pair("BOOKINGS", "📅 الحجوزات والطلبات"),
+                    Pair("CHATS", "💬 رقابة وصلاحيات الدردشات"),
+                    Pair("PROVIDERS", "👥 أعضاء الدليل والتميز"),
+                    Pair("PASSWORDS_RESET", "🔑 إعادة تعيين كلمات المرور"),
+                    Pair("BANNERS", "📢 البنرات الترويجية"),
+                    Pair("CATEGORIES", "🗂️ تحكم الأقسام"),
+                    Pair("CITIES", "🗺️ تحكم المدن"),
+                    Pair("COMPLAINTS", "⚠️ الشكاوى والبلاغات"),
+                    Pair("VIP", "🏆 ترقيات VIP والدليل"),
+                    Pair("SUPERVISORS", "🛡️ المشرفين والصلاحيات"),
+                    Pair("COLORS", "🎨 الهوية والألوان"),
+                    Pair("NOTIFICATIONS", "🔔 بث الإشعارات"),
+                    Pair("BACKUP", "💾 النسخ والجدولة والمزامنة"),
+                    Pair("CLEAN", "🧹 تهيئة البيانات"),
+                    Pair("REVIEWS", "⭐ إدارة التقييمات والتعليقات"),
+                    Pair("CALLS", "📞 مراقبة المكالمات"),
+                    Pair("COUPONS", "🎫 إدارة الكوبونات"),
+                    Pair("BLOCKED", "🚫 القائمة المحظورة"),
+                    Pair("DELETED", "🗑️ الفنيين والجهات المحذوفة"),
+                    Pair("PAYMENTS", "💳 نظام الدفع والتحقق والمحافظ"),
+                    Pair("CUSTOM_TABS", "📑 تخصيص تبويبات الملفات"),
+                    Pair("GOLDEN_ICONS", "👑 الأيقونات وحجم الخط"),
+                    Pair("ASSISTANT_SETTINGS", "🤖 تحكم المساعد الذكي وطلباتي"),
+                    Pair("ADVANCED_CHAT", "⚡ صلاحيات وتوجيه الدردشات")
+                )
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -9043,6 +8949,15 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
             }
 
             // ------------------ CONDITIONAL SUB-SCREENS RENDERING ------------------
+
+            if (activeSubTab == "ASSISTANT_SETTINGS") {
+                item {
+                    com.example.ui.AdminAssistantSettingsPanel(
+                        settings = settingsState,
+                        viewModel = viewModel
+                    )
+                }
+            }
 
             if (activeSubTab == "CUSTOM_TABS") {
                 item {
@@ -9578,12 +9493,6 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             }
                         )
                     }
-                }
-            }
-
-            if (activeSubTab == "BACKDOOR" && adminRole == "OWNER") {
-                item {
-                    OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors)
                 }
             }
 
@@ -16834,8 +16743,8 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("إخفاء زر المساعد الذكي العائم", color = Color.White, fontSize = 13.sp)
-            Switch(checked = assistantHidden, onCheckedChange = { assistantHidden = it })
+            Text("إخفاء شريط الفوتر", color = Color.White, fontSize = 13.sp)
+            Switch(checked = hidePromoFooter, onCheckedChange = { hidePromoFooter = it })
         }
 
         Row(
@@ -16865,8 +16774,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             Switch(checked = isUserPasswordRequired, onCheckedChange = { isUserPasswordRequired = it })
         }
 
-        var mapProviderState by remember { mutableStateOf(settingsState.mapProvider) }
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -16874,33 +16781,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
         ) {
             Text("تمكين ميزة الرادار والخريطة للجماهير", color = Color.White, fontSize = 13.sp)
             Switch(checked = isMapFeatureEnabled, onCheckedChange = { isMapFeatureEnabled = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("محرك الخرائط المعتمد:", color = Color.White, fontSize = 13.sp)
-            Row {
-                FilterChip(
-                    selected = mapProviderState == "MAPLIBRE",
-                    onClick = { mapProviderState = "MAPLIBRE" },
-                    label = { Text("MapLibre", fontSize = 10.sp) }
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                FilterChip(
-                    selected = mapProviderState == "GOOGLE",
-                    onClick = { mapProviderState = "GOOGLE" },
-                    label = { Text("Google", fontSize = 10.sp) }
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                FilterChip(
-                    selected = mapProviderState == "MAPBOX",
-                    onClick = { mapProviderState = "MAPBOX" },
-                    label = { Text("Mapbox", fontSize = 10.sp) }
-                )
-            }
         }
 
         Row(
@@ -17542,7 +17422,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     disableChatFirewall = disableChatFirewall,
                     disableBookingFirewall = disableBookingFirewall,
                     isMapFeatureEnabled = isMapFeatureEnabled,
-                    mapProvider = mapProviderState,
                     enableProvidersRegistration = enableProvidersRegistration,
                     enableStoresRegistration = enableStoresRegistration,
                     enableRestaurantsRegistration = enableRestaurantsRegistration,
@@ -17937,445 +17816,24 @@ fun AboutAppDialogView(viewModel: MainViewModel, themeColors: VisualThemePalette
 // ------ Smart Assistant Dialog View Overlay ------
 @Composable
 fun SmartAssistantDialogView(viewModel: MainViewModel, settings: AdminSettingsEntity, themeColors: VisualThemePalette, onDismiss: () -> Unit) {
-    val points by viewModel.currentUserPoints.collectAsState()
-    val context = LocalContext.current
-    val isOnline = com.example.NetworkUtils.isNetworkAvailable(context)
-    val coroutineScope = rememberCoroutineScope()
+    val providers by viewModel.providers.collectAsState()
+    val cities by viewModel.cities.collectAsState()
+    val stores by viewModel.stores.collectAsState()
+    val categories by viewModel.categories.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
 
-    // Chat history state
-    var chatHistory by remember { mutableStateOf(listOf<Pair<String, Boolean>>( // text to isUser
-        (settings.welcomeMessage.ifEmpty { "مرحباً بكم في منصة الخدمات اليمنية الشاملة! كيف يمكنني مساعدتك اليوم؟" }) to false
-    )) }
-
-    var typedText by remember { mutableStateOf("") }
-    var isGenerating by remember { mutableStateOf(false) }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-            shape = RoundedCornerShape(0.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Face, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(32.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("المساعد الذكي لدليل اليمن", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
-                    }
-                }
-
-                Divider(color = themeColors.accent.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 8.dp))
-
-                // Loyalty and points banner
-                if (settings.showLoyaltyBanner) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = themeColors.primary.copy(alpha = 0.15f)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("رصيد نقاط الولاء: $points نقطة", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Medium)
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(themeColors.accent)
-                                        .clickable { viewModel.redeemLoyaltyPoints() }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("استبدال", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(themeColors.surface)
-                                        .clickable { viewModel.rewardSharePoints() }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("مشاركة 🎁", fontSize = 9.sp, color = Color.White)
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Mode indicator
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isOnline) Color(0xFF065F46) else Color(0xFF854D0E))
-                        .padding(vertical = 4.dp, horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (isOnline) "🟢 متصل بالإنترنت: ذكاء اصطناعي فائق التوليد" else "🟡 وضع غير متصل: ذكاء محلي فوري وآمن",
-                        fontSize = 10.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = themeColors.accent.copy(alpha = 0.15f)),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.5.dp, themeColors.accent),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            VoiceManager.onHear?.invoke { spokenText ->
-                                if (spokenText.isNotEmpty()) {
-                                    viewModel.updateSearchQuery(spokenText)
-                                    viewModel.triggerNotification("🎙️ المساعد الذكي: جاري فلترة الخدمات وعرض نتائج البحث لـ '$spokenText' فوراً!")
-                                    onDismiss()
-                                }
-                            }
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("🎙️", fontSize = 22.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(horizontalAlignment = Alignment.Start) {
-                            Text("البحث الصوتي الذكي والمباشر", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("انطق اسم الخدمة (مثال: سباك، طبيب، تنظيف) للوصول للنتائج فوراً", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Chat Messages List
-                val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
-                LaunchedEffect(chatHistory.size) {
-                    if (chatHistory.isNotEmpty()) {
-                        scrollState.animateScrollToItem(chatHistory.size - 1)
-                    }
-                }
-
-                LazyColumn(
-                    state = scrollState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(chatHistory) { (text, isUser) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
-                        ) {
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isUser) themeColors.primary else themeColors.surface
-                                ),
-                                shape = RoundedCornerShape(
-                                    topStart = 12.dp,
-                                    topEnd = 12.dp,
-                                    bottomStart = if (isUser) 12.dp else 0.dp,
-                                    bottomEnd = if (isUser) 0.dp else 12.dp
-                                ),
-                                border = BorderStroke(1.dp, if (isUser) themeColors.primary else themeColors.accent.copy(alpha = 0.5f)),
-                                modifier = Modifier.widthIn(max = 280.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = text,
-                                        fontSize = 12.sp,
-                                        color = Color.White,
-                                        lineHeight = 18.sp
-                                    )
-                                    
-                                    if (!isUser && settings.allowTextToSpeechAssistant) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.End
-                                        ) {
-                                            IconButton(
-                                                onClick = { VoiceManager.onSpeak?.invoke(text) },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Text("🔊", fontSize = 12.sp)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (isGenerating) {
-                        item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Start
-                            ) {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.widthIn(max = 200.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = themeColors.accent, strokeWidth = 2.dp)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("جاري توليد الإجابة الدقيقة...", fontSize = 11.sp, color = Color.White)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Control panel
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = typedText,
-                        onValueChange = { typedText = it },
-                        placeholder = { Text("اطرح أي سؤال حول خدمات اليمن...", fontSize = 11.sp) },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        singleLine = true,
-                        trailingIcon = if (settings.allowVoiceInputAssistant) {
-                            {
-                                IconButton(
-                                    onClick = {
-                                        VoiceManager.onHear?.invoke { spokenText -> typedText = spokenText }
-                                    },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Text("🎙️", fontSize = 16.sp)
-                                }
-                            }
-                        } else null
-                    )
-                    
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    IconButton(
-                        onClick = {
-                            if (typedText.isNotEmpty() && !isGenerating) {
-                                val prompt = typedText
-                                typedText = ""
-                                chatHistory = chatHistory + (prompt to true)
-                                isGenerating = true
-
-                                // Perform async response generation
-                                coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                    val response = if (isOnline) {
-                                        // Attempt direct REST calling to Gemini API
-                                        try {
-                                            val apiKey = BuildConfig.GEMINI_API_KEY
-                                            if (apiKey.isNotEmpty()) {
-                                                val mediaType = "application/json; charset=utf-8".toMediaType()
-                                                
-                                                val providersList = viewModel.providers.value
-                                                val categoriesList = viewModel.categories.value
-
-                                                val normalizeArabicLocal = { text: String ->
-                                                    var str = text.trim().lowercase()
-                                                    str = str.replace(Regex("[\\u064B-\\u0652]"), "")
-                                                    str = str.replace(Regex("[أإآ]"), "ا")
-                                                    str = str.replace("ى", "ي")
-                                                    str = str.replace("ة", "ه")
-                                                    str
-                                                }
-                                                val qNormalized = normalizeArabicLocal(prompt)
-                                                val matched = providersList.filter { p ->
-                                                    val catName = categoriesList.find { it.id == p.categoryId }?.name ?: ""
-                                                    val pNameNorm = normalizeArabicLocal(p.name)
-                                                    val pProfNorm = normalizeArabicLocal(p.profession)
-                                                    val pSpecNorm = normalizeArabicLocal(p.specialization)
-                                                    val pAreaNorm = normalizeArabicLocal(p.area)
-                                                    val catNameNorm = normalizeArabicLocal(catName)
-
-                                                    pNameNorm.contains(qNormalized) ||
-                                                    pProfNorm.contains(qNormalized) ||
-                                                    pSpecNorm.contains(qNormalized) ||
-                                                    pAreaNorm.contains(qNormalized) ||
-                                                    catNameNorm.contains(qNormalized) ||
-                                                    qNormalized.split(" ", "،", ",").any { word ->
-                                                        val wordNorm = normalizeArabicLocal(word)
-                                                        wordNorm.length > 2 && (
-                                                            pNameNorm.contains(wordNorm) ||
-                                                            pProfNorm.contains(wordNorm) ||
-                                                            pSpecNorm.contains(wordNorm) ||
-                                                            pAreaNorm.contains(wordNorm) ||
-                                                            catNameNorm.contains(wordNorm)
-                                                        )
-                                                    }
-                                                }.take(15)
-
-                                                val ragList = if (matched.isNotEmpty()) matched else providersList.filter { it.isVip }.take(15)
-
-                                                val dbContextText = StringBuilder()
-                                                dbContextText.append("البيانات المسترجعة من قاعدة بيانات المنصة في اليمن (RAG Data):\\n")
-                                                ragList.forEach { p ->
-                                                    val catName = categoriesList.find { it.id == p.categoryId }?.name ?: "خدمة عامة"
-                                                    dbContextText.append("- الفني: ${p.name} | رقم الهاتف: ${p.phone} | المنطقة: ${p.area} | التخصص: ${p.specialization.ifEmpty { p.profession }} | القسم: $catName | التقييم: ${p.rating}/5.0 | الحالة: ${if (p.isAvailable) "متاح" else "مشغول"}\\n")
-                                                }
-                                                dbContextText.append("\\nمعلومات الدعم الفني الشامل للمنصة:\\n")
-                                                dbContextText.append("- رقم هاتف الدعم: ${settings.supportPhone}\\n")
-                                                dbContextText.append("- واتساب الإدارة: ${settings.supportWhatsapp}\\n")
-                                                dbContextText.append("- بريد الشكاوى: ${settings.supportEmail}\\n")
-
-                                                val systemInstructionText = "أنت 'مساعد منصة دليل خدمات اليمن الذكي'. نظام خبير مخصص للرد الفوري والدقيق للغاية باللغة العربية الفصحى أو اللهجة اليمنية المحببة.\\n\\nتصنيف الأسئلة ومعالجتها:\\n1. إذا كان السؤال عن فني أو مهندس: قم بتحليل الرغبة واقترح أسماء من البيانات المسترجعة (RAG) المرفقة بالأسفل، مع توفير أرقام هواتفهم ومناطقهم بكل أمانة ودقة دون اختراع أرقام.\\n2. إذا كان السؤال عن الدعم الفني: زوّد المستخدم بهواتف الدعم أو واتساب المرفق.\\n3. إذا كان خارج خدمات صيانة المنصة: اعتذر بأدب ووجهه لما هو مفيد.\\n\\nالبيانات الحية المتاحة:\\n$dbContextText"
-
-                                                val contentsArray = org.json.JSONArray()
-                                                chatHistory.forEach { (historyText, isUser) ->
-                                                    val contentObj = org.json.JSONObject()
-                                                    contentObj.put("role", if (isUser) "user" else "model")
-                                                    val partsArray = org.json.JSONArray()
-                                                    val partObj = org.json.JSONObject()
-                                                    partObj.put("text", historyText)
-                                                    partsArray.put(partObj)
-                                                    contentObj.put("parts", partsArray)
-                                                    contentsArray.put(contentObj)
-                                                }
-                                                // Append current prompt
-                                                val currentPromptObj = org.json.JSONObject()
-                                                currentPromptObj.put("role", "user")
-                                                val currentParts = org.json.JSONArray()
-                                                val currentPart = org.json.JSONObject()
-                                                currentPart.put("text", prompt)
-                                                currentParts.put(currentPart)
-                                                currentPromptObj.put("parts", currentParts)
-                                                contentsArray.put(currentPromptObj)
-
-                                                val systemInstructionObj = org.json.JSONObject()
-                                                val sysParts = org.json.JSONArray()
-                                                val sysPart = org.json.JSONObject()
-                                                sysPart.put("text", systemInstructionText)
-                                                sysParts.put(sysPart)
-                                                systemInstructionObj.put("parts", sysParts)
-
-                                                val finalRequestJsonObj = org.json.JSONObject()
-                                                finalRequestJsonObj.put("contents", contentsArray)
-                                                finalRequestJsonObj.put("systemInstruction", systemInstructionObj)
-
-                                                val requestJson = finalRequestJsonObj.toString()
-                                                
-                                                val request = okhttp3.Request.Builder()
-                                                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
-                                                    .post(okhttp3.RequestBody.create(mediaType, requestJson))
-                                                    .build()
-
-                                                val okHttpClient = okhttp3.OkHttpClient.Builder()
-                                                    .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                                                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                                                    .build()
-
-                                                okHttpClient.newCall(request).execute().use { response ->
-                                                    if (response.isSuccessful) {
-                                                        val bodyString = response.body?.string() ?: ""
-                                                        val jsonObject = org.json.JSONObject(bodyString)
-                                                        val candidates = jsonObject.optJSONArray("candidates")
-                                                        val candidate = candidates?.optJSONObject(0)
-                                                        val content = candidate?.optJSONObject("content")
-                                                        val parts = content?.optJSONArray("parts")
-                                                        val part = parts?.optJSONObject(0)
-                                                        val textVal = part?.optString("text")
-                                                        textVal ?: "لم أتمكن من استخلاص النص من الإجابة."
-                                                    } else {
-                                                        generateLocalOfflineResponse(prompt, viewModel)
-                                                    }
-                                                }
-                                            } else {
-                                                generateLocalOfflineResponse(prompt, viewModel)
-                                            }
-                                        } catch (e: Exception) {
-                                            generateLocalOfflineResponse(prompt, viewModel)
-                                        }
-                                    } else {
-                                        generateLocalOfflineResponse(prompt, viewModel)
-                                    }
-
-                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                        chatHistory = chatHistory + (response to false)
-                                        isGenerating = false
-                                        // Auto speak response!
-                                        if (settings.allowTextToSpeechAssistant) {
-                                            VoiceManager.onSpeak?.invoke(response)
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .background(themeColors.accent, CircleShape)
-                            .size(36.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Send, contentDescription = "إرسال", tint = Color.Black, modifier = Modifier.size(16.dp))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = {
-                            chatHistory = listOf((settings.welcomeMessage.ifEmpty { "مرحباً بكم في منصة الخدمات اليمنية الشاملة! كيف يمكنني مساعدتك اليوم؟" }) to false)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Text("🧹 مسح المحادثة", fontSize = 10.sp, color = Color.White)
-                    }
-
-                    Text(
-                        text = "يمكنك التحدث صوتياً بالنقر على 🎙️",
-                        fontSize = 9.sp,
-                        color = themeColors.textSecondary
-                    )
-                }
-            }
+    com.example.ui.AIAssistantDialog(
+        settings = settings,
+        providers = providers,
+        cities = cities,
+        stores = stores,
+        categories = categories,
+        isOnline = isOnline,
+        onDismiss = onDismiss,
+        onNavigateRoute = { route ->
+            viewModel.navigateTo(route)
         }
-    }
+    )
 }
 
 fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): String {
@@ -23029,8 +22487,8 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
 
     val context = LocalContext.current
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-    var phoneInput by remember { mutableStateOf(currentUserPhone) }
-    var activeSearchPhone by remember { mutableStateOf(currentUserPhone.ifEmpty { "ALL" }) }
+    var phoneInput by remember { mutableStateOf("") }
+    var activeSearchPhone by remember { mutableStateOf("") }
 
     LaunchedEffect(currentUserPhone) {
         if (currentUserPhone.isNotEmpty()) {
@@ -23040,42 +22498,33 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
     }
 
     val matchingProvider = remember(providers, activeSearchPhone) {
-        providers.find { it.phone.trim() == activeSearchPhone.trim() && activeSearchPhone.isNotEmpty() && activeSearchPhone != "ALL" }
+        providers.find { it.phone.trim() == activeSearchPhone.trim() && activeSearchPhone.isNotEmpty() }
     }
 
     val matchingStore = remember(stores, activeSearchPhone) {
-        stores.find { it.phone.trim() == activeSearchPhone.trim() && activeSearchPhone.isNotEmpty() && activeSearchPhone != "ALL" }
+        stores.find { it.phone.trim() == activeSearchPhone.trim() && activeSearchPhone.isNotEmpty() }
     }
 
     val matchingProperty = remember(properties, activeSearchPhone) {
-        properties.find { it.phone.trim() == activeSearchPhone.trim() && activeSearchPhone.isNotEmpty() && activeSearchPhone != "ALL" }
+        properties.find { it.phone.trim() == activeSearchPhone.trim() && activeSearchPhone.isNotEmpty() }
     }
 
-    // Filter customer bookings strictly to protect user privacy
-    val myCustomerBookings = remember(bookings, activeSearchPhone, currentUserPhone) {
-        if (activeSearchPhone == "ALL" || activeSearchPhone.isEmpty()) {
-            bookings.sortedByDescending { it.id }
-        } else {
-            val phoneToMatch = activeSearchPhone.trim()
-            bookings.filter { 
-                it.customerPhone.trim() == phoneToMatch || 
-                (currentUserPhone.isNotEmpty() && it.customerPhone.trim() == currentUserPhone.trim())
-            }.sortedByDescending { it.id }
-        }
+    // Filter customer bookings
+    val myCustomerBookings = remember(bookings, activeSearchPhone) {
+        bookings.filter { it.customerPhone.trim() == activeSearchPhone.trim() && activeSearchPhone.isNotEmpty() }
+            .sortedByDescending { it.id }
     }
 
-    // Filter technician / store / property received bookings + matching profession-specific urgent requests
+    // Filter technician / store / property received bookings
     val receivedBookings = remember(bookings, matchingProvider, matchingStore, matchingProperty) {
         val targetIds = mutableSetOf<String>()
         matchingProvider?.let { targetIds.add(it.id) }
         matchingStore?.let { targetIds.add(it.id) }
         matchingProperty?.let { targetIds.add(it.id) }
 
-        if (targetIds.isNotEmpty() || matchingProvider != null) {
-            bookings.filter { 
-                targetIds.contains(it.providerId) || 
-                (it.providerId == "ALL" && matchingProvider != null && (it.serviceType == matchingProvider.profession || matchingProvider.profession.trim().isEmpty()))
-            }.sortedByDescending { it.id }
+        if (targetIds.isNotEmpty()) {
+            bookings.filter { targetIds.contains(it.providerId) }
+                .sortedByDescending { it.id }
         } else {
             emptyList()
         }
@@ -23092,7 +22541,6 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
 
     // State for sub-tabs status categorization: ACTIVE, COMPLETED, CANCELLED
     var filterStatusTab by remember { mutableStateOf("ACTIVE") }
-    var customerSubTab by remember { mutableStateOf("URGENT") } // "URGENT" = طلباتي العاجلة, "DIRECT" = حجوزاتي المباشرة, "ALL" = عرض الكل
 
     // Dialog & overlay states
     var selectedDetailBooking by remember { mutableStateOf<com.example.data.BookingEntity?>(null) }
@@ -23145,7 +22593,7 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "📋 طلباتي وحجوزاتي العاجلة",
+                    text = "📅 إدارة الحجوزات والمواعيد",
                     color = Color.White,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
@@ -23351,54 +22799,7 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                         selectedTab = 0
                     }
 
-                    // Apply customer-specific tab filter (Urgent vs Direct vs All)
-                    val baseList = remember(selectedTab, myCustomerBookings, receivedBookings, customerSubTab) {
-                        if (selectedTab == 0) {
-                            when (customerSubTab) {
-                                "URGENT" -> myCustomerBookings.filter { it.providerId == "ALL" }
-                                "DIRECT" -> myCustomerBookings.filter { it.providerId != "ALL" }
-                                else -> myCustomerBookings
-                            }
-                        } else {
-                            receivedBookings
-                        }
-                    }
-
-                    if (selectedTab == 0) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                                .background(themeColors.surface, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .padding(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            val customerTabs = listOf(
-                                "URGENT" to "⚡ طلباتي العاجلة",
-                                "DIRECT" to "📅 حجوزاتي المباشرة",
-                                "ALL" to "📋 عرض الكل"
-                            )
-                            customerTabs.forEach { (tabId, label) ->
-                                val isSel = customerSubTab == tabId
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
-                                        .background(if (isSel) themeColors.accent else Color.Transparent)
-                                        .clickable { customerSubTab = tabId }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        color = if (isSel) Color.Black else Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    val baseList = if (selectedTab == 0) myCustomerBookings else receivedBookings
 
                     // Status Categorization Sub-Tabs: ACTIVE, COMPLETED, CANCELLED
                     Row(

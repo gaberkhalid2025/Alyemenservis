@@ -221,6 +221,20 @@ data class AdminSettingsEntity(
     // X and Y scaling positions (as percentages of screen width/height, 0f..1f)
     val assistantPositionX: Float = 0.85f,
     val assistantPositionY: Float = 0.70f,
+    val isAssistantEnabled: Boolean = true,
+    val isAssistantIconVisible: Boolean = true,
+    val assistantIconShape: String = "CIRCLE", // "CIRCLE", "ROUNDED", "SQUARE", "PILL"
+    val assistantIconStyle: String = "DEFAULT", // "DEFAULT", "GOLDEN_3D", "NEON", "MINIMAL"
+
+    // Urgent Request (اطلب خدمتك الآن / طلباتي) controls
+    val isUrgentRequestEnabled: Boolean = true,
+    val isUrgentRequestIconVisible: Boolean = true,
+    val urgentRequestPositionX: Float = 0.05f,
+    val urgentRequestPositionY: Float = 0.70f,
+    val urgentRequestSize: Int = 56,
+    val urgentRequestIconShape: String = "CIRCLE", // "CIRCLE", "ROUNDED", "SQUARE", "PILL"
+    val urgentRequestIconStyle: String = "DEFAULT",
+    val urgentAllowedSections: String = "ALL",
     val chatPositionX: Float = 0.85f,
     val chatPositionY: Float = 0.82f,
     val chatXOffset: Int = 20,
@@ -230,14 +244,7 @@ data class AdminSettingsEntity(
 
     // Map feature switches
     val isMapFeatureEnabled: Boolean = true,
-    val mapProvider: String = "MAPLIBRE", // "MAPLIBRE", "GOOGLE", "MAPBOX"
-    val mapDefaultZoom: Float = 14f,
-    val mapMaxDistanceKm: Int = 20,
     val mapPrecisionDigits: Int = 1, // 1 or 2 digits after decimal
-
-    // Assistant controls
-    val isAssistantEnabled: Boolean = true,
-    val isAssistantIconVisible: Boolean = true,
 
     // Card dimensions styles
     val coverHeight: Int = 0,
@@ -1005,6 +1012,49 @@ data class AppSettings(
     val disableVoiceCalls: Boolean = false,
     val voiceCallsDisabledAnnouncement: String = "",
     val appLanguage: String = "ar"
+)
+
+@Keep
+data class UrgentRequestEntity(
+    val id: String = "",
+    val userId: String = "",
+    val userName: String = "",
+    val userPhone: String = "",
+    val sectionId: String = "", // or categoryId
+    val categoryName: String = "",
+    val title: String = "",
+    val description: String = "",
+    val cityId: String = "",
+    val cityName: String = "",
+    val area: String = "",
+    val latitude: Double = 15.3694,
+    val longitude: Double = 44.1910,
+    val imageUrl: String = "",
+    val status: String = "OPEN", // "OPEN", "HAS_OFFERS", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "CANCELLED"
+    val acceptedOfferId: String = "",
+    val acceptedProviderId: String = "",
+    val acceptedProviderName: String = "",
+    val acceptedProviderPhone: String = "",
+    val offersCount: Int = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Keep
+data class OfferEntity(
+    val id: String = "",
+    val requestId: String = "",
+    val providerId: String = "",
+    val providerName: String = "",
+    val providerPhone: String = "",
+    val providerType: String = "PROVIDER", // "PROVIDER", "STORE", "CENTER", "CLINIC", "RESTAURANT"
+    val providerRating: Float = 5.0f,
+    val price: Double = 0.0,
+    val etaMinutes: Int = 30,
+    val note: String = "",
+    val isFixedPrice: Boolean = true,
+    val status: String = "SUBMITTED", // "SUBMITTED", "ACCEPTED", "REJECTED", "CANCELLED"
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 
