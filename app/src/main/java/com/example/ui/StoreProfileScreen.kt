@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,20 +54,21 @@ fun StoreProfileScreen(
     val tabs = remember(isOwner) {
         if (isOwner) {
             listOf(
-                "الرئيسية 🏪",
-                "المنتجات 🛒",
-                "الخدمات 🛠️",
-                "الحجوزات 📅",
-                "التقييمات ⭐",
-                "الإعدادات ⚙️"
+                "النبذة والمعلومات ℹ️",
+                "المنتجات والخدمات 🛒",
+                "العروض والخصومات 🏷️",
+                "المنيو والكتالوج 📄",
+                "التقييمات والآراء ⭐",
+                "لوحة المالك والإعدادات ⚙️"
             )
         } else {
             listOf(
-                "الرئيسية 🏪",
-                "المنتجات 🛒",
-                "الخدمات 🛠️",
-                "حجز موعد 📅",
-                "التقييمات ⭐"
+                "النبذة والمعلومات ℹ️",
+                "المنتجات والخدمات 🛒",
+                "العروض والخصومات 🏷️",
+                "المنيو والكتالوج 📄",
+                "التقييمات والآراء ⭐",
+                "حجز موعد/طلب 📅"
             )
         }
     }
@@ -80,7 +82,7 @@ fun StoreProfileScreen(
                         if (isOwner) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(color = Color(0xFF10B981), shape = RoundedCornerShape(4.dp)) {
-                                Text("مالك المركز", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                Text("صاحب المركز (حساب موثق)", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                             }
                         }
                     }
@@ -111,7 +113,7 @@ fun StoreProfileScreen(
                     Tab(
                         selected = selectedTabIdx == index,
                         onClick = { selectedTabIdx = index },
-                        text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                        text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
                     )
                 }
             }
@@ -121,10 +123,10 @@ fun StoreProfileScreen(
                 when (selectedTabIdx) {
                     0 -> OverviewTabContent(store = store, isOwner = isOwner, onDirectChat = onDirectChat)
                     1 -> ProductsTabContent(store = store, isOwner = isOwner)
-                    2 -> ServicesTabContent(store = store, isOwner = isOwner)
-                    3 -> BookingsTabContent(store = store, isOwner = isOwner, onRequestBooking = onRequestBooking)
+                    2 -> OffersTabContent(store = store, isOwner = isOwner)
+                    3 -> MenuCatalogTabContent(store = store, isOwner = isOwner)
                     4 -> ReviewsTabContent(store = store, isOwner = isOwner)
-                    5 -> if (isOwner) OwnerSettingsTabContent(store = store) else OverviewTabContent(store = store, isOwner = false, onDirectChat = onDirectChat)
+                    5 -> if (isOwner) OwnerSettingsTabContent(store = store) else BookingsTabContent(store = store, isOwner = false, onRequestBooking = onRequestBooking)
                 }
             }
         }
@@ -349,6 +351,75 @@ private fun ReviewsTabContent(store: StoreEntity, isOwner: Boolean) {
                     OutlinedButton(onClick = { }) {
                         Text("الرد على التعليق 💬", fontSize = 11.sp)
                     }
+                }
+            }
+        }
+    }
+}
+
+// ------ Tab 3: Offers & Discounts ------
+@Composable
+private fun OffersTabContent(store: StoreEntity, isOwner: Boolean) {
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("🏷️ العروض والتخفيضات المتاحة", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+            if (isOwner) {
+                Surface(color = Color(0xFF10B981), shape = RoundedCornerShape(6.dp)) {
+                    Text("إضافة عرض جديد ➕", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(6.dp))
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Color(0xFFEF4444)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(color = Color(0xFFEF4444), shape = RoundedCornerShape(6.dp)) {
+                        Text("خصم 20%", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("عرض الافتتاح والخدمات الشاملة", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("احصل على خصم فوري بقيمة 20% عند الطلب عبر التطبيق مباشرة.", color = Color(0xFFCBD5E1), fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+// ------ Tab 4: Catalog & Menu View ------
+@Composable
+private fun MenuCatalogTabContent(store: StoreEntity, isOwner: Boolean) {
+    val context = LocalContext.current
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("📄 المنيو والكتالوج الكامل", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+        Text("تصفح المنيو الرقمي للأسعار والخدمات المتاحة لدى ${store.name}:", color = Color(0xFF94A3B8), fontSize = 12.sp)
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.List, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("الكتالوج الرقمي الرسمي (.PDF / Images)", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        Toast.makeText(context, "جاري فتح الكتالوج والمنيو التفاعلي...", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8))
+                ) {
+                    Text("تحميل / فتح المنيو والكتالوج ⬇️", fontWeight = FontWeight.Bold, color = Color.Black)
                 }
             }
         }

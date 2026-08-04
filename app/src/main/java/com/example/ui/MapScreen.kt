@@ -572,82 +572,133 @@ private fun buildMultiEngineHtml(
 ): String {
     val centerLat = if (userLat != 0.0) userLat else 15.369444
     val centerLng = if (userLng != 0.0) userLng else 44.191
-    val zoom = if (userLat != 0.0) defaultZoom.toInt() else 7
+    val zoom = if (userLat != 0.0) defaultZoom.toInt() else 14
 
+    // Use CartoDB Dark Matter tile layer by default for dark radar theme
     val tileLayerUrl = when (provider.uppercase()) {
         "GOOGLE" -> "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-        "MAPBOX" -> "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        else -> "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    }
-
-    val mapTitle = when (provider.uppercase()) {
-        "GOOGLE" -> "Google Maps Engine"
-        "MAPBOX" -> "Mapbox GL Vector Engine"
-        else -> "MapLibre Open Engine"
+        "MAPBOX" -> "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        else -> "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
     }
 
     val markersJs = StringBuilder()
 
+    // Add User Radar Pulse Pin
     if (userLat != 0.0 && userLng != 0.0) {
         markersJs.append("""
-            L.circle([$userLat, $userLng], {
-                color: '#2196F3',
-                fillColor: '#2196F3',
-                fillOpacity: 0.3,
-                radius: 500
-            }).addTo(map);
-            L.marker([$userLat, $userLng]).addTo(map)
-                .bindPopup("<b>📍 موقعك الحالي</b>");
+            var userIcon = L.divIcon({
+                className: 'radar-user-pin',
+                html: '<div class="radar-pulse"></div><div class="user-dot">📍</div>',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            });
+            L.marker([$userLat, $userLng], {icon: userIcon}).addTo(map)
+                .bindPopup("<b>📍 موقعك الحالي (الرادار نشط)</b>");
         """.trimIndent())
     }
 
     providers.forEach { p ->
-        val lat = if (p.latitude != 0.0) p.latitude else centerLat + (Math.random() - 0.5) * 0.05
-        val lng = if (p.longitude != 0.0) p.longitude else centerLng + (Math.random() - 0.5) * 0.05
+        val lat = if (p.latitude != 0.0) p.latitude else centerLat + (Math.random() - 0.5) * 0.04
+        val lng = if (p.longitude != 0.0) p.longitude else centerLng + (Math.random() - 0.5) * 0.04
+        val pNameClean = p.name.replace("'", "\\'").replace("\"", "\\\"")
+        val catClean = p.customCategoryName.ifEmpty { "فني متخصص" }.replace("'", "\\'").replace("\"", "\\\"")
         markersJs.append("""
-            L.marker([$lat, $lng]).addTo(map)
-                .bindPopup("<b>🔧 ${p.name}</b><br>${p.customCategoryName}<br><a href='app://provider/${p.id}'>عرض التفاصيل</a>");
+            var pIcon = L.divIcon({
+                className: 'neon-pin provider-pin',
+                html: '<div class="pin-box provider-box">🔧</div>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+            L.marker([$lat, $lng], {icon: pIcon}).addTo(map)
+                .bindPopup("<div class='map-popup'><b>🔧 $pNameClean</b><br><small>$catClean</small><br><a href='app://provider/${p.id}' class='popup-btn'>عرض التفاصيل والاتصال</a></div>");
         """.trimIndent())
     }
 
     stores.forEach { s ->
-        val lat = if (s.latitude != 0.0) s.latitude else centerLat + (Math.random() - 0.5) * 0.05
-        val lng = if (s.longitude != 0.0) s.longitude else centerLng + (Math.random() - 0.5) * 0.05
+        val lat = if (s.latitude != 0.0) s.latitude else centerLat + (Math.random() - 0.5) * 0.04
+        val lng = if (s.longitude != 0.0) s.longitude else centerLng + (Math.random() - 0.5) * 0.04
+        val sNameClean = s.name.replace("'", "\\'").replace("\"", "\\\"")
         markersJs.append("""
-            L.marker([$lat, $lng]).addTo(map)
-                .bindPopup("<b>🏪 ${s.name}</b><br>${s.categoryId}<br><a href='app://store/${s.id}'>عرض التفاصيل</a>");
+            var sIcon = L.divIcon({
+                className: 'neon-pin store-pin',
+                html: '<div class="pin-box store-box">🏪</div>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+            L.marker([$lat, $lng], {icon: sIcon}).addTo(map)
+                .bindPopup("<div class='map-popup'><b>🏪 $sNameClean</b><br><a href='app://store/${s.id}' class='popup-btn'>زيارة المتجر والخدمات</a></div>");
         """.trimIndent())
     }
 
     properties.forEach { pr ->
-        val lat = if (pr.latitude != 0.0) pr.latitude else centerLat + (Math.random() - 0.5) * 0.05
-        val lng = if (pr.longitude != 0.0) pr.longitude else centerLng + (Math.random() - 0.5) * 0.05
+        val lat = if (pr.latitude != 0.0) pr.latitude else centerLat + (Math.random() - 0.5) * 0.04
+        val lng = if (pr.longitude != 0.0) pr.longitude else centerLng + (Math.random() - 0.5) * 0.04
+        val prTitleClean = pr.title.replace("'", "\\'").replace("\"", "\\\"")
         markersJs.append("""
-            L.marker([$lat, $lng]).addTo(map)
-                .bindPopup("<b>🏠 ${pr.title}</b><br>${pr.price}<br><a href='app://property/${pr.id}'>عرض التفاصيل</a>");
+            var prIcon = L.divIcon({
+                className: 'neon-pin property-pin',
+                html: '<div class="pin-box property-box">🏠</div>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+            L.marker([$lat, $lng], {icon: prIcon}).addTo(map)
+                .bindPopup("<div class='map-popup'><b>🏠 $prTitleClean</b><br><span>${pr.price}</span><br><a href='app://property/${pr.id}' class='popup-btn'>تفاصيل العقار</a></div>");
         """.trimIndent())
     }
 
     return """
         <!DOCTYPE html>
-        <html>
+        <html dir="rtl">
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <style>
-                body { margin: 0; padding: 0; background: #0f172a; }
+                body { margin: 0; padding: 0; background: #0b0f19; font-family: system-ui, sans-serif; }
                 #map { width: 100vw; height: 100vh; }
-                .leaflet-container { background: #0f172a; }
+                .leaflet-container { background: #0b0f19; }
+                .leaflet-popup-content-wrapper { background: #1e293b; color: #ffffff; border-radius: 12px; border: 1px solid #38bdf8; text-align: center; font-size: 13px; }
+                .leaflet-popup-tip { background: #1e293b; }
+                .popup-btn { display: inline-block; margin-top: 6px; padding: 4px 10px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 11px; }
+                
+                /* Radar pulse wave effect */
+                .radar-user-pin { position: relative; }
+                .user-dot { font-size: 20px; line-height: 40px; text-align: center; z-index: 2; position: relative; }
+                .radar-pulse {
+                    position: absolute;
+                    width: 40px; height: 40px;
+                    background: rgba(16, 185, 129, 0.4);
+                    border: 2px solid #10b981;
+                    border-radius: 50%;
+                    animation: pulse-wave 2s infinite ease-out;
+                    z-index: 1;
+                }
+                @keyframes pulse-wave {
+                    0% { transform: scale(0.5); opacity: 1; }
+                    100% { transform: scale(2.5); opacity: 0; }
+                }
+
+                /* Neon Custom Pin Boxes */
+                .pin-box {
+                    width: 32px; height: 32px;
+                    border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 16px; color: white;
+                    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+                }
+                .provider-box { background: #059669; border: 2px solid #10b981; box-shadow: 0 0 12px #10b981; }
+                .store-box { background: #d97706; border: 2px solid #f59e0b; box-shadow: 0 0 12px #f59e0b; }
+                .property-box { background: #7c3aed; border: 2px solid #8b5cf6; box-shadow: 0 0 12px #8b5cf6; }
             </style>
         </head>
         <body>
             <div id="map"></div>
             <script>
-                var map = L.map('map').setView([$centerLat, $centerLng], $zoom);
+                var map = L.map('map', { zoomControl: false }).setView([$centerLat, $centerLng], $zoom);
                 L.tileLayer('$tileLayerUrl', {
                     maxZoom: 19,
-                    attribution: '$mapTitle'
+                    subdomains: 'abcd',
+                    attribution: '© CartoDB Radar Map'
                 }).addTo(map);
                 $markersJs
             </script>

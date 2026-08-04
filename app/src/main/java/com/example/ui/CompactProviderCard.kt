@@ -63,7 +63,13 @@ fun CompactProviderCard(
                 .fillMaxWidth()
                 .padding(10.dp)
         ) {
-            // ------ Row 1: Header [ Avatar (40dp) | Name + Green Dot | Spec Badge | Rating ] ------
+            // Clickable header area for opening provider details profile
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenDetails() }
+            ) {
+                // ------ Row 1: Header [ Avatar (40dp) | Name + Green Dot | Spec Badge | Rating ] ------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -233,74 +239,151 @@ fun CompactProviderCard(
                     )
                 }
             }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ------ Row 3: Single-Row Compact Action Bar + Overflow Dropdown ------
+            // ------ Row 3: Action Buttons with Labels Below Each Button ------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Call Button
-                    IconButton(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
+                // 1. Direct Phone Call
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            val phoneNum = provider.phone.ifEmpty { "770000000" }
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneNum"))
                             context.startActivity(intent)
-                        },
+                        }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF10B981))
+                            .background(Color(0xFF10B981)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Phone, contentDescription = "اتصال", tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Phone, contentDescription = "اتصال", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
-
-                    // Direct Chat
-                    IconButton(
-                        onClick = onDirectChat,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF3B82F6))
-                    ) {
-                        Icon(Icons.Default.Email, contentDescription = "محادثة", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-
-                    // Voice Call (Agora)
-                    IconButton(
-                        onClick = onAgoraCall,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF8B5CF6))
-                    ) {
-                        Icon(Icons.Default.Call, contentDescription = "مكالمة صوتية", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-
-                    // Direct Quick Request
-                    Button(
-                        onClick = onRequestBooking,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier.height(34.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("طلب سريع ⚡", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("اتصال", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
                 }
 
-                // Collapsible Overflow Dropdown Menu
-                Box {
-                    IconButton(
-                        onClick = { showMenu = true },
+                // 2. WhatsApp Chat
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            val rawPhone = provider.phone.ifEmpty { "770000000" }
+                            val cleanPhone = rawPhone.replace("+", "").replace(" ", "")
+                            val waUrl = "https://wa.me/967${cleanPhone.takeLast(9)}"
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(waUrl))
+                            context.startActivity(intent)
+                        }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF334155))
+                            .background(Color(0xFF25D366)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "المزيد", tint = Color.White, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Share, contentDescription = "واتساب", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("واتساب", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
+                }
+
+                // 3. Direct In-App Messaging
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onDirectChat() }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF3B82F6)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = "محادثة", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("محادثة", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
+                }
+
+                // 4. In-App Voice Call (Agora HD)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onAgoraCall() }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF8B5CF6)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Call, contentDescription = "صوتي HD", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("صوتي HD", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
+                }
+
+                // 5. Urgent Quick Booking
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onRequestBooking() }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF59E0B)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Build, contentDescription = "طلب سريع", tint = Color.Black, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("طلب سريع", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                }
+
+                // 6. Overflow Dropdown Menu & Profile Details
+                Box {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showMenu = true }
+                            .padding(horizontal = 3.dp, vertical = 2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF334155)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "خيارات", tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("خيارات", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
                     }
 
                     DropdownMenu(
@@ -309,7 +392,7 @@ fun CompactProviderCard(
                         modifier = Modifier.background(Color(0xFF1E293B))
                     ) {
                         DropdownMenuItem(
-                            text = { Text("عرض الملف الكامل 📄", color = Color.White, fontSize = 12.sp) },
+                            text = { Text("عرض الملف والتقييمات 📄", color = Color.White, fontSize = 12.sp) },
                             onClick = {
                                 showMenu = false
                                 onOpenDetails()
@@ -323,7 +406,7 @@ fun CompactProviderCard(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("أضف تعليق وتقييم ✍️", color = Color.White, fontSize = 12.sp) },
+                            text = { Text("أضف تقييم وتقييم متبادل ✍️", color = Color.White, fontSize = 12.sp) },
                             onClick = {
                                 showMenu = false
                                 onAddReview()

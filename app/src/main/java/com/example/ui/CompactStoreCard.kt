@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,7 +62,13 @@ fun CompactStoreCard(
                 .fillMaxWidth()
                 .padding(10.dp)
         ) {
-            // ------ Row 1: Header [ Logo (40dp) | Store Name + Category Badge | Rating ] ------
+            // Clickable header area for opening store profile & details
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenDetails() }
+            ) {
+                // ------ Row 1: Header [ Logo (40dp) | Store Name + Category Badge | Rating ] ------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -228,76 +235,153 @@ fun CompactStoreCard(
                     )
                 }
             }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ------ Row 3: Single-Row Action Bar + Collapsible Overflow Menu ------
+            // ------ Row 3: Action Buttons with Labels Below Each Button ------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Direct Call
-                    IconButton(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
+                // 1. Direct Phone Call
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            val phoneNum = store.phone.ifEmpty { "770000000" }
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneNum"))
                             context.startActivity(intent)
-                        },
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF10B981))
-                    ) {
-                        Icon(Icons.Default.Phone, contentDescription = "اتصال", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-
-                    // Direct Chat
-                    IconButton(
-                        onClick = onDirectChat,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF3B82F6))
-                    ) {
-                        Icon(Icons.Default.Email, contentDescription = "محادثة", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-
-                    // In-App Voice Call (Agora HD)
-                    if (onAgoraCall != null) {
-                        IconButton(
-                            onClick = onAgoraCall,
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF8B5CF6))
-                        ) {
-                            Icon(Icons.Default.Call, contentDescription = "مكالمة صوتية", tint = Color.White, modifier = Modifier.size(16.dp))
                         }
-                    }
-
-                    // Browse Store Profile Button
-                    Button(
-                        onClick = onOpenDetails,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier.height(34.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-                        shape = RoundedCornerShape(10.dp)
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("زيارة المركز 🏪", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Icon(Icons.Default.Phone, contentDescription = "اتصال", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("اتصال", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
+                }
+
+                // 2. WhatsApp Chat
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            val rawPhone = store.phone.ifEmpty { "770000000" }
+                            val cleanPhone = rawPhone.replace("+", "").replace(" ", "")
+                            val waUrl = "https://wa.me/967${cleanPhone.takeLast(9)}"
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(waUrl))
+                            context.startActivity(intent)
+                        }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF25D366)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "واتساب", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("واتساب", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
+                }
+
+                // 3. Direct In-App Messaging
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onDirectChat() }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF3B82F6)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = "محادثة", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("محادثة", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
+                }
+
+                // 4. In-App Voice Call (Agora HD)
+                if (onAgoraCall != null) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onAgoraCall() }
+                            .padding(horizontal = 3.dp, vertical = 2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF8B5CF6)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Call, contentDescription = "صوتي HD", tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("صوتي HD", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2E8F0))
                     }
                 }
 
-                // Collapsible Overflow Dropdown Menu
-                Box {
-                    IconButton(
-                        onClick = { showMenu = true },
+                // 5. Open Store Profile & 6 Tabs
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onOpenDetails() }
+                        .padding(horizontal = 3.dp, vertical = 2.dp)
+                ) {
+                    Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF334155))
+                            .background(Color(0xFF0284C7)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "المزيد", tint = Color.White, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Home, contentDescription = "زيارة المركز", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("زيارة المركز", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
+                }
+
+                // 6. Overflow Dropdown Menu
+                Box {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showMenu = true }
+                            .padding(horizontal = 3.dp, vertical = 2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF334155)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "خيارات", tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("خيارات", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
                     }
 
                     DropdownMenu(
