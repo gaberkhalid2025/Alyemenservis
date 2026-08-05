@@ -209,7 +209,7 @@ fun MapScreen(
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
-                                    text = providerBadge,
+                                    text = "⚡ الرادار الحي",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -256,6 +256,7 @@ fun MapScreen(
             MultiEngineMapRenderer(
                 provider = settingsState.mapProvider,
                 defaultZoom = settingsState.mapDefaultZoom,
+                maxDistanceKm = maxDistanceKm,
                 userLat = userLat,
                 userLng = userLng,
                 providers = filteredProviders,
@@ -508,6 +509,7 @@ private fun MapEntityCardOverlay(
 private fun MultiEngineMapRenderer(
     provider: String,
     defaultZoom: Float,
+    maxDistanceKm: Float,
     userLat: Double,
     userLng: Double,
     providers: List<ProviderEntity>,
@@ -517,8 +519,8 @@ private fun MultiEngineMapRenderer(
     onSelectStore: (StoreEntity) -> Unit,
     onSelectProperty: (PropertyEntity) -> Unit
 ) {
-    val htmlContent = remember(provider, defaultZoom, userLat, userLng, providers, stores, properties) {
-        buildMultiEngineHtml(provider, defaultZoom, userLat, userLng, providers, stores, properties)
+    val htmlContent = remember(provider, defaultZoom, maxDistanceKm, userLat, userLng, providers, stores, properties) {
+        buildMultiEngineHtml(provider, defaultZoom, maxDistanceKm, userLat, userLng, providers, stores, properties)
     }
 
     AndroidView(
@@ -564,6 +566,7 @@ private fun MultiEngineMapRenderer(
 private fun buildMultiEngineHtml(
     provider: String,
     defaultZoom: Float,
+    maxDistanceKm: Float,
     userLat: Double,
     userLng: Double,
     providers: List<ProviderEntity>,
@@ -572,79 +575,151 @@ private fun buildMultiEngineHtml(
 ): String {
     val centerLat = if (userLat != 0.0) userLat else 15.369444
     val centerLng = if (userLng != 0.0) userLng else 44.191
-    val zoom = if (userLat != 0.0) defaultZoom.toInt() else 7
+    val zoom = if (userLat != 0.0) defaultZoom.toInt() else 8
 
-    val tileLayerUrl = when (provider.uppercase()) {
-        "GOOGLE" -> "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-        "MAPBOX" -> "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        else -> "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    }
-
-    val mapTitle = when (provider.uppercase()) {
-        "GOOGLE" -> "Google Maps Engine"
-        "MAPBOX" -> "Mapbox GL Vector Engine"
-        else -> "MapLibre Open Engine"
-    }
+    val tileLayerUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    val mapTitle = "خريطة كل خدمات اليمن الحية"
 
     val markersJs = StringBuilder()
 
+    // Add pulsating radar around user location
     if (userLat != 0.0 && userLng != 0.0) {
         markersJs.append("""
+            var userIcon = L.divIcon({
+                className: 'pulse-user-icon',
+                html: '<div class="user-pulse-ring"></div><div class="user-core-dot">📍</div>',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            });
+            L.marker([$userLat, $userLng], {icon: userIcon}).addTo(map)
+                .bindPopup("<div style='text-align:center;'><b>📍 موقعك الحالي</b><br><span style='color:#38bdf8;font-size:11px;'>رادار البحث نشط ⚡</span></div>");
+
             L.circle([$userLat, $userLng], {
-                color: '#2196F3',
-                fillColor: '#2196F3',
-                fillOpacity: 0.3,
-                radius: 500
+                color: '#38bdf8',
+                fillColor: '#0284c7',
+                fillOpacity: 0.15,
+                radius: ${maxDistanceKm * 1000}
             }).addTo(map);
-            L.marker([$userLat, $userLng]).addTo(map)
-                .bindPopup("<b>📍 موقعك الحالي</b>");
         """.trimIndent())
     }
 
     providers.forEach { p ->
-        val lat = if (p.latitude != 0.0) p.latitude else centerLat + (Math.random() - 0.5) * 0.05
-        val lng = if (p.longitude != 0.0) p.longitude else centerLng + (Math.random() - 0.5) * 0.05
+        val lat = if (p.latitude != 0.0) p.latitude else centerLat + (Math.random() - 0.5) * 0.06
+        val lng = if (p.longitude != 0.0) p.longitude else centerLng + (Math.random() - 0.5) * 0.06
         markersJs.append("""
-            L.marker([$lat, $lng]).addTo(map)
-                .bindPopup("<b>🔧 ${p.name}</b><br>${p.customCategoryName}<br><a href='app://provider/${p.id}'>عرض التفاصيل</a>");
+            var pIcon = L.divIcon({
+                className: 'tech-marker-icon',
+                html: '<div class="pulse-marker tech-pin">🔧</div>',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+            L.marker([$lat, $lng], {icon: pIcon}).addTo(map)
+                .bindPopup("<b>🔧 ${p.name}</b><br><span style='color:#f59e0b;'>${p.customCategoryName.ifEmpty { "فني متخصص" }}</span><br><a href='app://provider/${p.id}' style='color:#38bdf8;font-weight:bold;'>عرض التفاصيل</a>");
         """.trimIndent())
     }
 
     stores.forEach { s ->
-        val lat = if (s.latitude != 0.0) s.latitude else centerLat + (Math.random() - 0.5) * 0.05
-        val lng = if (s.longitude != 0.0) s.longitude else centerLng + (Math.random() - 0.5) * 0.05
+        val lat = if (s.latitude != 0.0) s.latitude else centerLat + (Math.random() - 0.5) * 0.06
+        val lng = if (s.longitude != 0.0) s.longitude else centerLng + (Math.random() - 0.5) * 0.06
         markersJs.append("""
-            L.marker([$lat, $lng]).addTo(map)
-                .bindPopup("<b>🏪 ${s.name}</b><br>${s.categoryId}<br><a href='app://store/${s.id}'>عرض التفاصيل</a>");
+            var sIcon = L.divIcon({
+                className: 'store-marker-icon',
+                html: '<div class="pulse-marker store-pin">🏪</div>',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+            L.marker([$lat, $lng], {icon: sIcon}).addTo(map)
+                .bindPopup("<b>🏪 ${s.name}</b><br><span style='color:#10b981;'>${s.categoryId.ifEmpty { "متجر" }}</span><br><a href='app://store/${s.id}' style='color:#38bdf8;font-weight:bold;'>عرض التفاصيل</a>");
         """.trimIndent())
     }
 
     properties.forEach { pr ->
-        val lat = if (pr.latitude != 0.0) pr.latitude else centerLat + (Math.random() - 0.5) * 0.05
-        val lng = if (pr.longitude != 0.0) pr.longitude else centerLng + (Math.random() - 0.5) * 0.05
+        val lat = if (pr.latitude != 0.0) pr.latitude else centerLat + (Math.random() - 0.5) * 0.06
+        val lng = if (pr.longitude != 0.0) pr.longitude else centerLng + (Math.random() - 0.5) * 0.06
         markersJs.append("""
-            L.marker([$lat, $lng]).addTo(map)
-                .bindPopup("<b>🏠 ${pr.title}</b><br>${pr.price}<br><a href='app://property/${pr.id}'>عرض التفاصيل</a>");
+            var prIcon = L.divIcon({
+                className: 'prop-marker-icon',
+                html: '<div class="pulse-marker prop-pin">🏠</div>',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+            L.marker([$lat, $lng], {icon: prIcon}).addTo(map)
+                .bindPopup("<b>🏠 ${pr.title}</b><br><span style='color:#a855f7;'>${pr.price}</span><br><a href='app://property/${pr.id}' style='color:#38bdf8;font-weight:bold;'>عرض التفاصيل</a>");
         """.trimIndent())
     }
 
     return """
         <!DOCTYPE html>
-        <html>
+        <html dir="rtl" lang="ar">
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <style>
-                body { margin: 0; padding: 0; background: #0f172a; }
-                #map { width: 100vw; height: 100vh; }
-                .leaflet-container { background: #0f172a; }
+                * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+                body, html { width: 100%; height: 100%; overflow: hidden; background: #0b0f19; }
+                #map { width: 100vw; height: 100vh; background: #0b0f19; }
+                
+                /* Custom Pulse Radar Animations */
+                .pulse-user-icon {
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .user-pulse-ring {
+                    position: absolute;
+                    width: 50px;
+                    height: 50px;
+                    border-radius: 50%;
+                    border: 2px solid #38bdf8;
+                    background: rgba(56, 189, 248, 0.25);
+                    animation: radarPulse 2s infinite ease-out;
+                }
+                .user-core-dot {
+                    font-size: 24px;
+                    z-index: 10;
+                }
+                
+                .pulse-marker {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 18px;
+                    box-shadow: 0 0 12px rgba(0,0,0,0.6);
+                    border: 2px solid #ffffff;
+                    animation: floatMarker 3s ease-in-out infinite alternate;
+                }
+                .tech-pin { background: #f59e0b; }
+                .store-pin { background: #10b981; }
+                .prop-pin { background: #8b5cf6; }
+
+                @keyframes radarPulse {
+                    0% { transform: scale(0.3); opacity: 1; }
+                    100% { transform: scale(2.2); opacity: 0; }
+                }
+                @keyframes floatMarker {
+                    0% { transform: translateY(0); }
+                    100% { transform: translateY(-5px); }
+                }
+                .leaflet-popup-content-wrapper {
+                    background: #1e293b;
+                    color: #f8fafc;
+                    border-radius: 12px;
+                    padding: 8px;
+                    font-family: inherit;
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+                }
+                .leaflet-popup-tip { background: #1e293b; }
             </style>
         </head>
         <body>
             <div id="map"></div>
             <script>
-                var map = L.map('map').setView([$centerLat, $centerLng], $zoom);
+                var map = L.map('map', { zoomControl: false }).setView([$centerLat, $centerLng], $zoom);
                 L.tileLayer('$tileLayerUrl', {
                     maxZoom: 19,
                     attribution: '$mapTitle'

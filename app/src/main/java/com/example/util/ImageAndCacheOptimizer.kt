@@ -67,13 +67,13 @@ object ImageAndCacheOptimizer {
         return cacheDir
     }
 
-    // 3. Smart Image Compression for Firebase Upload (Max target 300KB)
+    // 3. Smart Ultra-Compress Image for Firebase Storage Spark Plan (Max target 800x800, quality 65%)
     fun compressAndScaleImage(
         context: Context,
         imageUri: Uri,
-        maxWidth: Int = 1084,
-        maxHeight: Int = 1084,
-        targetQuality: Int = 75
+        maxWidth: Int = 800,
+        maxHeight: Int = 800,
+        targetQuality: Int = 65
     ): File? {
         return try {
             val inputStream = context.contentResolver.openInputStream(imageUri) ?: return null
@@ -81,7 +81,7 @@ object ImageAndCacheOptimizer {
             BitmapFactory.decodeStream(inputStream, null, options)
             inputStream.close()
 
-            // Calculate sample size
+            // Calculate sample size for max 800x800
             var inSampleSize = 1
             if (options.outHeight > maxHeight || options.outWidth > maxWidth) {
                 val halfHeight = options.outHeight / 2
