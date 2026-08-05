@@ -262,6 +262,10 @@ data class AdminSettingsEntity(
 
     // Buttons switches and colors
     val showCallButton: Boolean = true,
+    val showVoiceCallButton: Boolean = false,
+    val showInstantChatButton: Boolean = true,
+    val showReviewButton: Boolean = true,
+    val showReportButton: Boolean = true,
     val showWhatsappButton: Boolean = true,
     val showDetailsButton: Boolean = true,
     val showBookButton: Boolean = true,
@@ -281,6 +285,8 @@ data class AdminSettingsEntity(
     // Padding & Spacing
     val elementSpacing: Int = 8,
     val cardPadding: Int = 12,
+    val cardMarginHorizontal: Int = 0,
+    val cardMarginVertical: Int = 4,
 
     // Click press effect scale
     val enableScaleAnimation: Boolean = true,

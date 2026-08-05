@@ -7,6 +7,8 @@ import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.Brush
+import coil.compose.AsyncImage
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -564,32 +566,98 @@ fun StoreListItemCard(
     onClick: () -> Unit,
     viewModel: MainViewModel? = null
 ) {
+    val settingsState = viewModel?.settings?.collectAsState()?.value ?: AdminSettingsEntity()
+    val adminRole by (viewModel?.adminRole?.collectAsState() ?: remember { mutableStateOf("GUEST") })
+    val isAdmin = adminRole != "GUEST"
+    val context = LocalContext.current
+
+    var showAdminQuickEditDialog by remember { mutableStateOf(false) }
+    var editStoreName by remember(store) { mutableStateOf(store.name) }
+    var editStoreLogo by remember(store) { mutableStateOf(store.logoImage) }
+    var editStoreCover by remember(store) { mutableStateOf(store.coverImage) }
+    var editStorePhone by remember(store) { mutableStateOf(store.phone) }
+    var editStoreHours by remember(store) { mutableStateOf(store.workingHours) }
+
+    val logoBitmap = remember(store.logoImage) {
+        if (store.logoImage.isNotEmpty() && !store.logoImage.startsWith("http") && !store.logoImage.startsWith("content")) {
+            try {
+                val cleanBase64 = if (store.logoImage.contains(",")) store.logoImage.substringAfter(",") else store.logoImage
+                val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (e: Exception) { null }
+        } else null
+    }
+
+    val coverBitmap = remember(store.coverImage) {
+        if (store.coverImage.isNotEmpty() && !store.coverImage.startsWith("http") && !store.coverImage.startsWith("content")) {
+            try {
+                val cleanBase64 = if (store.coverImage.contains(",")) store.coverImage.substringAfter(",") else store.coverImage
+                val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (e: Exception) { null }
+        } else null
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = (settingsState.cardMarginHorizontal).dp, vertical = (settingsState.cardMarginVertical).dp)
             .clickable { onClick() }
             .border(
                 1.dp,
-                if (store.isPinned) themeColors.accent else themeColors.accent.copy(alpha = 0.08f),
+                if (store.isPinned) themeColors.accent else themeColors.accent.copy(alpha = 0.12f),
                 RoundedCornerShape(12.dp)
             )
     ) {
         Column {
+            // Header Cover Image Banner
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(110.dp)
-                    .background(Color.DarkGray)
+                    .height(115.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                themeColors.primary,
+                                themeColors.secondary
+                            )
+                        )
+                    )
             ) {
-                // Background Cover Photo
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(themeColors.primary.copy(alpha = 0.1f))
-                ) {
-                    Text("📸 غلاف المتجر", modifier = Modifier.align(Alignment.Center), color = Color.Gray, fontSize = 12.sp)
+                if (coverBitmap != null) {
+                    androidx.compose.foundation.Image(
+                        bitmap = coverBitmap.asImageBitmap(),
+                        contentDescription = "غلاف المركز",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (store.coverImage.isNotEmpty()) {
+                    AsyncImage(
+                        model = store.coverImage,
+                        contentDescription = "غلاف المركز",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(themeColors.primary.copy(alpha = 0.6f), Color(0xFF1E293B))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = store.name,
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
 
                 if (store.isPinned) {
@@ -613,32 +681,68 @@ fun StoreListItemCard(
                         Text("قيد المراجعة والتحقق", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
+
+                if (isAdmin) {
+                    IconButton(
+                        onClick = { showAdminQuickEditDialog = true },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .size(28.dp)
+                            .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                    ) {
+                        Text("✏️", fontSize = 12.sp)
+                    }
+                }
             }
 
+            // Core Profile Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Logo placeholder
+                // Logo/Avatar Container
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
-                        .background(themeColors.accent.copy(alpha = 0.2f))
+                        .background(themeColors.background)
                         .border(1.5.dp, themeColors.accent, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🏪", fontSize = 24.sp)
+                    if (logoBitmap != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = logoBitmap.asImageBitmap(),
+                            contentDescription = "شعار المركز",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else if (store.logoImage.isNotEmpty()) {
+                        AsyncImage(
+                            model = store.logoImage,
+                            contentDescription = "شعار المركز",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        val categoryIcon = when {
+                            store.categoryId.contains("medical") || store.name.contains("طبي") || store.name.contains("عيادة") -> "🏥"
+                            store.categoryId.contains("restaurant") || store.name.contains("مطعم") || store.name.contains("كافيه") -> "🍔"
+                            store.categoryId.contains("realestate") || store.name.contains("عقار") || store.name.contains("مقاولات") -> "🏢"
+                            else -> "🏪"
+                        }
+                        Text(categoryIcon, fontSize = 24.sp)
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(store.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         if (store.isVip) {
                             Box(
                                 modifier = Modifier
@@ -657,27 +761,20 @@ fun StoreListItemCard(
                             ) {
                                 Text("✅ موثق", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
                             }
-                            Spacer(modifier = Modifier.width(3.dp))
-                        }
-                        if (store.isRecommended) {
-                            Box(
-                                modifier = Modifier
-                                    .background(Color(0xFFEC4899), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text("💖 موصى به", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(3.dp))
                         }
                     }
-                    Text(store.description, fontSize = 10.sp, color = themeColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    if (store.description.isNotEmpty()) {
+                        Text(store.description, fontSize = 10.sp, color = themeColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Spacer(modifier = Modifier.height(3.dp))
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("🕒 ${store.workingHours}", fontSize = 9.sp, color = themeColors.textSecondary)
-                        Text("📍 الحي: ${store.localNeighborhood}", fontSize = 9.sp, color = themeColors.textSecondary)
+                        Text("🕒 ${store.workingHours.ifEmpty { "09:00 ص - 10:00 م" }}", fontSize = 9.sp, color = themeColors.textSecondary)
+                        if (store.localNeighborhood.isNotEmpty()) {
+                            Text("📍 ${store.localNeighborhood}", fontSize = 9.sp, color = themeColors.textSecondary)
+                        }
                     }
                 }
 
@@ -691,37 +788,162 @@ fun StoreListItemCard(
                 }
             }
 
-            Divider(color = Color.Gray.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 12.dp))
+            Divider(color = Color.Gray.copy(alpha = 0.15f), modifier = Modifier.padding(horizontal = 10.dp))
+
+            // Communication & Action Buttons Bar
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                Button(
-                    onClick = {
-                        val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${store.phone}"))
-                        context.startActivity(u)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    modifier = Modifier.weight(1f).height(30.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("📞 اتصال مباشر", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = {
-                        if (viewModel != null) {
-                            viewModel.startVoiceCall(store.name, "متجر / مركز تجاري HD")
-                        } else {
-                            val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${store.phone}"))
+                // Direct Dial
+                if (settingsState.showCallButton) {
+                    Button(
+                        onClick = {
+                            val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
                             context.startActivity(u)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                    modifier = Modifier.weight(1f).height(30.dp),
-                    contentPadding = PaddingValues(0.dp)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("📞 اتصال", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Instant Chat
+                if (settingsState.showInstantChatButton) {
+                    Button(
+                        onClick = onClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.2f)),
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                    ) {
+                        Text("📩 محادثة", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Voice Call (In-App) - Controlled strictly by Admin toggle
+                if (settingsState.showVoiceCallButton && !settingsState.disableVoiceCalls) {
+                    Button(
+                        onClick = {
+                            if (viewModel != null) {
+                                viewModel.startVoiceCall(store.name, "مركز تجاري / متجر")
+                            } else {
+                                val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
+                                context.startActivity(u)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("🎙️ مكالمة", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Details & Booking
+                Button(
+                    onClick = onClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    modifier = Modifier.weight(1f).height(32.dp),
+                    contentPadding = PaddingValues(0.dp),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("🎙️ مكالمة صوتية", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("🔍 التفاصيل", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    // Admin Quick Edit Modal for Store Card
+    if (showAdminQuickEditDialog) {
+        Dialog(onDismissRequest = { showAdminQuickEditDialog = false }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, themeColors.accent),
+                modifier = Modifier.padding(12.dp).fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("⚙️ تعديل وتنسيق بطاقة المركز/المتجر", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+
+                    OutlinedTextField(
+                        value = editStoreName,
+                        onValueChange = { editStoreName = it },
+                        label = { Text("اسم المتجر / المركز", color = Color.LightGray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editStoreLogo,
+                        onValueChange = { editStoreLogo = it },
+                        label = { Text("رابط الشعار / الصورة الشخصية (URL / Base64)", color = Color.LightGray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editStoreCover,
+                        onValueChange = { editStoreCover = it },
+                        label = { Text("رابط صورة الغلاف العلوي (URL / Base64)", color = Color.LightGray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editStorePhone,
+                        onValueChange = { editStorePhone = it },
+                        label = { Text("رقم الهاتف / الجوال", color = Color.LightGray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editStoreHours,
+                        onValueChange = { editStoreHours = it },
+                        label = { Text("ساعات العمل والدوام", color = Color.LightGray) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = { showAdminQuickEditDialog = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                        ) {
+                            Text("إلغاء", color = Color.White)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (viewModel != null) {
+                                    viewModel.saveStore(
+                                        store.copy(
+                                            name = editStoreName,
+                                            logoImage = editStoreLogo,
+                                            coverImage = editStoreCover,
+                                            phone = editStorePhone,
+                                            workingHours = editStoreHours
+                                        )
+                                    )
+                                }
+                                showAdminQuickEditDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                        ) {
+                            Text("حفظ التعديلات", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
@@ -1158,32 +1380,37 @@ fun PropertyListItemCard(
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    val settingsState = viewModel?.settings?.collectAsState()?.value ?: AdminSettingsEntity()
                     val context = androidx.compose.ui.platform.LocalContext.current
-                    Button(
-                        onClick = {
-                            val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${prop.phone}"))
-                            context.startActivity(u)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        modifier = Modifier.weight(1f).height(30.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text("📞 اتصال مباشر", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    Button(
-                        onClick = {
-                            if (viewModel != null) {
-                                viewModel.startVoiceCall(prop.title, "صاحب العقار HD")
-                            } else {
+                    if (settingsState.showCallButton) {
+                        Button(
+                            onClick = {
                                 val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${prop.phone}"))
                                 context.startActivity(u)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                        modifier = Modifier.weight(1f).height(30.dp),
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text("🎙️ مكالمة صوتية", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            modifier = Modifier.weight(1f).height(30.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("📞 اتصال مباشر", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    if (settingsState.showVoiceCallButton && !settingsState.disableVoiceCalls) {
+                        Button(
+                            onClick = {
+                                if (viewModel != null) {
+                                    viewModel.startVoiceCall(prop.title, "صاحب العقار HD")
+                                } else {
+                                    val u = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${prop.phone}"))
+                                    context.startActivity(u)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                            modifier = Modifier.weight(1f).height(30.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("🎙️ مكالمة صوتية", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

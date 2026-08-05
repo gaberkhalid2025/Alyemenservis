@@ -4353,51 +4353,55 @@ fun ProviderCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // 📩 مراسلة فورية
-                    Button(
-                        onClick = {
-                            if (provider.isChatDisabled) {
-                                Toast.makeText(context, "⚠️ عذراً، لقد تم إيقاف خدمة الدردشة مع هذا الفني مؤقتاً بواسطة الإدارة.", Toast.LENGTH_LONG).show()
-                            } else if (currentUserIdState == "guest" && !settingsState.bypassVisitorRegistration && !settingsState.disableChatFirewall) {
-                                showGuestRegisterDialogForBooking = true
-                            } else {
-                                val targetId = if (provider.chatRecipientId.isNotEmpty()) provider.chatRecipientId else provider.id
-                                val customerIdForChat = if (currentUserPhoneState.isNotEmpty()) currentUserPhoneState else currentUserIdState
-                                val chatRoomId = "chat_p_${targetId}_u_${customerIdForChat}"
-                                viewModel.getOrCreateChatChannel(
-                                    targetId,
-                                    provider.name,
-                                    customerIdForChat,
-                                    currentUserNameState
-                                )
-                                onChatOpen(chatRoomId)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.15f)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
-                    ) {
-                        Text("📩 مراسلة فورية", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    if (settingsState.showInstantChatButton) {
+                        Button(
+                            onClick = {
+                                if (provider.isChatDisabled) {
+                                    Toast.makeText(context, "⚠️ عذراً، لقد تم إيقاف خدمة الدردشة مع هذا الفني مؤقتاً بواسطة الإدارة.", Toast.LENGTH_LONG).show()
+                                } else if (currentUserIdState == "guest" && !settingsState.bypassVisitorRegistration && !settingsState.disableChatFirewall) {
+                                    showGuestRegisterDialogForBooking = true
+                                } else {
+                                    val targetId = if (provider.chatRecipientId.isNotEmpty()) provider.chatRecipientId else provider.id
+                                    val customerIdForChat = if (currentUserPhoneState.isNotEmpty()) currentUserPhoneState else currentUserIdState
+                                    val chatRoomId = "chat_p_${targetId}_u_${customerIdForChat}"
+                                    viewModel.getOrCreateChatChannel(
+                                        targetId,
+                                        provider.name,
+                                        customerIdForChat,
+                                        currentUserNameState
+                                    )
+                                    onChatOpen(chatRoomId)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                        ) {
+                            Text("📩 مراسلة فورية", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     // 📞 اتصال مباشر
-                    Button(
-                        onClick = {
-                            viewModel.logCall(provider.id, provider.name)
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
-                            context.startActivity(intent)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text("📞 اتصال", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    if (settingsState.showCallButton) {
+                        Button(
+                            onClick = {
+                                viewModel.logCall(provider.id, provider.name)
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            Text("📞 اتصال", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
 
-                    // 🎙️ مكالمة صوتية (تفتح المكالمة داخل التطبيق مباشرة إلا إذا ألغاها الأدمن)
-                    if (!settingsState.disableVoiceCalls) {
+                    // 🎙️ مكالمة صوتية (تظهر فقط إذا فعّلها الأدمن من الإعدادات)
+                    if (settingsState.showVoiceCallButton && !settingsState.disableVoiceCalls) {
                         Button(
                             onClick = {
                                 viewModel.logCall(provider.id, provider.name)
@@ -4408,7 +4412,7 @@ fun ProviderCard(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
-                            Text("🎙️ مكالمة صوتية", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("🎙️ مكالمة", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -4895,7 +4899,9 @@ fun ProviderCard(
     }
 
     // 4. Switch/Update Image
+    // 4. Change Images (Profile Image & Cover Image)
     if (showAdminEditImage) {
+        var adminCoverImageInput by remember { mutableStateOf(provider.coverImage) }
         Dialog(onDismissRequest = { showAdminEditImage = false }) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
@@ -4904,21 +4910,29 @@ fun ProviderCard(
                 modifier = Modifier.padding(12.dp).fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🖼️ تغيير الصورة الشخصية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("🖼️ إدارة الصور (الشخصية والغلاف)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     
                     OutlinedTextField(
                         value = adminProfileImageInput,
                         onValueChange = { adminProfileImageInput = it },
-                        label = { Text("رابط الصورة الشخصية (URL)", color = Color.LightGray, fontSize = 11.sp) },
+                        label = { Text("رابط الصورة الشخصية / الشعار (URL أو Base64)", color = Color.LightGray, fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = adminCoverImageInput,
+                        onValueChange = { adminCoverImageInput = it },
+                        label = { Text("رابط صورة الغلاف العلوي (URL أو Base64)", color = Color.LightGray, fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                     )
                     
-                    Text("أو اختر صورة رمزية نموذجية سريعة:", color = Color.White, fontSize = 11.sp)
+                    Text("صوَر شخصية نموذجية سريعة:", color = Color.White, fontSize = 11.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                         listOf(
-                            "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150" to "صورة نسائية رمزية",
-                            "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150" to "صورة رجالية رمزية"
+                            "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150" to "نسائي",
+                            "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150" to "رجالي"
                         ).forEach { (url, label) ->
                             Button(
                                 onClick = { adminProfileImageInput = url },
@@ -4933,14 +4947,17 @@ fun ProviderCard(
                     
                     Button(
                         onClick = {
-                            viewModel.updateProviderEntity(provider.copy(profileImage = adminProfileImageInput))
+                            viewModel.updateProviderEntity(provider.copy(
+                                profileImage = adminProfileImageInput,
+                                coverImage = adminCoverImageInput
+                            ))
                             showAdminEditImage = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("حفظ الصورة الشخصية", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("حفظ الصور المحدثة", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -4957,29 +4974,17 @@ fun ProviderCard(
                 modifier = Modifier.padding(12.dp).fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🔘 تخصيص أزرار الاتصال والحجز بالبطاقة", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("🔘 صلاحيات وتخصيص أزرار التفاعل بالبطاقة", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("عرض زر الاتصال المباشر", color = Color.White, fontSize = 11.sp)
+                        Text("📩 زر المراسلة والدردشة الفورية", color = Color.White, fontSize = 11.sp)
                         Switch(
-                            checked = settingsState.showCallButton,
-                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showCallButton = it)) }
-                        )
-                    }
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("عرض زر واتساب للمراسلة المباشرة", color = Color.White, fontSize = 11.sp)
-                        Switch(
-                            checked = settingsState.showWhatsappButton,
-                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showWhatsappButton = it)) }
+                            checked = settingsState.showInstantChatButton,
+                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showInstantChatButton = it)) }
                         )
                     }
 
@@ -4988,7 +4993,55 @@ fun ProviderCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("عرض زر حجز الخدمات الفورية", color = Color.White, fontSize = 11.sp)
+                        Text("📞 زر الاتصال المباشر", color = Color.White, fontSize = 11.sp)
+                        Switch(
+                            checked = settingsState.showCallButton,
+                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showCallButton = it)) }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🎙️ زر المكالمة الصوتية داخل التطبيق", color = Color.White, fontSize = 11.sp)
+                        Switch(
+                            checked = settingsState.showVoiceCallButton,
+                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showVoiceCallButton = it)) }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("💬 زر الآراء وتقييمات العملاء", color = Color.White, fontSize = 11.sp)
+                        Switch(
+                            checked = settingsState.showReviewButton,
+                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showReviewButton = it)) }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🚨 زر تقديم البلاغات والشكاوى", color = Color.White, fontSize = 11.sp)
+                        Switch(
+                            checked = settingsState.showReportButton,
+                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showReportButton = it)) }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📅 زر حجز المواعيد والخدمات", color = Color.White, fontSize = 11.sp)
                         Switch(
                             checked = settingsState.showBookButton,
                             onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showBookButton = it)) }
@@ -5001,7 +5054,7 @@ fun ProviderCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("إغلاق التخصيص", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("حفظ وتأكيد الأزرار", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }
