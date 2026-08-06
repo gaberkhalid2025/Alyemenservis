@@ -755,7 +755,11 @@ data class ProductEntity(
     val imageUrl: String = "",
     val isAvailable: Boolean = true,
     val isDeleted: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val category: String = "",
+    val isOffer: Boolean = false,
+    val discountPercent: Int = 0,
+    val oldPrice: Double = 0.0
 )
 
 @Keep

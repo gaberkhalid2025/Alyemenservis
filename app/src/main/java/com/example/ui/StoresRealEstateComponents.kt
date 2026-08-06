@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.graphics.asImageBitmap
@@ -1433,122 +1434,427 @@ fun StoreDetailsDialog(
     val ratings by viewModel.ratings.collectAsState()
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
     val context = LocalContext.current
 
-    val storeProducts = remember(products) { products.filter { it.storeId == store.id && !it.isDeleted && it.isAvailable } }
-    val storeReviews = remember(ratings) { ratings.filter { it.targetId == store.id && it.targetType == "STORE" && it.isApproved } }
+    val isOwnerOrAdmin = remember(adminRole, currentUserId, store) {
+        adminRole != "GUEST" || store.ownerId == currentUserId || store.phone == currentUserId
+    }
+
+    val storeProducts = remember(products, store.id) {
+        products.filter { it.storeId == store.id && !it.isDeleted && it.isAvailable }
+    }
+    val storeReviews = remember(ratings, store.id) {
+        ratings.filter { it.targetId == store.id && it.targetType == "STORE" && it.isApproved }
+    }
+
+    // Dynamic Categories Tabs
+    val productCategories = remember(storeProducts) {
+        val cats = storeProducts.map { it.category }.filter { it.isNotBlank() }.distinct().toMutableList()
+        val defaultTabs = mutableListOf("الكل", "خدمات", "عروض")
+        cats.forEach { c -> if (!defaultTabs.contains(c)) defaultTabs.add(c) }
+        defaultTabs
+    }
+
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var showEditStoreDialog by remember { mutableStateOf(false) }
+    var showBulkPriceDialog by remember { mutableStateOf(false) }
+    var showAddProductDialog by remember { mutableStateOf(false) }
 
     var userRatingInput by remember { mutableStateOf(5f) }
     var userCommentInput by remember { mutableStateOf("") }
 
-    Dialog(onDismissRequest = onDismiss) {
+    // Cover & Logo Image Pickers for Owner/Admin
+    val coverPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+                if (bytes != null) {
+                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                    viewModel.saveStore(store.copy(coverImage = base64))
+                    android.widget.Toast.makeText(context, "📸 تم تحديث صورة الغلاف بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(context, "فشل تحميل الصورة", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val logoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+                if (bytes != null) {
+                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                    viewModel.saveStore(store.copy(logoImage = base64))
+                    android.widget.Toast.makeText(context, "🖼️ تم تحديث صورة الشعار بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(context, "فشل تحميل الصورة", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = themeColors.background),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .border(2.dp, themeColors.accent, RoundedCornerShape(16.dp))
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f)
+                .border(2.dp, Brush.linearGradient(listOf(themeColors.accent, themeColors.primary)), RoundedCornerShape(20.dp))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                // Header Image Banner
+                // 1. Cover Image Banner
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(130.dp)
-                        .background(themeColors.primary.copy(alpha = 0.15f))
+                        .height(160.dp)
+                        .background(Brush.horizontalGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))))
                 ) {
-                    Text("📸 غلاف المتجر الرئيسي", modifier = Modifier.align(Alignment.Center), color = Color.Gray, fontSize = 12.sp)
-                    IconButton(
-                        onClick = onDismiss,
+                    val coverBitmap = rememberBase64Bitmap(store.coverImage)
+                    if (coverBitmap != null) {
+                        Image(
+                            bitmap = coverBitmap,
+                            contentDescription = "Cover",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else if (store.coverImage.startsWith("http")) {
+                        AsyncImage(
+                            model = store.coverImage,
+                            contentDescription = "Cover",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🏙️ غلاف المتجر الرئيسي", color = Color.LightGray.copy(alpha = 0.7f), fontSize = 13.sp)
+                        }
+                    }
+
+                    // Top Action Buttons
+                    Row(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Close, null, tint = Color.Red)
+                        if (isOwnerOrAdmin) {
+                            Button(
+                                onClick = { coverPickerLauncher.launch("image/*") },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.65f)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("📸 تغيير الغلاف", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.width(10.dp))
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                .size(34.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        }
                     }
                 }
 
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val adminRole by viewModel.adminRole.collectAsState()
-                    var showEditDialog by remember { mutableStateOf(false) }
+                // 2. Overlapping Logo Avatar & Business Details
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 14.dp)
+                        .offset(y = (-30).dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Logo Avatar Box
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF0F172A))
+                                .border(3.dp, themeColors.accent, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val logoBitmap = rememberBase64Bitmap(store.logoImage)
+                            if (logoBitmap != null) {
+                                Image(
+                                    bitmap = logoBitmap,
+                                    contentDescription = "Logo",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else if (store.logoImage.startsWith("http")) {
+                                AsyncImage(
+                                    model = store.logoImage,
+                                    contentDescription = "Logo",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Text(
+                                    text = if (store.categoryId.contains("rest") || store.name.contains("مطعم") || store.name.contains("كافيه")) "🍔" else "🏪",
+                                    fontSize = 32.sp
+                                )
+                            }
 
-                    if (adminRole != "GUEST") {
+                            if (isOwnerOrAdmin) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .background(themeColors.accent, CircleShape)
+                                        .clickable { logoPickerLauncher.launch("image/*") }
+                                        .padding(4.dp)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit Logo", tint = Color.Black, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = store.name,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (store.isVerified) {
+                                    Text("✔️ معتمد", fontSize = 10.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Text(
+                                text = "👤 المالك: ${store.ownerName.ifEmpty { "إدارة المركز" }}",
+                                fontSize = 11.sp,
+                                color = themeColors.textSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Basic Badges (Rating, Neighborhood, Hours)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            color = themeColors.surface,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
+                        ) {
+                            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("⭐ ${store.rating} (${store.numReviews} تقييم)", fontSize = 11.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Surface(
+                            color = themeColors.surface,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
+                        ) {
+                            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("📍 ${store.localNeighborhood.ifEmpty { "اليمن" }}", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+
+                        Surface(
+                            color = themeColors.surface,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
+                        ) {
+                            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("🕒 ${store.workingHours.ifEmpty { "24 ساعة" }}", fontSize = 10.sp, color = Color.LightGray)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 3. World-Class Direct Contact Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
+                                context.startActivity(u)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Call, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("اتصال", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val cleanPhone = store.phone.replace("+", "").replace(" ", "")
+                                val u = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanPhone"))
+                                context.startActivity(u)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            Text("💬 واتساب", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val shareIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, "🏪 تفضل بزيارة صفحة ${store.name} على دليل خدمات اليمن!\n📞 للتواصل: ${store.phone}\n📍 ${store.localNeighborhood}")
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "مشاركة المتجر"))
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("مشاركة", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 4. Owner & Admin Management Panel (If Authorized)
+                    if (isOwnerOrAdmin) {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.2f)),
-                            border = BorderStroke(1.dp, Color.Red),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                            border = BorderStroke(1.dp, themeColors.accent),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
                         ) {
                             Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("🛠️ لوحة تحكم الإدارة الفورية لهذا العنصر:", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("🛠️ لوحة إدارة المتجر والأسعار (المالك / الأدمن):", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     Button(
-                                        onClick = { showEditDialog = true },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                        modifier = Modifier.weight(1f).height(36.dp),
+                                        onClick = { showEditStoreDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
                                         shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(0.dp)
+                                        modifier = Modifier.weight(1f),
+                                        contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
                                     ) {
-                                        Text("📝 تعديل البيانات", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text("📝 البيانات", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
+
                                     Button(
-                                        onClick = {
-                                            viewModel.deleteStore(store.id)
-                                            onDismiss()
-                                            android.widget.Toast.makeText(context, "🗑️ تم حذف وحظر المتجر من النظام بنجاح!", android.widget.Toast.LENGTH_LONG).show()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                        modifier = Modifier.weight(1f).height(36.dp),
+                                        onClick = { showAddProductDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                                         shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(0.dp)
+                                        modifier = Modifier.weight(1f),
+                                        contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
                                     ) {
-                                        Text("🗑️ حذف وحظر", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text("➕ إضافة منتج", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Button(
+                                        onClick = { showBulkPriceDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f),
+                                        contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
+                                    ) {
+                                        Text("📈 رفع الأسعار", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    if (adminRole != "GUEST") {
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.deleteStore(store.id)
+                                                onDismiss()
+                                                android.widget.Toast.makeText(context, "🗑️ تم حذف وحظر المتجر!", android.widget.Toast.LENGTH_LONG).show()
+                                            },
+                                            modifier = Modifier
+                                                .background(Color.Red.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                                                .size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(16.dp))
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    if (showEditDialog) {
+                    if (showEditStoreDialog) {
                         StoreCreateEditDialog(
                             store = store,
                             viewModel = viewModel,
                             themeColors = themeColors,
-                            onDismiss = { showEditDialog = false }
+                            onDismiss = { showEditStoreDialog = false }
                         )
                     }
 
-                    // Logo + Name
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(54.dp)
-                                .clip(CircleShape)
-                                .background(themeColors.accent.copy(alpha = 0.2f))
-                                .border(2.dp, themeColors.accent, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🏪", fontSize = 28.sp)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(store.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("المالك: ${store.ownerName}", fontSize = 10.sp, color = themeColors.textSecondary)
-                        }
+                    if (showBulkPriceDialog) {
+                        BulkPriceAdjusterDialog(
+                            storeId = store.id,
+                            products = storeProducts,
+                            viewModel = viewModel,
+                            themeColors = themeColors,
+                            onDismiss = { showBulkPriceDialog = false }
+                        )
                     }
 
-                    Divider(color = themeColors.accent.copy(alpha = 0.15f))
+                    if (showAddProductDialog) {
+                        QuickAddProductDialog(
+                            storeId = store.id,
+                            viewModel = viewModel,
+                            themeColors = themeColors,
+                            onDismiss = { showAddProductDialog = false }
+                        )
+                    }
 
-                    Text("📝 نبذة و وصف المتجر:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text(store.description, fontSize = 11.sp, color = Color.White)
+                    HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 8.dp))
 
-                    // Show image gallery if available
-                    // Product & Services Attachments Section (VISITOR_VIEW)
+                    Text("📝 نبذة و وصف المتجر:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text(
+                        text = store.description.ifEmpty { "متجر معتمد يمتلك أفضل المنتجات والسلع بأسعار منافسة." },
+                        fontSize = 11.sp,
+                        color = Color.White
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Attachments & Special Offers
                     val storeAtts = remember(store.productAttachmentsJson) {
                         com.example.data.ProductAttachment.parseList(store.productAttachmentsJson)
                     }
@@ -1559,7 +1865,6 @@ fun StoreDetailsDialog(
                         themeColors = themeColors
                     )
 
-                    // Special Offers & Discounts Section (VISITOR_VIEW)
                     SpecialOffersSection(
                         offersJson = store.specialOffersJson,
                         onOffersChanged = {},
@@ -1567,11 +1872,12 @@ fun StoreDetailsDialog(
                         themeColors = themeColors
                     )
 
+                    // Store Gallery Photos
                     if (store.images.isNotEmpty()) {
-                        Text("📸 معرض الصور والمنتجات (${store.images.size}):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                        Text("📸 معرض الصور والمنتجات (${store.images.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().height(120.dp)
+                            modifier = Modifier.fillMaxWidth().height(120.dp).padding(vertical = 6.dp)
                         ) {
                             items(store.images.size) { index ->
                                 val bMap = rememberBase64Bitmap(store.images[index])
@@ -1587,12 +1893,12 @@ fun StoreDetailsDialog(
                         }
                     }
 
-                    // Show PDF link if available and approved
+                    // PDF Catalog
                     if (store.pdfFileBase64.isNotEmpty() && store.pdfStatus == "APPROVED") {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                             modifier = Modifier.fillMaxWidth().clickable {
-                                android.widget.Toast.makeText(context, "📄 تم تنزيل قائمة الخدمات والأسعار بنجاح لقرائتها خارج التطبيق!", android.widget.Toast.LENGTH_LONG).show()
+                                android.widget.Toast.makeText(context, "📄 تم تنزيل قائمة الخدمات والأسعار بنجاح!", android.widget.Toast.LENGTH_LONG).show()
                             }
                         ) {
                             Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1606,120 +1912,96 @@ fun StoreDetailsDialog(
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("📍 الموقع والحي السكني", fontSize = 9.sp, color = themeColors.textSecondary)
-                                Text(store.localNeighborhood, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("🕒 ساعات العمل اليومي", fontSize = 9.sp, color = themeColors.textSecondary)
-                                Text(store.workingHours, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    }
+                    HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 10.dp))
 
-                    // Contact row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val u = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                                context.startActivity(u)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
-                            modifier = Modifier.weight(1f)
+                    // 5. SMART TABROW & PRODUCTS SECTION
+                    Text("🛍️ السلع والمنتجات المتاحة (${storeProducts.size}):", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+
+                    if (productCategories.isNotEmpty()) {
+                        ScrollableTabRow(
+                            selectedTabIndex = selectedTabIndex,
+                            containerColor = Color.Transparent,
+                            contentColor = themeColors.accent,
+                            edgePadding = 0.dp,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                         ) {
-                            Icon(Icons.Default.Call, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("اتصال مباشر", color = Color.White, fontSize = 11.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                val u = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${store.phone.replace("+", "")}"))
-                                context.startActivity(u)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("💬 واتساب", color = Color.White, fontSize = 11.sp)
-                        }
-                    }
-
-                    Divider(color = themeColors.accent.copy(alpha = 0.15f))
-
-                    // Products/Menu Section
-                    Text("🛍️ السلع والمنتجات المتاحة (${storeProducts.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    if (storeProducts.isEmpty()) {
-                        Text("لا يوجد منتجات معروضة حالياً لهذا المتجر.", color = themeColors.textSecondary, fontSize = 10.sp)
-                    } else {
-                        storeProducts.forEach { product ->
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.3f)),
-                                modifier = Modifier.fillMaxWidth().border(1.dp, themeColors.accent.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(50.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color.DarkGray),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("📦", fontSize = 24.sp)
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(product.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                        Text(product.description, fontSize = 9.sp, color = themeColors.textSecondary, maxLines = 1)
-                                        Text("${product.price} YER", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                                    }
-                                    Button(
-                                        onClick = { onOrderProductClick(product) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
-                                    ) {
-                                        Text("شراء فوراً", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
+                            productCategories.forEachIndexed { index, catName ->
+                                val count = when (catName) {
+                                    "الكل" -> storeProducts.size
+                                    "خدمات" -> storeProducts.count { it.description.contains("خدمة") || it.name.contains("خدمة") }
+                                    "عروض" -> storeProducts.count { it.isOffer || it.discountPercent > 0 || it.oldPrice > it.price }
+                                    else -> storeProducts.count { it.category == catName }
                                 }
+                                Tab(
+                                    selected = selectedTabIndex == index,
+                                    onClick = { selectedTabIndex = index },
+                                    text = {
+                                        Text(
+                                            text = "$catName ($count)",
+                                            fontSize = 11.sp,
+                                            fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (selectedTabIndex == index) themeColors.accent else Color.LightGray
+                                        )
+                                    }
+                                )
                             }
                         }
                     }
 
-                    Divider(color = themeColors.accent.copy(alpha = 0.15f))
+                    // Filtered Products List
+                    val filteredProducts = remember(selectedTabIndex, storeProducts, productCategories) {
+                        if (selectedTabIndex >= productCategories.size) storeProducts
+                        else {
+                            val activeCat = productCategories[selectedTabIndex]
+                            when (activeCat) {
+                                "الكل" -> storeProducts
+                                "خدمات" -> storeProducts.filter { it.description.contains("خدمة") || it.name.contains("خدمة") }
+                                "عروض" -> storeProducts.filter { it.isOffer || it.discountPercent > 0 || it.oldPrice > it.price }
+                                else -> storeProducts.filter { it.category == activeCat }
+                            }
+                        }
+                    }
 
-                    // Reviews List
+                    if (filteredProducts.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("لا توجد منتجات متوفرة في هذا التبويب حالياً.", color = themeColors.textSecondary, fontSize = 11.sp)
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            filteredProducts.forEach { product ->
+                                ProductListItemCard(
+                                    product = product,
+                                    isOwnerOrAdmin = isOwnerOrAdmin,
+                                    themeColors = themeColors,
+                                    viewModel = viewModel,
+                                    onOrderClick = { onOrderProductClick(product) }
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 12.dp))
+
+                    // 6. REVIEWS & RATINGS SECTION
                     Text("⭐ التقييمات وآراء العملاء (${storeReviews.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     storeReviews.forEach { rev ->
                         Card(
                             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(rev.userName, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(rev.userName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     Row {
-                                        repeat(rev.rating.toInt()) { Text("⭐", fontSize = 8.sp) }
+                                        repeat(rev.rating.toInt()) { Text("⭐", fontSize = 9.sp) }
                                     }
                                 }
                                 Text(rev.comment, fontSize = 10.sp, color = themeColors.textSecondary)
@@ -1727,10 +2009,11 @@ fun StoreDetailsDialog(
                         }
                     }
 
-                    // Add Review Form
+                    // Add Review Form Card
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                        modifier = Modifier.fillMaxWidth()
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("➕ أضف تقييمك ورأيك في المتجر:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -1779,6 +2062,349 @@ fun StoreDetailsDialog(
                                 Text("إرسال التقييم", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 📦 Product Item Card Component with Inline Price Editing for Owner/Admin
+ */
+@Composable
+fun ProductListItemCard(
+    product: ProductEntity,
+    isOwnerOrAdmin: Boolean,
+    themeColors: VisualThemePalette,
+    viewModel: MainViewModel,
+    onOrderClick: () -> Unit
+) {
+    val context = LocalContext.current
+    var editingPrice by remember(product.price) { mutableStateOf(product.price.toString()) }
+    var isPriceEditing by remember { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f)),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Product Image Thumbnail
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.DarkGray),
+                contentAlignment = Alignment.Center
+            ) {
+                val pBitmap = rememberBase64Bitmap(product.imageUrl)
+                if (pBitmap != null) {
+                    Image(bitmap = pBitmap, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else if (product.imageUrl.startsWith("http")) {
+                    AsyncImage(model = product.imageUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    Text("📦", fontSize = 26.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = product.name,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (product.isOffer || product.discountPercent > 0) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color.Red, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text("🔥 خصم", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                if (product.description.isNotEmpty()) {
+                    Text(
+                        text = product.description,
+                        fontSize = 10.sp,
+                        color = themeColors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Price display or Inline Price Editor
+                if (isOwnerOrAdmin && isPriceEditing) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = editingPrice,
+                            onValueChange = { editingPrice = it },
+                            modifier = Modifier.width(90.dp).height(38.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+                        Button(
+                            onClick = {
+                                val pVal = editingPrice.toDoubleOrNull() ?: product.price
+                                viewModel.saveProduct(product.copy(price = pVal))
+                                isPriceEditing = false
+                                android.widget.Toast.makeText(context, "✅ تم تحديث سعر السلعة!", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("💾 حفظ", fontSize = 9.sp, color = Color.White)
+                        }
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "${product.price} YER",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColors.accent
+                        )
+                        if (isOwnerOrAdmin) {
+                            Text(
+                                text = "✏️ تعديل",
+                                fontSize = 9.sp,
+                                color = Color.Cyan,
+                                modifier = Modifier
+                                    .clickable { isPriceEditing = true }
+                                    .padding(horizontal = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Order Action Button
+            Button(
+                onClick = onOrderClick,
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text("🛒 شراء", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/**
+ * 📈 Bulk Price Adjuster Modal for Store Owner / Admin
+ */
+@Composable
+fun BulkPriceAdjusterDialog(
+    storeId: String,
+    products: List<ProductEntity>,
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
+    onDismiss: () -> Unit
+) {
+    var percentInput by remember { mutableStateOf("10") }
+    var actionType by remember { mutableStateOf("INCREASE") } // INCREASE or DECREASE
+    val context = LocalContext.current
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(2.dp, themeColors.accent),
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("📈 تعديل / رفع أسعار جميع السلع والمنتجات:", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("سيتم تطبيق نسبة التعديل على جميع المنتجات التابعة لـ هذا المتجر (${products.size} منتج)", fontSize = 10.sp, color = themeColors.textSecondary)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = actionType == "INCREASE",
+                        onClick = { actionType = "INCREASE" },
+                        label = { Text("📈 رفع الأسعار (+)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = actionType == "DECREASE",
+                        onClick = { actionType = "DECREASE" },
+                        label = { Text("📉 تخفيض الأسعار (-)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = percentInput,
+                    onValueChange = { percentInput = it },
+                    label = { Text("النسبة المئوية (%)", color = themeColors.textSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("إلغاء", color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val pct = percentInput.toDoubleOrNull() ?: 0.0
+                            if (pct > 0) {
+                                val factor = if (actionType == "INCREASE") (1.0 + pct / 100.0) else (1.0 - pct / 100.0)
+                                products.forEach { p ->
+                                    val newP = (p.price * factor).let { Math.round(it * 10.0) / 10.0 }
+                                    viewModel.saveProduct(p.copy(price = newP))
+                                }
+                                android.widget.Toast.makeText(context, "✅ تم تحديث أسعار ${products.size} منتج بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                                onDismiss()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                    ) {
+                        Text("تطبيق على المنتجات", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ➕ Quick Add Product Modal for Store Owner / Admin
+ */
+@Composable
+fun QuickAddProductDialog(
+    storeId: String,
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf("") }
+    var priceStr by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("خدمات") }
+    var isOffer by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(2.dp, themeColors.accent),
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("➕ إضافة منتج / سلعة جديدة للمتجر:", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("اسم المنتج / السلعة", color = themeColors.textSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                )
+
+                OutlinedTextField(
+                    value = desc,
+                    onValueChange = { desc = it },
+                    label = { Text("وصف السلعة / التفاصيل", color = themeColors.textSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = priceStr,
+                        onValueChange = { priceStr = it },
+                        label = { Text("السعر (YER)", color = themeColors.textSecondary) },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = { category = it },
+                        label = { Text("التبويب / القسم", color = themeColors.textSecondary) },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isOffer, onCheckedChange = { isOffer = it })
+                    Text("تعيين كـ عرض خاص 🔥", fontSize = 11.sp, color = Color.White)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("إلغاء", color = Color.Gray) }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (name.isNotBlank()) {
+                                val p = ProductEntity(
+                                    storeId = storeId,
+                                    name = name,
+                                    description = desc,
+                                    price = priceStr.toDoubleOrNull() ?: 0.0,
+                                    category = category.ifBlank { "خدمات" },
+                                    isOffer = isOffer
+                                )
+                                viewModel.saveProduct(p)
+                                android.widget.Toast.makeText(context, "✅ تم إضافة المنتج بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
+                                onDismiss()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                    ) {
+                        Text("حفظ السلعة", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }
