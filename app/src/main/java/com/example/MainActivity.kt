@@ -1129,7 +1129,14 @@ fun AppNavigator(
                                 )
                             }
 
-                            if (currentScreen != "REGISTER_FORM" && currentScreen != "JOIN_REQUEST_STATUS" && currentScreen != "LOGIN") {
+                            val isRegistrationOrFormOpen = currentScreen in setOf(
+                                "REGISTER_FORM", "JOIN_REQUEST_STATUS", "LOGIN", 
+                                "PROVIDER_REGISTRATION", "STORE_CREATION", "PROPERTY_CREATION", 
+                                "JOB_CREATION", "CREATE_BOOKING", "REGISTER"
+                            ) || showGuestRegisterDialogForAction != null || 
+                              showAssistantDialog || showRequestServiceModal
+
+                            if (!isRegistrationOrFormOpen) {
                                 FloatingIconsOverlay(
                                     settings = settingsState,
                                     themeColors = themeColors,

@@ -2432,14 +2432,17 @@ fun PropertyDetailsDialog(
     var userRatingInput by remember { mutableStateOf(5f) }
     var userCommentInput by remember { mutableStateOf("") }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = themeColors.background),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .border(2.dp, themeColors.accent, RoundedCornerShape(16.dp))
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f)
+                .border(2.dp, themeColors.accent, RoundedCornerShape(20.dp))
         ) {
             Column(
                 modifier = Modifier
