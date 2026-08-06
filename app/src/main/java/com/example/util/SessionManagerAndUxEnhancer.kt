@@ -1,5 +1,7 @@
 package com.example.util
 
+import com.example.utils.*
+
 import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -17,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.VisualThemePalette
+import com.example.utils.VisualThemePalette
 
 /**
  * ⏱️ Session Management & UX Enhancement Engine

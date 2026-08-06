@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.utils.*
+
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider

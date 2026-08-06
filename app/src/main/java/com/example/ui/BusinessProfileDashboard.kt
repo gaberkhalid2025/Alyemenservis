@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.utils.*
+
 import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.VisualThemePalette
+import com.example.utils.VisualThemePalette
 import com.example.data.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1184,11 +1186,3 @@ fun TabStatisticsGrowth(
     }
 }
 
-private fun convertUriToBase64(context: Context, uri: android.net.Uri): String {
-    return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return ""
-        val bytes = inputStream.readBytes()
-        inputStream.close()
-        android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
-    } catch (e: Exception) { "" }
-}

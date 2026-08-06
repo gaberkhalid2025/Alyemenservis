@@ -1,5 +1,7 @@
 package com.example.utils
 
+import com.example.utils.*
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -24,6 +26,21 @@ data class VisualThemePalette(
     val accent: Color,
     val gradientBrush: Brush,
     val scheme: ColorScheme
+)
+
+data class PresetPalette(
+    val name: String,
+    val primaryHex: String,
+    val secondaryHex: String,
+    val bgHex: String,
+    val surfaceHex: String
+)
+
+val colorsPresetsList = listOf(
+    PresetPalette("🌌 الكوني الفضي", "#9CA3AF", "#374151", "#111827", "#1F2937"),
+    PresetPalette("✨ ذهبي فاخر", "#D4AF37", "#FFD700", "#1A1A1A", "#2D2D2D"),
+    PresetPalette("🟢 زمردي راقي", "#004B49", "#50C878", "#0C1814", "#152A20"),
+    PresetPalette("⚫ الأسود الدخاني", "#121212", "#333333", "#080808", "#101010")
 )
 
 fun getBookingTimestamp(): Long = System.currentTimeMillis()

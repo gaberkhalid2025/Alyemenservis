@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.utils.*
+
 import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -20,7 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.VisualThemePalette
+import com.example.utils.VisualThemePalette
 import com.example.data.*
 import com.example.util.*
 import com.example.util.EntityIdGenerator

@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.utils.*
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -19,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.VisualThemePalette
+import com.example.utils.VisualThemePalette
 
 /**
  * 🎨 Unified UI State Components System (Material 3 Compliant)

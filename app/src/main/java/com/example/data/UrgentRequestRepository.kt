@@ -1,5 +1,7 @@
 package com.example.data
 
+import com.example.utils.*
+
 import androidx.annotation.Keep
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query

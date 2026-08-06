@@ -1,5 +1,7 @@
 package com.example.util
 
+import com.example.utils.*
+
 import android.util.Base64
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory

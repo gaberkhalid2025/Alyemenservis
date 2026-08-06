@@ -1,5 +1,7 @@
 package com.example.util
 
+import com.example.utils.*
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

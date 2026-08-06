@@ -1,5 +1,7 @@
 package com.example.data.local
 
+import com.example.utils.*
+
 import android.content.Context
 import com.example.data.LocalAppCacheManager
 import com.example.data.PropertyEntity

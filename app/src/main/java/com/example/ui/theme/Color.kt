@@ -1,5 +1,7 @@
 package com.example.ui.theme
 
+import com.example.utils.*
+
 import androidx.compose.ui.graphics.Color
 
 val EmeraldGreen = Color(0xFF1B5E20)

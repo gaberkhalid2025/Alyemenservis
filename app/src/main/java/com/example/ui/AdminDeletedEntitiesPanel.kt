@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.utils.*
+
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,7 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.VisualThemePalette
+import com.example.utils.VisualThemePalette
 import com.example.data.*
 import java.text.SimpleDateFormat
 import java.util.Date

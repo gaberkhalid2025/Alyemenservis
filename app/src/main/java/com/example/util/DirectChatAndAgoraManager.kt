@@ -1,5 +1,7 @@
 package com.example.util
 
+import com.example.utils.*
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

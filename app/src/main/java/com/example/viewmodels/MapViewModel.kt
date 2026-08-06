@@ -1,5 +1,7 @@
 package com.example.viewmodels
 
+import com.example.utils.*
+
 import android.app.Application
 import android.content.Context
 import android.content.Intent

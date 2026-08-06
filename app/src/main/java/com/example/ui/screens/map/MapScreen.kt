@@ -1,5 +1,7 @@
 package com.example.ui.screens.map
 
+import com.example.utils.*
+
 import androidx.compose.runtime.Composable
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
