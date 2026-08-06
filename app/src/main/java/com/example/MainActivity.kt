@@ -1,5 +1,9 @@
 package com.example
 
+import com.example.data.*
+import com.example.utils.*
+import com.example.ui.components.*
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
