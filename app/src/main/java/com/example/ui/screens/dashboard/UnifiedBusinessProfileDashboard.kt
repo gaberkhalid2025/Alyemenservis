@@ -1,4 +1,8 @@
-package com.example.ui
+package com.example.ui.screens.dashboard
+
+import com.example.ui.MainViewModel
+import com.example.ui.*
+import com.example.ui.utils.*
 
 import com.example.utils.*
 

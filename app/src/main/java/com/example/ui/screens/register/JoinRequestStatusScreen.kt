@@ -134,15 +134,15 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
 
     if (matchingStore != null && matchingStore.isActive) {
         val accType = if (matchingStore.sectionId.contains("restaurant") || matchingStore.name.contains("مطعم") || matchingStore.description.contains("أكل") || matchingStore.description.contains("وجبة")) "RESTAURANT" else if (matchingStore.sectionId.contains("medical") || matchingStore.name.contains("عيادة") || matchingStore.name.contains("طبي")) "MEDICAL" else "STORE"
-        com.example.ui.UnifiedBusinessProfileDashboard(accountType = accType, providerId = matchingStore.id, viewModel = viewModel, themeColors = themeColors)
+        UnifiedBusinessProfileDashboard(accountType = accType, providerId = matchingStore.id, viewModel = viewModel, themeColors = themeColors)
         return
     }
     if (matchingProperty != null && matchingProperty.isActive) {
-        com.example.ui.UnifiedBusinessProfileDashboard(accountType = "REAL_ESTATE", providerId = matchingProperty.id, viewModel = viewModel, themeColors = themeColors)
+        UnifiedBusinessProfileDashboard(accountType = "REAL_ESTATE", providerId = matchingProperty.id, viewModel = viewModel, themeColors = themeColors)
         return
     }
     if (matchingApproved != null) {
-        com.example.ui.UnifiedBusinessProfileDashboard(accountType = "TECHNICIAN", providerId = matchingApproved.id, viewModel = viewModel, themeColors = themeColors)
+        UnifiedBusinessProfileDashboard(accountType = "TECHNICIAN", providerId = matchingApproved.id, viewModel = viewModel, themeColors = themeColors)
         return
     }
 
