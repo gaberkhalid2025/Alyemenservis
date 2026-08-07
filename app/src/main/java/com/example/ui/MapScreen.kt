@@ -1073,6 +1073,28 @@ private fun buildLeafletHtml(
             fillOpacity: 0.12,
             radius: ${maxDistanceKm * 1000}
         }).addTo(map);
+
+        // Initialize Marker Clustering Group for stunning clean radar UI
+        var markersClusterGroup = L.markerClusterGroup({
+            showCoverageOnHover: false,
+            maxClusterRadius: 40,
+            iconCreateFunction: function(cluster) {
+                var childCount = cluster.getChildCount();
+                var c = ' marker-cluster-';
+                if (childCount < 5) {
+                    c += 'small';
+                } else if (childCount < 15) {
+                    c += 'medium';
+                } else {
+                    c += 'large';
+                }
+                return new L.DivIcon({ 
+                    html: '<div><span>' + childCount + '</span></div>', 
+                    className: 'marker-cluster' + c, 
+                    iconSize: new L.Point(40, 40) 
+                });
+            }
+        });
     """.trimIndent())
 
     // 🛠️ Technicians
@@ -1086,8 +1108,9 @@ private fun buildLeafletHtml(
                 iconSize: [36, 36],
                 iconAnchor: [18, 18]
             });
-            L.marker([$lat, $lng], {icon: pIcon}).addTo(map)
+            var pMarker = L.marker([$lat, $lng], {icon: pIcon})
                 .bindPopup("<b>🛠️ ${p.name}</b><br><span style='color:#f59e0b;'>${p.customCategoryName.ifEmpty { "فني متخصص" }}</span><br><a href='app://provider/${p.id}' style='color:#38bdf8;font-weight:bold;'>عرض التفاصيل والطلب</a>");
+            markersClusterGroup.addLayer(pMarker);
         """.trimIndent())
     }
 
@@ -1102,8 +1125,9 @@ private fun buildLeafletHtml(
                 iconSize: [36, 36],
                 iconAnchor: [18, 18]
             });
-            L.marker([$lat, $lng], {icon: sIcon}).addTo(map)
+            var sMarker = L.marker([$lat, $lng], {icon: sIcon})
                 .bindPopup("<b>🏪 ${s.name}</b><br><span style='color:#10b981;'>${s.categoryId.ifEmpty { "متجر" }}</span><br><a href='app://store/${s.id}' style='color:#38bdf8;font-weight:bold;'>عرض التفاصيل والاتصال</a>");
+            markersClusterGroup.addLayer(sMarker);
         """.trimIndent())
     }
 
@@ -1118,8 +1142,9 @@ private fun buildLeafletHtml(
                 iconSize: [36, 36],
                 iconAnchor: [18, 18]
             });
-            L.marker([$lat, $lng], {icon: rIcon}).addTo(map)
+            var rMarker = L.marker([$lat, $lng], {icon: rIcon})
                 .bindPopup("<b>🍔 ${r.name}</b><br><span style='color:#ef4444;'>مطعم / كافيه</span><br><a href='app://store/${r.id}' style='color:#38bdf8;font-weight:bold;'>عرض القائمة والطلب</a>");
+            markersClusterGroup.addLayer(rMarker);
         """.trimIndent())
     }
 
@@ -1134,10 +1159,16 @@ private fun buildLeafletHtml(
                 iconSize: [36, 36],
                 iconAnchor: [18, 18]
             });
-            L.marker([$lat, $lng], {icon: prIcon}).addTo(map)
+            var prMarker = L.marker([$lat, $lng], {icon: prIcon})
                 .bindPopup("<b>🏠 ${pr.title}</b><br><span style='color:#8b5cf6;'>${pr.price} YER</span><br><a href='app://property/${pr.id}' style='color:#38bdf8;font-weight:bold;'>التفاصيل المباشرة</a>");
+            markersClusterGroup.addLayer(prMarker);
         """.trimIndent())
     }
+
+    // Add clustering to map
+    markersJs.append("""
+        map.addLayer(markersClusterGroup);
+    """.trimIndent())
 
     return """
         <!DOCTYPE html>
@@ -1145,7 +1176,10 @@ private fun buildLeafletHtml(
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
                 body, html { width: 100%; height: 100%; overflow: hidden; background: #0b0f19; }
@@ -1187,6 +1221,54 @@ private fun buildLeafletHtml(
                 .store-pin { background: #10b981; }
                 .rest-pin { background: #ef4444; }
                 .prop-pin { background: #8b5cf6; }
+
+                /* Custom styled neon glow for Marker Clusters to solve visual pollution */
+                .marker-cluster {
+                    background-clip: padding-box;
+                    border-radius: 20px;
+                }
+                .marker-cluster div {
+                    width: 30px;
+                    height: 30px;
+                    margin-left: 5px;
+                    margin-top: 5px;
+                    text-align: center;
+                    border-radius: 15px;
+                    font-size: 12px;
+                }
+                .marker-cluster span {
+                    line-height: 30px;
+                }
+                .marker-cluster-small {
+                    background-color: rgba(16, 185, 129, 0.2) !important;
+                }
+                .marker-cluster-small div {
+                    background-color: rgba(16, 185, 129, 0.85) !important;
+                    color: white !important;
+                    font-weight: bold;
+                    box-shadow: 0 0 12px rgba(16, 185, 129, 0.9);
+                    border: 1px solid white;
+                }
+                .marker-cluster-medium {
+                    background-color: rgba(245, 158, 11, 0.2) !important;
+                }
+                .marker-cluster-medium div {
+                    background-color: rgba(245, 158, 11, 0.85) !important;
+                    color: white !important;
+                    font-weight: bold;
+                    box-shadow: 0 0 12px rgba(245, 158, 11, 0.9);
+                    border: 1px solid white;
+                }
+                .marker-cluster-large {
+                    background-color: rgba(239, 68, 68, 0.2) !important;
+                }
+                .marker-cluster-large div {
+                    background-color: rgba(239, 68, 68, 0.85) !important;
+                    color: white !important;
+                    font-weight: bold;
+                    box-shadow: 0 0 12px rgba(239, 68, 68, 0.9);
+                    border: 1px solid white;
+                }
 
                 @keyframes radarPulse {
                     0% { transform: scale(0.3); opacity: 1; }

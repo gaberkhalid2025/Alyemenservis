@@ -3062,6 +3062,27 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun deleteOrder(orderId: String) {
+        db.collection("orders").document(orderId).delete().addOnSuccessListener {
+            triggerNotification("🗑️ تم حذف الطلب بنجاح.")
+        }
+    }
+
+    fun deleteAllOrders(customerPhone: String) {
+        db.collection("orders")
+            .whereEqualTo("customerPhone", customerPhone)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val batch = db.batch()
+                for (doc in querySnapshot.documents) {
+                    batch.delete(doc.reference)
+                }
+                batch.commit().addOnSuccessListener {
+                    triggerNotification("🗑️ تم حذف جميع الطلبات بنجاح.")
+                }
+            }
+    }
+
     fun updateBackdoorSettings(
         appName: String, welcomeMsg: String, footerMsg: String, themeId: String,
         supportPhone: String, supportEmail: String, supportWhatsapp: String,
@@ -3824,6 +3845,22 @@ class MainViewModel : ViewModel() {
         _bookings.value = _bookings.value.filter { it.id != bookingId }
         db.collection("bookings").document(bookingId).delete()
         triggerNotification("🗑️ تم حذف الحجز من السجلات")
+    }
+
+    fun deleteAllBookings(customerPhone: String) {
+        _bookings.value = _bookings.value.filter { it.customerPhone != customerPhone }
+        db.collection("bookings")
+            .whereEqualTo("customerPhone", customerPhone)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val batch = db.batch()
+                for (doc in querySnapshot.documents) {
+                    batch.delete(doc.reference)
+                }
+                batch.commit().addOnSuccessListener {
+                    triggerNotification("🗑️ تم تصفية وحذف سجل جميع الحجوزات بنجاح.")
+                }
+            }
     }
 
     fun updateBooking(booking: BookingEntity) {

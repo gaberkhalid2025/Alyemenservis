@@ -182,6 +182,7 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
 
     // State for sub-tabs status categorization: ACTIVE, COMPLETED, CANCELLED
     var filterStatusTab by remember { mutableStateOf("ACTIVE") }
+    var showClearAllBookingsDialog by remember { mutableStateOf(false) }
     var customerSubTab by remember { mutableStateOf("URGENT") } // "URGENT" = طلباتي العاجلة, "DIRECT" = حجوزاتي المباشرة, "ALL" = عرض الكل
 
     // Dialog & overlay states
@@ -384,16 +385,28 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                             Text("🔍 مستعلم حالياً للرقم:", color = Color.LightGray, fontSize = 9.sp)
                             Text(activeSearchPhone, color = themeColors.accent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
-                        Button(
-                            onClick = {
-                                activeSearchPhone = ""
-                                phoneInput = ""
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("رقم آخر 🔁", color = Color.White, fontSize = 10.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (myCustomerBookings.isNotEmpty()) {
+                                Button(
+                                    onClick = { showClearAllBookingsDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f)),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text("حذف الكل 🗑️", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Button(
+                                onClick = {
+                                    activeSearchPhone = ""
+                                    phoneInput = ""
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("رقم آخر 🔁", color = Color.White, fontSize = 10.sp)
+                            }
                         }
                     }
 
@@ -1475,6 +1488,40 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
             settingsState = settingsState,
             themeColors = themeColors,
             onDismiss = { payingBookingObj = null }
+        )
+    }
+
+    if (showClearAllBookingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearAllBookingsDialog = false },
+            containerColor = themeColors.surface,
+            title = { Text("🗑️ تأكيد مسح جميع الحجوزات", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+            text = {
+                Text(
+                    "هل أنت متأكد تماماً من حذف سجل وتصفية جميع الحجوزات والمواعيد المسجلة برقم هاتفك ($activeSearchPhone) نهائياً من قاعدة البيانات؟ لا يمكن التراجع عن هذه الخطوة.",
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteAllBookings(activeSearchPhone)
+                        showClearAllBookingsDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("نعم، احذف الكل 🗑️", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showClearAllBookingsDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("تراجع", color = Color.White, fontSize = 11.sp)
+                }
+            }
         )
     }
 }

@@ -443,6 +443,7 @@ fun AppNavigator(
             onDismiss = { 
                 showAllConversationsDialog = false
                 preSelectedChannelId = null
+                viewModel.closeActiveChatChannel()
             }
         )
     }

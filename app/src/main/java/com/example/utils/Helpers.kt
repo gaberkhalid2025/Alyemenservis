@@ -46,6 +46,14 @@ val colorsPresetsList = listOf(
 fun getBookingTimestamp(): Long = System.currentTimeMillis()
 
 fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
+    val parseColorSafely = { hex: String, defaultColor: Color ->
+        try {
+            Color(android.graphics.Color.parseColor(hex))
+        } catch (e: Exception) {
+            defaultColor
+        }
+    }
+
     return when (settings.activeThemeId) {
         "COSMIC_SILVER" -> {
             val primary = Color(0xFF9CA3AF)
@@ -110,16 +118,16 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
             )
         }
-        else -> {
-            val primary = Color(0xFF2563EB)
-            val secondary = Color(0xFF1D4ED8)
-            val background = Color(0xFF0F172A)
-            val surface = Color(0xFF1E293B)
-            val textPrimary = Color(0xFFF8FAFC)
-            val textSecondary = Color(0xFF94A3B8)
-            val accent = Color(0xFF38BDF8)
+        "EMERALD_YEMEN", "YEMEN_EMERALD" -> {
+            val primary = Color(0xFF0F766E)
+            val secondary = Color(0xFF115E59)
+            val background = Color(0xFF042F2E)
+            val surface = Color(0xFF0F766E)
+            val textPrimary = Color(0xFFF0FDF4)
+            val textSecondary = Color(0xFFCCFBF1)
+            val accent = Color(0xFF14B8A6)
             VisualThemePalette(
-                activeId = "ROYAL_BLUE",
+                activeId = "EMERALD_YEMEN",
                 primary = primary,
                 secondary = secondary,
                 background = background,
@@ -127,9 +135,74 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                 textPrimary = textPrimary,
                 textSecondary = textSecondary,
                 accent = accent,
-                gradientBrush = Brush.verticalGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))),
+                gradientBrush = Brush.verticalGradient(listOf(Color(0xFF115E59), Color(0xFF042F2E))),
                 scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
             )
+        }
+        "CUSTOM" -> {
+            val primary = parseColorSafely(settings.customPrimaryHex, Color(0xFF0F766E))
+            val secondary = parseColorSafely(settings.customSecondaryHex, Color(0xFF115E59))
+            val background = parseColorSafely(settings.customBackgroundHex, Color(0xFF042F2E))
+            val surface = parseColorSafely(settings.customSurfaceHex, Color(0xFF115E59))
+            val textPrimary = Color(0xFFF9FAFB)
+            val textSecondary = Color(0xFFE5E7EB)
+            val accent = primary
+            VisualThemePalette(
+                activeId = "CUSTOM",
+                primary = primary,
+                secondary = secondary,
+                background = background,
+                surface = surface,
+                textPrimary = textPrimary,
+                textSecondary = textSecondary,
+                accent = accent,
+                gradientBrush = Brush.verticalGradient(listOf(surface, background)),
+                scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+            )
+        }
+        else -> {
+            // Check if there are custom hex colors specified, fall back to custom
+            if (settings.customPrimaryHex.startsWith("#") && settings.customBackgroundHex.startsWith("#")) {
+                val primary = parseColorSafely(settings.customPrimaryHex, Color(0xFF2563EB))
+                val secondary = parseColorSafely(settings.customSecondaryHex, Color(0xFF1D4ED8))
+                val background = parseColorSafely(settings.customBackgroundHex, Color(0xFF0F172A))
+                val surface = parseColorSafely(settings.customSurfaceHex, Color(0xFF1E293B))
+                val textPrimary = Color(0xFFF8FAFC)
+                val textSecondary = Color(0xFF94A3B8)
+                val accent = primary
+                VisualThemePalette(
+                    activeId = "CUSTOM",
+                    primary = primary,
+                    secondary = secondary,
+                    background = background,
+                    surface = surface,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary,
+                    accent = accent,
+                    gradientBrush = Brush.verticalGradient(listOf(surface, background)),
+                    scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                )
+            } else {
+                val primary = Color(0xFF2563EB)
+                val secondary = Color(0xFF1D4ED8)
+                val background = Color(0xFF0F172A)
+                val surface = Color(0xFF1E293B)
+                val textPrimary = Color(0xFFF8FAFC)
+                val textSecondary = Color(0xFF94A3B8)
+                val accent = Color(0xFF38BDF8)
+                VisualThemePalette(
+                    activeId = "ROYAL_BLUE",
+                    primary = primary,
+                    secondary = secondary,
+                    background = background,
+                    surface = surface,
+                    textPrimary = textPrimary,
+                    textSecondary = textSecondary,
+                    accent = accent,
+                    gradientBrush = Brush.verticalGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))),
+                    scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
+                )
+            }
         }
     }
 }
