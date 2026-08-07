@@ -497,31 +497,35 @@ fun AppNavigator(
                                         else -> raw
                                     }
 
+                                    fun normalizePhone(ph: String): String {
+                                        return ph.trim()
+                                            .replace(" ", "")
+                                            .replace("+", "")
+                                            .removePrefix("967")
+                                            .removePrefix("00967")
+                                            .removePrefix("0")
+                                    }
+                                    val normInput = normalizePhone(restorePhoneInput)
+
                                     if (cleanPhone.length >= 6) {
                                         val matchingPending = pendingProviders.find { 
-                                            val p = it.phone.replace("+967", "").removePrefix("0")
-                                            p == cleanPhone || it.phone == raw
+                                            normalizePhone(it.phone) == normInput
                                         }
                                         val matchingApproved = providers.find { 
-                                            val p = it.phone.replace("+967", "").removePrefix("0")
-                                            p == cleanPhone || it.phone == raw
+                                            normalizePhone(it.phone) == normInput
                                         }
                                         val matchingStore = stores.find { 
-                                            val s = it.phone.replace("+967", "").removePrefix("0")
-                                            s == cleanPhone || it.ownerId == cleanPhone || it.phone == raw
+                                            normalizePhone(it.phone) == normInput || normalizePhone(it.ownerId) == normInput
                                         }
                                         val matchingProperty = properties.find { 
-                                            val pr = it.phone.replace("+967", "").removePrefix("0")
-                                            pr == cleanPhone || it.phone == raw
+                                            normalizePhone(it.phone) == normInput || normalizePhone(it.ownerId) == normInput
                                         }
                                         
                                         val matchingBooking = bookings.find { b ->
-                                            val cp1 = b.clientPhone.replace("+967", "").removePrefix("0")
-                                            cp1 == cleanPhone || b.clientPhone == raw || (cleanPhone.isNotEmpty() && b.clientPhone.contains(cleanPhone))
+                                            normalizePhone(b.clientPhone) == normInput
                                         }
                                         val matchingChatChannel = chatChannels.find { c ->
-                                            val cp = c.customerPhone.replace("+967", "").removePrefix("0")
-                                            cp == cleanPhone || c.customerPhone == raw || (cleanPhone.isNotEmpty() && c.customerPhone.contains(cleanPhone))
+                                            normalizePhone(c.customerPhone) == normInput
                                         }
 
                                         if (matchingPending != null || matchingApproved != null || matchingStore != null || matchingProperty != null) {
@@ -715,6 +719,21 @@ fun AppNavigator(
                                     raw.startsWith("0") -> raw.substring(1)
                                     else -> raw
                                 }
+                                val savedPass = matchedProvider?.password 
+                                    ?: matchedPending?.password 
+                                    ?: matchedStore?.password 
+                                    ?: matchedProperty?.password 
+                                    ?: matchedUserDoc?.get("password")?.toString() 
+                                    ?: "مخفية/مشفرة"
+
+                                // Dispatch recovery notification directly to supervisor/admin collection so it is guaranteed to reach the admin panel
+                                viewModel.requestPasswordRecoveryGeneral(
+                                    accountName = accountName,
+                                    phone = cleanPhone,
+                                    accountType = accountType,
+                                    currentPassword = savedPass
+                                )
+
                                 val supportChId = "support_" + cleanPhone.ifEmpty { "user" }
                                 viewModel.getOrCreateChatChannel(
                                     providerId = "admin",
@@ -722,8 +741,7 @@ fun AppNavigator(
                                     customerId = cleanPhone,
                                     customerName = accountName
                                 )
-                                viewModel.sendMessageInChat("مرحباً إدارة المنصة، لقد نسيت كلمة المرور الخاصة بحسابي المسجل برقم ($cleanPhone) باسم ($accountName)، أود طلب إعادة تعيين كلمة المرور وتأكيد الملكية.")
-                                android.widget.Toast.makeText(context, "💬 تم إرسال طلب إعادة التعيين للإدارة وفتح شات مباشر!", android.widget.Toast.LENGTH_LONG).show()
+                                android.widget.Toast.makeText(context, "💬 تم إرسال طلب إعادة التعيين للإدارة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
                                 showRestoreAccountDialog = false
                                 restoreStep = 1
                             },

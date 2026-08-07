@@ -2597,6 +2597,21 @@ class MainViewModel : ViewModel() {
         triggerNotification("📨 تم إرسال طلب استعادة كلمة المرور للمشرف بنجاح!")
     }
 
+    fun requestPasswordRecoveryGeneral(accountName: String, phone: String, accountType: String, currentPassword: String) {
+        val adminNotif = NotificationEntity(
+            id = UUID.randomUUID().toString(),
+            title = "🔑 طلب استعادة كلمة مرور ($accountType)",
+            message = "الحساب: $accountName ($accountType) ذو الرقم: $phone يطلب استعادة كلمة المرور الخاصة به. كلمة المرور الحالية في النظام هي: $currentPassword",
+            targetType = "SUPERVISOR",
+            targetValue = "ALL",
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("notifications").document(adminNotif.id).set(adminNotif)
+            .addOnSuccessListener {
+                triggerNotification("📨 تم إرسال طلب استعادة كلمة المرور للمشرف/الأدمن بنجاح!")
+            }
+    }
+
     fun deleteStore(storeId: String) {
         val updates = mapOf(
             "isDeleted" to true,

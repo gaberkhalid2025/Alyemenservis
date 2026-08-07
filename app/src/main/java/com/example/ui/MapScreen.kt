@@ -103,6 +103,7 @@ fun MapScreen(
     // Extra UI Panels
     var showClosestSuggestions by remember { mutableStateOf(false) }
     var realtimeNoticeBanner by remember { mutableStateOf<String?>(null) }
+    var showAdvancedFilters by remember { mutableStateOf(false) }
 
     // Location Permission Handler
     var hasLocationPermission by remember {
@@ -311,15 +312,17 @@ fun MapScreen(
                     }
                 }
 
-                // 3. SEARCH & TOP HEADER OVERLAY
+                // 3. SEARCH & TOP HEADER OVERLAY (Modern Translucent Floating Card)
                 Surface(
-                    shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
-                    color = Color(0xFF0F172A).copy(alpha = 0.94f),
-                    shadowElevation = 10.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF0F172A).copy(alpha = 0.92f),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        // Title & Back & Quick City Centers
+                        // Title & Back & Quick City Centers Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -329,81 +332,104 @@ fun MapScreen(
                                 IconButton(
                                     onClick = onBackClick,
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(32.dp)
                                         .background(Color(0xFF1E293B), CircleShape)
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White, modifier = Modifier.size(16.dp))
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("🗺️ خريطة خدمات اليمن", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                                        Text("🗺️ رادار الخدمات اليمني", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Box(
                                             modifier = Modifier
-                                                .background(Color(0xFFF59E0B), RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                .background(Color(0xFFF59E0B), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 1.dp)
                                         ) {
-                                            Text("⚡ رادار حي", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                            Text("حي ⚡", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                                         }
                                     }
                                     Text(
-                                        text = "الموقع: اليمن (${String.format("%.3f, %.3f", userLat, userLng)})",
-                                        fontSize = 10.sp,
+                                        text = "موقعي: (${String.format("%.3f, %.3f", userLat, userLng)})",
+                                        fontSize = 9.sp,
                                         color = Color(0xFF94A3B8)
                                     )
                                 }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                // Weather Badge
-                                Box(
-                                    modifier = Modifier
-                                        .background(Color(0xFF1E293B), RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(12.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("☀️ صنعاء 26°C", fontSize = 10.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
-                                }
+                            // Weather Badge
+                            Box(
+                                modifier = Modifier
+                                    .background(Color(0xFF1E293B), RoundedCornerShape(8.dp))
+                                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text("☀️ صنعاء 26°C", fontSize = 9.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Search Bar
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = { Text("ابحث عن فني، محل، مطعم، عقار...", fontSize = 12.sp, color = Color.Gray) },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B)) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray)
-                                    }
-                                }
-                            },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF1E293B),
-                                unfocusedContainerColor = Color(0xFF1E293B),
-                                focusedBorderColor = Color(0xFFF59E0B),
-                                unfocusedBorderColor = Color(0xFF334155),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                        )
-
                         Spacer(modifier = Modifier.height(8.dp))
+
+                        // Search Bar & Filter Toggle Button Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("ابحث عن فني، محل، مطعم، عقار...", fontSize = 11.sp, color = Color.Gray) },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp)) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFF1E293B),
+                                    unfocusedContainerColor = Color(0xFF1E293B),
+                                    focusedBorderColor = Color(0xFFF59E0B),
+                                    unfocusedBorderColor = Color(0xFF334155),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                            )
+
+                            // Advanced Filter Toggle Icon
+                            IconButton(
+                                onClick = { showAdvancedFilters = !showAdvancedFilters },
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(
+                                        if (showAdvancedFilters) Color(0xFFF59E0B) else Color(0xFF1E293B),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "تصفية متقدمة",
+                                    tint = if (showAdvancedFilters) Color.Black else Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         // Filter Chips Row
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             item {
                                 FilterTypeChip(
@@ -447,59 +473,74 @@ fun MapScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Distance Radius Slider & Quick Toggles
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        // Collapsible Advanced Filters Section (Animated!)
+                        AnimatedVisibility(
+                            visible = showAdvancedFilters,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
                         ) {
-                            Text(
-                                text = "نطاق الرادار: ${maxDistanceKm.toInt()} كم",
-                                fontSize = 11.sp,
-                                color = Color(0xFFF59E0B),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(modifier = Modifier.padding(top = 8.dp)) {
+                                Divider(color = Color(0xFF334155), thickness = 0.5.dp)
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Distance Radius Slider & Quick Toggles Row
                                 Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (minRatingFilter >= 4.0f) Color(0xFFD97706) else Color(0xFF1E293B))
-                                        .clickable { minRatingFilter = if (minRatingFilter >= 4.0f) 0.0f else 4.0f }
-                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
-                                    Spacer(modifier = Modifier.width(2.dp))
-                                    Text("4.0+ ", fontSize = 10.sp, color = Color.White)
+                                    Text(
+                                        text = "نطاق الرادار: ${maxDistanceKm.toInt()} كم",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFF59E0B),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (minRatingFilter >= 4.0f) Color(0xFFD97706) else Color(0xFF1E293B))
+                                                .clickable { minRatingFilter = if (minRatingFilter >= 4.0f) 0.0f else 4.0f }
+                                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Text("4.0+ ", fontSize = 10.sp, color = Color.White)
+                                        }
+
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (onlyAvailableFilter) Color(0xFF10B981) else Color(0xFF1E293B))
+                                                .clickable { onlyAvailableFilter = !onlyAvailableFilter }
+                                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("متاح الآن ⚡", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
 
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (onlyAvailableFilter) Color(0xFF10B981) else Color(0xFF1E293B))
-                                        .clickable { onlyAvailableFilter = !onlyAvailableFilter }
-                                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("متاح الآن ⚡", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Slider(
+                                    value = maxDistanceKm,
+                                    onValueChange = { maxDistanceKm = it },
+                                    valueRange = 1f..100f,
+                                    steps = 19,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color(0xFFF59E0B),
+                                        activeTrackColor = Color(0xFFF59E0B),
+                                        inactiveTrackColor = Color(0xFF334155)
+                                    ),
+                                    modifier = Modifier.height(24.dp)
+                                )
                             }
                         }
-
-                        Slider(
-                            value = maxDistanceKm,
-                            onValueChange = { maxDistanceKm = it },
-                            valueRange = 1f..100f,
-                            steps = 19,
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color(0xFFF59E0B),
-                                activeTrackColor = Color(0xFFF59E0B),
-                                inactiveTrackColor = Color(0xFF334155)
-                            ),
-                            modifier = Modifier.height(24.dp)
-                        )
                     }
                 }
             }
