@@ -19,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AdminSettingsEntity
-import com.example.ui.theme.VisualThemePalette
+import com.example.utils.VisualThemePalette
 
 @Composable
 fun BoxScope.FloatingIconsOverlay(
