@@ -605,15 +605,15 @@ fun StoreListItemCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = (settingsState.cardMarginHorizontal).dp, vertical = (settingsState.cardMarginVertical).dp)
+            .padding(horizontal = (settingsState.cardMarginHorizontal * 0.6f).dp, vertical = (settingsState.cardMarginVertical * 0.6f).dp)
             .clickable { onClick() }
             .border(
                 1.dp,
                 if (store.isPinned) themeColors.accent else themeColors.accent.copy(alpha = 0.12f),
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(8.dp)
             )
     ) {
         Column {
@@ -621,7 +621,7 @@ fun StoreListItemCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(115.dp)
+                    .height(69.dp)
                     .background(
                         Brush.horizontalGradient(
                             listOf(
@@ -705,16 +705,16 @@ fun StoreListItemCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(10.dp),
+                    .padding(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Logo/Avatar Container
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(themeColors.background)
-                        .border(1.5.dp, themeColors.accent, CircleShape),
+                        .border(1.dp, themeColors.accent, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoBitmap != null) {
@@ -738,15 +738,15 @@ fun StoreListItemCard(
                             store.categoryId.contains("realestate") || store.name.contains("عقار") || store.name.contains("مقاولات") -> "🏢"
                             else -> "🏪"
                         }
-                        Text(categoryIcon, fontSize = 24.sp)
+                        Text(categoryIcon, fontSize = 16.sp)
                     }
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(store.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(store.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Spacer(modifier = Modifier.width(4.dp))
                         if (store.isVip) {
                             Box(
@@ -1269,21 +1269,21 @@ fun PropertyListItemCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
             .border(
                 1.dp,
                 if (prop.isPinned) themeColors.accent else themeColors.accent.copy(alpha = 0.08f),
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(8.dp)
             )
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(130.dp)
+                    .height(78.dp)
                     .background(Color.DarkGray)
             ) {
                 Box(
@@ -1332,9 +1332,9 @@ fun PropertyListItemCard(
                 }
             }
 
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(7.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(prop.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(prop.title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
                     if (prop.isVip) {
                         Box(

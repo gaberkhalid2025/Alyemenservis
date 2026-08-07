@@ -813,22 +813,22 @@ fun Luxury3DNavIcon(
     label: String,
     isSelected: Boolean,
     badgeCount: Int = 0,
-    iconSizeDp: Int = 26,
+    iconSizeDp: Int = 20,
     iconStyle: String = "GOLDEN_3D",
     onClick: () -> Unit
 ) {
-    val sizeDp = iconSizeDp.dp
+    val sizeDp = (iconSizeDp * 0.82f).dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .padding(horizontal = 3.dp, vertical = 1.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (isSelected) {
                 Box(
                     modifier = Modifier
-                        .size(sizeDp + 14.dp)
+                        .size(sizeDp + 8.dp)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -845,7 +845,7 @@ fun Luxury3DNavIcon(
                 shape = CircleShape,
                 color = if (isSelected) Color(0xFF1E293B) else Color(0xFF0F172A),
                 border = BorderStroke(
-                    width = if (isSelected) 1.8.dp else 1.dp,
+                    width = if (isSelected) 1.5.dp else 0.8.dp,
                     brush = Brush.linearGradient(
                         colors = if (isSelected) listOf(
                             Color(0xFFFFFAED),
@@ -858,8 +858,8 @@ fun Luxury3DNavIcon(
                         )
                     )
                 ),
-                shadowElevation = if (isSelected) 8.dp else 2.dp,
-                modifier = Modifier.size(sizeDp + 8.dp)
+                shadowElevation = if (isSelected) 5.dp else 1.dp,
+                modifier = Modifier.size(sizeDp + 5.dp)
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     if (vectorIcon != null && iconStyle == "MINIMAL") {
@@ -883,25 +883,25 @@ fun Luxury3DNavIcon(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 6.dp, y = (-3).dp)
-                        .size(16.dp)
+                        .offset(x = 4.dp, y = (-2).dp)
+                        .size(13.dp)
                         .background(Color.Red, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (badgeCount > 99) "99+" else badgeCount.toString(),
                         color = Color.White,
-                        fontSize = 8.sp,
+                        fontSize = 7.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(1.dp))
         Text(
             text = label,
-            fontSize = 10.sp,
+            fontSize = 8.5.sp,
             color = if (isSelected) Color(0xFFFBBF24) else Color.White,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1
@@ -1317,31 +1317,31 @@ fun BoxScope.FloatingIconsOverlay(
     Box(
         modifier = Modifier
             .align(Alignment.BottomStart)
-            .padding(start = 16.dp, bottom = 18.dp)
-            .clip(RoundedCornerShape(30.dp))
+            .padding(start = 12.dp, bottom = 14.dp)
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.horizontalGradient(
                     listOf(Color(0xFF10B981), Color(0xFF059669))
                 )
             )
             .clickable { onRequestServiceClick() }
-            .border(1.5.dp, Color.White, RoundedCornerShape(30.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .border(1.dp, Color.White, RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Send,
                 contentDescription = "اطلب خدمتك الآن",
                 tint = Color.White,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(14.dp)
             )
             Text(
                 text = "اطلب خدمتك الآن ⚡",
-                fontSize = 12.sp,
+                fontSize = 9.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
@@ -1353,22 +1353,22 @@ fun BoxScope.FloatingIconsOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 18.dp)
-                .clip(RoundedCornerShape(30.dp))
+                .padding(end = 12.dp, bottom = 14.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .background(themeColors.accent)
                 .clickable { onAssistantClick() }
-                .border(1.5.dp, Color.White, RoundedCornerShape(30.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .border(1.dp, Color.White, RoundedCornerShape(20.dp))
+                .padding(horizontal = 11.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("🤖", fontSize = 16.sp)
+                Text("🤖", fontSize = 13.sp)
                 Text(
                     text = "المساعد الذكي",
-                    fontSize = 11.sp,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )

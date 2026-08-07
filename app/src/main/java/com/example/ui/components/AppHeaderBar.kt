@@ -105,7 +105,7 @@ fun AppHeaderBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (showBackButton) {
@@ -205,9 +205,9 @@ fun AppHeaderBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-                .background(Color(0xFF1E293B), RoundedCornerShape(12.dp))
-                .padding(vertical = 6.dp),
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .background(Color(0xFF1E293B), RoundedCornerShape(10.dp))
+                .padding(vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
