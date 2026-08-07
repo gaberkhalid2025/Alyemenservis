@@ -348,7 +348,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            val colors = remember(settingsState.activeThemeId, settingsState.customPrimaryHex, settingsState.customSecondaryHex) {
+            val colors = remember(settingsState) {
                 resolveThemePalette(settingsState)
             }
 

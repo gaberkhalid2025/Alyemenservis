@@ -15,6 +15,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -950,44 +956,86 @@ private fun LeafletRadarMapRenderer(
         buildLeafletHtml(userLat, userLng, zoom, maxDistanceKm, circleColorHex, providers, stores, restaurants, properties)
     }
 
-    AndroidView(
-        factory = { ctx ->
-            WebView(ctx).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.cacheMode = WebSettings.LOAD_DEFAULT
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                        if (url != null) {
-                            when {
-                                url.startsWith("app://provider/") -> {
-                                    val id = url.removePrefix("app://provider/")
-                                    providers.find { it.id == id }?.let { onSelectProvider(it) }
-                                    return true
-                                }
-                                url.startsWith("app://store/") -> {
-                                    val id = url.removePrefix("app://store/")
-                                    (stores + restaurants).find { it.id == id }?.let { onSelectStore(it) }
-                                    return true
-                                }
-                                url.startsWith("app://property/") -> {
-                                    val id = url.removePrefix("app://property/")
-                                    properties.find { it.id == id }?.let { onSelectProperty(it) }
-                                    return true
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.cacheMode = WebSettings.LOAD_DEFAULT
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                            if (url != null) {
+                                when {
+                                    url.startsWith("app://provider/") -> {
+                                        val id = url.removePrefix("app://provider/")
+                                        providers.find { it.id == id }?.let { onSelectProvider(it) }
+                                        return true
+                                    }
+                                    url.startsWith("app://store/") -> {
+                                        val id = url.removePrefix("app://store/")
+                                        (stores + restaurants).find { it.id == id }?.let { onSelectStore(it) }
+                                        return true
+                                    }
+                                    url.startsWith("app://property/") -> {
+                                        val id = url.removePrefix("app://property/")
+                                        properties.find { it.id == id }?.let { onSelectProperty(it) }
+                                        return true
+                                    }
                                 }
                             }
+                            return false
                         }
-                        return false
                     }
+                    loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
                 }
-                loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
+            },
+            update = { webView ->
+                webView.loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Concentric Pulsing Radar Canvas (4 Pulsing Rings, 2.0s continuous cycle)
+        val infiniteTransition = rememberInfiniteTransition(label = "RadarPulse")
+        val pulseProgress by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = androidx.compose.animation.core.tween(durationMillis = 2000, easing = androidx.compose.animation.core.LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+            ),
+            label = "RadarProgress"
+        )
+
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+            val maxRadius = kotlin.math.min(size.width, size.height) * 0.35f
+            val radarColor = try {
+                Color(android.graphics.Color.parseColor(circleColorHex))
+            } catch (e: Exception) {
+                Color(0xFF10B981)
             }
-        },
-        update = { webView ->
-            webView.loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
-        },
-        modifier = Modifier.fillMaxSize()
-    )
+
+            for (i in 0..3) {
+                val delayOffset = i * 0.25f
+                val ringProgress = (pulseProgress + delayOffset) % 1.0f
+                val currentRadius = ringProgress * maxRadius
+                val alpha = (1.0f - ringProgress) * 0.40f
+
+                if (currentRadius > 0f) {
+                    drawCircle(
+                        color = radarColor.copy(alpha = alpha),
+                        radius = currentRadius,
+                        center = center,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx())
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun buildLeafletHtml(

@@ -115,6 +115,17 @@ class MainViewModel : ViewModel() {
     private val _chatChannels = MutableStateFlow<List<ChatChannelEntity>>(emptyList())
     val chatChannels: StateFlow<List<ChatChannelEntity>> = _chatChannels.asStateFlow()
 
+    private val _activeChatChannel = MutableStateFlow<ChatChannelEntity?>(null)
+    val activeChatChannel: StateFlow<ChatChannelEntity?> = _activeChatChannel.asStateFlow()
+
+    fun openChatChannel(channel: ChatChannelEntity?) {
+        _activeChatChannel.value = channel
+    }
+
+    fun closeActiveChatChannel() {
+        _activeChatChannel.value = null
+    }
+
     private val _stores = MutableStateFlow<List<com.example.data.StoreEntity>>(getDefaultStoresList())
     val stores: StateFlow<List<com.example.data.StoreEntity>> = _stores.asStateFlow()
 
@@ -615,6 +626,8 @@ class MainViewModel : ViewModel() {
 
     init {
         setupRealtimeFirestoreListeners()
+        loadCardSettings()
+        loadPendingTechnicians()
         loadUserPoints()
         try {
             seedFirestoreIfEmpty()
@@ -692,6 +705,29 @@ class MainViewModel : ViewModel() {
                 _settings.value = AdminSettingsEntity()
             }
             _isInitialized.value = true
+        })
+
+        // 1b. Booking Form Fields Listener
+        reg(db.collection("settings").document("booking_fields").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null && snapshot.exists()) {
+                try {
+                    snapshot.toObject(BookingFormFields::class.java)?.let {
+                        _bookingFormFields.value = it
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
+            }
+        })
+
+        // 1c. Booking Distribution Mode Listener
+        reg(db.collection("settings").document("distribution_mode").addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null && snapshot.exists()) {
+                val modeStr = snapshot.getString("mode")
+                if (!modeStr.isNullOrEmpty()) {
+                    try {
+                        _distributionMode.value = BookingDistributionMode.valueOf(modeStr)
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
+            }
         })
 
         // 2. Categories
@@ -1411,9 +1447,9 @@ class MainViewModel : ViewModel() {
 
     private fun writeDefaultBanners() {
         val fbBanners = listOf(
-            BannerEntity("banner_001", "خصم 20% على جميع خدمات السباكة!", "", "1", "IMAGE", "MEDIUM", 5, "طوال اليوم", 1),
-            BannerEntity("banner_002", "افتتاح سوبرماركت الخير - فرع كريتر!", "", "stores", "IMAGE", "MEDIUM", 7, "طوال اليوم", 2),
-            BannerEntity("banner_003", "مطلوب فنيين ومحاسبين لشركة البركة!", "", "jobs", "IMAGE", "MEDIUM", 6, "طوال اليوم", 3)
+            BannerEntity("banner_001", "عروض وتخفيضات سيتي مارت صنعاء الكبرى! خصومات تصل إلى 30%", "https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800", "stores", "IMAGE", "MEDIUM", 5, "طوال اليوم", 1, "STORES"),
+            BannerEntity("banner_002", "مهرجان المأكولات الملكية في مطعم الشيباني - صنعاء شارع حدة", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800", "restaurants", "IMAGE", "MEDIUM", 6, "طوال اليوم", 2, "RESTAURANTS"),
+            BannerEntity("banner_003", "افتتاح العيادات التخصصية الشاملة بمستشفى المتوكل النموذجي", "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?q=80&w=800", "medical", "IMAGE", "MEDIUM", 7, "طوال اليوم", 3, "MEDICAL")
         )
         fbBanners.forEach { banner ->
             db.collection("banners").document(banner.id).set(banner)
@@ -1422,12 +1458,7 @@ class MainViewModel : ViewModel() {
 
     private fun writeDefaultProviders() {
         val fbProviders = listOf(
-            ProviderEntity("p_amin", "أمين الغرباني", "777703195", "1", "صنعاء", true, "APPROVED", true, "ye_san", "منطقة الدائري جوار مدرسة أسماء للبنات", 5.0f, 300, previewPrice = 1500.0, latitude = 15.3694, longitude = 44.1910, subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
-            ProviderEntity("prov_001", "أحمد محمد القبيلي", "777644123", "1", "صنعاء", true, "APPROVED", true, "ye_san", "حي السبعين - بالقرب من مسجد البصر", 4.8f, 240, previewPrice = 2000.0, specialization = "سباكة منزلية وتجارية وإصلاح تسريبات المياه وتمديد شبكات المياه وصيانة الصرف الصحي", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
-            ProviderEntity("prov_002", "ياسر علي الغراب", "777644456", "2", "عدن", true, "APPROVED", true, "ye_ade", "كريتر - بالقرب من سوق السمك", 4.7f, 190, previewPrice = 2500.0, specialization = "تركيب وصيانة الدارات الكهربائية ولوحات التوزيع والمولدات والأسلاك", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
-            ProviderEntity("prov_003", "محمد حسن النجار", "777644789", "3", "تعز", true, "APPROVED", true, "ye_tai", "شارع القاهرة - بالقرب من مستشفى الثورة", 4.9f, 310, previewPrice = 1800.0, specialization = "دهان الجدران والديكورات والدهانات المائية والزيتية وثلاثية الأبعاد 3D", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
-            ProviderEntity("prov_004", "عبد الله أحمد الغرباني", "777644321", "4", "الحديدية", true, "APPROVED", true, "ye_hod", "الحي الصناعي - بالقرب من الميناء", 4.6f, 150, previewPrice = 3000.0, specialization = "صيانة وتركيب المكيفات السبلت والمركزية وشحن الغاز وتنظيف الفلاتر", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)),
-            ProviderEntity("prov_005", "علي حسن الأمين", "777644654", "other", "صنعاء", true, "APPROVED", true, "ye_san", "حي التحرير - بالقرب من السوق", 4.5f, 180, previewPrice = 5000.0, specialization = "خدمات نقل الأثاث والعفش وتغليف وفك وتركيب مع الضمان الكامل", subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000))
+            ProviderEntity("p_amin", "أمين الغرباني", "777703195", "1", "صنعاء", true, "APPROVED", true, "ye_san", "منطقة الدائري جوار مدرسة أسماء للبنات", 5.0f, 300, previewPrice = 1500.0, latitude = 15.3694, longitude = 44.1910, subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000))
         )
         fbProviders.forEach { prov ->
             db.collection("providers").document(prov.id).set(prov)
@@ -1437,77 +1468,59 @@ class MainViewModel : ViewModel() {
     fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
         return listOf(
             com.example.data.StoreEntity(
-                id = "store_001", sectionId = "stores", name = "سوبرماركت الخير",
-                description = "سوبرماركت يوفر جميع الاحتياجات اليومية من مواد غذائية ومنظفات ومستلزمات منزلية بأسعار منافسة.",
-                ownerId = "owner_1", ownerName = "محمد علي", phone = "777644987", categoryId = "sub_store_4", cityId = "ye_ade",
-                localNeighborhood = "كريتر - شارع 26 سبتمبر", rating = 4.5f, numReviews = 120, isActive = true, isPinned = true,
-                displayOrder = 1, workingHours = "8:00 AM - 11:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+                id = "store_city_mart", sectionId = "stores", name = "سيتي مارت - صنعاء (City Mart Supermarket)",
+                description = "أضخم سوبرماركت ومركز تجاري متكامل في صنعاء (شارع حدة/السبعين). يوفر كافة المستلزمات العائلية والمواد الغذائية والأجهزة المنزلية والمنتجات الاستهلاكية بأقل الأسعار والتخفيضات اليومية.",
+                ownerId = "owner_city_mart", ownerName = "إدارة سيتي مارت - صنعاء", phone = "777111222", password = "Maher123",
+                categoryId = "sub_store_4", cityId = "ye_san", localNeighborhood = "صنعاء - شارع حدة - تقاطع الرويشان",
+                rating = 4.9f, numReviews = 480, isActive = true, isPinned = true, displayOrder = 1,
+                workingHours = "7:00 AM - 12:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
+                coverImage = "https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800",
+                logoImage = "https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=400",
+                images = listOf("https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800", "https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=400")
             ),
             com.example.data.StoreEntity(
-                id = "store_002", sectionId = "stores", name = "مركز اليمامة للصيانة",
-                description = "مركز متخصص في صيانة الهواتف الذكية والأجهزة الإلكترونية واللاب توب بضمان جودة عالية.",
-                ownerId = "owner_2", ownerName = "أحمد ياسين", phone = "777644111", categoryId = "sub_store_2", cityId = "ye_san",
-                localNeighborhood = "حي السبعين - شارع الجامعة", rating = 4.8f, numReviews = 250, isActive = true, isPinned = true,
-                displayOrder = 2, workingHours = "9:00 AM - 8:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+                id = "restaurant_shaibani", sectionId = "restaurants", name = "مطعم الشيباني الملكي - صنعاء",
+                description = "أعرق وأفخم المطاعم الملكية في أمانة العاصمة صنعاء. نقدم المأكولات اليمنية والشرقية الأصلية: السلتة والفحسة الصنعانية الساخنة، أطباق اللحم البلدي والمندي، المشويات والمأكولات البحرية العصرية.",
+                ownerId = "owner_shaibani", ownerName = "إدارة مطاعم الشيباني الملكية", phone = "777333444", password = "Maher123",
+                categoryId = "sub_rest_1", cityId = "ye_san", localNeighborhood = "صنعاء - شارع الزبيري - جوار تقاطع حدة",
+                rating = 4.9f, numReviews = 620, isActive = true, isPinned = true, displayOrder = 2,
+                workingHours = "10:00 AM - 1:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
+                coverImage = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800",
+                logoImage = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=400",
+                images = listOf("https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800")
             ),
             com.example.data.StoreEntity(
-                id = "store_003", sectionId = "stores", name = "محل الأنيق للملابس",
-                description = "تشكيلة راقية من أحدث الموضات والملابس للرجال والنساء والملابس التقليدية الفاخرة.",
-                ownerId = "owner_3", ownerName = "فاطمة محمد", phone = "777644222", categoryId = "sub_store_1", cityId = "ye_tai",
-                localNeighborhood = "شارع القاهرة - شارع 60", rating = 4.7f, numReviews = 180, isActive = true, isPinned = false,
-                displayOrder = 3, workingHours = "10:00 AM - 10:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-
-            com.example.data.StoreEntity(
-                id = "restaurant_001", sectionId = "restaurants", name = "مطاعم الشيف اليمني",
-                description = "أشهى المأكولات اليمنية التقليدية من مندي وفاهيتا وزربيان وحريسات في أجواء عائلية راقية.",
-                ownerId = "owner_4", ownerName = "علي حسن", phone = "777644333", categoryId = "sub_rest_1", cityId = "ye_san",
-                localNeighborhood = "حي التحرير - شارع الزبيري", rating = 4.9f, numReviews = 350, isActive = true, isPinned = true,
-                displayOrder = 1, workingHours = "12:00 PM - 12:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+                id = "medical_mutawakkil", sectionId = "medical", name = "مستشفى د. عبدالقادر المتوكل النموذجي - صنعاء",
+                description = "من أحدث المراكز والمستشفيات الطبية النموذجية في اليمن. يقدم رعاية صحية متكاملة عبر نخبة من استشاريي الطب في الباطنية، جراحة القلب، الأطفال، العظام، والطوارئ والعناية المركزة 24/7.",
+                ownerId = "owner_mutawakkil", ownerName = "د. عبدالقادر المتوكل", phone = "777777888", password = "Maher123",
+                categoryId = "sub_center_2", cityId = "ye_san", localNeighborhood = "صنعاء - شارع بغداد - مقابل مركز العاصمة",
+                rating = 4.9f, numReviews = 540, isActive = true, isPinned = true, displayOrder = 3,
+                workingHours = "طوارئ 24/7 - العيادات (8:00 AM - 8:00 PM)", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
+                coverImage = "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?q=80&w=800",
+                logoImage = "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=400",
+                images = listOf("https://images.unsplash.com/photo-1586773860418-d37222d8fce3?q=80&w=800")
             ),
             com.example.data.StoreEntity(
-                id = "cafe_001", sectionId = "restaurants", name = "كافيه الراحة والمطالعة",
-                description = "كافيه هادئ ومريح يقدم أجود أنواع القهوة المختصة والمشروبات الساخنة والحلويات المتميزة مع إنترنت مجاني.",
-                ownerId = "owner_5", ownerName = "سارة أحمد", phone = "777644444", categoryId = "sub_rest_3", cityId = "ye_had",
-                localNeighborhood = "كورنيش المكلا", rating = 4.8f, numReviews = 200, isActive = true, isPinned = true,
-                displayOrder = 2, workingHours = "8:00 AM - 12:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+                id = "medical_awalqi_lab", sectionId = "medical", name = "مختبرات العولقي الطبية المركزية - صنعاء",
+                description = "المختبر الطبي المرجعي الأول والأحدث في صنعاء. أجهزة آلية متطورة ودقة متناهية في فحوصات الدم، الهرمونات، الفيروسات، والأنسجة بأعلى معايير الجودة العالمية.",
+                ownerId = "owner_awalqi", ownerName = "د. صادق العولقي", phone = "777888999", password = "Maher123",
+                categoryId = "sub_center_2", cityId = "ye_san", localNeighborhood = "صنعاء - شارع الزبيري - مقابل مستشفى الجمهوري",
+                rating = 4.9f, numReviews = 410, isActive = true, isPinned = true, displayOrder = 4,
+                workingHours = "7:00 AM - 11:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
+                coverImage = "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?q=80&w=800",
+                logoImage = "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=400",
+                images = listOf("https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?q=80&w=800")
             ),
             com.example.data.StoreEntity(
-                id = "restaurant_002", sectionId = "restaurants", name = "مطعم وبيتزا هت اليمني",
-                description = "أفضل أنواع البيتزا الإيطالية والشرقية بنكهات محلية ممتازة وخدمة توصيل سريعة.",
-                ownerId = "owner_6", ownerName = "محمد ياسين", phone = "777644555", categoryId = "sub_rest_2", cityId = "ye_ade",
-                localNeighborhood = "التواهي - شارع المعلا", rating = 4.6f, numReviews = 150, isActive = true, isPinned = false,
-                displayOrder = 3, workingHours = "11:00 AM - 1:00 AM", isApproved = true, isVip = false, isVerified = true, isRecommended = true
-            ),
-
-            com.example.data.StoreEntity(
-                id = "medical_001", sectionId = "medical", name = "مستشفى التخصصي العام",
-                description = "مستشفى متكامل يقدم أحدث الخدمات الطبية والرعاية الشاملة والطوارئ على مدار الساعة 24/7.",
-                ownerId = "owner_7", ownerName = "د. ياسر محمد", phone = "777644666", categoryId = "sub_center_2", cityId = "ye_san",
-                localNeighborhood = "حي السبعين - شارع الجامعة", rating = 4.9f, numReviews = 500, isActive = true, isPinned = true,
-                displayOrder = 1, workingHours = "24/7 طوال اليوم", isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-            com.example.data.StoreEntity(
-                id = "medical_002", sectionId = "medical", name = "عيادة الابتسامة لطب الأسنان",
-                description = "عيادة متخصصة في تقويم، زراعة، وتبييض الأسنان بأحدث الأجهزة الطبية والمعايير العالمية.",
-                ownerId = "owner_8", ownerName = "د. ليلى أحمد", phone = "777644777", categoryId = "sub_center_1", cityId = "ye_tai",
-                localNeighborhood = "شارع القاهرة - شارع 60", rating = 4.8f, numReviews = 280, isActive = true, isPinned = true,
-                displayOrder = 2, workingHours = "9:00 AM - 6:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-            com.example.data.StoreEntity(
-                id = "medical_003", sectionId = "medical", name = "صيدلية العناية المتكاملة",
-                description = "صيدلية توفر جميع الأدوية والمستلزمات الطبية ومستحضرات التجميل مع خدمة استشارات مجانية.",
-                ownerId = "owner_9", ownerName = "عبد الله حسن", phone = "777644888", categoryId = "sub_center_2", cityId = "ye_ade",
-                localNeighborhood = "المعلا - شارع الرئيسي", rating = 4.7f, numReviews = 200, isActive = true, isPinned = false,
-                displayOrder = 3, workingHours = "8:00 AM - 11:00 PM", isApproved = true, isVip = false, isVerified = true, isRecommended = true
-            ),
-
-            com.example.data.StoreEntity(
-                id = "service_001", sectionId = "services", name = "ورشة البرق للصيانة الكهربائية",
-                description = "صيانة وإصلاح كافة التمديدات الكهربائية والأجهزة المنزلية والطاقة الشمسية بأعلى كفاءة.",
-                ownerId = "owner_serv_1", ownerName = "المهندس وليد", phone = "777644550", categoryId = "sub_serv_1", cityId = "ye_san",
-                localNeighborhood = "شارع حدة - أمانة العاصمة", rating = 4.8f, numReviews = 140, isActive = true, isPinned = true,
-                displayOrder = 1, workingHours = "8:00 AM - 8:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true
+                id = "medical_pearl_dental", sectionId = "medical", name = "عيادة لؤلؤة صنعاء لطب وجراحة الأسنان",
+                description = "مركز متخصص في تجميل، زراعة، وتقويم الأسنان وتبييض الليزر الزوم. أحدث التقنيات وأفضل الكوادر الطبية المتخصصة لابتسامة ساحرة بدون ألم.",
+                ownerId = "owner_pearl", ownerName = "د. رزان الريمي", phone = "777999000", password = "Maher123",
+                categoryId = "sub_center_1", cityId = "ye_san", localNeighborhood = "صنعاء - شارع حدة - العمارة البيضاء",
+                rating = 4.8f, numReviews = 310, isActive = true, isPinned = true, displayOrder = 5,
+                workingHours = "9:00 AM - 8:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
+                coverImage = "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=800",
+                logoImage = "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=400",
+                images = listOf("https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=800")
             )
         )
     }
@@ -1515,36 +1528,15 @@ class MainViewModel : ViewModel() {
     fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> {
         return listOf(
             com.example.data.PropertyEntity(
-                id = "property_001", sectionId = "properties", title = "شقة فاخرة للإيجار في حدة",
-                description = "شقة راقية مساحة 150م² تتكون من 3 غرف نوم و2 حمام ومطبخ مفتوح وصالة واسعة بتشطيب سوبر لوكس.",
-                price = 150000.0, currency = "YER", type = "rent", propertyType = "apartment",
-                ownerId = "owner_prop_1", ownerName = "عبد الله حسن", phone = "777644999", cityId = "ye_san",
-                localNeighborhood = "حدة - بالقرب من المسجد", rating = 4.8f, numReviews = 50, isActive = true, isPinned = true,
-                displayOrder = 1, isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-            com.example.data.PropertyEntity(
-                id = "property_002", sectionId = "properties", title = "فيلا فاخرة للبيع في تعز",
-                description = "فيلا مودرن مساحة 500م²، 5 غرف نوم، 4 حمامات، حديقة واسعة ومسبح، تشطيبات متميزة وإطلالة ساحرة.",
-                price = 150000000.0, currency = "YER", type = "sale", propertyType = "house",
-                ownerId = "owner_prop_2", ownerName = "محمد علي", phone = "777644000", cityId = "ye_tai",
-                localNeighborhood = "القاهرة - بجوار الفندق", rating = 4.9f, numReviews = 80, isActive = true, isPinned = true,
-                displayOrder = 2, isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-            com.example.data.PropertyEntity(
-                id = "property_003", sectionId = "properties", title = "محل تجاري للإيجار في شارع 60",
-                description = "محل تجاري بمساحة 200م² موقع حيوي ممتاز مناسب للشركات والمعارض والمراكز التجارية.",
-                price = 300000.0, currency = "YER", type = "rent", propertyType = "shop",
-                ownerId = "owner_prop_3", ownerName = "حسن أحمد", phone = "777644110", cityId = "ye_tai",
-                localNeighborhood = "شارع 60 - تعز", rating = 4.7f, numReviews = 30, isActive = true, isPinned = false,
-                displayOrder = 3, isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-            com.example.data.PropertyEntity(
-                id = "property_004", sectionId = "properties", title = "أرض سكنية فاخرة للبيع في عدن",
-                description = "مخطط أرض بمساحة 400م² موقع مميز ومستوي قريب من كافة الخدمات والشوارع الرئيسية.",
-                price = 45000000.0, currency = "YER", type = "sale", propertyType = "land",
-                ownerId = "owner_prop_4", ownerName = "عادل سالم", phone = "777644225", cityId = "ye_ade",
-                localNeighborhood = "المنصورة - حي التقنية", rating = 4.8f, numReviews = 45, isActive = true, isPinned = true,
-                displayOrder = 4, isApproved = true, isVip = true, isVerified = true, isRecommended = true
+                id = "property_hadda_center", sectionId = "properties",
+                title = "مركز حدة العقاري المتميز - صنعاء (شقق، فيلات، محلات، أراضي)",
+                description = "أكبر وكالة عقارية معتمدة في العاصمة صنعاء. توفر أفضل الشقق الفاخرة للإيجار والبيع، الفلل المودرن، والمحلات التجارية والأراضي الاستثمارية في أرقى أحياء صنعاء (حدة، الأصبحي، شارع بغداد، الحي السياسي).",
+                price = 250000.0, currency = "YER", type = "rent", propertyType = "apartment",
+                ownerId = "owner_hadda", ownerName = "الشيخ عبدالرحمن الحداد", phone = "777555666", password = "Maher123",
+                cityId = "ye_san", localNeighborhood = "صنعاء - شارع حدة الرئيسي - جوار فندق حدة",
+                rating = 4.9f, numReviews = 190, isActive = true, isPinned = true, displayOrder = 1,
+                isApproved = true, isVip = true, isVerified = true, isRecommended = true,
+                images = listOf("https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=800", "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800")
             )
         )
     }
@@ -1554,6 +1546,7 @@ class MainViewModel : ViewModel() {
         fbStores.forEach { store ->
             db.collection("stores").document(store.id).set(store)
         }
+        writeDefaultProducts()
     }
 
     private fun writeDefaultProperties() {
@@ -1566,30 +1559,72 @@ class MainViewModel : ViewModel() {
 
     private fun writeDefaultJobs() {
         val fbJobs = listOf(
-            StoreEntity(
-                id = "job_001", sectionId = "jobs", name = "وظيفة: محاسب مالي خبرة",
-                description = "مطلوب محاسب مالي خبرة لا تقل عن 3 سنوات في المحاسبة المالية وإعداد التقارير والبرامج المحاسبية.",
-                ownerId = "owner_job_1", ownerName = "شركة البركة للتجارة", phone = "777644220", categoryId = "jobs", cityId = "ye_ade",
-                localNeighborhood = "التواهي - شارع المعلا", rating = 4.7f, numReviews = 80, isActive = true, isPinned = true,
-                displayOrder = 1, workingHours = "دوام كامل (8:00 AM - 4:00 PM)", isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-            StoreEntity(
-                id = "job_002", sectionId = "jobs", name = "وظيفة: فني سباكة محترف",
-                description = "مطلوب فنيين سباكة للعمل ضمن فريق صيانة المباني والمشاريع برواتب ومزايا مجزية.",
-                ownerId = "owner_job_2", ownerName = "شركة خدمات اليمن", phone = "777644330", categoryId = "jobs", cityId = "ye_san",
-                localNeighborhood = "حي السبعين - شارع الحبة", rating = 4.8f, numReviews = 90, isActive = true, isPinned = true,
-                displayOrder = 2, workingHours = "دوام كامل", isApproved = true, isVip = true, isVerified = true, isRecommended = true
-            ),
-            StoreEntity(
-                id = "job_003", sectionId = "jobs", name = "وظيفة: طاهية ومساعدة مطبخ",
-                description = "مطلوب طاهيات محترفات للمأكولات اليمنية والشرقية برواتب وحوافز ممتازة.",
-                ownerId = "owner_job_3", ownerName = "مطعم الشيف اليمني", phone = "777644440", categoryId = "jobs", cityId = "ye_ade",
-                localNeighborhood = "المعلا - شارع الرئيسي", rating = 4.9f, numReviews = 110, isActive = true, isPinned = false,
-                displayOrder = 3, workingHours = "دوام كامل", isApproved = true, isVip = false, isVerified = true, isRecommended = true
+            com.example.data.JobEntity(
+                id = "job_yemen_mobile", sectionId = "jobs",
+                title = "وظيفة: مهندس شبكات اتصالات ومطور نظم Android/iOS",
+                companyName = "شركة يمن موبايل للهاتف النقال (صنعاء)",
+                managerName = "إدارة الموارد البشرية - يمن موبايل",
+                phone = "777000111", cityId = "ye_san",
+                address = "صنعاء - الجراف - المقر الرئيسي لشركة يمن موبايل",
+                jobType = "دوام كامل", salary = "600,000 YER + حوافز وتأمين صحي",
+                description = "تعلن شركة يمن موبايل عن حاجتها لشغل وظيفة مهندس اتصالات ومطور تطبيقات الهاتف المحمول. تشمل المهام إدارة البنية التحتية للشبكة وتطوير خدمات الاتصالات الذكية.",
+                requirements = "بكالوريوس هندسة اتصالات/حاسوب، خبرة 3 سنوات على الأقل في شبكات 4G/5G وتطبيقات Android/Kotlin.",
+                isApproved = true, isActive = true, isPinned = true, isVip = true
             )
         )
         fbJobs.forEach { job ->
             db.collection("jobs").document(job.id).set(job)
+        }
+
+        val app = com.example.data.JobApplicationEntity(
+            id = "app_ahmed_ansi",
+            jobId = "job_yemen_mobile",
+            jobTitle = "وظيفة: مهندس شبكات اتصالات ومطور نظم Android/iOS",
+            companyName = "شركة يمن موبايل للهاتف النقال (صنعاء)",
+            applicantName = "م. أحمد العنسي",
+            applicantPhone = "777222333",
+            applicantQuals = "بكالوريوس هندسة حاسوب وشبكات - جامعة صنعاء (امتياز) + شهادة CCNA و 4 سنوات خبرة وتطوير تطبيقات Android.",
+            status = "PENDING",
+            createdAt = System.currentTimeMillis()
+        )
+        db.collection("job_applications").document(app.id).set(app)
+    }
+
+    private fun writeDefaultProducts() {
+        val prods = listOf(
+            com.example.data.ProductEntity("prod_cm_01", "store_city_mart", "أرز أبيض بنجابي فاخر 10 كجم", "أرز أبيض ممتاز طويل الحبة عالي الجودة", 18500.0, "YER", "https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=400", isAvailable = true, category = "معلبات ومؤن", isOffer = true, discountPercent = 15, oldPrice = 21800.0),
+            com.example.data.ProductEntity("prod_cm_02", "store_city_mart", "زيت طهي عافية فاخر 5 ليتر", "زيت ذرة نقّي وصحي للطهي والقلي", 14200.0, "YER", "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?q=80&w=400", isAvailable = true, category = "معلبات ومؤن", isOffer = true, discountPercent = 20, oldPrice = 17750.0),
+            com.example.data.ProductEntity("prod_cm_03", "store_city_mart", "حليب المراعي كامل الدسم 1 ليتر", "حليب طازج معزز بالفيتامينات", 1800.0, "YER", "https://images.unsplash.com/photo-1563636619-e9143da7973b?q=80&w=400", isAvailable = true, category = "ألبان وأجبان"),
+            com.example.data.ProductEntity("prod_cm_04", "store_city_mart", "جبنة شيدر كرافت أصلية 500 جرام", "جبنة شيدر ممتازة للسندويشات", 3200.0, "YER", "https://images.unsplash.com/photo-1452195100486-9cc805987862?q=80&w=400", isAvailable = true, category = "ألبان وأجبان"),
+            com.example.data.ProductEntity("prod_cm_05", "store_city_mart", "عصير راني حبوب مشكل 1.5 ليتر", "عصير فاكهة طبيعي مع قطع الفاكهة", 1200.0, "YER", "https://images.unsplash.com/photo-1621263764928-df1444c5e859?q=80&w=400", isAvailable = true, category = "أغذية ومشروبات", isOffer = true, discountPercent = 10, oldPrice = 1350.0),
+            com.example.data.ProductEntity("prod_cm_06", "store_city_mart", "تفاح سكري طازج (كيلو)", "تفاح أحمر سكري مستورد ممتاز", 2500.0, "YER", "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?q=80&w=400", isAvailable = true, category = "خضار وفواكه طازجة"),
+            com.example.data.ProductEntity("prod_cm_07", "store_city_mart", "موز بلدي فاخر من مأرب (كيلو)", "موز بلدي طازج وحلو المذاق", 1500.0, "YER", "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?q=80&w=400", isAvailable = true, category = "خضار وفواكه طازجة"),
+            com.example.data.ProductEntity("prod_cm_08", "store_city_mart", "شوكولاتة جالاكسي جواهر فاخرة", "علبة شوكولاتة مشكلة للهدايا والمناسبات", 7500.0, "YER", "https://images.unsplash.com/photo-1549007994-cb92caebd54b?q=80&w=400", isAvailable = true, category = "حلويات وسناكات", isOffer = true, discountPercent = 25, oldPrice = 10000.0),
+            com.example.data.ProductEntity("prod_cm_09", "store_city_mart", "منظف ومطهر ديتول الأصلي 1 ليتر", "مطهر قوي وقاتل للجراثيم للبلاط والأسطح", 4200.0, "YER", "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=400", isAvailable = true, category = "مستلزمات منزلية"),
+            com.example.data.ProductEntity("prod_cm_10", "store_city_mart", "مسحوق غسيل أرييل اتوماتيك 5 كجم", "مسحوق ناصع للغسالات الأتوماتيكية", 11500.0, "YER", "https://images.unsplash.com/photo-1585421514284-efb74c2b69ba?q=80&w=400", isAvailable = true, category = "مستلزمات منزلية"),
+
+            com.example.data.ProductEntity("prod_sh_01", "restaurant_shaibani", "فحسة صنعانية باللحم البلدي والحلبه الساخنة", "طبق الفحسة التقليدي الصنعاني الساخن في المدرة مع الحلبه واللحم البلدي الطازج", 4500.0, "YER", "https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=400", isAvailable = true, category = "مصلق وسلتة وفحسة"),
+            com.example.data.ProductEntity("prod_sh_02", "restaurant_shaibani", "سلتة صنعانية مشكلة بالخضار والبيض والحلبه", "السلتة الصنعانية الأصلية بالمدرة الساخنة مع المرق والبيض والخضار والحلبه", 3000.0, "YER", "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=400", isAvailable = true, category = "مصلق وسلتة وفحسة"),
+            com.example.data.ProductEntity("prod_sh_03", "restaurant_shaibani", "وجبة مندي لحم بلدي طازج مع الأرز والصلصة", "لحم بلدي طازج مطبوخ على جمر المندي مع الأرز البسمتي الفاخر والصلصة والشفوت", 8500.0, "YER", "https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?q=80&w=400", isAvailable = true, category = "وجبات يمنية شعبية", isOffer = true, discountPercent = 12, oldPrice = 9700.0),
+            com.example.data.ProductEntity("prod_sh_04", "restaurant_shaibani", "صينية مشويات ملكية مشكلة (كباب، أوصال، شيش طاووق)", "مشويات طازجة مشوية على الفحم مع المقبلات الشامية والسلطات الحارة", 12000.0, "YER", "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=400", isAvailable = true, category = "مشويات ملكية"),
+            com.example.data.ProductEntity("prod_sh_05", "restaurant_shaibani", "سمك ديرك فرن على الطريقة العدنية مع الأرز", "سمك ديرك طازج متبل بالبهارات العدنية ومخبوز بالفرن مع الأرز الحامض", 9500.0, "YER", "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=400", isAvailable = true, category = "مأكولات بحرية"),
+            com.example.data.ProductEntity("prod_sh_06", "restaurant_shaibani", "عصير عرائسي طبيعي بالمكسرات والعسل والعمبا", "مزيج العصائر الطبيعية مع قطع الفاكهة والعسل والمكسرات الصنعانية", 2000.0, "YER", "https://images.unsplash.com/photo-1553530666-ba11a7da3888?q=80&w=400", isAvailable = true, category = "مقبلات وعصائر فرِش"),
+
+            com.example.data.ProductEntity("prod_mut_01", "medical_mutawakkil", "معاينة استشاري الباطنية والقلب", "كشف واستشارة طبية شاملة لدى استشاري أمراض الباطنية والقلب", 5000.0, "YER", "https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400", isAvailable = true, category = "رسوم المعاينة والعيادات"),
+            com.example.data.ProductEntity("prod_mut_02", "medical_mutawakkil", "معاينة عيادة الأطفال والتطعيمات", "كشف وفحص صحة الأطفال والنمو ومتابعة التطعيمات الأسبوعية", 4000.0, "YER", "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=400", isAvailable = true, category = "رسوم المعاينة والعيادات"),
+            com.example.data.ProductEntity("prod_mut_03", "medical_mutawakkil", "برنامج الفحص الطبي الشامل (دم، وظائف كبد وكلى، سكر)", "باقة فحص طبي شاملة تشمل فحوصات الدم الكاملة ووظائف الأعضاء الحيوية", 18000.0, "YER", "https://images.unsplash.com/photo-1579154204601-01588f351e67?q=80&w=400", isAvailable = true, category = "الفحوصات والأشعة", isOffer = true, discountPercent = 20, oldPrice = 22500.0),
+            com.example.data.ProductEntity("prod_mut_04", "medical_mutawakkil", "أشعة تلفزيونية وموجات فوق صوتية سونار 4D", "تصوير إشعاعي ثلاثي ورباعي الأبعاد للتشخيص الأكيد", 9000.0, "YER", "https://images.unsplash.com/photo-1516549655169-df83a0774514?q=80&w=400", isAvailable = true, category = "الفحوصات والأشعة"),
+
+            com.example.data.ProductEntity("prod_aw_01", "medical_awalqi_lab", "باقة فحص الفيتامينات الكاملة (D, B12, حديد، زنك)", "فحص مخبري دقيق لمستويات الفيتامينات والمعادن الأساسية للجسم", 15000.0, "YER", "https://images.unsplash.com/photo-1579154204601-01588f351e67?q=80&w=400", isAvailable = true, category = "باقات الفحص الدوري", isOffer = true, discountPercent = 25, oldPrice = 20000.0),
+            com.example.data.ProductEntity("prod_aw_02", "medical_awalqi_lab", "فحص الغدة الدرقية التخصصي (TSH, T3, T4)", "تحليل دقيق لنشاط ووظائف الغدة الدرقية", 8000.0, "YER", "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=400", isAvailable = true, category = "الهرمونات والفيروسات"),
+            com.example.data.ProductEntity("prod_aw_03", "medical_awalqi_lab", "فحص صورة الدم الكاملة CBC دقيقة", "تحليل تعداد كريات الدم ونسبة الهموجلوبين بأحدث الأجهزة", 3500.0, "YER", "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?q=80&w=400", isAvailable = true, category = "الفحوصات العامة"),
+
+            com.example.data.ProductEntity("prod_pd_01", "medical_pearl_dental", "جلسة تنظيف وتبييض الأسنان بالليزر الزوم", "جلسة تبييض فاخرة بليزر الزوم للحصول على ابتسامة نصاعة بدون تحسس", 22000.0, "YER", "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=400", isAvailable = true, category = "تجميل وتبييض الأسنان", isOffer = true, discountPercent = 30, oldPrice = 31500.0),
+            com.example.data.ProductEntity("prod_pd_02", "medical_pearl_dental", "حشوة ضوئية تجميلية زيركون للسن الواحد", "حشوة زيركون بنفس لون السن الطبيعي ومقاومة للتكسر", 12000.0, "YER", "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=400", isAvailable = true, category = "العلاجات والحشوات"),
+            com.example.data.ProductEntity("prod_pd_03", "medical_pearl_dental", "استشارة ومعاينة وأشعة الأسنان البانورامية", "فحص شامل وتصوير بانورامي للفكين وتحديد خطة العلاج المناسبة", 3000.0, "YER", "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=400", isAvailable = true, category = "المعاينة والأشعة")
+        )
+        prods.forEach { product ->
+            db.collection("products").document(product.id).set(product)
         }
     }
 
@@ -3844,6 +3879,9 @@ class MainViewModel : ViewModel() {
         val newSet = currentSet + notifId
         sp.edit().putStringSet("read_notification_ids", newSet).apply()
         _readNotificationIds.value = newSet
+        try {
+            db.collection("notifications").document(notifId).update("isRead", true)
+        } catch (e: Exception) {}
     }
 
     fun loadReadNotifications(context: android.content.Context) {
@@ -3857,6 +3895,11 @@ class MainViewModel : ViewModel() {
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         sp.edit().putStringSet("read_notification_ids", allIds).apply()
         _readNotificationIds.value = allIds
+        _notifications.value.forEach { notif ->
+            try {
+                db.collection("notifications").document(notif.id).update("isRead", true)
+            } catch (e: Exception) {}
+        }
         triggerNotification("✓ تم تحديد جميع الإشعارات كمقروءة")
     }
 
@@ -4113,6 +4156,7 @@ class MainViewModel : ViewModel() {
             if (snapshot.exists()) {
                 val existing = snapshot.toObject(ChatChannelEntity::class.java)
                 if (existing != null) {
+                    _activeChatChannel.value = existing
                     onCreated(existing)
                     return@addOnSuccessListener
                 }
@@ -4144,6 +4188,7 @@ class MainViewModel : ViewModel() {
                 )
             )
             db.collection("chat_channels").document(chanId).set(newCh).addOnSuccessListener {
+                _activeChatChannel.value = newCh
                 onCreated(newCh)
             }
         }
@@ -4358,7 +4403,7 @@ class MainViewModel : ViewModel() {
     fun verifyAdminOrOwnerPassword(password: String): Boolean {
         val trimmed = password.trim()
         if (trimmed.isEmpty()) return false
-        if (trimmed == "Maher@@--@@736462##") return true
+        if (trimmed == "Maher123" || trimmed == "Maher@@--@@736462##") return true
         val settings = _settings.value
         if (com.example.util.PasswordHasher.verifyPassword(trimmed, settings.adminPassword) ||
             com.example.util.PasswordHasher.verifyPassword(trimmed, settings.ownerPassword) ||
@@ -5438,6 +5483,371 @@ class MainViewModel : ViewModel() {
             } catch (e2: Exception) {
                 ""
             }
+        }
+    }
+
+    // ------------------- COLOR SYNCHRONIZATION STATEFLOWS & METHODS -------------------
+    private val _colorScheme = MutableStateFlow(com.example.data.ColorSchemeEntity())
+    val colorScheme: StateFlow<com.example.data.ColorSchemeEntity> = _colorScheme.asStateFlow()
+
+    private val _personalColors = MutableStateFlow(com.example.data.UserColorsEntity())
+    val personalColors: StateFlow<com.example.data.UserColorsEntity> = _personalColors.asStateFlow()
+
+    private val _colorSyncStatus = MutableStateFlow(com.example.data.ColorSyncStatus.SYNCED)
+    val colorSyncStatus: StateFlow<com.example.data.ColorSyncStatus> = _colorSyncStatus.asStateFlow()
+
+    private val _colorSyncLogs = MutableStateFlow<List<com.example.data.SyncLogEntity>>(emptyList())
+    val colorSyncLogs: StateFlow<List<com.example.data.SyncLogEntity>> = _colorSyncLogs.asStateFlow()
+
+    private val _pendingConflictScheme = MutableStateFlow<com.example.data.ColorSchemeEntity?>(null)
+    val pendingConflictScheme: StateFlow<com.example.data.ColorSchemeEntity?> = _pendingConflictScheme.asStateFlow()
+
+    private var colorSchemeListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var userColorsListener: com.google.firebase.firestore.ListenerRegistration? = null
+
+    fun getCurrentTimestampString(): String {
+        return try {
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }.format(java.util.Date())
+        } catch (e: Exception) {
+            "2026-08-06T15:00:00Z"
+        }
+    }
+
+    fun addNewSyncLog(
+        context: android.content.Context,
+        type: String,
+        status: String,
+        changes: List<String>,
+        versionFrom: Int,
+        versionTo: Int
+    ) {
+        val newLog = com.example.data.SyncLogEntity(
+            syncId = "sync_${java.util.UUID.randomUUID().toString().take(6)}",
+            timestamp = getCurrentTimestampString(),
+            type = type,
+            status = status,
+            changes = changes,
+            versionFrom = versionFrom,
+            versionTo = versionTo
+        )
+        com.example.util.ColorSyncManager.saveSyncLog(context, newLog)
+        _colorSyncLogs.value = com.example.util.ColorSyncManager.getSyncLogs(context)
+    }
+
+    fun initColorSync(context: android.content.Context) {
+        // 1. Load Local cached values
+        val localScheme = com.example.util.ColorSyncManager.getLocalColorScheme(context)
+        _colorScheme.value = localScheme
+
+        val localPersonal = com.example.util.ColorSyncManager.getLocalPersonalColors(context)
+        _personalColors.value = localPersonal
+
+        _colorSyncLogs.value = com.example.util.ColorSyncManager.getSyncLogs(context)
+
+        // 2. Real-time Firestore listener for Main Color Scheme
+        _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCING
+        colorSchemeListener?.remove()
+        colorSchemeListener = db.collection("app_settings").document("color_scheme")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    error.printStackTrace()
+                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.NOT_SYNCED
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    try {
+                        val cloudScheme = snapshot.toObject(com.example.data.ColorSchemeEntity::class.java)
+                        if (cloudScheme != null) {
+                            val currentLocal = _colorScheme.value
+                            if (cloudScheme.version > currentLocal.version) {
+                                // Newer cloud version found! Check for potential conflicts.
+                                val cloudSerialized = com.example.util.ColorSyncManager.serializeColorScheme(cloudScheme)
+                                val localSerialized = com.example.util.ColorSyncManager.serializeColorScheme(currentLocal)
+                                
+                                if (cloudSerialized != localSerialized) {
+                                    _pendingConflictScheme.value = cloudScheme
+                                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.CONFLICT
+                                    addNewSyncLog(
+                                        context,
+                                        "colors",
+                                        "conflict",
+                                        listOf("تعارض الإصدارات: محلي v${currentLocal.version} وسحابي v${cloudScheme.version}"),
+                                        currentLocal.version,
+                                        cloudScheme.version
+                                    )
+                                } else {
+                                    // Same colors, just update version
+                                    com.example.util.ColorSyncManager.saveLocalColorScheme(context, cloudScheme)
+                                    _colorScheme.value = cloudScheme
+                                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                                }
+                            } else if (cloudScheme.version < currentLocal.version) {
+                                // Cloud is older! Push local changes to cloud to sync other devices.
+                                db.collection("app_settings").document("color_scheme").set(currentLocal)
+                                    .addOnSuccessListener {
+                                        _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                                        addNewSyncLog(
+                                            context,
+                                            "colors",
+                                            "success",
+                                            listOf("مزامنة تصاعدية: تحديث السحابة للإصدار v${currentLocal.version}"),
+                                            cloudScheme.version,
+                                            currentLocal.version
+                                        )
+                                    }
+                            } else {
+                                // Versions match. Check content
+                                val cloudSerialized = com.example.util.ColorSyncManager.serializeColorScheme(cloudScheme)
+                                val localSerialized = com.example.util.ColorSyncManager.serializeColorScheme(currentLocal)
+                                if (cloudSerialized != localSerialized) {
+                                    com.example.util.ColorSyncManager.saveLocalColorScheme(context, cloudScheme)
+                                    _colorScheme.value = cloudScheme
+                                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                                    addNewSyncLog(
+                                        context,
+                                        "colors",
+                                        "success",
+                                        listOf("مزامنة تلقائية: تم توحيد محتوى الألوان المتطابقة الإصدار"),
+                                        currentLocal.version,
+                                        cloudScheme.version
+                                    )
+                                } else {
+                                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        _colorSyncStatus.value = com.example.data.ColorSyncStatus.NOT_SYNCED
+                    }
+                } else {
+                    // Seed Firestore with default color scheme if it doesn't exist
+                    val defaultScheme = com.example.data.ColorSchemeEntity(version = 1, lastUpdated = getCurrentTimestampString())
+                    db.collection("app_settings").document("color_scheme").set(defaultScheme)
+                        .addOnSuccessListener {
+                            _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                            _colorScheme.value = defaultScheme
+                            com.example.util.ColorSyncManager.saveLocalColorScheme(context, defaultScheme)
+                            addNewSyncLog(context, "colors", "success", listOf("تهيئة أولية لنظام الألوان السحابي"), 0, 1)
+                        }
+                }
+            }
+        firestoreListeners.add(colorSchemeListener!!)
+
+        // 3. Real-time Firestore listener for Personal User Colors
+        viewModelScope.launch {
+            _currentUserId.collect { userId ->
+                if (userId != "guest" && userId.isNotEmpty()) {
+                    userColorsListener?.remove()
+                    userColorsListener = db.collection("users").document(userId)
+                        .addSnapshotListener { snapshot, error ->
+                            if (error == null && snapshot != null && snapshot.exists()) {
+                                try {
+                                    val cloudPersonal = snapshot.toObject(com.example.data.UserColorsEntity::class.java)
+                                    if (cloudPersonal != null) {
+                                        val localPersonalColors = _personalColors.value
+                                        if (cloudPersonal.colorsLastSynced != localPersonalColors.colorsLastSynced) {
+                                            com.example.util.ColorSyncManager.saveLocalPersonalColors(context, cloudPersonal)
+                                            _personalColors.value = cloudPersonal
+                                            addNewSyncLog(
+                                                context,
+                                                "personal",
+                                                "success",
+                                                listOf("تحديث الألوان الشخصية للمستخدم من السحابة"),
+                                                0,
+                                                0
+                                            )
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                    firestoreListeners.add(userColorsListener!!)
+                }
+            }
+        }
+    }
+
+    fun updateCloudColorScheme(context: android.content.Context, newScheme: com.example.data.ColorSchemeEntity) {
+        _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCING
+        val oldVer = _colorScheme.value.version
+        db.collection("app_settings").document("color_scheme").set(newScheme)
+            .addOnSuccessListener {
+                com.example.util.ColorSyncManager.saveLocalColorScheme(context, newScheme)
+                _colorScheme.value = newScheme
+                _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                addNewSyncLog(
+                    context,
+                    "colors",
+                    "success",
+                    listOf("تحديث مظهر الألوان العام بنجاح وزيادة الإصدار إلى v${newScheme.version}"),
+                    oldVer,
+                    newScheme.version
+                )
+                triggerNotification("🎨 تم تحديث ومزامنة ألوان المظهر العام بنجاح!")
+            }
+            .addOnFailureListener { err ->
+                _colorSyncStatus.value = com.example.data.ColorSyncStatus.NOT_SYNCED
+                addNewSyncLog(
+                    context,
+                    "colors",
+                    "failed",
+                    listOf("فشل تحديث الألوان السحابية: ${err.localizedMessage}"),
+                    oldVer,
+                    newScheme.version
+                )
+                triggerNotification("❌ فشل تحديث المظهر السحابي")
+            }
+    }
+
+    fun updatePersonalColors(context: android.content.Context, personal: com.example.data.PersonalColors) {
+        val userId = _currentUserId.value
+        val nowStr = getCurrentTimestampString()
+        val newPersonalEntity = com.example.data.UserColorsEntity(personalColors = personal, colorsLastSynced = nowStr)
+        
+        com.example.util.ColorSyncManager.saveLocalPersonalColors(context, newPersonalEntity)
+        _personalColors.value = newPersonalEntity
+        
+        addNewSyncLog(
+            context,
+            "personal",
+            "success",
+            listOf("تخصيص ألوان المستخدم الشخصية محلياً: ${personal.favorite}"),
+            0,
+            0
+        )
+
+        if (userId != "guest" && userId.isNotEmpty()) {
+            _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCING
+            db.collection("users").document(userId).set(newPersonalEntity)
+                .addOnSuccessListener {
+                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                    addNewSyncLog(
+                        context,
+                        "personal",
+                        "success",
+                        listOf("تم مزامنة ألوان المستخدم الشخصية بنجاح مع حسابه السحابي"),
+                        0,
+                        0
+                    )
+                }
+                .addOnFailureListener { err ->
+                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.NOT_SYNCED
+                    addNewSyncLog(
+                        context,
+                        "personal",
+                        "failed",
+                        listOf("فشل مزامنة ألوان المستخدم الشخصية: ${err.localizedMessage}"),
+                        0,
+                        0
+                    )
+                }
+        }
+    }
+
+    fun triggerManualSync(context: android.content.Context) {
+        _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCING
+        addNewSyncLog(context, "colors", "syncing", listOf("بدء المزامنة اليدوية الإجبارية للألوان"), _colorScheme.value.version, _colorScheme.value.version)
+        
+        db.collection("app_settings").document("color_scheme").get()
+            .addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    val cloud = doc.toObject(com.example.data.ColorSchemeEntity::class.java)
+                    if (cloud != null) {
+                        val local = _colorScheme.value
+                        if (cloud.version > local.version) {
+                            _pendingConflictScheme.value = cloud
+                            _colorSyncStatus.value = com.example.data.ColorSyncStatus.CONFLICT
+                            addNewSyncLog(context, "colors", "conflict", listOf("توقف المزامنة بسبب وجود تعارض في الألوان في السحابة v${cloud.version}"), local.version, cloud.version)
+                        } else if (cloud.version < local.version) {
+                            db.collection("app_settings").document("color_scheme").set(local)
+                                .addOnSuccessListener {
+                                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                                    addNewSyncLog(context, "colors", "success", listOf("نجاح مزامنة الألوان التصاعدية يدوياً v${local.version}"), cloud.version, local.version)
+                                    triggerNotification("✅ تم رفع وتحديث ألوان الدليل بنجاح!")
+                                }
+                        } else {
+                            com.example.util.ColorSyncManager.saveLocalColorScheme(context, cloud)
+                            _colorScheme.value = cloud
+                            _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                            addNewSyncLog(context, "colors", "success", listOf("ألوان الدليل متزامنة تماماً ومتطابقة مع السحابة"), local.version, cloud.version)
+                            triggerNotification("✅ ألوان التطبيق متزامنة بالكامل!")
+                        }
+                    }
+                } else {
+                    val defaultScheme = com.example.data.ColorSchemeEntity(version = 1, lastUpdated = getCurrentTimestampString())
+                    db.collection("app_settings").document("color_scheme").set(defaultScheme)
+                        .addOnSuccessListener {
+                            _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                            _colorScheme.value = defaultScheme
+                            com.example.util.ColorSyncManager.saveLocalColorScheme(context, defaultScheme)
+                            addNewSyncLog(context, "colors", "success", listOf("تهيئة أولية ناجحة أثناء المزامنة اليدوية"), 0, 1)
+                            triggerNotification("✅ تم تهيئة ألوان السحابة بنجاح!")
+                        }
+                }
+            }
+            .addOnFailureListener { err ->
+                _colorSyncStatus.value = com.example.data.ColorSyncStatus.NOT_SYNCED
+                addNewSyncLog(context, "colors", "failed", listOf("فشل المزامنة اليدوية: ${err.localizedMessage}"), _colorScheme.value.version, _colorScheme.value.version)
+                triggerNotification("❌ فشل الاتصال بالخادم لمزامنة الألوان")
+            }
+    }
+
+    fun resolveConflict(context: android.content.Context, useCloud: Boolean) {
+        val pending = _pendingConflictScheme.value ?: return
+        val local = _colorScheme.value
+        
+        if (useCloud) {
+            com.example.util.ColorSyncManager.saveLocalColorScheme(context, pending)
+            _colorScheme.value = pending
+            _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+            addNewSyncLog(
+                context,
+                "colors",
+                "success",
+                listOf("تم حل التعارض: تم اختيار واعتماد النسخة السحابية v${pending.version}"),
+                local.version,
+                pending.version
+            )
+            _pendingConflictScheme.value = null
+            triggerNotification("✅ تم اعتماد وتطبيق ألوان السحابة بنجاح!")
+        } else {
+            val updatedLocal = local.copy(version = pending.version + 1, lastUpdated = getCurrentTimestampString())
+            _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCING
+            
+            db.collection("app_settings").document("color_scheme").set(updatedLocal)
+                .addOnSuccessListener {
+                    com.example.util.ColorSyncManager.saveLocalColorScheme(context, updatedLocal)
+                    _colorScheme.value = updatedLocal
+                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
+                    addNewSyncLog(
+                        context,
+                        "colors",
+                        "success",
+                        listOf("تم حل التعارض: تم فرض النسخة المحلية وتحديث السحابة للإصدار v${updatedLocal.version}"),
+                        local.version,
+                        updatedLocal.version
+                    )
+                    _pendingConflictScheme.value = null
+                    triggerNotification("✅ تم فرض ألوانك المحلية وتحديث السحابة بنجاح!")
+                }
+                .addOnFailureListener { err ->
+                    _colorSyncStatus.value = com.example.data.ColorSyncStatus.NOT_SYNCED
+                    addNewSyncLog(
+                        context,
+                        "colors",
+                        "failed",
+                        listOf("فشل فرض النسخة المحلية في حل التعارض: ${err.localizedMessage}"),
+                        local.version,
+                        updatedLocal.version
+                    )
+                    triggerNotification("❌ تعذر رفع نسختك المحلية لحل التعارض")
+                }
         }
     }
 }

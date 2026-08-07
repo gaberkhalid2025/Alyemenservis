@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import com.example.data.*
 import com.example.ui.MainViewModel
+import com.example.ui.components.ReviewInput
 
 @Composable
 fun rememberBase64Bitmap(base64Str: String): ImageBitmap? {
@@ -547,7 +548,7 @@ fun StoresTabContent(
             }
         } else {
             activeStores.take(itemsToShowLimit).forEach { store ->
-                StoreListItemCard(store = store, themeColors = themeColors, onClick = { onStoreClick(store) })
+                StoreListItemCard(store = store, themeColors = themeColors, onClick = { onStoreClick(store) }, viewModel = viewModel)
             }
             if (activeStores.size > itemsToShowLimit) {
                 Button(
@@ -567,7 +568,8 @@ fun StoreListItemCard(
     store: StoreEntity,
     themeColors: VisualThemePalette,
     onClick: () -> Unit,
-    viewModel: MainViewModel? = null
+    viewModel: MainViewModel? = null,
+    onChatClick: (() -> Unit)? = null
 ) {
     val settingsState = viewModel?.settings?.collectAsState()?.value ?: AdminSettingsEntity()
     val adminRole by (viewModel?.adminRole?.collectAsState() ?: remember { mutableStateOf("GUEST") })
@@ -819,7 +821,23 @@ fun StoreListItemCard(
                 // Instant Chat
                 if (settingsState.showInstantChatButton) {
                     Button(
-                        onClick = onClick,
+                        onClick = {
+                            if (onChatClick != null) {
+                                onChatClick()
+                            } else if (viewModel != null) {
+                                viewModel.openOrCreateChatChannel(
+                                    targetId = store.id,
+                                    targetType = "STORE",
+                                    targetName = store.name,
+                                    targetPhone = store.phone,
+                                    onCreated = {
+                                        viewModel.triggerNotification("💬 تم فتح المحادثة الفورية مع متجر ${store.name}")
+                                    }
+                                )
+                            } else {
+                                onClick()
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.2f)),
                         modifier = Modifier.weight(1f).height(32.dp),
                         contentPadding = PaddingValues(0.dp),
@@ -1434,6 +1452,9 @@ fun StoreDetailsDialog(
 ) {
     val products by viewModel.products.collectAsState()
     val ratings by viewModel.ratings.collectAsState()
+    val customReviews by remember(store.id) {
+        DataManager.getReviews(store.id)
+    }.collectAsState(initial = emptyList())
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
@@ -1581,11 +1602,10 @@ fun StoreDetailsDialog(
                     }
                 }
 
-                // 2. Overlapping Logo Avatar & Business Details
+                // 2. Logo Avatar & Business Details (Seamless clean layout without empty spaces)
                 Column(
                     modifier = Modifier
-                        .padding(horizontal = 14.dp)
-                        .offset(y = (-30).dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.Bottom,
@@ -1990,7 +2010,31 @@ fun StoreDetailsDialog(
                     HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 12.dp))
 
                     // 6. REVIEWS & RATINGS SECTION
-                    Text("⭐ التقييمات وآراء العملاء (${storeReviews.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    val totalReviewsCount = storeReviews.size + customReviews.size
+                    Text("⭐ التقييمات وآراء العملاء ($totalReviewsCount):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    // Custom real-time reviews
+                    customReviews.forEach { rev ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(rev.userName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Row {
+                                        repeat(rev.rating) { Text("⭐", fontSize = 9.sp) }
+                                    }
+                                }
+                                Text(rev.text, fontSize = 10.sp, color = themeColors.textSecondary)
+                            }
+                        }
+                    }
+
+                    // Existing ratings
                     storeReviews.forEach { rev ->
                         Card(
                             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -2011,60 +2055,32 @@ fun StoreDetailsDialog(
                         }
                     }
 
-                    // Add Review Form Card
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("➕ أضف تقييمك ورأيك في المتجر:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("النجوم: ", fontSize = 10.sp, color = themeColors.textSecondary)
-                                (1..5).forEach { i ->
-                                    val isSelected = userRatingInput >= i
-                                    Text(
-                                        text = if (isSelected) "★" else "☆",
-                                        fontSize = 18.sp,
-                                        color = if (isSelected) themeColors.accent else Color.Gray,
-                                        modifier = Modifier.clickable { userRatingInput = i.toFloat() }.padding(horizontal = 2.dp)
-                                    )
-                                }
-                            }
-                            OutlinedTextField(
-                                value = userCommentInput,
-                                onValueChange = { userCommentInput = it },
-                                placeholder = { Text("اكتب تعليقك هنا...", fontSize = 11.sp, color = themeColors.textSecondary) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 7. Interactive Review Input (Material 3 style)
+                    ReviewInput(
+                        onSubmit = { rating, comment ->
+                            val newReview = Review(
+                                id = java.util.UUID.randomUUID().toString(),
+                                shopId = store.id,
+                                userId = currentUserId,
+                                userName = currentUserName.ifEmpty { "عميل التطبيق" },
+                                rating = rating,
+                                text = comment,
+                                timestamp = System.currentTimeMillis()
                             )
-                            Button(
-                                onClick = {
-                                    if (userCommentInput.isNotEmpty()) {
-                                        viewModel.addRating(
-                                            RatingEntity(
-                                                targetId = store.id,
-                                                targetType = "STORE",
-                                                userId = currentUserId,
-                                                userName = currentUserName.ifEmpty { "عميل التطبيق" },
-                                                rating = userRatingInput,
-                                                comment = userCommentInput
-                                            )
-                                        )
-                                        userCommentInput = ""
-                                    }
+                            DataManager.submitReview(
+                                shopId = store.id,
+                                review = newReview,
+                                onSuccess = {
+                                    android.widget.Toast.makeText(context, "✅ تم إرسال تقييمك بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                                modifier = Modifier.align(Alignment.End)
-                            ) {
-                                Text("إرسال التقييم", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
+                                onFailure = {
+                                    android.widget.Toast.makeText(context, "❌ فشل إرسال التقييم: ${it.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            )
                         }
-                    }
+                    )
                 }
             }
         }
