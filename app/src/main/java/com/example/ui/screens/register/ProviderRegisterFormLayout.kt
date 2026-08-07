@@ -1,5 +1,6 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.example.ui.screens.register
+import com.example.ui.screens.dashboard.*
 
 import com.example.ui.*
 import com.example.ui.utils.*
