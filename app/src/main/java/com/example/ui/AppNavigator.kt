@@ -195,27 +195,31 @@ fun AppNavigator(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
-                AppHeaderBar(
-                    viewModel = viewModel,
-                    themeColors = themeColors,
-                    onNotificationsClick = { showNotificationsDialog = true },
-                    onChatsClick = { showAllConversationsDialog = true },
-                    chatReadTrigger = chatReadTrigger,
-                    onMenuClick = {}
-                )
+                if (currentScreen != "MAP_VIEW") {
+                    AppHeaderBar(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onNotificationsClick = { showNotificationsDialog = true },
+                        onChatsClick = { showAllConversationsDialog = true },
+                        chatReadTrigger = chatReadTrigger,
+                        onMenuClick = {}
+                    )
+                }
             },
             bottomBar = {
-                AppFooterBar(
-                    viewModel = viewModel,
-                    themeColors = themeColors,
-                    onInfoClick = { showInfoDialog = true }
-                )
+                if (currentScreen != "MAP_VIEW") {
+                    AppFooterBar(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onInfoClick = { showInfoDialog = true }
+                    )
+                }
             }
         ) { innerPadding ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
+                    .padding(if (currentScreen == "MAP_VIEW") PaddingValues(0.dp) else innerPadding)
                     .background(themeColors.background)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {

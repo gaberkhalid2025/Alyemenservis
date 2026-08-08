@@ -84,8 +84,11 @@ fun MapScreen(
     val properties by viewModel.properties.collectAsState(initial = emptyList())
 
     // User Location State - Default Sana'a (15.3694, 44.1910)
-    var userLat by remember { mutableDoubleStateOf(15.3694) }
-    var userLng by remember { mutableDoubleStateOf(44.1910) }
+    val userLatState by viewModel.userLatitude.collectAsState()
+    val userLngState by viewModel.userLongitude.collectAsState()
+
+    var userLat by remember(userLatState) { mutableDoubleStateOf(userLatState) }
+    var userLng by remember(userLngState) { mutableDoubleStateOf(userLngState) }
 
     // Map Controls
     var mapZoom by remember { mutableIntStateOf(12) }
@@ -128,15 +131,10 @@ fun MapScreen(
         }
     }
 
-    // Pulse Effect & User Location Simulation/Tracker (5-second radar pulse)
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(5000L)
-            if (userLat != 0.0) {
-                userLat += (Math.random() - 0.5) * 0.0001
-                userLng += (Math.random() - 0.5) * 0.0001
-            }
-        }
+    // Sync location from ViewModel
+    LaunchedEffect(userLatState, userLngState) {
+        userLat = userLatState
+        userLng = userLngState
     }
 
     // Real-time detection tracker for new items

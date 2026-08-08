@@ -184,52 +184,48 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // Search Bar Block
+        // Smart Autocomplete Search Bar
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(themeColors.surface, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(imageVector = Icons.Default.Search, contentDescription = "أيقونة البحث عن الخدمات والمهن", tint = themeColors.textSecondary)
-                Spacer(modifier = Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.updateSearchQuery(it) },
-                    placeholder = { Text("ابحث عن سباك، كهربائي، حدة...", fontSize = 13.sp, color = themeColors.textSecondary) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("search_text_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    singleLine = true
-                )
-                
-                if (settingsState.isSpeechSearchEnabled) {
-                    IconButton(onClick = {
-                        VoiceManager.onHear?.invoke { spokenText ->
-                            viewModel.updateSearchQuery(spokenText)
-                            viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
+            SmartAutocompleteSearchBox(
+                searchQuery = searchQuery,
+                onQueryChange = { viewModel.updateSearchQuery(it) },
+                viewModel = viewModel,
+                themeColors = themeColors,
+                onToggleFilters = { showFiltersPanel = !showFiltersPanel },
+                showFilters = showFiltersPanel,
+                onSelectSuggestion = { type, item ->
+                    when (type) {
+                        "PROVIDER" -> {
+                            val p = item as? ProviderEntity
+                            if (p != null) {
+                                viewModel.selectCategory(p.categoryId)
+                            }
                         }
-                    }) {
-                        Text("🎙️", fontSize = 20.sp)
+                        "STORE" -> {
+                            val s = item as? StoreEntity
+                            if (s != null) {
+                                selectedStoreForDetails = s
+                            }
+                        }
+                        "PROPERTY" -> {
+                            val pr = item as? PropertyEntity
+                            if (pr != null) {
+                                selectedPropertyForDetails = pr
+                            }
+                        }
+                        "PRODUCT" -> {
+                            val pair = item as? Pair<*, *>
+                            val store = pair?.first as? StoreEntity
+                            if (store != null) {
+                                selectedStoreForDetails = store
+                            }
+                        }
+                        "JOB" -> {
+                            activeTabName = "الوظائف والتوظيف"
+                        }
                     }
                 }
-
-                IconButton(onClick = { showFiltersPanel = !showFiltersPanel }) {
-                    Icon(
-                        imageVector = if (showFiltersPanel) Icons.Default.Settings else Icons.Default.List,
-                        contentDescription = "الفلاتر",
-                        tint = themeColors.accent
-                    )
-                }
-            }
+            )
         }
 
         // ----------------- TAB CHIPS BAR -----------------
@@ -244,9 +240,13 @@ fun ServicesBrowserLayout(
                 activeTabs.forEach { tabName ->
                     val isSelected = activeTabName == tabName
                     val icon = when (tabName) {
-                        "الرئيسية" -> "🛠️"
-                        settingsState.storesTabName -> "🏪"
-                        settingsState.propertiesTabName -> "🏠"
+                        "الرئيسية" -> "🏠"
+                        "الفنيين والخدمات" -> "🛠️"
+                        "المحلات والمراكز", settingsState.storesTabName -> "🏪"
+                        "المطاعم والكافيهات" -> "🍔"
+                        "المراكز الطبية" -> "🏥"
+                        "المكاتب والعقارات", settingsState.propertiesTabName -> "🏢"
+                        "الوظائف والتوظيف" -> "💼"
                         "المفضلة" -> "⭐"
                         else -> "✨"
                     }
@@ -272,8 +272,12 @@ fun ServicesBrowserLayout(
                                 when (tabName) {
                                     "الرئيسية" -> "Home"
                                     "المفضلة" -> "Favorites"
-                                    settingsState.storesTabName -> "Stores"
-                                    settingsState.propertiesTabName -> "Properties"
+                                    "الفنيين والخدمات" -> "Technicians"
+                                    "المحلات والمراكز", settingsState.storesTabName -> "Stores"
+                                    "المطاعم والكافيهات" -> "Restaurants"
+                                    "المراكز الطبية" -> "Medical"
+                                    "المكاتب والعقارات", settingsState.propertiesTabName -> "Properties"
+                                    "الوظائف والتوظيف" -> "Jobs"
                                     else -> tabName
                                 }
                             } else {
@@ -291,7 +295,29 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // --- SMART RECOMMENDATIONS ---
+        // --- 6 MAIN SECTIONS OVERVIEW GRID (HOME TAB) ---
+        if (activeTabName == "الرئيسية") {
+            item {
+                MainCategoriesOverviewGrid(
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    settingsState = settingsState,
+                    onSelectCategory = { catId ->
+                        when (catId) {
+                            "1", "technicians" -> activeTabName = "الفنيين والخدمات"
+                            "stores" -> activeTabName = "المحلات والمراكز"
+                            "restaurants" -> activeTabName = "المطاعم والكافيهات"
+                            "medical" -> activeTabName = "المراكز الطبية"
+                            "realestate" -> activeTabName = "المكاتب والعقارات"
+                            "jobs" -> activeTabName = "الوظائف والتوظيف"
+                            else -> viewModel.selectCategory(catId)
+                        }
+                    }
+                )
+            }
+        }
+
+        // --- SMART RECOMMENDATIONS & PINNED ITEMS ---
         if (activeTabName == "الرئيسية" && (settingsState.isStoresEnabled || settingsState.isPropertiesEnabled)) {
             item {
                 SmartRecommendationsSection(
@@ -1161,3 +1187,377 @@ fun ServicesBrowserLayout(
         }
     }
 }
+
+// -------------------------------------------------------------------------------------
+// SMART AUTOCOMPLETE SEARCH BOX COMPONENT
+// -------------------------------------------------------------------------------------
+@Composable
+fun SmartAutocompleteSearchBox(
+    searchQuery: String,
+    onQueryChange: (String) -> Unit,
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
+    onToggleFilters: () -> Unit,
+    showFilters: Boolean,
+    onSelectSuggestion: (type: String, item: Any) -> Unit
+) {
+    val providers by viewModel.providers.collectAsState()
+    val stores by viewModel.stores.collectAsState()
+    val properties by viewModel.properties.collectAsState()
+    val jobs by viewModel.jobs.collectAsState()
+    val settingsState by viewModel.settings.collectAsState()
+
+    var isDropdownExpanded by remember { mutableStateOf(false) }
+
+    val cleanQuery = searchQuery.trim().lowercase()
+
+    val suggestions = remember(cleanQuery, providers, stores, properties, jobs) {
+        if (cleanQuery.isEmpty()) emptyList()
+        else {
+            val list = mutableListOf<SearchSuggestionItem>()
+
+            // 1. Technicians & Providers
+            providers.filter { p ->
+                !p.isDeleted && (
+                    p.name.lowercase().contains(cleanQuery) ||
+                    p.profession.lowercase().contains(cleanQuery) ||
+                    p.specialization.lowercase().contains(cleanQuery) ||
+                    p.area.lowercase().contains(cleanQuery) ||
+                    p.localNeighborhood.lowercase().contains(cleanQuery) ||
+                    p.phone.contains(cleanQuery)
+                )
+            }.take(4).forEach { p ->
+                list.add(SearchSuggestionItem(
+                    type = "PROVIDER",
+                    id = p.id,
+                    title = p.name,
+                    subtitle = "${p.profession} - ${p.area}",
+                    badge = "🛠️ فني/خدمة",
+                    rawItem = p
+                ))
+            }
+
+            // 2. Stores & Shops & Restaurants & Medical Centers
+            stores.filter { s ->
+                !s.isDeleted && s.isActive && (
+                    s.name.lowercase().contains(cleanQuery) ||
+                    s.description.lowercase().contains(cleanQuery) ||
+                    s.categoryId.lowercase().contains(cleanQuery) ||
+                    s.phone.contains(cleanQuery) ||
+                    s.localNeighborhood.lowercase().contains(cleanQuery)
+                )
+            }.take(5).forEach { s ->
+                val badge = when {
+                    s.sectionId == "restaurants" || s.categoryId.contains("rest") -> "🍔 مطعم/كافيه"
+                    s.sectionId == "medical" || s.categoryId.contains("med") -> "🏥 مركز طبي"
+                    else -> "🏪 محل/مركز تجاري"
+                }
+                list.add(SearchSuggestionItem(
+                    type = "STORE",
+                    id = s.id,
+                    title = s.name,
+                    subtitle = "${s.description.take(25)} - ${s.phone}",
+                    badge = badge,
+                    rawItem = s
+                ))
+            }
+
+            // 3. Real Estate Properties
+            properties.filter { pr ->
+                !pr.isDeleted && pr.isActive && (
+                    pr.title.lowercase().contains(cleanQuery) ||
+                    pr.description.lowercase().contains(cleanQuery) ||
+                    pr.localNeighborhood.lowercase().contains(cleanQuery) ||
+                    pr.propertyType.lowercase().contains(cleanQuery)
+                )
+            }.take(3).forEach { pr ->
+                list.add(SearchSuggestionItem(
+                    type = "PROPERTY",
+                    id = pr.id,
+                    title = pr.title,
+                    subtitle = "${pr.price} YER - ${pr.type}",
+                    badge = "🏢 عقار/مكتب",
+                    rawItem = pr
+                ))
+            }
+
+            // 4. Jobs
+            jobs.filter { j ->
+                !j.isDeleted && (
+                    j.title.lowercase().contains(cleanQuery) ||
+                    j.companyName.lowercase().contains(cleanQuery) ||
+                    j.address.lowercase().contains(cleanQuery)
+                )
+            }.take(3).forEach { j ->
+                list.add(SearchSuggestionItem(
+                    type = "JOB",
+                    id = j.id,
+                    title = j.title,
+                    subtitle = "${j.companyName} - ${j.address}",
+                    badge = "💼 وظيفة",
+                    rawItem = j
+                ))
+            }
+
+            list.take(8)
+        }
+    }
+
+    LaunchedEffect(cleanQuery) {
+        isDropdownExpanded = cleanQuery.isNotEmpty() && suggestions.isNotEmpty()
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(themeColors.surface, RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = Icons.Default.Search, contentDescription = "أيقونة البحث الذكي", tint = themeColors.textSecondary)
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = {
+                    onQueryChange(it)
+                    isDropdownExpanded = it.isNotBlank()
+                },
+                placeholder = {
+                    Text(
+                        "ابحث بالاسم، فني، مطعم، وجبة، عصير، منتج، عقار، دواء، منطقة...",
+                        fontSize = 11.sp,
+                        color = themeColors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("search_text_input"),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
+                singleLine = true
+            )
+
+            if (searchQuery.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange(""); isDropdownExpanded = false }) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            if (settingsState.isSpeechSearchEnabled) {
+                IconButton(onClick = {
+                    VoiceManager.onHear?.invoke { spokenText ->
+                        onQueryChange(spokenText)
+                        viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
+                    }
+                }) {
+                    Text("🎙️", fontSize = 18.sp)
+                }
+            }
+
+            IconButton(onClick = onToggleFilters) {
+                Icon(
+                    imageVector = if (showFilters) Icons.Default.Settings else Icons.Default.List,
+                    contentDescription = "الفلاتر",
+                    tint = themeColors.accent
+                )
+            }
+        }
+
+        // Suggestions Dropdown Popup Overlay
+        if (isDropdownExpanded && suggestions.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, themeColors.accent),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 54.dp)
+            ) {
+                Column(modifier = Modifier.padding(6.dp)) {
+                    Text(
+                        "💡 نتائج البحث والاقتراحات التلقائية المطابقة (${suggestions.size}):",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.accent,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                    HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f))
+
+                    suggestions.forEach { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    isDropdownExpanded = false
+                                    onSelectSuggestion(item.type, item.rawItem)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(item.subtitle, fontSize = 10.sp, color = themeColors.textSecondary)
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = themeColors.accent.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                            ) {
+                                Text(
+                                    item.badge,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = themeColors.accent,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        HorizontalDivider(color = Color.Gray.copy(alpha = 0.15f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+data class SearchSuggestionItem(
+    val type: String,
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val badge: String,
+    val rawItem: Any
+)
+
+// -------------------------------------------------------------------------------------
+// 6 MAIN SECTIONS OVERVIEW GRID COMPONENT
+// -------------------------------------------------------------------------------------
+@Composable
+fun MainCategoriesOverviewGrid(
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
+    settingsState: AdminSettingsEntity,
+    onSelectCategory: (String) -> Unit
+) {
+    val parsedSections = remember(settingsState.dynamicSectionsData) {
+        DynamicSection.parseDynamicSections(settingsState.dynamicSectionsData)
+    }
+
+    val mainCategories = listOf(
+        MainCategoryItem("1", "قسم الفنيين والخدمات", "🛠️", "نخبة المهنيين والصيانة والمعاينة الفورية", "#1E3A8A"),
+        MainCategoryItem("stores", "قسم المحلات والمراكز التجارية", "🏪", "تسوق من المحلات والمعارض والمولات", "#15803D"),
+        MainCategoryItem("restaurants", "قسم المطاعم والكافيهات", "🍔", "أشهر الوجبات، المأكولات والعصائر", "#C2410C"),
+        MainCategoryItem("medical", "قسم المراكز الطبية والمستشفيات", "🏥", "عيادات، صيدليات، أطباء ومستشفيات", "#047857"),
+        MainCategoryItem("realestate", "قسم المكاتب والخدمات العقارية", "🏢", "شقق، فلل، أراضي ومحلات للإيجار والبيع", "#B45309"),
+        MainCategoryItem("jobs", "قسم المعلنين عن الوظائف والتوظيف", "💼", "فرص عمل متجددة لكافة التخصصات", "#6B21A8")
+    ).filter { cat ->
+        when (cat.id) {
+            "stores" -> settingsState.isStoresEnabled && parsedSections.any { it.id == "stores" && it.isEnabled }
+            "realestate" -> settingsState.isPropertiesEnabled && parsedSections.any { it.id == "properties" && it.isEnabled }
+            "restaurants" -> parsedSections.any { it.id == "restaurants" && it.isEnabled }
+            "medical" -> parsedSections.any { it.id == "medical" && it.isEnabled }
+            "jobs" -> parsedSections.any { it.id == "jobs" && it.isEnabled }
+            else -> true
+        }
+    }
+
+    if (mainCategories.isNotEmpty()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Text(
+                text = "✨ الأقسام والخدمات الرئيسية بالتطبيق:",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = themeColors.accent,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            val chunked = mainCategories.chunked(2)
+            chunked.forEach { pair ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    pair.forEach { cat ->
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onSelectCategory(cat.id) }
+                                .shadow(4.dp, RoundedCornerShape(16.dp)),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = themeColors.accent.copy(alpha = 0.15f),
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(cat.icon, fontSize = 20.sp)
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowForward,
+                                        contentDescription = null,
+                                        tint = themeColors.accent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = cat.name,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = cat.description,
+                                    fontSize = 9.sp,
+                                    color = themeColors.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    if (pair.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+data class MainCategoryItem(
+    val id: String,
+    val name: String,
+    val icon: String,
+    val description: String,
+    val hexAccent: String
+)
+

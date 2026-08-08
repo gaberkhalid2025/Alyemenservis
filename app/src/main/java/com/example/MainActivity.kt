@@ -67,8 +67,23 @@ class MainActivity : ComponentActivity() {
 
     fun startVoiceInput(onResult: (String) -> Unit) {
         if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.RECORD_AUDIO), 101)
-            Toast.makeText(this, "⚠️ فضلاً وافق على إذن استخدام المايك في النافذة المنبثقة، ثم جرب الضغط على زر الميكروفون مجدداً لخدمتك بالكامل", Toast.LENGTH_LONG).show()
+            if (androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this, android.Manifest.permission.RECORD_AUDIO)) {
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("🎙️ إذن الميكروفون")
+                    .setMessage("نحتاج إلى إذن الميكروفون لتمكين ميزة البحث الصوتي والأوامر الصوتية الذكية مع المساعد الذكي لمساعدتك بسرعة وسهولة.")
+                    .setPositiveButton("منح الإذن 👍") { _, _ ->
+                        androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.RECORD_AUDIO), 101)
+                    }
+                    .setNegativeButton("إلغاء ❌") { dialog, _ ->
+                        dialog.dismiss()
+                        Toast.makeText(this, "تم إلغاء منح إذن الصوت. يمكنك البحث بالكتابة بدلاً من ذلك.", Toast.LENGTH_SHORT).show()
+                    }
+                    .create()
+                    .show()
+            } else {
+                androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.RECORD_AUDIO), 101)
+                Toast.makeText(this, "⚠️ فضلاً وافق على إذن استخدام المايك في النافذة المنبثقة لخدمتك بالكامل", Toast.LENGTH_LONG).show()
+            }
             return
         }
 
@@ -114,6 +129,42 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this@MainActivity, "عذراً، نظام هاتفك لا يدعم التعرف الصوتي المباشر.", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    private fun startFusedLocationUpdates(activity: ComponentActivity, viewModel: MainViewModel) {
+        try {
+            val context = activity.applicationContext
+            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    if (location != null) {
+                        viewModel.updateUserLocation(location.latitude, location.longitude)
+                    }
+                }
+                
+                val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
+                    com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 5000L
+                ).setMinUpdateIntervalMillis(3000L).build()
+                
+                val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+                    override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                        for (loc in result.locations) {
+                            viewModel.updateUserLocation(loc.latitude, loc.longitude)
+                        }
+                    }
+                }
+                
+                fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    android.os.Looper.getMainLooper()
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -205,11 +256,26 @@ class MainActivity : ComponentActivity() {
                         "android.permission.POST_NOTIFICATIONS"
                     ) != android.content.pm.PackageManager.PERMISSION_GRANTED
                 ) {
-                    androidx.core.app.ActivityCompat.requestPermissions(
-                        this,
-                        arrayOf("android.permission.POST_NOTIFICATIONS"),
-                        102
-                    )
+                    if (androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this, "android.permission.POST_NOTIFICATIONS")) {
+                        android.app.AlertDialog.Builder(this)
+                            .setTitle("🔔 إذن الإشعارات")
+                            .setMessage("نحتاج إلى إذن الإشعارات لإرسال التحديثات الهامة حول حجوزاتك، العروض الجديدة، ورسائل الدردشة الفورية.")
+                            .setPositiveButton("منح الإذن 👍") { _, _ ->
+                                androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf("android.permission.POST_NOTIFICATIONS"), 102)
+                            }
+                            .setNegativeButton("إلغاء ❌") { dialog, _ ->
+                                dialog.dismiss()
+                                Toast.makeText(this, "تم إلغاء الإشعارات. لن تتلقى تنبيهات بالرسائل الجديدة.", Toast.LENGTH_SHORT).show()
+                            }
+                            .create()
+                            .show()
+                    } else {
+                        androidx.core.app.ActivityCompat.requestPermissions(
+                            this,
+                            arrayOf("android.permission.POST_NOTIFICATIONS"),
+                            102
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -266,43 +332,9 @@ class MainActivity : ComponentActivity() {
                 val granted = results.values.all { it }
                 if (granted) {
                     viewModel.triggerNotification("📌 تم تفعيل تحديد الموقع التلقائي بدقة عالية!")
-                    try {
-                        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                        val providerStr = if (lm != null && lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                            LocationManager.GPS_PROVIDER
-                        } else if (lm != null && lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                            LocationManager.NETWORK_PROVIDER
-                        } else {
-                            null
-                        }
-                        if (lm != null && providerStr != null) {
-                            val lastKnown = lm.getLastKnownLocation(providerStr)
-                            if (lastKnown != null) {
-                                viewModel.updateUserLocation(lastKnown.latitude, lastKnown.longitude)
-                            }
-                            val listener = object : LocationListener {
-                                override fun onLocationChanged(loc: Location) {
-                                    viewModel.updateUserLocation(loc.latitude, loc.longitude)
-                                }
-                                override fun onProviderEnabled(p: String) {}
-                                override fun onProviderDisabled(p: String) {}
-                                override fun onStatusChanged(p: String?, s: Int, e: Bundle?) {}
-                            }
-                            lm.requestLocationUpdates(
-                                providerStr,
-                                3000L,
-                                1.0f,
-                                listener,
-                                android.os.Looper.getMainLooper()
-                            )
-                        }
-                    } catch (e: SecurityException) {
-                        e.printStackTrace()
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    startFusedLocationUpdates(this@MainActivity, viewModel)
                 } else {
-                    viewModel.triggerNotification("⚠️ تم رفض الإذن، يمكنك تحديد مدينتك يدوياً")
+                    viewModel.triggerNotification("⚠️ تم رفض إذن الموقع، يمكنك تحديد مدينتك يدوياً")
                 }
             }
 
@@ -311,36 +343,23 @@ class MainActivity : ComponentActivity() {
                     val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     if (hasFine || hasCoarse) {
-                        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                        if (lm != null) {
-                            val providerStr = if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                                LocationManager.GPS_PROVIDER
-                            } else if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                                LocationManager.NETWORK_PROVIDER
-                            } else {
-                                null
-                            }
-                            if (providerStr != null) {
-                                val lastKnown = lm.getLastKnownLocation(providerStr)
-                                if (lastKnown != null) {
-                                    viewModel.updateUserLocation(lastKnown.latitude, lastKnown.longitude)
+                        startFusedLocationUpdates(this@MainActivity, viewModel)
+                    } else {
+                        if (androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, android.Manifest.permission.ACCESS_FINE_LOCATION)) {
+                            android.app.AlertDialog.Builder(this@MainActivity)
+                                .setTitle("📍 إذن الموقع الجغرافي")
+                                .setMessage("يحتاج تطبيق كل خدمات اليمن للوصول لموقعك الجغرافي لعرض الخدمات والمهن والمحلات القريبة منك مباشرة وبدقة على الخريطة.")
+                                .setPositiveButton("منح الإذن 👍") { _, _ ->
+                                    permissionLauncher.launch(locationPermissions)
                                 }
-                                val listener = object : LocationListener {
-                                    override fun onLocationChanged(loc: Location) {
-                                        viewModel.updateUserLocation(loc.latitude, loc.longitude)
-                                    }
-                                    override fun onProviderEnabled(p: String) {}
-                                    override fun onProviderDisabled(p: String) {}
-                                    override fun onStatusChanged(p: String?, s: Int, e: Bundle?) {}
+                                .setNegativeButton("إلغاء ❌") { dialog, _ ->
+                                    dialog.dismiss()
+                                    viewModel.triggerNotification("⚠️ تم رفض إذن الموقع، يمكنك اختيار مدينتك يدوياً")
                                 }
-                                lm.requestLocationUpdates(
-                                    providerStr,
-                                    5000L,
-                                    10.0f,
-                                    listener,
-                                    android.os.Looper.getMainLooper()
-                                )
-                            }
+                                .create()
+                                .show()
+                        } else {
+                            permissionLauncher.launch(locationPermissions)
                         }
                     }
                 } catch (e: Exception) {
