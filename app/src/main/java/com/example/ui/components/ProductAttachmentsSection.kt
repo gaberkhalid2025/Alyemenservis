@@ -1,7 +1,6 @@
 package com.example.ui
 
 import com.example.utils.*
-
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -465,9 +464,6 @@ fun ProductAttachmentsSection(
     }
 }
 
-// ==========================================
-// 🔥 SPECIAL OFFERS & DISCOUNTS COMPONENT
-// ==========================================
 @Composable
 fun SpecialOffersSection(
     offersJson: String,
