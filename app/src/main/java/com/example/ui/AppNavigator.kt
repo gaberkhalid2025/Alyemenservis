@@ -727,6 +727,7 @@ fun AppNavigator(
                                     ?: "مخفية/مشفرة"
 
                                 // Dispatch recovery notification directly to supervisor/admin collection so it is guaranteed to reach the admin panel
+                                viewModel.setPasswordRecoveryWaitingPhone(cleanPhone)
                                 viewModel.requestPasswordRecoveryGeneral(
                                     accountName = accountName,
                                     phone = cleanPhone,

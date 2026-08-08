@@ -141,6 +141,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
     // Dialog state controllers for notifications deletions
     var showDeleteNotifConfirmId by remember { mutableStateOf<String?>(null) }
+    var selectedRecoveryNotif by remember { mutableStateOf<NotificationEntity?>(null) }
 
     // Dialog state controllers for chat selections
     var showActiveChatChannelObj by remember { mutableStateOf<ChatChannelEntity?>(null) }
@@ -3017,6 +3018,19 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 else -> "جميع المشتركين بالمنصة"
                             }
                             Text("نطاق الاستهداف: $filterStr", fontSize = 10.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                            val isRecovery = n.title.contains("استعادة") || n.title.contains("طلب") || n.message.contains("يطلب") || n.message.contains("هاتف")
+                            if (isRecovery) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Button(
+                                    onClick = { selectedRecoveryNotif = n },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.secondary),
+                                    modifier = Modifier.fillMaxWidth().height(32.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("🔓 إدارة واستعادة كلمة المرور ومراسلة المستخدم", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                 }
@@ -7917,5 +7931,117 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
             }
         }
+    }
+
+    selectedRecoveryNotif?.let { notif ->
+        var phoneExtract = ""
+        var nameExtract = "المستخدم"
+        try {
+            val phoneRegex = Regex("(?:هاتف:|الرقم:|الهاتف:)?\\s*([0-9]{9,10})")
+            val match = phoneRegex.find(notif.message)
+            if (match != null) {
+                phoneExtract = match.groupValues[1]
+            }
+            if (notif.message.contains("المتجر")) {
+                val split = notif.message.split("المتجر")
+                if (split.size > 1) {
+                    nameExtract = split[1].substringBefore("(").trim()
+                }
+            } else if (notif.message.contains("الحساب:")) {
+                val split = notif.message.split("الحساب:")
+                if (split.size > 1) {
+                    nameExtract = split[1].substringBefore("(").trim()
+                }
+            }
+        } catch (e: Exception) {}
+
+        var newPasswordInput by remember { mutableStateOf("123456") }
+        var notifyActionChoice by remember { mutableStateOf("DIRECT_PASSWORD") }
+
+        AlertDialog(
+            onDismissRequest = { selectedRecoveryNotif = null },
+            containerColor = Color(0xFF0F172A),
+            title = { Text("🔓 إدارة استعادة كلمة المرور للحساب", color = themeColors.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("تفاصيل الطلب: ${notif.message}", fontSize = 11.sp, color = Color.White)
+                    
+                    OutlinedTextField(
+                        value = phoneExtract,
+                        onValueChange = { phoneExtract = it },
+                        label = { Text("رقم الهاتف المستهدف") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = newPasswordInput,
+                        onValueChange = { newPasswordInput = it },
+                        label = { Text("كلمة المرور الجديدة (أو الحالية)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Text("اختر الإجراء الإداري للرد والاشعار:", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { notifyActionChoice = "DIRECT_PASSWORD" }) {
+                        RadioButton(selected = notifyActionChoice == "DIRECT_PASSWORD", onClick = { notifyActionChoice = "DIRECT_PASSWORD" })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إعادة تعيين كلمة المرور وإرسالها بإشعار مباشر للمستخدم", fontSize = 10.sp, color = Color.White)
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { notifyActionChoice = "VERIFICATION_WHATSAPP" }) {
+                        RadioButton(selected = notifyActionChoice == "VERIFICATION_WHATSAPP", onClick = { notifyActionChoice = "VERIFICATION_WHATSAPP" })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("طلب التحقق عبر الواتس / التليجرام أو المحادثة الفورية", fontSize = 10.sp, color = Color.White)
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { notifyActionChoice = "INSTANT_CHAT" }) {
+                        RadioButton(selected = notifyActionChoice == "INSTANT_CHAT", onClick = { notifyActionChoice = "INSTANT_CHAT" })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("فتح محادثة فورية مباشرة مع المستخدم لإثبات الهوية", fontSize = 10.sp, color = Color.White)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (phoneExtract.isNotEmpty() && newPasswordInput.isNotEmpty()) {
+                            viewModel.adminResetAccountPassword(
+                                phone = phoneExtract,
+                                newPassword = newPasswordInput.trim(),
+                                notifyAction = notifyActionChoice,
+                                customerName = nameExtract
+                            )
+                            if (notifyActionChoice == "INSTANT_CHAT") {
+                                viewModel.getOrCreateChatChannel(
+                                    providerId = "admin",
+                                    providerName = "الإدارة والدعم",
+                                    customerId = phoneExtract,
+                                    customerName = nameExtract
+                                )
+                                Toast.makeText(context, "💬 تم فتح محادثة الدعم وإرسال الإجراء بنجاح!", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "✅ تم إعادة تعيين كلمة المرور وإرسال الإشعار بنجاح!", Toast.LENGTH_LONG).show()
+                            }
+                            selectedRecoveryNotif = null
+                        } else {
+                            Toast.makeText(context, "الرجاء التأكد من رقم الهاتف وكلمة المرور", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("تنفيذ الإجراء وإرسال 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { selectedRecoveryNotif = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("إلغاء", color = Color.White, fontSize = 11.sp)
+                }
+            }
+        )
     }
 }

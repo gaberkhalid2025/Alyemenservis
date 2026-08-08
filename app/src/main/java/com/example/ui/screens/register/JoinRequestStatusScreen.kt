@@ -120,6 +120,8 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
 
     val matchingPending = pendingProviders.find { it.phone == joinPhone }
     val matchingApproved = providers.find { it.phone == joinPhone }
+    val recoveryWaitingPhone by viewModel.passwordRecoveryWaitingPhone.collectAsState()
+    val isWaitingRecovery = recoveryWaitingPhone.trim() == joinPhone.trim() && joinPhone.isNotEmpty()
     
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
@@ -189,6 +191,46 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
             ) {
                 val categories by viewModel.categories.collectAsState()
                 when {
+                    isWaitingRecovery -> {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(Color(0xFF3B82F6).copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "⏳", fontSize = 28.sp)
+                        }
+
+                        Text(
+                            text = "في انتظار إعادة تعيين كلمة المرور",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF3B82F6),
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "تم إرسال طلب استعادة كلمة المرور الخاصة بحسابك إلى الإدارة والأدمن بنجاح. نحن بانتظار مراجعة طلبك وإعادة تعيين كلمة المرور أو إرسال تفاصيل التحقق والمحادثة الفورية.",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.85f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 16.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = {
+                                viewModel.setPasswordRecoveryWaitingPhone("")
+                                viewModel.cancelOrResetJoinRequest(context)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(38.dp)
+                        ) {
+                            Text("إعادة محاولة الدخول 🔄", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
                     matchingStore != null -> {
                         StoreOwnerDashboardLayout(store = matchingStore, viewModel = viewModel, themeColors = themeColors, ratings = ratings)
                     }

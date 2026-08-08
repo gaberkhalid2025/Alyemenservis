@@ -108,6 +108,13 @@ class MainViewModel : ViewModel() {
     private val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
     val notifications: StateFlow<List<NotificationEntity>> = _notifications.asStateFlow()
 
+    private val _passwordRecoveryWaitingPhone = MutableStateFlow<String>("")
+    val passwordRecoveryWaitingPhone: StateFlow<String> = _passwordRecoveryWaitingPhone.asStateFlow()
+
+    fun setPasswordRecoveryWaitingPhone(phone: String) {
+        _passwordRecoveryWaitingPhone.value = phone
+    }
+
     var selectedProvider: com.example.data.ProviderEntity? = null
     var selectedStore: com.example.data.StoreEntity? = null
     var selectedProperty: com.example.data.PropertyEntity? = null
@@ -2585,6 +2592,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun requestPasswordRecoveryForStore(name: String, phone: String, password: String) {
+        setPasswordRecoveryWaitingPhone(phone)
         val adminNotif = NotificationEntity(
             id = UUID.randomUUID().toString(),
             title = "🔑 استعادة كلمة مرور متجر",
@@ -2598,6 +2606,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun requestPasswordRecoveryGeneral(accountName: String, phone: String, accountType: String, currentPassword: String) {
+        setPasswordRecoveryWaitingPhone(phone)
         val adminNotif = NotificationEntity(
             id = UUID.randomUUID().toString(),
             title = "🔑 طلب استعادة كلمة مرور ($accountType)",
@@ -2610,6 +2619,71 @@ class MainViewModel : ViewModel() {
             .addOnSuccessListener {
                 triggerNotification("📨 تم إرسال طلب استعادة كلمة المرور للمشرف/الأدمن بنجاح!")
             }
+    }
+
+    fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: String, customerName: String) {
+        val cleanPhone = phone.trim()
+        db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+            for (doc in snap.documents) {
+                db.collection("providers").document(doc.id).update("password", newPassword)
+            }
+        }
+        db.collection("pending_providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+            for (doc in snap.documents) {
+                db.collection("pending_providers").document(doc.id).update("password", newPassword)
+            }
+        }
+        db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+            for (doc in snap.documents) {
+                db.collection("stores").document(doc.id).update("password", newPassword)
+            }
+        }
+        db.collection("properties").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+            for (doc in snap.documents) {
+                db.collection("properties").document(doc.id).update("password", newPassword)
+            }
+        }
+        db.collection("registered_users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+            for (doc in snap.documents) {
+                db.collection("registered_users").document(doc.id).update("password", newPassword)
+            }
+        }
+
+        if (_passwordRecoveryWaitingPhone.value == cleanPhone) {
+            _passwordRecoveryWaitingPhone.value = ""
+        }
+
+        val notifId = UUID.randomUUID().toString()
+        val (title, message) = when (notifyAction) {
+            "DIRECT_PASSWORD" -> Pair(
+                "🔑 إعادة تعيين كلمة المرور بنجاح",
+                "تمت الموافقة على طلب استعادة حسابك وإعادة تعيين كلمة المرور من قبل الإدارة. كلمة المرور الجديدة هي: $newPassword"
+            )
+            "VERIFICATION_WHATSAPP" -> Pair(
+                "🔐 التحقق من الهوية - استعادة الحساب",
+                "عزيزي المشترك، يرجى التواصل عبر الواتساب أو التليجرام أو المحادثة الفورية مع الإدارة للتحقق من هويتك وتأكيد ملكيتك للحساب واستلام كلمة المرور."
+            )
+            "INSTANT_CHAT" -> Pair(
+                "💬 محادثة فورية لاستعادة الحساب",
+                "تم فتح قناة دعم فورية لك. يرجى التوجه للمحادثة المباشرة مع الإدارة للتحقق من هويتك واسترجاع حسابك فوراً."
+            )
+            else -> Pair(
+                "🔑 تحديث كلمة المرور",
+                "قامت الإدارة بتحديث ومعالجة طلب استعادة كلمة المرور الخاصة بحسابك."
+            )
+        }
+
+        val userNotif = NotificationEntity(
+            id = notifId,
+            title = title,
+            message = message,
+            targetType = "USER",
+            targetValue = cleanPhone,
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("notifications").document(notifId).set(userNotif).addOnSuccessListener {
+            triggerNotification("✅ تم إرسال إشعار إعادة التعيين للمستخدم بنجاح!")
+        }
     }
 
     fun deleteStore(storeId: String) {
@@ -2774,6 +2848,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun requestPasswordRecoveryForProperty(title: String, phone: String, password: String) {
+        setPasswordRecoveryWaitingPhone(phone)
         val adminNotif = NotificationEntity(
             id = UUID.randomUUID().toString(),
             title = "🔑 استعادة كلمة مرور عقار",
