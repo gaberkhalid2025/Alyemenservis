@@ -344,23 +344,6 @@ class MainActivity : ComponentActivity() {
                     val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     if (hasFine || hasCoarse) {
                         startFusedLocationUpdates(this@MainActivity, viewModel)
-                    } else {
-                        if (androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(this@MainActivity, android.Manifest.permission.ACCESS_FINE_LOCATION)) {
-                            android.app.AlertDialog.Builder(this@MainActivity)
-                                .setTitle("📍 إذن الموقع الجغرافي")
-                                .setMessage("يحتاج تطبيق كل خدمات اليمن للوصول لموقعك الجغرافي لعرض الخدمات والمهن والمحلات القريبة منك مباشرة وبدقة على الخريطة.")
-                                .setPositiveButton("منح الإذن 👍") { _, _ ->
-                                    permissionLauncher.launch(locationPermissions)
-                                }
-                                .setNegativeButton("إلغاء ❌") { dialog, _ ->
-                                    dialog.dismiss()
-                                    viewModel.triggerNotification("⚠️ تم رفض إذن الموقع، يمكنك اختيار مدينتك يدوياً")
-                                }
-                                .create()
-                                .show()
-                        } else {
-                            permissionLauncher.launch(locationPermissions)
-                        }
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()

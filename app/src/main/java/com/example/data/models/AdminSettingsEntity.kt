@@ -163,9 +163,9 @@ data class AdminSettingsEntity(
     val aboutCustomInfo: String = "تطبيق دليل خدمات اليمن الذكي هو منصة متكاملة مخصصة لربط المستخدمين والعملاء بأمهر الفنيين، المهندسين، ومقدمي الخدمات في شتى المجالات والصيانة في مختلف محافظات الجمهورية اليمنية بسهولة وسرعة فائقة.",
 
     // Main screen Banner configuration
-    val bannerEnabled: Boolean = true,
+    val bannerEnabled: Boolean = false,
     val bannerType: String = "TEXT", // "TEXT", "IMAGE", "VIDEO"
-    val bannerContent: String = "أهلاً بكم في دليل خدمات اليمن! المنصة الأولى لربط مقدمي الخدمات والمهنيين والمراكز التجارية مع المستخدمين، وانتظروا الإضافات القادمة! ✨",
+    val bannerContent: String = "",
     val bannerBase64: String = "",
     val bannerLocation: String = "TOP", // "TOP", "BOTTOM"
     val bannerDurationSeconds: Int = 10, // 0 for persistent, otherwise duration in seconds
@@ -179,7 +179,7 @@ data class AdminSettingsEntity(
     val showSettingsIcon: Boolean = false,
     val headerIconsOrder: String = "MENU,NOTIF,CHAT",
     val headerIconsVisible: String = "MENU,NOTIF,CHAT",
-    val categoriesLayoutType: String = "GRID_HORIZONTAL",
+    val categoriesLayoutType: String = "GRID_VERTICAL",
     val isFavoritesEnabled: Boolean = true,
     val encryptionType: String = "تشفير آمن سحابي",
     val splashWelcomeMessage: String = "التطبيق الأول في اليمن والوطن العربي الذي يربط مقدمي الخدمات وأصحاب المهن بالمستخدمين فورياً",

@@ -184,48 +184,74 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // Smart Autocomplete Search Bar
+        // Search Bar Block (Smart Cross Search - Picture 2 Style)
         item {
-            SmartAutocompleteSearchBox(
-                searchQuery = searchQuery,
-                onQueryChange = { viewModel.updateSearchQuery(it) },
-                viewModel = viewModel,
-                themeColors = themeColors,
-                onToggleFilters = { showFiltersPanel = !showFiltersPanel },
-                showFilters = showFiltersPanel,
-                onSelectSuggestion = { type, item ->
-                    when (type) {
-                        "PROVIDER" -> {
-                            val p = item as? ProviderEntity
-                            if (p != null) {
-                                viewModel.selectCategory(p.categoryId)
-                            }
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "بحث",
+                        tint = themeColors.accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.updateSearchQuery(it) },
+                        placeholder = {
+                            Text(
+                                text = "البحث الذكي المتقاطع 🔍 (فنيين، محلات، استشارات...)",
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("search_text_input"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        singleLine = true
+                    )
+                    
+                    Surface(
+                        onClick = { showFiltersPanel = !showFiltersPanel },
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFF1E40AF)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("بحث ذكي", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
-                        "STORE" -> {
-                            val s = item as? StoreEntity
-                            if (s != null) {
-                                selectedStoreForDetails = s
+                    }
+
+                    if (settingsState.isSpeechSearchEnabled) {
+                        IconButton(onClick = {
+                            VoiceManager.onHear?.invoke { spokenText ->
+                                viewModel.updateSearchQuery(spokenText)
+                                viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
                             }
-                        }
-                        "PROPERTY" -> {
-                            val pr = item as? PropertyEntity
-                            if (pr != null) {
-                                selectedPropertyForDetails = pr
-                            }
-                        }
-                        "PRODUCT" -> {
-                            val pair = item as? Pair<*, *>
-                            val store = pair?.first as? StoreEntity
-                            if (store != null) {
-                                selectedStoreForDetails = store
-                            }
-                        }
-                        "JOB" -> {
-                            activeTabName = "الوظائف والتوظيف"
+                        }) {
+                            Text("🎙️", fontSize = 18.sp)
                         }
                     }
                 }
-            )
+            }
         }
 
         // ----------------- TAB CHIPS BAR -----------------
@@ -240,13 +266,9 @@ fun ServicesBrowserLayout(
                 activeTabs.forEach { tabName ->
                     val isSelected = activeTabName == tabName
                     val icon = when (tabName) {
-                        "الرئيسية" -> "🏠"
-                        "الفنيين والخدمات" -> "🛠️"
-                        "المحلات والمراكز", settingsState.storesTabName -> "🏪"
-                        "المطاعم والكافيهات" -> "🍔"
-                        "المراكز الطبية" -> "🏥"
-                        "المكاتب والعقارات", settingsState.propertiesTabName -> "🏢"
-                        "الوظائف والتوظيف" -> "💼"
+                        "الرئيسية" -> "🛠️"
+                        settingsState.storesTabName -> "🏪"
+                        settingsState.propertiesTabName -> "🏠"
                         "المفضلة" -> "⭐"
                         else -> "✨"
                     }
@@ -272,12 +294,8 @@ fun ServicesBrowserLayout(
                                 when (tabName) {
                                     "الرئيسية" -> "Home"
                                     "المفضلة" -> "Favorites"
-                                    "الفنيين والخدمات" -> "Technicians"
-                                    "المحلات والمراكز", settingsState.storesTabName -> "Stores"
-                                    "المطاعم والكافيهات" -> "Restaurants"
-                                    "المراكز الطبية" -> "Medical"
-                                    "المكاتب والعقارات", settingsState.propertiesTabName -> "Properties"
-                                    "الوظائف والتوظيف" -> "Jobs"
+                                    settingsState.storesTabName -> "Stores"
+                                    settingsState.propertiesTabName -> "Properties"
                                     else -> tabName
                                 }
                             } else {
@@ -295,29 +313,7 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // --- 6 MAIN SECTIONS OVERVIEW GRID (HOME TAB) ---
-        if (activeTabName == "الرئيسية") {
-            item {
-                MainCategoriesOverviewGrid(
-                    viewModel = viewModel,
-                    themeColors = themeColors,
-                    settingsState = settingsState,
-                    onSelectCategory = { catId ->
-                        when (catId) {
-                            "1", "technicians" -> activeTabName = "الفنيين والخدمات"
-                            "stores" -> activeTabName = "المحلات والمراكز"
-                            "restaurants" -> activeTabName = "المطاعم والكافيهات"
-                            "medical" -> activeTabName = "المراكز الطبية"
-                            "realestate" -> activeTabName = "المكاتب والعقارات"
-                            "jobs" -> activeTabName = "الوظائف والتوظيف"
-                            else -> viewModel.selectCategory(catId)
-                        }
-                    }
-                )
-            }
-        }
-
-        // --- SMART RECOMMENDATIONS & PINNED ITEMS ---
+        // --- SMART RECOMMENDATIONS ---
         if (activeTabName == "الرئيسية" && (settingsState.isStoresEnabled || settingsState.isPropertiesEnabled)) {
             item {
                 SmartRecommendationsSection(
@@ -555,320 +551,193 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // Horizontal Grid list of categories (Responsive Grid / Custom Admin Display Layout)
+        // Picture 2 Dark Card Grid for Main Sectors & Categories
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "📁 تصفح حسب الأقسام (تصنيف تفاعلي):",
-                    fontSize = 14.sp,
+                    text = "✨ الخدمات والقطاعات الرئيسية",
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = themeColors.accent,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
                 )
 
-                val allCats = listOf(
-                    CategoryEntity(id = "", name = "الكل", icon = "🌐")
-                ) + categories
+                // Define main sectors if categories exist or default list
+                val mainSectors = listOf(
+                    CategoryEntity(id = "1", name = "مزودو الخدمات والمهنيين", icon = "👷"),
+                    CategoryEntity(id = "stores", name = "المحلات والمراكز التجارية", icon = "🏪"),
+                    CategoryEntity(id = "2", name = "المراكز والعيادات الطبية", icon = "🏥"),
+                    CategoryEntity(id = "restaurants", name = "المطاعم والوجبات السريعة", icon = "🍔"),
+                    CategoryEntity(id = "jobs", name = "الفرص والوظائف والمهن", icon = "💼")
+                )
 
-                when (settingsState.categoriesLayoutType) {
-                    "ROW_HORIZONTAL" -> {
+                // Render 2x2 grid for first 4 items, then 5th item as full-width
+                val gridPairs = listOf(
+                    mainSectors.subList(0, 2),
+                    mainSectors.subList(2, 4)
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    gridPairs.forEach { rowItems ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            allCats.forEach { cat ->
-                                val isSelected = if (cat.id.isEmpty()) selectedCategory == null else selectedCategory == cat.id
-                                Card(
-                                    modifier = Modifier
-                                        .clickable {
-                                            if (cat.id.isEmpty()) {
-                                                viewModel.selectCategory(null)
-                                            } else {
-                                                viewModel.selectCategory(cat.id)
-                                            }
-                                        }
-                                        .testTag("category_row_${cat.id}"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) themeColors.accent else themeColors.surface
-                                    ),
-                                    border = BorderStroke(
-                                        width = 1.dp,
-                                        color = if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = cat.icon,
-                                            fontSize = 18.sp,
-                                            modifier = Modifier
-                                                .background(
-                                                    color = (if (isSelected) Color.Black else themeColors.primary).copy(alpha = 0.15f),
-                                                    shape = RoundedCornerShape(8.dp)
-                                                )
-                                                .padding(6.dp)
-                                        )
-                                        Text(
-                                            text = cat.name,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) Color.Black else Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    "GRID_HORIZONTAL" -> {
-                        val chunkSize = (allCats.size + 1) / 2
-                        val row1 = allCats.take(chunkSize)
-                        val row2 = allCats.drop(chunkSize)
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                row1.forEach { cat ->
-                                    val isSelected = if (cat.id.isEmpty()) selectedCategory == null else selectedCategory == cat.id
-                                    Card(
-                                        modifier = Modifier
-                                            .clickable {
-                                                if (cat.id.isEmpty()) {
-                                                    viewModel.selectCategory(null)
-                                                } else {
-                                                    viewModel.selectCategory(cat.id)
-                                                }
-                                            }
-                                            .testTag("category_gridh1_${cat.id}"),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isSelected) themeColors.accent else themeColors.surface
-                                        ),
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.2f)
-                                        )
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                text = cat.icon,
-                                                fontSize = 16.sp,
-                                                modifier = Modifier
-                                                    .background(
-                                                        color = (if (isSelected) Color.Black else themeColors.primary).copy(alpha = 0.15f),
-                                                        shape = RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(4.dp)
-                                            )
-                                            Text(
-                                                text = cat.name,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) Color.Black else Color.White
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                row2.forEach { cat ->
-                                    val isSelected = if (cat.id.isEmpty()) selectedCategory == null else selectedCategory == cat.id
-                                    Card(
-                                        modifier = Modifier
-                                            .clickable {
-                                                if (cat.id.isEmpty()) {
-                                                    viewModel.selectCategory(null)
-                                                } else {
-                                                    viewModel.selectCategory(cat.id)
-                                                }
-                                            }
-                                            .testTag("category_gridh2_${cat.id}"),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isSelected) themeColors.accent else themeColors.surface
-                                        ),
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.2f)
-                                        )
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                text = cat.icon,
-                                                fontSize = 16.sp,
-                                                modifier = Modifier
-                                                    .background(
-                                                        color = (if (isSelected) Color.Black else themeColors.primary).copy(alpha = 0.15f),
-                                                        shape = RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(4.dp)
-                                            )
-                                            Text(
-                                                text = cat.name,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) Color.Black else Color.White
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    "LIST_VERTICAL" -> {
-                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            allCats.forEach { cat ->
-                                val isSelected = if (cat.id.isEmpty()) selectedCategory == null else selectedCategory == cat.id
+                            rowItems.forEach { cat ->
+                                val isSelected = selectedCategory == cat.id
+                                val catDetail = getPicture2CategoryDetail(cat)
+
                                 Card(
                                     modifier = Modifier
-                                        .fillMaxWidth()
+                                        .weight(1f)
                                         .clickable {
-                                            if (cat.id.isEmpty()) {
+                                            if (isSelected) {
                                                 viewModel.selectCategory(null)
                                             } else {
                                                 viewModel.selectCategory(cat.id)
                                             }
                                         }
-                                        .testTag("category_list_${cat.id}"),
-                                    shape = RoundedCornerShape(12.dp),
+                                        .testTag("category_grid_${cat.id}"),
+                                    shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) themeColors.accent else themeColors.surface
+                                        containerColor = if (isSelected) themeColors.accent.copy(alpha = 0.25f) else Color(0xFF0F172A)
                                     ),
                                     border = BorderStroke(
-                                        width = 1.dp,
-                                        color = if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.2f)
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) themeColors.accent else Color(0xFF1E293B)
                                     )
                                 ) {
-                                    Row(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            .padding(14.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Text(
-                                            text = cat.icon,
-                                            fontSize = 22.sp,
-                                            modifier = Modifier
-                                                .background(
-                                                    color = (if (isSelected) Color.Black else themeColors.primary).copy(alpha = 0.15f),
-                                                    shape = RoundedCornerShape(8.dp)
-                                                )
-                                                .padding(6.dp)
-                                        )
-                                        Column {
-                                            Text(
-                                                text = cat.name,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) Color.Black else Color.White
-                                            )
-                                            Text(
-                                                text = if (cat.id.isEmpty()) "كل الخدمات اليمنية المتكاملة" else "عرض المختصين في $cat.name",
-                                                fontSize = 10.sp,
-                                                color = if (isSelected) Color.Black.copy(alpha = 0.7f) else themeColors.textSecondary
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (catDetail.badge != null) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = if (catDetail.badge == "طبي" || catDetail.badge == "وظائف") Color(0xFF065F46).copy(alpha = 0.7f) else Color(0xFF1E3A8A).copy(alpha = 0.7f)
+                                                ) {
+                                                    Text(
+                                                        text = catDetail.badge,
+                                                        fontSize = 10.sp,
+                                                        color = if (catDetail.badge == "طبي" || catDetail.badge == "وظائف") Color(0xFF34D399) else Color(0xFF60A5FA),
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            } else {
+                                                Spacer(modifier = Modifier.width(1.dp))
+                                            }
+
+                                            Icon(
+                                                imageVector = catDetail.vectorIcon,
+                                                contentDescription = catDetail.title,
+                                                tint = Color(0xFF3B82F6),
+                                                modifier = Modifier.size(28.dp)
                                             )
                                         }
+
+                                        Text(
+                                            text = catDetail.title,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) themeColors.accent else Color.White,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+
+                                        Text(
+                                            text = catDetail.subtitle,
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF94A3B8),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                 }
                             }
                         }
                     }
-                    else -> { // "GRID_VERTICAL"
-                        val columns = 2
-                        val rows = allCats.chunked(columns)
-                        rows.forEach { rowItems ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowItems.forEach { cat ->
-                                    val isSelected = if (cat.id.isEmpty()) selectedCategory == null else selectedCategory == cat.id
-                                    Card(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable {
-                                                if (cat.id.isEmpty()) {
-                                                    viewModel.selectCategory(null)
-                                                } else {
-                                                    viewModel.selectCategory(cat.id)
-                                                }
-                                            }
-                                            .testTag("category_grid_${cat.id}"),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isSelected) themeColors.accent else themeColors.surface
-                                        ),
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.2f)
-                                        )
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                text = cat.icon,
-                                                fontSize = 18.sp,
-                                                modifier = Modifier
-                                                    .background(
-                                                        color = (if (isSelected) Color.Black else themeColors.primary).copy(alpha = 0.15f),
-                                                        shape = RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(6.dp)
-                                            )
-                                            Column {
-                                                Text(
-                                                    text = cat.name,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isSelected) Color.Black else Color.White,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = if (cat.id.isEmpty()) "كل الخدمات اليمنية" else "عرض المختصين",
-                                                    fontSize = 8.sp,
-                                                    color = if (isSelected) Color.Black.copy(alpha = 0.7f) else themeColors.textSecondary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                if (rowItems.size < columns) {
-                                    Spacer(modifier = Modifier.weight(columns - rowItems.size.toFloat()))
+
+                    // 5th Item: Full-Width Card for "الفرص والوظائف والمهن"
+                    val cat5 = mainSectors[4]
+                    val isSelected5 = selectedCategory == cat5.id
+                    val catDetail5 = getPicture2CategoryDetail(cat5)
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (isSelected5) {
+                                    viewModel.selectCategory(null)
+                                } else {
+                                    viewModel.selectCategory(cat5.id)
                                 }
                             }
+                            .testTag("category_grid_${cat5.id}"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected5) themeColors.accent.copy(alpha = 0.25f) else Color(0xFF0F172A)
+                        ),
+                        border = BorderStroke(
+                            width = if (isSelected5) 2.dp else 1.dp,
+                            color = if (isSelected5) themeColors.accent else Color(0xFF1E293B)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF065F46).copy(alpha = 0.7f)
+                                ) {
+                                    Text(
+                                        text = "وظائف",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF34D399),
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = catDetail5.vectorIcon,
+                                    contentDescription = catDetail5.title,
+                                    tint = Color(0xFF3B82F6),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+
+                            Text(
+                                text = catDetail5.title,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected5) themeColors.accent else Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Text(
+                                text = catDetail5.subtitle,
+                                fontSize = 10.sp,
+                                color = Color(0xFF94A3B8),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -1188,376 +1057,65 @@ fun ServicesBrowserLayout(
     }
 }
 
-// -------------------------------------------------------------------------------------
-// SMART AUTOCOMPLETE SEARCH BOX COMPONENT
-// -------------------------------------------------------------------------------------
-@Composable
-fun SmartAutocompleteSearchBox(
-    searchQuery: String,
-    onQueryChange: (String) -> Unit,
-    viewModel: MainViewModel,
-    themeColors: VisualThemePalette,
-    onToggleFilters: () -> Unit,
-    showFilters: Boolean,
-    onSelectSuggestion: (type: String, item: Any) -> Unit
-) {
-    val providers by viewModel.providers.collectAsState()
-    val stores by viewModel.stores.collectAsState()
-    val properties by viewModel.properties.collectAsState()
-    val jobs by viewModel.jobs.collectAsState()
-    val settingsState by viewModel.settings.collectAsState()
-
-    var isDropdownExpanded by remember { mutableStateOf(false) }
-
-    val cleanQuery = searchQuery.trim().lowercase()
-
-    val suggestions = remember(cleanQuery, providers, stores, properties, jobs) {
-        if (cleanQuery.isEmpty()) emptyList()
-        else {
-            val list = mutableListOf<SearchSuggestionItem>()
-
-            // 1. Technicians & Providers
-            providers.filter { p ->
-                !p.isDeleted && (
-                    p.name.lowercase().contains(cleanQuery) ||
-                    p.profession.lowercase().contains(cleanQuery) ||
-                    p.specialization.lowercase().contains(cleanQuery) ||
-                    p.area.lowercase().contains(cleanQuery) ||
-                    p.localNeighborhood.lowercase().contains(cleanQuery) ||
-                    p.phone.contains(cleanQuery)
-                )
-            }.take(4).forEach { p ->
-                list.add(SearchSuggestionItem(
-                    type = "PROVIDER",
-                    id = p.id,
-                    title = p.name,
-                    subtitle = "${p.profession} - ${p.area}",
-                    badge = "🛠️ فني/خدمة",
-                    rawItem = p
-                ))
-            }
-
-            // 2. Stores & Shops & Restaurants & Medical Centers
-            stores.filter { s ->
-                !s.isDeleted && s.isActive && (
-                    s.name.lowercase().contains(cleanQuery) ||
-                    s.description.lowercase().contains(cleanQuery) ||
-                    s.categoryId.lowercase().contains(cleanQuery) ||
-                    s.phone.contains(cleanQuery) ||
-                    s.localNeighborhood.lowercase().contains(cleanQuery)
-                )
-            }.take(5).forEach { s ->
-                val badge = when {
-                    s.sectionId == "restaurants" || s.categoryId.contains("rest") -> "🍔 مطعم/كافيه"
-                    s.sectionId == "medical" || s.categoryId.contains("med") -> "🏥 مركز طبي"
-                    else -> "🏪 محل/مركز تجاري"
-                }
-                list.add(SearchSuggestionItem(
-                    type = "STORE",
-                    id = s.id,
-                    title = s.name,
-                    subtitle = "${s.description.take(25)} - ${s.phone}",
-                    badge = badge,
-                    rawItem = s
-                ))
-            }
-
-            // 3. Real Estate Properties
-            properties.filter { pr ->
-                !pr.isDeleted && pr.isActive && (
-                    pr.title.lowercase().contains(cleanQuery) ||
-                    pr.description.lowercase().contains(cleanQuery) ||
-                    pr.localNeighborhood.lowercase().contains(cleanQuery) ||
-                    pr.propertyType.lowercase().contains(cleanQuery)
-                )
-            }.take(3).forEach { pr ->
-                list.add(SearchSuggestionItem(
-                    type = "PROPERTY",
-                    id = pr.id,
-                    title = pr.title,
-                    subtitle = "${pr.price} YER - ${pr.type}",
-                    badge = "🏢 عقار/مكتب",
-                    rawItem = pr
-                ))
-            }
-
-            // 4. Jobs
-            jobs.filter { j ->
-                !j.isDeleted && (
-                    j.title.lowercase().contains(cleanQuery) ||
-                    j.companyName.lowercase().contains(cleanQuery) ||
-                    j.address.lowercase().contains(cleanQuery)
-                )
-            }.take(3).forEach { j ->
-                list.add(SearchSuggestionItem(
-                    type = "JOB",
-                    id = j.id,
-                    title = j.title,
-                    subtitle = "${j.companyName} - ${j.address}",
-                    badge = "💼 وظيفة",
-                    rawItem = j
-                ))
-            }
-
-            list.take(8)
-        }
-    }
-
-    LaunchedEffect(cleanQuery) {
-        isDropdownExpanded = cleanQuery.isNotEmpty() && suggestions.isNotEmpty()
-    }
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(themeColors.surface, RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(imageVector = Icons.Default.Search, contentDescription = "أيقونة البحث الذكي", tint = themeColors.textSecondary)
-            Spacer(modifier = Modifier.width(8.dp))
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = {
-                    onQueryChange(it)
-                    isDropdownExpanded = it.isNotBlank()
-                },
-                placeholder = {
-                    Text(
-                        "ابحث بالاسم، فني، مطعم، وجبة، عصير، منتج، عقار، دواء، منطقة...",
-                        fontSize = 11.sp,
-                        color = themeColors.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("search_text_input"),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                ),
-                singleLine = true
-            )
-
-            if (searchQuery.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange(""); isDropdownExpanded = false }) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(18.dp))
-                }
-            }
-
-            if (settingsState.isSpeechSearchEnabled) {
-                IconButton(onClick = {
-                    VoiceManager.onHear?.invoke { spokenText ->
-                        onQueryChange(spokenText)
-                        viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
-                    }
-                }) {
-                    Text("🎙️", fontSize = 18.sp)
-                }
-            }
-
-            IconButton(onClick = onToggleFilters) {
-                Icon(
-                    imageVector = if (showFilters) Icons.Default.Settings else Icons.Default.List,
-                    contentDescription = "الفلاتر",
-                    tint = themeColors.accent
-                )
-            }
-        }
-
-        // Suggestions Dropdown Popup Overlay
-        if (isDropdownExpanded && suggestions.isNotEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, themeColors.accent),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 54.dp)
-            ) {
-                Column(modifier = Modifier.padding(6.dp)) {
-                    Text(
-                        "💡 نتائج البحث والاقتراحات التلقائية المطابقة (${suggestions.size}):",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = themeColors.accent,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                    HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f))
-
-                    suggestions.forEach { item ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    isDropdownExpanded = false
-                                    onSelectSuggestion(item.type, item.rawItem)
-                                }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(item.title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                Text(item.subtitle, fontSize = 10.sp, color = themeColors.textSecondary)
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = themeColors.accent.copy(alpha = 0.15f),
-                                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
-                            ) {
-                                Text(
-                                    item.badge,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = themeColors.accent,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        HorizontalDivider(color = Color.Gray.copy(alpha = 0.15f))
-                    }
-                }
-            }
-        }
-    }
-}
-
-data class SearchSuggestionItem(
-    val type: String,
-    val id: String,
+data class Picture2CategoryDetail(
     val title: String,
     val subtitle: String,
-    val badge: String,
-    val rawItem: Any
+    val vectorIcon: ImageVector,
+    val badge: String? = null
 )
 
-// -------------------------------------------------------------------------------------
-// 6 MAIN SECTIONS OVERVIEW GRID COMPONENT
-// -------------------------------------------------------------------------------------
-@Composable
-fun MainCategoriesOverviewGrid(
-    viewModel: MainViewModel,
-    themeColors: VisualThemePalette,
-    settingsState: AdminSettingsEntity,
-    onSelectCategory: (String) -> Unit
-) {
-    val parsedSections = remember(settingsState.dynamicSectionsData) {
-        DynamicSection.parseDynamicSections(settingsState.dynamicSectionsData)
-    }
-
-    val mainCategories = listOf(
-        MainCategoryItem("1", "قسم الفنيين والخدمات", "🛠️", "نخبة المهنيين والصيانة والمعاينة الفورية", "#1E3A8A"),
-        MainCategoryItem("stores", "قسم المحلات والمراكز التجارية", "🏪", "تسوق من المحلات والمعارض والمولات", "#15803D"),
-        MainCategoryItem("restaurants", "قسم المطاعم والكافيهات", "🍔", "أشهر الوجبات، المأكولات والعصائر", "#C2410C"),
-        MainCategoryItem("medical", "قسم المراكز الطبية والمستشفيات", "🏥", "عيادات، صيدليات، أطباء ومستشفيات", "#047857"),
-        MainCategoryItem("realestate", "قسم المكاتب والخدمات العقارية", "🏢", "شقق، فلل، أراضي ومحلات للإيجار والبيع", "#B45309"),
-        MainCategoryItem("jobs", "قسم المعلنين عن الوظائف والتوظيف", "💼", "فرص عمل متجددة لكافة التخصصات", "#6B21A8")
-    ).filter { cat ->
-        when (cat.id) {
-            "stores" -> settingsState.isStoresEnabled && parsedSections.any { it.id == "stores" && it.isEnabled }
-            "realestate" -> settingsState.isPropertiesEnabled && parsedSections.any { it.id == "properties" && it.isEnabled }
-            "restaurants" -> parsedSections.any { it.id == "restaurants" && it.isEnabled }
-            "medical" -> parsedSections.any { it.id == "medical" && it.isEnabled }
-            "jobs" -> parsedSections.any { it.id == "jobs" && it.isEnabled }
-            else -> true
-        }
-    }
-
-    if (mainCategories.isNotEmpty()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            Text(
-                text = "✨ الأقسام والخدمات الرئيسية بالتطبيق:",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.accent,
-                modifier = Modifier.padding(bottom = 8.dp)
+fun getPicture2CategoryDetail(cat: CategoryEntity): Picture2CategoryDetail {
+    val id = cat.id.lowercase()
+    val name = cat.name.lowercase()
+    return when {
+        id == "1" || id == "crafts" || id == "services" || name.contains("صيانة") || name.contains("مهن") || name.contains("فني") ->
+            Picture2CategoryDetail(
+                title = if (cat.name.isNotEmpty() && cat.name != "صيانة وخدمات مهنية") cat.name else "مزودو الخدمات والمهنيين",
+                subtitle = "كهرباء، سباكة، بناء، عمال...",
+                vectorIcon = Icons.Default.Build,
+                badge = "خدمات"
             )
-
-            val chunked = mainCategories.chunked(2)
-            chunked.forEach { pair ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    pair.forEach { cat ->
-                        Card(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { onSelectCategory(cat.id) }
-                                .shadow(4.dp, RoundedCornerShape(16.dp)),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f))
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = themeColors.accent.copy(alpha = 0.15f),
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(cat.icon, fontSize = 20.sp)
-                                        }
-                                    }
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowForward,
-                                        contentDescription = null,
-                                        tint = themeColors.accent,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = cat.name,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = cat.description,
-                                    fontSize = 9.sp,
-                                    color = themeColors.textSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                    if (pair.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
+        id == "stores" || name.contains("محل") || name.contains("تجاري") || name.contains("معارض") ->
+            Picture2CategoryDetail(
+                title = if (cat.name.isNotEmpty() && cat.name != "محلات ومعارض تجارية") cat.name else "المحلات والمراكز التجارية",
+                subtitle = "تسوق، معروضات، أجهزة تجارية...",
+                vectorIcon = Icons.Default.ShoppingCart,
+                badge = null
+            )
+        id == "restaurants" || name.contains("مطعم") || name.contains("وجب") || name.contains("كافيه") ->
+            Picture2CategoryDetail(
+                title = if (cat.name.isNotEmpty() && cat.name != "مطاعم وكافيهات") cat.name else "المطاعم والوجبات السريعة",
+                subtitle = "أقرب المطاعم، كافيهات، توصيل",
+                vectorIcon = Icons.Default.Place,
+                badge = null
+            )
+        id == "2" || id == "medical" || name.contains("طب") || name.contains("صحي") || name.contains("عياد") ->
+            Picture2CategoryDetail(
+                title = if (cat.name.isNotEmpty() && cat.name != "طب ورعاية صحية") cat.name else "المراكز والعيادات الطبية",
+                subtitle = "صيدليات، أطباء، رعاية صحية",
+                vectorIcon = Icons.Default.Add,
+                badge = "طبي"
+            )
+        id == "jobs" || name.contains("وظا") || name.contains("فرص") || name.contains("عمل") ->
+            Picture2CategoryDetail(
+                title = if (cat.name.isNotEmpty()) cat.name else "الفرص والوظائف والمهن",
+                subtitle = "وظائف شاغرة، تقديم طلبات توظيف",
+                vectorIcon = Icons.Default.AccountBox,
+                badge = "وظائف"
+            )
+        id == "realestate" || name.contains("عقار") || name.contains("أرض") ->
+            Picture2CategoryDetail(
+                title = cat.name,
+                subtitle = "شقق، فلل، أراضي، مكاتب...",
+                vectorIcon = Icons.Default.Home,
+                badge = "عقارات"
+            )
+        else ->
+            Picture2CategoryDetail(
+                title = cat.name,
+                subtitle = if (cat.id.isEmpty()) "عرض جميع الخدمات والقطاعات" else "تصفح القائمة في ${cat.name}",
+                vectorIcon = Icons.Default.List,
+                badge = null
+            )
     }
 }
-
-data class MainCategoryItem(
-    val id: String,
-    val name: String,
-    val icon: String,
-    val description: String,
-    val hexAccent: String
-)
-

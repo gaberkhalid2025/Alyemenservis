@@ -233,15 +233,25 @@ fun AllConversationsDialogView(
                 if (myProvider != null && myProvider.id == providerId) {
                     val rawCustomerName = ch.customerName.ifEmpty { ch.userName.substringAfter("مع ").ifEmpty { "عميل" } }
                     val custPhone = ch.customerPhone.ifEmpty { currentUserPhone }
-                    if (settingsState.showUserIdInsteadOfNameInChat) {
-                        val custId = ch.customerId.ifEmpty { if (custPhone.isNotEmpty()) "USR-${custPhone.takeLast(6)}" else "USR-CLIENT" }
-                        "👤 العميل: $custId"
-                    } else {
-                        "👤 العميل: $rawCustomerName ${if (custPhone.isNotEmpty()) "($custPhone)" else ""}"
+                    val custId = ch.customerId.ifEmpty { if (custPhone.isNotEmpty()) "USR-${custPhone.takeLast(6)}" else "USR-CLIENT" }
+                    val label = when (settingsState.chatDisplayIdentityMode) {
+                        "NAME_ONLY" -> rawCustomerName
+                        "NAME_AND_ID" -> "$rawCustomerName ($custId)"
+                        "PHONE_ONLY" -> custPhone.ifEmpty { rawCustomerName }
+                        else -> "$rawCustomerName ${if (custPhone.isNotEmpty()) "($custPhone)" else ""}"
                     }
+                    "👤 العميل: $label"
                 } else {
                     val pName = providerObj?.name ?: ch.userName.substringAfter("دردشة: ").substringBefore(" مع")
-                    "👷 الفني: $pName"
+                    val pPhone = providerObj?.phone ?: ""
+                    val pId = providerObj?.id ?: "PRV-001"
+                    val label = when (settingsState.chatDisplayIdentityMode) {
+                        "NAME_ONLY" -> pName
+                        "NAME_AND_ID" -> "$pName ($pId)"
+                        "PHONE_ONLY" -> pPhone.ifEmpty { pName }
+                        else -> "$pName ${if (pPhone.isNotEmpty()) "($pPhone)" else ""}"
+                    }
+                    "👷 الفني: $label"
                 }
             } else {
                 ch.userName

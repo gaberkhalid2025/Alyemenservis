@@ -1530,24 +1530,34 @@ fun StoreDetailsDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = themeColors.background),
-            shape = RoundedCornerShape(20.dp),
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.92f)
-                .border(2.dp, Brush.linearGradient(listOf(themeColors.accent, themeColors.primary)), RoundedCornerShape(20.dp))
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.65f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
         ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.background),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .wrapContentHeight()
+                    .heightIn(max = 680.dp)
+                    .clickable(enabled = false) {}
+                    .border(2.dp, Brush.linearGradient(listOf(themeColors.accent, themeColors.primary)), RoundedCornerShape(20.dp))
+            ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
                 // 1. Cover Image Banner
+                val hasCover = store.coverImage.isNotEmpty()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp)
+                        .height(if (hasCover) 140.dp else 90.dp)
                         .background(Brush.horizontalGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))))
                 ) {
                     val coverBitmap = rememberBase64Bitmap(store.coverImage)
@@ -1566,11 +1576,12 @@ fun StoreDetailsDialog(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start
                         ) {
-                            Text("🏙️ غلاف المتجر الرئيسي", color = Color.LightGray.copy(alpha = 0.7f), fontSize = 13.sp)
+                            Text("🏙️ ${store.name}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -1893,8 +1904,11 @@ fun StoreDetailsDialog(
 
                     SpecialOffersSection(
                         offersJson = store.specialOffersJson,
-                        onOffersChanged = {},
-                        isEditable = false,
+                        onOffersChanged = { newOffersJson ->
+                            viewModel.saveStore(store.copy(specialOffersJson = newOffersJson))
+                            android.widget.Toast.makeText(context, "🔥 تم حفظ التعديلات على العروض والتخفيضات!", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        isEditable = isOwnerOrAdmin,
                         themeColors = themeColors
                     )
 
@@ -2089,6 +2103,7 @@ fun StoreDetailsDialog(
             }
         }
     }
+}
 }
 
 
@@ -2312,27 +2327,41 @@ fun PropertyDetailsDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = themeColors.background),
-            shape = RoundedCornerShape(20.dp),
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.92f)
-                .border(2.dp, themeColors.accent, RoundedCornerShape(20.dp))
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.65f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
         ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.background),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .wrapContentHeight()
+                    .heightIn(max = 680.dp)
+                    .clickable(enabled = false) {}
+                    .border(2.dp, themeColors.accent, RoundedCornerShape(20.dp))
+            ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
                 // Photo Gallery/Cover
+                val hasImages = property.images.isNotEmpty()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(150.dp)
+                        .height(if (hasImages) 150.dp else 90.dp)
                         .background(themeColors.primary.copy(alpha = 0.15f))
                 ) {
-                    Text("📸 معرض صور العقار التفصيلية", modifier = Modifier.align(Alignment.Center), color = Color.Gray, fontSize = 12.sp)
+                    if (!hasImages) {
+                        Text("🏠 ${property.title}", modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("📸 معرض صور العقار التفصيلية", modifier = Modifier.align(Alignment.Center), color = Color.Gray, fontSize = 12.sp)
+                    }
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier
@@ -2593,6 +2622,7 @@ fun PropertyDetailsDialog(
         }
     }
 }
+}
 
 // --------------------------------------------------------
 // 6. STORE CREATE/EDIT DIALOG
@@ -2679,6 +2709,42 @@ fun StoreCreateEditDialog(
     // Admin limit
     var customMaxPhotosInput by remember { mutableStateOf(if (store != null) store.maxImages.toString() else "5") }
 
+    // Cover & Logo Image Pickers
+    var logoImageBase64 by remember { mutableStateOf(store?.logoImage ?: "") }
+    var coverImageBase64 by remember { mutableStateOf(store?.coverImage ?: "") }
+
+    val logoImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
+                if (bytes != null) {
+                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                    logoImageBase64 = base64
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val coverImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
+                if (bytes != null) {
+                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                    coverImageBase64 = base64
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     // PDF files
     var pdfUriText by remember { mutableStateOf(store?.pdfFileUri ?: "") }
     var pdfBase64Text by remember { mutableStateOf(store?.pdfFileBase64 ?: "") }
@@ -2727,12 +2793,13 @@ fun StoreCreateEditDialog(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+                .wrapContentHeight()
+                .heightIn(max = 650.dp)
                 .border(2.dp, themeColors.accent, RoundedCornerShape(16.dp))
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -2974,6 +3041,39 @@ fun StoreCreateEditDialog(
                     )
                 }
 
+                // Logo and Cover Upload Buttons
+                Text("📷 الشعار وصورة غلاف المتجر الرئيسي:", fontSize = 11.sp, color = themeColors.textSecondary)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { logoImagePickerLauncher.launch("image/*") },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                    ) {
+                        Text(
+                            text = if (logoImageBase64.isEmpty()) "📷 رفع الشعار" else "✅ تم تغيير الشعار",
+                            fontSize = 10.sp,
+                            color = Color.White
+                        )
+                    }
+
+                    Button(
+                        onClick = { coverImagePickerLauncher.launch("image/*") },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                    ) {
+                        Text(
+                            text = if (coverImageBase64.isEmpty()) "🖼️ رفع صورة الغلاف" else "✅ تم تغيير الغلاف",
+                            fontSize = 10.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+
                 // PDF Upload Section
                 Text("📄 ملفات PDF المرفقة (قوائم الأسعار، عروض السلع والمطعم):", fontSize = 11.sp, color = themeColors.textSecondary)
                 Button(
@@ -3037,6 +3137,8 @@ fun StoreCreateEditDialog(
                                 cityId = selectedCityId,
                                 localNeighborhood = neighborhood.ifEmpty { "إدارة التطبيق" },
                                 workingHours = workingHours,
+                                logoImage = logoImageBase64,
+                                coverImage = coverImageBase64,
                                 isActive = if (adminRole != "GUEST") true else (store?.isActive ?: false), // Auto-approve if added by admin
                                 isApproved = if (adminRole != "GUEST") true else (store?.isApproved ?: false),
                                 password = password,
@@ -3143,12 +3245,13 @@ fun PropertyCreateEditDialog(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+                .wrapContentHeight()
+                .heightIn(max = 650.dp)
                 .border(2.dp, themeColors.accent, RoundedCornerShape(16.dp))
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)

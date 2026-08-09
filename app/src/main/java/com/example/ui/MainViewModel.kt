@@ -1453,14 +1453,7 @@ class MainViewModel : ViewModel() {
     }
 
     private fun writeDefaultBanners() {
-        val fbBanners = listOf(
-            BannerEntity("banner_001", "عروض وتخفيضات سيتي مارت صنعاء الكبرى! خصومات تصل إلى 30%", "https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800", "stores", "IMAGE", "MEDIUM", 5, "طوال اليوم", 1, "STORES"),
-            BannerEntity("banner_002", "مهرجان المأكولات الملكية في مطعم الشيباني - صنعاء شارع حدة", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800", "restaurants", "IMAGE", "MEDIUM", 6, "طوال اليوم", 2, "RESTAURANTS"),
-            BannerEntity("banner_003", "افتتاح العيادات التخصصية الشاملة بمستشفى المتوكل النموذجي", "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?q=80&w=800", "medical", "IMAGE", "MEDIUM", 7, "طوال اليوم", 3, "MEDICAL")
-        )
-        fbBanners.forEach { banner ->
-            db.collection("banners").document(banner.id).set(banner)
-        }
+        // No fake default banners written automatically
     }
 
     private fun writeDefaultProviders() {
