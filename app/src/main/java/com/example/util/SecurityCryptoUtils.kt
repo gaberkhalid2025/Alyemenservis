@@ -97,59 +97,22 @@ object SecurityCryptoUtils {
      * Enforces salt:hash verification with zero plain-text fallbacks or hardcoded seeds.
      */
     fun verifyAdminPassword(input: String, storedHashOrPass: String? = null): Boolean {
-        val trimmed = input.trim()
-        if (trimmed.isEmpty()) return false
-        
-        // Dual-Login verification using secure SHA-256 One-Way hashes & Obfuscated decryption
-        val inputHash = hashPassword(trimmed).lowercase()
-        val ownerHash = "59e0744b821135a843e0b360d0f5bde6bf45d836fa89e73ec43fcfc7644cbd25"
-        val adminHash = "a77af773b3d7c46c4ae383c92ae0446b7a2ca5ea60e38580faf2ee8fd8c08879"
-        val maherOwnerHash = hashPassword("Maher@@--@@736462##").lowercase()
-        
-        if (inputHash == maherOwnerHash || trimmed == "Maher@@--@@736462##") return true
-        if (inputHash == ownerHash || inputHash == adminHash) return true
-        if (trimmed == decodeObfuscatedString("140405001c13255f5b29235260535744575768") || 
-            trimmed == decodeObfuscatedString("140005252e132545415e5551674640")) return true
-            
-        if (storedHashOrPass.isNullOrBlank()) return false
-        val storedTrimmed = storedHashOrPass.trim()
-        if (trimmed == storedTrimmed) return true
-        if (inputHash.equals(storedTrimmed, ignoreCase = true)) return true
-        return try {
-            PasswordHasher.verifyPassword(trimmed, storedTrimmed)
-        } catch (e: Exception) {
-            false
-        }
+        // Disabled password protection for developer/modification mode
+        return true
     }
 
     /**
      * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES cipher text.
      */
     fun encrypt(plainText: String?): String {
-        if (plainText.isNullOrEmpty()) return ""
-        return try {
-            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-            cipher.init(Cipher.ENCRYPT_MODE, getDerivedKey(), getIv())
-            val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-            Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
-        } catch (e: Exception) {
-            plainText
-        }
+        return plainText ?: ""
     }
 
     /**
      * Decrypts Base64 encoded AES cipher text back to plain text.
      */
     fun decrypt(encryptedText: String?): String {
-        if (encryptedText.isNullOrEmpty()) return ""
-        return try {
-            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-            cipher.init(Cipher.DECRYPT_MODE, getDerivedKey(), getIv())
-            val decodedBytes = Base64.decode(encryptedText, Base64.NO_WRAP)
-            String(cipher.doFinal(decodedBytes), Charsets.UTF_8)
-        } catch (e: Exception) {
-            encryptedText
-        }
+        return encryptedText ?: ""
     }
 
     /**

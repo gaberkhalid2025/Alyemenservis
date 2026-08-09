@@ -166,8 +166,8 @@ fun ServicesBrowserLayout(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(if (activeTabName == "الرئيسية") 12.dp else 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (settingsState.bannerEnabled && settingsState.bannerLocation == "TOP") {
             item {
@@ -184,12 +184,12 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // Search Bar Block (Smart Cross Search - Picture 2 Style)
+        // Search Bar Block (Smart Cross Search - Matches Theme Perfectly)
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f)),
+                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(

@@ -197,13 +197,12 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     var editShowWhatsappButton by remember(settingsState.showWhatsappButton) { mutableStateOf(settingsState.showWhatsappButton) }
     var editShowDetailsButton by remember(settingsState.showDetailsButton) { mutableStateOf(settingsState.showDetailsButton) }
     var editShowBookButton by remember(settingsState.showBookButton) { mutableStateOf(settingsState.showBookButton) }
-    var editShowQuickOrderButton by remember(settingsState.showQuickOrderButton) { mutableStateOf(settingsState.showQuickOrderButton) }
 
+    var categoryManagementMode by remember { mutableStateOf("MAINTENANCE") } // MAINTENANCE or PLATFORM_SECTIONS
     var editCallButtonColorHex by remember(settingsState.callButtonColorHex) { mutableStateOf(settingsState.callButtonColorHex) }
     var editWhatsappButtonColorHex by remember(settingsState.whatsappButtonColorHex) { mutableStateOf(settingsState.whatsappButtonColorHex) }
     var editDetailsButtonColorHex by remember(settingsState.detailsButtonColorHex) { mutableStateOf(settingsState.detailsButtonColorHex) }
     var editBookButtonColorHex by remember(settingsState.bookButtonColorHex) { mutableStateOf(settingsState.bookButtonColorHex) }
-    var editQuickOrderButtonColorHex by remember(settingsState.quickOrderButtonColorHex) { mutableStateOf(settingsState.quickOrderButtonColorHex) }
 
     var editShowLoyaltyBanner by remember(settingsState.showLoyaltyBanner) { mutableStateOf(settingsState.showLoyaltyBanner) }
     var editMaxWorkPhotos by remember(settingsState.maxWorkPhotos) { mutableStateOf(settingsState.maxWorkPhotos.toFloat()) }
@@ -2193,7 +2192,6 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             var bannerUrl by remember { mutableStateOf("") }
                             var bannerRedirect by remember { mutableStateOf("") }
                             var bannerDuration by remember { mutableStateOf(5) }
-                            var bannerTargetSection by remember { mutableStateOf("ALL") }
                             
                             // Type Selector Chips
                             Text("نوع البنر الترويجي:", fontSize = 10.sp, color = Color.White)
@@ -2287,40 +2285,6 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                             )
-
-                            // Target Section selection
-                            Text("القسم أو الشاشة المستهدفة للبنر: 🎯", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-                            androidx.compose.foundation.layout.FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                listOf(
-                                    "ALL" to "الرئيسية 🏠",
-                                    "stores" to "المتاجر والمحلات 🏪",
-                                    "restaurants" to "المطاعم والكافيهات 🍔",
-                                    "medical" to "المراكز والعيادات 🏥",
-                                    "properties" to "العقارات والأراضي 🏠",
-                                    "services" to "المهن والخدمات 🛠️",
-                                    "delivery" to "التوصيل 🛵"
-                                ).forEach { (secId, secLabel) ->
-                                    val isSecSelected = bannerTargetSection == secId
-                                    Surface(
-                                        onClick = { bannerTargetSection = secId },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (isSecSelected) themeColors.accent else Color.White.copy(alpha = 0.08f),
-                                        border = BorderStroke(1.dp, if (isSecSelected) themeColors.primary else Color.Gray.copy(alpha = 0.2f))
-                                    ) {
-                                        Text(
-                                            text = secLabel,
-                                            fontSize = 10.sp,
-                                            color = if (isSecSelected) Color.Black else Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                        )
-                                    }
-                                }
-                            }
                             
                             // Duration selection
                             Column(modifier = Modifier.fillMaxWidth()) {
@@ -2354,14 +2318,12 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                         redirect = bannerRedirect.trim(),
                                         type = bannerType,
                                         size = "LARGE",
-                                        duration = bannerDuration,
-                                        targetSection = bannerTargetSection
+                                        duration = bannerDuration
                                     )
                                     bannerTitle = ""
                                     bannerUrl = ""
                                     bannerRedirect = ""
                                     bannerDuration = 5
-                                    bannerTargetSection = "ALL"
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                                 modifier = Modifier.fillMaxWidth()
@@ -2866,11 +2828,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                     Pair("USER", "عميل 👤"),
                                     Pair("PROVIDER", "فني 🔧"),
                                     Pair("SUPERVISOR", "مشرف 👮"),
-                                    Pair("AREA", "محافظة 📍"),
-                                    Pair("STORES", "المتاجر 🛍️"),
-                                    Pair("RESTAURANTS", "المطاعم 🍕"),
-                                    Pair("MEDICAL", "المراكز الطبية 🏥"),
-                                    Pair("REAL_ESTATE", "العقارات 🏢")
+                                    Pair("AREA", "محافظة 📍")
                                 ).forEach { (type, label) ->
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -2891,10 +2849,6 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                             "USER" -> "رقم هاتف العميل للتوصيل"
                                             "PROVIDER" -> "رقم هاتف أو معرّف الفني"
                                             "SUPERVISOR" -> "معرّف/اسم المشرف المالي"
-                                            "STORES" -> "معرّف المتجر المستهدف أو اتركه فارغاً لكل المتاجر"
-                                            "RESTAURANTS" -> "معرّف المطعم المستهدف أو اتركه فارغاً لكل المطاعم"
-                                            "MEDICAL" -> "معرّف المركز الطبي المستهدف أو اتركه فارغاً لكل المراكز"
-                                            "REAL_ESTATE" -> "معرّف المكتب العقاري المستهدف أو اتركه فارغاً لكل المكاتب"
                                             else -> "اسم المحافظة/المدينة المستهدفة"
                                         }
                                         Text(lbl)
@@ -3862,23 +3816,6 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                     )
                                 }
                             }
-
-                            // Quick Order button
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("⚡ تفعيل زر الطلب السريع المباشر", fontSize = 11.sp, color = Color.White)
-                                    Switch(checked = editShowQuickOrderButton, onCheckedChange = { editShowQuickOrderButton = it })
-                                }
-                                if (editShowQuickOrderButton) {
-                                    OutlinedTextField(
-                                        value = editQuickOrderButtonColorHex,
-                                        onValueChange = { editQuickOrderButtonColorHex = it },
-                                        label = { Text("لون زر الطلب السريع (Hex)") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -3916,12 +3853,10 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 showWhatsappButton = editShowWhatsappButton,
                                 showDetailsButton = editShowDetailsButton,
                                 showBookButton = editShowBookButton,
-                                showQuickOrderButton = editShowQuickOrderButton,
                                 callButtonColorHex = editCallButtonColorHex,
                                 whatsappButtonColorHex = editWhatsappButtonColorHex,
                                 detailsButtonColorHex = editDetailsButtonColorHex,
                                 bookButtonColorHex = editBookButtonColorHex,
-                                quickOrderButtonColorHex = editQuickOrderButtonColorHex,
                                 showLoyaltyBanner = editShowLoyaltyBanner,
                                 maxWorkPhotos = editMaxWorkPhotos.toInt()
                             )
@@ -4417,11 +4352,36 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
             if (activeSubTab == "CATEGORIES") {
                 item {
-                    Text("🗂️ إدارة أقسام الصيانة والمهن بالمنصة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("إضافة أقسام جديدة وتعديل الأقسام وتحديد الأيقونة التعبيرية المناسبة:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Text("🗂️ إدارة الأقسام والقطاعات بالمنصة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("يمكنك التحكم بأقسام الصيانة أو إضافة وتفعيل قطاعات رئيسية جديدة كلياً (كقسم التوصيل، المتاجر، العقارات):", fontSize = 11.sp, color = themeColors.textSecondary)
                     Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { categoryManagementMode = "MAINTENANCE" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (categoryManagementMode == "MAINTENANCE") themeColors.accent else Color.DarkGray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("🛠️ أقسام الصيانة والمهن", fontSize = 10.sp, color = if (categoryManagementMode == "MAINTENANCE") Color.Black else Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { categoryManagementMode = "PLATFORM_SECTIONS" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (categoryManagementMode == "PLATFORM_SECTIONS") themeColors.accent else Color.DarkGray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("🌐 القطاعات والأنشطة الرئيسية", fontSize = 10.sp, color = if (categoryManagementMode == "PLATFORM_SECTIONS") Color.Black else Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
 
+                if (categoryManagementMode == "PLATFORM_SECTIONS") {
+                    item {
+                        AdminStoresPropertiesPanel(viewModel = viewModel, themeColors = themeColors)
+                    }
+                } else {
                 item {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -4614,6 +4574,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             }
                         }
                     }
+                }
                 }
             }
 

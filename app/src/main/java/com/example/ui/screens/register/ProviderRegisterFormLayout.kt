@@ -259,14 +259,14 @@ fun ProviderRegisterFormLayout(
     val showWorkPhotos = isWorkPhotosRequirement != null && settingsState.showWorkPhotos
     val isWorkPhotosMandatory = isWorkPhotosRequirement?.second ?: false
 
-    var coverPhotoBase64 by remember { mutableStateOf("") }
+    var workPhotosList by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    val coverPhotoUriPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: android.net.Uri? ->
-        uri?.let {
-            coverPhotoBase64 = convertUriToBase64(context, it)
-        }
+    val workPhotosUriPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<android.net.Uri> ->
+        val converted = uris.map { convertUriToBase64(context, it) }.filter { it.isNotEmpty() }
+        val combined = (workPhotosList + converted).take(settingsState.maxWorkPhotos)
+        workPhotosList = combined
     }
 
     val storePdfPicker = rememberLauncherForActivityResult(
@@ -945,62 +945,72 @@ fun ProviderRegisterFormLayout(
             }
         }
 
-        if (showWorkPhotos) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+        // Cover Photo Upload Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f)),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "🖼️ صورة غلاف الصفحة الشخصية / المركز (اختياري)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "تظهر صورة الغلاف كبنر رئيسي أعلى ملفك الشخصي لجذب العملاء",
+                    fontSize = 10.sp,
+                    color = Color.LightGray,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (workPhotosList.isNotEmpty()) {
+                    val coverPhoto = workPhotosList.first()
+                    val bitmap = remember(coverPhoto) {
+                        try {
+                            val bytes = android.util.Base64.decode(coverPhoto, android.util.Base64.DEFAULT)
+                            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                        } catch(e: Exception) { null }
+                    }
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(8.dp))) {
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = "صورة الغلاف",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .background(Color.Red, shape = CircleShape)
+                                .clickable { workPhotosList = emptyList() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("×", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+
+                Button(
+                    onClick = { workPhotosUriPicker.launch("image/*") },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
                     Text(
-                        text = "🌅 صورة غلاف الحساب / المتجر / الفني" + if (isWorkPhotosMandatory) " *" else " (اختياري)",
+                        text = if (workPhotosList.isEmpty()) "📂 اختيار صورة الغلاف من المعرض" else "🔄 تغيير صورة الغلاف",
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (coverPhotoBase64.isNotEmpty()) {
-                        val bitmap = remember(coverPhotoBase64) {
-                            try {
-                                val bytes = android.util.Base64.decode(coverPhotoBase64, android.util.Base64.DEFAULT)
-                                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                            } catch(e: Exception) { null }
-                        }
-                        Box(modifier = Modifier.size(120.dp, 80.dp)) {
-                            if (bitmap != null) {
-                                Image(
-                                    bitmap = bitmap,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .align(Alignment.TopEnd)
-                                    .background(Color.Red, shape = CircleShape)
-                                    .clickable {
-                                        coverPhotoBase64 = ""
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("×", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    Button(
-                        onClick = { coverPhotoUriPicker.launch("image/*") },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                        modifier = Modifier.fillMaxWidth().height(36.dp)
-                    ) {
-                        Text(if (coverPhotoBase64.isNotEmpty()) "تغيير صورة الغلاف 🌅" else "رفع صورة غلاف الحساب 📂", fontSize = 11.sp, color = Color.White)
-                    }
                 }
             }
         }
@@ -1024,7 +1034,6 @@ fun ProviderRegisterFormLayout(
                 if (isNeighbourMandatory && neighborhood.trim().isEmpty()) missingList.add("الحي أو الشارع")
                 if (isSelfieMandatory && selfiePhotoBase64.isEmpty()) missingList.add("صورة سيلفي شخصية")
                 if (isIdMandatory && idPhotoBase64.isEmpty()) missingList.add("صورة بطاقة الهوية")
-                if (isWorkPhotosMandatory && coverPhotoBase64.isEmpty()) missingList.add("صورة غلاف الحساب")
 
                 if (password.trim().isEmpty()) missingList.add("كلمة المرور")
                 if (confirmPassword.trim().isEmpty()) missingList.add("تأكيد كلمة المرور")
@@ -1034,8 +1043,7 @@ fun ProviderRegisterFormLayout(
                         viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
                     } else {
                         val attsJson = com.example.data.ProductAttachment.serializeList(providerAttachmentsList)
-                        val wList = if (coverPhotoBase64.isNotEmpty()) listOf(coverPhotoBase64) else emptyList()
-                        viewModel.submitJoinForm(context, name, phone, selectedCatId, area, neighborhood, selfiePhotoBase64, idPhotoBase64, "", wList, customProfession, password, attsJson)
+                        viewModel.submitJoinForm(context, name, phone, selectedCatId, area, neighborhood, selfiePhotoBase64, idPhotoBase64, "", workPhotosList, customProfession, password, attsJson)
                         name = ""
                         phone = ""
                         password = ""
@@ -1046,7 +1054,7 @@ fun ProviderRegisterFormLayout(
                         neighborhood = ""
                         selfiePhotoBase64 = ""
                         idPhotoBase64 = ""
-                        coverPhotoBase64 = ""
+                        workPhotosList = emptyList()
                         providerAttachmentsList = emptyList()
                         android.widget.Toast.makeText(context, "📨 تم تقديم طلبك بنجاح! جاري عرض حالة الطلب التفاعلية.", android.widget.Toast.LENGTH_LONG).show()
                     }

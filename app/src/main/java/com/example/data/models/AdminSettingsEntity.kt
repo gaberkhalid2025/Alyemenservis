@@ -126,13 +126,11 @@ data class AdminSettingsEntity(
     val showWhatsappButton: Boolean = true,
     val showDetailsButton: Boolean = true,
     val showBookButton: Boolean = true,
-    val showQuickOrderButton: Boolean = true,
     val callButtonColorHex: String = "#10B981",
     val whatsappButtonColorHex: String = "#25D366",
     val detailsButtonColorHex: String = "#3B82F6",
     val bookButtonColorHex: String = "#F59E0B",
-    val quickOrderButtonColorHex: String = "#EF4444",
-    val buttonsOrder: String = "CALL,WHATSAPP,DETAILS,BOOK,QUICK_ORDER",
+    val buttonsOrder: String = "CALL,WHATSAPP,DETAILS,BOOK",
 
     // Information rows switches and order
     val showDistance: Boolean = true,

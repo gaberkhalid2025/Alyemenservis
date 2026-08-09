@@ -110,18 +110,43 @@ fun AllConversationsDialogView(
     val adminRole by viewModel.adminRole.collectAsState()
 
     val myProvider = providers.find { it.phone == currentUserPhone }
-    val isAdmin = adminRole != "GUEST" || currentUserId == "admin" || currentUserPhone.startsWith("admin")
+    val isAdmin = currentUserId == "admin" || currentUserId.startsWith("super_") || adminRole != "GUEST"
 
-    val myChannels = remember(chatChannels, currentUserId, currentUserPhone, myProvider, isAdmin) {
-        if (isAdmin) {
+    var selectedSectionFilter by remember { mutableStateOf("ALL") } // ALL, PROVIDER, STORE, RESTAURANT, MEDICAL, PROPERTY, JOB, SUPPORT
+
+    val myChannels = remember(chatChannels, currentUserId, currentUserPhone, myProvider, isAdmin, selectedSectionFilter) {
+        val baseList = if (isAdmin) {
             chatChannels
         } else {
+            val storeId = viewModel.selectedStore?.id ?: ""
+            val propId = viewModel.selectedProperty?.id ?: ""
+            val prvId = myProvider?.id ?: ""
             chatChannels.filter { ch ->
                 ch.id == "support_$currentUserId" ||
                 ch.id.contains(currentUserId) ||
                 (currentUserPhone.isNotEmpty() && ch.id.contains(currentUserPhone)) ||
-                (myProvider != null && (ch.id.contains("chat_p_${myProvider.id}_") || ch.id.contains("_u_${myProvider.id}"))) ||
-                currentUserId == "admin" || currentUserId.startsWith("super_")
+                (prvId.isNotEmpty() && (ch.id.contains("chat_p_${prvId}_") || ch.id.contains("_u_${prvId}"))) ||
+                (storeId.isNotEmpty() && (ch.id.contains(storeId) || ch.targetId == storeId)) ||
+                (propId.isNotEmpty() && (ch.id.contains(propId) || ch.targetId == propId)) ||
+                ch.customerId == currentUserId
+            }
+        }
+
+        if (selectedSectionFilter == "ALL") {
+            baseList
+        } else {
+            baseList.filter { ch ->
+                val type = ch.channelType.uppercase()
+                when (selectedSectionFilter) {
+                    "PROVIDER" -> type == "PROVIDER" || ch.id.startsWith("chat_p_")
+                    "STORE" -> type == "STORE" || ch.id.contains("store")
+                    "RESTAURANT" -> type == "RESTAURANT" || ch.id.contains("restaurant")
+                    "MEDICAL" -> type == "MEDICAL" || ch.id.contains("medical")
+                    "PROPERTY" -> type == "PROPERTY" || ch.id.contains("property")
+                    "JOB" -> type == "JOB" || ch.id.contains("job")
+                    "SUPPORT" -> type == "ADMIN" || type == "SUPERVISOR" || ch.id.startsWith("support_")
+                    else -> true
+                }
             }
         }
     }
@@ -327,6 +352,37 @@ fun AllConversationsDialogView(
                 }
 
                 Divider(color = Color.White.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 8.dp))
+
+                // Section Filter Chips for Chats
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val filterOptions = listOf(
+                        Pair("ALL", "الكل 🌐"),
+                        Pair("PROVIDER", "الفنيين 🛠️"),
+                        Pair("STORE", "المتاجر 🏪"),
+                        Pair("RESTAURANT", "المطاعم 🍔"),
+                        Pair("MEDICAL", "الطبية 🏥"),
+                        Pair("PROPERTY", "العقارات 🏠"),
+                        Pair("JOB", "الوظائف 💼"),
+                        Pair("SUPPORT", "الدعم 💬")
+                    )
+                    items(filterOptions) { opt ->
+                        val isSelected = selectedSectionFilter == opt.first
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedSectionFilter = opt.first },
+                            label = { Text(opt.second, fontSize = 10.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = themeColors.accent,
+                                selectedLabelColor = Color.Black,
+                                containerColor = Color.White.copy(alpha = 0.08f),
+                                labelColor = Color.White
+                            )
+                        )
+                    }
+                }
 
                 if (selectedChannelId == null) {
                     if (myChannels.isEmpty()) {
