@@ -36,7 +36,7 @@ fun convertBitmapToBase64(bitmap: android.graphics.Bitmap): String {
     } catch (e: Exception) { "" }
 }
 
-fun compressAndResizeImageUri(context: android.content.Context, uri: android.net.Uri, maxDimension: Int = 800, quality: Int = 70): String {
+fun compressAndResizeImageUri(context: android.content.Context, uri: android.net.Uri, maxDimension: Int = 600, quality: Int = 55): String {
     return try {
         val contentResolver = context.contentResolver
         val inputStreamForBounds = contentResolver.openInputStream(uri) ?: return ""

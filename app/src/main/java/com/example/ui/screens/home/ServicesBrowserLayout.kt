@@ -551,193 +551,85 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // Picture 2 Dark Card Grid for Main Sectors & Categories
+        // Clean Category Chips Filter Row for Service Categories
         item {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
                 Text(
-                    text = "✨ الخدمات والقطاعات الرئيسية",
-                    fontSize = 15.sp,
+                    text = "📂 التخصصات والقطاعات المتاحة:",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
+                    modifier = Modifier.padding(bottom = 6.dp)
                 )
 
-                // Define main sectors if categories exist or default list
-                val mainSectors = listOf(
-                    CategoryEntity(id = "1", name = "مزودو الخدمات والمهنيين", icon = "👷"),
-                    CategoryEntity(id = "stores", name = "المحلات والمراكز التجارية", icon = "🏪"),
-                    CategoryEntity(id = "2", name = "المراكز والعيادات الطبية", icon = "🏥"),
-                    CategoryEntity(id = "restaurants", name = "المطاعم والوجبات السريعة", icon = "🍔"),
-                    CategoryEntity(id = "jobs", name = "الفرص والوظائف والمهن", icon = "💼")
-                )
-
-                // Render 2x2 grid for first 4 items, then 5th item as full-width
-                val gridPairs = listOf(
-                    mainSectors.subList(0, 2),
-                    mainSectors.subList(2, 4)
-                )
-
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    gridPairs.forEach { rowItems ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            rowItems.forEach { cat ->
-                                val isSelected = selectedCategory == cat.id
-                                val catDetail = getPicture2CategoryDetail(cat)
-
-                                Card(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable {
-                                            if (isSelected) {
-                                                viewModel.selectCategory(null)
-                                            } else {
-                                                viewModel.selectCategory(cat.id)
-                                            }
-                                        }
-                                        .testTag("category_grid_${cat.id}"),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) themeColors.accent.copy(alpha = 0.25f) else Color(0xFF0F172A)
-                                    ),
-                                    border = BorderStroke(
-                                        width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) themeColors.accent else Color(0xFF1E293B)
-                                    )
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(14.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            if (catDetail.badge != null) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    color = if (catDetail.badge == "طبي" || catDetail.badge == "وظائف") Color(0xFF065F46).copy(alpha = 0.7f) else Color(0xFF1E3A8A).copy(alpha = 0.7f)
-                                                ) {
-                                                    Text(
-                                                        text = catDetail.badge,
-                                                        fontSize = 10.sp,
-                                                        color = if (catDetail.badge == "طبي" || catDetail.badge == "وظائف") Color(0xFF34D399) else Color(0xFF60A5FA),
-                                                        fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                                    )
-                                                }
-                                            } else {
-                                                Spacer(modifier = Modifier.width(1.dp))
-                                            }
-
-                                            Icon(
-                                                imageVector = catDetail.vectorIcon,
-                                                contentDescription = catDetail.title,
-                                                tint = Color(0xFF3B82F6),
-                                                modifier = Modifier.size(28.dp)
-                                            )
-                                        }
-
-                                        Text(
-                                            text = catDetail.title,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) themeColors.accent else Color.White,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-
-                                        Text(
-                                            text = catDetail.subtitle,
-                                            fontSize = 10.sp,
-                                            color = Color(0xFF94A3B8),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // "All" chip
+                    val isAllSelected = selectedCategory == null
+                    Surface(
+                        modifier = Modifier
+                            .clickable { viewModel.selectCategory(null) }
+                            .testTag("category_chip_all"),
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isAllSelected) themeColors.accent else themeColors.surface,
+                        border = BorderStroke(1.dp, if (isAllSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = "✨ الكل",
+                            color = if (isAllSelected) Color.Black else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
                     }
 
-                    // 5th Item: Full-Width Card for "الفرص والوظائف والمهن"
-                    val cat5 = mainSectors[4]
-                    val isSelected5 = selectedCategory == cat5.id
-                    val catDetail5 = getPicture2CategoryDetail(cat5)
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (isSelected5) {
-                                    viewModel.selectCategory(null)
-                                } else {
-                                    viewModel.selectCategory(cat5.id)
-                                }
-                            }
-                            .testTag("category_grid_${cat5.id}"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected5) themeColors.accent.copy(alpha = 0.25f) else Color(0xFF0F172A)
-                        ),
-                        border = BorderStroke(
-                            width = if (isSelected5) 2.dp else 1.dp,
-                            color = if (isSelected5) themeColors.accent else Color(0xFF1E293B)
-                        )
-                    ) {
-                        Column(
+                    // Display categories
+                    val mainCats = categories.filter { it.isMainCategory || it.parentId.isNullOrEmpty() }
+                    val displayCats = if (mainCats.isNotEmpty()) mainCats else categories
+                    displayCats.forEach { cat ->
+                        val isSelected = selectedCategory == cat.id
+                        Surface(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                .clickable {
+                                    if (cat.id == "stores" || cat.parentId == "stores" || cat.id == "restaurants") {
+                                        activeTabName = settingsState.storesTabName
+                                        viewModel.selectCategory(cat.id)
+                                    } else if (cat.id == "realestate" || cat.parentId == "realestate" || cat.id == "jobs") {
+                                        activeTabName = settingsState.propertiesTabName
+                                        viewModel.selectCategory(cat.id)
+                                    } else {
+                                        activeTabName = "الرئيسية"
+                                        if (isSelected) viewModel.selectCategory(null)
+                                        else viewModel.selectCategory(cat.id)
+                                    }
+                                }
+                                .testTag("category_chip_${cat.id}"),
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isSelected) themeColors.accent else themeColors.surface,
+                            border = BorderStroke(1.dp, if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color(0xFF065F46).copy(alpha = 0.7f)
-                                ) {
-                                    Text(
-                                        text = "وظائف",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFF34D399),
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-
-                                Icon(
-                                    imageVector = catDetail5.vectorIcon,
-                                    contentDescription = catDetail5.title,
-                                    tint = Color(0xFF3B82F6),
-                                    modifier = Modifier.size(28.dp)
+                                Text(cat.icon, fontSize = 12.sp)
+                                Text(
+                                    text = cat.name,
+                                    color = if (isSelected) Color.Black else Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-
-                            Text(
-                                text = catDetail5.title,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected5) themeColors.accent else Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-
-                            Text(
-                                text = catDetail5.subtitle,
-                                fontSize = 10.sp,
-                                color = Color(0xFF94A3B8),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
                     }
                 }
