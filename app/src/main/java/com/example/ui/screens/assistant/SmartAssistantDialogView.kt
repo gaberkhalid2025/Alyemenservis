@@ -106,7 +106,9 @@ fun SmartAssistantDialogView(
     settings: AdminSettingsEntity,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
-    onChatOpen: (String) -> Unit
+    onChatOpen: (String) -> Unit,
+    onRequestQuickService: () -> Unit = {},
+    onNavigateToMap: () -> Unit = {}
 ) {
     val points by viewModel.currentUserPoints.collectAsState()
     val context = LocalContext.current
@@ -295,17 +297,76 @@ fun SmartAssistantDialogView(
                                             lineHeight = 18.sp
                                         )
                                         
-                                        if (!msg.isUser && settings.allowTextToSpeechAssistant) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.End
+                                        if (!msg.isUser) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            // Interactive Action Chips
+                                            LazyRow(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                                             ) {
-                                                IconButton(
-                                                    onClick = { VoiceManager.onSpeak?.invoke(msg.text) },
-                                                    modifier = Modifier.size(24.dp)
+                                                item {
+                                                    AssistChip(
+                                                        onClick = onRequestQuickService,
+                                                        label = { Text("🛠️ طلب أقرب فني لهذه المشكلة", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = themeColors.accent) },
+                                                        colors = AssistChipDefaults.assistChipColors(containerColor = themeColors.surface)
+                                                    )
+                                                }
+                                                item {
+                                                    AssistChip(
+                                                        onClick = {
+                                                            typedText = "محلات المواد القريبة"
+                                                        },
+                                                        label = { Text("🏬 محلات المواد القريبة", fontSize = 10.sp, color = Color.White) },
+                                                        colors = AssistChipDefaults.assistChipColors(containerColor = themeColors.surface)
+                                                    )
+                                                }
+                                                item {
+                                                    AssistChip(
+                                                        onClick = {
+                                                            val topProv = msg.matchedProviders.firstOrNull() ?: viewModel.providers.value.firstOrNull()
+                                                            if (topProv != null) {
+                                                                try {
+                                                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${topProv.phone}"))
+                                                                    context.startActivity(intent)
+                                                                } catch (e: Exception) {
+                                                                    Toast.makeText(context, "📞 هاتف الفني: ${topProv.phone}", Toast.LENGTH_LONG).show()
+                                                                }
+                                                            } else {
+                                                                Toast.makeText(context, "📱 هاتف الدعم: ${settings.supportPhone}", Toast.LENGTH_LONG).show()
+                                                            }
+                                                        },
+                                                        label = { Text("📞 اتصل بفني", fontSize = 10.sp, color = Color.White) },
+                                                        colors = AssistChipDefaults.assistChipColors(containerColor = themeColors.surface)
+                                                    )
+                                                }
+                                                item {
+                                                    AssistChip(
+                                                        onClick = onRequestQuickService,
+                                                        label = { Text("📅 احجز موعداً", fontSize = 10.sp, color = Color.White) },
+                                                        colors = AssistChipDefaults.assistChipColors(containerColor = themeColors.surface)
+                                                    )
+                                                }
+                                                item {
+                                                    AssistChip(
+                                                        onClick = onNavigateToMap,
+                                                        label = { Text("📍 اعرض على الخريطة", fontSize = 10.sp, color = Color.White) },
+                                                        colors = AssistChipDefaults.assistChipColors(containerColor = themeColors.surface)
+                                                    )
+                                                }
+                                            }
+
+                                            if (settings.allowTextToSpeechAssistant) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.End
                                                 ) {
-                                                    Text("🔊", fontSize = 12.sp)
+                                                    IconButton(
+                                                        onClick = { VoiceManager.onSpeak?.invoke(msg.text) },
+                                                        modifier = Modifier.size(24.dp)
+                                                    ) {
+                                                        Text("🔊", fontSize = 12.sp)
+                                                    }
                                                 }
                                             }
                                         }

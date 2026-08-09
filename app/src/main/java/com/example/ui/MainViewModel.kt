@@ -3024,6 +3024,191 @@ class MainViewModel : ViewModel() {
             }
     }
 
+    // --- EXTENDED ADMIN MANAGEMENT & ENTITY CONTROLS ---
+
+    fun setStoreBlocked(storeId: String, isBlocked: Boolean, reason: String = "") {
+        val updates = mapOf(
+            "isBlocked" to isBlocked,
+            "blockReason" to reason
+        )
+        db.collection("stores").document(storeId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isBlocked) "🚫 تم حظر المحل/المركز بنجاح ($reason)" else "✅ تم إلغاء حظر المحل/المركز")
+            }
+    }
+
+    fun setStorePaymentEnabled(storeId: String, isEnabled: Boolean) {
+        db.collection("stores").document(storeId).update("paymentEnabled", isEnabled)
+            .addOnSuccessListener {
+                triggerNotification(if (isEnabled) "💳 تم تفعيل نظام الدفع والمحفظة للمتجر" else "🔒 تم تعطيل نظام الدفع للمتجر")
+            }
+    }
+
+    fun setPropertyBlocked(propertyId: String, isBlocked: Boolean, reason: String = "") {
+        val updates = mapOf(
+            "isBlocked" to isBlocked,
+            "blockReason" to reason
+        )
+        db.collection("properties").document(propertyId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isBlocked) "🚫 تم حظر إعلان العقار بنجاح ($reason)" else "✅ تم إلغاء حظر إعلان العقار")
+            }
+    }
+
+    fun setPropertyPaymentEnabled(propertyId: String, isEnabled: Boolean) {
+        db.collection("properties").document(propertyId).update("paymentEnabled", isEnabled)
+            .addOnSuccessListener {
+                triggerNotification(if (isEnabled) "💳 تم تفعيل نظام الدفع للعقار" else "🔒 تم تعطيل نظام الدفع للعقار")
+            }
+    }
+
+    fun setJobBlocked(jobId: String, isBlocked: Boolean, reason: String = "") {
+        val updates = mapOf(
+            "isBlocked" to isBlocked,
+            "blockReason" to reason
+        )
+        db.collection("jobs").document(jobId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification(if (isBlocked) "🚫 تم حظر الإعلان الوظيفي ($reason)" else "✅ تم إلغاء حظر الإعلان الوظيفي")
+            }
+    }
+
+    fun setJobPinned(jobId: String, isPinned: Boolean) {
+        db.collection("jobs").document(jobId).update("isPinned", isPinned)
+            .addOnSuccessListener {
+                triggerNotification(if (isPinned) "📌 تم تثبيت الوظيفة في الصدارة" else "📌 تم إلغاء تثبيت الوظيفة")
+            }
+    }
+
+    fun setJobVip(jobId: String, isVip: Boolean) {
+        db.collection("jobs").document(jobId).update("isVip", isVip)
+            .addOnSuccessListener {
+                triggerNotification(if (isVip) "🏆 تم تمييز الإعلان الوظيفي كـ VIP" else "🔒 تم إلغاء شارة VIP عن الوظيفة")
+            }
+    }
+
+    fun setJobChatDisabled(jobId: String, isDisabled: Boolean) {
+        db.collection("jobs").document(jobId).update("isChatDisabled", isDisabled)
+            .addOnSuccessListener {
+                triggerNotification(if (isDisabled) "🔇 تم إيقاف الدردشة للإعلان الوظيفي" else "💬 تم تفعيل الدردشة للإعلان الوظيفي")
+            }
+    }
+
+    fun deleteJobPermanently(jobId: String) {
+        db.collection("jobs").document(jobId).delete()
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف الإعلان الوظيفي نهائياً من النظام")
+            }
+    }
+
+    fun deleteJobApplication(appId: String) {
+        db.collection("job_applications").document(appId).delete()
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف طلب التقديم من النظام بنجاح")
+            }
+    }
+
+    fun acceptJobApplication(appId: String) {
+        updateJobApplicationStatus(appId, "ACCEPTED")
+    }
+
+    fun rejectJobApplication(appId: String, reason: String) {
+        db.collection("job_applications").document(appId).update("status", "REJECTED", "rejectionReason", reason)
+            .addOnSuccessListener {
+                triggerNotification("❌ تم رفض طلب التقديم للوظيفة مع إرسال السبب: $reason")
+            }
+    }
+
+    fun sendNotificationToApplicants(title: String, message: String, jobId: String = "") {
+        val notif = NotificationEntity(
+            id = UUID.randomUUID().toString(),
+            title = title,
+            message = message,
+            targetType = if (jobId.isNotEmpty()) "JOB_APPLICANTS" else "ALL",
+            targetValue = jobId,
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("notifications").document(notif.id).set(notif)
+            .addOnSuccessListener {
+                triggerNotification("🔔 تم إرسال الإشعار لجميع المتقدمين للوظائف بنجاح!")
+            }
+    }
+
+    fun exportJobApplicantsCsv(context: android.content.Context) {
+        try {
+            val apps = _jobApplications.value
+            val csvContent = StringBuilder()
+            csvContent.append("المعرف,اسم المتقدم,رقم الهاتف,الوظيفة,الشركة,المؤهلات,الحالة,تاريخ التقديم\n")
+            apps.forEach { app ->
+                val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(app.createdAt))
+                csvContent.append("${app.id},\"${app.applicantName}\",\"${app.applicantPhone}\",\"${app.jobTitle}\",\"${app.companyName}\",\"${app.applicantQuals.replace("\n", " ")}\",\"${app.status}\",\"$dateStr\"\n")
+            }
+            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("Job Applicants CSV", csvContent.toString())
+            clipboard.setPrimaryClip(clip)
+            triggerNotification("📋 تم نسخ بيانات المتقدمين للوظائف بصيغة CSV إلى الحافظة بنجاح (${apps.size} متقدم)!")
+        } catch (e: Exception) {
+            triggerNotification("❌ فشل تصدير البيانات: ${e.message}")
+        }
+    }
+
+    fun unbanEntity(entityType: String, entityId: String) {
+        when (entityType.uppercase()) {
+            "PROVIDER" -> setProviderStatus(entityId, "ACTIVE")
+            "STORE", "RESTAURANT", "MEDICAL" -> setStoreBlocked(entityId, false, "")
+            "PROPERTY" -> setPropertyBlocked(entityId, false, "")
+            "JOB" -> setJobBlocked(entityId, false, "")
+            else -> {
+                db.collection("stores").document(entityId).update("isBlocked", false)
+                db.collection("properties").document(entityId).update("isBlocked", false)
+                db.collection("jobs").document(entityId).update("isBlocked", false)
+                db.collection("providers").document(entityId).update("status", "ACTIVE")
+            }
+        }
+        triggerNotification("✅ تم إلغاء حظر الكيان بنجاح!")
+    }
+
+    fun restoreEntity(entityType: String, entityId: String) {
+        when (entityType.uppercase()) {
+            "PROVIDER" -> restoreProvider(entityId)
+            "STORE", "RESTAURANT", "MEDICAL" -> restoreStore(entityId)
+            "PROPERTY" -> restoreProperty(entityId)
+            "JOB" -> restoreJob(entityId)
+            else -> {
+                restoreStore(entityId)
+                restoreProperty(entityId)
+                restoreJob(entityId)
+            }
+        }
+    }
+
+    fun hardDeleteEntity(entityType: String, entityId: String) {
+        when (entityType.uppercase()) {
+            "PROVIDER" -> deleteProviderPermanently(entityId)
+            "STORE", "RESTAURANT", "MEDICAL" -> deleteStorePermanently(entityId)
+            "PROPERTY" -> deletePropertyPermanently(entityId)
+            "JOB" -> deleteJobPermanently(entityId)
+            else -> {
+                deleteStorePermanently(entityId)
+                deletePropertyPermanently(entityId)
+                deleteJobPermanently(entityId)
+            }
+        }
+    }
+
+    fun redirectBookingToEntity(bookingId: String, targetEntityId: String, targetEntityName: String, targetPhone: String) {
+        val updates = mapOf(
+            "providerId" to targetEntityId,
+            "providerName" to targetEntityName,
+            "providerPhone" to targetPhone,
+            "status" to "PENDING"
+        )
+        db.collection("bookings").document(bookingId).update(updates)
+            .addOnSuccessListener {
+                triggerNotification("🔄 تم توجيه الحجز للجهة/الفني ($targetEntityName) بنجاح!")
+            }
+    }
+
     // --- RATINGS & COMMENTS ---
     fun addRating(rating: com.example.data.RatingEntity) {
         val targetId = db.collection("ratings").document().id

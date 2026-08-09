@@ -470,14 +470,18 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     val baseTabs = mutableListOf(
                         Pair("REG_REQ", "⌛ طلبات الانضمام والاعتماد (جديد)"),
                         Pair("MANUAL_ADD", "➕ الإضافة اليدوية للإدارة (جديد)"),
-                        Pair("STORES", "🏪 إدارة المحلات والعقارات والطبية"),
-                        Pair("JOBS", "💼 قسم الوظائف والتقديم"),
+                        Pair("STORES", "🏪 المحلات التجارية والمراكز"),
+                        Pair("RESTAURANTS", "🍔 المطاعم والكافيهات"),
+                        Pair("MEDICAL", "🏥 المراكز الطبية والعيادات"),
+                        Pair("PROPERTIES", "🏠 العقارات والأراضي"),
+                        Pair("JOBS", "💼 المعلنين عن الوظائف"),
+                        Pair("APPLICANTS", "📄 المتقدمين للوظائف"),
                         Pair("STATS", "📊 الإحصائيات الشاملة"),
                         Pair("BOOKINGS", "📅 الحجوزات والطلبات"),
                         Pair("CHATS", "💬 رقابة وصلاحيات الدردشات"),
                         Pair("PROVIDERS", "👥 أعضاء الدليل والتميز"),
                         Pair("PASSWORDS_RESET", "🔑 إعادة تعيين كلمات المرور"),
-                        Pair("BANNERS", "📢 البنرات الترويجية"),
+                        Pair("BANNERS", "📢 البنرات الترويجية والتوجيه"),
                         Pair("CATEGORIES", "🗂️ تحكم الأقسام"),
                         Pair("CITIES", "🗺️ تحكم المدن"),
                         Pair("COMPLAINTS", "⚠️ الشكاوى والبلاغات"),
@@ -490,8 +494,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         Pair("REVIEWS", "⭐ إدارة التقييمات والتعليقات"),
                         Pair("CALLS", "📞 مراقبة المكالمات"),
                         Pair("COUPONS", "🎫 إدارة الكوبونات"),
-                        Pair("BLOCKED", "🚫 القائمة المحظورة"),
-                        Pair("DELETED", "🗑️ الفنيين والجهات المحذوفة"),
+                        Pair("BLOCKED", "🚫 القائمة المحظورة المركزية"),
+                        Pair("DELETED", "🗑️ سلة المحذوفات المركزية"),
                         Pair("PAYMENTS", "💳 نظام الدفع والتحقق والمحافظ"),
                         Pair("CUSTOM_TABS", "📑 تخصيص تبويبات الملفات"),
                         Pair("GOLDEN_ICONS", "👑 الأيقونات وحجم الخط"),
@@ -875,13 +879,17 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         }
                     }
                 }
-            } else if (activeSubTab == "STORES") {
+            } else if (activeSubTab == "STORES" || activeSubTab == "RESTAURANTS" || activeSubTab == "MEDICAL" || activeSubTab == "PROPERTIES") {
                 item {
                     AdminStoresPropertiesPanel(viewModel = viewModel, themeColors = themeColors)
                 }
             } else if (activeSubTab == "JOBS") {
                 item {
                     AdminJobsPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            } else if (activeSubTab == "APPLICANTS") {
+                item {
+                    AdminJobApplicantsPanel(viewModel = viewModel, themeColors = themeColors)
                 }
             } else if (activeSubTab == "STATS") {
                 item {

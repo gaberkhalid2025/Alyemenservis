@@ -369,7 +369,7 @@ fun AppNavigator(
                                 "REGISTER_FORM", "JOIN_REQUEST_STATUS", "LOGIN", 
                                 "PROVIDER_REGISTRATION", "STORE_CREATION", "PROPERTY_CREATION", 
                                 "JOB_CREATION", "CREATE_BOOKING", "REGISTER",
-                                "MAP_VIEW", "ADMIN_PANEL", "ADMIN_LOGIN", "OWNER_PANEL"
+                                "MAP", "MAP_VIEW", "ADMIN_PANEL", "ADMIN_LOGIN", "OWNER_PANEL"
                             ) || showGuestRegisterDialogForAction != null || 
                               showAssistantDialog || showRequestServiceModal
 
@@ -426,6 +426,14 @@ fun AppNavigator(
                 preSelectedChannelId = channelId
                 showAllConversationsDialog = true
                 showAssistantDialog = false
+            },
+            onRequestQuickService = {
+                showAssistantDialog = false
+                showRequestServiceModal = true
+            },
+            onNavigateToMap = {
+                showAssistantDialog = false
+                viewModel.navigateTo("MAP_VIEW")
             }
         )
     }
