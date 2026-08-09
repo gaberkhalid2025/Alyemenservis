@@ -113,6 +113,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
     val jobs by viewModel.jobs.collectAsState()
+    val jobApplications by viewModel.jobApplications.collectAsState()
 
     var inputPasscode by remember { mutableStateOf("") }
     var isAuthorized by remember(adminRole) { mutableStateOf(adminRole != "GUEST") }
@@ -245,6 +246,11 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     // Section 7 state variables
     var activeProvidersSearchQuery by remember { mutableStateOf("") }
     var activeJobsSearchQuery by remember { mutableStateOf("") }
+    var storesSearchQuery by remember { mutableStateOf("") }
+    var restaurantsSearchQuery by remember { mutableStateOf("") }
+    var medicalSearchQuery by remember { mutableStateOf("") }
+    var propertiesSearchQuery by remember { mutableStateOf("") }
+    var applicantsSearchQuery by remember { mutableStateOf("") }
     var showEditProviderMetadataObj by remember { mutableStateOf<ProviderEntity?>(null) }
     var editProviderPhone by remember { mutableStateOf("") }
     var editProviderCategoryId by remember { mutableStateOf("") }
@@ -879,17 +885,394 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         }
                     }
                 }
-            } else if (activeSubTab == "STORES" || activeSubTab == "RESTAURANTS" || activeSubTab == "MEDICAL" || activeSubTab == "PROPERTIES") {
+            } else if (activeSubTab == "STORES") {
                 item {
-                    AdminStoresPropertiesPanel(viewModel = viewModel, themeColors = themeColors)
+                    Text("🏪 إدارة المحلات التجارية والمراكز الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("البحث والتحكم في شارات وأوسمة المحلات وحظرها وحذفها وتعديلها:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                item {
+                    OutlinedTextField(
+                        value = storesSearchQuery,
+                        onValueChange = { storesSearchQuery = it },
+                        label = { Text("البحث في المحلات التجارية...") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = themeColors.accent) }
+                    )
+                }
+                val filteredStores = stores.filter { s ->
+                    val isMedical = s.categoryId.contains("طبي", true) || s.categoryId.contains("عياد", true)
+                    val isRestaurant = s.categoryId.contains("مطعم", true) || s.categoryId.contains("كافيه", true)
+                    !isMedical && !isRestaurant && (s.name.contains(storesSearchQuery, true) || s.phone.contains(storesSearchQuery, true))
+                }
+                items(filteredStores, key = { it.id }) { s ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(s.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("الهاتف: ${s.phone} | التصنيف: ${s.categoryId}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                }
+                                IconButton(onClick = { viewModel.deleteStore(s.id) }) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف المحل", tint = Color.Red, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isVip, onCheckedChange = { viewModel.setStoreVip(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFD97706)), modifier = Modifier.size(32.dp))
+                                    Text("VIP ذهبي", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isVerified, onCheckedChange = { viewModel.setStoreVerified(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)), modifier = Modifier.size(32.dp))
+                                    Text("موثق", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isRecommended, onCheckedChange = { viewModel.setStoreRecommended(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)), modifier = Modifier.size(32.dp))
+                                    Text("موصى به", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isChatDisabled, onCheckedChange = { viewModel.setStoreChatDisabled(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEF4444)), modifier = Modifier.size(32.dp))
+                                    Text("قفل الدردشة", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isBlocked, onCheckedChange = { viewModel.setStoreBlocked(s.id, it, "حظر إداري") }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFB91C1C)), modifier = Modifier.size(32.dp))
+                                    Text("حظر المحل", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (activeSubTab == "RESTAURANTS") {
+                item {
+                    Text("🍔 إدارة المطاعم والكافيهات الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("البحث والتحكم في شارات وأوسمة المطاعم وقوائم الطعام وحظرها:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                item {
+                    OutlinedTextField(
+                        value = restaurantsSearchQuery,
+                        onValueChange = { restaurantsSearchQuery = it },
+                        label = { Text("البحث في المطاعم والكافيهات...") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = themeColors.accent) }
+                    )
+                }
+                val filteredRestaurants = stores.filter { s ->
+                    val isRestaurant = s.categoryId.contains("مطعم", true) || s.categoryId.contains("كافيه", true)
+                    isRestaurant && (s.name.contains(restaurantsSearchQuery, true) || s.phone.contains(restaurantsSearchQuery, true))
+                }
+                items(filteredRestaurants, key = { it.id }) { s ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(s.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("الهاتف: ${s.phone} | التصنيف: ${s.categoryId}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                }
+                                IconButton(onClick = { viewModel.deleteStore(s.id) }) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف المطعم", tint = Color.Red, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isVip, onCheckedChange = { viewModel.setStoreVip(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFD97706)), modifier = Modifier.size(32.dp))
+                                    Text("VIP ذهبي", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isVerified, onCheckedChange = { viewModel.setStoreVerified(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)), modifier = Modifier.size(32.dp))
+                                    Text("موثق", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isRecommended, onCheckedChange = { viewModel.setStoreRecommended(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)), modifier = Modifier.size(32.dp))
+                                    Text("موصى به", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isChatDisabled, onCheckedChange = { viewModel.setStoreChatDisabled(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEF4444)), modifier = Modifier.size(32.dp))
+                                    Text("قفل الدردشة", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isBlocked, onCheckedChange = { viewModel.setStoreBlocked(s.id, it, "حظر إداري") }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFB91C1C)), modifier = Modifier.size(32.dp))
+                                    Text("حظر المطعم", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (activeSubTab == "MEDICAL") {
+                item {
+                    Text("🏥 إدارة المراكز الطبية والعيادات الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("البحث والتحكم في المراكز الطبية والعيادات وحظرها:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                item {
+                    OutlinedTextField(
+                        value = medicalSearchQuery,
+                        onValueChange = { medicalSearchQuery = it },
+                        label = { Text("البحث في المراكز الطبية والعيادات...") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = themeColors.accent) }
+                    )
+                }
+                val filteredMedical = stores.filter { s ->
+                    val isMedical = s.categoryId.contains("طبي", true) || s.categoryId.contains("عياد", true)
+                    isMedical && (s.name.contains(medicalSearchQuery, true) || s.phone.contains(medicalSearchQuery, true))
+                }
+                items(filteredMedical, key = { it.id }) { s ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(s.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("الهاتف: ${s.phone} | التخصص: ${s.categoryId}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                }
+                                IconButton(onClick = { viewModel.deleteStore(s.id) }) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف المركز", tint = Color.Red, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isVip, onCheckedChange = { viewModel.setStoreVip(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFD97706)), modifier = Modifier.size(32.dp))
+                                    Text("VIP ذهبي", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isVerified, onCheckedChange = { viewModel.setStoreVerified(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)), modifier = Modifier.size(32.dp))
+                                    Text("موثق", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isRecommended, onCheckedChange = { viewModel.setStoreRecommended(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)), modifier = Modifier.size(32.dp))
+                                    Text("موصى به", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isChatDisabled, onCheckedChange = { viewModel.setStoreChatDisabled(s.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEF4444)), modifier = Modifier.size(32.dp))
+                                    Text("قفل الدردشة", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = s.isBlocked, onCheckedChange = { viewModel.setStoreBlocked(s.id, it, "حظر إداري") }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFB91C1C)), modifier = Modifier.size(32.dp))
+                                    Text("حظر المركز", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (activeSubTab == "PROPERTIES") {
+                item {
+                    Text("🏠 إدارة العقارات والأراضي الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("البحث والتحكم في إعلانات العقارات والأراضي وشارات التميز وحظرها:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                item {
+                    OutlinedTextField(
+                        value = propertiesSearchQuery,
+                        onValueChange = { propertiesSearchQuery = it },
+                        label = { Text("البحث في العقارات والأراضي...") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = themeColors.accent) }
+                    )
+                }
+                val filteredProperties = properties.filter { p ->
+                    !p.isDeleted && (p.title.contains(propertiesSearchQuery, true) || p.phone.contains(propertiesSearchQuery, true) || p.cityId.contains(propertiesSearchQuery, true))
+                }
+                items(filteredProperties, key = { it.id }) { p ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(p.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("السعر: ${p.price} ${p.currency} | المدينة: ${p.cityId}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                }
+                                IconButton(onClick = { viewModel.deleteProperty(p.id) }) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف العقار", tint = Color.Red, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = p.isVip, onCheckedChange = { viewModel.setPropertyVip(p.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFD97706)), modifier = Modifier.size(32.dp))
+                                    Text("VIP ذهبي", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = p.isVerified, onCheckedChange = { viewModel.setPropertyVerified(p.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)), modifier = Modifier.size(32.dp))
+                                    Text("موثق", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = p.isRecommended, onCheckedChange = { viewModel.setPropertyRecommended(p.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)), modifier = Modifier.size(32.dp))
+                                    Text("موصى به", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = p.isChatDisabled, onCheckedChange = { viewModel.setPropertyChatDisabled(p.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEF4444)), modifier = Modifier.size(32.dp))
+                                    Text("قفل الدردشة", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = p.isBlocked, onCheckedChange = { viewModel.setPropertyBlocked(p.id, it, "حظر إداري") }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFB91C1C)), modifier = Modifier.size(32.dp))
+                                    Text("حظر العقار", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
                 }
             } else if (activeSubTab == "JOBS") {
                 item {
-                    AdminJobsPanel(viewModel = viewModel, themeColors = themeColors)
+                    Text("💼 إدارة إعلانات الوظائف والشركات الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("البحث والتحكم في إعلانات الوظائف وحظرها وتعديلها:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                item {
+                    OutlinedTextField(
+                        value = activeJobsSearchQuery,
+                        onValueChange = { activeJobsSearchQuery = it },
+                        label = { Text("البحث في إعلانات الوظائف...") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = themeColors.accent) }
+                    )
+                }
+                val filteredJobsList = jobs.filter { j ->
+                    !j.isDeleted && (j.title.contains(activeJobsSearchQuery, true) || j.companyName.contains(activeJobsSearchQuery, true) || j.phone.contains(activeJobsSearchQuery, true))
+                }
+                items(filteredJobsList, key = { it.id }) { j ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(j.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("الشركة: ${j.companyName} | الراتب: ${j.salary}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                }
+                                IconButton(onClick = { viewModel.deleteJob(j.id) }) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف الإعلان", tint = Color.Red, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = j.isVip, onCheckedChange = { viewModel.setJobVip(j.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFD97706)), modifier = Modifier.size(32.dp))
+                                    Text("VIP ذهبي", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = j.isPinned, onCheckedChange = { viewModel.setJobPinned(j.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)), modifier = Modifier.size(32.dp))
+                                    Text("تثبيت الوظيفة", fontSize = 10.sp, color = Color.White, maxLines = 1)
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = j.isChatDisabled, onCheckedChange = { viewModel.setJobChatDisabled(j.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEF4444)), modifier = Modifier.size(32.dp))
+                                    Text("قفل الدردشة", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Checkbox(checked = j.isBlocked, onCheckedChange = { viewModel.setJobBlocked(j.id, it, "حظر إداري") }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFB91C1C)), modifier = Modifier.size(32.dp))
+                                    Text("حظر الإعلان", fontSize = 9.sp, color = Color.LightGray, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
                 }
             } else if (activeSubTab == "APPLICANTS") {
                 item {
-                    AdminJobApplicantsPanel(viewModel = viewModel, themeColors = themeColors)
+                    Text("📄 إدارة المتقدمين للوظائف والطلبات الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("مراجعة وقبول أو رفض طلبات التقديم على الوظائف:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                item {
+                    OutlinedTextField(
+                        value = applicantsSearchQuery,
+                        onValueChange = { applicantsSearchQuery = it },
+                        label = { Text("البحث في المتقدمين للوظائف...") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = themeColors.accent) }
+                    )
+                }
+                val filteredApplicants = jobApplications.filter { app ->
+                    app.applicantName.contains(applicantsSearchQuery, true) || app.applicantPhone.contains(applicantsSearchQuery, true) || app.jobTitle.contains(applicantsSearchQuery, true)
+                }
+                items(filteredApplicants, key = { it.id }) { app ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(app.applicantName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("المتقدم: ${app.applicantPhone} | الوظيفة: ${app.jobTitle}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    Text("الحالة: ${app.status}", fontSize = 10.sp, color = if (app.status == "ACCEPTED") Color.Green else if (app.status == "REJECTED") Color.Red else Color.Yellow)
+                                }
+                                IconButton(onClick = { viewModel.deleteJobApplication(app.id) }) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف الطلب", tint = Color.Red, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { viewModel.acceptJobApplication(app.id) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    modifier = Modifier.weight(1f).height(36.dp)
+                                ) {
+                                    Text("قبول ✅", color = Color.White, fontSize = 11.sp)
+                                }
+                                Button(
+                                    onClick = { viewModel.rejectJobApplication(app.id, "لم يستوف الشروط") },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                    modifier = Modifier.weight(1f).height(36.dp)
+                                ) {
+                                    Text("رفض ❌", color = Color.White, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             } else if (activeSubTab == "STATS") {
                 item {

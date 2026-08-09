@@ -5022,8 +5022,8 @@ fun AdminCentralizedBlockedPanel(
 
     val allBlocked = mutableListOf<BlockedItem>()
 
-    providers.filter { it.status == "SUSPENDED" || it.status == "BLOCKED" }.forEach { p ->
-        allBlocked.add(BlockedItem(p.id, "PROVIDER", p.name, p.phone, p.suspensionReason.ifEmpty { "حظر إداري عام" }))
+    providers.filter { it.isBlocked || it.subscriptionStatus == "SUSPENDED" }.forEach { p ->
+        allBlocked.add(BlockedItem(p.id, "PROVIDER", p.name, p.phone, "حظر إداري عام"))
     }
 
     stores.filter { it.isBlocked }.forEach { s ->

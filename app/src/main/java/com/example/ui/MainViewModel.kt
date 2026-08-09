@@ -3154,7 +3154,7 @@ class MainViewModel : ViewModel() {
 
     fun unbanEntity(entityType: String, entityId: String) {
         when (entityType.uppercase()) {
-            "PROVIDER" -> setProviderStatus(entityId, "ACTIVE")
+            "PROVIDER" -> db.collection("providers").document(entityId).update("isBlocked", false)
             "STORE", "RESTAURANT", "MEDICAL" -> setStoreBlocked(entityId, false, "")
             "PROPERTY" -> setPropertyBlocked(entityId, false, "")
             "JOB" -> setJobBlocked(entityId, false, "")
@@ -3162,7 +3162,7 @@ class MainViewModel : ViewModel() {
                 db.collection("stores").document(entityId).update("isBlocked", false)
                 db.collection("properties").document(entityId).update("isBlocked", false)
                 db.collection("jobs").document(entityId).update("isBlocked", false)
-                db.collection("providers").document(entityId).update("status", "ACTIVE")
+                db.collection("providers").document(entityId).update("isBlocked", false)
             }
         }
         triggerNotification("✅ تم إلغاء حظر الكيان بنجاح!")
@@ -3184,7 +3184,7 @@ class MainViewModel : ViewModel() {
 
     fun hardDeleteEntity(entityType: String, entityId: String) {
         when (entityType.uppercase()) {
-            "PROVIDER" -> deleteProviderPermanently(entityId)
+            "PROVIDER" -> removeProviderPermanently(entityId)
             "STORE", "RESTAURANT", "MEDICAL" -> deleteStorePermanently(entityId)
             "PROPERTY" -> deletePropertyPermanently(entityId)
             "JOB" -> deleteJobPermanently(entityId)

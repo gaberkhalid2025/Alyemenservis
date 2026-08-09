@@ -40,5 +40,7 @@ data class PropertyEntity(
     val isRecommended: Boolean = false,
     val isChatDisabled: Boolean = false,
     val isNotificationsDisabled: Boolean = false,
-    val productAttachmentsJson: String = ""
+    val productAttachmentsJson: String = "",
+    val isBlocked: Boolean = false,
+    val blockReason: String = ""
 )

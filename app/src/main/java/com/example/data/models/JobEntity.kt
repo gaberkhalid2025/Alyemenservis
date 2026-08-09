@@ -22,7 +22,9 @@ data class JobEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val isPinned: Boolean = false,
     val isVip: Boolean = false,
-    val isChatDisabled: Boolean = false
+    val isChatDisabled: Boolean = false,
+    val isBlocked: Boolean = false,
+    val blockReason: String = ""
 )
 
 @Keep
