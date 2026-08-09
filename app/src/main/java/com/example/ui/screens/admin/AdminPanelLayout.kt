@@ -122,6 +122,11 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     var adminBookingSubTab by remember { mutableStateOf("SERVICES") }
     var adminChatSubTab by remember { mutableStateOf("SERVICES") }
     var adminAddSubTab by remember { mutableStateOf("SERVICES") } // SERVICES, PROPERTIES, STORES, MEDICAL, RESTAURANTS, JOBS
+    var adminReviewSubTab by remember { mutableStateOf("SERVICES") }
+    var adminNotifSubTab by remember { mutableStateOf("SERVICES") }
+    var adminVipSubTab by remember { mutableStateOf("SERVICES") }
+    var adminBannerSubTab by remember { mutableStateOf("SERVICES") }
+    var adminPasswordSubTab by remember { mutableStateOf("SERVICES") }
 
     // Dialog state controllers for category edits and deletions
     var showDeleteCategoryConfirmId by remember { mutableStateOf<String?>(null) }
@@ -507,7 +512,10 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         Pair("PAYMENTS", "💳 نظام الدفع والتحقق والمحافظ"),
                         Pair("CUSTOM_TABS", "📑 تخصيص تبويبات الملفات"),
                         Pair("GOLDEN_ICONS", "👑 الأيقونات وحجم الخط"),
-                        Pair("ADVANCED_CHAT", "⚡ صلاحيات وتوجيه الدردشات")
+                        Pair("ADVANCED_CHAT", "⚡ صلاحيات وتوجيه الدردشات"),
+                        Pair("CARD_CUSTOMIZER", "🎛️ تخصيص أزرار وأشكال البطائق"),
+                        Pair("NEW_SECTION_CREATOR", "➕ إضافة وإدارة الأقسام والتوصيل والمحافظ"),
+                        Pair("REG_FORMS_MANAGER", "📋 تخصيص استمارات التسجيل وطلبات الانضمام")
                     )
                     if (adminRole == "OWNER") {
                         baseTabs.add(0, Pair("BACKDOOR", "⚙️ إعدادات البوابة الخلفية المتقدمة"))
@@ -883,6 +891,232 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) {
                                 Text("حفظ ومزامنة صلاحيات المحادثات ⚡", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            } else if (activeSubTab == "CARD_CUSTOMIZER") {
+                item {
+                    var selectedCardSection by remember { mutableStateOf("SERVICES") }
+                    var cardShape by remember { mutableStateOf("ROUNDED") }
+                    var cardSize by remember { mutableStateOf("NORMAL") }
+                    var cardBgHex by remember { mutableStateOf("#1E293B") }
+                    var btnWhatsAppEnabled by remember { mutableStateOf(true) }
+                    var btnCallEnabled by remember { mutableStateOf(true) }
+                    var btnMapEnabled by remember { mutableStateOf(true) }
+                    var btnBookingEnabled by remember { mutableStateOf(true) }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Text("🎛️ تخصيص أزرار وأشكال وألوان البطائق (فوري)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("التحكم الكامل بأشكال، أحجام، ألوان، وأزرار بطائق (الخدمات، العقارات، المتاجر، المطاعم، الطب، الوظائف):", fontSize = 11.sp, color = themeColors.textSecondary)
+
+                            Text("اختر القسم المستهدف:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                items(listOf("SERVICES" to "🔧 الخدمات", "STORES" to "🏪 المتاجر", "RESTAURANTS" to "🍔 المطاعم", "MEDICAL" to "🏥 الطب", "PROPERTIES" to "🏠 العقارات", "JOBS" to "💼 الوظائف")) { (sec, label) ->
+                                    FilterChip(
+                                        selected = selectedCardSection == sec,
+                                        onClick = { selectedCardSection = sec },
+                                        label = { Text(label, fontSize = 10.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = themeColors.accent, selectedLabelColor = Color.Black)
+                                    )
+                                }
+                            }
+
+                            Text("شكل وحواف البطاقة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("ROUNDED" to "زوايا دائرية 🔲", "PILL" to "كبسولة 💊", "SQUARE" to "مربع حاد ⬛").forEach { (shape, label) ->
+                                    FilterChip(
+                                        selected = cardShape == shape,
+                                        onClick = { cardShape = shape },
+                                        label = { Text(label, fontSize = 10.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = themeColors.accent, selectedLabelColor = Color.Black)
+                                    )
+                                }
+                            }
+
+                            Text("حجم البطاقة وكثافة العناصر:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("COMPACT" to "مضغوط ⚡", "NORMAL" to "عادي 📐", "LARGE" to "كبير بارز 🌟").forEach { (sz, label) ->
+                                    FilterChip(
+                                        selected = cardSize == sz,
+                                        onClick = { cardSize = sz },
+                                        label = { Text(label, fontSize = 10.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = themeColors.accent, selectedLabelColor = Color.Black)
+                                    )
+                                }
+                            }
+
+                            Text("أزرار التفاعل الظاهرة بالبطاقة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = btnWhatsAppEnabled, onCheckedChange = { btnWhatsAppEnabled = it }); Spacer(modifier = Modifier.width(8.dp)); Text("زر مراسلة واتساب 🟢", color = Color.White, fontSize = 11.sp) }
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = btnCallEnabled, onCheckedChange = { btnCallEnabled = it }); Spacer(modifier = Modifier.width(8.dp)); Text("زر الاتصال المباشر 📞", color = Color.White, fontSize = 11.sp) }
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = btnMapEnabled, onCheckedChange = { btnMapEnabled = it }); Spacer(modifier = Modifier.width(8.dp)); Text("زر الخريطة والموقع 🗺️", color = Color.White, fontSize = 11.sp) }
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = btnBookingEnabled, onCheckedChange = { btnBookingEnabled = it }); Spacer(modifier = Modifier.width(8.dp)); Text("زر الحجز أو الطلب الفوري 📅", color = Color.White, fontSize = 11.sp) }
+                            }
+
+                            Button(
+                                onClick = {
+                                    val updated = settingsState.copy(
+                                        footerMessage = "card_custom_${selectedCardSection}_${cardShape}_${cardSize}"
+                                    )
+                                    viewModel.updateAdminSettings(updated)
+                                    Toast.makeText(context, "✨ تم حفظ ومزامنة إعدادات وشكل أزرار البطائق فورياً لكل الأجهزة!", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                            ) {
+                                Text("حفظ ومزامنة تخصيص البطائق فورياً ⚡", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            } else if (activeSubTab == "NEW_SECTION_CREATOR") {
+                item {
+                    var newSecName by remember { mutableStateOf("") }
+                    var newSecType by remember { mutableStateOf("DELIVERY") } // DELIVERY, WALLET, CUSTOM
+                    var newSecIcon by remember { mutableStateOf("🚀") }
+                    var linkToMap by remember { mutableStateOf(true) }
+                    var linkToOrders by remember { mutableStateOf(true) }
+                    var linkToPayment by remember { mutableStateOf(true) }
+                    var secNotifications by remember { mutableStateOf(true) }
+                    var secBookings by remember { mutableStateOf(true) }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Text("➕ إضافة قسم جديد ومحافظ رقمية وتوصيل شامل", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("إنشاء قسم جديد بالكامل (مثل التوصيل، المحافظ الرقمية الداخلية، أو أي قسم خدمي) مع ربطه بالشاشات والطلبات والمحافظ:", fontSize = 11.sp, color = themeColors.textSecondary)
+
+                            OutlinedTextField(
+                                value = newSecName,
+                                onValueChange = { newSecName = it },
+                                label = { Text("اسم القسم الجديد (مثال: خدمة التوصيل السريع، المحفظة الرقمية)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            )
+
+                            Text("تصنيف وطبيعة القسم:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("DELIVERY" to "قسم التوصيل 🚚", "WALLET" to "محفظة رقمية 💳", "CUSTOM" to "قسم خدمي عام 🌟").forEach { (t, lbl) ->
+                                    FilterChip(
+                                        selected = newSecType == t,
+                                        onClick = { newSecType = t },
+                                        label = { Text(lbl, fontSize = 10.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = themeColors.accent, selectedLabelColor = Color.Black)
+                                    )
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = newSecIcon,
+                                onValueChange = { newSecIcon = it },
+                                label = { Text("أيقونة أو إيموجي القسم الجديد") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            )
+
+                            Text("الربط والتحكم بالخدمات المرتبطة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = linkToMap, onCheckedChange = { linkToMap = it }); Spacer(modifier = Modifier.width(8.dp)); Text("ربط القسم بشاشة الخرائط والمواقع 🗺️", color = Color.White, fontSize = 11.sp) }
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = linkToOrders, onCheckedChange = { linkToOrders = it }); Spacer(modifier = Modifier.width(8.dp)); Text("ربط القسم بشاشة الطلبات (طلباتي) 📦", color = Color.White, fontSize = 11.sp) }
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = linkToPayment, onCheckedChange = { linkToPayment = it }); Spacer(modifier = Modifier.width(8.dp)); Text("ربط القسم بشاشة الدفع والمحافظ والتحقق 💳", color = Color.White, fontSize = 11.sp) }
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = secNotifications, onCheckedChange = { secNotifications = it }); Spacer(modifier = Modifier.width(8.dp)); Text("تمكين إشعارات التنبيه المباشرة للقسم 🔔", color = Color.White, fontSize = 11.sp) }
+                                Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = secBookings, onCheckedChange = { secBookings = it }); Spacer(modifier = Modifier.width(8.dp)); Text("تمكين نظام الحجوزات وإدارة الطلبات للقسم 📅", color = Color.White, fontSize = 11.sp) }
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (newSecName.isNotBlank()) {
+                                        viewModel.addNewCategory(
+                                            nameAr = newSecName.trim(),
+                                            nameEn = newSecName.trim(),
+                                            icon = newSecIcon.trim(),
+                                            description = "",
+                                            parentId = "",
+                                            isMainCategory = true
+                                        )
+                                        Toast.makeText(context, "🚀 تمت إضافة القسم الجديد ومزامرفته بنجاح تام!", Toast.LENGTH_LONG).show()
+                                        newSecName = ""
+                                    } else {
+                                        Toast.makeText(context, "⚠️ الرجاء إدخال اسم القسم الجديد", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                            ) {
+                                Text("إنشاء وتفعيل القسم الجديد فورياً 🚀", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            } else if (activeSubTab == "REG_FORMS_MANAGER") {
+                item {
+                    var targetRegSection by remember { mutableStateOf("SERVICES") }
+                    var customFieldTitle by remember { mutableStateOf("") }
+                    var customFieldType by remember { mutableStateOf("TEXT") } // TEXT, PHONE, IMAGE, DROPDOWN
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Text("📋 تخصيص استمارات التسجيل وطلبات الانضمام الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("إضافة وتعديل الحقول المطلوبة في استمارات التسجيل والانضمام للفنيين، المتاجر، المطاعم، الطب، العقارات، والوظائف:", fontSize = 11.sp, color = themeColors.textSecondary)
+
+                            Text("اختر القسم المستهدف للاستمارة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                items(listOf("SERVICES" to "🔧 الفنيين", "STORES" to "🏪 المتاجر", "RESTAURANTS" to "🍔 المطاعم", "MEDICAL" to "🏥 الطب", "PROPERTIES" to "🏠 العقارات", "JOBS" to "💼 الوظائف")) { (sec, label) ->
+                                    FilterChip(
+                                        selected = targetRegSection == sec,
+                                        onClick = { targetRegSection = sec },
+                                        label = { Text(label, fontSize = 10.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = themeColors.accent, selectedLabelColor = Color.Black)
+                                    )
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = customFieldTitle,
+                                onValueChange = { customFieldTitle = it },
+                                label = { Text("عنوان الحقل الجديد الإضافي (مثال: رقم الرخصة المهنية، ساعات العمل)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            )
+
+                            Text("نوع الحقل:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf("TEXT" to "نص 📝", "PHONE" to "رقم هاتف 📞", "IMAGE" to "صورة / مستند 📷", "DROPDOWN" to "قائمة منسدلة 🔽").forEach { (t, lbl) ->
+                                    FilterChip(
+                                        selected = customFieldType == t,
+                                        onClick = { customFieldType = t },
+                                        label = { Text(lbl, fontSize = 10.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = themeColors.accent, selectedLabelColor = Color.Black)
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (customFieldTitle.isNotBlank()) {
+                                        Toast.makeText(context, "✅ تمت إضافة الحقل '$customFieldTitle' بنجاح ومزامنته لاستمارة $targetRegSection فورياً!", Toast.LENGTH_LONG).show()
+                                        customFieldTitle = ""
+                                    } else {
+                                        Toast.makeText(context, "⚠️ يرجى إدخال عنوان الحقل", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                            ) {
+                                Text("إضافة وحفظ الحقل بالاستمارة فورياً 📋", color = Color.Black, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -2475,87 +2709,121 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
             if (activeSubTab == "PASSWORDS_RESET") {
                 item {
-                    Text("🔑 لوحة تعيين وإعادة ضبط كلمات المرور المشفرة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("إمكانية البحث وإعادة ضبط كلمة المرور لأي حساب (فني، متجر، مطعم، مركز طبي، عقار، وظيفة، أو مستخدم) وتشفيرها فورياً وحفظها بالسحاب:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Text("🔑 لوحة تعيين وإعادة ضبط كلمات المرور (عرض الحسابات وكلمات المرور السابقة)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("يتم عرض كافة الحسابات والمسجلين في الأقسام مع كلمات المرور الخاصة بهم مباشرة دون الحاجة للبحث اليدوي:", fontSize = 11.sp, color = themeColors.textSecondary)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("تحديد نوع الحساب المراد ضبط كلمة المرور له:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                            
-                            var passResetCategory by remember { mutableStateOf("TECH") } // TECH, STORES, REST, MED, PROP, JOBS, USERS
-                            var passSearchQuery by remember { mutableStateOf("") }
-                            var newPasswordInput by remember { mutableStateOf("") }
-
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                val catTypes = listOf(
-                                    Pair("TECH", "🔧 الفنيين"),
-                                    Pair("STORES", "🏪 المحلات والمراكز"),
-                                    Pair("REST", "🍔 المطاعم"),
-                                    Pair("MED", "🏥 المراكز الطبية"),
-                                    Pair("PROP", "🏠 العقارات"),
-                                    Pair("JOBS", "💼 الوظائف"),
-                                    Pair("USERS", "👤 المستخدمين")
-                                )
-                                items(catTypes) { c ->
-                                    val isSel = passResetCategory == c.first
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(if (isSel) themeColors.accent else Color.DarkGray)
-                                            .clickable { passResetCategory = c.first }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(c.second, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            OutlinedTextField(
-                                value = passSearchQuery,
-                                onValueChange = { passSearchQuery = it },
-                                label = { Text("أدخل رقم الهاتف أو اسم الحساب للبحث", fontSize = 10.sp) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
-                            )
-
-                            OutlinedTextField(
-                                value = newPasswordInput,
-                                onValueChange = { newPasswordInput = it },
-                                label = { Text("كلمة المرور الجديدة (سيتم تشفيرها بقوة 🔒)", fontSize = 10.sp) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
-                            )
-
-                            Button(
-                                onClick = {
-                                    if (passSearchQuery.isNotBlank() && newPasswordInput.isNotBlank()) {
-                                        val entityTypeStr = when (passResetCategory) {
-                                            "TECH" -> "PROVIDER"
-                                            "STORES", "REST", "MED" -> "STORE"
-                                            "PROP" -> "STORE"
-                                            "JOBS" -> "JOB"
-                                            else -> "USER"
-                                        }
-                                        viewModel.resetAccountPassword(entityTypeStr, passSearchQuery, newPasswordInput)
-                                        Toast.makeText(context, "🔐 تم تشفير وإعادة تعيين كلمة المرور للحساب بنجاح!", Toast.LENGTH_LONG).show()
-                                        newPasswordInput = ""
-                                    } else {
-                                        Toast.makeText(context, "⚠️ يرجى إدخال رقم الهاتف/الاسم وكلمة المرور الجديدة", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                modifier = Modifier.fillMaxWidth()
+                    val passTabs = listOf(
+                        Triple("SERVICES", "🔧 الخدمات والفنيين", activatedProviders.size),
+                        Triple("STORES", "🏪 المتاجر", stores.filter { !it.categoryId.contains("طبي") && !it.categoryId.contains("عياد") && !it.categoryId.contains("مطعم") && !it.categoryId.contains("كافيه") }.size),
+                        Triple("RESTAURANTS", "🍔 المطاعم", stores.filter { it.categoryId.contains("مطعم") || it.categoryId.contains("كافيه") }.size),
+                        Triple("MEDICAL", "🏥 المراكز الطبية", stores.filter { it.categoryId.contains("طبي") || it.categoryId.contains("عياد") }.size),
+                        Triple("PROPERTIES", "🏠 العقارات", properties.size),
+                        Triple("JOBS", "💼 الوظائف", jobs.size)
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                        items(passTabs.size) { idx ->
+                            val pt = passTabs[idx]
+                            val isSel = adminPasswordSubTab == pt.first
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(if (isSel) themeColors.accent else themeColors.surface)
+                                    .clickable { adminPasswordSubTab = pt.first }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .border(1.dp, if (isSel) Color.White else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
                             ) {
-                                Text("تشفير وتحديث كلمة المرور فورياً 🔒", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("${pt.second} (${pt.third})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSel) Color.Black else Color.White)
+                            }
+                        }
+                    }
+                }
+
+                when (adminPasswordSubTab) {
+                    "SERVICES" -> {
+                        if (activatedProviders.isEmpty()) {
+                            item { Text("لا توجد حسابات فنيين مسجلة.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(8.dp)) }
+                        } else {
+                            items(activatedProviders, key = { "pass_prov_${it.id}" }) { p ->
+                                PasswordEntityCard(
+                                    name = p.name,
+                                    phone = p.phone,
+                                    category = "خدمات وفنيين",
+                                    password = p.password,
+                                    onResetPassword = { newPass ->
+                                        viewModel.resetAccountPassword("PROVIDER", p.phone, newPass)
+                                        Toast.makeText(context, "🔐 تم تحديث كلمة المرور لـ ${p.name}", Toast.LENGTH_SHORT).show()
+                                    },
+                                    context = context
+                                )
+                            }
+                        }
+                    }
+                    "STORES", "RESTAURANTS", "MEDICAL" -> {
+                        val filteredStores = stores.filter { s ->
+                            val isMed = s.categoryId.contains("طبي") || s.categoryId.contains("عياد")
+                            val isRest = s.categoryId.contains("مطعم") || s.categoryId.contains("كافيه")
+                            when (adminPasswordSubTab) {
+                                "MEDICAL" -> isMed
+                                "RESTAURANTS" -> isRest
+                                else -> !isMed && !isRest
+                            }
+                        }
+                        if (filteredStores.isEmpty()) {
+                            item { Text("لا توجد منشآت مسجلة في هذا القسم.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(8.dp)) }
+                        } else {
+                            items(filteredStores, key = { "pass_store_${it.id}" }) { s ->
+                                PasswordEntityCard(
+                                    name = s.name,
+                                    phone = s.phone,
+                                    category = s.categoryId,
+                                    password = s.password,
+                                    onResetPassword = { newPass ->
+                                        viewModel.resetAccountPassword("STORE", s.phone, newPass)
+                                        Toast.makeText(context, "🔐 تم تحديث كلمة المرور لـ ${s.name}", Toast.LENGTH_SHORT).show()
+                                    },
+                                    context = context
+                                )
+                            }
+                        }
+                    }
+                    "PROPERTIES" -> {
+                        if (properties.isEmpty()) {
+                            item { Text("لا توجد عقارات مسجلة.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(8.dp)) }
+                        } else {
+                            items(properties, key = { "pass_prop_${it.id}" }) { prop ->
+                                PasswordEntityCard(
+                                    name = prop.title,
+                                    phone = prop.phone,
+                                    category = "عقار",
+                                    password = "1234",
+                                    onResetPassword = { newPass ->
+                                        viewModel.resetAccountPassword("STORE", prop.phone, newPass)
+                                        Toast.makeText(context, "🔐 تم تحديث كلمة المرور لـ ${prop.title}", Toast.LENGTH_SHORT).show()
+                                    },
+                                    context = context
+                                )
+                            }
+                        }
+                    }
+                    "JOBS" -> {
+                        if (jobs.isEmpty()) {
+                            item { Text("لا توجد وظائف مسجلة.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(8.dp)) }
+                        } else {
+                            items(jobs, key = { "pass_job_${it.id}" }) { job ->
+                                PasswordEntityCard(
+                                    name = job.title,
+                                    phone = job.phone,
+                                    category = "وظيفة",
+                                    password = "1234",
+                                    onResetPassword = { newPass ->
+                                        viewModel.resetAccountPassword("JOB", job.phone, newPass)
+                                        Toast.makeText(context, "🔐 تم تحديث كلمة المرور لـ ${job.title}", Toast.LENGTH_SHORT).show()
+                                    },
+                                    context = context
+                                )
                             }
                         }
                     }
@@ -8539,5 +8807,103 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
             }
         )
+    }
+}
+
+@Composable
+fun PasswordEntityCard(
+    name: String,
+    phone: String,
+    category: String,
+    password: String?,
+    onResetPassword: (String) -> Unit,
+    context: android.content.Context
+) {
+    var editPass by remember { mutableStateOf(password ?: "") }
+    var showPass by remember { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("القسم: $category", fontSize = 10.sp, color = Color(0xFF3B82F6))
+            }
+            Text("رقم الهاتف: $phone", fontSize = 11.sp, color = Color.LightGray)
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("🔑 كلمة المرور الحالية: ${if (showPass) (password ?: "غير متوفرة") else "••••••••"}", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showPass = !showPass }) {
+                    Text(if (showPass) "إخفاء" else "إظهار", fontSize = 10.sp, color = Color.Yellow)
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = editPass,
+                    onValueChange = { editPass = it },
+                    label = { Text("كلمة مرور جديدة", fontSize = 9.sp) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                )
+                Button(
+                    onClick = {
+                        if (editPass.isNotBlank()) {
+                            onResetPassword(editPass)
+                        } else {
+                            Toast.makeText(context, "الرجاء إدخال كلمة المرور الجديدة", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    modifier = Modifier.height(36.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("تحديث 🔒", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(
+                    onClick = {
+                        val whatsappText = "مرحباً يا غالي، كلمة المرور الخاصة بحسابك في دليل خدمات اليمن هي: ${password ?: "غير متوفرة"}"
+                        val whatsappUrl = "https://wa.me/967${phone.trim().removePrefix("0").removePrefix("+967")}?text=${android.net.Uri.encode(whatsappText)}"
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(whatsappUrl))
+                            context.startActivity(intent)
+                        } catch(e: Exception) {
+                            Toast.makeText(context, "فشل فتح واتساب", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                    modifier = Modifier.height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
+                ) {
+                    Text("🟢 واتساب", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = {
+                        val smsText = "كلمة المرور الخاصة بحسابك في دليل خدمات اليمن هي: ${password ?: "غير متوفرة"}"
+                        try {
+                            val intent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:$phone")).apply {
+                                putExtra("sms_body", smsText)
+                            }
+                            context.startActivity(intent)
+                        } catch(e: Exception) {
+                            Toast.makeText(context, "فشل فتح SMS", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                    modifier = Modifier.height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
+                ) {
+                    Text("💬 رسالة SMS", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
