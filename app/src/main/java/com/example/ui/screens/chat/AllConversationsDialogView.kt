@@ -107,16 +107,22 @@ fun AllConversationsDialogView(
     val chatChannels by viewModel.chatChannels.collectAsState()
     val providers by viewModel.providers.collectAsState()
     val settingsState by viewModel.settings.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
 
     val myProvider = providers.find { it.phone == currentUserPhone }
+    val isAdmin = adminRole != "GUEST" || currentUserId == "admin" || currentUserPhone.startsWith("admin")
 
-    val myChannels = remember(chatChannels, currentUserId, currentUserPhone, myProvider) {
-        chatChannels.filter { ch ->
-            ch.id == "support_$currentUserId" ||
-            ch.id.contains(currentUserId) ||
-            (currentUserPhone.isNotEmpty() && ch.id.contains(currentUserPhone)) ||
-            (myProvider != null && (ch.id.contains("chat_p_${myProvider.id}_") || ch.id.contains("_u_${myProvider.id}"))) ||
-            currentUserId == "admin" || currentUserId.startsWith("super_")
+    val myChannels = remember(chatChannels, currentUserId, currentUserPhone, myProvider, isAdmin) {
+        if (isAdmin) {
+            chatChannels
+        } else {
+            chatChannels.filter { ch ->
+                ch.id == "support_$currentUserId" ||
+                ch.id.contains(currentUserId) ||
+                (currentUserPhone.isNotEmpty() && ch.id.contains(currentUserPhone)) ||
+                (myProvider != null && (ch.id.contains("chat_p_${myProvider.id}_") || ch.id.contains("_u_${myProvider.id}"))) ||
+                currentUserId == "admin" || currentUserId.startsWith("super_")
+            }
         }
     }
 

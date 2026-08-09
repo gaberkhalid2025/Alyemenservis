@@ -2285,7 +2285,7 @@ class MainViewModel : ViewModel() {
         triggerNotification("➕ تم إضافة الفني $name يدوياً")
     }
 
-    fun addNewBanner(title: String, url: String, redirect: String, type: String, size: String, duration: Int, displayTime: String = "طوال اليوم") {
+    fun addNewBanner(title: String, url: String, redirect: String, type: String, size: String, duration: Int, displayTime: String = "طوال اليوم", targetSection: String = "ALL") {
         val banner = BannerEntity(
             id = UUID.randomUUID().toString(),
             title = title,
@@ -2295,7 +2295,8 @@ class MainViewModel : ViewModel() {
             size = size,
             duration = duration,
             displayTime = displayTime,
-            order = _banners.value.size + 1
+            order = _banners.value.size + 1,
+            targetSection = targetSection
         )
         db.collection("banners").document(banner.id).set(banner)
         triggerNotification("🖼️ تم إضافة إعلان جديد: $title")
@@ -3656,6 +3657,38 @@ class MainViewModel : ViewModel() {
             val updated = store.copy(maxImages = maxImages)
             saveStore(updated)
             triggerNotification("📸 تم تحديث الحد الأقصى للصور إلى: $maxImages")
+        }
+    }
+
+    fun triggerQuickBookingForStore(store: StoreEntity, context: android.content.Context) {
+        val message = "مرحباً ${store.name}، أود حجز موعد لخدمة من خلال تطبيق خدمات اليمن الشامل."
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            data = android.net.Uri.parse("https://wa.me/${store.phone.trim()}?text=${android.net.Uri.encode(message)}")
+        }
+        try {
+            context.startActivity(intent)
+            triggerNotification("📅 تم تشغيل طلب الحجز السريع لمتجر ${store.name}")
+        } catch (e: Exception) {
+            try {
+                val dialIntent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${store.phone}"))
+                context.startActivity(dialIntent)
+            } catch (ex: Exception) {}
+        }
+    }
+
+    fun triggerQuickOrderForStore(store: StoreEntity, context: android.content.Context) {
+        val message = "مرحباً ${store.name}، أود تقديم طلب سريع لمنتج/خدمة عبر تطبيق دليل خدمات اليمن الشامل."
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            data = android.net.Uri.parse("https://wa.me/${store.phone.trim()}?text=${android.net.Uri.encode(message)}")
+        }
+        try {
+            context.startActivity(intent)
+            triggerNotification("⚡ تم تشغيل طلب الشراء السريع لمتجر ${store.name}")
+        } catch (e: Exception) {
+            try {
+                val dialIntent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${store.phone}"))
+                context.startActivity(dialIntent)
+            } catch (ex: Exception) {}
         }
     }
 

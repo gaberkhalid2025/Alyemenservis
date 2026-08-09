@@ -146,14 +146,27 @@ fun ProductListItemCard(
                             color = themeColors.accent
                         )
                         if (isOwnerOrAdmin) {
-                            Text(
-                                text = "✏️ تعديل",
-                                fontSize = 9.sp,
-                                color = Color.Cyan,
-                                modifier = Modifier
-                                    .clickable { isPriceEditing = true }
-                                    .padding(horizontal = 2.dp)
-                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "✏️ تعديل",
+                                    fontSize = 9.sp,
+                                    color = Color.Cyan,
+                                    modifier = Modifier
+                                        .clickable { isPriceEditing = true }
+                                        .padding(horizontal = 2.dp)
+                                )
+                                Text(
+                                    text = "🗑️ حذف",
+                                    fontSize = 9.sp,
+                                    color = Color.Red,
+                                    modifier = Modifier
+                                        .clickable {
+                                            viewModel.deleteProduct(product.id)
+                                            android.widget.Toast.makeText(context, "🗑️ تم حذف السلعة!", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(horizontal = 2.dp)
+                                )
+                            }
                         }
                     }
                 }

@@ -166,7 +166,7 @@ fun ServicesBrowserLayout(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(12.dp),
+            .padding(if (activeTabName == "الرئيسية") 12.dp else 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (settingsState.bannerEnabled && settingsState.bannerLocation == "TOP") {
@@ -188,7 +188,7 @@ fun ServicesBrowserLayout(
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                 border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -212,7 +212,7 @@ fun ServicesBrowserLayout(
                             Text(
                                 text = "البحث الذكي المتقاطع 🔍 (فنيين، محلات، استشارات...)",
                                 fontSize = 11.sp,
-                                color = Color.Gray
+                                color = themeColors.textSecondary.copy(alpha = 0.7f)
                             )
                         },
                         modifier = Modifier
@@ -221,8 +221,8 @@ fun ServicesBrowserLayout(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent,
                             unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary
                         ),
                         singleLine = true
                     )
@@ -230,13 +230,13 @@ fun ServicesBrowserLayout(
                     Surface(
                         onClick = { showFiltersPanel = !showFiltersPanel },
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF1E40AF)
+                        color = themeColors.accent
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("بحث ذكي", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("بحث ذكي ⚙️", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                     }
 

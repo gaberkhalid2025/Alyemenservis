@@ -259,14 +259,14 @@ fun ProviderRegisterFormLayout(
     val showWorkPhotos = isWorkPhotosRequirement != null && settingsState.showWorkPhotos
     val isWorkPhotosMandatory = isWorkPhotosRequirement?.second ?: false
 
-    var workPhotosList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var coverPhotoBase64 by remember { mutableStateOf("") }
 
-    val workPhotosUriPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris: List<android.net.Uri> ->
-        val converted = uris.map { convertUriToBase64(context, it) }.filter { it.isNotEmpty() }
-        val combined = (workPhotosList + converted).take(settingsState.maxWorkPhotos)
-        workPhotosList = combined
+    val coverPhotoUriPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        uri?.let {
+            coverPhotoBase64 = convertUriToBase64(context, it)
+        }
     }
 
     val storePdfPicker = rememberLauncherForActivityResult(
@@ -955,61 +955,51 @@ fun ProviderRegisterFormLayout(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "📸 نماذج من أعمالك السابقة (حد أقصى ${settingsState.maxWorkPhotos} صور)" + if (isWorkPhotosMandatory) " *" else " (اختياري)",
+                        text = "🌅 صورة غلاف الحساب / المتجر / الفني" + if (isWorkPhotosMandatory) " *" else " (اختياري)",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    if (workPhotosList.isNotEmpty()) {
-                        androidx.compose.foundation.lazy.LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            items(workPhotosList.size) { index ->
-                                val photo = workPhotosList[index]
-                                val bitmap = remember(photo) {
-                                    try {
-                                        val bytes = android.util.Base64.decode(photo, android.util.Base64.DEFAULT)
-                                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                                    } catch(e: Exception) { null }
-                                }
-                                Box(modifier = Modifier.size(70.dp)) {
-                                    if (bitmap != null) {
-                                        Image(
-                                            bitmap = bitmap,
-                                            contentDescription = null,
-                                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .align(Alignment.TopEnd)
-                                            .background(Color.Red, shape = CircleShape)
-                                            .clickable {
-                                                workPhotosList = workPhotosList.filterIndexed { idx, _ -> idx != index }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("×", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
+                    if (coverPhotoBase64.isNotEmpty()) {
+                        val bitmap = remember(coverPhotoBase64) {
+                            try {
+                                val bytes = android.util.Base64.decode(coverPhotoBase64, android.util.Base64.DEFAULT)
+                                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                            } catch(e: Exception) { null }
+                        }
+                        Box(modifier = Modifier.size(120.dp, 80.dp)) {
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.TopEnd)
+                                    .background(Color.Red, shape = CircleShape)
+                                    .clickable {
+                                        coverPhotoBase64 = ""
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("×", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    if (workPhotosList.size < settingsState.maxWorkPhotos) {
-                        Button(
-                            onClick = { workPhotosUriPicker.launch("image/*") },
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                            modifier = Modifier.fillMaxWidth().height(36.dp)
-                        ) {
-                            Text("إضافة صور من الاستوديو (${workPhotosList.size}/${settingsState.maxWorkPhotos})", fontSize = 11.sp, color = Color.White)
-                        }
+                    Button(
+                        onClick = { coverPhotoUriPicker.launch("image/*") },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                    ) {
+                        Text(if (coverPhotoBase64.isNotEmpty()) "تغيير صورة الغلاف 🌅" else "رفع صورة غلاف الحساب 📂", fontSize = 11.sp, color = Color.White)
                     }
                 }
             }
@@ -1034,7 +1024,7 @@ fun ProviderRegisterFormLayout(
                 if (isNeighbourMandatory && neighborhood.trim().isEmpty()) missingList.add("الحي أو الشارع")
                 if (isSelfieMandatory && selfiePhotoBase64.isEmpty()) missingList.add("صورة سيلفي شخصية")
                 if (isIdMandatory && idPhotoBase64.isEmpty()) missingList.add("صورة بطاقة الهوية")
-                if (isWorkPhotosMandatory && workPhotosList.isEmpty()) missingList.add("نماذج من أعمالك السابقة")
+                if (isWorkPhotosMandatory && coverPhotoBase64.isEmpty()) missingList.add("صورة غلاف الحساب")
 
                 if (password.trim().isEmpty()) missingList.add("كلمة المرور")
                 if (confirmPassword.trim().isEmpty()) missingList.add("تأكيد كلمة المرور")
@@ -1044,7 +1034,8 @@ fun ProviderRegisterFormLayout(
                         viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
                     } else {
                         val attsJson = com.example.data.ProductAttachment.serializeList(providerAttachmentsList)
-                        viewModel.submitJoinForm(context, name, phone, selectedCatId, area, neighborhood, selfiePhotoBase64, idPhotoBase64, "", workPhotosList, customProfession, password, attsJson)
+                        val wList = if (coverPhotoBase64.isNotEmpty()) listOf(coverPhotoBase64) else emptyList()
+                        viewModel.submitJoinForm(context, name, phone, selectedCatId, area, neighborhood, selfiePhotoBase64, idPhotoBase64, "", wList, customProfession, password, attsJson)
                         name = ""
                         phone = ""
                         password = ""
@@ -1055,7 +1046,7 @@ fun ProviderRegisterFormLayout(
                         neighborhood = ""
                         selfiePhotoBase64 = ""
                         idPhotoBase64 = ""
-                        workPhotosList = emptyList()
+                        coverPhotoBase64 = ""
                         providerAttachmentsList = emptyList()
                         android.widget.Toast.makeText(context, "📨 تم تقديم طلبك بنجاح! جاري عرض حالة الطلب التفاعلية.", android.widget.Toast.LENGTH_LONG).show()
                     }

@@ -33,8 +33,11 @@ import com.example.ui.MainViewModel
 @Composable
 fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) {
     val orders by viewModel.orders.collectAsState()
+    val bookings by viewModel.bookings.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val context = LocalContext.current
+
+    var activeSubTab by remember { mutableStateOf("PURCHASES") } // "PURCHASES", "URGENT"
 
     // Allow user to query by phone if currentUserPhone is empty
     var customPhoneInput by remember { mutableStateOf("") }
@@ -52,7 +55,18 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
         }
     }
 
+    val myBookings = remember(bookings, activePhone) {
+        if (activePhone.isBlank()) {
+            emptyList()
+        } else {
+            bookings.filter {
+                it.customerPhone.trim() == activePhone.trim()
+            }.sortedByDescending { it.createdAt }
+        }
+    }
+
     var selectedOrderForDeletion by remember { mutableStateOf<OrderEntity?>(null) }
+    var selectedBookingForCancellation by remember { mutableStateOf<BookingEntity?>(null) }
     var deletionCodeInput by remember { mutableStateOf("") }
     var showDeleteAllConfirm by remember { mutableStateOf(false) }
 
@@ -82,13 +96,13 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                 }
                 Column {
                     Text(
-                        text = "📦 شاشة طلبات الشراء",
+                        text = "📦 شاشة الطلبات والخدمات المستعجلة",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
-                        text = "خاصة بالمنتجات والمأكولات فقط",
+                        text = "المنتجات والمأكولات والخدمات المستعجلة والصيانة",
                         fontSize = 10.sp,
                         color = Color.LightGray
                     )
@@ -111,6 +125,49 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
         }
 
         Divider(color = themeColors.accent.copy(alpha = 0.15f), thickness = 1.dp, modifier = Modifier.padding(bottom = 12.dp))
+
+        // Toggle Sub Tabs (Purchases vs Urgent Services)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .background(themeColors.surface, RoundedCornerShape(10.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Button(
+                onClick = { activeSubTab = "PURCHASES" },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (activeSubTab == "PURCHASES") themeColors.accent else Color.Transparent
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f).height(36.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "🛍️ طلبات الشراء والمشتريات (${myOrders.size})",
+                    fontSize = 11.sp,
+                    color = if (activeSubTab == "PURCHASES") Color.Black else Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Button(
+                onClick = { activeSubTab = "URGENT" },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (activeSubTab == "URGENT") themeColors.accent else Color.Transparent
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f).height(36.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "⚡ خدمات مستعجلة وصيانة (${myBookings.size})",
+                    fontSize = 11.sp,
+                    color = if (activeSubTab == "URGENT") Color.Black else Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
 
         // If the user's phone is empty, prompt them to enter it to view their purchases
         if (currentUserPhone.isEmpty()) {
@@ -135,7 +192,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = "يرجى كتابة رقم هاتفك المحمول لعرض وتتبع جميع طلبات الشراء التي قمت بها من المتاجر والمطاعم بشكل آمن وخاص بك:",
+                        text = "يرجى كتابة رقم هاتفك المحمول لعرض وتتبع جميع طلبات الشراء أو طلبات الخدمات المستعجلة والصيانة التي قمت بها بشكل آمن وخاص بك:",
                         fontSize = 11.sp,
                         color = Color.LightGray,
                         textAlign = TextAlign.Center,
@@ -173,153 +230,281 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                     Text("اكتب رقم هاتفك أعلاه لعرض طلباتك", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
                 }
             }
-        } else if (myOrders.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("📭", fontSize = 48.sp)
-                    Text("لا توجد أي طلبات شراء مسجلة لهذا الرقم", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
-                    Text("تأكد من رقم الهاتف أو اطلب سلعاً من المتاجر والمطاعم", fontSize = 11.sp, color = Color.Gray)
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(myOrders) { order ->
-                    val deleteCode = remember(order.id) { 
-                        (order.id.hashCode().coerceAtLeast(0) % 9000 + 1000).toString() 
+        } else if (activeSubTab == "PURCHASES") {
+            if (myOrders.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("📭", fontSize = 48.sp)
+                        Text("لا توجد أي طلبات شراء مسجلة لهذا الرقم", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+                        Text("تأكد من رقم الهاتف أو اطلب سلعاً من المتاجر والمطاعم", fontSize = 11.sp, color = Color.Gray)
                     }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(myOrders) { order ->
+                        val deleteCode = remember(order.id) { 
+                            (order.id.hashCode().coerceAtLeast(0) % 9000 + 1000).toString() 
+                        }
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.15f))
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            // Order ID & Status Badge
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "طلب شراء #${order.id.takeLast(6)}",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = themeColors.accent
-                                )
-                                Surface(
-                                    color = when (order.status) {
-                                        "COMPLETED" -> Color(0xFF10B981)
-                                        "CANCELLED" -> Color(0xFFEF4444)
-                                        "PROCESSING" -> Color(0xFF3B82F6)
-                                        else -> Color(0xFFF59E0B)
-                                    },
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = when (order.status) {
-                                            "COMPLETED" -> "تم التوصيل ✅"
-                                            "CANCELLED" -> "ملغي ❌"
-                                            "PROCESSING" -> "قيد التجهيز ⏳"
-                                            else -> "قيد الانتظار ⚡"
-                                        },
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                        fontSize = 10.sp,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            // Product details
-                            Text(
-                                text = "📦 المادة: ${order.productName}", 
-                                fontSize = 13.sp, 
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "🏪 المتجر: ${order.storeName}", 
-                                fontSize = 11.sp, 
-                                color = Color.LightGray
-                            )
-                            Text(
-                                text = "📝 الملاحظات: ${order.notes.ifBlank { "لا توجد" }}", 
-                                fontSize = 11.sp, 
-                                color = Color.Gray
-                            )
-                            
-                            Divider(
-                                color = Color.Gray.copy(alpha = 0.1f), 
-                                thickness = 0.5.dp, 
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                            
-                            // Amount and Action Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = "الكمية: ${order.quantity} | السعر: ${order.price} ر.ي",
-                                        fontSize = 11.sp,
-                                        color = Color.LightGray
-                                    )
-                                    Text(
-                                        text = "الإجمالي: ${order.totalAmount} ريال يمني",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = themeColors.primary
-                                    )
-                                }
-
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.15f))
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                // Order ID & Status Badge
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Deletion Code display
-                                    Box(
-                                        modifier = Modifier
-                                            .background(themeColors.primary.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
-                                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                                    Text(
+                                        text = "طلب شراء #${order.id.takeLast(6)}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = themeColors.accent
+                                    )
+                                    Surface(
+                                        color = when (order.status) {
+                                            "COMPLETED" -> Color(0xFF10B981)
+                                            "CANCELLED" -> Color(0xFFEF4444)
+                                            "PROCESSING" -> Color(0xFF3B82F6)
+                                            else -> Color(0xFFF59E0B)
+                                        },
+                                        shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Text(
-                                            text = "كود الحذف: $deleteCode",
-                                            fontSize = 9.sp,
+                                            text = when (order.status) {
+                                                "COMPLETED" -> "تم التوصيل ✅"
+                                                "CANCELLED" -> "ملغي ❌"
+                                                "PROCESSING" -> "قيد التجهيز ⏳"
+                                                else -> "قيد الانتظار ⚡"
+                                            },
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                            fontSize = 10.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Product details
+                                Text(
+                                    text = "📦 المادة: ${order.productName}", 
+                                    fontSize = 13.sp, 
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "🏪 المتجر: ${order.storeName}", 
+                                    fontSize = 11.sp, 
+                                    color = Color.LightGray
+                                )
+                                Text(
+                                    text = "📝 الملاحظات: ${order.notes.ifBlank { "لا توجد" }}", 
+                                    fontSize = 11.sp, 
+                                    color = Color.Gray
+                                )
+                                
+                                Divider(
+                                    color = Color.Gray.copy(alpha = 0.1f), 
+                                    thickness = 0.5.dp, 
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                                
+                                // Amount and Action Row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "الكمية: ${order.quantity} | السعر: ${order.price} ر.ي",
+                                            fontSize = 11.sp,
+                                            color = Color.LightGray
+                                        )
+                                        Text(
+                                            text = "الإجمالي: ${order.totalAmount} ريال يمني",
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = themeColors.accent
+                                            color = themeColors.primary
                                         )
                                     }
 
-                                    // Delete Order Button
-                                    IconButton(
-                                        onClick = {
-                                            selectedOrderForDeletion = order
-                                            deletionCodeInput = ""
-                                        },
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(Color.Red.copy(alpha = 0.1f), CircleShape)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "حذف",
-                                            tint = Color.Red,
-                                            modifier = Modifier.size(16.dp)
+                                        // Deletion Code display
+                                        Box(
+                                            modifier = Modifier
+                                                .background(themeColors.primary.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = "كود الحذف: $deleteCode",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = themeColors.accent
+                                            )
+                                        }
+
+                                        // Delete Order Button
+                                        IconButton(
+                                            onClick = {
+                                                selectedOrderForDeletion = order
+                                                deletionCodeInput = ""
+                                            },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .background(Color.Red.copy(alpha = 0.1f), CircleShape)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "حذف",
+                                                tint = Color.Red,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            if (myBookings.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("⚡", fontSize = 48.sp)
+                        Text("لا توجد طلبات صيانة أو خدمات مستعجلة مسجلة", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+                        Text("اطلب خدمات صيانة أو إسعافات من شاشة الخدمات الفنية والمراكز", fontSize = 11.sp, color = Color.Gray)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(myBookings) { booking ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "طلب خدمة مستعجلة #${booking.bookingNumber.ifEmpty { booking.id.takeLast(6) }}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = themeColors.accent
+                                    )
+                                    Surface(
+                                        color = when (booking.status) {
+                                            "APPROVED", "SUCCESS" -> Color(0xFF10B981)
+                                            "REJECTED", "CANCELLED" -> Color(0xFFEF4444)
+                                            else -> Color(0xFFF59E0B)
+                                        },
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = when (booking.status) {
+                                                "APPROVED" -> "تم القبول ومؤكد ✅"
+                                                "SUCCESS" -> "مكتمل بنجاح 🎉"
+                                                "REJECTED" -> "مرفوض من الفني ❌"
+                                                "CANCELLED" -> "ملغي من العميل 🗑️"
+                                                else -> "قيد الانتظار والمراجعة ⏳"
+                                            },
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                            fontSize = 9.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
                                         )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "🔧 الخدمة المطلوبة: ${booking.serviceType}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "👤 مقدم الخدمة: ${booking.providerName}",
+                                    fontSize = 11.sp,
+                                    color = Color.LightGray
+                                )
+                                Text(
+                                    text = "📍 العنوان المحدد: ${booking.clientAddress.ifEmpty { booking.customerArea }}",
+                                    fontSize = 11.sp,
+                                    color = Color.LightGray
+                                )
+                                if (booking.serviceDetails.isNotEmpty()) {
+                                    Text(
+                                        text = "📝 تفاصيل العطل: ${booking.serviceDetails}",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+
+                                Divider(
+                                    color = Color.Gray.copy(alpha = 0.1f),
+                                    thickness = 0.5.dp,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "🔑 كود الإلغاء الآمن: ${booking.bookingPassword.ifEmpty { booking.pinCode }}",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = themeColors.primary
+                                    )
+
+                                    if (booking.status != "CANCELLED" && booking.status != "REJECTED") {
+                                        Button(
+                                            onClick = {
+                                                selectedBookingForCancellation = booking
+                                                deletionCodeInput = ""
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.15f)),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(28.dp),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("إلغاء الطلب 🗑️", fontSize = 10.sp, color = Color.Red, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
@@ -454,6 +639,84 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                         }
                         OutlinedButton(
                             onClick = { showDeleteAllConfirm = false },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        ) {
+                            Text("تراجع", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 🔒 Confirm Individual Booking Deletion Code Dialog
+    if (selectedBookingForCancellation != null) {
+        val booking = selectedBookingForCancellation!!
+        val correctCode = booking.bookingPassword.ifEmpty { booking.pinCode }.ifEmpty { "1234" }
+
+        Dialog(onDismissRequest = { selectedBookingForCancellation = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(2.dp, themeColors.accent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "🔒 إلغاء طلب الخدمة المستعجلة",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.accent
+                    )
+                    Text(
+                        text = "لكي تتمكن من إلغاء هذا الطلب بنفسك، يرجى كتابة كود الإلغاء الآمن المكون من 4 أرقام وهو ($correctCode):",
+                        fontSize = 12.sp,
+                        color = Color.LightGray,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+                    OutlinedTextField(
+                        value = deletionCodeInput,
+                        onValueChange = { deletionCodeInput = it },
+                        placeholder = { Text("اكتب الرمز المكون من 4 أرقام") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = themeColors.accent
+                        ),
+                        singleLine = true
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (deletionCodeInput.trim() == correctCode) {
+                                    viewModel.cancelBookingByUser(booking.id)
+                                    selectedBookingForCancellation = null
+                                    Toast.makeText(context, "✅ تم إلغاء طلب الخدمة بنجاح!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "❌ رمز الإلغاء غير صحيح! يرجى المحاولة مرة أخرى.", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("تأكيد الإلغاء 🗑️", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                        OutlinedButton(
+                            onClick = { selectedBookingForCancellation = null },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                         ) {

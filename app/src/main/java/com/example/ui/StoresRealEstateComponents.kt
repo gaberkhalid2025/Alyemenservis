@@ -254,10 +254,15 @@ fun StoresTabContent(
     val stores by viewModel.stores.collectAsState()
     val cities by viewModel.cities.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val banners by viewModel.banners.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
     val currentPhone by viewModel.currentUserPhone.collectAsState()
     val currentLang by viewModel.currentLanguage.collectAsState()
     val isEn = currentLang == "en"
+
+    val sectionBanners = remember(banners, sectionId) {
+        banners.filter { it.targetSection.equals(sectionId, ignoreCase = true) }
+    }
 
     val sectionCategories = remember(categories, sectionId) {
         val filtered = categories.filter { it.parentId == sectionId && !it.isMainCategory }
@@ -407,6 +412,15 @@ fun StoresTabContent(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+            }
+        }
+
+        // Section Specific Banner Slider
+        if (sectionBanners.isNotEmpty()) {
+            com.example.ui.components.BannerSliderView(banners = sectionBanners, themeColors = themeColors) { catTarget ->
+                if (catTarget.isNotEmpty()) {
+                    selectedCatId = catTarget
                 }
             }
         }
@@ -586,6 +600,13 @@ fun StoreListItemCard(
     var editStoreCover by remember(store) { mutableStateOf(store.coverImage) }
     var editStorePhone by remember(store) { mutableStateOf(store.phone) }
     var editStoreHours by remember(store) { mutableStateOf(store.workingHours) }
+    var editIsPinned by remember(store) { mutableStateOf(store.isPinned) }
+    var editIsVip by remember(store) { mutableStateOf(store.isVip) }
+    var editIsVerified by remember(store) { mutableStateOf(store.isVerified) }
+    var editIsRecommended by remember(store) { mutableStateOf(store.isRecommended) }
+    var editPaymentEnabled by remember(store) { mutableStateOf(store.paymentEnabled) }
+    var editIsChatDisabled by remember(store) { mutableStateOf(store.isChatDisabled) }
+    var editIsNotificationsDisabled by remember(store) { mutableStateOf(store.isNotificationsDisabled) }
 
     val logoBitmap = remember(store.logoImage) {
         if (store.logoImage.isNotEmpty() && !store.logoImage.startsWith("http") && !store.logoImage.startsWith("content")) {
@@ -872,6 +893,44 @@ fun StoreListItemCard(
                     }
                 }
 
+                // Booking Button (Admin Customization)
+                if (settingsState.showBookButton) {
+                    Button(
+                        onClick = {
+                            if (viewModel != null) {
+                                viewModel.triggerQuickBookingForStore(store, context)
+                            } else {
+                                android.widget.Toast.makeText(context, "الحجز متاح من القائمة الرئيسية", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("📅 حجز", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Quick Order Button (Admin Customization)
+                if (settingsState.showQuickOrderButton) {
+                    Button(
+                        onClick = {
+                            if (viewModel != null) {
+                                viewModel.triggerQuickOrderForStore(store, context)
+                            } else {
+                                android.widget.Toast.makeText(context, "الطلب السريع متاح من القائمة الرئيسية", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("⚡ طلب سريع", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+
                 // Details & Booking
                 Button(
                     onClick = onClick,
@@ -941,6 +1000,40 @@ fun StoreListItemCard(
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                     )
 
+                    // Admin Toggles
+                    Text("⚙️ صلاحيات وإعدادات تحكم الأدمن", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("📌 تثبيت في صدارة القائمة الرئيسيّة", fontSize = 10.sp, color = Color.White)
+                            Switch(checked = editIsPinned, onCheckedChange = { editIsPinned = it })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("🏆 تصنيف كـ VIP متميز", fontSize = 10.sp, color = Color.White)
+                            Switch(checked = editIsVip, onCheckedChange = { editIsVip = it })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("✅ توثيق المحل (أيقونة موثق)", fontSize = 10.sp, color = Color.White)
+                            Switch(checked = editIsVerified, onCheckedChange = { editIsVerified = it })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("💖 موصى به (Badge الموصى به)", fontSize = 10.sp, color = Color.White)
+                            Switch(checked = editIsRecommended, onCheckedChange = { editIsRecommended = it })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("💳 ربط وتفعيل أنظمة الدفع للمتجر", fontSize = 10.sp, color = Color.White)
+                            Switch(checked = editPaymentEnabled, onCheckedChange = { editPaymentEnabled = it })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("💬 تفعيل الدردشة الفورية للمتجر", fontSize = 10.sp, color = Color.White)
+                            Switch(checked = !editIsChatDisabled, onCheckedChange = { editIsChatDisabled = !it })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("🔔 تفعيل توجيه الإشعارات المباشرة للمتجر", fontSize = 10.sp, color = Color.White)
+                            Switch(checked = !editIsNotificationsDisabled, onCheckedChange = { editIsNotificationsDisabled = !it })
+                        }
+                    }
+
                     Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                         Button(
                             onClick = { showAdminQuickEditDialog = false },
@@ -958,7 +1051,14 @@ fun StoreListItemCard(
                                             logoImage = editStoreLogo,
                                             coverImage = editStoreCover,
                                             phone = editStorePhone,
-                                            workingHours = editStoreHours
+                                            workingHours = editStoreHours,
+                                            isPinned = editIsPinned,
+                                            isVip = editIsVip,
+                                            isVerified = editIsVerified,
+                                            isRecommended = editIsRecommended,
+                                            paymentEnabled = editPaymentEnabled,
+                                            isChatDisabled = editIsChatDisabled,
+                                            isNotificationsDisabled = editIsNotificationsDisabled
                                         )
                                     )
                                 }
@@ -1460,12 +1560,13 @@ fun StoreDetailsDialog(
         DataManager.getReviews(store.id)
     }.collectAsState(initial = emptyList())
     val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
     val context = LocalContext.current
 
-    val isOwnerOrAdmin = remember(adminRole, currentUserId, store) {
-        adminRole != "GUEST" || store.ownerId == currentUserId || store.phone == currentUserId
+    val isOwnerOrAdmin = remember(adminRole, currentUserId, currentUserPhone, store) {
+        adminRole != "GUEST" || store.ownerId == currentUserId || store.phone == currentUserId || store.ownerId == currentUserPhone || store.phone == currentUserPhone
     }
 
     val storeProducts = remember(products, store.id) {
@@ -1526,30 +1627,31 @@ fun StoreDetailsDialog(
         }
     }
 
+    val parsedBgColor = remember(store.backgroundColorHex) {
+        try {
+            if (store.backgroundColorHex.isNotBlank()) {
+                Color(android.graphics.Color.parseColor(store.backgroundColorHex))
+            } else {
+                themeColors.background
+            }
+        } catch (e: Exception) {
+            themeColors.background
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
+        Surface(
+            color = parsedBgColor,
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.65f))
-                .clickable { onDismiss() },
-            contentAlignment = Alignment.Center
+                .clickable(enabled = false) {}
         ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.background),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier
-                    .fillMaxWidth(0.94f)
-                    .wrapContentHeight()
-                    .heightIn(max = 680.dp)
-                    .clickable(enabled = false) {}
-                    .border(2.dp, Brush.linearGradient(listOf(themeColors.accent, themeColors.primary)), RoundedCornerShape(20.dp))
-            ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
                 // 1. Cover Image Banner
@@ -2104,7 +2206,6 @@ fun StoreDetailsDialog(
         }
     }
 }
-}
 
 
 
@@ -2388,16 +2489,25 @@ fun PropertyDetailsDialog(
 
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     val adminRole by viewModel.adminRole.collectAsState()
+                    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+                    val isOwnerOrAdmin = remember(adminRole, currentUserId, currentUserPhone, property) {
+                        adminRole != "GUEST" || property.ownerId == currentUserId || property.phone == currentUserId || property.ownerId == currentUserPhone || property.phone == currentUserPhone
+                    }
                     var showEditDialog by remember { mutableStateOf(false) }
 
-                    if (adminRole != "GUEST") {
+                    if (isOwnerOrAdmin) {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.2f)),
-                            border = BorderStroke(1.dp, Color.Red),
+                            colors = CardDefaults.cardColors(containerColor = if (adminRole != "GUEST") Color(0xFF7F1D1D).copy(alpha = 0.2f) else themeColors.surface),
+                            border = BorderStroke(1.dp, if (adminRole != "GUEST") Color.Red else themeColors.accent.copy(alpha = 0.5f)),
                             modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
                         ) {
                             Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("🛠️ لوحة تحكم الإدارة الفورية لهذا العقار:", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = if (adminRole != "GUEST") "🛠️ لوحة تحكم الإدارة الفورية لهذا العقار:" else "⚙️ لوحة التحكم بملكيتك لهذا العقار:",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
                                         onClick = { showEditDialog = true },
@@ -2406,20 +2516,20 @@ fun PropertyDetailsDialog(
                                         shape = RoundedCornerShape(8.dp),
                                         contentPadding = PaddingValues(0.dp)
                                     ) {
-                                        Text("📝 تعديل البيانات", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text("📝 تعديل السعر والبيانات", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                     Button(
                                         onClick = {
                                             viewModel.deleteProperty(property.id)
                                             onDismiss()
-                                            android.widget.Toast.makeText(context, "🗑️ تم حذف وحظر العقار من النظام بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                                            android.widget.Toast.makeText(context, "🗑️ تم حذف العقار بنجاح!", android.widget.Toast.LENGTH_LONG).show()
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                         modifier = Modifier.weight(1f).height(36.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         contentPadding = PaddingValues(0.dp)
                                     ) {
-                                        Text("🗑️ حذف وحظر", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text("🗑️ حذف وإلغاء", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -2701,6 +2811,7 @@ fun StoreCreateEditDialog(
 
     var selectedCatId by remember { mutableStateOf(store?.categoryId ?: availableCategories.firstOrNull()?.id ?: "") }
     var workingHours by remember { mutableStateOf(store?.workingHours ?: "9:00 AM - 10:00 PM") }
+    var backgroundColorHex by remember { mutableStateOf(store?.backgroundColorHex ?: "") }
     
     // Passwords
     var password by remember { mutableStateOf(store?.password ?: "") }
@@ -2893,6 +3004,47 @@ fun StoreCreateEditDialog(
                         unfocusedTextColor = Color.White
                     )
                 )
+
+                // Personal page background color
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedTextField(
+                        value = backgroundColorHex,
+                        onValueChange = { backgroundColorHex = it },
+                        label = { Text("لون خلفية الصفحة الشخصية (Hex مثال: #0F172A)", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
+                    )
+                    Text("💡 اختر من الألوان الجاهزة:", fontSize = 10.sp, color = themeColors.textSecondary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        listOf(
+                            Triple("#121212", "داكن", Color(0xFF121212)),
+                            Triple("#0F172A", "كحلي", Color(0xFF0F172A)),
+                            Triple("#FAF7F2", "بيج", Color(0xFFFAF7F2)),
+                            Triple("#1E1B18", "بني", Color(0xFF1E1B18)),
+                            Triple("#0B1F19", "زيتي", Color(0xFF0B1F19))
+                        ).forEach { (hex, label, col) ->
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 48.dp, height = 24.dp)
+                                    .background(col, RoundedCornerShape(4.dp))
+                                    .border(1.dp, if (backgroundColorHex == hex) themeColors.accent else Color.Gray, RoundedCornerShape(4.dp))
+                                    .clickable { backgroundColorHex = hex },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    label,
+                                    fontSize = 8.sp,
+                                    color = if (col == Color(0xFFFAF7F2)) Color.Black else Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // Passwords with confirmation
                 Text("🔑 كلمة المرور لحساب المالك والمشرف:", fontSize = 11.sp, color = themeColors.textSecondary)
@@ -3146,7 +3298,8 @@ fun StoreCreateEditDialog(
                                 pdfFileUri = pdfUriText,
                                 pdfFileBase64 = pdfBase64Text,
                                 pdfStatus = if (pdfBase64Text.isNotEmpty()) (store?.pdfStatus ?: "PENDING") else "",
-                                images = storePhotosList
+                                images = storePhotosList,
+                                backgroundColorHex = backgroundColorHex
                             )
                             viewModel.saveStore(newStore)
                             onDismiss()
