@@ -345,34 +345,8 @@ fun ProductAttachmentsSection(
                         }
                     }
 
-                    Text("📋 قائمة المنتجات والخدمات (من Excel/JSON):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF0F172A))
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("الصورة", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                            Text("اسم المنتج", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("السعر", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("الفئة", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                        }
-                        HorizontalDivider(color = Color.DarkGray)
-                        listOf(
-                            Triple("أرز بسمتي فاخر", "1,000 YER", "مواد غذائية"),
-                            Triple("زيت طهي نقي", "1,500 YER", "مواد غذائية"),
-                            Triple("سكر أبيض ممتاز", "800 YER", "مواد غذائية")
-                        ).forEach { (pName, price, cat) ->
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text("🖼️", fontSize = 12.sp)
-                                Text(pName, fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                Text(price, fontSize = 9.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
-                                Text(cat, fontSize = 9.sp, color = Color.LightGray)
-                            }
-                        }
+                    if (attachments.isEmpty()) {
+                        Text("لا توجد ملفات أو مرفقات مضافة حالياً من قبل صاحب المنشأة.", fontSize = 10.sp, color = Color.Gray)
                     }
 
                     if (images.isNotEmpty()) {
@@ -392,18 +366,6 @@ fun ProductAttachmentsSection(
                                     }
                                 }
                             }
-                        }
-                    }
-
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("💡 نصيحة:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Yellow)
-                            Text("• لتحميل الكتالوج الكامل (PDF)، اضغط على زر التحميل أعلاه.", fontSize = 9.sp, color = Color.LightGray)
-                            Text("• لقراءة قائمة الأسعار (Excel)، يمكنك فتحها في إكسيل أو جوجل شيتس.", fontSize = 9.sp, color = Color.LightGray)
                         }
                     }
                 }

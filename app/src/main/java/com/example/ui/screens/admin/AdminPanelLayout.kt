@@ -119,6 +119,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     var isAuthorized by remember(adminRole) { mutableStateOf(adminRole != "GUEST") }
     var activeSubTab by remember(adminRole) { mutableStateOf(if (adminRole == "OWNER") "BACKDOOR" else "REG_REQ") }
     var adminReqSubTab by remember { mutableStateOf("SERVICES") } // SERVICES, PROPERTIES, STORES, MEDICAL, RESTAURANTS, JOBS
+    var adminBookingSubTab by remember { mutableStateOf("SERVICES") }
+    var adminChatSubTab by remember { mutableStateOf("SERVICES") }
     var adminAddSubTab by remember { mutableStateOf("SERVICES") } // SERVICES, PROPERTIES, STORES, MEDICAL, RESTAURANTS, JOBS
 
     // Dialog state controllers for category edits and deletions
@@ -2818,6 +2820,32 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 item {
                     Text("📅 إدارة حجوزات الصيانة والطلبات والتحكم بالاستمارات", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     Spacer(modifier = Modifier.height(4.dp))
+
+                    val bookingSubTabs = listOf(
+                        Triple("SERVICES", "🔧 الخدمات والمهن", bookings.count { it.providerId.contains("SERVICES") || it.providerId == "ALL" || !it.providerId.contains("PROPERTIES") && !it.providerId.contains("STORES") && !it.providerId.contains("MEDICAL") && !it.providerId.contains("RESTAURANTS") && !it.providerId.contains("JOBS") }),
+                        Triple("PROPERTIES", "🏠 العقارات", bookings.count { it.providerId.contains("PROPERTIES") }),
+                        Triple("STORES", "🏪 المراكز والمحلات", bookings.count { it.providerId.contains("STORES") }),
+                        Triple("MEDICAL", "🏥 المراكز الطبية", bookings.count { it.providerId.contains("MEDICAL") }),
+                        Triple("RESTAURANTS", "🍔 المطاعم والكافيهات", bookings.count { it.providerId.contains("RESTAURANTS") }),
+                        Triple("JOBS", "💼 الوظائف", bookings.count { it.providerId.contains("JOBS") })
+                    )
+
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                        items(bookingSubTabs.size) { index ->
+                            val st = bookingSubTabs[index]
+                            val isSel = adminBookingSubTab == st.first
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSel) themeColors.accent else themeColors.surface)
+                                    .clickable { adminBookingSubTab = st.first }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .border(1.dp, if (isSel) Color.White else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            ) {
+                                Text("${st.second} (${st.third})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSel) Color.Black else Color.White)
+                            }
+                        }
+                    }
                 }
 
                 // Dynamic Booking Form & Routing Config Card
@@ -3030,14 +3058,26 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
                 }
 
-                if (bookings.isEmpty()) {
+                val filteredBookings = bookings.filter { b ->
+                    when (adminBookingSubTab) {
+                        "SERVICES" -> b.providerId.contains("SERVICES") || b.providerId == "ALL" || (!b.providerId.contains("PROPERTIES") && !b.providerId.contains("STORES") && !b.providerId.contains("MEDICAL") && !b.providerId.contains("RESTAURANTS") && !b.providerId.contains("JOBS"))
+                        "PROPERTIES" -> b.providerId.contains("PROPERTIES")
+                        "STORES" -> b.providerId.contains("STORES")
+                        "MEDICAL" -> b.providerId.contains("MEDICAL")
+                        "RESTAURANTS" -> b.providerId.contains("RESTAURANTS")
+                        "JOBS" -> b.providerId.contains("JOBS")
+                        else -> true
+                    }
+                }
+
+                if (filteredBookings.isEmpty()) {
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
-                            Text("لا توجد طلبات حجز مكتوبة حالياً في السجلات", fontSize = 11.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
+                            Text("لا توجد طلبات حجز مطابقة في هذا القسم حالياً.", fontSize = 11.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
                         }
                     }
                 } else {
-                    items(bookings, key = { it.id }) { b ->
+                    items(filteredBookings, key = { it.id }) { b ->
                         Card(
                             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                             border = BorderStroke(1.dp, if (b.status == "PENDING") themeColors.accent else Color.Transparent),
@@ -3709,23 +3749,61 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 item {
                     Text("📋 قنوات المحادثة والدردشة النشطة حالياً (${chatChannels.size}):", fontSize = 12.sp, color = themeColors.textSecondary, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
+
+                    val chatSubTabs = listOf(
+                        Triple("SERVICES", "🔧 الخدمات", chatChannels.count { !it.isProvider || it.userName.contains("فني") || it.id.contains("service") }),
+                        Triple("PROPERTIES", "🏠 العقارات", chatChannels.count { it.id.contains("property") || it.lastMessage.contains("عقار") }),
+                        Triple("STORES", "🏪 المتاجر", chatChannels.count { it.id.contains("store") || it.lastMessage.contains("متجر") || it.lastMessage.contains("سلعة") }),
+                        Triple("MEDICAL", "🏥 طبية", chatChannels.count { it.id.contains("medical") || it.lastMessage.contains("صيدلية") }),
+                        Triple("RESTAURANTS", "🍔 مطاعم", chatChannels.count { it.id.contains("restaurant") || it.lastMessage.contains("وجبة") }),
+                        Triple("JOBS", "💼 وظائف", chatChannels.count { it.id.contains("job") || it.lastMessage.contains("وظيفة") })
+                    )
+
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                        items(chatSubTabs.size) { index ->
+                            val st = chatSubTabs[index]
+                            val isSel = adminChatSubTab == st.first
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSel) themeColors.accent else themeColors.surface)
+                                    .clickable { adminChatSubTab = st.first }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .border(1.dp, if (isSel) Color.White else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            ) {
+                                Text("${st.second} (${st.third})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSel) Color.Black else Color.White)
+                            }
+                        }
+                    }
                 }
 
-                if (chatChannels.isEmpty()) {
+                val filteredChatChannels = chatChannels.filter { ch ->
+                    when (adminChatSubTab) {
+                        "SERVICES" -> !ch.id.contains("property") && !ch.id.contains("store") && !ch.id.contains("medical") && !ch.id.contains("restaurant") && !ch.id.contains("job")
+                        "PROPERTIES" -> ch.id.contains("property") || ch.lastMessage.contains("عقار")
+                        "STORES" -> ch.id.contains("store") || ch.lastMessage.contains("متجر")
+                        "MEDICAL" -> ch.id.contains("medical") || ch.lastMessage.contains("صيدلية")
+                        "RESTAURANTS" -> ch.id.contains("restaurant") || ch.lastMessage.contains("وجبة")
+                        "JOBS" -> ch.id.contains("job") || ch.lastMessage.contains("وظيفة")
+                        else -> true
+                    }
+                }
+
+                if (filteredChatChannels.isEmpty()) {
                     item {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("لا توجد محادثات نشطة حالياً بالمنصة 🟢", fontSize = 12.sp, color = Color.Green, fontWeight = FontWeight.Bold)
+                                Text("لا توجد محادثات نشطة مطابقة في هذا القسم 🟢", fontSize = 12.sp, color = Color.Green, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("لم يقم أي فني أو عميل ببدء دردشة جديدة حتى الآن، سيتم المزامنة تلقائياً بمجرد إرسال أي رسالة.", fontSize = 10.sp, color = themeColors.textSecondary)
+                                Text("لم يبدأ أي طرف محادثة في هذا القسم حتى الآن.", fontSize = 10.sp, color = themeColors.textSecondary)
                             }
                         }
                     }
                 } else {
-                    items(chatChannels, key = { it.id }) { ch ->
+                    items(filteredChatChannels, key = { it.id }) { ch ->
                         Card(
                             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { showActiveChatChannelObj = ch }

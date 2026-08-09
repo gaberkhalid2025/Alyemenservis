@@ -112,13 +112,24 @@ fun QuickServiceRequestDialog(
 
     var nameInput by remember(currentUserName, currentUserPhone) { mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotBlank()) "عميل ($currentUserPhone)" else "" }) }
     var phoneInput by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
+    var selectedCategoryTab by remember { mutableStateOf("SERVICES") } // SERVICES, STORES, RESTAURANTS, MEDICAL, PROPERTIES, JOBS
     var selectedCity by remember { mutableStateOf("صنعاء") }
     var selectedServiceType by remember { mutableStateOf("سباكة وتمديدات") }
     var problemDescription by remember { mutableStateOf("") }
     var pinCodeInput by remember { mutableStateOf("") }
 
     val yemeniCities = listOf("صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت", "ذمار", "عمران", "صعدة", "مأرب", "شبوة", "البيضاء", "لحج", "أبين", "المهرة")
-    val serviceTypes = listOf("سباكة وتمديدات", "كهرباء وصيانة", "تكييف وتبريد", "صيانة سيارات", "نقل عفش وأثاث", "تنظيف ومكافحة حشرات", "بناء ومقاولات", "برمجة وهواتف", "أخرى")
+    
+    val categoryTabs = listOf(
+        Triple("SERVICES", "🔧 الخدمات والفنيين", listOf("سباكة وتمديدات", "كهرباء وصيانة", "تكييف وتبريد", "صيانة سيارات", "نقل عفش", "تنظيف ومكافحة", "برمجة وهواتف", "أخرى")),
+        Triple("STORES", "🏪 المراكز والمتاجر", listOf("مواد غذائية", "إلكترونيات وهواتف", "أجهزة منزلية", "ملابس وأزياء", "عطور ومستحضرات", "أثاث منزلي", "أخرى")),
+        Triple("RESTAURANTS", "🍔 المطاعم والكافيهات", listOf("وجبات سريعة", "مشويات ومندي", "حلويات وعصائر", "مأكولات شعبية", "قهوة ومشروبات", "أخرى")),
+        Triple("MEDICAL", "🏥 المراكز الطبية", listOf("عيادة عامة وطوارئ", "أسنان وتجميل", "صيدلية وتوصيل أدوية", "مختبر وتحاليل", "أشعة", "أخرى")),
+        Triple("PROPERTIES", "🏠 العقارات والأراضي", listOf("شقق إيجار", "بيوت ومنازل للبيع", "أراضي وعقارات تجارية", "استئجار مفروش", "أخرى")),
+        Triple("JOBS", "💼 الوظائف والخدمات", listOf("وظيفة شاغرة", "طلب عمل/مهنة", "خدمات حرة", "أخرى"))
+    )
+
+    val currentSubTypes = categoryTabs.find { it.first == selectedCategoryTab }?.third ?: listOf("عام")
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -209,12 +220,36 @@ fun QuickServiceRequestDialog(
                     }
                 }
 
+                // Category Section Choice
+                Column {
+                    Text("📂 قسم المنشأة / الطلب:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        items(categoryTabs.size) { idx ->
+                            val cat = categoryTabs[idx]
+                            val isSel = selectedCategoryTab == cat.first
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSel) themeColors.accent else themeColors.surface)
+                                    .clickable {
+                                        selectedCategoryTab = cat.first
+                                        selectedServiceType = cat.third.firstOrNull() ?: ""
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .border(1.dp, if (isSel) Color.White else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                            ) {
+                                Text(cat.second, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSel) Color.Black else Color.White)
+                            }
+                        }
+                    }
+                }
+
                 // Specialty Choice
                 Column {
-                    Text("🔧 التخصص / الخدمة المطلوبة:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("🔧 التخصص أو نوع السلعة/الخدمة المطلوبة:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        items(serviceTypes.size) { idx ->
-                            val s = serviceTypes[idx]
+                        items(currentSubTypes.size) { idx ->
+                            val s = currentSubTypes[idx]
                             val isSel = selectedServiceType == s
                             Box(
                                 modifier = Modifier
@@ -274,22 +309,23 @@ fun QuickServiceRequestDialog(
                             android.widget.Toast.makeText(context, "⚠️ يرجى إدخال رقم هاتف يمني صحيح مكون من 9 أرقام (77/73/71/70/78)", android.widget.Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        val desc = if (problemDescription.isBlank()) "طلب خدمة عاجلة: $selectedServiceType في $selectedCity" else problemDescription
+                        val sectionLabel = categoryTabs.find { it.first == selectedCategoryTab }?.second ?: "المنشآت"
+                        val desc = if (problemDescription.isBlank()) "طلب عاجل [$sectionLabel]: $selectedServiceType في $selectedCity" else "[ $sectionLabel - $selectedServiceType ]: $problemDescription"
 
                         viewModel.addBooking(
                             name = nameInput.ifEmpty { "عميل" },
                             phone = cleanP,
                             area = selectedCity,
                             serviceType = desc,
-                            providerId = "ALL",
-                            providerName = "جميع الفنيين المعتمدين",
+                            providerId = "ALL_${selectedCategoryTab}",
+                            providerName = "جميع مزودي $sectionLabel",
                             dateString = "طلب عاجل الآن ⚡",
-                            timeString = "المزاد العكسي",
+                            timeString = "المزاد العكسي الشامل",
                             customPassword = pinCodeInput.trim()
                         )
 
-                        viewModel.triggerNotification("🚀 تم نشر طلبك العاجل بنجاح! تم تنبيه جميع الفنيين المتخصصين في $selectedCity")
-                        android.widget.Toast.makeText(context, "✅ تم إرسال طلبك العاجل بنجاح لجميع الفنيين المتخصصين! تابع العروض الواردة في شاشة طلباتي.", android.widget.Toast.LENGTH_LONG).show()
+                        viewModel.triggerNotification("🚀 تم نشر طلبك في قسم ($sectionLabel) بنجاح! تم تنبيه جميع الجهات والمزودين في $selectedCity")
+                        android.widget.Toast.makeText(context, "✅ تم إرسال طلبك بنجاح لجميع المزودين والمراكز في قسم $sectionLabel! ترقب عروضهم وأسعارهم مباشرة في طلباتي.", android.widget.Toast.LENGTH_LONG).show()
 
                         onRequestCreated()
                     },
@@ -299,7 +335,7 @@ fun QuickServiceRequestDialog(
                 ) {
                     Icon(imageVector = Icons.Default.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("إرسال الطلب لجميع الفنيين فوراً 🚀", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("إرسال الطلب لجميع المزودين والمتاجر فوراً 🚀", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
