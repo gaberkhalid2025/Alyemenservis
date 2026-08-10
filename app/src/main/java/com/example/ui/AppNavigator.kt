@@ -330,7 +330,7 @@ fun AppNavigator(
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                                 "BOOKINGS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
-                                "ORDERS_VIEW" -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors)
+                                "ORDERS_VIEW" -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { showRequestServiceModal = true })
                                 "MAP_VIEW" -> com.example.ui.MapScreen(
                                     viewModel = viewModel,
                                     onBackClick = { viewModel.navigateTo("HOME") },

@@ -65,9 +65,6 @@ data class AdminSettingsEntity(
     val allowTextToSpeechBookingForm: Boolean = true,
     val approveChatsBeforeProvider: Boolean = false,
     val bookingRouting: String = "BOTH", // "BOTH", "ADMIN", "PROVIDER"
-    val enablePurchaseButtonGlobal: Boolean = true,
-    val purchaseButtonMode: String = "ALL", // "ALL", "STORES_ONLY", "NONE"
-    val enableMedicalBooking: Boolean = true,
 
     // Section 10 layout and details customization
     val activeFontFamily: String = "CAIRO", // "CAIRO", "DEFAULT", "TAHOMA", "AMIRI"

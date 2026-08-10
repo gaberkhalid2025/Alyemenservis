@@ -107,7 +107,7 @@ fun ProductAttachmentsSection(
                     }
 
                     Text(
-                        "📌 الملفات المرفوعة (${attachments.size}/10):",
+                        "📌 الملفات المرفوعة (${attachments.size}):",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -178,7 +178,7 @@ fun ProductAttachmentsSection(
                     }
 
                     Text(
-                        "📂 ملفاتي الحالية (${attachments.size}/10):",
+                        "📂 ملفاتي الحالية (${attachments.size}):",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

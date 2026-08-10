@@ -33,7 +33,7 @@ import com.example.utils.*
 import com.example.ui.MainViewModel
 
 @Composable
-fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) {
+fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette, onRequestQuickService: () -> Unit = {}) {
     val orders by viewModel.orders.collectAsState()
     val bookings by viewModel.bookings.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
@@ -220,7 +220,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
         if (selectedOrderTypeTab == "URGENT_SERVICES") {
             // Button to trigger new quick service request
             Button(
-                onClick = { viewModel.showQuickServiceDialog = true },
+                onClick = { onRequestQuickService() },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                 modifier = Modifier.fillMaxWidth().height(42.dp).padding(bottom = 6.dp),
                 shape = RoundedCornerShape(10.dp)

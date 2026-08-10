@@ -636,14 +636,22 @@ class MainViewModel : ViewModel() {
     }
 
     init {
-        setupRealtimeFirestoreListeners()
-        loadCardSettings()
-        loadPendingTechnicians()
-        loadUserPoints()
         try {
+            setupRealtimeFirestoreListeners()
+            loadCardSettings()
+            loadPendingTechnicians()
+            loadUserPoints()
             seedFirestoreIfEmpty()
         } catch (e: Exception) {
             e.printStackTrace()
+            _isInitialized.value = true
+        }
+
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(1500)
+            if (!_isInitialized.value) {
+                _isInitialized.value = true
+            }
         }
 
         // Initialization complete
