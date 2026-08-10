@@ -35,6 +35,8 @@ fun ProductListItemCard(
     isOwnerOrAdmin: Boolean,
     themeColors: VisualThemePalette,
     viewModel: MainViewModel,
+    isMedical: Boolean = false,
+    isRestaurant: Boolean = false,
     onOrderClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -162,13 +164,23 @@ fun ProductListItemCard(
             Spacer(modifier = Modifier.width(6.dp))
 
             // Order Action Button
-            Button(
-                onClick = onOrderClick,
-                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text("🛒 شراء", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            val settings = viewModel.settings.collectAsState().value
+            val showPurchase = if (isMedical) settings.enableMedicalBooking else (settings.enablePurchaseButtonGlobal && settings.purchaseButtonMode != "NONE")
+
+            if (showPurchase) {
+                Button(
+                    onClick = onOrderClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isMedical) Color(0xFF0284C7) else themeColors.accent),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    val btnText = when {
+                        isMedical -> "📅 حجز موعد"
+                        isRestaurant -> "🍽️ طلب الوجبة"
+                        else -> "🛒 شراء"
+                    }
+                    Text(btnText, color = if (isMedical) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

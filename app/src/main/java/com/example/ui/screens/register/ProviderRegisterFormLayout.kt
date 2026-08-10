@@ -1020,7 +1020,8 @@ fun ProviderRegisterFormLayout(
             attachments = providerAttachmentsList,
             onAttachmentsChanged = { providerAttachmentsList = it },
             mode = "REGISTRATION",
-            themeColors = themeColors
+            themeColors = themeColors,
+            departmentType = "PROVIDER"
         )
 
         Button(
@@ -1294,7 +1295,8 @@ fun ProviderRegisterFormLayout(
             attachments = storeAttachmentsList,
             onAttachmentsChanged = { storeAttachmentsList = it },
             mode = "REGISTRATION",
-            themeColors = themeColors
+            themeColors = themeColors,
+            departmentType = "STORE"
         )
 
         Button(
@@ -1544,7 +1546,8 @@ fun ProviderRegisterFormLayout(
             attachments = storeAttachmentsList,
             onAttachmentsChanged = { storeAttachmentsList = it },
             mode = "REGISTRATION",
-            themeColors = themeColors
+            themeColors = themeColors,
+            departmentType = "RESTAURANT"
         )
 
         Button(

@@ -556,3 +556,56 @@ fun OptionCheckboxCard(
         }
     }
 }
+
+@Composable
+fun AppAsyncImage(
+    model: Any?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Crop,
+    fallbackEmoji: String = "🏢"
+) {
+    var hasError by remember(model) { mutableStateOf(false) }
+    val stringModel = model?.toString() ?: ""
+
+    val decodedBitmap = remember(stringModel) {
+        if (stringModel.startsWith("data:image")) {
+            try {
+                val base64Data = stringModel.substringAfter(",")
+                val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+    if (hasError || stringModel.isBlank() || stringModel == "null") {
+        Box(
+            modifier = modifier
+                .background(Color(0xFF1E293B), RoundedCornerShape(8.dp))
+                .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(fallbackEmoji, fontSize = 22.sp)
+        }
+    } else if (decodedBitmap != null) {
+        Image(
+            painter = BitmapPainter(decodedBitmap.asImageBitmap()),
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale
+        )
+    } else {
+        AsyncImage(
+            model = model,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale,
+            onError = { hasError = true }
+        )
+    }
+}
+

@@ -33,7 +33,8 @@ fun ProductAttachmentsSection(
     attachments: List<ProductAttachment>,
     onAttachmentsChanged: (List<ProductAttachment>) -> Unit,
     mode: String, // "REGISTRATION", "MANAGEMENT", "VISITOR_VIEW"
-    themeColors: VisualThemePalette
+    themeColors: VisualThemePalette,
+    departmentType: String = "GENERAL"
 ) {
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
@@ -44,7 +45,7 @@ fun ProductAttachmentsSection(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
-            val name = customFileName.ifBlank { "attachment_${System.currentTimeMillis()}.${selectedType.lowercase()}" }
+            val name = customFileName.ifBlank { "document_${System.currentTimeMillis()}.${selectedType.lowercase()}" }
             val newAtt = ProductAttachment(
                 id = UUID.randomUUID().toString(),
                 type = selectedType,
@@ -53,16 +54,13 @@ fun ProductAttachmentsSection(
                 size = 1024 * 750L,
                 mimeType = when (selectedType) {
                     "PDF" -> "application/pdf"
-                    "EXCEL" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    "CSV" -> "text/csv"
                     "IMAGE" -> "image/jpeg"
-                    "JSON" -> "application/json"
                     else -> "*/*"
                 }
             )
             onAttachmentsChanged(attachments + newAtt)
             showAddDialog = false
-            Toast.makeText(context, "تم رفع وتحديث الملف بنجاح 📁", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "تم رفع الملف بنجاح 📁", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -80,67 +78,23 @@ fun ProductAttachmentsSection(
         ) {
             when (mode) {
                 "REGISTRATION" -> {
+                    val titleText = when (departmentType.uppercase()) {
+                        "MEDICAL" -> "🏥 المستندات والشهادات الطبية (اختياري)"
+                        "RESTAURANT" -> "🍽️ قائمة الوجبات أو المنيو (اختياري)"
+                        "PROPERTY" -> "🏢 عقود أو صكوك العقارات (اختياري)"
+                        "STORE" -> "🛍️ كاتالوج المنتجات (اختياري)"
+                        else -> "📁 المستندات والملفات التعريفية (اختياري)"
+                    }
                     Text(
-                        "📁 مرفقات المنتجات/الخدمات",
+                        titleText,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = themeColors.accent
                     )
                     Text(
-                        "اختر صيغة ملف لمنتجاتك/خدماتك. سيظهر هذا الملف في ملفك الشخصي بعد الموافقة.",
+                        "يمكنك إرفاق ملف PDF أو صور توضيحية لتعزيز ملفك لدى العملاء.",
                         fontSize = 10.sp,
                         color = Color.LightGray
-                    )
-
-                    // Formats Table
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1E293B))
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("الصيغة", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("الاستخدام", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Text("مثال", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                            Text("حد أقصى", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                        }
-                        HorizontalDivider(color = Color.DarkGray)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("📊 Excel/CSV", fontSize = 9.sp, color = Color.White)
-                            Text("جدول المنتجات والأسعار", fontSize = 8.sp, color = Color.LightGray)
-                            Text("products.xlsx", fontSize = 8.sp, color = Color.Gray)
-                            Text("10 ملفات", fontSize = 8.sp, color = themeColors.accent)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("📄 PDF", fontSize = 9.sp, color = Color.White)
-                            Text("منيو/كتالوج (عرض ثابت)", fontSize = 8.sp, color = Color.LightGray)
-                            Text("menu.pdf", fontSize = 8.sp, color = Color.Gray)
-                            Text("5 ملفات", fontSize = 8.sp, color = themeColors.accent)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("🖼️ صور", fontSize = 9.sp, color = Color.White)
-                            Text("صور المنتجات (عرض مرئي)", fontSize = 8.sp, color = Color.LightGray)
-                            Text("product1.jpg", fontSize = 8.sp, color = Color.Gray)
-                            Text("10 صور", fontSize = 8.sp, color = themeColors.accent)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("📋 JSON", fontSize = 9.sp, color = Color.White)
-                            Text("استيراد تلقائي", fontSize = 8.sp, color = Color.LightGray)
-                            Text("products.json", fontSize = 8.sp, color = Color.Gray)
-                            Text("5 ملفات", fontSize = 8.sp, color = themeColors.accent)
-                        }
-                    }
-
-                    Text(
-                        "🔹 شروط:\n• حجم الملف: <10MB (Excel/PDF/JSON) | <5MB (صور).\n• امتدادات مدعومة: XLSX, CSV, PDF, JPG, PNG, JSON.",
-                        fontSize = 9.sp,
-                        color = Color(0xFFFBBF24)
                     )
 
                     Button(

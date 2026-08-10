@@ -389,6 +389,7 @@ fun MapScreen(
                                 },
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
+                                textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 12.sp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = Color(0xFF1E293B),
                                     unfocusedContainerColor = Color(0xFF1E293B),
@@ -399,7 +400,6 @@ fun MapScreen(
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(44.dp)
                             )
 
                             // Advanced Filter Toggle Icon

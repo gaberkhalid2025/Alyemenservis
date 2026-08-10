@@ -1942,7 +1942,15 @@ fun StoreDetailsDialog(
                     HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 10.dp))
 
                     // 5. SMART TABROW & PRODUCTS SECTION
-                    Text("🛍️ السلع والمنتجات المتاحة (${storeProducts.size}):", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    val isMedical = store.categoryId.contains("طبي", true) || store.categoryId.contains("عياد", true) || store.categoryId.contains("medical", true) || store.name.contains("مستشفى", true) || store.name.contains("مركز طبي", true) || store.name.contains("عيادة", true)
+                    val isRestaurant = store.categoryId.contains("مطعم", true) || store.categoryId.contains("كافيه", true) || store.categoryId.contains("restaurant", true)
+
+                    val sectionTitle = when {
+                        isMedical -> "🏥 الخدمات الطبية والأقسام الصحية للحجز (${storeProducts.size}):"
+                        isRestaurant -> "🍽️ الوجبات والأطباق المتاحة للطلب (${storeProducts.size}):"
+                        else -> "🛍️ السلع والمنتجات المتاحة (${storeProducts.size}):"
+                    }
+                    Text(sectionTitle, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
 
                     if (productCategories.isNotEmpty()) {
                         ScrollableTabRow(
@@ -1996,7 +2004,7 @@ fun StoreDetailsDialog(
                                 .padding(20.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("لا توجد منتجات متوفرة في هذا التبويب حالياً.", color = themeColors.textSecondary, fontSize = 11.sp)
+                            Text(if (isMedical) "لا توجد خدمات طبية مسجلة حالياً." else "لا توجد منتجات متوفرة في هذا التبويب حالياً.", color = themeColors.textSecondary, fontSize = 11.sp)
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2006,6 +2014,8 @@ fun StoreDetailsDialog(
                                     isOwnerOrAdmin = isOwnerOrAdmin,
                                     themeColors = themeColors,
                                     viewModel = viewModel,
+                                    isMedical = isMedical,
+                                    isRestaurant = isRestaurant,
                                     onOrderClick = { onOrderProductClick(product) }
                                 )
                             }
