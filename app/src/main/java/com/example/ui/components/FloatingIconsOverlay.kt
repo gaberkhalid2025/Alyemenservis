@@ -28,62 +28,62 @@ fun BoxScope.FloatingIconsOverlay(
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن" (Instant Request Service / Reverse Marketplace FAB)
+    // 1. Primary Action FAB: "اطلب خدمتك الآن" (Compact 30% smaller, placed slightly higher to not block map controls)
     Box(
         modifier = Modifier
             .align(Alignment.BottomStart)
-            .padding(start = 16.dp, bottom = 18.dp)
-            .clip(RoundedCornerShape(30.dp))
+            .padding(start = 12.dp, bottom = 48.dp)
+            .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.horizontalGradient(
                     listOf(Color(0xFF10B981), Color(0xFF059669))
                 )
             )
             .clickable { onRequestServiceClick() }
-            .border(1.5.dp, Color.White, RoundedCornerShape(30.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .border(1.dp, Color.White, RoundedCornerShape(24.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Send,
                 contentDescription = "اطلب خدمتك الآن",
                 tint = Color.White,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(13.dp)
             )
             Text(
-                text = "اطلب خدمتك الآن ⚡",
-                fontSize = 12.sp,
+                text = "اطلب خدمتك ⚡",
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
         }
     }
 
-    // 2. Secondary FAB: "المساعد الذكي" (Offline Local AI Assistant FAB)
+    // 2. Secondary FAB: "المساعد الذكي" (Compact 30% smaller, placed slightly higher)
     if (!settings.assistantHidden) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 18.dp)
-                .clip(RoundedCornerShape(30.dp))
+                .padding(end = 12.dp, bottom = 48.dp)
+                .clip(RoundedCornerShape(24.dp))
                 .background(themeColors.accent)
                 .clickable { onAssistantClick() }
-                .border(1.5.dp, Color.White, RoundedCornerShape(30.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .border(1.dp, Color.White, RoundedCornerShape(24.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("🤖", fontSize = 16.sp)
+                Text("🤖", fontSize = 13.sp)
                 Text(
                     text = "المساعد الذكي",
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )

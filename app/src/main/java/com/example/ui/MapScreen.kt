@@ -312,14 +312,14 @@ fun MapScreen(
 
                 // 3. SEARCH & TOP HEADER OVERLAY (Modern Translucent Floating Card)
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = Color(0xFF0F172A).copy(alpha = 0.92f),
-                    shadowElevation = 8.dp,
+                    shadowElevation = 6.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp)
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(8.dp)) {
                         // Title & Back & Quick City Centers Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -330,27 +330,27 @@ fun MapScreen(
                                 IconButton(
                                     onClick = onBackClick,
                                     modifier = Modifier
-                                        .size(32.dp)
+                                        .size(26.dp)
                                         .background(Color(0xFF1E293B), CircleShape)
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White, modifier = Modifier.size(13.dp))
                                 }
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("🗺️ رادار الخدمات اليمني", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("🗺️ رادار الخدمات اليمني", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.White)
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Box(
                                             modifier = Modifier
-                                                .background(Color(0xFFF59E0B), RoundedCornerShape(4.dp))
-                                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                .background(Color(0xFFF59E0B), RoundedCornerShape(3.dp))
+                                                .padding(horizontal = 3.dp, vertical = 1.dp)
                                         ) {
-                                            Text("حي ⚡", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                            Text("حي ⚡", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                                         }
                                     }
                                     Text(
                                         text = "موقعي: (${String.format("%.3f, %.3f", userLat, userLng)})",
-                                        fontSize = 9.sp,
+                                        fontSize = 8.sp,
                                         color = Color(0xFF94A3B8)
                                     )
                                 }
@@ -359,37 +359,40 @@ fun MapScreen(
                             // Weather Badge
                             Box(
                                 modifier = Modifier
-                                    .background(Color(0xFF1E293B), RoundedCornerShape(8.dp))
-                                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                                    .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
+                                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
-                                Text("☀️ صنعاء 26°C", fontSize = 9.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                                Text("☀️ صنعاء 26°C", fontSize = 8.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
 
                         // Search Bar & Filter Toggle Button Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("ابحث عن فني، محل، مطعم، عقار...", fontSize = 11.sp, color = Color.Gray) },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp)) },
+                                placeholder = { Text("ابحث عن فني، محل، مطعم، عقار...", fontSize = 9.5.sp, color = Color.Gray) },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(14.dp)) },
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                        IconButton(
+                                            onClick = { searchQuery = "" },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(13.dp))
                                         }
                                     }
                                 },
                                 singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 12.sp),
+                                shape = RoundedCornerShape(10.dp),
+                                textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 10.sp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = Color(0xFF1E293B),
                                     unfocusedContainerColor = Color(0xFF1E293B),
@@ -400,32 +403,33 @@ fun MapScreen(
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .heightIn(min = 36.dp, max = 38.dp)
                             )
 
                             // Advanced Filter Toggle Icon
                             IconButton(
                                 onClick = { showAdvancedFilters = !showAdvancedFilters },
                                 modifier = Modifier
-                                    .size(44.dp)
+                                    .size(36.dp)
                                     .background(
                                         if (showAdvancedFilters) Color(0xFFF59E0B) else Color(0xFF1E293B),
-                                        RoundedCornerShape(12.dp)
+                                        RoundedCornerShape(10.dp)
                                     )
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = "تصفية متقدمة",
                                     tint = if (showAdvancedFilters) Color.Black else Color.White,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
                         // Filter Chips Row
                         LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
