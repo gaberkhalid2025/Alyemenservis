@@ -1,4 +1,5 @@
 package com.example
+import com.example.ui.*
 
 import com.example.utils.*
 
@@ -523,7 +524,7 @@ fun StoresTabContent(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Button(
-                    onClick = { viewModel.triggerRestoreAccountDialog.value = true },
+                    onClick = { viewModel.triggerRestoreAccountDialog(true) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp)
@@ -1220,7 +1221,7 @@ fun PropertiesTabContent(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Button(
-                    onClick = { viewModel.triggerRestoreAccountDialog.value = true },
+                    onClick = { viewModel.triggerRestoreAccountDialog(true) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp)

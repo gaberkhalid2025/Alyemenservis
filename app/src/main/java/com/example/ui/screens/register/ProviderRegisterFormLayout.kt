@@ -249,7 +249,7 @@ fun ProviderRegisterFormLayout(
     val triggerRestore by viewModel.triggerRestoreAccountDialog.collectAsState()
     if (triggerRestore) {
         showRestoreAccountDialog = true
-        viewModel.triggerRestoreAccountDialog.value = false
+        viewModel.triggerRestoreAccountDialog(false)
     }
 
     var selfiePhotoBase64 by remember { mutableStateOf("") }
@@ -621,7 +621,7 @@ fun ProviderRegisterFormLayout(
                 Spacer(modifier = Modifier.height(10.dp))
                 Button(
                     onClick = { 
-                        viewModel.triggerRestoreAccountDialog.value = true
+                        viewModel.triggerRestoreAccountDialog(true)
                         showRestoreAccountDialog = true 
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.2f)),
@@ -1093,7 +1093,7 @@ fun ProviderRegisterFormLayout(
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { 
-                        viewModel.triggerRestoreAccountDialog.value = true
+                        viewModel.triggerRestoreAccountDialog(true)
                         showRestoreAccountDialog = true 
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.2f)),

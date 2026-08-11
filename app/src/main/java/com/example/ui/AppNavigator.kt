@@ -171,7 +171,7 @@ fun AppNavigator(
     val triggerRestore by viewModel.triggerRestoreAccountDialog.collectAsState()
     if (triggerRestore) {
         showRestoreAccountDialog = true
-        viewModel.triggerRestoreAccountDialog.value = false
+        viewModel.triggerRestoreAccountDialog(false)
     }
 
     val activeChatChannel by viewModel.activeChatChannel.collectAsState()
