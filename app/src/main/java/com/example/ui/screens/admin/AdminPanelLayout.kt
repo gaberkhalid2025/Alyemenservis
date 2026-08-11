@@ -727,7 +727,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         Pair("ADVANCED_CHAT", "⚡ صلاحيات وتوجيه الدردشات"),
                         Pair("CARD_CUSTOMIZER", "🎛️ تخصيص أزرار وأشكال البطائق"),
                         Pair("NEW_SECTION_CREATOR", "➕ إضافة وإدارة الأقسام والتوصيل والمحافظ"),
-                        Pair("REG_FORMS_MANAGER", "📋 تخصيص استمارات التسجيل وطلبات الانضمام")
+                        Pair("REG_FORMS_MANAGER", "📋 تخصيص استمارات التسجيل وطلبات الانضمام"),
+                        Pair("ROLES_PERMISSIONS", "📋 دليل وصلاحيات جميع المستخدمين")
                     )
                     if (adminRole == "OWNER") {
                         baseTabs.add(0, Pair("BACKDOOR", "⚙️ إعدادات البوابة الخلفية المتقدمة"))
@@ -774,6 +775,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
             adminSettingsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
             adminBackupPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
             adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+            adminRolesAndPermissionsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
 
             if (activeSubTab == "BACKDOOR" && adminRole == "OWNER") {
                 item {
