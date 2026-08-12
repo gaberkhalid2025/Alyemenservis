@@ -200,27 +200,27 @@ fun ServicesBrowserLayout(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                     border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f)),
-                    modifier = Modifier.fillMaxWidth(0.65f)
+                    modifier = Modifier.fillMaxWidth(0.8f)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "بحث",
                             tint = themeColors.accent,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { viewModel.updateSearchQuery(it) },
                             placeholder = {
                                 Text(
-                                    text = "البحث الذكي المتقاطع 🔍 (فنيين، محلات، استشارات...)",
+                                    text = "بحث سريع...",
                                     fontSize = 11.sp,
                                     color = themeColors.textSecondary.copy(alpha = 0.7f),
                                     maxLines = 1
