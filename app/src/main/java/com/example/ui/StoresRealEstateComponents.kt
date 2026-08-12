@@ -824,7 +824,14 @@ fun StoreListItemCard(
                 }
 
                 // Instant Chat
-                if (settingsState.showInstantChatButton) {
+                val isStoreSectionChatDisabled = remember(settingsState.chatDisabledCategories, store.sectionId) {
+                    settingsState.chatDisabledCategories.split(",").map { it.trim().lowercase() }.contains(store.sectionId.lowercase())
+                }
+                val isStoreChatBlocked = remember(settingsState.chatBlockedIds, store.id, store.phone) {
+                    val list = settingsState.chatBlockedIds.split(",").map { it.trim() }
+                    list.contains(store.id) || list.contains(store.phone)
+                }
+                if (settingsState.showInstantChatButton && !settingsState.disableChatAll && !isStoreSectionChatDisabled && !isStoreChatBlocked) {
                     Button(
                         onClick = {
                             if (onChatClick != null) {
@@ -1488,6 +1495,8 @@ fun StoreDetailsDialog(
     var showEditStoreDialog by remember { mutableStateOf(false) }
     var showBulkPriceDialog by remember { mutableStateOf(false) }
     var showAddProductDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    var reportContent by remember { mutableStateOf("") }
 
     var userRatingInput by remember { mutableStateOf(5f) }
     var userCommentInput by remember { mutableStateOf("") }
@@ -1773,6 +1782,20 @@ fun StoreDetailsDialog(
                             Spacer(modifier = Modifier.width(3.dp))
                             Text("مشاركة", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { showReportDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إبلاغ عن هذا المتجر أو الكيان 📢", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -2099,6 +2122,80 @@ fun StoreDetailsDialog(
                     )
                 }
             }
+
+            if (showReportDialog) {
+                Dialog(onDismissRequest = { showReportDialog = false }) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(2.dp, Color.Red),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("📢 تقديم بلاغ / شكوى على هذا الكيان:", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("يرجى كتابة سبب البلاغ بالتفصيل لمساعدة الإدارة في مراجعته واتخاذ الإجراء اللازم:", fontSize = 10.sp, color = themeColors.textSecondary)
+
+                            OutlinedTextField(
+                                value = reportContent,
+                                onValueChange = { reportContent = it },
+                                placeholder = { Text("مثال: معلومات مضللة، أسعار مرتفعة جداً، أو عدم توفر السلعة...", fontSize = 11.sp, color = Color.Gray) },
+                                modifier = Modifier.fillMaxWidth().height(100.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = themeColors.accent,
+                                    unfocusedBorderColor = Color.Gray
+                                )
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (reportContent.isNotBlank()) {
+                                            val sectionType = when(store.sectionId) {
+                                                "restaurants" -> "RESTAURANTS"
+                                                "medical" -> "MEDICAL"
+                                                else -> "STORES"
+                                            }
+                                            viewModel.sendReport(
+                                                providerId = store.id,
+                                                providerName = store.name,
+                                                reporterName = "مستخدم دليل الخدمات",
+                                                content = reportContent.trim(),
+                                                targetId = store.id,
+                                                targetType = sectionType
+                                            )
+                                            showReportDialog = false
+                                            reportContent = ""
+                                            android.widget.Toast.makeText(context, "📨 تم إرسال بلاغك للإدارة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                                        } else {
+                                            android.widget.Toast.makeText(context, "يرجى كتابة نص البلاغ أولاً", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("إرسال البلاغ 🚀", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { showReportDialog = false },
+                                    border = BorderStroke(1.dp, Color.Gray),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("إلغاء", color = Color.White, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -2319,6 +2416,8 @@ fun PropertyDetailsDialog(
 
     var userRatingInput by remember { mutableStateOf(5f) }
     var userCommentInput by remember { mutableStateOf("") }
+    var showReportDialog by remember { mutableStateOf(false) }
+    var reportContent by remember { mutableStateOf("") }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -2536,6 +2635,22 @@ fun PropertyDetailsDialog(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { showReportDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("إبلاغ عن هذا العقار 📢", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Divider(color = themeColors.accent.copy(alpha = 0.15f))
 
                     // Reviews/Comments list
@@ -2598,6 +2713,75 @@ fun PropertyDetailsDialog(
                                 modifier = Modifier.align(Alignment.End)
                             ) {
                                 Text("إرسال", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (showReportDialog) {
+                Dialog(onDismissRequest = { showReportDialog = false }) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(2.dp, Color.Red),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("📢 تقديم بلاغ / شكوى على هذا العقار:", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("يرجى كتابة سبب البلاغ بالتفصيل لمساعدة الإدارة في مراجعته واتخاذ الإجراء اللازم:", fontSize = 10.sp, color = themeColors.textSecondary)
+
+                            OutlinedTextField(
+                                value = reportContent,
+                                onValueChange = { reportContent = it },
+                                placeholder = { Text("مثال: معلومات مضللة، عقار متاح بالفعل، سعر غير حقيقي...", fontSize = 11.sp, color = Color.Gray) },
+                                modifier = Modifier.fillMaxWidth().height(100.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = themeColors.accent,
+                                    unfocusedBorderColor = Color.Gray
+                                )
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (reportContent.isNotBlank()) {
+                                            viewModel.sendReport(
+                                                providerId = property.id,
+                                                providerName = property.title,
+                                                reporterName = "مستخدم دليل الخدمات",
+                                                content = reportContent.trim(),
+                                                targetId = property.id,
+                                                targetType = "PROPERTIES"
+                                            )
+                                            showReportDialog = false
+                                            reportContent = ""
+                                            android.widget.Toast.makeText(context, "📨 تم إرسال بلاغك للإدارة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                                        } else {
+                                            android.widget.Toast.makeText(context, "يرجى كتابة نص البلاغ أولاً", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("إرسال البلاغ 🚀", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { showReportDialog = false },
+                                    border = BorderStroke(1.dp, Color.Gray),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("إلغاء", color = Color.White, fontSize = 11.sp)
+                                }
                             }
                         }
                     }

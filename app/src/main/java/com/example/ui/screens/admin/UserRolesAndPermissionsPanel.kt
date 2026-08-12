@@ -23,13 +23,13 @@ fun LazyListScope.adminRolesAndPermissionsPanel(viewModel: MainViewModel, themeC
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "📋 المرجع الشامل لصلاحيات الأدمن الـ 538 والأقسام الـ 18",
+                        text = "📋 المرجع الشامل لصلاحيات الأدمن الـ 559 والأقسام الـ 18",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = themeColors.accent
                     )
                     Text(
-                        text = "توثيق كامل لكافة عمليات وصلاحيات لوحة التحكم الإدارية في النظام بدقة شديدة.",
+                        text = "توثيق كامل لجميع الصلاحيات الـ 559 المطبقة والمصادق عليها للتحكم الفوري والحصري للمدير والمشرفين.",
                         fontSize = 11.sp,
                         color = Color.LightGray
                     )

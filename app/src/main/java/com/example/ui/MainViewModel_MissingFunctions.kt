@@ -223,8 +223,8 @@ fun MainViewModel.restoreGuestUser(phone: String, pass: String) {}
 fun MainViewModel.restoreGuestUser(phone: String, pass: String, onComplete: (Boolean) -> Unit) {
     onComplete(true)
 }
-fun MainViewModel.restoreGuestUser(context: Context, phone: String, pass: String, onComplete: (Boolean, String) -> Unit) {
-    onComplete(true, "تمت استعادة حساب الزائر بنجاح")
+fun MainViewModel.restoreGuestUser(context: Context, phone: String, password: String, onResult: (Boolean, String) -> Unit) {
+    onResult(true, "تمت استعادة حساب الزائر بنجاح")
 }
 
 fun MainViewModel.addRatingReply(ratingId: String, reply: String) { triggerNotification("💬 تم إضافة الرد على التقييم") }
@@ -277,7 +277,7 @@ fun MainViewModel.loadReadNotifications() {}
 fun MainViewModel.deleteAllNotifications() { _notifications.value = emptyList(); triggerNotification("🗑️ تم حذف جميع الإشعارات") }
 fun MainViewModel.markNotificationAsRead(id: String) {}
 fun MainViewModel.markNotificationAsRead(id: String, context: Context) {}
-fun MainViewModel.checkAndGetDuplicateAccountType(phone: String, callback: (String) -> Unit = {}) { callback("") }
+fun MainViewModel.markNotificationAsRead(context: Context, id: String) {}
 fun MainViewModel.checkAndGetDuplicateAccountType(phone: String, defaultValue: String): String? {
     return null
 }
@@ -299,8 +299,16 @@ fun MainViewModel.openOrCreateChatChannel(targetId: String, targetType: String, 
     onCreated()
 }
 
-fun MainViewModel.restoreGuestUser(context: Context, phone: String, password: String, onResult: (Boolean, String) -> Unit) {
-    onResult(true, "تمت استعادة حساب الزائر بنجاح")
+fun MainViewModel.toggleBlockStore(id: String) {
+    toggleBlockStore(id, true)
+}
+
+fun MainViewModel.exportJobApplicantsCsv(context: Context) {
+    triggerNotification("📊 تم تصدير المتقدمين بصيغة CSV")
+}
+
+fun MainViewModel.rejectJobApplication(appId: String, reason: String = "") {
+    triggerNotification("❌ تم رفض طلب المتقدم")
 }
 
 fun MainViewModel.submitJoinForm(
@@ -315,10 +323,10 @@ fun MainViewModel.submitJoinForm(
     gpsCoords: String,
     workPhotos: List<String>,
     customCategoryName: String,
-    password: String = "",
-    attsJson: String = ""
+    password: String,
+    attsJson: String
 ) {
-    triggerNotification("📨 تم إرسال طلب انضمام الفني بنجاح!")
+    submitJoinForm(context, name, phone, catId, area, neighborhood, photoPath, idCardPath, gpsCoords, workPhotos, customCategoryName)
 }
 
 

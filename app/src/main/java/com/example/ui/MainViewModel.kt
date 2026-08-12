@@ -42,6 +42,9 @@ class MainViewModel : ViewModel() {
     internal val _settings = MutableStateFlow(AdminSettingsEntity())
     val settings: StateFlow<AdminSettingsEntity> = _settings.asStateFlow()
 
+    internal val _forceRebuildKey = MutableStateFlow(0)
+    val forceRebuildKey: StateFlow<Int> = _forceRebuildKey.asStateFlow()
+
     internal val _reports = MutableStateFlow<List<ReportEntity>>(emptyList())
     val reports: StateFlow<List<ReportEntity>> = _reports.asStateFlow()
 
@@ -660,6 +663,20 @@ class MainViewModel : ViewModel() {
                 _colorPalettes.value = fetched
             }
         }
+
+        // 14. Activity Logs (Instantly synced)
+        db.collection("activity_logs").addSnapshotListener { snapshot, error ->
+            if (snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(ActivityLogEntity::class.java)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }.sortedByDescending { it.timestamp }
+                _activityLogs.value = fetched.take(100)
+            }
+        }
     }
 
     internal fun writeDefaultSupervisors() {
@@ -911,21 +928,35 @@ class MainViewModel : ViewModel() {
         triggerNotification("🧹 تم تصفية وحذف سجل المحادثة الذكية بنجاح!")
     }
 
-    fun sendReport(providerId: String, providerName: String, reporterName: String, content: String) {
-        val newReport = ReportEntity(
-            id = UUID.randomUUID().toString(),
-            providerId = providerId,
-            providerName = providerName,
-            reporterName = reporterName,
-            content = content
-        )
-        db.collection("reports").document(newReport.id).set(newReport)
-        triggerNotification("📢 تم إرسال بلاغك ضد $providerName")
+    fun sendReport(providerId: String, providerName: String, reporterName: String, content: String, targetId: String = "", targetType: String = "SERVICES") {
+        try {
+            val newReport = ReportEntity(
+                id = UUID.randomUUID().toString(),
+                providerId = providerId,
+                providerName = providerName,
+                reporterName = reporterName,
+                content = content,
+                targetId = if (targetId.isNotEmpty()) targetId else providerId,
+                targetType = targetType
+            )
+            db.collection("reports").document(newReport.id).set(newReport)
+            logActivity("تقديم بلاغ ضد: $providerName ($targetType)")
+            triggerNotification("📢 تم إرسال بلاغك ضد $providerName")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _uiErrorMessage.value = "حدث خطأ أثناء إرسال البلاغ: ${e.localizedMessage}"
+        }
     }
 
     fun deleteReport(reportId: String) {
-        db.collection("reports").document(reportId).delete()
-        triggerNotification("🗑️ تم حذف البلاغ من النظام")
+        try {
+            db.collection("reports").document(reportId).delete()
+            logActivity("حذف بلاغ رقم: $reportId")
+            triggerNotification("🗑️ تم حذف البلاغ من النظام")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _uiErrorMessage.value = "حدث خطأ أثناء حذف البلاغ: ${e.localizedMessage}"
+        }
     }
 
     fun sendMessageInChat(msgText: String, imageUrl: String = "") {
@@ -983,23 +1014,34 @@ class MainViewModel : ViewModel() {
     }
 
     fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) {
-        val channelId = "chat_p_${providerId}_u_${customerId}"
+        val settingsState = _settings.value
+        val isRedirectedToAdmin = settingsState.chatRoutingMode == "ADMIN_ONLY" || settingsState.chatRoutingMode == "ADMIN_THEN_CENTER"
+        
+        val targetProviderId = if (isRedirectedToAdmin) "admin" else providerId
+        val targetProviderName = if (isRedirectedToAdmin) "الإدارة والدعم" else providerName
+        val channelId = if (isRedirectedToAdmin) "support_$customerId" else "chat_p_${providerId}_u_${customerId}"
+        
         val dispCustomerName = customerName.ifEmpty { "عميل" }
-        val displayName = "دردشة: $providerName مع $dispCustomerName"
+        val displayName = if (isRedirectedToAdmin) "الدعم المباشر: $dispCustomerName" else "دردشة: $targetProviderName مع $dispCustomerName"
         
         db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
             if (!snapshot.exists()) {
                 val newCh = ChatChannelEntity(
                     id = channelId,
                     userName = displayName,
-                    lastMessage = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
+                    customerId = customerId,
+                    customerName = dispCustomerName,
+                    customerPhone = customerId,
+                    targetId = targetProviderId,
+                    targetName = targetProviderName,
+                    lastMessage = if (isRedirectedToAdmin) "مرحباً! تم تحويل محادثتك تلقائياً إلى الإدارة للمتابعة والدعم." else "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
                     timestamp = System.currentTimeMillis(),
                     isProvider = false,
                     messages = listOf(
                         ChatMessageEntity(
                             id = UUID.randomUUID().toString(),
                             senderId = "system",
-                            message = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
+                            message = if (isRedirectedToAdmin) "مرحباً! تم تحويل محادثتك تلقائياً إلى الإدارة للمتابعة والدعم والتحقق من الجودة وحماية الشراء." else "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
                             timestamp = System.currentTimeMillis(),
                             senderName = "النظام"
                         )
@@ -1174,7 +1216,7 @@ class MainViewModel : ViewModel() {
         triggerNotification("➕ تم إضافة الفني $name يدوياً")
     }
 
-    fun addNewBanner(title: String, url: String, redirect: String, type: String, size: String, duration: Int, displayTime: String = "طوال اليوم") {
+    fun addNewBanner(title: String, url: String, redirect: String, type: String, size: String, duration: Int, displayTime: String = "طوال اليوم", targetSection: String = "ALL") {
         val banner = BannerEntity(
             id = UUID.randomUUID().toString(),
             title = title,
@@ -1184,7 +1226,8 @@ class MainViewModel : ViewModel() {
             size = size,
             duration = duration,
             displayTime = displayTime,
-            order = _banners.value.size + 1
+            order = _banners.value.size + 1,
+            targetSection = targetSection
         )
         db.collection("banners").document(banner.id).set(banner)
         triggerNotification("🖼️ تم إضافة إعلان جديد: $title")
@@ -1291,15 +1334,27 @@ class MainViewModel : ViewModel() {
     }
 
     fun updateTheme(themeId: String) {
-        db.collection("settings").document("main_settings").get().addOnSuccessListener { snapshot ->
-            val s = snapshot.toObject(AdminSettingsEntity::class.java) ?: AdminSettingsEntity()
-            db.collection("settings").document("main_settings").set(s.copy(activeThemeId = themeId))
+        val current = _settings.value
+        val updated = current.copy(activeThemeId = themeId)
+        _settings.value = updated
+        _forceRebuildKey.value = _forceRebuildKey.value + 1
+        try {
+            db.collection("settings").document("main_settings").set(updated)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
         triggerNotification("🎨 تم تغيير مظهر التطبيق إلى $themeId")
     }
 
     fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
-        db.collection("settings").document("main_settings").set(newSettings)
+        _settings.value = newSettings
+        _maxKmRadius.value = newSettings.maxSearchRadiusKm
+        _forceRebuildKey.value = _forceRebuildKey.value + 1
+        try {
+            db.collection("settings").document("main_settings").set(newSettings)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun updateBackdoorSettings(
@@ -1348,8 +1403,14 @@ class MainViewModel : ViewModel() {
             customBackgroundHex = customBackgroundHex,
             customSurfaceHex = customSurfaceHex
         )
-        db.collection("settings").document("main_settings").set(updated)
         _settings.value = updated
+        _maxKmRadius.value = radiusKm
+        _forceRebuildKey.value = _forceRebuildKey.value + 1
+        try {
+            db.collection("settings").document("main_settings").set(updated)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         triggerNotification("💾 تم حفظ إعدادات البوابة البارزة والملفات بنجاح")
     }
 
@@ -2479,9 +2540,50 @@ class MainViewModel : ViewModel() {
         _uiErrorMessage.value = message
     }
 
+    fun logActivity(actionName: String) {
+        val log = ActivityLogEntity(
+            id = "log_" + java.util.UUID.randomUUID().toString().take(6),
+            action = actionName,
+            timestamp = System.currentTimeMillis()
+        )
+        try {
+            db.collection("activity_logs").document(log.id).set(log)
+            _activityLogs.value = (listOf(log) + _activityLogs.value).take(100)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun refreshData() {
         _isRefreshing.value = true
+        try {
+            db.collection("settings").document("main_settings").get().addOnSuccessListener { snapshot ->
+                if (snapshot != null && snapshot.exists()) {
+                    snapshot.toObject(AdminSettingsEntity::class.java)?.let {
+                        _settings.value = it
+                        _maxKmRadius.value = it.maxSearchRadiusKm
+                    }
+                }
+            }
+            db.collection("categories").get().addOnSuccessListener { snapshot ->
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(CategoryEntity::class.java) }
+                    _categories.value = list
+                }
+            }
+            db.collection("banners").get().addOnSuccessListener { snapshot ->
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(BannerEntity::class.java) }
+                    _banners.value = list.sortedBy { it.order }
+                }
+            }
+            applyFilters()
+            _forceRebuildKey.value = _forceRebuildKey.value + 1
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         _isRefreshing.value = false
+        triggerNotification("🔄 تم تحديث وإعادة تحميل كافة بيانات التطبيق والإعدادات بنجاح!")
     }
 
     fun retryConnection(context: android.content.Context? = null) {

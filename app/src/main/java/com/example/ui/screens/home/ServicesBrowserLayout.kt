@@ -163,6 +163,10 @@ fun ServicesBrowserLayout(
     var showPropertyCreateDialog by remember { mutableStateOf(false) }
     var productToOrderElectronic by remember { mutableStateOf<com.example.data.ProductEntity?>(null) }
 
+    val filteredBanners = remember(bannersList) {
+        bannersList.filter { it.targetSection.contains("ALL") || it.targetSection.contains("HOME") }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -176,9 +180,9 @@ fun ServicesBrowserLayout(
         }
 
         // Horizontal banners list
-        if (bannersList.isNotEmpty()) {
+        if (filteredBanners.isNotEmpty()) {
             item {
-                com.example.ui.components.BannerSliderView(banners = bannersList, themeColors = themeColors) { catTarget ->
+                com.example.ui.components.BannerSliderView(banners = filteredBanners, themeColors = themeColors) { catTarget ->
                     if (catTarget.isNotEmpty()) viewModel.selectCategory(catTarget)
                 }
             }

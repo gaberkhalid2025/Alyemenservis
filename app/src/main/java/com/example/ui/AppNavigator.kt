@@ -2573,7 +2573,14 @@ fun ProviderCard(
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     // 📩 مراسلة فورية
-                    if (settingsState.showInstantChatButton) {
+                    val isProviderSectionChatDisabled = remember(settingsState.chatDisabledCategories) {
+                        settingsState.chatDisabledCategories.split(",").map { it.trim().lowercase() }.contains("services")
+                    }
+                    val isProviderChatBlocked = remember(settingsState.chatBlockedIds, provider.id, provider.phone) {
+                        val list = settingsState.chatBlockedIds.split(",").map { it.trim() }
+                        list.contains(provider.id) || list.contains(provider.phone)
+                    }
+                    if (settingsState.showInstantChatButton && !settingsState.disableChatAll && !isProviderSectionChatDisabled && !isProviderChatBlocked) {
                         Button(
                             onClick = {
                                 if (provider.isChatDisabled) {
