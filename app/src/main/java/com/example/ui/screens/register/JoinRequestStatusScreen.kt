@@ -1,9 +1,6 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.register
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 
 import com.example.ui.screens.dashboard.*
 import android.content.Intent
@@ -105,7 +102,7 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
     val joinPhone by viewModel.joinRequestPhone.collectAsState()
     val pendingProviders by viewModel.pendingProviders.collectAsState()
     val providers by viewModel.providers.collectAsState()
-    val notifications by viewModel.notifications.collectAsState(initial = emptyList())
+    val notifications by viewModel.notifications.collectAsState()
     val bookings by viewModel.bookings.collectAsState()
     val chatChannels by viewModel.chatChannels.collectAsState()
 
@@ -451,7 +448,7 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
                                 }
                             }
                         } else {
-                            Column { myNotifs.take(4).forEach { notif ->
+                            myNotifs.take(4).forEach { notif ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
                                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
@@ -503,7 +500,7 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
                                                         
                                                         activeProviderChatChannel = existingChannel ?: com.example.data.ChatChannelEntity(
                                                             id = finalId,
-                                                            userName = if (notif.customerName.isBlank()) "عميل جديد" else notif.customerName,
+                                                            userName = notif.customerName.ifEmpty { "عميل جديد" },
                                                             lastMessage = "",
                                                             messages = emptyList()
                                                         )
@@ -521,7 +518,6 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
                                 }
                             }
                         }
-                    }
 
                         // Local Chat Dialog Overlay for Provider
                         activeProviderChatChannel?.let { ch ->

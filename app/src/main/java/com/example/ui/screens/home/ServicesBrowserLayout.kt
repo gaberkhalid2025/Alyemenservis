@@ -163,10 +163,6 @@ fun ServicesBrowserLayout(
     var showPropertyCreateDialog by remember { mutableStateOf(false) }
     var productToOrderElectronic by remember { mutableStateOf<com.example.data.ProductEntity?>(null) }
 
-    val filteredBanners = remember(bannersList) {
-        bannersList.filter { it.targetSection.contains("ALL") || it.targetSection.contains("HOME") }
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -180,9 +176,9 @@ fun ServicesBrowserLayout(
         }
 
         // Horizontal banners list
-        if (filteredBanners.isNotEmpty()) {
+        if (bannersList.isNotEmpty()) {
             item {
-                com.example.ui.components.BannerSliderView(banners = filteredBanners, themeColors = themeColors) { catTarget ->
+                com.example.ui.components.BannerSliderView(banners = bannersList, themeColors = themeColors) { catTarget ->
                     if (catTarget.isNotEmpty()) viewModel.selectCategory(catTarget)
                 }
             }
@@ -190,76 +186,68 @@ fun ServicesBrowserLayout(
 
         // Search Bar Block (Smart Cross Search - Matches Theme Perfectly)
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f)),
-                    modifier = Modifier.fillMaxWidth(0.8f)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "بحث",
+                        tint = themeColors.accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.updateSearchQuery(it) },
+                        placeholder = {
+                            Text(
+                                text = "البحث الذكي المتقاطع 🔍 (فنيين، محلات، استشارات...)",
+                                fontSize = 11.sp,
+                                color = themeColors.textSecondary.copy(alpha = 0.7f)
+                            )
+                        },
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .weight(1f)
+                            .testTag("search_text_input"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = themeColors.textPrimary,
+                            unfocusedTextColor = themeColors.textPrimary
+                        ),
+                        singleLine = true
+                    )
+                    
+                    Surface(
+                        onClick = { showFiltersPanel = !showFiltersPanel },
+                        shape = RoundedCornerShape(20.dp),
+                        color = themeColors.accent
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "بحث",
-                            tint = themeColors.accent,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { viewModel.updateSearchQuery(it) },
-                            placeholder = {
-                                Text(
-                                    text = "بحث سريع...",
-                                    fontSize = 11.sp,
-                                    color = themeColors.textSecondary.copy(alpha = 0.7f),
-                                    maxLines = 1
-                                )
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("search_text_input"),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedTextColor = themeColors.textPrimary,
-                                unfocusedTextColor = themeColors.textPrimary
-                            ),
-                            singleLine = true
-                        )
-                        
-                        Surface(
-                            onClick = { showFiltersPanel = !showFiltersPanel },
-                            shape = RoundedCornerShape(20.dp),
-                            color = themeColors.accent
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("بحث ذكي ⚙️", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-                            }
+                            Text("بحث ذكي ⚙️", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                         }
+                    }
 
-                        if (settingsState.isSpeechSearchEnabled) {
-                            IconButton(onClick = {
-                                VoiceManager.onHear?.invoke { spokenText ->
-                                    viewModel.updateSearchQuery(spokenText)
-                                    viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
-                                }
-                            }) {
-                                Text("🎙️", fontSize = 18.sp)
+                    if (settingsState.isSpeechSearchEnabled) {
+                        IconButton(onClick = {
+                            VoiceManager.onHear?.invoke { spokenText ->
+                                viewModel.updateSearchQuery(spokenText)
+                                viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
                             }
+                        }) {
+                            Text("🎙️", fontSize = 18.sp)
                         }
                     }
                 }

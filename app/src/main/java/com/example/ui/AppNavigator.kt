@@ -171,7 +171,7 @@ fun AppNavigator(
     val triggerRestore by viewModel.triggerRestoreAccountDialog.collectAsState()
     if (triggerRestore) {
         showRestoreAccountDialog = true
-        viewModel.triggerRestoreAccountDialog(false)
+        viewModel.triggerRestoreAccountDialog.value = false
     }
 
     val activeChatChannel by viewModel.activeChatChannel.collectAsState()
@@ -322,7 +322,10 @@ fun AppNavigator(
                                 "ADMIN_PANEL" -> AdminPanelLayout(viewModel = viewModel, themeColors = themeColors)
                                 "REGISTER_FORM" -> ProviderRegisterFormLayout(
                                     viewModel = viewModel,
-                                    themeColors = themeColors
+                                    themeColors = themeColors,
+                                    regType = preselectedRegistrationType,
+                                    sectionId = activeSectionIdForCreation,
+                                    onRegTypeChange = { preselectedRegistrationType = it }
                                 )
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
@@ -2570,14 +2573,7 @@ fun ProviderCard(
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     // 📩 مراسلة فورية
-                    val isProviderSectionChatDisabled = remember(settingsState.chatDisabledCategories) {
-                        settingsState.chatDisabledCategories.split(",").map { it.trim().lowercase() }.contains("services")
-                    }
-                    val isProviderChatBlocked = remember(settingsState.chatBlockedIds, provider.id, provider.phone) {
-                        val list = settingsState.chatBlockedIds.split(",").map { it.trim() }
-                        list.contains(provider.id) || list.contains(provider.phone)
-                    }
-                    if (settingsState.showInstantChatButton && !settingsState.disableChatAll && !isProviderSectionChatDisabled && !isProviderChatBlocked) {
+                    if (settingsState.showInstantChatButton) {
                         Button(
                             onClick = {
                                 if (provider.isChatDisabled) {
