@@ -322,10 +322,7 @@ fun AppNavigator(
                                 "ADMIN_PANEL" -> AdminPanelLayout(viewModel = viewModel, themeColors = themeColors)
                                 "REGISTER_FORM" -> ProviderRegisterFormLayout(
                                     viewModel = viewModel,
-                                    themeColors = themeColors,
-                                    regType = preselectedRegistrationType,
-                                    sectionId = activeSectionIdForCreation,
-                                    onRegTypeChange = { preselectedRegistrationType = it }
+                                    themeColors = themeColors
                                 )
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)

@@ -1,111 +1,127 @@
 package com.example.ui.screens.bookings
 
-import androidx.compose.foundation.background
+import android.widget.Toast
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
-data class BookingLog(
-    val id: String,
-    val date: String,
-    val status: String,
-    val description: String,
-    val reason: String = ""
-)
-
 @Composable
-fun BookingHistory(
-    themeColors: VisualThemePalette,
-    logs: List<BookingLog> = listOf(
-        BookingLog("1", "2026-08-11 10:00", "تعديل الموعد", "تم تأجيل موعد الخدمة تلبية لطلب العميل"),
-        BookingLog("2", "2026-08-10 14:30", "إلغاء حجز", "إلغاء الحجز بسبب عدم توفر فني بديل في الموعد المختار", "ظرف فني طارئ لدى مقدم الخدمة")
-    )
+fun BookingHistoryScreen(
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+    val context = LocalContext.current
+    val bookings by viewModel.bookings.collectAsState(initial = emptyList())
+
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+            .fillMaxSize()
+            .background(Color(0xFF0F172A))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "📋 سجل العمليات وتعديلات الحجز",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.textPrimary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            IconButton(onClick = { viewModel.goBack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+            }
+            Text("📋 سجل الحجوزات والمواعيد", color = themeColors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(48.dp))
+        }
 
-            if (logs.isEmpty()) {
-                Text(
-                    text = "لا توجد تعديلات سابقة مسجلة لهذا الحجز.",
-                    fontSize = 11.sp,
-                    color = themeColors.textSecondary,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-            } else {
-                logs.forEach { log ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .background(color = themeColors.background, shape = RoundedCornerShape(8.dp))
-                            .padding(10.dp)
+        if (bookings.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(64.dp))
+                    Text("لا توجد حجوزات سابقة مسجلة", color = Color.Gray, fontSize = 16.sp)
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(bookings) { booking ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "⚡ ${log.status}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (log.status.contains("إلغاء")) Color.Red else themeColors.accent
-                            )
-                            Text(
-                                text = log.date,
-                                fontSize = 10.sp,
-                                color = themeColors.textSecondary
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = log.description,
-                            fontSize = 11.sp,
-                            color = themeColors.textPrimary
-                        )
-
-                        if (log.reason.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(4.dp))
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(Icons.Default.Info, null, tint = Color.Red, modifier = Modifier.size(12.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "السبب: ${log.reason}",
-                                    fontSize = 10.sp,
-                                    color = Color.Red,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Text(booking.serviceType.ifBlank { booking.providerName }, color = themeColors.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Surface(
+                                    color = when (booking.status.uppercase()) {
+                                        "APPROVED", "COMPLETED" -> Color(0xFF10B981)
+                                        "REJECTED", "CANCELLED" -> Color(0xFFEF4444)
+                                        else -> Color(0xFFF59E0B)
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = viewModel.getBookingStatusLabel(booking.status),
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                            Text("📅 التاريخ: ${booking.dateString} | ⏰ الوقت: ${booking.timeString}", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
+                            if (booking.rejectionReason.isNotBlank()) {
+                                Text("📝 سبب الرفض/الملاحظة: ${booking.rejectionReason}", color = Color(0xFFEF4444), fontSize = 13.sp)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (booking.status.uppercase() != "CANCELLED" && booking.status.uppercase() != "COMPLETED") {
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.updateBookingStatus(booking.id, "CANCELLED", "إلغاء بواسطة العميل")
+                                            Toast.makeText(context, "تم إلغاء الحجز بنجاح", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("إلغاء الحجز")
+                                    }
+                                }
                             }
                         }
                     }

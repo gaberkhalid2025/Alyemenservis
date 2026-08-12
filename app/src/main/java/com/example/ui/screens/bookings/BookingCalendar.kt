@@ -1,144 +1,170 @@
 package com.example.ui.screens.bookings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import android.widget.Toast
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
-fun BookingCalendar(
+fun BookingCalendarScreen(
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    onDateSelected: (String) -> Unit
+    serviceId: String = "",
+    serviceName: String = "خدمة عامة"
 ) {
-    var selectedDay by remember { mutableIntStateOf(12) }
-    val daysInMonth = (1..30).toList()
-    val bookedDays = listOf(3, 7, 15, 22)
+    val context = LocalContext.current
+    var selectedDate by remember { mutableStateOf(Calendar.getInstance()) }
+    var selectedTimeSlot by remember { mutableStateOf("09:00 صباحاً") }
+    var note by remember { mutableStateOf("") }
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+    val timeSlots = listOf(
+        "09:00 صباحاً", "10:30 صباحاً", "12:00 ظهراً",
+        "02:00 عصراً", "04:00 عصراً", "06:00 مساءً", "08:00 مساءً"
+    )
+
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale("ar"))
+
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+            .fillMaxSize()
+            .background(Color(0xFF0F172A))
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "📅 اختر تاريخ الحجز المناسب",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.textPrimary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("شعبان / رمضان ١٤٤٧ هـ", fontSize = 12.sp, color = themeColors.textSecondary)
-                Text("أغسطس ٢٠٢٦ م", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+            IconButton(onClick = { viewModel.goBack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
             }
+            Text("📅 حجز موعد جديد", color = themeColors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(48.dp))
+        }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Calendar Grid
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(7),
-                modifier = Modifier.height(180.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, themeColors.accent),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                val weekDays = listOf("ح", "ن", "ث", "ر", "خ", "ج", "س")
-                items(weekDays) { day ->
+                Text("الخدمة المطلوبة: $serviceName", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                
+                Divider(color = Color.Gray.copy(alpha = 0.3f))
+
+                Text("اختر تاريخ الموعد:", color = themeColors.accent, fontWeight = FontWeight.Bold)
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        val cal = selectedDate.clone() as Calendar
+                        cal.add(Calendar.DAY_OF_MONTH, -1)
+                        selectedDate = cal
+                    }) {
+                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = "السابق", tint = Color.White)
+                    }
                     Text(
-                        text = day,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = themeColors.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        text = dateFormat.format(selectedDate.time),
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                }
-
-                items(daysInMonth) { day ->
-                    val isBooked = bookedDays.contains(day)
-                    val isSelected = selectedDay == day
-
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(1f)
-                            .clip(CircleShape)
-                            .background(
-                                color = when {
-                                    isSelected -> themeColors.accent
-                                    isBooked -> Color.Red.copy(alpha = 0.15f)
-                                    else -> Color.Transparent
-                                }
-                            )
-                            .clickable {
-                                if (!isBooked) {
-                                    selectedDay = day
-                                    onDateSelected("2026-08-$day")
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = day.toString(),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = when {
-                                isSelected -> Color.Black
-                                isBooked -> Color.Red
-                                else -> themeColors.textPrimary
-                            }
-                        )
+                    IconButton(onClick = {
+                        val cal = selectedDate.clone() as Calendar
+                        cal.add(Calendar.DAY_OF_MONTH, 1)
+                        selectedDate = cal
+                    }) {
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "التالي", tint = Color.White)
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("اختر الوقت المناسب:", color = themeColors.accent, fontWeight = FontWeight.Bold)
 
-            // Calendar Legend
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
-            ) {
-                LegendItem(label = "متاح", color = themeColors.textSecondary)
-                LegendItem(label = "محدد", color = themeColors.accent)
-                LegendItem(label = "محجوز مسبقاً", color = Color.Red)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    timeSlots.chunked(3).forEach { rowSlots ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowSlots.forEach { slot ->
+                                val isSelected = (selectedTimeSlot == slot)
+                                Button(
+                                    onClick = { selectedTimeSlot = slot },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSelected) themeColors.accent else Color(0xFF334155)
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = slot,
+                                        color = if (isSelected) Color.Black else Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("ملاحظات إضافية للفني / مزود الخدمة") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+
+                Button(
+                    onClick = {
+                        val dateStr = dateFormat.format(selectedDate.time)
+                        viewModel.addBooking(
+                            name = viewModel.currentUserName.value.ifBlank { "عميل زائر" },
+                            phone = viewModel.currentUserPhone.value.ifBlank { "770000000" },
+                            area = viewModel.currentUserResidence.value.ifBlank { "صنعاء" },
+                            serviceType = serviceName,
+                            providerId = serviceId.ifEmpty { "p_general" },
+                            providerName = serviceName,
+                            dateString = dateStr,
+                            timeString = selectedTimeSlot
+                        )
+                        Toast.makeText(context, "تم تأكيد حجز الموعد بنجاح! 🚀", Toast.LENGTH_LONG).show()
+                        viewModel.goBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("تأكيد وحجز الموعد الآن ✨", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun LegendItem(label: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color = color)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(label, fontSize = 10.sp, color = color)
     }
 }

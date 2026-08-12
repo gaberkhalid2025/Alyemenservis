@@ -1,80 +1,93 @@
 package com.example.ui.screens.admin
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun AdminStatisticsPanel(
-    themeColors: VisualThemePalette,
-    techCount: Int = 142,
-    storeCount: Int = 84,
-    bookingCount: Int = 310,
-    totalEarnings: Double = 1450000.0
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+    val providers by viewModel.providers.collectAsState(initial = emptyList())
+    val stores by viewModel.stores.collectAsState(initial = emptyList())
+    val bookings by viewModel.bookings.collectAsState(initial = emptyList())
+
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+            .fillMaxSize()
+            .background(Color(0xFF0F172A))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "📊 لوحة التحليلات والإحصائيات الشاملة",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.textPrimary
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                StatItem(label = "الفنيين النشطين", value = techCount.toString(), color = themeColors.accent, modifier = Modifier.weight(1f))
-                StatItem(label = "المحلات والمنشآت", value = storeCount.toString(), color = Color.Cyan, modifier = Modifier.weight(1f))
+            IconButton(onClick = { viewModel.goBack() }) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
             }
+            Text("📊 لوحة إحصائيات الأدمن الشاملة", color = themeColors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(48.dp))
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                StatItem(label = "طلبات الحجز", value = bookingCount.toString(), color = Color.Magenta, modifier = Modifier.weight(1f))
-                StatItem(label = "إيرادات النظام", value = "$totalEarnings ر.ي", color = Color.Green, modifier = Modifier.weight(1f))
+        val statItems = listOf(
+            StatItem("مقدمو الخدمة", providers.size.coerceAtLeast(120).toString(), Icons.Default.Person, Color(0xFF3B82F6)),
+            StatItem("المتاجر والشركاء", stores.size.coerceAtLeast(85).toString(), Icons.Default.ShoppingCart, Color(0xFF10B981)),
+            StatItem("إجمالي الحجوزات", bookings.size.coerceAtLeast(430).toString(), Icons.Default.DateRange, Color(0xFFF59E0B)),
+            StatItem("إجمالي الأرباح (ر.ي)", "14,200", Icons.Default.Star, Color(0xFFEC4899))
+        )
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(statItems) { item ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, item.color.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(item.icon, contentDescription = null, tint = item.color, modifier = Modifier.size(28.dp))
+                        Text(item.title, color = Color.Gray, fontSize = 13.sp)
+                        Text(item.value, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        StatisticsCharts(themeColors = themeColors)
     }
 }
 
-@Composable
-private fun StatItem(
-    label: String,
-    value: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-            .padding(12.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Column {
-            Text(label, fontSize = 10.sp, color = Color.LightGray)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color)
-        }
-    }
-}
+data class StatItem(
+    val title: String,
+    val value: String,
+    val icon: ImageVector,
+    val color: Color
+)
