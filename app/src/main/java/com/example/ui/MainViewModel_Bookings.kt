@@ -78,7 +78,7 @@ fun MainViewModel.addBooking(name: String, phone: String, area: String, serviceT
 
         // 2. Distribute to technicians according to the active mode set by the admin
         when (_distributionMode.value) {
-            BookingDistributionMode.SPECIFIC_PROVIDER -> {
+            MainViewModel.BookingDistributionMode.SPECIFIC_PROVIDER -> {
                 // Find and notify the specific technician named in the booking
                 val tech = _providers.value.find { it.id == providerId }
                 if (tech != null) {
@@ -90,7 +90,7 @@ fun MainViewModel.addBooking(name: String, phone: String, area: String, serviceT
                     )
                 }
             }
-            BookingDistributionMode.NEAREST_PROVIDER, BookingDistributionMode.ALL_PROVIDERS -> {
+            MainViewModel.BookingDistributionMode.NEAREST_PROVIDER, MainViewModel.BookingDistributionMode.ALL_PROVIDERS -> {
                 // Find and notify all providers in the same category (or closest geographically)
                 val categoryIdOfProvider = _providers.value.find { it.id == providerId }?.categoryId ?: "1"
                 val catTechs = _providers.value.filter { it.categoryId == categoryIdOfProvider }
@@ -172,7 +172,7 @@ fun MainViewModel.updateBooking(booking: BookingEntity) {
     // Targeted Notifications Management
 
 
-fun MainViewModel.updateBookingFormFields(fields: BookingFormFields) {
+fun MainViewModel.updateBookingFormFields(fields: MainViewModel.BookingFormFields) {
         _bookingFormFields.value = fields
         try {
             db.collection("settings").document("booking_fields").set(fields)
@@ -181,7 +181,7 @@ fun MainViewModel.updateBookingFormFields(fields: BookingFormFields) {
 
 
 
-fun MainViewModel.updateDistributionMode(mode: BookingDistributionMode) {
+fun MainViewModel.updateDistributionMode(mode: MainViewModel.BookingDistributionMode) {
         _distributionMode.value = mode
         try {
             db.collection("settings").document("distribution_mode").set(mapOf("mode" to mode.name))

@@ -108,7 +108,7 @@ fun UserNotificationsDialogView(
     val allNotifications by viewModel.notifications.collectAsState()
     val userPhone by viewModel.currentUserPhone.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
-    val readIds by viewModel.readNotificationIds.collectAsState()
+    val readIds = remember { emptyList<String>() }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var activeTab by remember { mutableStateOf("ALL") } // "ALL", "UNREAD", "READ"
