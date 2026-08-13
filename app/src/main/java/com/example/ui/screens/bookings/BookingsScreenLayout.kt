@@ -1,5 +1,8 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.example.ui.screens.bookings
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 
 import com.example.ui.*
 import com.example.ui.utils.*
@@ -224,10 +227,13 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                     .fillMaxWidth()
                     .background(themeColors.secondary)
                     .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { viewModel.navigateTo("USER_BROWSE") }) {
+                IconButton(
+                    onClick = { viewModel.navigateTo("USER_BROWSE") },
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
                         imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
                         contentDescription = "رجوع",
@@ -358,7 +364,7 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
 
                                 Button(
                                     onClick = {
-                                        viewModel.triggerRestoreAccountDialog.value = true
+                                        viewModel.triggerRestoreAccountDialog(true)
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.3f)),
                                     border = BorderStroke(1.dp, themeColors.accent),
@@ -415,13 +421,14 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 10.dp)
+                                .padding(bottom = 8.dp)
                                 .background(themeColors.surface, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                                 .padding(4.dp)
                         ) {
                             Button(
                                 onClick = { selectedTab = 0 },
                                 modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (selectedTab == 0) themeColors.accent else Color.Transparent
                                 ),
@@ -430,13 +437,16 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                                 Text(
                                     "حجوزاتي كعميل (${myCustomerBookings.size})",
                                     color = if (selectedTab == 0) Color.Black else themeColors.textSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    maxLines = 1
                                 )
                             }
                             Button(
                                 onClick = { selectedTab = 1 },
                                 modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (selectedTab == 1) themeColors.accent else Color.Transparent
                                 ),
@@ -445,8 +455,10 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                                 Text(
                                     "الحجوزات المستلمة (${receivedBookings.size})",
                                     color = if (selectedTab == 1) Color.Black else themeColors.textSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    maxLines = 1
                                 )
                             }
                         }
@@ -471,10 +483,11 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp)
+                                .padding(bottom = 8.dp)
                                 .background(themeColors.surface, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                                 .padding(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             val customerTabs = listOf(
                                 "URGENT" to "⚡ طلباتي العاجلة",
@@ -489,14 +502,16 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                                         .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
                                         .background(if (isSel) themeColors.accent else Color.Transparent)
                                         .clickable { customerSubTab = tabId }
-                                        .padding(vertical = 8.dp),
+                                        .padding(vertical = 8.dp, horizontal = 4.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = label,
                                         color = if (isSel) Color.Black else Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -507,10 +522,11 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp)
+                            .padding(bottom = 8.dp)
                             .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                             .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         val subTabs = listOf(
                             Triple("ACTIVE", "📅 نشطة", Color(0xFFF59E0B)),
@@ -526,14 +542,16 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                                     .background(if (isSel) tabColor.copy(alpha = 0.2f) else Color.Transparent)
                                     .border(1.dp, if (isSel) tabColor else Color.Transparent, RoundedCornerShape(6.dp))
                                     .clickable { filterStatusTab = tabId }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = label,
                                     color = if (isSel) Color.White else Color.Gray,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    maxLines = 1
                                 )
                             }
                         }

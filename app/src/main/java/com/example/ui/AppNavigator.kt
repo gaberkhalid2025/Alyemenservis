@@ -7,6 +7,8 @@ import androidx.compose.ui.graphics.PathEffect
 import okhttp3.MediaType.Companion.toMediaType
 
 import com.example.*
+import com.example.util.PermissionGuard
+import com.example.util.RoleManager
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -171,7 +173,7 @@ fun AppNavigator(
     val triggerRestore by viewModel.triggerRestoreAccountDialog.collectAsState()
     if (triggerRestore) {
         showRestoreAccountDialog = true
-        viewModel.triggerRestoreAccountDialog.value = false
+        viewModel.triggerRestoreAccountDialog(false)
     }
 
     val activeChatChannel by viewModel.activeChatChannel.collectAsState()
@@ -318,14 +320,25 @@ fun AppNavigator(
                             MaintenanceSplashView(settingsState = settingsState, themeColors = themeColors, viewModel = viewModel)
                         } else {
                             when (currentScreen) {
-                                "OWNER_PANEL" -> OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors)
-                                "ADMIN_PANEL" -> AdminPanelLayout(viewModel = viewModel, themeColors = themeColors)
+                                "OWNER_PANEL" -> {
+                                    PermissionGuard.GuardContent(
+                                        role = RoleManager.fromRoleString(adminRole),
+                                        requiredPermission = "OWNER_PANEL",
+                                        onGranted = { OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors) },
+                                        onDenied = { AdminPanelLayout(viewModel = viewModel, themeColors = themeColors) }
+                                    )
+                                }
+                                "ADMIN_PANEL" -> {
+                                    PermissionGuard.GuardContent(
+                                        role = RoleManager.fromRoleString(adminRole),
+                                        requiredPermission = "ADMIN_PANEL",
+                                        onGranted = { AdminPanelLayout(viewModel = viewModel, themeColors = themeColors) },
+                                        onDenied = { AdminPanelLayout(viewModel = viewModel, themeColors = themeColors) }
+                                    )
+                                }
                                 "REGISTER_FORM" -> ProviderRegisterFormLayout(
                                     viewModel = viewModel,
-                                    themeColors = themeColors,
-                                    regType = preselectedRegistrationType,
-                                    sectionId = activeSectionIdForCreation,
-                                    onRegTypeChange = { preselectedRegistrationType = it }
+                                    themeColors = themeColors
                                 )
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
@@ -2573,7 +2586,14 @@ fun ProviderCard(
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     // 📩 مراسلة فورية
-                    if (settingsState.showInstantChatButton) {
+                    val isProviderSectionChatDisabled = remember(settingsState.chatDisabledCategories) {
+                        settingsState.chatDisabledCategories.split(",").map { it.trim().lowercase() }.contains("services")
+                    }
+                    val isProviderChatBlocked = remember(settingsState.chatBlockedIds, provider.id, provider.phone) {
+                        val list = settingsState.chatBlockedIds.split(",").map { it.trim() }
+                        list.contains(provider.id) || list.contains(provider.phone)
+                    }
+                    if (settingsState.showInstantChatButton && !settingsState.disableChatAll && !isProviderSectionChatDisabled && !isProviderChatBlocked) {
                         Button(
                             onClick = {
                                 if (provider.isChatDisabled) {

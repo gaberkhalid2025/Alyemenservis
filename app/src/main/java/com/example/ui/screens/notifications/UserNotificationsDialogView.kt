@@ -108,7 +108,7 @@ fun UserNotificationsDialogView(
     val allNotifications by viewModel.notifications.collectAsState()
     val userPhone by viewModel.currentUserPhone.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
-    val readIds by viewModel.readNotificationIds.collectAsState()
+    val readIds = remember { emptyList<String>() }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var activeTab by remember { mutableStateOf("ALL") } // "ALL", "UNREAD", "READ"
@@ -279,13 +279,20 @@ fun UserNotificationsDialogView(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(finalNotifs, key = { it.id }) { notif ->
-                            val iconText = when {
-                                notif.title.contains("حجز") -> "📅"
-                                notif.title.contains("دردشة") || notif.title.contains("محادثة") -> "💬"
-                                notif.title.contains("طلب") -> "👷"
-                                notif.title.contains("تفعيل") || notif.title.contains("قبول") -> "🎉"
-                                notif.title.contains("رفض") -> "❌"
-                                else -> "🔔"
+                            val iconText = when (notif.targetType) {
+                                "STORE" -> "🏪"
+                                "RESTAURANT" -> "🍔"
+                                "MEDICAL" -> "🏥"
+                                "PROPERTY" -> "🏠"
+                                "JOB" -> "💼"
+                                else -> {
+                                    if (notif.title.contains("حجز")) "📅"
+                                    else if (notif.title.contains("دردشة") || notif.title.contains("محادثة")) "💬"
+                                    else if (notif.title.contains("طلب")) "👷"
+                                    else if (notif.title.contains("تفعيل") || notif.title.contains("قبول")) "🎉"
+                                    else if (notif.title.contains("رفض")) "❌"
+                                    else "🔔"
+                                }
                             }
 
                             val isUnread = !readIds.contains(notif.id)

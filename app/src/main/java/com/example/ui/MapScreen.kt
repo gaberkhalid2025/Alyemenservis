@@ -378,21 +378,21 @@ fun MapScreen(
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("ابحث عن فني، محل، مطعم، عقار...", fontSize = 9.5.sp, color = Color.Gray) },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(14.dp)) },
+                                placeholder = { Text("ابحث عن فني، محل، مطعم، عقار...", fontSize = 12.sp, color = Color.LightGray) },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp)) },
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {
                                         IconButton(
                                             onClick = { searchQuery = "" },
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier.size(32.dp)
                                         ) {
-                                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(13.dp))
+                                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.LightGray, modifier = Modifier.size(16.dp))
                                         }
                                     }
                                 },
                                 singleLine = true,
                                 shape = RoundedCornerShape(10.dp),
-                                textStyle = LocalTextStyle.current.copy(color = Color.White, fontSize = 10.sp),
+                                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = Color(0xFF1E293B),
                                     unfocusedContainerColor = Color(0xFF1E293B),
@@ -403,14 +403,14 @@ fun MapScreen(
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = 36.dp, max = 38.dp)
+                                    .height(48.dp)
                             )
 
                             // Advanced Filter Toggle Icon
                             IconButton(
                                 onClick = { showAdvancedFilters = !showAdvancedFilters },
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(48.dp)
                                     .background(
                                         if (showAdvancedFilters) Color(0xFFF59E0B) else Color(0xFF1E293B),
                                         RoundedCornerShape(10.dp)

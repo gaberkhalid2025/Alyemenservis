@@ -8,7 +8,9 @@ data class ReportEntity(
     val providerId: String = "",
     val providerName: String = "",
     val reporterName: String = "",
-    val content: String = ""
+    val content: String = "",
+    val targetId: String = "",
+    val targetType: String = "" // SERVICES, STORES, RESTAURANTS, MEDICAL, PROPERTIES, JOBS
 )
 
 @Keep
