@@ -404,8 +404,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
         showActiveChatChannelObjState = showActiveChatChannelObjState,
         adminChatReplyInputState = adminChatReplyInputState,
         showDeleteChatConfirmIdState = showDeleteChatConfirmIdState,
-        backupJsonStringStateState = backupJsonStringStateState,
-        restoreJsonInputStateState = restoreJsonInputStateState,
+        backupJsonStringState = backupJsonStringStateState,
+        restoreJsonInputState = restoreJsonInputStateState,
         notifTitleInputState = notifTitleInputState,
         notifMsgInputState = notifMsgInputState,
         notifTargetTypeState = notifTargetTypeState,
@@ -771,203 +771,90 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
             // ------------------ CONDITIONAL SUB-SCREENS RENDERING ------------------
 
-            adminRequestsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminManualAddPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminProvidersPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminStoresPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminRestaurantsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminMedicalPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminPropertiesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminJobsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminApplicantsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminBookingsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminNotificationsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminBannersPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminCategoriesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminPaymentsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminSettingsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminBackupPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminCleanPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminReviewsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminCallsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminBlockedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminDeletedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminCustomTabsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminAdvancedChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminBookingRoutingPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-            adminRolesAndPermissionsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-
-            // Dedicated Stats Panel with Charts & Exporter
-            if (activeSubTab == "STATS") {
-                item {
-                    AdminStatisticsPanel(viewModel = viewModel, themeColors = themeColors)
+            when (activeSubTab) {
+                "REG_REQ" -> adminRequestsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "MANUAL_ADD" -> adminManualAddPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "PROVIDERS" -> adminProvidersPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "STORES" -> adminStoresPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "RESTAURANTS" -> adminRestaurantsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "MEDICAL" -> adminMedicalPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "PROPERTIES" -> adminPropertiesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "JOBS" -> adminJobsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "APPLICANTS" -> adminApplicantsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "BOOKINGS" -> adminBookingsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "NOTIFICATIONS" -> adminNotificationsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "CHATS" -> adminChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "BANNERS" -> adminBannersPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "CATEGORIES" -> adminCategoriesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "BACKUP" -> adminBackupPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "CLEAN" -> adminCleanPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "REVIEWS" -> adminReviewsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "CALLS" -> adminCallsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "BLOCKED" -> adminBlockedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "DELETED" -> adminDeletedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "CUSTOM_TABS" -> adminCustomTabsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "ADVANCED_CHAT" -> adminAdvancedChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "BOOKING_ROUTING" -> adminBookingRoutingPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "SUPERVISORS" -> adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "ROLES_PERMISSIONS" -> adminRolesAndPermissionsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "COMPLAINTS" -> adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                
+                // Grouped subtabs handled by adminSettingsPanel
+                "COLORS", "GOLDEN_ICONS", "CARD_CUSTOMIZER", "NEW_SECTION_CREATOR", "REG_FORMS_MANAGER" -> {
+                    adminSettingsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
                 }
-            }
 
+                "STATS" -> item { AdminStatisticsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
 
+                "VIP" -> item { AdminVipPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
 
-            // Dedicated Coupons Manager Panel
-            if (activeSubTab == "COUPONS") {
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("🎫 إدارة الكوبونات وخصومات العروض", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                        var couponCodeInput by remember { mutableStateOf("") }
-                        var discountInput by remember { mutableStateOf("") }
-                        var descInput by remember { mutableStateOf("") }
+                "COUPONS" -> item { AdminCouponsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
 
-                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("إضافة كوبون خصم جديد:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                OutlinedTextField(
-                                    value = couponCodeInput,
-                                    onValueChange = { couponCodeInput = it },
-                                    label = { Text("رمز الكوبون (مثال: SAVE20)") },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                OutlinedTextField(
-                                    value = discountInput,
-                                    onValueChange = { discountInput = it },
-                                    label = { Text("نسبة الخصم (%)") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                                )
-                                OutlinedTextField(
-                                    value = descInput,
-                                    onValueChange = { descInput = it },
-                                    label = { Text("وصف الكوبون") },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Button(
-                                    onClick = {
-                                        val disc = discountInput.toIntOrNull() ?: 10
-                                        if (couponCodeInput.isNotBlank()) {
-                                            com.example.data.CouponManager.createCoupon(couponCodeInput, disc, descInput)
-                                            couponCodeInput = ""
-                                            discountInput = ""
-                                            descInput = ""
-                                            viewModel.triggerNotification("✅ تم إضافة الكوبون بنجاح")
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary)
-                                ) {
-                                    Text("حفظ الكوبون 💾", color = Color.White)
-                                }
-                            }
+                "GOLDEN_ICONS" -> item { AdminGoldenIconsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "CARD_CUSTOMIZER" -> item { AdminCardCustomizerPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "NEW_SECTION_CREATOR" -> item { AdminNewSectionCreatorPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "REG_FORMS_MANAGER" -> item { AdminRegFormsManagerPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "PASSWORDS_RESET" -> item { AdminPasswordsResetPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "CITIES" -> item { AdminCitiesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "COMPLAINTS" -> item { AdminComplaintsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "COLORS" -> item { AdminColorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "BACKUP" -> item { AdminBackupPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+
+                "PAYMENTS" -> {
+                    item {
+                        WalletManager(themeColors = themeColors)
+                    }
+                    adminPaymentsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                }
+
+                "BACKDOOR" -> {
+                    if (adminRole == "OWNER") {
+                        item {
+                            OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors)
                         }
-
-                        Text("📋 الكوبونات المتاحة حالياً:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        val allCoupons = remember(couponCodeInput) { com.example.data.CouponManager.getAllCoupons() }
-                        allCoupons.forEach { coupon ->
-                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                                Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                    Column {
-                                        Text("كود: ${coupon.code} (${coupon.discountPercent}% خصم)", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 12.sp)
-                                        Text(coupon.description, color = Color.LightGray, fontSize = 10.sp)
-                                    }
-                                    Text(if (coupon.isUsed) "مستخدم ❌" else "نشط ✅", color = if (coupon.isUsed) Color.Red else Color.Green, fontSize = 10.sp)
-                                }
+                    } else {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                Text("🚫 عذراً، هذه اللوحة مخصصة للمالك فقط", color = Color.Red, fontSize = 14.sp)
                             }
                         }
                     }
                 }
-            }
 
-            // Dedicated Passwords Reset Panel
-            if (activeSubTab == "PASSWORDS_RESET") {
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("🔑 إعادة تعيين كلمات المرور لجميع الحسابات", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                        var searchEntityInput by remember { mutableStateOf("") }
-                        var newPasswordInput by remember { mutableStateOf("") }
-
-                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("إعادة تعيين كلمة مرور سريعة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                OutlinedTextField(
-                                    value = searchEntityInput,
-                                    onValueChange = { searchEntityInput = it },
-                                    label = { Text("اسم أو رقم هاتف الحساب / الفني / المحل") },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                OutlinedTextField(
-                                    value = newPasswordInput,
-                                    onValueChange = { newPasswordInput = it },
-                                    label = { Text("كلمة المرور الجديدة") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    visualTransformation = PasswordVisualTransformation()
-                                )
-                                Button(
-                                    onClick = {
-                                        if (searchEntityInput.isNotBlank() && newPasswordInput.isNotBlank()) {
-                                            viewModel.triggerNotification("🔑 تم تغيير كلمة المرور بنجاح للحساب: $searchEntityInput")
-                                            searchEntityInput = ""
-                                            newPasswordInput = ""
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                                ) {
-                                    Text("حفظ كلمة المرور الجديدة 🔐", color = Color.Black)
-                                }
-                            }
+                else -> {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Text("⚠️ اللوحة غير موجودة أو قيد التطوير", color = Color.Yellow, fontSize = 14.sp)
                         }
                     }
-                }
-            }
-
-            // Dedicated Cities Management Panel
-            if (activeSubTab == "CITIES") {
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("🗺️ تحكم المدن والمحافظات اليمنية", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                        var newCityName by remember { mutableStateOf("") }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = newCityName,
-                                onValueChange = { newCityName = it },
-                                label = { Text("اسم المدينة الجديدة") },
-                                modifier = Modifier.weight(1f)
-                            )
-                            Button(
-                                onClick = {
-                                    if (newCityName.isNotBlank()) {
-                                        viewModel.addNewCity(newCityName, newCityName)
-                                        newCityName = ""
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary)
-                            ) {
-                                Text("إضافة ➕", color = Color.White)
-                            }
-                        }
-                        val cities by viewModel.cities.collectAsState()
-                        cities.forEach { city ->
-                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                                Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("📍 ${city.nameAr}", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
-                                    IconButton(onClick = { viewModel.removeCity(city.id) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Wallet Manager in Payments tab
-            if (activeSubTab == "PAYMENTS") {
-                item {
-                    WalletManager(themeColors = themeColors)
-                }
-            }
-
-            if (activeSubTab == "BACKDOOR" && adminRole == "OWNER") {
-                item {
-                    OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors)
                 }
             }
         }

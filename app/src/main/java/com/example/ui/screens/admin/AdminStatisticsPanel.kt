@@ -19,12 +19,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
+import com.example.util.PermissionGuard
+import com.example.util.RoleManager
 
 @Composable
 fun AdminStatisticsPanel(
     viewModel: MainViewModel,
-    themeColors: VisualThemePalette
+    themeColors: VisualThemePalette,
+    state: AdminPanelState
 ) {
+    if (!PermissionGuard.hasPermission(RoleManager.fromRoleString(viewModel.adminRole.value), "VIEW_STATS")) {
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Red, modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("🔒 ليس لديك صلاحية للوصول إلى هذه اللوحة", color = Color.White, fontSize = 14.sp)
+                Text("يرجى التواصل مع المالك أو المدير الرئيسي", color = Color.Gray, fontSize = 12.sp)
+            }
+        }
+        return
+    }
+
     val providers by viewModel.providers.collectAsState(initial = emptyList())
     val stores by viewModel.stores.collectAsState(initial = emptyList())
     val bookings by viewModel.bookings.collectAsState(initial = emptyList())
