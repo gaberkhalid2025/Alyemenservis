@@ -732,6 +732,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         Pair("CUSTOM_TABS", "📑 تخصيص تبويبات الملفات"),
                         Pair("GOLDEN_ICONS", "👑 الأيقونات وحجم الخط"),
                         Pair("ADVANCED_CHAT", "⚡ صلاحيات وتوجيه الدردشات"),
+                        Pair("BOOKING_ROUTING", "🔄 توجيه الحجوزات"),
                         Pair("CARD_CUSTOMIZER", "🎛️ تخصيص أزرار وأشكال البطائق"),
                         Pair("NEW_SECTION_CREATOR", "➕ إضافة وإدارة الأقسام والتوصيل والمحافظ"),
                         Pair("REG_FORMS_MANAGER", "📋 تخصيص استمارات التسجيل وطلبات الانضمام"),
@@ -793,6 +794,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
             adminBlockedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
             adminDeletedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
             adminCustomTabsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+            adminAdvancedChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+            adminBookingRoutingPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
             adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
             adminRolesAndPermissionsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
 

@@ -2199,22 +2199,22 @@ class MainViewModel : ViewModel() {
         val technician = _pendingProviders.value.find { it.id == providerId }
         technician?.let {
             _pendingProviders.value = _pendingProviders.value.filter { it.id != providerId }
-            val p = ProviderEntity(
-                id = it.id,
-                name = it.name,
-                phone = it.phone,
-                categoryId = it.categoryId,
-                area = it.area,
-                localNeighborhood = it.localNeighborhood,
-                isVerified = true,
-                isRecommended = false,
-                subscriptionStatus = "APPROVED",
-                isVip = false,
-                isAvailable = true,
-                rating = 5.0f,
-                subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
-                workPhotosBase64 = it.workPhotosBase64
+            
+            // Log security event
+            com.example.util.AuditTrailLogger.logSecurityEvent(
+                userId = "ADMIN",
+                actionType = "APPROVE_JOIN_REQUEST",
+                targetEntityId = providerId,
+                details = "Approved request for ${it.name} (${it.categoryId})",
+                status = "SUCCESS"
             )
+
+            val cat = it.categoryId.lowercase()
+            val isStore = cat.contains("محل") || cat.contains("store") || cat.contains("معرض") || cat.contains("دكان") || cat.contains("تجا")
+            val isRestaurant = cat.contains("مطعم") || cat.contains("كافيه") || cat.contains("restaurant") || cat.contains("caf") || cat.contains("وجب")
+            val isMedical = cat.contains("طب") || cat.contains("عياد") || cat.contains("مستشف") || cat.contains("medical") || cat.contains("clinic") || cat.contains("مركز")
+            val isProperty = cat.contains("عقار") || cat.contains("شقة") || cat.contains("بيت") || cat.contains("أرض") || cat.contains("property") || cat.contains("real")
+            val isJob = cat.contains("وظيفة") || cat.contains("عمل") || cat.contains("job") || cat.contains("متقدم")
 
             val notification = NotificationEntity(
                 id = UUID.randomUUID().toString(),
@@ -2228,9 +2228,96 @@ class MainViewModel : ViewModel() {
 
             try {
                 db.collection("pending_providers").document(providerId).delete()
-                db.collection("providers").document(providerId).set(p)
                 db.collection("notifications").document(notification.id).set(notification)
-            } catch (e: Exception) {}
+
+                if (isRestaurant) {
+                    val s = StoreEntity(
+                        id = it.id,
+                        sectionId = "restaurants",
+                        name = it.name,
+                        phone = it.phone,
+                        categoryId = "مطاعم وكافيهات",
+                        cityId = it.area,
+                        localNeighborhood = it.localNeighborhood,
+                        isApproved = true,
+                        password = it.password
+                    )
+                    db.collection("stores").document(it.id).set(s)
+                } else if (isMedical) {
+                    val s = StoreEntity(
+                        id = it.id,
+                        sectionId = "medical",
+                        name = it.name,
+                        phone = it.phone,
+                        categoryId = "عيادات ومراكز طبية",
+                        cityId = it.area,
+                        localNeighborhood = it.localNeighborhood,
+                        isApproved = true,
+                        password = it.password
+                    )
+                    db.collection("stores").document(it.id).set(s)
+                } else if (isStore) {
+                    val s = StoreEntity(
+                        id = it.id,
+                        sectionId = "stores",
+                        name = it.name,
+                        phone = it.phone,
+                        categoryId = it.categoryId,
+                        cityId = it.area,
+                        localNeighborhood = it.localNeighborhood,
+                        isApproved = true,
+                        password = it.password
+                    )
+                    db.collection("stores").document(it.id).set(s)
+                } else if (isProperty) {
+                    val p = PropertyEntity(
+                        id = it.id,
+                        sectionId = "properties",
+                        title = it.name,
+                        description = "تمت إضافته من طلب انضمام معتمد",
+                        phone = it.phone,
+                        cityId = it.area,
+                        localNeighborhood = it.localNeighborhood,
+                        isApproved = true,
+                        password = it.password
+                    )
+                    db.collection("properties").document(it.id).set(p)
+                } else if (isJob) {
+                    val j = JobEntity(
+                        id = it.id,
+                        sectionId = "jobs",
+                        title = it.profession.ifBlank { "وظيفة شاغرة" },
+                        companyName = it.name,
+                        description = "تمت إضافتها من طلب انضمام معتمد",
+                        phone = it.phone,
+                        cityId = it.area,
+                        isApproved = true
+                    )
+                    db.collection("jobs").document(it.id).set(j)
+                } else {
+                    // Default to Provider
+                    val p = ProviderEntity(
+                        id = it.id,
+                        name = it.name,
+                        phone = it.phone,
+                        categoryId = it.categoryId,
+                        area = it.area,
+                        localNeighborhood = it.localNeighborhood,
+                        isVerified = true,
+                        isRecommended = false,
+                        subscriptionStatus = "APPROVED",
+                        isVip = false,
+                        isAvailable = true,
+                        rating = 5.0f,
+                        subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
+                        workPhotosBase64 = it.workPhotosBase64,
+                        password = it.password
+                    )
+                    db.collection("providers").document(providerId).set(p)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -2238,6 +2325,15 @@ class MainViewModel : ViewModel() {
         val technician = _pendingProviders.value.find { it.id == providerId }
         technician?.let {
             _pendingProviders.value = _pendingProviders.value.filter { it.id != providerId }
+
+            // Log security event
+            com.example.util.AuditTrailLogger.logSecurityEvent(
+                userId = "ADMIN",
+                actionType = "REJECT_JOIN_REQUEST",
+                targetEntityId = providerId,
+                details = "Rejected request for ${it.name} (${it.categoryId}). Reason: $reason",
+                status = "SUCCESS"
+            )
 
             val notification = NotificationEntity(
                 id = UUID.randomUUID().toString(),
@@ -2461,6 +2557,18 @@ class MainViewModel : ViewModel() {
     fun updateProviderEntity(provider: ProviderEntity) {
         db.collection("providers").document(provider.id).set(provider)
         triggerNotification("💾 تم تحديث بيانات مقدم الخدمة ${provider.name} بنجاح")
+    }
+
+    fun toggleProviderBlock(providerId: String) {
+        val provider = _providers.value.find { it.id == providerId }
+        provider?.let {
+            val updated = it.copy(isBlocked = !it.isBlocked)
+            _providers.value = _providers.value.map { p -> if (p.id == providerId) updated else p }
+            try {
+                db.collection("providers").document(providerId).set(updated)
+            } catch (e: Exception) {}
+            triggerNotification("🔄 تم تحديث حالة حظر الفني")
+        }
     }
 
     // Additional StateFlows for app compatibility
@@ -2776,16 +2884,54 @@ class MainViewModel : ViewModel() {
 
     fun toggleStoreBlock(storeId: String, reason: String = "مخالفة الشروط") {
         _stores.value = _stores.value.map {
-            if (it.id == storeId) it.copy(isBlocked = !it.isBlocked, blockReason = if (!it.isBlocked) reason else "") else it
+            if (it.id == storeId) {
+                val updated = it.copy(isBlocked = !it.isBlocked, blockReason = if (!it.isBlocked) reason else "")
+                try {
+                    db.collection("stores").document(storeId).set(updated)
+                } catch (e: Exception) {}
+                updated
+            } else it
         }
         triggerNotification("🔄 تم تحديث حالة حظر المحل")
     }
 
     fun toggleStoreVip(storeId: String) {
         _stores.value = _stores.value.map {
-            if (it.id == storeId) it.copy(isVip = !it.isVip) else it
+            if (it.id == storeId) {
+                val updated = it.copy(isVip = !it.isVip)
+                try {
+                    db.collection("stores").document(storeId).set(updated)
+                } catch (e: Exception) {}
+                updated
+            } else it
         }
         triggerNotification("🏆 تم تحديث شارة VIP للمحل")
+    }
+
+    fun toggleStoreVerified(storeId: String) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) {
+                val updated = it.copy(isVerified = !it.isVerified)
+                try {
+                    db.collection("stores").document(storeId).set(updated)
+                } catch (e: Exception) {}
+                updated
+            } else it
+        }
+        triggerNotification("🛡️ تم تحديث حالة التوثيق")
+    }
+
+    fun toggleStoreRecommended(storeId: String) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) {
+                val updated = it.copy(isRecommended = !it.isRecommended)
+                try {
+                    db.collection("stores").document(storeId).set(updated)
+                } catch (e: Exception) {}
+                updated
+            } else it
+        }
+        triggerNotification("⭐️ تم تحديث حالة التوصية للمحل")
     }
 
     // --- PROPERTIES MANAGEMENT ---

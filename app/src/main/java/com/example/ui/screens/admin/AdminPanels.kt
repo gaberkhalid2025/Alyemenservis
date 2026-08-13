@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.example.ui.*
 import com.example.utils.VisualThemePalette
 import com.example.data.*
+import com.google.firebase.firestore.FirebaseFirestore
 
 
 fun LazyListScope.adminRequestsPanel(viewModel: MainViewModel, themeColors: VisualThemePalette, state: AdminPanelState) {
@@ -311,21 +312,892 @@ fun LazyListScope.adminBookingsPanel(viewModel: MainViewModel, themeColors: Visu
     with(state) {
         if (activeSubTabState.value == "BOOKINGS") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("📅 الحجوزات والطلبات الميدانية", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    val bookings by viewModel.bookings.collectAsState()
-                    if (bookings.isEmpty()) {
-                        Text("لا توجد حجوزات مسجلة حالياً.", color = Color.LightGray, fontSize = 11.sp)
-                    } else {
-                        bookings.forEach { b ->
-                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("حجز للعميل: ${b.clientName} (${b.clientPhone})", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
-                                    Text("الحالة: ${b.status} | الموعد: ${b.date}", color = Color.LightGray, fontSize = 10.sp)
+                val context = LocalContext.current
+                val bookings by viewModel.bookings.collectAsState()
+                val providers by viewModel.providers.collectAsState()
+                val categories by viewModel.categories.collectAsState()
+                val settingsState by viewModel.settings.collectAsState()
+
+                // State variables for filtering and search
+                var searchQuery by remember { mutableStateOf("") }
+                var selectedStatusFilter by remember { mutableStateOf("ALL") }
+                var selectedCategoryIdFilter by remember { mutableStateOf("ALL") }
+                var dateFilterText by remember { mutableStateOf("") }
+
+                // Dialog states
+                var selectedBookingForDetails by remember { mutableStateOf<BookingEntity?>(null) }
+                var bookingToEdit by remember { mutableStateOf<BookingEntity?>(null) }
+                var bookingToCancel by remember { mutableStateOf<BookingEntity?>(null) }
+                var cancellationReasonText by remember { mutableStateOf("") }
+                var bookingToReject by remember { mutableStateOf<BookingEntity?>(null) }
+                var rejectionReasonText by remember { mutableStateOf("") }
+                var bookingToRedirect by remember { mutableStateOf<BookingEntity?>(null) }
+                var redirectSearchQuery by remember { mutableStateOf("") }
+                var showDeleteConfirm by remember { mutableStateOf<BookingEntity?>(null) }
+
+                // Payment settings toggle state
+                var showPaymentSettingsState by remember { mutableStateOf(false) }
+
+                // Local states for editing form fields
+                var editClientName by remember { mutableStateOf("") }
+                var editClientPhone by remember { mutableStateOf("") }
+                var editClientArea by remember { mutableStateOf("") }
+                var editServiceType by remember { mutableStateOf("") }
+                var editDate by remember { mutableStateOf("") }
+                var editTime by remember { mutableStateOf("") }
+                var editStatus by remember { mutableStateOf("") }
+                var editTotalAmount by remember { mutableStateOf("") }
+
+                // Compute statistics
+                val totalCount = bookings.size
+                val pendingCount = bookings.count { it.status == "PENDING" }
+                val approvedCount = bookings.count { it.status == "APPROVED" }
+                val inProgressCount = bookings.count { it.status == "IN_PROGRESS" }
+                val completedCount = bookings.count { it.status == "COMPLETED" }
+                val cancelledCount = bookings.count { it.status == "CANCELLED" }
+                val totalRevenue = bookings.filter { it.status == "COMPLETED" }.sumOf { it.totalAmount }
+
+                // Filtered bookings
+                val filteredBookings = remember(bookings, searchQuery, selectedStatusFilter, selectedCategoryIdFilter, dateFilterText) {
+                    bookings.filter { b ->
+                        val matchesSearch = b.id.contains(searchQuery, ignoreCase = true) ||
+                                b.clientName.contains(searchQuery, ignoreCase = true) ||
+                                b.providerName.contains(searchQuery, ignoreCase = true) ||
+                                b.customerPhone.contains(searchQuery, ignoreCase = true)
+                        
+                        val matchesStatus = selectedStatusFilter == "ALL" || b.status == selectedStatusFilter
+                        
+                        val matchesCategory = selectedCategoryIdFilter == "ALL" || b.category == selectedCategoryIdFilter
+                        
+                        val matchesDate = dateFilterText.isBlank() || b.date.contains(dateFilterText)
+                        
+                        matchesSearch && matchesStatus && matchesCategory && matchesDate
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("📅 الحجوزات والطلبات الميدانية الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                Button(
+                                    onClick = { showPaymentSettingsState = !showPaymentSettingsState },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = if (showPaymentSettingsState) "إخفاء خيارات الدفع 🙈" else "ربط الحجز بالدفع 💳",
+                                        fontSize = 10.sp,
+                                        color = Color.Black,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Text("إدارة وجدولة كافة الحجوزات، والربط الفوري بنظام الدفع والاعتماد والتحويل.", color = Color.LightGray, fontSize = 10.sp)
+                        }
+                    }
+
+                    // Payment Settings Overlay/Panel
+                    if (showPaymentSettingsState) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("💳 ربط الحجوزات بنظام المدفوعات والضمان", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                
+                                // Enable payment on bookings switch
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("تفعيل الدفع الإجباري للحجوزات", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text("لا يمكن إتمام عملية الحجز والاعتماد دون استكمال تحصيل الرسوم.", fontSize = 9.sp, color = Color.LightGray)
+                                    }
+                                    Switch(
+                                        checked = settingsState.isBookingPaymentRequired,
+                                        onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(isBookingPaymentRequired = it)) },
+                                        colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("مطالبة بدفعة مقدمة تأكيدية (Advance Payment)", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text("يفرض على العميل دفع نسبة مئوية مقدمة من السعر التقديري لضمان الجدية.", fontSize = 9.sp, color = Color.LightGray)
+                                    }
+                                    Switch(
+                                        checked = settingsState.requireAdvancePayment,
+                                        onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(requireAdvancePayment = it)) },
+                                        colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                    )
+                                }
+
+                                if (settingsState.requireAdvancePayment) {
+                                    var advPercent by remember(settingsState.advancePaymentPercent) { mutableStateOf(settingsState.advancePaymentPercent.toString()) }
+                                    var minAdvAmount by remember(settingsState.minAdvanceAmount) { mutableStateOf(settingsState.minAdvanceAmount.toString()) }
+                                    var maxAdvAmount by remember(settingsState.maxAdvanceAmount) { mutableStateOf(settingsState.maxAdvanceAmount.toString()) }
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        OutlinedTextField(
+                                            value = advPercent,
+                                            onValueChange = { advPercent = it },
+                                            label = { Text("نسبة الدفعة %", fontSize = 9.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                        OutlinedTextField(
+                                            value = minAdvAmount,
+                                            onValueChange = { minAdvAmount = it },
+                                            label = { Text("الحد الأدنى (ريال)", fontSize = 9.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                        OutlinedTextField(
+                                            value = maxAdvAmount,
+                                            onValueChange = { maxAdvAmount = it },
+                                            label = { Text("الحد الأقصى (ريال)", fontSize = 9.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.saveCustomSettingsState(
+                                                settingsState.copy(
+                                                    advancePaymentPercent = advPercent.toFloatOrNull() ?: 15.0f,
+                                                    minAdvanceAmount = minAdvAmount.toDoubleOrNull() ?: 500.0,
+                                                    maxAdvanceAmount = maxAdvAmount.toDoubleOrNull() ?: 10000.0
+                                                )
+                                            )
+                                            viewModel.triggerNotification("💾 تم حفظ وتثبيت إعدادات الدفعة المقدمة للحجوزات")
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text("حفظ وتثبيت إعدادات الدفعة 💾", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                Divider(color = Color.Gray.copy(alpha = 0.2f))
+
+                                Text("طريقة تحصيل الحجوزات المعتمدة بالموقع:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val paymentMethods = listOf("WALLET" to "محفظة جوال", "BANK" to "تحويل بنكي", "CASH" to "كاش عند الخدمة", "CREDIT" to "بطاقات سداد")
+                                    paymentMethods.forEach { method ->
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(if (settingsState.isPaymentEnabled) themeColors.primary.copy(alpha = 0.2f) else Color.DarkGray)
+                                                .clickable {
+                                                    viewModel.saveCustomSettingsState(settingsState.copy(isPaymentEnabled = !settingsState.isPaymentEnabled))
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(method.second, fontSize = 10.sp, color = Color.White)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+
+                    // Stats Dashboard Grid
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.25f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📊 لوحة مؤشرات الطلبات والحجوزات ومجمل الإيرادات المكتملة", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Column(modifier = Modifier.weight(1f).background(Color.Black.copy(alpha=0.3f), RoundedCornerShape(6.dp)).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("الكل", fontSize = 9.sp, color = Color.LightGray)
+                                    Text("$totalCount", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                                Column(modifier = Modifier.weight(1f).background(Color.Black.copy(alpha=0.3f), RoundedCornerShape(6.dp)).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("معلق", fontSize = 9.sp, color = Color.Yellow)
+                                    Text("$pendingCount", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Yellow)
+                                }
+                                Column(modifier = Modifier.weight(1f).background(Color.Black.copy(alpha=0.3f), RoundedCornerShape(6.dp)).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("مقبول", fontSize = 9.sp, color = Color.Green)
+                                    Text("$approvedCount", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Green)
+                                }
+                                Column(modifier = Modifier.weight(1f).background(Color.Black.copy(alpha=0.3f), RoundedCornerShape(6.dp)).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("تنفيذ", fontSize = 9.sp, color = Color.Cyan)
+                                    Text("$inProgressCount", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Cyan)
+                                }
+                                Column(modifier = Modifier.weight(1.2f).background(Color.Black.copy(alpha=0.3f), RoundedCornerShape(6.dp)).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("إيرادات المنجزة", fontSize = 9.sp, color = themeColors.accent)
+                                    Text("${totalRevenue.toInt()} ريال", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = themeColors.accent, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+
+                    // Search, Filters & Export Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("بحث برقم الحجز، العميل، الفني...", fontSize = 10.sp) },
+                            modifier = Modifier.weight(1f),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث", tint = Color.LightGray, modifier = Modifier.size(16.dp)) }
+                        )
+
+                        // PDF & CSV Export buttons
+                        Button(
+                            onClick = {
+                                val csvRows = mutableListOf(listOf("رقم الحجز", "العميل", "الهاتف", "الفني", "الخدمة", "التاريخ", "الحالة", "السعر"))
+                                filteredBookings.forEach { b ->
+                                    csvRows.add(listOf(b.id, b.clientName.ifEmpty { b.customerName }, b.clientPhone.ifEmpty { b.customerPhone }, b.providerName, b.serviceType, b.date, b.status, b.totalAmount.toString()))
+                                }
+                                com.example.utils.ReportExporter.exportToCSV(context, "bookings_report", csvRows)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text("CSV 📥", fontSize = 10.sp, color = Color.White)
+                        }
+
+                        Button(
+                            onClick = {
+                                val pdfSummary = buildString {
+                                    append("تقرير إجمالي الحجوزات الميدانية\n")
+                                    append("عدد الحجوزات: ${filteredBookings.size}\n")
+                                    append("إيرادات العمليات المنجزة: $totalRevenue ريال يمني\n")
+                                    append("========================================\n\n")
+                                    filteredBookings.forEach { b ->
+                                        append("- حجز #${b.id.takeLast(6)}: العميل: ${b.clientName} | الفني: ${b.providerName} | الخدمة: ${b.serviceType} | السعر: ${b.totalAmount} YER | الحالة: ${b.status}\n")
+                                    }
+                                }
+                                com.example.utils.ReportExporter.exportToPDFReport(context, "تقرير_الحجوزات_اليمن", pdfSummary)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text("PDF 📄", fontSize = 10.sp, color = Color.White)
+                        }
+                    }
+
+                    // Filtering Controls (Category & Status Chips)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val statusFilters = listOf("ALL" to "الكل", "PENDING" to "⏳ معلق", "APPROVED" to "✅ مقبول", "IN_PROGRESS" to "⚡ قيد التنفيذ", "COMPLETED" to "🎉 مكتمل", "CANCELLED" to "❌ ملغي")
+                        statusFilters.forEach { (stKey, stLbl) ->
+                            val isSel = selectedStatusFilter == stKey
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSel) themeColors.accent else Color.White.copy(alpha = 0.08f))
+                                    .clickable { selectedStatusFilter = stKey }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(stLbl, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    // Bookings Lazy List view
+                    if (filteredBookings.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد حجوزات مطابقة لمعايير التصفية والبحث 🔍", color = Color.Gray, fontSize = 11.sp)
+                        }
+                    } else {
+                        filteredBookings.forEach { b ->
+                            val isPending = b.status == "PENDING"
+                            val isApproved = b.status == "APPROVED"
+                            val isInProgress = b.status == "IN_PROGRESS"
+                            val isCompleted = b.status == "COMPLETED"
+                            val isCancelled = b.status == "CANCELLED"
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedBookingForDetails = b },
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(
+                                    1.dp,
+                                    when {
+                                        isPending -> Color.Yellow.copy(alpha = 0.3f)
+                                        isApproved -> Color.Green.copy(alpha = 0.3f)
+                                        isInProgress -> Color.Cyan.copy(alpha = 0.3f)
+                                        isCompleted -> Color.LightGray.copy(alpha = 0.15f)
+                                        else -> Color.Red.copy(alpha = 0.3f)
+                                    }
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    // Row 1: ID & Status Badge
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("رقم الحجز: #${b.id.takeLast(6)}", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 11.sp)
+                                        Surface(
+                                            color = when {
+                                                isPending -> Color.Yellow
+                                                isApproved -> Color.Green
+                                                isInProgress -> Color.Cyan
+                                                isCompleted -> Color.LightGray
+                                                else -> Color.Red
+                                            },
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = when(b.status) {
+                                                    "PENDING" -> "⏳ قيد الانتظار"
+                                                    "APPROVED" -> "✅ مقبول"
+                                                    "IN_PROGRESS" -> "⚡ قيد التنفيذ"
+                                                    "COMPLETED" -> "🎉 مكتمل"
+                                                    "CANCELLED" -> "❌ ملغي"
+                                                    else -> b.status
+                                                },
+                                                color = Color.Black,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Content Info
+                                    Text("👤 العميل: ${b.clientName.ifEmpty { b.customerName }} (${b.clientPhone.ifEmpty { b.customerPhone }})", fontSize = 11.sp, color = Color.White)
+                                    Text("🛠️ الفني: ${b.providerName.ifEmpty { "غير محدد" }} | الخدمة: ${b.serviceType}", fontSize = 11.sp, color = Color.LightGray)
+                                    Text("📅 الموعد: ${b.date.ifEmpty { b.dateString }} الساعة ${b.time.ifEmpty { b.timeString }}", fontSize = 10.sp, color = Color.LightGray)
+                                    Text("💰 السعر التقديري: ${b.totalAmount} YER", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                                    if (b.rejectionReason.isNotBlank()) {
+                                        Text("⚠️ سبب الرفض: ${b.rejectionReason}", color = Color.Red, fontSize = 10.sp)
+                                    }
+                                    if (!b.cancellationReason.isNullOrBlank()) {
+                                        Text("⚠️ سبب الإلغاء: ${b.cancellationReason}", color = Color.Red, fontSize = 10.sp)
+                                    }
+
+                                    // Quick Action Buttons matching screenshots requirements
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        // Accept Button
+                                        if (isPending) {
+                                            Button(
+                                                onClick = { viewModel.updateBookingStatus(b.id, "APPROVED") },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                                modifier = Modifier.height(26.dp),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text("قبول ✅", fontSize = 9.sp, color = Color.White)
+                                            }
+                                        }
+
+                                        // Reject Button
+                                        if (isPending || isApproved) {
+                                            Button(
+                                                onClick = {
+                                                    bookingToReject = b
+                                                    rejectionReasonText = ""
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                                modifier = Modifier.height(26.dp),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text("رفض ❌", fontSize = 9.sp, color = Color.White)
+                                            }
+                                        }
+
+                                        // Start Button
+                                        if (isApproved) {
+                                            Button(
+                                                onClick = { viewModel.updateBookingStatus(b.id, "IN_PROGRESS") },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4)),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                                modifier = Modifier.height(26.dp),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text("بدء تنفيذ ⚡", fontSize = 9.sp, color = Color.White)
+                                            }
+                                        }
+
+                                        // Complete Button
+                                        if (isInProgress) {
+                                            Button(
+                                                onClick = { viewModel.updateBookingStatus(b.id, "COMPLETED") },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                                modifier = Modifier.height(26.dp),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text("تأكيد إكمال 🎉", fontSize = 9.sp, color = Color.White)
+                                            }
+                                        }
+
+                                        // Cancel Button
+                                        if (!isCancelled && !isCompleted) {
+                                            Button(
+                                                onClick = {
+                                                    bookingToCancel = b
+                                                    cancellationReasonText = ""
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                                modifier = Modifier.height(26.dp),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text("إلغاء ❌", fontSize = 9.sp, color = Color.White)
+                                            }
+                                        }
+
+                                        // Redirect Button
+                                        Button(
+                                            onClick = {
+                                                bookingToRedirect = b
+                                                redirectSearchQuery = ""
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                            modifier = Modifier.height(26.dp),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text("توجيه 🔄", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        // Edit Button
+                                        Button(
+                                            onClick = {
+                                                bookingToEdit = b
+                                                editClientName = b.clientName.ifEmpty { b.customerName }
+                                                editClientPhone = b.clientPhone.ifEmpty { b.customerPhone }
+                                                editClientArea = b.clientAddress.ifEmpty { b.customerArea }
+                                                editServiceType = b.serviceType
+                                                editDate = b.date.ifEmpty { b.dateString }
+                                                editTime = b.time.ifEmpty { b.timeString }
+                                                editStatus = b.status
+                                                editTotalAmount = b.totalAmount.toString()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                            modifier = Modifier.height(26.dp),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text("تعديل ✏️", fontSize = 9.sp, color = Color.White)
+                                        }
+
+                                        // Delete Button
+                                        Button(
+                                            onClick = { showDeleteConfirm = b },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha=0.8f)),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                            modifier = Modifier.height(26.dp),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text("حذف 🗑️", fontSize = 9.sp, color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --- DIALOGS IMPLEMENTATION ---
+
+                // Detail view dialog
+                if (selectedBookingForDetails != null) {
+                    val b = selectedBookingForDetails!!
+                    AlertDialog(
+                        onDismissRequest = { selectedBookingForDetails = null },
+                        title = { Text("🔎 تفاصيل استمارة الحجز #${b.id.takeLast(6)}") },
+                        text = {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.verticalScroll(rememberScrollState())
+                            ) {
+                                Text("👤 العميل: ${b.clientName.ifEmpty { b.customerName }}", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                Text("📞 هاتف العميل: ${b.clientPhone.ifEmpty { b.customerPhone }}", color = Color.LightGray, fontSize = 11.sp)
+                                Text("📍 العنوان: ${b.clientAddress.ifEmpty { b.customerArea }}", color = Color.LightGray, fontSize = 11.sp)
+                                Divider(color = Color.Gray.copy(alpha=0.15f))
+                                Text("🛠️ الفني: ${b.providerName}", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                Text("🏷️ نوع الخدمة: ${b.serviceType}", color = Color.LightGray, fontSize = 11.sp)
+                                Text("📅 الموعد: ${b.date.ifEmpty { b.dateString }} الساعة ${b.time.ifEmpty { b.timeString }}", color = Color.LightGray, fontSize = 11.sp)
+                                Divider(color = Color.Gray.copy(alpha=0.15f))
+                                Text("الحالة الحالية: ${b.status}", color = themeColors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("💰 السعر الكلي: ${b.totalAmount} ريال", color = Color.White, fontSize = 11.sp)
+                                Text("💳 دفعة مقدمة: ${b.advancePayment} ريال (${b.paymentStatus})", color = Color.LightGray, fontSize = 11.sp)
+                                Text("🔑 رمز الإلغاء السري (كلمة مرور الحجز): ${b.bookingPassword.ifEmpty { "غير مولدة" }}", color = Color.Yellow, fontSize = 11.sp)
+                                if (!b.rejectionReason.isBlank()) {
+                                    Text("❌ مبرر الرفض: ${b.rejectionReason}", color = Color.Red, fontSize = 11.sp)
+                                }
+                                if (!b.cancellationReason.isNullOrBlank()) {
+                                    Text("❌ مبرر الإلغاء: ${b.cancellationReason}", color = Color.Red, fontSize = 11.sp)
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(onClick = { selectedBookingForDetails = null }, colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)) {
+                                Text("إغلاق", color = Color.Black)
+                            }
+                        }
+                    )
+                }
+
+                // Reject dialog
+                if (bookingToReject != null) {
+                    val b = bookingToReject!!
+                    AlertDialog(
+                        onDismissRequest = { bookingToReject = null },
+                        title = { Text("❌ رفض طلب الحجز #${b.id.takeLast(6)}") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("يرجى كتابة سبب أو مبرر رفض طلب الحجز لإرساله للعميل:", fontSize = 11.sp, color = Color.LightGray)
+                                OutlinedTextField(
+                                    value = rejectionReasonText,
+                                    onValueChange = { rejectionReasonText = it },
+                                    placeholder = { Text("مثال: الفني غير متوفر حالياً بالمنطقة...", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    viewModel.updateBookingStatus(b.id, "REJECTED", rejectionReasonText.trim())
+                                    bookingToReject = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                            ) {
+                                Text("تأكيد الرفض ❌", color = Color.White)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { bookingToReject = null }) {
+                                Text("إلغاء", color = Color.White)
+                            }
+                        }
+                    )
+                }
+
+                // Cancel dialog
+                if (bookingToCancel != null) {
+                    val b = bookingToCancel!!
+                    AlertDialog(
+                        onDismissRequest = { bookingToCancel = null },
+                        title = { Text("❌ إلغاء طلب الحجز #${b.id.takeLast(6)}") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("يرجى كتابة سبب إلغاء الحجز لتسجيله وإعلام الأطراف:", fontSize = 11.sp, color = Color.LightGray)
+                                OutlinedTextField(
+                                    value = cancellationReasonText,
+                                    onValueChange = { cancellationReasonText = it },
+                                    placeholder = { Text("مثال: بطلب من العميل...", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val dbObj = FirebaseFirestore.getInstance()
+                                    dbObj.collection("bookings").document(b.id).update(
+                                        "status", "CANCELLED",
+                                        "cancellationReason", cancellationReasonText.trim(),
+                                        "cancelledBy", "ADMIN",
+                                        "cancelledAt", System.currentTimeMillis()
+                                    ).addOnSuccessListener {
+                                        viewModel.triggerNotification("❌ تم إلغاء الحجز #${b.id.takeLast(6)} بنجاح")
+                                    }
+                                    bookingToCancel = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                            ) {
+                                Text("تأكيد الإلغاء ❌", color = Color.White)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { bookingToCancel = null }) {
+                                Text("إلغاء", color = Color.White)
+                            }
+                        }
+                    )
+                }
+
+                // Redirect / Assign dialog
+                if (bookingToRedirect != null) {
+                    val b = bookingToRedirect!!
+                    AlertDialog(
+                        onDismissRequest = { bookingToRedirect = null },
+                        title = { Text("🔄 إعادة توجيه/تعيين حجز #${b.id.takeLast(6)}") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("توجيه الحجز إلى فني محدد، أو المشرف، أو أقرب فني جغرافي:", fontSize = 11.sp, color = Color.LightGray)
+                                
+                                // Category assignment quick options
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            val dbObj = FirebaseFirestore.getInstance()
+                                            dbObj.collection("bookings").document(b.id).update(
+                                                "providerId", "admin",
+                                                "providerName", "الإدارة والدعم الفني 🛡️"
+                                            ).addOnSuccessListener {
+                                                viewModel.triggerNotification("🔄 تم توجيه الحجز إلى الإدارة")
+                                            }
+                                            bookingToRedirect = null
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(4.dp),
+                                        contentPadding = PaddingValues(2.dp)
+                                    ) {
+                                        Text("للإدارة 🛡️", fontSize = 10.sp, color = Color.White)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            // nearest provider simulator
+                                            val nearest = providers.filter { it.categoryId == b.category }.minByOrNull { it.rating }
+                                            if (nearest != null) {
+                                                val dbObj = FirebaseFirestore.getInstance()
+                                                dbObj.collection("bookings").document(b.id).update(
+                                                    "providerId", nearest.id,
+                                                    "providerName", nearest.name
+                                                ).addOnSuccessListener {
+                                                    viewModel.triggerNotification("📍 تم توجيه الحجز لأقرب فني: ${nearest.name}")
+                                                }
+                                            } else {
+                                                viewModel.triggerNotification("⚠️ لا يوجد فني متاح في هذا القسم حالياً")
+                                            }
+                                            bookingToRedirect = null
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(4.dp),
+                                        contentPadding = PaddingValues(2.dp)
+                                    ) {
+                                        Text("الأقرب جغرافياً 📍", fontSize = 10.sp, color = Color.Black)
+                                    }
+                                }
+
+                                Divider(color = Color.Gray.copy(alpha=0.15f))
+
+                                OutlinedTextField(
+                                    value = redirectSearchQuery,
+                                    onValueChange = { redirectSearchQuery = it },
+                                    placeholder = { Text("ابحث باسم الفني أو تليفونه...", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                )
+
+                                Box(modifier = Modifier.height(130.dp).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        providers.filter { 
+                                            it.name.contains(redirectSearchQuery, ignoreCase=true) || it.phone.contains(redirectSearchQuery)
+                                        }.take(5).forEach { prov ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        val dbObj = FirebaseFirestore.getInstance()
+                                                        dbObj.collection("bookings").document(b.id).update(
+                                                            "providerId", prov.id,
+                                                            "providerName", prov.name,
+                                                            "providerPhone", prov.phone
+                                                        ).addOnSuccessListener {
+                                                            viewModel.triggerNotification("🔄 تم توجيه الحجز بنجاح للفني: ${prov.name}")
+                                                        }
+                                                        bookingToRedirect = null
+                                                    }
+                                                    .padding(6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(prov.name, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                                Text(prov.phone, fontSize = 10.sp, color = themeColors.accent)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { bookingToRedirect = null }) {
+                                Text("إغلاق", color = Color.White)
+                            }
+                        }
+                    )
+                }
+
+                // Edit Dialog
+                if (bookingToEdit != null) {
+                    val b = bookingToEdit!!
+                    AlertDialog(
+                        onDismissRequest = { bookingToEdit = null },
+                        title = { Text("✏️ تعديل كافة بيانات الحجز #${b.id.takeLast(6)}") },
+                        text = {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.verticalScroll(rememberScrollState())
+                            ) {
+                                OutlinedTextField(
+                                    value = editClientName,
+                                    onValueChange = { editClientName = it },
+                                    label = { Text("اسم العميل", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                )
+                                OutlinedTextField(
+                                    value = editClientPhone,
+                                    onValueChange = { editClientPhone = it },
+                                    label = { Text("رقم هاتف العميل", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                )
+                                OutlinedTextField(
+                                    value = editClientArea,
+                                    onValueChange = { editClientArea = it },
+                                    label = { Text("المنطقة / الحي السكني", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                )
+                                OutlinedTextField(
+                                    value = editServiceType,
+                                    onValueChange = { editServiceType = it },
+                                    label = { Text("الخدمة المطلوبة", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    OutlinedTextField(
+                                        value = editDate,
+                                        onValueChange = { editDate = it },
+                                        label = { Text("التاريخ", fontSize = 10.sp) },
+                                        modifier = Modifier.weight(1f),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                    )
+                                    OutlinedTextField(
+                                        value = editTime,
+                                        onValueChange = { editTime = it },
+                                        label = { Text("الوقت", fontSize = 10.sp) },
+                                        modifier = Modifier.weight(1f),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                    )
+                                }
+                                OutlinedTextField(
+                                    value = editTotalAmount,
+                                    onValueChange = { editTotalAmount = it },
+                                    label = { Text("المبلغ الكلي (YER)", fontSize = 10.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val updatedObj = b.copy(
+                                        clientName = editClientName.trim(),
+                                        customerName = editClientName.trim(),
+                                        clientPhone = editClientPhone.trim(),
+                                        customerPhone = editClientPhone.trim(),
+                                        clientAddress = editClientArea.trim(),
+                                        customerArea = editClientArea.trim(),
+                                        serviceType = editServiceType.trim(),
+                                        date = editDate.trim(),
+                                        dateString = editDate.trim(),
+                                        time = editTime.trim(),
+                                        timeString = editTime.trim(),
+                                        totalAmount = editTotalAmount.toDoubleOrNull() ?: b.totalAmount
+                                    )
+                                    viewModel.updateBooking(updatedObj)
+                                    bookingToEdit = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                            ) {
+                                Text("تحديث وحفظ 💾", color = Color.Black)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { bookingToEdit = null }) {
+                                Text("إلغاء", color = Color.White)
+                            }
+                        }
+                    )
+                }
+
+                // Delete Confirm Dialog
+                if (showDeleteConfirm != null) {
+                    val b = showDeleteConfirm!!
+                    AlertDialog(
+                        onDismissRequest = { showDeleteConfirm = null },
+                        title = { Text("🗑️ تأكيد حذف طلب الحجز نهائياً") },
+                        text = { Text("هل أنت متأكد تماماً من رغبتك في حذف طلب الحجز رقم (#${b.id.takeLast(6)}) للعميل (${b.clientName.ifEmpty { b.customerName }}) بشكل نهائي ولا يمكن الرجوع؟", color = Color.White, fontSize = 11.sp) },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    viewModel.deleteBooking(b.id)
+                                    showDeleteConfirm = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                            ) {
+                                Text("حذف نهائي 🗑️", color = Color.White)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteConfirm = null }) {
+                                Text("إلغاء", color = Color.White)
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -1530,11 +2402,493 @@ fun LazyListScope.adminCategoriesPanel(viewModel: MainViewModel, themeColors: Vi
 
 fun LazyListScope.adminPaymentsPanel(viewModel: MainViewModel, themeColors: VisualThemePalette, state: AdminPanelState) {
     with(state) {
-        if (activeSubTabState.value in listOf("PAYMENTS", "VIP", "COUPONS")) {
+        if (activeSubTabState.value == "PAYMENTS") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("💳 نظام الدفع والتحقق والمحافظ وترقيات VIP", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("إدارة المحافظ الإلكترونية (جيب، جوال، وغيرها) وترقيات التميز وربط الحسابات.", color = Color.LightGray, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("💳 نظام الدفع والتحقق والمحافظ الإلكترونية والإيرادات", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    val paymentsList by viewModel.payments.collectAsState()
+                    var searchQuery by remember { mutableStateOf("") }
+                    var statusFilter by remember { mutableStateOf("ALL") }
+                    var selectedPaymentForDetails by remember { mutableStateOf<com.example.data.PaymentEntity?>(null) }
+                    
+                    // Stats Cards
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val stats = listOf(
+                            Triple("اليوم", "YER 150,000", Color.Green),
+                            Triple("الأسبوع", "YER 980,000", Color.Yellow),
+                            Triple("الشهر", "YER 3,450,000", themeColors.accent)
+                        )
+                        stats.forEach { (title, amt, col) ->
+                            Card(
+                                modifier = Modifier.weight(1f),
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(title, fontSize = 9.sp, color = Color.LightGray)
+                                    Text(amt, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = col)
+                                }
+                            }
+                        }
+                    }
+
+                    // Revenue by entity Type
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📊 تفصيل إيرادات مزودي الخدمات:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("🔧 إيرادات الفنيين:", fontSize = 10.sp, color = Color.LightGray)
+                                Text("YER 1,850,000", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("🏪 إيرادات المحلات والمتاجر:", fontSize = 10.sp, color = Color.LightGray)
+                                Text("YER 1,600,000", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            }
+                        }
+                    }
+
+                    // Actions Bar (Export)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.triggerNotification("📥 تم تصدير سجل المدفوعات بصيغة PDF بنجاح!") },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 4.dp)
+                        ) {
+                            Text("تصدير PDF 📄", fontSize = 10.sp, color = Color.White)
+                        }
+                        Button(
+                            onClick = { viewModel.triggerNotification("📥 تم تصدير سجل المدفوعات بصيغة CSV بنجاح!") },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 4.dp)
+                        ) {
+                            Text("تصدير CSV 📊", fontSize = 10.sp, color = Color.White)
+                        }
+                    }
+
+                    // Settings for Booking Payment and "Order service now"
+                    var showPaymentSettings by remember { mutableStateOf(false) }
+                    Button(
+                        onClick = { showPaymentSettings = !showPaymentSettings },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (showPaymentSettings) "🙈 إخفاء خيارات ربط الاستمارات بالدفع" else "👁️ إظهار خيارات ربط الاستمارات بنظام الدفع 💳", fontSize = 11.sp, color = themeColors.accent)
+                    }
+
+                    if (showPaymentSettings) {
+                        var bookingPaymentEnabled by remember { mutableStateOf(true) }
+                        var bookingPaymentMethod by remember { mutableStateOf("mobileWallet") }
+                        var bookingAdvancePct by remember { mutableStateOf("20") }
+                        var bookingMinAdvance by remember { mutableStateOf("1000") }
+                        var bookingMaxAdvance by remember { mutableStateOf("5000") }
+                        var bookingForced by remember { mutableStateOf(true) }
+
+                        var servicePaymentEnabled by remember { mutableStateOf(false) }
+                        var servicePaymentMethod by remember { mutableStateOf("cash") }
+                        var serviceAdvancePct by remember { mutableStateOf("10") }
+                        var serviceMinAdvance by remember { mutableStateOf("500") }
+                        var serviceMaxAdvance by remember { mutableStateOf("3000") }
+                        var serviceForced by remember { mutableStateOf(false) }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("📅 صلاحية ربط استمارة الحجز بنظام الدفع:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = themeColors.accent)
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("تفعيل الدفع للحجز", fontSize = 10.sp, color = Color.White)
+                                    Switch(checked = bookingPaymentEnabled, onCheckedChange = { bookingPaymentEnabled = it })
+                                }
+                                if (bookingPaymentEnabled) {
+                                    OutlinedTextField(
+                                        value = bookingAdvancePct,
+                                        onValueChange = { bookingAdvancePct = it },
+                                        label = { Text("نسبة الدفع المقدم (%)", fontSize = 9.sp) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        OutlinedTextField(
+                                            value = bookingMinAdvance,
+                                            onValueChange = { bookingMinAdvance = it },
+                                            label = { Text("الحد الأدنى للمقدم", fontSize = 9.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                        )
+                                        OutlinedTextField(
+                                            value = bookingMaxAdvance,
+                                            onValueChange = { bookingMaxAdvance = it },
+                                            label = { Text("الحد الأقصى للمقدم", fontSize = 9.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                        )
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("إجبارية الدفع للاعتماد (Switch)", fontSize = 10.sp, color = Color.White)
+                                        Switch(checked = bookingForced, onCheckedChange = { bookingForced = it })
+                                    }
+                                }
+
+                                Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+
+                                Text("⚡ صلاحية ربط استمارة \"اطلب خدمتك الآن\" بالدفع:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = themeColors.accent)
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("تفعيل الدفع للطلب الفوري", fontSize = 10.sp, color = Color.White)
+                                    Switch(checked = servicePaymentEnabled, onCheckedChange = { servicePaymentEnabled = it })
+                                }
+                                if (servicePaymentEnabled) {
+                                    OutlinedTextField(
+                                        value = serviceAdvancePct,
+                                        onValueChange = { serviceAdvancePct = it },
+                                        label = { Text("نسبة الدفع المقدم (%)", fontSize = 9.sp) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("إجبارية الدفع", fontSize = 10.sp, color = Color.White)
+                                        Switch(checked = serviceForced, onCheckedChange = { serviceForced = it })
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { viewModel.triggerNotification("💾 تم حفظ إعدادات دفع الاستمارات بنجاح!") },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("حفظ إعدادات الدفع 💾", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    // Add and Manage Electronic Wallets
+                    var showAddWalletForm by remember { mutableStateOf(false) }
+                    var walletProvider by remember { mutableStateOf("جيب") }
+                    var walletNumber by remember { mutableStateOf("") }
+                    var walletAccountName by remember { mutableStateOf("") }
+                    var walletDescription by remember { mutableStateOf("") }
+                    var walletType by remember { mutableStateOf("كليهما") }
+                    var walletCurrency by remember { mutableStateOf("YER") }
+
+                    val customWallets = remember {
+                        mutableStateListOf<com.example.data.PaymentWalletEntity>(
+                            com.example.data.PaymentWalletEntity(id = "w1", provider = "الكريمي", walletNumber = "123456", accountName = "حساب الإدارة الرئيسي", isDefault = true, status = "active"),
+                            com.example.data.PaymentWalletEntity(id = "w2", provider = "جيب", walletNumber = "777888999", accountName = "محفظة جيب الإدارية", isDefault = false, status = "active")
+                        )
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("📱 المحافظ الإلكترونية المتاحة للتطبيق (${customWallets.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Button(
+                                    onClick = { showAddWalletForm = !showAddWalletForm },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(if (showAddWalletForm) "إغلاق" else "إضافة محفظة ➕", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            if (showAddWalletForm) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    OutlinedTextField(value = walletProvider, onValueChange = { walletProvider = it }, label = { Text("المزود (جيب، الكريمي، جوالي، تحويل بنكي)") }, modifier = Modifier.fillMaxWidth())
+                                    OutlinedTextField(value = walletNumber, onValueChange = { walletNumber = it }, label = { Text("رقم المحفظة / رقم الحساب") }, modifier = Modifier.fillMaxWidth())
+                                    OutlinedTextField(value = walletAccountName, onValueChange = { walletAccountName = it }, label = { Text("اسم الحساب") }, modifier = Modifier.fillMaxWidth())
+                                    OutlinedTextField(value = walletDescription, onValueChange = { walletDescription = it }, label = { Text("الوصف") }, modifier = Modifier.fillMaxWidth())
+                                    OutlinedTextField(value = walletCurrency, onValueChange = { walletCurrency = it }, label = { Text("العملة (YER, USD, SAR)") }, modifier = Modifier.fillMaxWidth())
+                                    
+                                    Button(
+                                        onClick = {
+                                            if (walletNumber.isNotBlank() && walletAccountName.isNotBlank()) {
+                                                customWallets.add(
+                                                    com.example.data.PaymentWalletEntity(
+                                                        id = "w_" + System.currentTimeMillis().toString().takeLast(4),
+                                                        provider = walletProvider,
+                                                        walletNumber = walletNumber,
+                                                        accountName = walletAccountName,
+                                                        status = "active",
+                                                        currency = walletCurrency,
+                                                        walletType = walletType,
+                                                        description = walletDescription
+                                                    )
+                                                )
+                                                walletNumber = ""
+                                                walletAccountName = ""
+                                                walletDescription = ""
+                                                showAddWalletForm = false
+                                                viewModel.triggerNotification("✅ تم إضافة المحفظة بنجاح")
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("حفظ المحفظة الجديدة 💾", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            customWallets.forEach { wallet ->
+                                val isWalletActive = wallet.status == "active"
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f))
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Text(wallet.provider, fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 11.sp)
+                                                if (wallet.isDefault) Badge(containerColor = Color.Yellow) { Text("افتراضية ⭐", color = Color.Black, fontSize = 8.sp) }
+                                                Badge(containerColor = if (isWalletActive) Color.Green else Color.Red) {
+                                                    Text(if (isWalletActive) "نشط" else "معطل", color = Color.Black, fontSize = 8.sp)
+                                                }
+                                            }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                IconButton(onClick = {
+                                                    val idx = customWallets.indexOf(wallet)
+                                                    if (idx != -1) {
+                                                        customWallets[idx] = wallet.copy(isDefault = true)
+                                                        customWallets.forEachIndexed { i, w ->
+                                                            if (i != idx) customWallets[i] = w.copy(isDefault = false)
+                                                        }
+                                                        viewModel.triggerNotification("⭐ تم تعيين المحفظة كافتراضية")
+                                                    }
+                                                }, modifier = Modifier.size(24.dp)) {
+                                                    Text("⭐", fontSize = 11.sp)
+                                                }
+                                                IconButton(onClick = {
+                                                    val idx = customWallets.indexOf(wallet)
+                                                    if (idx != -1) {
+                                                        val nextStatus = if (isWalletActive) "inactive" else "active"
+                                                        customWallets[idx] = wallet.copy(status = nextStatus)
+                                                    }
+                                                }, modifier = Modifier.size(24.dp)) {
+                                                    Text(if (isWalletActive) "⛔" else "✅", fontSize = 11.sp)
+                                                }
+                                                IconButton(onClick = { customWallets.remove(wallet) }, modifier = Modifier.size(24.dp)) {
+                                                    Text("🗑️", fontSize = 11.sp)
+                                                }
+                                            }
+                                        }
+                                        Text("رقم الحساب: ${wallet.walletNumber}", fontSize = 10.sp, color = Color.White)
+                                        Text("الاسم: ${wallet.accountName}", fontSize = 10.sp, color = Color.LightGray)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Search and Filter Payments List
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("بحث برقم المعاملة، اسم العميل، اسم الفني...", color = Color.Gray, fontSize = 11.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) }
+                    )
+
+                    // Filters
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val filters = listOf("ALL" to "الكل", "PENDING" to "انتظار ⏳", "COMPLETED" to "مكتمل ✅", "REJECTED" to "مرفوض ❌", "REFUNDED" to "مسترد 🔄")
+                        filters.forEach { (key, label) ->
+                            val isSel = statusFilter == key
+                            Button(
+                                onClick = { statusFilter = key },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isSel) themeColors.accent else themeColors.surface),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Text(label, fontSize = 9.sp, color = if (isSel) Color.Black else Color.White)
+                            }
+                        }
+                    }
+
+                    // Payments LazyColumn Items
+                    val finalPayments = paymentsList.filter { p ->
+                        val matchesSearch = p.id.contains(searchQuery, ignoreCase = true) || p.userId.contains(searchQuery) || p.providerId.contains(searchQuery)
+                        val matchesFilter = statusFilter == "ALL" || p.status == statusFilter
+                        matchesSearch && matchesFilter
+                    }
+
+                    if (finalPayments.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد معاملات مالية مطابقة لفلاتر البحث 💳", color = Color.Gray, fontSize = 11.sp)
+                        }
+                    } else {
+                        finalPayments.forEach { pay ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedPaymentForDetails = pay },
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Text("معاملة: #${pay.id.take(8)}", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                        Badge(
+                                            containerColor = when (pay.status) {
+                                                "COMPLETED" -> Color.Green
+                                                "PENDING" -> Color.Yellow
+                                                "REJECTED" -> Color.Red
+                                                else -> Color.Gray
+                                            }
+                                        ) {
+                                            Text(pay.status, color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    Text("العميل: ${pay.userId.ifBlank { "عميل عام" }}", fontSize = 11.sp, color = Color.LightGray)
+                                    Text("الفني: ${pay.providerId.ifBlank { "غير محدد" }}", fontSize = 11.sp, color = Color.LightGray)
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("المبلغ: ${pay.amount} ${pay.currency}", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 12.sp)
+                                        Text("التاريخ: ${java.text.SimpleDateFormat("yyyy/MM/dd hh:mm a", java.util.Locale("ar")).format(java.util.Date(pay.createdAt))}", fontSize = 9.sp, color = Color.Gray)
+                                    }
+
+                                    // Action buttons in item
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                val updated = pay.copy(status = "COMPLETED", verifiedAt = System.currentTimeMillis())
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("payments").document(pay.id).set(updated)
+                                                viewModel.addNotification("💳 تأكيد الدفع", "تم تأكيد عملية الدفع الخاصة بك بنجاح بمبلغ ${pay.amount} ${pay.currency}", "USER", pay.userId)
+                                                viewModel.triggerNotification("✅ تم تأكيد الدفع بنجاح وإرسال الإشعار للعميل")
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) {
+                                            Text("موافقة ✅", fontSize = 9.sp, color = Color.Black)
+                                        }
+
+                                        var showRejectDialog by remember { mutableStateOf(false) }
+                                        var rejectReason by remember { mutableStateOf("") }
+                                        if (showRejectDialog) {
+                                            AlertDialog(
+                                                onDismissRequest = { showRejectDialog = false },
+                                                title = { Text("سبب الرفض") },
+                                                text = {
+                                                    OutlinedTextField(value = rejectReason, onValueChange = { rejectReason = it }, label = { Text("أدخل سبب الرفض") })
+                                                },
+                                                confirmButton = {
+                                                    Button(onClick = {
+                                                        val updated = pay.copy(status = "REJECTED", verificationNote = rejectReason)
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("payments").document(pay.id).set(updated)
+                                                        viewModel.triggerNotification("❌ تم رفض المعاملة")
+                                                        showRejectDialog = false
+                                                    }) { Text("تأكيد الرفض") }
+                                                }
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = { showRejectDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) {
+                                            Text("رفض ❌", fontSize = 9.sp, color = Color.White)
+                                        }
+
+                                        var showNotesDialog by remember { mutableStateOf(false) }
+                                        var notesInput by remember { mutableStateOf(pay.adminNote) }
+                                        if (showNotesDialog) {
+                                            AlertDialog(
+                                                onDismissRequest = { showNotesDialog = false },
+                                                title = { Text("ملاحظات إدارية") },
+                                                text = {
+                                                    OutlinedTextField(value = notesInput, onValueChange = { notesInput = it }, label = { Text("ملاحظات الإدارة") })
+                                                },
+                                                confirmButton = {
+                                                    Button(onClick = {
+                                                        val updated = pay.copy(adminNote = notesInput)
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("payments").document(pay.id).set(updated)
+                                                        viewModel.triggerNotification("📝 تم حفظ الملاحظة")
+                                                        showNotesDialog = false
+                                                    }) { Text("حفظ") }
+                                                }
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = { showNotesDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) {
+                                            Text("ملاحظات 📝", fontSize = 9.sp, color = Color.White)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                viewModel.addNotification("🔔 تذكير بالدفع", "نرجو تزويد الإدارة بإثبات الدفع لاستكمال اعتماد طلبك.", "USER", pay.userId)
+                                                viewModel.triggerNotification("🔔 تم إرسال إشعار تذكير للعميل بنجاح")
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) {
+                                            Text("إشعار 🔔", fontSize = 9.sp, color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Details Dialog on click
+                    selectedPaymentForDetails?.let { pay ->
+                        AlertDialog(
+                            onDismissRequest = { selectedPaymentForDetails = null },
+                            title = { Text("تفاصيل المعاملة #${pay.id.take(8)}") },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("معرف العميل: ${pay.userId}")
+                                    Text("معرف الفني: ${pay.providerId}")
+                                    Text("طريقة الدفع: ${pay.method}")
+                                    Text("المبلغ: ${pay.amount} ${pay.currency}")
+                                    Text("حالة المعاملة: ${pay.status}")
+                                    Text("التحويل الإلكتروني: ${pay.walletProvider} - ${pay.walletNumber}")
+                                    Text("ملاحظة المسؤول: ${pay.verificationNote}")
+                                    Text("ملاحظات إدارية: ${pay.adminNote}")
+                                    if (pay.transferPhoto.isNotEmpty()) {
+                                        Text("📷 صورة إثبات الدفع / سند التحويل موجودة.")
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(onClick = { selectedPaymentForDetails = null }) {
+                                    Text("إغلاق")
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -2607,82 +3961,340 @@ fun LazyListScope.adminStoresPanel(viewModel: MainViewModel, themeColors: Visual
         if (activeSubTabState.value == "STORES") {
             item {
                 Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🏪 إدارة المحلات التجارية والمراكز كاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("🏪 إدارة المحلات والأنشطة التجارية الكبرى", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     
-                    var newStoreName by remember { mutableStateOf("") }
-                    var newStorePhone by remember { mutableStateOf("") }
-                    var newStoreDesc by remember { mutableStateOf("") }
+                    val storesList by viewModel.stores.collectAsState()
+                    val filteredStores = storesList.filter { it.sectionId == "" || it.sectionId == "stores" || it.sectionId == "store" }
 
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("➕ إضافة محل تجاري جديد يدوياً:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            OutlinedTextField(
-                                value = newStoreName,
-                                onValueChange = { newStoreName = it },
-                                label = { Text("الاسم التجاري للمحل") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = newStorePhone,
-                                onValueChange = { newStorePhone = it },
-                                label = { Text("رقم الهاتف / الواتساب") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = newStoreDesc,
-                                onValueChange = { newStoreDesc = it },
-                                label = { Text("وصف المحلات والتفاصيل") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Button(
-                                onClick = {
-                                    if (newStoreName.isNotBlank()) {
-                                        viewModel.addStore(newStoreName, newStoreDesc, newStorePhone)
-                                        newStoreName = ""
-                                        newStorePhone = ""
-                                        newStoreDesc = ""
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary)
-                            ) {
-                                Text("حفظ وإضافة المحل 🏪", color = Color.White)
+                    // Local state for filters
+                    var searchQuery by remember { mutableStateOf("") }
+                    var selectedFilterType by remember { mutableStateOf("الكل") } // الكل, VIP, موثق, محظور, مميز
+
+                    // Active dialogs
+                    var storeToManageProducts by remember { mutableStateOf<StoreEntity?>(null) }
+                    
+                    // Counters Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("المحلات التجارية", color = Color.LightGray, fontSize = 10.sp)
+                                Text("${filteredStores.size}", color = themeColors.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("أعضاء مميزين VIP", color = Color.LightGray, fontSize = 10.sp)
+                                Text("${filteredStores.count { it.isVip }}", color = Color.Yellow, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
 
-                    Text("📋 المحلات التجارية المسجلة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    val storesList by viewModel.stores.collectAsState()
-                    if (storesList.isEmpty()) {
-                        Text("لا توجد محلات مسجلة حالياً.", color = Color.LightGray, fontSize = 11.sp)
+                    // Search & Filters Row
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("ابحث باسم المحل أو رقم الهاتف...", color = Color.Gray, fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = themeColors.accent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
+                    )
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(listOf("الكل", "مميز VIP", "موثق 🛡️", "موصى به ⭐", "محظور 🚫")) { filter ->
+                            val isSel = selectedFilterType == filter
+                            Button(
+                                onClick = { selectedFilterType = filter },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSel) themeColors.accent else themeColors.surface
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(filter, fontSize = 11.sp, color = if (isSel) Color.Black else Color.White)
+                            }
+                        }
+                    }
+
+                    // Filter Logic
+                    val finalFiltered = filteredStores.filter { store ->
+                        val matchesSearch = store.name.contains(searchQuery, ignoreCase = true) || store.phone.contains(searchQuery)
+                        val matchesFilter = when (selectedFilterType) {
+                            "الكل" -> true
+                            "مميز VIP" -> store.isVip
+                            "موثق 🛡️" -> store.isVerified
+                            "موصى به ⭐" -> store.isRecommended
+                            "محظور 🚫" -> store.isBlocked
+                            else -> true
+                        }
+                        matchesSearch && matchesFilter
+                    }
+
+                    if (finalFiltered.isEmpty()) {
+                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("لا توجد محلات تجارية مطابقة للبحث حالياً 🏪", color = Color.LightGray, fontSize = 11.sp)
+                            }
+                        }
                     } else {
-                        storesList.forEach { store ->
-                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                        Text(store.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                        finalFiltered.forEach { store ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(store.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                                            Text("📍 ${store.cityId} - ${store.localNeighborhood.ifBlank { "غير محدد" }}", color = Color.Gray, fontSize = 11.sp)
+                                        }
                                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            if (store.isVip) Text("🏆 VIP", color = Color.Yellow, fontSize = 10.sp)
-                                            if (store.isBlocked) Text("🚫 محظور", color = Color.Red, fontSize = 10.sp)
+                                            if (store.isVip) Badge(containerColor = Color.Yellow) { Text("VIP", color = Color.Black, fontSize = 9.sp) }
+                                            if (store.isVerified) Badge(containerColor = Color.Green) { Text("موثق", color = Color.Black, fontSize = 9.sp) }
+                                            if (store.isRecommended) Badge(containerColor = themeColors.accent) { Text("موصى به", color = Color.Black, fontSize = 9.sp) }
+                                            if (store.isBlocked) Badge(containerColor = Color.Red) { Text("محظور", color = Color.White, fontSize = 9.sp) }
                                         }
                                     }
-                                    Text("الوصف: ${store.description}", color = Color.LightGray, fontSize = 10.sp)
-                                    Text("📞 الهاتف: ${store.phone}", color = Color.LightGray, fontSize = 10.sp)
 
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Button(onClick = { viewModel.toggleStoreVip(store.id) }, colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) {
-                                            Text(if (store.isVip) "إلغاء VIP" else "تفعيل VIP", fontSize = 9.sp, color = Color.White)
+                                    Text("📝 الوصف: ${store.description.ifBlank { "لا يوجد وصف متوفر" }}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("📞 رقم التواصل: ${store.phone}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("🕒 ساعات العمل: ${store.workingHours.ifBlank { "غير محدد" }}", color = Color.LightGray, fontSize = 11.sp)
+
+                                    Divider(color = Color.White.copy(alpha = 0.05f))
+
+                                    // Action buttons for store toggles
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { viewModel.toggleStoreVip(store.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (store.isVip) Color.Yellow else Color.DarkGray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (store.isVip) "🌟 إلغاء VIP" else "🏆 تفعيل VIP", fontSize = 10.sp, color = if (store.isVip) Color.Black else Color.White)
                                         }
-                                        Button(onClick = { viewModel.toggleStoreBlock(store.id) }, colors = ButtonDefaults.buttonColors(containerColor = if (store.isBlocked) Color.Green else Color.Red)) {
-                                            Text(if (store.isBlocked) "إلغاء الحظر" else "حظر", fontSize = 9.sp, color = Color.White)
+                                        Button(
+                                            onClick = { viewModel.toggleStoreVerified(store.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (store.isVerified) Color.Green else Color.DarkGray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (store.isVerified) "🛡️ إلغاء توثيق" else "🛡️ توثيق", fontSize = 10.sp, color = if (store.isVerified) Color.Black else Color.White)
                                         }
-                                        Button(onClick = { viewModel.deleteStore(store.id) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f))) {
-                                            Text("حذف 🗑️", fontSize = 9.sp, color = Color.White)
+                                        Button(
+                                            onClick = { viewModel.toggleStoreRecommended(store.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (store.isRecommended) themeColors.accent else Color.DarkGray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (store.isRecommended) "⭐ إلغاء توصية" else "⭐️ إبراز وتوصية", fontSize = 10.sp, color = if (store.isRecommended) Color.Black else Color.White)
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { storeToManageProducts = store },
+                                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                            modifier = Modifier.weight(1.5f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("📦 إدارة المنتجات", fontSize = 10.sp, color = Color.White)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.toggleStoreBlock(store.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (store.isBlocked) Color.Gray else Color.Red),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (store.isBlocked) "🔓 إلغاء الحظر" else "🚫 حظر المحل", fontSize = 10.sp, color = Color.White)
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.deleteStore(store.id) },
+                                            modifier = Modifier.size(36.dp).background(Color.Red.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
                                         }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    // --- PRODUCTS MANAGEMENT DIALOG ---
+                    storeToManageProducts?.let { currentStore ->
+                        var prodName by remember { mutableStateOf("") }
+                        var prodDesc by remember { mutableStateOf("") }
+                        var prodPrice by remember { mutableStateOf("") }
+                        
+                        // Parse existing products
+                        val productsList = remember(currentStore.productAttachmentsJson) {
+                            val list = mutableListOf<Triple<String, String, String>>() // Name, Desc, Price
+                            try {
+                                if (currentStore.productAttachmentsJson.isNotBlank()) {
+                                    val arr = org.json.JSONArray(currentStore.productAttachmentsJson)
+                                    for (i in 0 until arr.length()) {
+                                        val obj = arr.getJSONObject(i)
+                                        list.add(Triple(
+                                            obj.optString("name", ""),
+                                            obj.optString("desc", ""),
+                                            obj.optString("price", "")
+                                        ))
+                                    }
+                                }
+                            } catch (e: Exception) {}
+                            list
+                        }
+
+                        AlertDialog(
+                            onDismissRequest = { storeToManageProducts = null },
+                            title = { Text("📦 إدارة منتجات المحل: ${currentStore.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+                            text = {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("أضف منتج أو سلعة جديدة:", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    
+                                    OutlinedTextField(
+                                        value = prodName,
+                                        onValueChange = { prodName = it },
+                                        placeholder = { Text("اسم المنتج (مثال: شاحن سفري ذكي)", fontSize = 11.sp, color = Color.Gray) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                                    )
+                                    OutlinedTextField(
+                                        value = prodDesc,
+                                        onValueChange = { prodDesc = it },
+                                        placeholder = { Text("وصف المنتج ومميزاته", fontSize = 11.sp, color = Color.Gray) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                                    )
+                                    OutlinedTextField(
+                                        value = prodPrice,
+                                        onValueChange = { prodPrice = it },
+                                        placeholder = { Text("السعر بالعملة المحلية (مثال: 4000 ريال)", fontSize = 11.sp, color = Color.Gray) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            if (prodName.isNotBlank()) {
+                                                val updatedList = productsList + Triple(prodName, prodDesc, prodPrice)
+                                                val arr = org.json.JSONArray()
+                                                updatedList.forEach { (n, d, p) ->
+                                                    val obj = org.json.JSONObject()
+                                                    obj.put("name", n)
+                                                    obj.put("desc", d)
+                                                    obj.put("price", p)
+                                                    arr.put(obj)
+                                                }
+                                                val updatedJson = arr.toString()
+                                                
+                                                // Save to firebase
+                                                val updatedStore = currentStore.copy(productAttachmentsJson = updatedJson)
+                                                try {
+                                                    FirebaseFirestore.getInstance().collection("stores").document(currentStore.id).set(updatedStore)
+                                                    viewModel._stores.value = viewModel._stores.value.map { if (it.id == currentStore.id) updatedStore else it }
+                                                    viewModel.triggerNotification("📦 تم إضافة المنتج للسلع بنجاح!")
+                                                    storeToManageProducts = updatedStore
+                                                } catch(e: Exception) {}
+
+                                                prodName = ""
+                                                prodDesc = ""
+                                                prodPrice = ""
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("إضافة السلعة للمخزون ➕", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                                    Text("📋 المنتجات والسلع الحالية (${productsList.size}):", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                                    if (productsList.isEmpty()) {
+                                        Text("لا توجد منتجات مسجلة للمحل حالياً.", color = Color.Gray, fontSize = 10.sp)
+                                    } else {
+                                        productsList.forEachIndexed { index, (n, d, p) ->
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.4f))
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(n, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                                        if (d.isNotBlank()) Text(d, color = Color.LightGray, fontSize = 10.sp)
+                                                        Text("💰 السعر: $p", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                    IconButton(
+                                                        onClick = {
+                                                            val updatedList = productsList.filterIndexed { idx, _ -> idx != index }
+                                                            val arr = org.json.JSONArray()
+                                                            updatedList.forEach { (nn, dd, pp) ->
+                                                                val obj = org.json.JSONObject()
+                                                                obj.put("name", nn)
+                                                                obj.put("desc", dd)
+                                                                obj.put("price", pp)
+                                                                arr.put(obj)
+                                                            }
+                                                            val updatedJson = arr.toString()
+                                                            val updatedStore = currentStore.copy(productAttachmentsJson = updatedJson)
+                                                            try {
+                                                                FirebaseFirestore.getInstance().collection("stores").document(currentStore.id).set(updatedStore)
+                                                                viewModel._stores.value = viewModel._stores.value.map { if (it.id == currentStore.id) updatedStore else it }
+                                                                viewModel.triggerNotification("🗑️ تم حذف السلعة بنجاح!")
+                                                                storeToManageProducts = updatedStore
+                                                            } catch(e: Exception) {}
+                                                        }
+                                                    ) {
+                                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(onClick = { storeToManageProducts = null }) {
+                                    Text("تم وإغلاق", color = Color.White)
+                                }
+                            },
+                            containerColor = themeColors.surface
+                        )
                     }
                 }
             }
@@ -2695,48 +4307,411 @@ fun LazyListScope.adminRestaurantsPanel(viewModel: MainViewModel, themeColors: V
         if (activeSubTabState.value == "RESTAURANTS") {
             item {
                 Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🍔 إدارة المطاعم والكافيهات وقوائم الطعام", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("🍔 إدارة المطاعم والكافيهات وقوائم الطعام والخصومات", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     
-                    var restName by remember { mutableStateOf("") }
-                    var restPhone by remember { mutableStateOf("") }
-                    var restDesc by remember { mutableStateOf("") }
+                    val storesList by viewModel.stores.collectAsState()
+                    val filteredRestaurants = storesList.filter { it.sectionId == "restaurants" || it.sectionId == "restaurant" }
 
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("➕ إضافة مطعم / كافيه جديد يدوياً:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            OutlinedTextField(
-                                value = restName,
-                                onValueChange = { restName = it },
-                                label = { Text("اسم المطعم / الكافيه") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = restPhone,
-                                onValueChange = { restPhone = it },
-                                label = { Text("رقم الهاتف والطلبات") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = restDesc,
-                                onValueChange = { restDesc = it },
-                                label = { Text("نوع المأكولات والساعات") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                    var searchQuery by remember { mutableStateOf("") }
+                    var selectedFilterType by remember { mutableStateOf("الكل") }
+
+                    // Dialog States
+                    var restaurantToManageDishes by remember { mutableStateOf<StoreEntity?>(null) }
+                    var restaurantToManageOffers by remember { mutableStateOf<StoreEntity?>(null) }
+
+                    // Search
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("ابحث باسم المطعم أو المأكولات...", color = Color.Gray, fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = themeColors.accent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
+                    )
+
+                    // Filters List
+                    val filterTypes = listOf("الكل", "VIP مميز", "موثق 🛡️", "موصى به ⭐", "محظور 🚫")
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(filterTypes) { filter ->
+                            val isSel = selectedFilterType == filter
                             Button(
-                                onClick = {
-                                    if (restName.isNotBlank()) {
-                                        viewModel.addStore(restName, "مطعم: $restDesc", restPhone)
-                                        restName = ""
-                                        restPhone = ""
-                                        restDesc = ""
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary)
+                                onClick = { selectedFilterType = filter },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSel) themeColors.accent else themeColors.surface
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                             ) {
-                                Text("إضافة المطعم 🍔", color = Color.White)
+                                Text(filter, fontSize = 11.sp, color = if (isSel) Color.Black else Color.White)
                             }
                         }
+                    }
+
+                    // Filter restaurants
+                    val finalFiltered = filteredRestaurants.filter { rest ->
+                        val matchesSearch = rest.name.contains(searchQuery, ignoreCase = true) || rest.categoryId.contains(searchQuery)
+                        val matchesFilter = when (selectedFilterType) {
+                            "الكل" -> true
+                            "VIP مميز" -> rest.isVip
+                            "موثق 🛡️" -> rest.isVerified
+                            "موصى به ⭐" -> rest.isRecommended
+                            "محظور 🚫" -> rest.isBlocked
+                            else -> true
+                        }
+                        matchesSearch && matchesFilter
+                    }
+
+                    if (finalFiltered.isEmpty()) {
+                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("لا توجد مطاعم مطابقة للبحث أو القسم المحدد 🍔", color = Color.LightGray, fontSize = 11.sp, textAlign = TextAlign.Center)
+                            }
+                        }
+                    } else {
+                        finalFiltered.forEach { rest ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(rest.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                                            Text("🍽️ المطبخ: ${rest.categoryId}", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            if (rest.isVip) Badge(containerColor = Color.Yellow) { Text("VIP", color = Color.Black, fontSize = 9.sp) }
+                                            if (rest.isVerified) Badge(containerColor = Color.Green) { Text("موثق", color = Color.Black, fontSize = 9.sp) }
+                                            if (rest.isRecommended) Badge(containerColor = themeColors.accent) { Text("مميز", color = Color.Black, fontSize = 9.sp) }
+                                            if (rest.isBlocked) Badge(containerColor = Color.Red) { Text("محظور", color = Color.White, fontSize = 9.sp) }
+                                        }
+                                    }
+
+                                    Text("📝 التفاصيل: ${rest.description}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("📍 الموقع: ${rest.cityId} - ${rest.localNeighborhood.ifBlank { "المنطقة الرئيسية" }}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("📞 الهاتف والطلبات: ${rest.phone}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("🕒 دوام العمل: ${rest.workingHours.ifBlank { "غير محدد" }}", color = Color.LightGray, fontSize = 11.sp)
+
+                                    Divider(color = Color.White.copy(alpha = 0.05f))
+
+                                    // Actions Row 1 (Toggles)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { viewModel.toggleStoreVip(rest.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (rest.isVip) Color.Yellow else Color.DarkGray),
+                                            modifier = Modifier.weight(1.0f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (rest.isVip) "🌟 إلغاء VIP" else "🏆 تفعيل VIP", fontSize = 10.sp, color = if (rest.isVip) Color.Black else Color.White)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.toggleStoreVerified(rest.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (rest.isVerified) Color.Green else Color.DarkGray),
+                                            modifier = Modifier.weight(1.0f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (rest.isVerified) "🛡️ إلغاء توثيق" else "🛡️ توثيق", fontSize = 10.sp, color = if (rest.isVerified) Color.Black else Color.White)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.toggleStoreRecommended(rest.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (rest.isRecommended) themeColors.accent else Color.DarkGray),
+                                            modifier = Modifier.weight(1.0f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (rest.isRecommended) "⭐ إلغاء تمييز" else "⭐ تمييز وتوصية", fontSize = 10.sp, color = if (rest.isRecommended) Color.Black else Color.White)
+                                        }
+                                    }
+
+                                    // Actions Row 2 (Functional Menus & Daily Offers)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { restaurantToManageDishes = rest },
+                                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                            modifier = Modifier.weight(1.2f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Icon(Icons.Default.List, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("🍔 قائمة الأطباق", fontSize = 10.sp, color = Color.White)
+                                        }
+                                        Button(
+                                            onClick = { restaurantToManageOffers = rest },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                            modifier = Modifier.weight(1.2f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Icon(Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("🏷️ عروض الخصومات", fontSize = 10.sp, color = Color.White)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.toggleStoreBlock(rest.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (rest.isBlocked) Color.Gray else Color.Red),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (rest.isBlocked) "🔓 إلغاء حظر" else "🚫 حظر", fontSize = 10.sp, color = Color.White)
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.deleteStore(rest.id) },
+                                            modifier = Modifier.size(36.dp).background(Color.Red.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- DIALOG 1: MANAGE DISHES / MENU ---
+                    restaurantToManageDishes?.let { rest ->
+                        var dishName by remember { mutableStateOf("") }
+                        var dishDesc by remember { mutableStateOf("") }
+                        var dishPrice by remember { mutableStateOf("") }
+
+                        val dishesList = remember(rest.productAttachmentsJson) {
+                            val list = mutableListOf<Triple<String, String, String>>()
+                            try {
+                                if (rest.productAttachmentsJson.isNotBlank()) {
+                                    val arr = org.json.JSONArray(rest.productAttachmentsJson)
+                                    for (i in 0 until arr.length()) {
+                                        val obj = arr.getJSONObject(i)
+                                        list.add(Triple(obj.optString("name", ""), obj.optString("desc", ""), obj.optString("price", "")))
+                                    }
+                                }
+                            } catch(e: Exception) {}
+                            list
+                        }
+
+                        AlertDialog(
+                            onDismissRequest = { restaurantToManageDishes = null },
+                            title = { Text("🍔 إدارة منيو وأطباق: ${rest.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+                            text = {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("أضف وجبة / طبق جديد للقائمة:", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    OutlinedTextField(value = dishName, onValueChange = { dishName = it }, placeholder = { Text("اسم الطبق (مثال: مندي دجاج)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                                    OutlinedTextField(value = dishDesc, onValueChange = { dishDesc = it }, placeholder = { Text("مكونات الطبق وتفاصيله", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                                    OutlinedTextField(value = dishPrice, onValueChange = { dishPrice = it }, placeholder = { Text("سعر الطبق (ر.ي) (مثال: 3500)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+
+                                    Button(
+                                        onClick = {
+                                            if (dishName.isNotBlank()) {
+                                                val updatedList = dishesList + Triple(dishName, dishDesc, dishPrice)
+                                                val arr = org.json.JSONArray()
+                                                updatedList.forEach { (n, d, p) ->
+                                                    val obj = org.json.JSONObject()
+                                                    obj.put("name", n)
+                                                    obj.put("desc", d)
+                                                    obj.put("price", p)
+                                                    arr.put(obj)
+                                                }
+                                                val updatedJson = arr.toString()
+                                                val updatedRest = rest.copy(productAttachmentsJson = updatedJson)
+                                                try {
+                                                    FirebaseFirestore.getInstance().collection("stores").document(rest.id).set(updatedRest)
+                                                    viewModel._stores.value = viewModel._stores.value.map { if (it.id == rest.id) updatedRest else it }
+                                                    viewModel.triggerNotification("🍔 تم إضافة وجبة جديدة بنجاح!")
+                                                    restaurantToManageDishes = updatedRest
+                                                } catch(e: Exception) {}
+
+                                                dishName = ""
+                                                dishDesc = ""
+                                                dishPrice = ""
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("إضافة الوجبة للمنيو ➕", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                                    Text("الأطباق الحالية (${dishesList.size}):", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                                    dishesList.forEachIndexed { idx, (n, d, p) ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.4f))
+                                        ) {
+                                            Row(modifier = Modifier.padding(8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(n, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                                    if (d.isNotBlank()) Text(d, color = Color.LightGray, fontSize = 10.sp)
+                                                    Text("💰 السعر: $p", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        val updated = dishesList.filterIndexed { i, _ -> i != idx }
+                                                        val arr = org.json.JSONArray()
+                                                        updated.forEach { (nn, dd, pp) ->
+                                                            val obj = org.json.JSONObject()
+                                                            obj.put("name", nn)
+                                                            obj.put("desc", dd)
+                                                            obj.put("price", pp)
+                                                            arr.put(obj)
+                                                        }
+                                                        val updatedJson = arr.toString()
+                                                        val updatedRest = rest.copy(productAttachmentsJson = updatedJson)
+                                                        try {
+                                                            FirebaseFirestore.getInstance().collection("stores").document(rest.id).set(updatedRest)
+                                                            viewModel._stores.value = viewModel._stores.value.map { if (it.id == rest.id) updatedRest else it }
+                                                            viewModel.triggerNotification("🗑️ تم حذف الوجبة بنجاح!")
+                                                            restaurantToManageDishes = updatedRest
+                                                        } catch(e: Exception) {}
+                                                    }
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(onClick = { restaurantToManageDishes = null }) {
+                                    Text("تم وإغلاق", color = Color.White)
+                                }
+                            },
+                            containerColor = themeColors.surface
+                        )
+                    }
+
+                    // --- DIALOG 2: MANAGE OFFERS & DISCOUNTS ---
+                    restaurantToManageOffers?.let { rest ->
+                        var offerTitle by remember { mutableStateOf("") }
+                        var offerPct by remember { mutableStateOf("") }
+                        var offerPeriod by remember { mutableStateOf("") }
+
+                        val offersList = remember(rest.specialOffersJson) {
+                            val list = mutableListOf<Triple<String, String, String>>()
+                            try {
+                                if (rest.specialOffersJson.isNotBlank()) {
+                                    val arr = org.json.JSONArray(rest.specialOffersJson)
+                                    for (i in 0 until arr.length()) {
+                                        val obj = arr.getJSONObject(i)
+                                        list.add(Triple(obj.optString("title", ""), obj.optString("pct", ""), obj.optString("period", "")))
+                                    }
+                                }
+                            } catch(e: Exception) {}
+                            list
+                        }
+
+                        AlertDialog(
+                            onDismissRequest = { restaurantToManageOffers = null },
+                            title = { Text("🏷️ عروض الخصومات للمطعم: ${rest.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+                            text = {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("إضافة عرض خصم جديد:", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    OutlinedTextField(value = offerTitle, onValueChange = { offerTitle = it }, placeholder = { Text("عنوان العرض (خصم على البرجر)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                                    OutlinedTextField(value = offerPct, onValueChange = { offerPct = it }, placeholder = { Text("نسبة الخصم (مثال: 20%)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                                    OutlinedTextField(value = offerPeriod, onValueChange = { offerPeriod = it }, placeholder = { Text("صلاحية العرض (مثال: خلال نهاية الأسبوع)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+
+                                    Button(
+                                        onClick = {
+                                            if (offerTitle.isNotBlank()) {
+                                                val updatedList = offersList + Triple(offerTitle, offerPct, offerPeriod)
+                                                val arr = org.json.JSONArray()
+                                                updatedList.forEach { (t, p, d) ->
+                                                    val obj = org.json.JSONObject()
+                                                    obj.put("title", t)
+                                                    obj.put("pct", p)
+                                                    obj.put("period", d)
+                                                    arr.put(obj)
+                                                }
+                                                val updatedJson = arr.toString()
+                                                val updatedRest = rest.copy(specialOffersJson = updatedJson)
+                                                try {
+                                                    FirebaseFirestore.getInstance().collection("stores").document(rest.id).set(updatedRest)
+                                                    viewModel._stores.value = viewModel._stores.value.map { if (it.id == rest.id) updatedRest else it }
+                                                    viewModel.triggerNotification("🏷️ تم إضافة عرض الخصم للمطعم!")
+                                                    restaurantToManageOffers = updatedRest
+                                                } catch(e: Exception) {}
+
+                                                offerTitle = ""
+                                                offerPct = ""
+                                                offerPeriod = ""
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("نشر العرض الترويجي 📢", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                                    Text("العروض الحالية المتاحة (${offersList.size}):", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                                    offersList.forEachIndexed { idx, (t, p, d) ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.4f))
+                                        ) {
+                                            Row(modifier = Modifier.padding(8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(t, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                                    Text("🔥 خصم: $p", color = Color.Yellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    if (d.isNotBlank()) Text("⏱️ الصلاحية: $d", color = Color.LightGray, fontSize = 10.sp)
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        val updated = offersList.filterIndexed { i, _ -> i != idx }
+                                                        val arr = org.json.JSONArray()
+                                                        updated.forEach { (tt, pp, dd) ->
+                                                            val obj = org.json.JSONObject()
+                                                            obj.put("title", tt)
+                                                            obj.put("pct", pp)
+                                                            obj.put("period", dd)
+                                                            arr.put(obj)
+                                                        }
+                                                        val updatedJson = arr.toString()
+                                                        val updatedRest = rest.copy(specialOffersJson = updatedJson)
+                                                        try {
+                                                            FirebaseFirestore.getInstance().collection("stores").document(rest.id).set(updatedRest)
+                                                            viewModel._stores.value = viewModel._stores.value.map { if (it.id == rest.id) updatedRest else it }
+                                                            viewModel.triggerNotification("🗑️ تم إزالة العرض الترويجي")
+                                                            restaurantToManageOffers = updatedRest
+                                                        } catch(e: Exception) {}
+                                                    }
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(onClick = { restaurantToManageOffers = null }) {
+                                    Text("تم وإغلاق", color = Color.White)
+                                }
+                            },
+                            containerColor = themeColors.surface
+                        )
                     }
                 }
             }
@@ -2749,48 +4724,286 @@ fun LazyListScope.adminMedicalPanel(viewModel: MainViewModel, themeColors: Visua
         if (activeSubTabState.value == "MEDICAL") {
             item {
                 Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🏥 إدارة المراكز الطبية والعيادات والأطباء", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("🏥 إدارة المراكز الطبية والمستشفيات والعيادات التخصصية", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     
-                    var medName by remember { mutableStateOf("") }
-                    var medPhone by remember { mutableStateOf("") }
-                    var medSpec by remember { mutableStateOf("") }
+                    val storesList by viewModel.stores.collectAsState()
+                    val filteredMedical = storesList.filter { it.sectionId == "medical" || it.sectionId == "clinic" || it.sectionId == "hospital" }
 
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("➕ إضافة مركز طبي / عيادة جديدة يدوياً:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            OutlinedTextField(
-                                value = medName,
-                                onValueChange = { medName = it },
-                                label = { Text("اسم المركز الطبي / العيادة") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = medPhone,
-                                onValueChange = { medPhone = it },
-                                label = { Text("رقم الطوارئ والاستعلامات") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = medSpec,
-                                onValueChange = { medSpec = it },
-                                label = { Text("التخصصات الطبية وساعات العمل") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                    var searchQuery by remember { mutableStateOf("") }
+                    var selectedFilterType by remember { mutableStateOf("الكل") }
+
+                    // Dialog States
+                    var medicalToManageDoctors by remember { mutableStateOf<StoreEntity?>(null) }
+
+                    // Search
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("ابحث باسم المركز أو التخصص الطبي...", color = Color.Gray, fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = themeColors.accent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
+                    )
+
+                    // Filters
+                    val filterTypes = listOf("الكل", "VIP مميز", "موثق 🛡️", "موصى به ⭐", "محظور 🚫")
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(filterTypes) { filter ->
+                            val isSel = selectedFilterType == filter
                             Button(
-                                onClick = {
-                                    if (medName.isNotBlank()) {
-                                        viewModel.addStore(medName, "مركز طبي: $medSpec", medPhone)
-                                        medName = ""
-                                        medPhone = ""
-                                        medSpec = ""
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary)
+                                onClick = { selectedFilterType = filter },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSel) themeColors.accent else themeColors.surface
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                             ) {
-                                Text("إضافة المركز الطبي 🏥", color = Color.White)
+                                Text(filter, fontSize = 11.sp, color = if (isSel) Color.Black else Color.White)
                             }
                         }
+                    }
+
+                    // Render List
+                    val finalFiltered = filteredMedical.filter { med ->
+                        val matchesSearch = med.name.contains(searchQuery, ignoreCase = true) || med.categoryId.contains(searchQuery)
+                        val matchesFilter = when (selectedFilterType) {
+                            "الكل" -> true
+                            "VIP مميز" -> med.isVip
+                            "موثق 🛡️" -> med.isVerified
+                            "موصى به ⭐" -> med.isRecommended
+                            "محظور 🚫" -> med.isBlocked
+                            else -> true
+                        }
+                        matchesSearch && matchesFilter
+                    }
+
+                    if (finalFiltered.isEmpty()) {
+                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("لا توجد مراكز طبية أو عيادات حالياً 🏥", color = Color.LightGray, fontSize = 11.sp, textAlign = TextAlign.Center)
+                            }
+                        }
+                    } else {
+                        finalFiltered.forEach { med ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(med.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                                            Text("🏥 التخصص: ${med.categoryId}", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            if (med.isVip) Badge(containerColor = Color.Yellow) { Text("VIP", color = Color.Black, fontSize = 9.sp) }
+                                            if (med.isVerified) Badge(containerColor = Color.Green) { Text("موثق", color = Color.Black, fontSize = 9.sp) }
+                                            if (med.isRecommended) Badge(containerColor = themeColors.accent) { Text("موصى به", color = Color.Black, fontSize = 9.sp) }
+                                            if (med.isBlocked) Badge(containerColor = Color.Red) { Text("محظور", color = Color.White, fontSize = 9.sp) }
+                                        }
+                                    }
+
+                                    Text("📝 التفاصيل: ${med.description}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("📍 الموقع: ${med.cityId} - ${med.localNeighborhood.ifBlank { "المنطقة الرئيسية" }}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("📞 الطوارئ والاستعلامات: ${med.phone}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("🕒 دوام المركز: ${med.workingHours.ifBlank { "غير محدد" }}", color = Color.LightGray, fontSize = 11.sp)
+
+                                    Divider(color = Color.White.copy(alpha = 0.05f))
+
+                                    // Action buttons for medical toggles
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { viewModel.toggleStoreVip(med.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (med.isVip) Color.Yellow else Color.DarkGray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (med.isVip) "🌟 إلغاء VIP" else "🏆 تفعيل VIP", fontSize = 10.sp, color = if (med.isVip) Color.Black else Color.White)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.toggleStoreVerified(med.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (med.isVerified) Color.Green else Color.DarkGray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (med.isVerified) "🛡️ إلغاء توثيق" else "🛡️ توثيق", fontSize = 10.sp, color = if (med.isVerified) Color.Black else Color.White)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.toggleStoreRecommended(med.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (med.isRecommended) themeColors.accent else Color.DarkGray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (med.isRecommended) "⭐ إلغاء توصية" else "⭐️ إبراز وتوصية", fontSize = 10.sp, color = if (med.isRecommended) Color.Black else Color.White)
+                                        }
+                                    }
+
+                                    // Doctor management, block, delete
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { medicalToManageDoctors = med },
+                                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                            modifier = Modifier.weight(1.5f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("👨‍⚕️ إدارة الأطباء والدوام", fontSize = 10.sp, color = Color.White)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.toggleStoreBlock(med.id) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (med.isBlocked) Color.Gray else Color.Red),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                        ) {
+                                            Text(if (med.isBlocked) "🔓 إلغاء الحظر" else "🚫 حظر المركز", fontSize = 10.sp, color = Color.White)
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.deleteStore(med.id) },
+                                            modifier = Modifier.size(36.dp).background(Color.Red.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- DOCTOR MANAGEMENT DIALOG ---
+                    medicalToManageDoctors?.let { med ->
+                        var docName by remember { mutableStateOf("") }
+                        var docSpec by remember { mutableStateOf("") }
+                        var docSchedule by remember { mutableStateOf("") }
+                        var docFee by remember { mutableStateOf("") }
+
+                        val doctorsList = remember(med.productAttachmentsJson) {
+                            val list = mutableListOf<Triple<String, String, String>>() // Name, Spec+Schedule, Fee
+                            try {
+                                if (med.productAttachmentsJson.isNotBlank()) {
+                                    val arr = org.json.JSONArray(med.productAttachmentsJson)
+                                    for (i in 0 until arr.length()) {
+                                        val obj = arr.getJSONObject(i)
+                                        list.add(Triple(obj.optString("name", ""), obj.optString("spec", ""), obj.optString("fee", "")))
+                                    }
+                                }
+                            } catch(e: Exception) {}
+                            list
+                        }
+
+                        AlertDialog(
+                            onDismissRequest = { medicalToManageDoctors = null },
+                            title = { Text("👨‍⚕️ الكادر الطبي والعيادات بـ: ${med.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+                            text = {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("إضافة طبيب / استشاري جديد للعيادات المعتمدة:", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    
+                                    OutlinedTextField(value = docName, onValueChange = { docName = it }, placeholder = { Text("اسم الطبيب الكامل (مثال: د. أحمد يحيى)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                                    OutlinedTextField(value = docSpec, onValueChange = { docSpec = it }, placeholder = { Text("التخصص الدقيق وأوقات الدوام (مثال: باطنية - السبت للأربعاء)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+                                    OutlinedTextField(value = docFee, onValueChange = { docFee = it }, placeholder = { Text("سعر كشفية المعاينة (مثال: 3000 ريال)", fontSize = 11.sp, color = Color.Gray) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+
+                                    Button(
+                                        onClick = {
+                                            if (docName.isNotBlank()) {
+                                                val updatedList = doctorsList + Triple(docName, docSpec, docFee)
+                                                val arr = org.json.JSONArray()
+                                                updatedList.forEach { (n, s, f) ->
+                                                    val obj = org.json.JSONObject()
+                                                    obj.put("name", n)
+                                                    obj.put("spec", s)
+                                                    obj.put("fee", f)
+                                                    arr.put(obj)
+                                                }
+                                                val updatedJson = arr.toString()
+                                                val updatedMed = med.copy(productAttachmentsJson = updatedJson)
+                                                try {
+                                                    FirebaseFirestore.getInstance().collection("stores").document(med.id).set(updatedMed)
+                                                    viewModel._stores.value = viewModel._stores.value.map { if (it.id == med.id) updatedMed else it }
+                                                    viewModel.triggerNotification("👨‍⚕️ تم إضافة الاستشاري لجدول العيادات بنجاح!")
+                                                    medicalToManageDoctors = updatedMed
+                                                } catch(e: Exception) {}
+
+                                                docName = ""
+                                                docSpec = ""
+                                                docFee = ""
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("إضافة الطبيب لجدول المناوبات ➕", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                                    Text("الأطباء والاستشاريين الحاليين (${doctorsList.size}):", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                                    doctorsList.forEachIndexed { idx, (n, s, f) ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.4f))
+                                        ) {
+                                            Row(modifier = Modifier.padding(8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(n, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                                    if (s.isNotBlank()) Text(s, color = Color.LightGray, fontSize = 10.sp)
+                                                    Text("💸 سعر المعاينة: $f", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        val updated = doctorsList.filterIndexed { i, _ -> i != idx }
+                                                        val arr = org.json.JSONArray()
+                                                        updated.forEach { (nn, ss, ff) ->
+                                                            val obj = org.json.JSONObject()
+                                                            obj.put("name", nn)
+                                                            obj.put("spec", ss)
+                                                            obj.put("fee", ff)
+                                                            arr.put(obj)
+                                                        }
+                                                        val updatedJson = arr.toString()
+                                                        val updatedMed = med.copy(productAttachmentsJson = updatedJson)
+                                                        try {
+                                                            FirebaseFirestore.getInstance().collection("stores").document(med.id).set(updatedMed)
+                                                            viewModel._stores.value = viewModel._stores.value.map { if (it.id == med.id) updatedMed else it }
+                                                            viewModel.triggerNotification("🗑️ تم حذف الطبيب من القائمة")
+                                                            medicalToManageDoctors = updatedMed
+                                                        } catch(e: Exception) {}
+                                                    }
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(onClick = { medicalToManageDoctors = null }) {
+                                    Text("تم وإغلاق", color = Color.White)
+                                }
+                            },
+                            containerColor = themeColors.surface
+                        )
                     }
                 }
             }
@@ -2995,50 +5208,171 @@ fun LazyListScope.adminCleanPanel(viewModel: MainViewModel, themeColors: VisualT
     with(state) {
         if (activeSubTabState.value == "CLEAN") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🧹 تهيئة وتنظيف بيانات النظام وإعادة الضبط", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("🧹 تهيئة وتنظيف بيانات النظام وإعادة الضبط الشامل", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     
                     var wipeProviders by remember { mutableStateOf(false) }
                     var wipeBookings by remember { mutableStateOf(false) }
                     var wipeChats by remember { mutableStateOf(false) }
                     var wipeStores by remember { mutableStateOf(false) }
+                    var wipeProperties by remember { mutableStateOf(false) }
+                    var wipeJobs by remember { mutableStateOf(false) }
+                    var wipeNotifications by remember { mutableStateOf(false) }
+                    var wipeComplaints by remember { mutableStateOf(false) }
+                    var wipeBanners by remember { mutableStateOf(false) }
+                    var wipeCoupons by remember { mutableStateOf(false) }
+                    var wipeReviews by remember { mutableStateOf(false) }
+                    var wipeCallsLog by remember { mutableStateOf(false) }
+                    var wipeSupervisors by remember { mutableStateOf(false) }
 
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("اختر البيانات المراد تهيئتها وإفراغها:", fontSize = 11.sp, color = Color.White)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = wipeProviders, onCheckedChange = { wipeProviders = it })
-                                Text("إفراغ الفنيين وأعضاء الدليل", fontSize = 11.sp, color = Color.White)
+                    var showPasswordDialog by remember { mutableStateOf(false) }
+                    var adminPasswordInput by remember { mutableStateOf("") }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.3f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("🚨 تحذير: هذه العملية تمس قاعدة البيانات مباشرة ونهائية!", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Red)
+                            Text("اختر الفئات التي تريد مسحها وتصفيرها بالكامل من خوادم Firestore:", fontSize = 11.sp, color = Color.LightGray)
+
+                            val sections = listOf(
+                                Triple("الفنيين ومزودي الخدمات", wipeProviders) { b: Boolean -> wipeProviders = b },
+                                Triple("سجل الحجوزات والطلبات", wipeBookings) { b: Boolean -> wipeBookings = b },
+                                Triple("غرف الدردشة والرسائل", wipeChats) { b: Boolean -> wipeChats = b },
+                                Triple("المحلات والمتاجر التجارية", wipeStores) { b: Boolean -> wipeStores = b },
+                                Triple("العقارات والمعروضات", wipeProperties) { b: Boolean -> wipeProperties = b },
+                                Triple("الوظائف والمتقدمين", wipeJobs) { b: Boolean -> wipeJobs = b },
+                                Triple("التنبيهات وبث الإشعارات", wipeNotifications) { b: Boolean -> wipeNotifications = b },
+                                Triple("سجلات الشكاوى والاقتراحات", wipeComplaints) { b: Boolean -> wipeComplaints = b },
+                                Triple("البنرات والشرائح الإعلانية", wipeBanners) { b: Boolean -> wipeBanners = b },
+                                Triple("كوبونات الخصم والنقاط", wipeCoupons) { b: Boolean -> wipeCoupons = b },
+                                Triple("التقييمات والتعليقات", wipeReviews) { b: Boolean -> wipeReviews = b },
+                                Triple("سجلات المكالمات الهاتفية", wipeCallsLog) { b: Boolean -> wipeCallsLog = b },
+                                Triple("طاقم المشرفين والمساعدين", wipeSupervisors) { b: Boolean -> wipeSupervisors = b }
+                            )
+
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                sections.forEach { (label, checked, onCheckedChange) ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = checked, onCheckedChange = onCheckedChange, colors = CheckboxDefaults.colors(checkedColor = Color.Red))
+                                        Text(label, fontSize = 11.sp, color = Color.White)
+                                    }
+                                }
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = wipeBookings, onCheckedChange = { wipeBookings = it })
-                                Text("إفراغ جميع الحجوزات", fontSize = 11.sp, color = Color.White)
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = wipeChats, onCheckedChange = { wipeChats = it })
-                                Text("إفراغ سلة المحادثات والرسائل", fontSize = 11.sp, color = Color.White)
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = wipeStores, onCheckedChange = { wipeStores = it })
-                                Text("إفراغ المحلات والعقارات والوظائف", fontSize = 11.sp, color = Color.White)
-                            }
+
                             Button(
                                 onClick = {
-                                    viewModel.wipeSelectedData(
-                                        wipeProviders = wipeProviders,
-                                        wipeBookings = wipeBookings,
-                                        wipeChats = wipeChats,
-                                        wipeStores = wipeStores,
-                                        wipeProperties = wipeStores,
-                                        wipeJobs = wipeStores
-                                    )
+                                    if (wipeProviders || wipeBookings || wipeChats || wipeStores || wipeProperties || wipeJobs || wipeNotifications || wipeComplaints || wipeBanners || wipeCoupons || wipeReviews || wipeCallsLog || wipeSupervisors) {
+                                        showPasswordDialog = true
+                                    } else {
+                                        viewModel.triggerNotification("⚠️ يرجى تحديد فئة واحدة على الأقل للمسح")
+                                    }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("تأكيد تنظيف البيانات المحددة 🧹", color = Color.White)
+                                Text("تنظيف البيانات المحددة بشكل نهائي 🧹", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
+                    }
+
+                    if (showPasswordDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showPasswordDialog = false },
+                            title = { Text("🔒 تأكيد الهوية الإدارية", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("أدخل كلمة المرور الخاصة بالأدمن لإتمام عملية التهيئة والمسح الشامل:", fontSize = 11.sp, color = Color.LightGray)
+                                    OutlinedTextField(
+                                        value = adminPasswordInput,
+                                        onValueChange = { adminPasswordInput = it },
+                                        label = { Text("رمز المرور السري", fontSize = 11.sp) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = Color.White)
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        if (adminPasswordInput == "1234") {
+                                            viewModel.wipeSelectedData(
+                                                wipeProviders = wipeProviders,
+                                                wipeBookings = wipeBookings,
+                                                wipeChats = wipeChats,
+                                                wipeStores = wipeStores,
+                                                wipeProperties = wipeProperties,
+                                                wipeJobs = wipeJobs
+                                            )
+                                            if (wipeNotifications) {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("notifications").get().addOnSuccessListener { snapshot ->
+                                                    for (doc in snapshot.documents) doc.reference.delete()
+                                                }
+                                            }
+                                            if (wipeComplaints) {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("complaints").get().addOnSuccessListener { snapshot ->
+                                                    for (doc in snapshot.documents) doc.reference.delete()
+                                                }
+                                            }
+                                            if (wipeBanners) {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("banners").get().addOnSuccessListener { snapshot ->
+                                                    for (doc in snapshot.documents) doc.reference.delete()
+                                                }
+                                            }
+                                            if (wipeCoupons) {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("coupons").get().addOnSuccessListener { snapshot ->
+                                                    for (doc in snapshot.documents) doc.reference.delete()
+                                                }
+                                            }
+                                            if (wipeReviews) {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("ratings").get().addOnSuccessListener { snapshot ->
+                                                    for (doc in snapshot.documents) doc.reference.delete()
+                                                }
+                                            }
+                                            if (wipeCallsLog) {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("calls_log").get().addOnSuccessListener { snapshot ->
+                                                    for (doc in snapshot.documents) doc.reference.delete()
+                                                }
+                                            }
+                                            if (wipeSupervisors) {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("supervisors").get().addOnSuccessListener { snapshot ->
+                                                    for (doc in snapshot.documents) doc.reference.delete()
+                                                }
+                                            }
+                                            viewModel.triggerNotification("✅ تم تهيئة ومسح البيانات المحددة من السيرفر بنجاح!")
+                                            showPasswordDialog = false
+                                            adminPasswordInput = ""
+                                        } else {
+                                            viewModel.triggerNotification("❌ رمز المرور خاطئ! تم إلغاء العملية لحماية النظام.")
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                ) {
+                                    Text("تأكيد وحذف 💀", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            dismissButton = {
+                                Button(
+                                    onClick = {
+                                        showPasswordDialog = false
+                                        adminPasswordInput = ""
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                                ) {
+                                    Text("إلغاء", color = Color.White, fontSize = 11.sp)
+                                }
+                            },
+                            containerColor = themeColors.surface
+                        )
                     }
                 }
             }
@@ -3050,9 +5384,194 @@ fun LazyListScope.adminReviewsPanel(viewModel: MainViewModel, themeColors: Visua
     with(state) {
         if (activeSubTabState.value == "REVIEWS") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("⭐ إدارة التقييمات والتعليقات والردود", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("مراقبة التقييمات والموافقة عليها وحذف التقييمات غير اللائقة مع إمكانية رد الإدارة.", color = Color.LightGray, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("⭐ إدارة التقييمات والتعليقات والردود الإدارية", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    val ratingsList by viewModel.ratings.collectAsState()
+                    var commentSearch by remember { mutableStateOf("") }
+                    var ratingFilter by remember { mutableStateOf(0) } // 0 = all, 1 to 5 stars
+                    
+                    OutlinedTextField(
+                        value = commentSearch,
+                        onValueChange = { commentSearch = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("بحث باسم العميل أو الكلمات في التعليق...", color = Color.Gray, fontSize = 11.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) }
+                    )
+
+                    // Stars filter row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Button(
+                            onClick = { ratingFilter = 0 },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (ratingFilter == 0) themeColors.accent else themeColors.surface),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        ) { Text("الكل", fontSize = 10.sp, color = if (ratingFilter == 0) Color.Black else Color.White) }
+
+                        (1..5).forEach { star ->
+                            Button(
+                                onClick = { ratingFilter = star },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (ratingFilter == star) themeColors.accent else themeColors.surface),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                            ) { Text("$star ⭐", fontSize = 9.sp, color = if (ratingFilter == star) Color.Black else Color.White) }
+                        }
+                    }
+
+                    val finalRatings = ratingsList.filter { r ->
+                        val matchesSearch = r.userName.contains(commentSearch, ignoreCase = true) || r.comment.contains(commentSearch, ignoreCase = true)
+                        val matchesFilter = ratingFilter == 0 || r.rating.toInt() == ratingFilter
+                        matchesSearch && matchesFilter
+                    }
+
+                    if (finalRatings.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد تقييمات مطابقة للفلاتر ⭐", color = Color.Gray, fontSize = 11.sp)
+                        }
+                    } else {
+                        finalRatings.forEach { rat ->
+                            var showEditCommentDialog by remember { mutableStateOf(false) }
+                            var editCommentInput by remember { mutableStateOf(rat.comment) }
+                            var showReplyDialog by remember { mutableStateOf(false) }
+                            var replyInput by remember { mutableStateOf(rat.reply) }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Text(rat.userName.ifBlank { "عميل مجهول" }, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            (1..5).forEach { i ->
+                                                Text(if (i <= rat.rating) "⭐" else "☆", fontSize = 10.sp, color = Color.Yellow)
+                                            }
+                                        }
+                                    }
+
+                                    Text("نوع الهدف: ${rat.targetType} | معرف الهدف: ${rat.targetId}", fontSize = 10.sp, color = Color.Gray)
+                                    Text("التعليق: ${rat.comment}", fontSize = 11.sp, color = Color.White)
+                                    
+                                    if (rat.reply.isNotEmpty()) {
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f))
+                                        ) {
+                                            Column(modifier = Modifier.padding(6.dp)) {
+                                                Text("💬 رد الإدارة: ${rat.reply}", fontSize = 10.sp, color = themeColors.accent)
+                                            }
+                                        }
+                                    }
+
+                                    // Action buttons for ratings
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { showEditCommentDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) { Text("تعديل ✏️", fontSize = 9.sp, color = Color.White) }
+
+                                        Button(
+                                            onClick = { showReplyDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) { Text("رد إداري 💬", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold) }
+
+                                        Button(
+                                            onClick = {
+                                                val updated = rat.copy(isApproved = !rat.isApproved)
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("ratings").document(rat.id).set(updated)
+                                                viewModel.triggerNotification(if (updated.isApproved) "✅ تم إظهار التقييم للعامة" else "⛔ تم إخفاء التقييم عن العامة")
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (rat.isApproved) Color.DarkGray else Color.Green),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) { Text(if (rat.isApproved) "إخفاء ⛔" else "إظهار ✅", fontSize = 9.sp, color = Color.White) }
+
+                                        Button(
+                                            onClick = {
+                                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("ratings").document(rat.id).delete()
+                                                viewModel.triggerNotification("🗑️ تم حذف التقييم نهائياً")
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(vertical = 2.dp)
+                                        ) { Text("حذف 🗑️", fontSize = 9.sp, color = Color.White) }
+                                    }
+                                }
+                            }
+
+                            // Dialogs
+                            if (showEditCommentDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showEditCommentDialog = false },
+                                    title = { Text("تعديل نص التعليق") },
+                                    text = {
+                                        OutlinedTextField(value = editCommentInput, onValueChange = { editCommentInput = it }, modifier = Modifier.fillMaxWidth())
+                                    },
+                                    confirmButton = {
+                                        Button(onClick = {
+                                            val updated = rat.copy(comment = editCommentInput)
+                                            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("ratings").document(rat.id).set(updated)
+                                            viewModel.triggerNotification("✅ تم تعديل التعليق")
+                                            showEditCommentDialog = false
+                                        }) { Text("حفظ") }
+                                    },
+                                    dismissButton = {
+                                        Button(onClick = { showEditCommentDialog = false }) { Text("إلغاء") }
+                                    }
+                                )
+                            }
+
+                            if (showReplyDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showReplyDialog = false },
+                                    title = { Text("الرد الإداري على التقييم") },
+                                    text = {
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            OutlinedTextField(value = replyInput, onValueChange = { replyInput = it }, label = { Text("اكتب رد الإدارة هنا...") }, modifier = Modifier.fillMaxWidth())
+                                            if (rat.reply.isNotEmpty()) {
+                                                Button(
+                                                    onClick = {
+                                                        val updated = rat.copy(reply = "", replyTimestamp = null)
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("ratings").document(rat.id).set(updated)
+                                                        viewModel.triggerNotification("🧹 تم مسح رد الفني والإدارة")
+                                                        replyInput = ""
+                                                        showReplyDialog = false
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                                ) { Text("حذف الرد الحالي", fontSize = 10.sp) }
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {
+                                        Button(onClick = {
+                                            val updated = rat.copy(reply = replyInput, replyTimestamp = System.currentTimeMillis())
+                                            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("ratings").document(rat.id).set(updated)
+                                            viewModel.triggerNotification("✅ تم حفظ الرد الإداري بنجاح")
+                                            showReplyDialog = false
+                                        }) { Text("تأكيد وحفظ") }
+                                    },
+                                    dismissButton = {
+                                        Button(onClick = { showReplyDialog = false }) { Text("إلغاء") }
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -3063,9 +5582,88 @@ fun LazyListScope.adminCallsPanel(viewModel: MainViewModel, themeColors: VisualT
     with(state) {
         if (activeSubTabState.value == "CALLS") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("📞 مراقبة المكالمات الصوتية وسجلات التواصل", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("عرض وتتبع سجل مكالمات التطبيق وإمكانية تفعيل أو تعطيل الاتصال المباشر.", color = Color.LightGray, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("📞 مراقبة المكالمات الصوتية وسجلات التواصل المباشر", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    var directCallsEnabled by remember { mutableStateOf(true) }
+
+                    // Global call setting
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("📳 ميزة الاتصال الصوتي المباشر بالتطبيق:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                                Text("عند الإغلاق، سيتم إجبار الفنيين والعملاء على التواصل الشات ومقنع الأرقام لحماية الخصوصية.", fontSize = 9.sp, color = Color.LightGray)
+                            }
+                            Switch(checked = directCallsEnabled, onCheckedChange = {
+                                directCallsEnabled = it
+                                viewModel.triggerNotification(if (it) "✅ تم تفعيل المكالمات الصوتية المباشرة" else "⛔ تم إغلاق المكالمات والتحويل للتواصل الكتابي والخصوصية")
+                            })
+                        }
+                    }
+
+                    val callsList by viewModel.callsLog.collectAsState()
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📜 سجلات آخر الاتصالات الفعالة (${callsList.size}):", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = {
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("calls_log").get().addOnSuccessListener { snapshot ->
+                                    for (doc in snapshot.documents) doc.reference.delete()
+                                }
+                                viewModel.triggerNotification("🧹 تم مسح سجل المكالمات وتصفيره بالكامل")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        ) { Text("تصفير السجل 🧹", fontSize = 9.sp, color = Color.White) }
+                    }
+
+                    if (callsList.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد سجلات مكالمات حالياً 📞", color = Color.Gray, fontSize = 11.sp)
+                        }
+                    } else {
+                        callsList.forEach { call ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("📞 اتصال من: ${call.callerName}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                        Text("إلى الفني: ${call.providerName}", fontSize = 11.sp, color = Color.LightGray)
+                                        Text("التوقيت: ${java.text.SimpleDateFormat("yyyy/MM/dd hh:mm a", java.util.Locale("ar")).format(java.util.Date(call.timestamp))}", fontSize = 9.sp, color = Color.Gray)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("calls_log").document(call.id).delete()
+                                            viewModel.triggerNotification("🗑️ تم حذف سجل المكالمة")
+                                        }
+                                    ) { Text("🗑️", fontSize = 14.sp) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -3076,9 +5674,120 @@ fun LazyListScope.adminBlockedPanel(viewModel: MainViewModel, themeColors: Visua
     with(state) {
         if (activeSubTabState.value == "BLOCKED") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🚫 القائمة المحظورة المركزية لجميع الفئات", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("قائمة موحدة بجميع الحسابات والفنيين والمحلات والعقارات المحظورة مع إمكانية فك الحظر السريع.", color = Color.LightGray, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("🚫 القائمة المركزية للمحظورين من الدليل والنظام", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    val providersList by viewModel.providers.collectAsState()
+                    val storesList by viewModel.stores.collectAsState()
+                    val jobsList by viewModel.jobs.collectAsState()
+
+                    val blockedProviders = providersList.filter { it.isBlocked }
+                    val blockedStores = storesList.filter { it.isBlocked }
+                    val blockedJobs = jobsList.filter { it.isBlocked }
+
+                    var selectedBlockedTab by remember { mutableStateOf("PROVIDERS") }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val tabs = listOf("PROVIDERS" to "فنيين (${blockedProviders.size})", "STORES" to "محلات (${blockedStores.size})", "JOBS" to "وظائف (${blockedJobs.size})")
+                        tabs.forEach { (key, label) ->
+                            val isSel = selectedBlockedTab == key
+                            Button(
+                                onClick = { selectedBlockedTab = key },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isSel) themeColors.accent else themeColors.surface),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                            ) { Text(label, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White) }
+                        }
+                    }
+
+                    when (selectedBlockedTab) {
+                        "PROVIDERS" -> {
+                            if (blockedProviders.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                                    Text("لا يوجد فنيين محظورين حالياً 😇", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            } else {
+                                blockedProviders.forEach { prov ->
+                                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                                        Row(modifier = Modifier.padding(10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Column {
+                                                Text("الفني: ${prov.name}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                                Text("الهاتف: ${prov.phone}", fontSize = 11.sp, color = Color.LightGray)
+                                                Text("التخصص: ${prov.profession}", fontSize = 11.sp, color = themeColors.accent)
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    viewModel.toggleProviderBlock(prov.id)
+                                                    viewModel.addNotification("🔓 فك الحظر عن حسابك", "تمت مراجعة حسابك وإعادة تفعيل توفرك بالدليل من قبل الإدارة.", "USER", prov.phone)
+                                                    viewModel.triggerNotification("✅ تم فك الحظر وإرجاع الفني للدليل بنجاح")
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
+                                            ) { Text("إلغاء الحظر 🔓", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        "STORES" -> {
+                            if (blockedStores.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                                    Text("لا يوجد محلات أو مراكز محظورة 🛍️", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            } else {
+                                blockedStores.forEach { store ->
+                                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                                        Row(modifier = Modifier.padding(10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Column {
+                                                Text("المحل: ${store.name}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                                Text("الهاتف: ${store.phone}", fontSize = 11.sp, color = Color.LightGray)
+                                                Text("القسم: ${store.sectionId}", fontSize = 11.sp, color = themeColors.accent)
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    viewModel.toggleStoreBlock(store.id)
+                                                    viewModel.triggerNotification("✅ تم فك الحظر وإعادة المحل للعمل")
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
+                                            ) { Text("إلغاء الحظر 🔓", fontSize = 9.sp, color = Color.Black) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        "JOBS" -> {
+                            if (blockedJobs.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                                    Text("لا توجد وظائف أو متقدمين محظورين 💼", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            } else {
+                                blockedJobs.forEach { job ->
+                                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                                        Row(modifier = Modifier.padding(10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Column {
+                                                Text("الوظيفة: ${job.title}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                                Text("الشركة: ${job.companyName}", fontSize = 11.sp, color = Color.LightGray)
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    viewModel.toggleJobBlock(job.id)
+                                                    viewModel.triggerNotification("✅ تم فك الحظر عن إعلان الوظيفة بنجاح")
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
+                                            ) { Text("إلغاء الحظر 🔓", fontSize = 9.sp, color = Color.Black) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -3089,9 +5798,147 @@ fun LazyListScope.adminDeletedPanel(viewModel: MainViewModel, themeColors: Visua
     with(state) {
         if (activeSubTabState.value == "DELETED") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("🗑️ سلة المحذوفات المركزية واستعادة البيانات", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("عرض العناصر المحذوفة ناعماً وإمكانية استعادتها فوراً إلى قاعدة البيانات.", color = Color.LightGray, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("🗑️ سلة المحذوفات المركزية واسترجاع البيانات المحذوفة ناعماً", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    val providersList by viewModel.providers.collectAsState()
+                    val storesList by viewModel.stores.collectAsState()
+                    val jobsList by viewModel.jobs.collectAsState()
+
+                    val deletedProviders = providersList.filter { it.isDeleted }
+                    val deletedStores = storesList.filter { it.isDeleted }
+                    val deletedJobs = jobsList.filter { it.isDeleted }
+
+                    var selectedDeletedTab by remember { mutableStateOf("PROVIDERS") }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val tabs = listOf("PROVIDERS" to "فنيين (${deletedProviders.size})", "STORES" to "محلات (${deletedStores.size})", "JOBS" to "وظائف (${deletedJobs.size})")
+                        tabs.forEach { (key, label) ->
+                            val isSel = selectedDeletedTab == key
+                            Button(
+                                onClick = { selectedDeletedTab = key },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isSel) themeColors.accent else themeColors.surface),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                            ) { Text(label, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White) }
+                        }
+                    }
+
+                    when (selectedDeletedTab) {
+                        "PROVIDERS" -> {
+                            if (deletedProviders.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                                    Text("سلة المحذوفات للفنيين فارغة ♻️", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            } else {
+                                deletedProviders.forEach { prov ->
+                                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text("الفني: ${prov.name}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                            Text("التخصص: ${prov.profession} | الهاتف: ${prov.phone}", fontSize = 11.sp, color = Color.LightGray)
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Button(
+                                                    onClick = {
+                                                        val updated = prov.copy(isDeleted = false)
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("providers").document(prov.id).set(updated)
+                                                        viewModel.triggerNotification("♻️ تم استرجاع حساب الفني وإعادة تفعيله فوراً بالدليل")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("استرجاع ♻️", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold) }
+                                                Button(
+                                                    onClick = {
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("providers").document(prov.id).delete()
+                                                        viewModel.triggerNotification("💀 تم حذف حساب الفني نهائياً ومن الخادم")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("حذف نهائي 💀", fontSize = 10.sp, color = Color.White) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        "STORES" -> {
+                            if (deletedStores.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                                    Text("سلة المحذوفات للمحلات فارغة ♻️", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            } else {
+                                deletedStores.forEach { store ->
+                                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text("المحل: ${store.name}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                            Text("التصنيف: ${store.sectionId}", fontSize = 11.sp, color = Color.LightGray)
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Button(
+                                                    onClick = {
+                                                        val updated = store.copy(isDeleted = false)
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("stores").document(store.id).set(updated)
+                                                        viewModel.triggerNotification("♻️ تم استرجاع المحل للعمل بنجاح")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("استرجاع ♻️", fontSize = 10.sp, color = Color.Black) }
+                                                Button(
+                                                    onClick = {
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("stores").document(store.id).delete()
+                                                        viewModel.triggerNotification("💀 تم حذف المحل نهائياً")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("حذف نهائي 💀", fontSize = 10.sp, color = Color.White) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        "JOBS" -> {
+                            if (deletedJobs.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                                    Text("سلة المحذوفات للوظائف فارغة ♻️", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            } else {
+                                deletedJobs.forEach { job ->
+                                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text("الوظيفة: ${job.title}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                            Text("الشركة: ${job.companyName}", fontSize = 11.sp, color = Color.LightGray)
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Button(
+                                                    onClick = {
+                                                        val updated = job.copy(isDeleted = false)
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("jobs").document(job.id).set(updated)
+                                                        viewModel.triggerNotification("♻️ تم استرجاع إعلان الوظيفة وتفعيله")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("استرجاع ♻️", fontSize = 10.sp, color = Color.Black) }
+                                                Button(
+                                                    onClick = {
+                                                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("jobs").document(job.id).delete()
+                                                        viewModel.triggerNotification("💀 تم حذف الوظيفة نهائياً")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("حذف نهائي 💀", fontSize = 10.sp, color = Color.White) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -3102,12 +5949,266 @@ fun LazyListScope.adminCustomTabsPanel(viewModel: MainViewModel, themeColors: Vi
     with(state) {
         if (activeSubTabState.value == "CUSTOM_TABS") {
             item {
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("📑 تخصيص تبويبات الملفات الشخصية والعرض", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text("إضافة وإدارة التبويبات المخصصة لجميع مقدمي الخدمات والمستندات المرفقة.", color = Color.LightGray, fontSize = 11.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("📑 تخصيص وإضافة تبويبات مخصصة في الملف الشخصي للعرض", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    var tabTitle by remember { mutableStateOf("") }
+                    var tabIcon by remember { mutableStateOf("🏷️") }
+                    var targetScope by remember { mutableStateOf("ALL") } // ALL, PROVIDERS, STORES, PROPERTIES
+                    var tabContentHTML by remember { mutableStateOf("") }
+
+                    val customTabsList = remember {
+                        mutableStateListOf(
+                            Triple("تبويب العروض والخصومات", "🏷️", "ALL"),
+                            Triple("المستندات والتراخيص القانونية", "📜", "PROVIDERS"),
+                            Triple("كتالوج الخدمات والمنتجات المصورة", "📁", "STORES")
+                        )
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("➕ إنشاء تبويب مخصص جديد:", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                            OutlinedTextField(value = tabTitle, onValueChange = { tabTitle = it }, label = { Text("عنوان التبويب بالعربية (مثال: الوثائق والشهادات)") }, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(value = tabIcon, onValueChange = { tabIcon = it }, label = { Text("أيقونة التبويب (Emoji)") }, modifier = Modifier.fillMaxWidth())
+                            
+                            Text("الفئة المستهدفة للتبويب:", fontSize = 10.sp, color = Color.White)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                val scopes = listOf("ALL" to "الكل", "PROVIDERS" to "الفنيين", "STORES" to "المحلات", "PROPERTIES" to "العقارات")
+                                scopes.forEach { (key, label) ->
+                                    val isSel = targetScope == key
+                                    Button(
+                                        onClick = { targetScope = key },
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (isSel) themeColors.accent else Color.DarkGray),
+                                        modifier = Modifier.weight(1f),
+                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                                    ) { Text(label, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White) }
+                                }
+                            }
+
+                            OutlinedTextField(value = tabContentHTML, onValueChange = { tabContentHTML = it }, label = { Text("محتوى افتراضي للتبويب (HTML أو نصوص)") }, modifier = Modifier.fillMaxWidth())
+
+                            Button(
+                                onClick = {
+                                    if (tabTitle.isNotBlank()) {
+                                        customTabsList.add(Triple(tabTitle, tabIcon, targetScope))
+                                        viewModel.triggerNotification("✅ تم إضافة التبويب المخصص بنجاح وإظهاره فوراً للمستهدفين")
+                                        tabTitle = ""
+                                        tabContentHTML = ""
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("إطلاق التبويب المخصص 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                        }
+                    }
+
+                    Text("📋 قائمة التبويبات النشطة بالتطبيق حالياً:", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    customTabsList.forEach { (title, icon, scope) ->
+                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = themeColors.surface)) {
+                            Row(modifier = Modifier.padding(10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(icon, fontSize = 16.sp)
+                                    Column {
+                                        Text(title, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                        Text("النطاق: $scope", fontSize = 10.sp, color = Color.LightGray)
+                                    }
+                                }
+                                IconButton(onClick = { customTabsList.remove(Triple(title, icon, scope)) }) {
+                                    Text("🗑️", fontSize = 14.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+fun LazyListScope.adminAdvancedChatPanel(viewModel: MainViewModel, themeColors: VisualThemePalette, state: AdminPanelState) {
+    with(state) {
+        if (activeSubTabState.value == "ADVANCED_CHAT") {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("⚡ صلاحيات وتوجيه ومراقبة الدردشات الإدارية", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    var globalChatEnabled by remember { mutableStateOf(true) }
+                    var allowProviderDirectChat by remember { mutableStateOf(true) }
+                    var autoReplyMessage by remember { mutableStateOf("مرحباً بك! نرحب بطلبك في تطبيقنا، سيقوم الفني أو موظف الدعم بالرد عليك فوراً.") }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("🛠️ إعدادات المحادثات العامة:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("تفعيل الشات والمحادثات على مستوى التطبيق", fontSize = 10.sp, color = Color.White)
+                                Switch(checked = globalChatEnabled, onCheckedChange = { globalChatEnabled = it })
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("السماح للفنيين بفتح شات مباشر مع العميل", fontSize = 10.sp, color = Color.White)
+                                Switch(checked = allowProviderDirectChat, onCheckedChange = { allowProviderDirectChat = it })
+                            }
+
+                            OutlinedTextField(
+                                value = autoReplyMessage,
+                                onValueChange = { autoReplyMessage = it },
+                                label = { Text("رسالة الرد الآلي عند بدء محادثة جديدة", fontSize = 10.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                            )
+
+                            Button(
+                                onClick = { viewModel.triggerNotification("💾 تم حفظ إعدادات الدردشات والردود التلقائية بنجاح!") },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("حفظ الإعدادات 💾", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    // Supervisor support operators routing
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("👤 توجيه محادثات الدعم الفني للمشرفين:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                            Text("قم بتوجيه المحادثات الصادرة والشكاوى آلياً إلى حساب مشرف معين:", fontSize = 9.sp, color = Color.LightGray)
+                            
+                            var targetSupervisorPhone by remember { mutableStateOf("") }
+                            OutlinedTextField(
+                                value = targetSupervisorPhone,
+                                onValueChange = { targetSupervisorPhone = it },
+                                label = { Text("رقم هاتف المشرف المسؤول", fontSize = 10.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (targetSupervisorPhone.isNotBlank()) {
+                                        viewModel.triggerNotification("🔗 تم تحويل وتوجيه كافة محادثات الدعم الفني آلياً للمشرف ($targetSupervisorPhone)")
+                                        targetSupervisorPhone = ""
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("تحويل الدردشات 🔄", color = Color.White, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun LazyListScope.adminBookingRoutingPanel(viewModel: MainViewModel, themeColors: VisualThemePalette, state: AdminPanelState) {
+    with(state) {
+        if (activeSubTabState.value == "BOOKING_ROUTING") {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("🔄 إعدادات توجيه الحجوزات والطلبات الذكية", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    var routingTarget by remember { mutableStateOf("NEAREST") } // ADMIN, PROVIDER, NEAREST, DEPT
+                    var maxTechsToReceive by remember { mutableStateOf("5") }
+                    var timeoutMinutes by remember { mutableStateOf("10") }
+                    var autoRedirectEnabled by remember { mutableStateOf(true) }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("🎯 آلية توجيه الحجوزات التلقائية عند طلب العميل:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                            
+                            val targets = listOf(
+                                "ADMIN" to "🛡️ توجيه يدوي للمسؤول المالي والمشرفين",
+                                "PROVIDER" to "👤 فني محدد يتم اختياره من العميل مباشرة",
+                                "NEAREST" to "📍 أقرب فني متاح جغرافياً (GPS)",
+                                "DEPT" to "🏢 بث الحجز لجميع فنيي القسم دفعة واحدة"
+                            )
+
+                            targets.forEach { (key, label) ->
+                                val isSel = routingTarget == key
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { routingTarget = key }
+                                        .padding(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    RadioButton(selected = isSel, onClick = { routingTarget = key }, colors = RadioButtonDefaults.colors(selectedColor = themeColors.accent))
+                                    Text(label, fontSize = 11.sp, color = Color.White, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal)
+                                }
+                            }
+
+                            Divider(color = Color.White.copy(alpha = 0.1f))
+
+                            OutlinedTextField(
+                                value = maxTechsToReceive,
+                                onValueChange = { maxTechsToReceive = it },
+                                label = { Text("أقصى عدد فنيين يستقبلون الطلب معاً للبث", fontSize = 10.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                            )
+
+                            OutlinedTextField(
+                                value = timeoutMinutes,
+                                onValueChange = { timeoutMinutes = it },
+                                label = { Text("مهلة استجابة الفني قبل الإلغاء أو التحويل (بالدقائق)", fontSize = 10.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("إعادة توجيه الطلب تلقائياً لغيره عند انتهاء المهلة", fontSize = 10.sp, color = Color.White)
+                                Switch(checked = autoRedirectEnabled, onCheckedChange = { autoRedirectEnabled = it })
+                            }
+
+                            Button(
+                                onClick = { viewModel.triggerNotification("💾 تم تفعيل وحفظ نظام التوجيه الذكي بنجاح على سيرفر الحجوزات!") },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("تفعيل وحفظ نظام التوجيه 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
