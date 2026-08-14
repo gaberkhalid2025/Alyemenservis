@@ -1777,14 +1777,15 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
 
                 if (adminReqSubTab == "SERVICES") {
-                    if (pendingProviders.isEmpty()) {
+                    val activePendingProviders = pendingProviders.filter { it.status == "PENDING" || it.status.isEmpty() }
+                    if (activePendingProviders.isEmpty()) {
                         item {
                             Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
                                 Text("لا توجد طلبات معلقة من الفنيين/المهن حالياً.", fontSize = 11.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
                             }
                         }
                     } else {
-                        items(pendingProviders, key = { it.id }) { req ->
+                        items(activePendingProviders, key = { it.id }) { req ->
                             val idBitmap = remember(req.idPhotoBase64) {
                                 if (!req.idPhotoBase64.isNullOrEmpty()) {
                                     try {
@@ -1928,6 +1929,9 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text("🏪 ${store.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    if (store.commercialRegisterNo.isNotEmpty()) {
+                                        Text("📝 رقم السجل التجاري: ${store.commercialRegisterNo}", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                    }
                                     Text("القسم: ${store.categoryId} | الهاتف: ${store.phone}", fontSize = 11.sp, color = themeColors.textSecondary)
                                     Text("العنوان: ${store.cityId} - ${store.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
                                     if (store.description.isNotEmpty()) {
@@ -1972,6 +1976,9 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text("🏥 ${med.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    if (med.medicalLicenseNo.isNotEmpty()) {
+                                        Text("🩺 رقم الترخيص الطبي: ${med.medicalLicenseNo}", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                    }
                                     Text("رقم التواصل والعيادة: ${med.phone}", fontSize = 11.sp, color = themeColors.textSecondary)
                                     Text("العنوان والمدينة: ${med.cityId} - ${med.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
                                     if (med.description.isNotEmpty()) {

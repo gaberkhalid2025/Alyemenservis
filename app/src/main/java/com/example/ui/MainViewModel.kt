@@ -2202,6 +2202,16 @@ class MainViewModel : ViewModel() {
     }
 
     fun cancelOrResetJoinRequest(context: android.content.Context) {
+        val phone = _joinRequestPhone.value
+        if (phone.isNotEmpty()) {
+            val matching = _pendingProviders.value.find { it.phone == phone }
+            matching?.let {
+                _pendingProviders.value = _pendingProviders.value.filter { item -> item.id != it.id }
+                try {
+                    db.collection("pending_providers").document(it.id).delete()
+                } catch (e: Exception) {}
+            }
+        }
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         sp.edit().remove("join_request_phone").apply()
         _joinRequestPhone.value = ""
@@ -5373,7 +5383,8 @@ class MainViewModel : ViewModel() {
     fun rejectTechnician(providerId: String, reason: String = "لم يستوفِ الشروط") {
         val technician = _pendingProviders.value.find { it.id == providerId }
         technician?.let {
-            _pendingProviders.value = _pendingProviders.value.filter { it.id != providerId }
+            val updated = it.copy(status = "REJECTED", reason = reason)
+            _pendingProviders.value = _pendingProviders.value.map { item -> if (item.id == providerId) updated else item }
 
             val notification = NotificationEntity(
                 id = UUID.randomUUID().toString(),
@@ -5386,7 +5397,7 @@ class MainViewModel : ViewModel() {
             _notifications.value = listOf(notification) + _notifications.value
 
             try {
-                db.collection("pending_providers").document(providerId).delete()
+                db.collection("pending_providers").document(providerId).set(updated)
                 db.collection("notifications").document(notification.id).set(notification)
             } catch (e: Exception) {}
         }

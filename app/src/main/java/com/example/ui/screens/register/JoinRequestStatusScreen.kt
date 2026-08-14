@@ -622,64 +622,104 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
                         }
                     }
                     matchingPending != null -> {
-                        // Pending approval screen
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .background(Color(0xFFF59E0B).copy(alpha = 0.2f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = "⏳", fontSize = 28.sp)
-                        }
+                        if (matchingPending.status == "REJECTED") {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .background(Color(0xFFEF4444).copy(alpha = 0.2f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = "❌", fontSize = 28.sp)
+                            }
 
-                        Text(
-                            text = "⏳ طلب انضمامك قيد المراجعة حالياً",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF59E0B),
-                            textAlign = TextAlign.Center
-                        )
+                            Text(
+                                text = "❌ تم رفض طلب انضمامك كفني",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFEF4444),
+                                textAlign = TextAlign.Center
+                            )
 
-                        Text(
-                            text = "أهلاً بك يا غالي! تم إرسال طلبك بنجاح وهو قيد المراجعة والتدقيق الإداري الآن من قبل الإدارة. نسعد بانضمامك وسنبلغك فور التنشيط والموافقة لتتمكن من استقبال الحجوزات والدردشة مباشرة!",
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.85f),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 16.sp
-                        )
+                            Text(
+                                text = "عذراً يا غالي! تم مراجعة طلبك من قبل الإدارة ورفضه للسبب التالي:\n\n👉 [ ${matchingPending.reason.ifEmpty { "مستندات غير واضحة أو ناقصة" }} ] 👈\n\nيمكنك الضغط على الزر أدناه لتعديل بياناتك وإعادة إرسال طلبك بكل سهولة.",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.85f),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 16.sp
+                            )
 
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2214)),
-                            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("📋 تفاصيل الطلب المقدم:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
-                                Text("• الاسم الثلاثي: ${matchingPending.name}", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                Text("• رقم الهاتف: ${matchingPending.phone}", fontSize = 11.sp, color = Color.White)
-                                val catName = if (matchingPending.categoryId == "other" && matchingPending.customCategoryName.isNotEmpty()) matchingPending.customCategoryName else (categories.find { it.id == matchingPending.categoryId }?.name ?: "صيانة عامة")
-                                Text("• القسم والتخصص: $catName", fontSize = 11.sp, color = Color.White)
-                                Text("• منطقة الخدمة: ${matchingPending.area}", fontSize = 11.sp, color = Color.White)
-                                if (matchingPending.localNeighborhood.isNotEmpty()) {
-                                    Text("• الحي/الشارع التفصيلي: ${matchingPending.localNeighborhood}", fontSize = 11.sp, color = Color.White)
+                            Button(
+                                onClick = {
+                                    viewModel.cancelOrResetJoinRequest(context)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().height(38.dp)
+                            ) {
+                                Text("✍️ تعديل وإعادة تقديم الطلب", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        } else {
+                            // Pending approval screen
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .background(Color(0xFFF59E0B).copy(alpha = 0.2f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = "⏳", fontSize = 28.sp)
+                            }
+
+                            Text(
+                                text = "⏳ طلب انضمامك قيد المراجعة حالياً",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFF59E0B),
+                                textAlign = TextAlign.Center
+                            )
+
+                            Text(
+                                text = "أهلاً بك يا غالي! تم إرسال طلبك بنجاح وهو قيد المراجعة والتدقيق الإداري الآن من قبل الإدارة. نسعد بانضمامك وسنبلغك فور التنشيط والموافقة لتتمكن من استقبال الحجوزات والدردشة مباشرة!",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.85f),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 16.sp
+                            )
+
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2214)),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("📋 تفاصيل الطلب المقدم:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                                    Text("• الاسم الثلاثي: ${matchingPending.name}", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("• رقم الهاتف: ${matchingPending.phone}", fontSize = 11.sp, color = Color.White)
+                                    val catName = if (matchingPending.categoryId == "other" && matchingPending.customCategoryName.isNotEmpty()) matchingPending.customCategoryName else (categories.find { it.id == matchingPending.categoryId }?.name ?: "صيانة عامة")
+                                    Text("• القسم والتخصص: $catName", fontSize = 11.sp, color = Color.White)
+                                    Text("• منطقة الخدمة: ${matchingPending.area}", fontSize = 11.sp, color = Color.White)
+                                    if (matchingPending.localNeighborhood.isNotEmpty()) {
+                                        Text("• الحي/الشارع التفصيلي: ${matchingPending.localNeighborhood}", fontSize = 11.sp, color = Color.White)
+                                    }
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                        Button(
-                            onClick = {
-                                viewModel.cancelOrResetJoinRequest(context)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth().height(38.dp)
-                        ) {
-                            Text("❌ إلغاء الطلب والعودة للرئيسية", color = Color.White, fontSize = 11.sp)
+                            Button(
+                                onClick = {
+                                    viewModel.cancelOrResetJoinRequest(context)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().height(38.dp)
+                            ) {
+                                Text("❌ إلغاء الطلب والعودة للرئيسية", color = Color.White, fontSize = 11.sp)
+                            }
                         }
                     }
                     else -> {

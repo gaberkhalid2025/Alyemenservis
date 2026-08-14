@@ -148,6 +148,8 @@ fun ProviderRegisterFormLayout(
 
     // Store custom fields
     var storeName by remember { mutableStateOf("") }
+    var storeCommercialRegisterNo by remember { mutableStateOf("") }
+    var medMedicalLicenseNo by remember { mutableStateOf("") }
     var storeDesc by remember { mutableStateOf("") }
     var storePhone by remember { mutableStateOf("") }
     var storeAddress by remember { mutableStateOf("") }
@@ -1125,6 +1127,15 @@ fun ProviderRegisterFormLayout(
         )
 
         OutlinedTextField(
+            value = storeCommercialRegisterNo,
+            onValueChange = { storeCommercialRegisterNo = it },
+            label = { Text("رقم السجل التجاري *") },
+            placeholder = { Text("مثال: 104523/ي م") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+        )
+
+        OutlinedTextField(
             value = storePhone,
             onValueChange = { storePhone = it },
             label = { Text("رقم هاتف المحل والواتساب المباشر *") },
@@ -1304,6 +1315,7 @@ fun ProviderRegisterFormLayout(
                 val missing = mutableListOf<String>()
                 if (storeOwnerName.trim().isEmpty()) missing.add("اسم المالك")
                 if (storeName.trim().isEmpty()) missing.add("الاسم التجاري للمحل")
+                if (storeCommercialRegisterNo.trim().isEmpty()) missing.add("رقم السجل التجاري")
                 if (storePhone.trim().isEmpty()) missing.add("رقم هاتف المحل")
                 if (storeDesc.trim().isEmpty()) missing.add("الوصف التفصيلي")
                 if (storeWorkingHours.trim().isEmpty()) missing.add("ساعات العمل")
@@ -1342,7 +1354,8 @@ fun ProviderRegisterFormLayout(
                             workingHours = storeWorkingHours.trim(),
                             isActive = false,
                             isApproved = false,
-                            productAttachmentsJson = attsJson
+                            productAttachmentsJson = attsJson,
+                            commercialRegisterNo = storeCommercialRegisterNo.trim()
                         )
                         viewModel.saveStore(newStore)
                         viewModel.setJoinRequestPhone(context, cleanPhone)
@@ -1920,6 +1933,15 @@ fun ProviderRegisterFormLayout(
         )
 
         OutlinedTextField(
+            value = medMedicalLicenseNo,
+            onValueChange = { medMedicalLicenseNo = it },
+            label = { Text("رقم الترخيص الطبي الرسمي *") },
+            placeholder = { Text("مثال: ت/ص/2026/89") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+        )
+
+        OutlinedTextField(
             value = medPhone,
             onValueChange = { medPhone = it },
             label = { Text("رقم هاتف الاستقبال والواتساب *") },
@@ -2040,6 +2062,7 @@ fun ProviderRegisterFormLayout(
                 val missing = mutableListOf<String>()
                 if (medOwnerName.trim().isEmpty()) missing.add("اسم الطبيب/المدير")
                 if (medName.trim().isEmpty()) missing.add("اسم المركز الطبي")
+                if (medMedicalLicenseNo.trim().isEmpty()) missing.add("رقم الترخيص الطبي")
                 if (medPhone.trim().isEmpty()) missing.add("رقم الهاتف")
                 if (medDesc.trim().isEmpty()) missing.add("التخصصات المتاحة")
                 if (medWorkingHours.trim().isEmpty()) missing.add("ساعات الدوام والطوارئ")
@@ -2074,7 +2097,8 @@ fun ProviderRegisterFormLayout(
                             password = medPassword,
                             workingHours = medWorkingHours.trim(),
                             isActive = false,
-                            isApproved = false
+                            isApproved = false,
+                            medicalLicenseNo = medMedicalLicenseNo.trim()
                         )
                         viewModel.saveStore(newMed)
                         viewModel.setJoinRequestPhone(context, cleanPhone)

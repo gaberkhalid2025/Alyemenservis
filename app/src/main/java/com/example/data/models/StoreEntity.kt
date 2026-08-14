@@ -44,5 +44,7 @@ data class StoreEntity(
     val specialOffersJson: String = "",
     val isBlocked: Boolean = false,
     val blockReason: String = "",
-    val backgroundColorHex: String = ""
+    val backgroundColorHex: String = "",
+    val commercialRegisterNo: String = "",
+    val medicalLicenseNo: String = ""
 )
