@@ -46,6 +46,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -310,16 +313,16 @@ fun MapScreen(
                     }
                 }
 
-                // 3. SEARCH & TOP HEADER OVERLAY (Modern Translucent Floating Card)
+                // 3. SEARCH & TOP HEADER OVERLAY (Modern Translucent Floating Card - 20% Smaller Compact Design)
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = Color(0xFF0F172A).copy(alpha = 0.92f),
-                    shadowElevation = 6.dp,
+                    shadowElevation = 5.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp)) {
                         // Title & Back & Quick City Centers Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -330,27 +333,27 @@ fun MapScreen(
                                 IconButton(
                                     onClick = onBackClick,
                                     modifier = Modifier
-                                        .size(26.dp)
+                                        .size(22.dp)
                                         .background(Color(0xFF1E293B), CircleShape)
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White, modifier = Modifier.size(13.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White, modifier = Modifier.size(11.dp))
                                 }
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("🗺️ رادار الخدمات اليمني", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.White)
-                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("🗺️ رادار الخدمات اليمني", fontWeight = FontWeight.Bold, fontSize = 8.5.sp, color = Color.White)
+                                        Spacer(modifier = Modifier.width(3.dp))
                                         Box(
                                             modifier = Modifier
                                                 .background(Color(0xFFF59E0B), RoundedCornerShape(3.dp))
-                                                .padding(horizontal = 3.dp, vertical = 1.dp)
+                                                .padding(horizontal = 2.dp, vertical = 0.5.dp)
                                         ) {
-                                            Text("حي ⚡", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                            Text("حي ⚡", fontSize = 6.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                                         }
                                     }
                                     Text(
                                         text = "موقعي: (${String.format("%.3f, %.3f", userLat, userLng)})",
-                                        fontSize = 8.sp,
+                                        fontSize = 6.5.sp,
                                         color = Color(0xFF94A3B8)
                                     )
                                 }
@@ -359,15 +362,15 @@ fun MapScreen(
                             // Weather Badge
                             Box(
                                 modifier = Modifier
-                                    .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
-                                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                    .background(Color(0xFF1E293B), RoundedCornerShape(5.dp))
+                                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(5.dp))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
                             ) {
-                                Text("☀️ صنعاء 26°C", fontSize = 8.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                                Text("☀️ صنعاء 26°C", fontSize = 6.5.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
 
                         // Search Bar & Filter Toggle Button Row
                         Row(
@@ -375,42 +378,79 @@ fun MapScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("ابحث عن فني، محل، مطعم، عقار...", fontSize = 12.sp, color = Color.LightGray) },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp)) },
-                                trailingIcon = {
+                            // Custom Search Field (BasicTextField - completely prevents text clipping & cutoff)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .background(Color(0xFF1E293B), RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (searchQuery.isNotEmpty()) Color(0xFFF59E0B) else Color(0xFF334155),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(horizontal = 10.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = "بحث",
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Box(
+                                        modifier = Modifier.weight(1f),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        if (searchQuery.isEmpty()) {
+                                            Text(
+                                                "ابحث عن فني، محل، مطعم، عقار...",
+                                                fontSize = 13.sp,
+                                                color = Color(0xFF94A3B8),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        BasicTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            singleLine = true,
+                                            textStyle = TextStyle(
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Normal,
+                                                textDirection = androidx.compose.ui.text.style.TextDirection.ContentOrRtl
+                                            ),
+                                            cursorBrush = SolidColor(Color(0xFFF59E0B)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                     if (searchQuery.isNotEmpty()) {
                                         IconButton(
                                             onClick = { searchQuery = "" },
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(28.dp)
                                         ) {
-                                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                                            Icon(
+                                                Icons.Default.Clear,
+                                                contentDescription = "مسح",
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(16.dp)
+                                            )
                                         }
                                     }
-                                },
-                                singleLine = true,
-                                shape = RoundedCornerShape(10.dp),
-                                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = Color(0xFF1E293B),
-                                    unfocusedContainerColor = Color(0xFF1E293B),
-                                    focusedBorderColor = Color(0xFFF59E0B),
-                                    unfocusedBorderColor = Color(0xFF334155),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                            )
+                                }
+                            }
 
                             // Advanced Filter Toggle Icon
                             IconButton(
                                 onClick = { showAdvancedFilters = !showAdvancedFilters },
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(44.dp)
                                     .background(
                                         if (showAdvancedFilters) Color(0xFFF59E0B) else Color(0xFF1E293B),
                                         RoundedCornerShape(10.dp)
@@ -832,18 +872,18 @@ private fun FilterTypeChip(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(if (selected) Color(0xFFF59E0B) else Color(0xFF1E293B))
-            .border(1.dp, if (selected) Color.White else Color(0xFF334155), RoundedCornerShape(12.dp))
+            .border(1.dp, if (selected) Color.White else Color(0xFF334155), RoundedCornerShape(8.dp))
             .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(icon, fontSize = 12.sp)
-            Spacer(modifier = Modifier.width(4.dp))
+            Text(icon, fontSize = 10.sp)
+            Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = label,
-                fontSize = 11.sp,
+                fontSize = 9.5.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 color = if (selected) Color.Black else Color.White
             )

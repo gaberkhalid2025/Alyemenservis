@@ -37,11 +37,5 @@ data class OrderEntity(
     val paymentStatus: String = "PENDING", // PENDING, PROCESSING, COMPLETED, FAILED
     val status: String = "PENDING", // PENDING, PROCESSING, COMPLETED, CANCELLED
     val notes: String = "",
-    val timestamp: Long = System.currentTimeMillis(),
-    
-    // Purchase Protection & Dispute Fields
-    val isVerifiedByAdmin: Boolean = false,
-    val adminNotes: String = "",
-    val disputeStatus: String = "NONE", // NONE, UNDER_INVESTIGATION, RESOLVED, FRAUD_DETECTED
-    val protectionLogged: Boolean = true
+    val timestamp: Long = System.currentTimeMillis()
 )
