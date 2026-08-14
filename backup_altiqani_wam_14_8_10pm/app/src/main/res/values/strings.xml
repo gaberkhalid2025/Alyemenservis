@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">دليل خدمات اليمن</string>
+    <string name="app_description">التطبيق الشامل لخدمات وحجوزات الفنيين والمتاجر والعقارات في اليمن</string>
+    <string name="search_placeholder">ابحث عن خدمة، فني، متجر، أو عقار...</string>
+    <string name="home_tab">الرئيسية</string>
+    <string name="stores_tab">المتاجر</string>
+    <string name="real_estate_tab">العقارات</string>
+    <string name="favorites_tab">المفضلة</string>
+    <string name="profile_tab">حسابي</string>
+    <string name="content_desc_banner">صورة البنر الإعلاني للخدمة</string>
+    <string name="content_desc_category_icon">أيقونة القسم الرئيسي للخدمات</string>
+    <string name="content_desc_provider_avatar">صورة مقدم الخدمة الشخصية</string>
+    <string name="content_desc_back">زر العودة للخلف</string>
+    <string name="content_desc_close">إغلاق النافذة</string>
+</resources>
