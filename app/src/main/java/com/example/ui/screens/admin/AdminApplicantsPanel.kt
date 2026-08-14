@@ -40,8 +40,7 @@ fun AdminApplicantsPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text("📄 إدارة طلبات المتقدمين للوظائف والسير الذاتية", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)

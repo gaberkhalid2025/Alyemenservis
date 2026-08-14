@@ -58,8 +58,8 @@ fun MainViewModel.verifyAdminOrOwnerPassword(password: String): Boolean {
     return trimmed.isNotEmpty()
 }
 
-fun MainViewModel.resetAccountPassword(userId: String = "", phone: String = "", newPassword: String = "") {
-    adminResetAccountPassword(userId, phone, newPassword)
+fun MainViewModel.resetAccountPassword(type: String, id: String, newPass: String) {
+    adminResetAccountPassword(type, id, newPass)
 }
 
 fun MainViewModel.loadReadNotifications(context: Context) {}
@@ -192,6 +192,11 @@ fun MainViewModel.unbanEntity(id: String) { triggerNotification("🔓 تم فك 
 fun MainViewModel.restoreEntity(id: String) { triggerNotification("♻️ تم استعادة العنصر بنجاح") }
 fun MainViewModel.hardDeleteEntity(id: String) { triggerNotification("🗑️ تم الحذف النهائي بنجاح") }
 fun MainViewModel.updateCity(city: CityEntity) { triggerNotification("🏙️ تم تحديث المدينة بنجاح") }
+fun MainViewModel.updateCity(id: String, nameAr: String, nameEn: String) {
+    val city = CityEntity(id, nameAr, nameEn)
+    db.collection("cities").document(id).set(city)
+    triggerNotification("🏙️ تم تحديث المدينة: $nameAr")
+}
 fun MainViewModel.mergeCategories(sourceId: String, targetId: String) { triggerNotification("🔀 تم دمج الأقسام بنجاح") }
 fun MainViewModel.addPaymentWallet(wallet: PaymentWalletEntity) { triggerNotification("💳 تمت إضافة المحفظة بنجاح") }
 fun MainViewModel.updatePaymentWallet(wallet: PaymentWalletEntity) { triggerNotification("💳 تم تحديث المحفظة بنجاح") }

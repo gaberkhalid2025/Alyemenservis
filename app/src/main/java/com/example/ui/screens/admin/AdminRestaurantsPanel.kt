@@ -50,8 +50,7 @@ fun AdminRestaurantsPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text("🍔 إدارة المطاعم والكافيهات وقوائم الطعام والخصومات", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)

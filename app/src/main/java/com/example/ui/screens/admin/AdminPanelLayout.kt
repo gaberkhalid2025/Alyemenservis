@@ -781,52 +781,33 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 "PROPERTIES" -> adminPropertiesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
                 "JOBS" -> adminJobsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
                 "APPLICANTS" -> adminApplicantsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "STATS" -> item { AdminStatisticsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
                 "BOOKINGS" -> adminBookingsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "NOTIFICATIONS" -> adminNotificationsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
                 "CHATS" -> adminChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
+                "PASSWORDS_RESET" -> item { AdminPasswordsResetPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
                 "BANNERS" -> adminBannersPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
                 "CATEGORIES" -> adminCategoriesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "BACKUP" -> adminBackupPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "CLEAN" -> adminCleanPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "REVIEWS" -> adminReviewsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "CALLS" -> adminCallsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "BLOCKED" -> adminBlockedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "DELETED" -> adminDeletedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "CUSTOM_TABS" -> adminCustomTabsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "ADVANCED_CHAT" -> adminAdvancedChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "BOOKING_ROUTING" -> adminBookingRoutingPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "SUPERVISORS" -> adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "ROLES_PERMISSIONS" -> adminRolesAndPermissionsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                "COMPLAINTS" -> adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                
-                // Grouped subtabs handled by adminSettingsPanel
-                "COLORS", "GOLDEN_ICONS", "CARD_CUSTOMIZER", "NEW_SECTION_CREATOR", "REG_FORMS_MANAGER" -> {
-                    adminSettingsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
-                }
-
-                "STATS" -> item { AdminStatisticsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
-                "VIP" -> item { AdminVipPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
-                "COUPONS" -> item { AdminCouponsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
-                "GOLDEN_ICONS" -> item { AdminGoldenIconsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
-                "CARD_CUSTOMIZER" -> item { AdminCardCustomizerPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
-                "NEW_SECTION_CREATOR" -> item { AdminNewSectionCreatorPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
-                "REG_FORMS_MANAGER" -> item { AdminRegFormsManagerPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
-                "PASSWORDS_RESET" -> item { AdminPasswordsResetPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
                 "CITIES" -> item { AdminCitiesPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
                 "COMPLAINTS" -> item { AdminComplaintsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
+                "VIP" -> item { AdminVipPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "SUPERVISORS" -> adminSupervisorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
                 "COLORS" -> item { AdminColorsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
-
+                "NOTIFICATIONS" -> adminNotificationsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState)
                 "BACKUP" -> item { AdminBackupPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "CLEAN" -> item { AdminCleanPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "REVIEWS" -> item { AdminReviewsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "CALLS" -> item { AdminCallsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "COUPONS" -> item { AdminCouponsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "BLOCKED" -> item { AdminBlockedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "DELETED" -> item { AdminDeletedPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "CUSTOM_TABS" -> item { AdminCustomTabsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "GOLDEN_ICONS" -> item { AdminGoldenIconsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "ADVANCED_CHAT" -> item { AdminAdvancedChatPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "BOOKING_ROUTING" -> item { AdminBookingRoutingPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "CARD_CUSTOMIZER" -> item { AdminCardCustomizerPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "NEW_SECTION_CREATOR" -> item { AdminNewSectionCreatorPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "REG_FORMS_MANAGER" -> item { AdminRegFormsManagerPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
+                "ROLES_PERMISSIONS" -> item { AdminRolesAndPermissionsPanel(viewModel = viewModel, themeColors = themeColors, state = adminPanelState) }
 
                 "PAYMENTS" -> {
                     item {

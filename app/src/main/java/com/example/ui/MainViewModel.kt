@@ -2626,6 +2626,47 @@ class MainViewModel : ViewModel() {
     internal val _customProfileTabs = MutableStateFlow<List<CustomProfileTabEntity>>(emptyList())
     val customProfileTabs: StateFlow<List<CustomProfileTabEntity>> = _customProfileTabs.asStateFlow()
 
+    fun updateAdminSettings(newSettings: AdminSettingsEntity) {
+        saveCustomSettingsState(newSettings)
+    }
+
+    fun saveCustomProfileTab(tab: CustomProfileTabEntity) {
+        val tabId = if (tab.id.isBlank()) java.util.UUID.randomUUID().toString() else tab.id
+        val finalTab = tab.copy(id = tabId)
+        val currentList = _customProfileTabs.value.filter { it.id != tabId }.toMutableList()
+        currentList.add(finalTab)
+        _customProfileTabs.value = currentList
+        try {
+            db.collection("custom_profile_tabs").document(tabId).set(finalTab)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun toggleCustomProfileTab(tabId: String) {
+        val currentList = _customProfileTabs.value.map {
+            if (it.id == tabId) it.copy(isEnabled = !it.isEnabled) else it
+        }
+        _customProfileTabs.value = currentList
+        val updatedTab = currentList.find { it.id == tabId }
+        if (updatedTab != null) {
+            try {
+                db.collection("custom_profile_tabs").document(tabId).set(updatedTab)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun deleteCustomProfileTab(tabId: String) {
+        _customProfileTabs.value = _customProfileTabs.value.filter { it.id != tabId }
+        try {
+            db.collection("custom_profile_tabs").document(tabId).delete()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     internal val _passwordRecoveryWaitingPhone = MutableStateFlow("")
     val passwordRecoveryWaitingPhone: StateFlow<String> = _passwordRecoveryWaitingPhone.asStateFlow()
 

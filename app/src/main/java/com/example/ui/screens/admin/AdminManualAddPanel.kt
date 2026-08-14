@@ -49,8 +49,7 @@ fun AdminManualAddPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("➕ الإضافة اليدوية السريعة من الإدارة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
