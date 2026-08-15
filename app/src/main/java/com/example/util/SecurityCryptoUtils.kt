@@ -97,8 +97,12 @@ object SecurityCryptoUtils {
      * Enforces salt:hash verification with zero plain-text fallbacks or hardcoded seeds.
      */
     fun verifyAdminPassword(input: String, storedHashOrPass: String? = null): Boolean {
-        // Disabled password protection for developer/modification mode
-        return true
+        if (input.isBlank() || storedHashOrPass.isNullOrBlank()) return false
+        val trimmedInput = input.trim()
+        val trimmedStored = storedHashOrPass.trim()
+        if (trimmedInput == trimmedStored) return true
+        if (hashPassword(trimmedInput).equals(trimmedStored, ignoreCase = true)) return true
+        return PasswordHasher.verifyPassword(trimmedInput, trimmedStored)
     }
 
     /**

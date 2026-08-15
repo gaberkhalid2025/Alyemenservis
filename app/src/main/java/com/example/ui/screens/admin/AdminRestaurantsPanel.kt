@@ -28,9 +28,11 @@ fun AdminRestaurantsPanel(
     themeColors: VisualThemePalette
 ) {
     val adminRoleStr by viewModel.adminRole.collectAsState()
+    val supervisorPermissions by viewModel.currentSupervisorPermissions.collectAsState()
     if (!PermissionGuard.hasPermission(
-            RoleManager.fromRoleString(adminRoleStr),
-            PermissionGuard.PERMISSION_RESTAURANTS
+            role = RoleManager.fromRoleString(adminRoleStr),
+            permission = PermissionGuard.PERMISSION_RESTAURANTS,
+            supervisorGrantedPermissions = supervisorPermissions
         )
     ) {
         PermissionGuard.UnauthorizedView()

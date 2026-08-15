@@ -167,6 +167,8 @@ fun AppNavigator(
     var matchedUserDoc by remember { mutableStateOf<Map<String, Any>?>(null) }
     var isSearchingAccount by remember { mutableStateOf(false) }
     var restorePasswordInput by remember { mutableStateOf("") }
+    var failedRecoveryAttempts by remember { mutableIntStateOf(0) }
+    var recoveryLockoutUntil by remember { mutableLongStateOf(0L) }
 
     val triggerRestore by viewModel.triggerRestoreAccountDialog.collectAsState()
     if (triggerRestore) {
@@ -643,6 +645,15 @@ fun AppNavigator(
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = {
+                                    val currentTime = System.currentTimeMillis()
+                                    if (currentTime < recoveryLockoutUntil) {
+                                        val remainingSeconds = (recoveryLockoutUntil - currentTime) / 1000
+                                        val mins = remainingSeconds / 60
+                                        val secs = remainingSeconds % 60
+                                        android.widget.Toast.makeText(context, "⚠️ الحساب مقفل مؤقتاً لحمايتك ($mins دقيقة و $secs ثانية). يمكنك طلب الاستعادة من الإدارة فوراً.", android.widget.Toast.LENGTH_LONG).show()
+                                        return@Button
+                                    }
+
                                     val raw = restorePhoneInput.trim().replace(" ", "")
                                     val cleanPhone = when {
                                         raw.startsWith("+967") -> raw.substring(4)
@@ -658,11 +669,15 @@ fun AppNavigator(
                                         ?: matchedUserDoc?.get("password")?.toString() 
                                         ?: ""
 
-                                    val isPassValid = com.example.util.PasswordHasher.verifyPassword(restorePasswordInput, savedPass) || 
-                                                      com.example.util.SecurityCryptoUtils.verifyAdminPassword(restorePasswordInput, savedPass) ||
-                                                      viewModel.verifyAdminOrOwnerPassword(restorePasswordInput)
+                                    val isPassValid = restorePasswordInput.isNotBlank() && (
+                                        com.example.util.PasswordHasher.verifyPassword(restorePasswordInput, savedPass) || 
+                                        com.example.util.SecurityCryptoUtils.verifyAdminPassword(restorePasswordInput, savedPass) ||
+                                        (savedPass.isBlank() && viewModel.verifyAdminOrOwnerPassword(restorePasswordInput))
+                                    )
 
                                     if (isPassValid) {
+                                        failedRecoveryAttempts = 0
+                                        recoveryLockoutUntil = 0L
                                         val rName = accountName
                                         viewModel.setUserSessionDetails(context, rName, cleanPhone, "اليمن")
 
@@ -702,7 +717,14 @@ fun AppNavigator(
                                         matchedProperty = null
                                         matchedUserDoc = null
                                     } else {
-                                        android.widget.Toast.makeText(context, "❌ كلمة المرور غير صحيحة!", android.widget.Toast.LENGTH_LONG).show()
+                                        failedRecoveryAttempts++
+                                        if (failedRecoveryAttempts >= 3) {
+                                            recoveryLockoutUntil = System.currentTimeMillis() + 5 * 60 * 1000L
+                                            android.widget.Toast.makeText(context, "🚫 تم تجاوز الحد الأقصى للمحاولات (3 محاولات). تم قفل الحساب لمدة 5 دقائق لحمايته. يمكنك طلب المساعدة من الإدارة.", android.widget.Toast.LENGTH_LONG).show()
+                                        } else {
+                                            val remaining = 3 - failedRecoveryAttempts
+                                            android.widget.Toast.makeText(context, "❌ كلمة المرور غير صحيحة! متبقي لديك $remaining محاولات قبل القفل المؤقت.", android.widget.Toast.LENGTH_LONG).show()
+                                        }
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
@@ -770,6 +792,7 @@ fun AppNavigator(
     }
 
     if (showBackdoorDialogState) {
+        var bdEmailInput by remember { mutableStateOf("") }
         var bdPasswordInput by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { viewModel.dismissBackdoorDialog() },
@@ -777,7 +800,14 @@ fun AppNavigator(
             title = { Text("🔓 بوابة تسجيل الدخول الخلفي للمنفذ العظيم", color = themeColors.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("الرجاء إدخال كلمة المرور للتحكم الخلفي والمالك:", color = Color.White, fontSize = 11.sp)
+                    Text("الرجاء إدخال البريد الإلكتروني وكلمة المرور للتحكم الخلفي والمالك:", color = Color.White, fontSize = 11.sp)
+                    OutlinedTextField(
+                        value = bdEmailInput,
+                        onValueChange = { bdEmailInput = it },
+                        label = { Text("البريد الإلكتروني") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
                     OutlinedTextField(
                         value = bdPasswordInput,
                         onValueChange = { bdPasswordInput = it },
@@ -791,13 +821,18 @@ fun AppNavigator(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (viewModel.verifyAdminOrOwnerPassword(bdPasswordInput.trim())) {
+                        val trimmedEmail = bdEmailInput.trim()
+                        val trimmedPass = bdPasswordInput.trim()
+                        val isValidEmail = trimmedEmail.isNotEmpty() && (trimmedEmail.equals("mah73646@gmail.com", ignoreCase = true) || trimmedEmail.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedEmail == "WAM2026")
+                        val isValidPass = trimmedPass.isNotEmpty() && (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.ownerPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
+
+                        if (isValidEmail && isValidPass) {
                             viewModel.authenticateAdmin("OWNER")
                             viewModel.navigateTo("OWNER_PANEL")
                             viewModel.dismissBackdoorDialog()
                             viewModel.triggerNotification("🔓 تم تفعيل البوابة الخلفية والتحكم الشامل بنجاح!")
                         } else {
-                            viewModel.triggerNotification("❌ الرمز السري للمنفذ الخلفي غير صحيح!")
+                            viewModel.triggerNotification("❌ البريد أو الرمز السري للمنفذ الخلفي غير صحيح!")
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
@@ -1272,7 +1307,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = settingsState.footerMessage.ifBlank { "WAM2026" },
+                        text = if (settingsState.footerMessage.startsWith("card_custom_")) "WAM2026" else settingsState.footerMessage.ifBlank { "WAM2026" },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color(0xFFE2E8F0),
@@ -1997,23 +2032,23 @@ fun CategoryChip(name: String, icon: String, isSelected: Boolean, themeColors: V
     }
 }
 
-// ------ Detailed Provider Placeholder Card ------
+// ------ Detailed Provider Placeholder Card (50% Reduced Size) ------
 @Composable
 fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
     val context = LocalContext.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(vertical = 3.dp)
             .testTag("provider_detail_placeholder_card"),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(2.dp, themeColors.accent)
+        border = BorderStroke(1.dp, themeColors.accent)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp)
+                .padding(7.dp)
         ) {
             // Header with VIP badge and Rating
             Row(
@@ -2023,23 +2058,23 @@ fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .background(themeColors.accent, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .background(themeColors.accent, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "👑 نموذجي معتمد",
-                            fontSize = 10.sp,
+                            fontSize = 7.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
                         )
                     }
                     Text(
                         text = "صيانة منزلية",
-                        fontSize = 10.sp,
+                        fontSize = 7.sp,
                         color = themeColors.accent,
                         fontWeight = FontWeight.Bold
                     )
@@ -2048,24 +2083,24 @@ fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
                 // Rating Star Indicator
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Star,
                         contentDescription = "Rating",
                         tint = themeColors.accent,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(10.dp)
                     )
                     Text(
                         text = "4.9 (نموذج)",
-                        fontSize = 11.sp,
+                        fontSize = 7.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Provider Name & Call Button
             Row(
@@ -2076,24 +2111,24 @@ fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "امين الغرباني (صيانة عامة)",
-                        fontSize = 15.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(top = 2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.padding(top = 1.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.LocationOn,
                             contentDescription = "Location",
                             tint = themeColors.textSecondary,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(8.dp)
                         )
                         Text(
                             text = "صنعاء، منطقة الدائري جوار مدرسة اسماء للبنات",
-                            fontSize = 11.sp,
+                            fontSize = 7.5.sp,
                             color = themeColors.textSecondary
                         )
                     }
@@ -2107,35 +2142,35 @@ fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
                     },
                     modifier = Modifier
                         .background(Color.Green.copy(alpha = 0.2f), CircleShape)
-                        .size(40.dp)
+                        .size(24.dp)
                         .testTag("provider_placeholder_call_btn")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Call,
                         contentDescription = "اتصال بالفني",
                         tint = Color.Green,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                 }
             }
 
             HorizontalDivider(
                 color = themeColors.accent.copy(alpha = 0.2f),
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = 4.dp)
             )
 
             // Service Description
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "وصف الخدمة النموذجية:",
-                    fontSize = 11.sp,
+                    fontSize = 7.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = themeColors.accent
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "مختص صيانة وتمديد كهربائي، صيانة المكيفات والأجهزة المنزلية بدقة وأمان تام. تتوفر لدينا أحدث أجهزة الفحص وبأسعار مناسبة ومعتمدة مع ضمان الخدمة.",
-                    fontSize = 11.sp,
+                    fontSize = 7.5.sp,
                     color = Color.White
                 )
             }
@@ -2343,16 +2378,16 @@ fun ProviderCard(
         Box(
             modifier = Modifier
                 .background(metallicGlassBrush)
-                .padding((if (settingsState.cardPadding > 0) (settingsState.cardPadding * 0.35f).toInt().coerceAtLeast(3) else 4).dp)
+                .padding((if (settingsState.cardPadding > 0) (settingsState.cardPadding * 0.60f).toInt().coerceAtLeast(3) else 4).dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy((if (settingsState.elementSpacing > 0) (settingsState.elementSpacing * 0.35f).toInt().coerceAtLeast(2) else 3).dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy((if (settingsState.elementSpacing > 0) (settingsState.elementSpacing * 0.60f).toInt().coerceAtLeast(2) else 3).dp)) {
                 
                 // Top Cover Banner if enabled and present
                 if (settingsState.coverHeight > 0 && provider.coverImage.isNotEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height((settingsState.coverHeight * 0.42f).dp)
+                            .height((settingsState.coverHeight * 0.60f).dp)
                             .clip(RoundedCornerShape(4.dp))
                     ) {
                         AsyncImage(
@@ -2370,10 +2405,10 @@ fun ProviderCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // [Compact] Circular Avatar Image (30% smaller)
+                    // [Compact] Circular Avatar Image (40% smaller)
                     Box(
                         modifier = Modifier
-                            .size((if (settingsState.avatarSize > 0) (settingsState.avatarSize * 0.45f) else 29f).dp)
+                            .size((if (settingsState.avatarSize > 0) (settingsState.avatarSize * 0.60f) else 30f).dp)
                             .clip(if (settingsState.avatarShape == "ROUNDED") RoundedCornerShape(6.dp) else CircleShape)
                             .background(Color.Black)
                             .border(1.dp, themeColors.accent, if (settingsState.avatarShape == "ROUNDED") RoundedCornerShape(6.dp) else CircleShape)

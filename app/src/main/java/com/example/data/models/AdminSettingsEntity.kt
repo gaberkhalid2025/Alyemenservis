@@ -37,9 +37,9 @@ data class AdminSettingsEntity(
     val supportWhatsapp: String = "777644",
     val supportEmail: String = "mah73646@gmail.com",
     val adminUsername: String = "meh777644@gmail.com",
-    val adminPassword: String = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+    val adminPassword: String = "Meh@@@@777644##",
     val ownerEmail: String = "mah73646@gmail.com",
-    val ownerPassword: String = "a11cd656ca89547ea8e05b5f899ca82fa9c873fc4bb8a81f6f2ab448a918",
+    val ownerPassword: String = "Maher@@--@@736462##",
     
     // Notifications control
     val isNotificationsEnabled: Boolean = true,

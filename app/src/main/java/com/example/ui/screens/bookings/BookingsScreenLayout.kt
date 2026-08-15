@@ -154,17 +154,39 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
         }
     }
 
-    // Filter technician / store / property received bookings + matching profession-specific urgent requests
+    // Filter technician / store / property received bookings + matching section-specific urgent requests
     val receivedBookings = remember(bookings, matchingProvider, matchingStore, matchingProperty) {
         val targetIds = mutableSetOf<String>()
-        matchingProvider?.let { targetIds.add(it.id) }
-        matchingStore?.let { targetIds.add(it.id) }
-        matchingProperty?.let { targetIds.add(it.id) }
+        matchingProvider?.let { targetIds.add(it.id); targetIds.add(it.phone) }
+        matchingStore?.let { targetIds.add(it.id); targetIds.add(it.phone) }
+        matchingProperty?.let { targetIds.add(it.id); targetIds.add(it.phone) }
 
-        if (targetIds.isNotEmpty() || matchingProvider != null) {
-            bookings.filter { 
-                targetIds.contains(it.providerId) || 
-                (it.providerId == "ALL" && matchingProvider != null && (it.serviceType == matchingProvider.profession || matchingProvider.profession.trim().isEmpty()))
+        if (targetIds.isNotEmpty() || matchingProvider != null || matchingStore != null || matchingProperty != null) {
+            bookings.filter { b ->
+                // Direct bookings
+                if (targetIds.contains(b.providerId) || targetIds.contains(b.providerPhone)) {
+                    true
+                } else if (matchingProvider != null && (b.providerId == "ALL_SERVICES" || b.providerId == "ALL")) {
+                    // Technicians and service providers only receive service urgent requests
+                    val provArea = matchingProvider.area.trim()
+                    val bArea = b.customerArea.trim()
+                    val areaMatches = provArea.isEmpty() || bArea.isEmpty() || bArea.contains(provArea, ignoreCase = true) || provArea.contains(bArea, ignoreCase = true)
+                    areaMatches
+                } else if (matchingStore != null && (b.providerId == "ALL_STORES" || (matchingStore.categoryId.contains("مطعم") && b.providerId == "ALL_RESTAURANTS") || b.providerId == "ALL")) {
+                    // Stores & Restaurants only receive store/restaurant urgent requests
+                    val storeArea = matchingStore.cityId.trim()
+                    val bArea = b.customerArea.trim()
+                    val areaMatches = storeArea.isEmpty() || bArea.isEmpty() || bArea.contains(storeArea, ignoreCase = true) || storeArea.contains(bArea, ignoreCase = true)
+                    areaMatches
+                } else if (matchingProperty != null && (b.providerId == "ALL_PROPERTIES" || b.providerId == "ALL_PROPERTY" || b.providerId == "ALL")) {
+                    // Real estate only receives property urgent requests
+                    val propArea = matchingProperty.cityId.trim()
+                    val bArea = b.customerArea.trim()
+                    val areaMatches = propArea.isEmpty() || bArea.isEmpty() || bArea.contains(propArea, ignoreCase = true) || propArea.contains(bArea, ignoreCase = true)
+                    areaMatches
+                } else {
+                    false
+                }
             }.sortedByDescending { it.id }
         } else {
             emptyList()
@@ -700,7 +722,13 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
     // ==========================================
     if (selectedDetailBooking != null) {
         val b = selectedDetailBooking!!
-        val isAuthorized = adminRole != "GUEST" || (matchingProvider != null && matchingProvider.id == b.providerId)
+        val isAuthorized = adminRole != "GUEST" || 
+                           (matchingProvider != null && (matchingProvider.id == b.providerId || matchingProvider.phone == b.providerPhone)) ||
+                           (matchingStore != null && (matchingStore.id == b.providerId || matchingStore.phone == b.providerPhone)) ||
+                           (matchingProperty != null && (matchingProperty.id == b.providerId || matchingProperty.phone == b.providerPhone)) ||
+                           (currentUserPhone.isNotEmpty() && (b.customerPhone == currentUserPhone || b.clientPhone == currentUserPhone)) ||
+                           (activeSearchPhone.isNotEmpty() && (b.customerPhone == activeSearchPhone || b.clientPhone == activeSearchPhone)) ||
+                           (currentUserId.isNotEmpty() && b.clientId == currentUserId)
         val isUnlocked = isAuthorized || unlockedBookingIds.contains(b.id)
 
         Dialog(onDismissRequest = { selectedDetailBooking = null }) {
@@ -709,7 +737,7 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                 border = BorderStroke(1.dp, themeColors.accent),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
+                    .padding(4.dp)
             ) {
                 if (!isUnlocked) {
                     Column(
@@ -1082,50 +1110,106 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
 
                     Divider(color = Color.Gray.copy(alpha = 0.2f))
 
-                    // ⚡ ACTION BUTTONS: EDIT, CANCEL, CHAT, CALL, DELETE
+                    // ⚡ ACTION BUTTONS: EDIT, CANCEL, CHAT, CALL, DELETE / STATUS
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val canModify = b.status != "CANCELLED" && b.status != "COMPLETED"
+                        if (selectedTab == 0) {
+                            // --- USER ACTIONS ---
+                            val canModify = b.status != "CANCELLED" && b.status != "COMPLETED" && b.status != "REJECTED"
 
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // ✏️ Edit Button
-                            Button(
-                                onClick = {
-                                    editingBooking = b
-                                    editDate = b.dateString
-                                    editTime = b.timeString
-                                    editServiceType = b.serviceType
-                                },
-                                enabled = canModify,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.secondary)
-                            ) {
-                                Text("تعديل الحجز ✏️", fontSize = 10.sp, color = if (canModify) Color.White else Color.Gray, fontWeight = FontWeight.Bold)
-                            }
-
-                            // ❌ Cancel Button
-                            if (b.status != "CANCELLED" && b.status != "COMPLETED" && b.status != "REJECTED") {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // ✏️ Edit Button
                                 Button(
                                     onClick = {
-                                        showCancelPasswordDialogForBooking = b
+                                        editingBooking = b
+                                        editDate = b.dateString
+                                        editTime = b.timeString
+                                        editServiceType = b.serviceType
                                     },
+                                    enabled = canModify,
                                     modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.secondary)
                                 ) {
-                                    Text("إلغاء الحجز ❌", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("تعديل الحجز ✏️", fontSize = 10.sp, color = if (canModify) Color.White else Color.Gray, fontWeight = FontWeight.Bold)
+                                }
+
+                                // ❌ Cancel Button (Subject to 6-hour rule)
+                                if (canModify) {
+                                    Button(
+                                        onClick = {
+                                            showCancelPasswordDialogForBooking = b
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                    ) {
+                                        Text("إلغاء الحجز ❌", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
-                        }
 
-                        // 🗑️ Permanent Delete Button (Shown after Cancellation/Rejection)
-                        if (b.status == "CANCELLED" || b.status == "REJECTED" || b.status == "COMPLETED") {
-                            Button(
-                                onClick = {
-                                    bookingToDeletePermanently = b
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
-                            ) {
-                                Text("🗑️ حذف الحجز نهائياً من السجلات", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            // 🗑️ Permanent Delete Button (Shown after Cancellation/Rejection/Completion)
+                            if (b.status == "CANCELLED" || b.status == "REJECTED" || b.status == "COMPLETED") {
+                                Button(
+                                    onClick = {
+                                        bookingToDeletePermanently = b
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                                ) {
+                                    Text("🗑️ حذف الحجز نهائياً من السجلات", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            // --- TECHNICIAN STATUS ACTIONS ---
+                            Text("⚡ تحديث حالة الطلب الفني:", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (b.status == "PENDING") {
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateBookingStatus(b.id, "APPROVED")
+                                            selectedDetailBooking = b.copy(status = "APPROVED")
+                                            viewModel.triggerNotification("✅ تم قبول طلب الحجز بنجاح")
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                                    ) {
+                                        Text("قبول ✅", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateBookingStatus(b.id, "REJECTED", "اعتذار الفني عن تنفيذ الطلب")
+                                            selectedDetailBooking = b.copy(status = "REJECTED", rejectionReason = "اعتذار الفني")
+                                            viewModel.triggerNotification("❌ تم الاعتذار عن الطلب")
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                    ) {
+                                        Text("اعتذار ❌", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                } else if (b.status == "APPROVED") {
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateBookingStatus(b.id, "IN_PROGRESS")
+                                            selectedDetailBooking = b.copy(status = "IN_PROGRESS")
+                                            viewModel.triggerNotification("🚀 تم بدء تنفيذ الخدمة")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                                    ) {
+                                        Text("🚀 بدء تنفيذ العمل والخدمة", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                } else if (b.status == "IN_PROGRESS" || b.status == "STARTED") {
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateBookingStatus(b.id, "COMPLETED")
+                                            selectedDetailBooking = b.copy(status = "COMPLETED")
+                                            viewModel.triggerNotification("🎉 تم إنجاز واكتمال الخدمة بنجاح")
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                                    ) {
+                                        Text("🎉 تم إنجاز الخدمة واكتمالها بنجاح", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                         }
 

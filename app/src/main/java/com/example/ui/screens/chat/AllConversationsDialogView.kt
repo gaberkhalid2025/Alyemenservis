@@ -109,26 +109,35 @@ fun AllConversationsDialogView(
     val settingsState by viewModel.settings.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
 
-    val myProvider = providers.find { it.phone == currentUserPhone }
+    val stores by viewModel.stores.collectAsState()
+    val properties by viewModel.properties.collectAsState()
+
+    val myProvider = providers.find { it.phone == currentUserPhone || it.id == currentUserId }
+    val myStore = stores.find { it.phone == currentUserPhone || it.id == currentUserId }
+    val myProperty = properties.find { it.phone == currentUserPhone || it.id == currentUserId }
+    val isBusinessOwner = myProvider != null || myStore != null || myProperty != null
     val isAdmin = currentUserId == "admin" || currentUserId.startsWith("super_") || adminRole != "GUEST"
 
     var selectedSectionFilter by remember { mutableStateOf("ALL") } // ALL, PROVIDER, STORE, RESTAURANT, MEDICAL, PROPERTY, JOB, SUPPORT
 
-    val myChannels = remember(chatChannels, currentUserId, currentUserPhone, myProvider, isAdmin, selectedSectionFilter) {
+    val myChannels = remember(chatChannels, currentUserId, currentUserPhone, myProvider, myStore, myProperty, isAdmin, selectedSectionFilter) {
         val baseList = if (isAdmin) {
             chatChannels
         } else {
-            val storeId = viewModel.selectedStore?.id ?: ""
-            val propId = viewModel.selectedProperty?.id ?: ""
+            val storeId = myStore?.id ?: (viewModel.selectedStore?.id ?: "")
+            val propId = myProperty?.id ?: (viewModel.selectedProperty?.id ?: "")
             val prvId = myProvider?.id ?: ""
+            val userPhoneClean = currentUserPhone.trim()
             chatChannels.filter { ch ->
                 ch.id == "support_$currentUserId" ||
+                ch.id == "support_$userPhoneClean" ||
                 ch.id.contains(currentUserId) ||
-                (currentUserPhone.isNotEmpty() && ch.id.contains(currentUserPhone)) ||
-                (prvId.isNotEmpty() && (ch.id.contains("chat_p_${prvId}_") || ch.id.contains("_u_${prvId}"))) ||
+                (userPhoneClean.isNotEmpty() && ch.id.contains(userPhoneClean)) ||
+                (prvId.isNotEmpty() && (ch.id.contains("chat_p_${prvId}_") || ch.id.contains("_u_${prvId}") || ch.targetId == prvId)) ||
                 (storeId.isNotEmpty() && (ch.id.contains(storeId) || ch.targetId == storeId)) ||
                 (propId.isNotEmpty() && (ch.id.contains(propId) || ch.targetId == propId)) ||
-                ch.customerId == currentUserId
+                ch.customerId == currentUserId ||
+                ch.customerPhone == userPhoneClean
             }
         }
 
@@ -244,7 +253,7 @@ fun AllConversationsDialogView(
     }
 
     // Dynamic Header Title
-    val titleText = remember(selectedChannelId, chatChannels, providers, currentUserId, myProvider, settingsState) {
+    val titleText = remember(selectedChannelId, chatChannels, providers, stores, properties, currentUserId, currentUserPhone, myProvider, myStore, myProperty, settingsState) {
         val ch = chatChannels.find { it.id == selectedChannelId }
         if (ch == null) {
             "💬 كل محادثاتك المباشرة"
@@ -256,14 +265,28 @@ fun AllConversationsDialogView(
                     ch.id.substringAfter("chat_p_").substringBefore("_u_")
                 } else {
                     val parts = ch.id.removePrefix("chat_").split("_")
-                    if (parts.size == 2) {
-                        if (providers.any { it.id == parts[0] }) parts[0] else parts[1]
-                    } else ""
+                    if (parts.size >= 2) parts[0] else ""
                 }
-                val providerObj = providers.find { it.id == providerId }
-                if (myProvider != null && myProvider.id == providerId) {
-                    val rawCustomerName = ch.customerName.ifEmpty { ch.userName.substringAfter("مع ").ifEmpty { "عميل" } }
-                    val custPhone = ch.customerPhone.ifEmpty { currentUserPhone }
+                val customerPhoneFromId = if (ch.id.startsWith("chat_p_")) {
+                    ch.id.substringAfter("_u_")
+                } else {
+                    val parts = ch.id.removePrefix("chat_").split("_")
+                    if (parts.size >= 2) parts[1] else ""
+                }
+                val providerObj = providers.find { it.id == providerId || it.phone == providerId }
+                val isMeProvider = (myProvider != null && (myProvider.id == providerId || myProvider.phone == providerId)) ||
+                                   (myStore != null && (myStore.id == providerId || myStore.phone == providerId)) ||
+                                   (myProperty != null && (myProperty.id == providerId || myProperty.phone == providerId))
+
+                if (isMeProvider) {
+                    val rawCustomerName = ch.customerName.ifEmpty { 
+                        ch.userName.substringAfter("مع ").ifEmpty { 
+                            if (ch.messages.any { it.senderId != providerId }) {
+                                ch.messages.firstOrNull { it.senderId != providerId }?.senderName ?: "العميل"
+                            } else "العميل"
+                        } 
+                    }
+                    val custPhone = ch.customerPhone.ifEmpty { customerPhoneFromId }
                     val custId = ch.customerId.ifEmpty { if (custPhone.isNotEmpty()) "USR-${custPhone.takeLast(6)}" else "USR-CLIENT" }
                     val label = when (settingsState.chatDisplayIdentityMode) {
                         "NAME_ONLY" -> rawCustomerName
@@ -273,8 +296,8 @@ fun AllConversationsDialogView(
                     }
                     "👤 العميل: $label"
                 } else {
-                    val pName = providerObj?.name ?: ch.userName.substringAfter("دردشة: ").substringBefore(" مع")
-                    val pPhone = providerObj?.phone ?: ""
+                    val pName = providerObj?.name ?: ch.targetName.ifEmpty { ch.userName.substringAfter("دردشة: ").substringBefore(" مع").ifEmpty { "الفني / المتجر" } }
+                    val pPhone = providerObj?.phone ?: providerId
                     val pId = providerObj?.id ?: "PRV-001"
                     val label = when (settingsState.chatDisplayIdentityMode) {
                         "NAME_ONLY" -> pName
@@ -426,7 +449,7 @@ fun AllConversationsDialogView(
                             }
 
                             items(myChannels) { ch ->
-                                val displayItemTitle = remember(ch, providers, currentUserId, myProvider) {
+                                val displayItemTitle = remember(ch, providers, stores, properties, currentUserId, currentUserPhone, myProvider, myStore, myProperty, settingsState) {
                                     if (ch.id.startsWith("support_")) {
                                         "💬 الدعم الفني المباشر"
                                     } else if (ch.id.startsWith("chat_p_") || (ch.id.startsWith("chat_") && !ch.id.startsWith("support_"))) {
@@ -434,17 +457,47 @@ fun AllConversationsDialogView(
                                             ch.id.substringAfter("chat_p_").substringBefore("_u_")
                                         } else {
                                             val parts = ch.id.removePrefix("chat_").split("_")
-                                            if (parts.size == 2) {
-                                                if (providers.any { it.id == parts[0] }) parts[0] else parts[1]
-                                            } else ""
+                                            if (parts.size >= 2) parts[0] else ""
                                         }
-                                        val providerObj = providers.find { it.id == providerId }
-                                        if (myProvider != null && myProvider.id == providerId) {
-                                            val customerNamePart = ch.userName.substringAfter("مع ").ifEmpty { "عميل" }
-                                            "👤 العميل: $customerNamePart"
+                                        val customerPhoneFromId = if (ch.id.startsWith("chat_p_")) {
+                                            ch.id.substringAfter("_u_")
                                         } else {
-                                            val pName = providerObj?.name ?: ch.userName.substringAfter("دردشة: ").substringBefore(" مع")
-                                            "👷 الفني: $pName"
+                                            val parts = ch.id.removePrefix("chat_").split("_")
+                                            if (parts.size >= 2) parts[1] else ""
+                                        }
+                                        val providerObj = providers.find { it.id == providerId || it.phone == providerId }
+                                        val isMeProvider = (myProvider != null && (myProvider.id == providerId || myProvider.phone == providerId)) ||
+                                                           (myStore != null && (myStore.id == providerId || myStore.phone == providerId)) ||
+                                                           (myProperty != null && (myProperty.id == providerId || myProperty.phone == providerId))
+
+                                        if (isMeProvider) {
+                                            val rawCustomerName = ch.customerName.ifEmpty { 
+                                                ch.userName.substringAfter("مع ").ifEmpty { 
+                                                    if (ch.messages.any { it.senderId != providerId }) {
+                                                        ch.messages.firstOrNull { it.senderId != providerId }?.senderName ?: "العميل"
+                                                    } else "العميل"
+                                                } 
+                                            }
+                                            val custPhone = ch.customerPhone.ifEmpty { customerPhoneFromId }
+                                            val custId = ch.customerId.ifEmpty { if (custPhone.isNotEmpty()) "USR-${custPhone.takeLast(6)}" else "USR-CLIENT" }
+                                            val label = when (settingsState.chatDisplayIdentityMode) {
+                                                "NAME_ONLY" -> rawCustomerName
+                                                "NAME_AND_ID" -> "$rawCustomerName ($custId)"
+                                                "PHONE_ONLY" -> custPhone.ifEmpty { rawCustomerName }
+                                                else -> "$rawCustomerName ${if (custPhone.isNotEmpty()) "($custPhone)" else ""}"
+                                            }
+                                            "👤 العميل: $label"
+                                        } else {
+                                            val pName = providerObj?.name ?: ch.targetName.ifEmpty { ch.userName.substringAfter("دردشة: ").substringBefore(" مع").ifEmpty { "الفني / المتجر" } }
+                                            val pPhone = providerObj?.phone ?: providerId
+                                            val pId = providerObj?.id ?: "PRV-001"
+                                            val label = when (settingsState.chatDisplayIdentityMode) {
+                                                "NAME_ONLY" -> pName
+                                                "NAME_AND_ID" -> "$pName ($pId)"
+                                                "PHONE_ONLY" -> pPhone.ifEmpty { pName }
+                                                else -> "$pName ${if (pPhone.isNotEmpty()) "($pPhone)" else ""}"
+                                            }
+                                            "👷 الفني: $label"
                                         }
                                     } else {
                                         ch.userName
@@ -683,8 +736,26 @@ fun AllConversationsDialogView(
                                     Button(
                                         onClick = {
                                             if (replyText.trim().isNotEmpty()) {
-                                                val senderName = currentUserName.ifEmpty { myProvider?.name ?: "مستخدم" }
-                                                val senderId = myProvider?.id ?: currentUserId
+                                                val providerId = if (ch.id.startsWith("chat_p_")) {
+                                                    ch.id.substringAfter("chat_p_").substringBefore("_u_")
+                                                } else {
+                                                    val parts = ch.id.removePrefix("chat_").split("_")
+                                                    if (parts.size >= 2) parts[0] else ""
+                                                }
+                                                val isMeProvider = (myProvider != null && (myProvider.id == providerId || myProvider.phone == providerId)) ||
+                                                                   (myStore != null && (myStore.id == providerId || myStore.phone == providerId)) ||
+                                                                   (myProperty != null && (myProperty.id == providerId || myProperty.phone == providerId))
+
+                                                val senderName = if (isMeProvider) {
+                                                    myProvider?.name ?: (myStore?.name ?: (myProperty?.title ?: "الجهة الفنية"))
+                                                } else {
+                                                    currentUserName.ifEmpty { "عميل ($currentUserPhone)" }
+                                                }
+                                                val senderId = if (isMeProvider) {
+                                                    myProvider?.id ?: (myStore?.id ?: (myProperty?.id ?: currentUserId))
+                                                } else {
+                                                    currentUserId
+                                                }
                                                 viewModel.replyToChatChannel(ch.id, senderId, replyText.trim(), senderName)
                                                 
                                                 replyText = ""

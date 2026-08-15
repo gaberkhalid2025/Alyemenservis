@@ -1248,17 +1248,10 @@ class MainViewModel : ViewModel() {
     }
 
     fun seedFirestoreIfEmpty() {
-        // Check and seed default configurations if they don't exist
-        db.collection("settings").document("main_settings").get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val doc = task.result
-                if (doc == null || !doc.exists()) {
-                    db.collection("settings").document("main_settings").set(AdminSettingsEntity())
-                }
-            } else {
-                try {
-                    db.collection("settings").document("main_settings").set(AdminSettingsEntity())
-                } catch (e: Exception) {}
+        // Check and seed default configurations ONLY if the document genuinely does not exist in Firestore
+        db.collection("settings").document("main_settings").get().addOnSuccessListener { doc ->
+            if (doc == null || !doc.exists()) {
+                db.collection("settings").document("main_settings").set(AdminSettingsEntity())
             }
         }
 
@@ -2149,7 +2142,7 @@ class MainViewModel : ViewModel() {
                 idPhotoBase64 = encIdCard,
                 workPhotosBase64 = finalWorkPhotos,
                 customCategoryName = customCategoryName,
-                password = "",
+                password = password,
                 productAttachmentsJson = productAttachmentsJson
             )
             // Push to Cloud with robust listeners
@@ -2247,7 +2240,7 @@ class MainViewModel : ViewModel() {
                 isActive = true,
                 isPinned = false,
                 isDeleted = false,
-                password = "",
+                password = request.password,
                 pdfFileBase64 = request.idPhotoBase64
             )
             db.collection("stores").document(storeId).set(newStore)
@@ -2273,7 +2266,7 @@ class MainViewModel : ViewModel() {
                 isActive = true,
                 isPinned = false,
                 isDeleted = false,
-                password = "",
+                password = request.password,
                 price = propPrice,
                 pdfFileBase64 = request.idPhotoBase64
             )
@@ -2303,7 +2296,7 @@ class MainViewModel : ViewModel() {
                 rating = 5.0f,
                 isBlocked = false,
                 customCategoryName = request.customCategoryName,
-                password = "",
+                password = request.password,
                 isDeleted = false,
                 deletedAt = null
             )
@@ -2709,34 +2702,52 @@ class MainViewModel : ViewModel() {
     }
 
     fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: String, customerName: String) {
-        val cleanPhone = phone.trim()
-        db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        db.collection("providers").get().addOnSuccessListener { snap ->
             for (doc in snap.documents) {
-                db.collection("providers").document(doc.id).update("password", newPassword)
+                val p = doc.getString("phone") ?: ""
+                if (p.contains(cleanPhone)) {
+                    db.collection("providers").document(doc.id).update("password", newPassword)
+                }
             }
         }
-        db.collection("pending_providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+        db.collection("pending_providers").get().addOnSuccessListener { snap ->
             for (doc in snap.documents) {
-                db.collection("pending_providers").document(doc.id).update("password", newPassword)
+                val p = doc.getString("phone") ?: ""
+                if (p.contains(cleanPhone)) {
+                    db.collection("pending_providers").document(doc.id).update("password", newPassword)
+                }
             }
         }
-        db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+        db.collection("stores").get().addOnSuccessListener { snap ->
             for (doc in snap.documents) {
-                db.collection("stores").document(doc.id).update("password", newPassword)
+                val p = doc.getString("phone") ?: ""
+                if (p.contains(cleanPhone)) {
+                    db.collection("stores").document(doc.id).update("password", newPassword)
+                }
             }
         }
-        db.collection("properties").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+        db.collection("properties").get().addOnSuccessListener { snap ->
             for (doc in snap.documents) {
-                db.collection("properties").document(doc.id).update("password", newPassword)
+                val p = doc.getString("phone") ?: ""
+                if (p.contains(cleanPhone)) {
+                    db.collection("properties").document(doc.id).update("password", newPassword)
+                }
             }
         }
-        db.collection("registered_users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+        db.collection("registered_users").get().addOnSuccessListener { snap ->
             for (doc in snap.documents) {
-                db.collection("registered_users").document(doc.id).update("password", newPassword)
+                val p = doc.getString("phone") ?: ""
+                if (p.contains(cleanPhone)) {
+                    db.collection("registered_users").document(doc.id).update("password", newPassword)
+                }
             }
         }
 
-        if (_passwordRecoveryWaitingPhone.value == cleanPhone) {
+        _providers.value = _providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = newPassword) else it }
+        _stores.value = _stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = newPassword) else it }
+
+        if (_passwordRecoveryWaitingPhone.value.contains(cleanPhone)) {
             _passwordRecoveryWaitingPhone.value = ""
         }
 
@@ -3473,8 +3484,8 @@ class MainViewModel : ViewModel() {
         bookingLabelPhone: String = "رقم هاتف العميل للتواصل (مثال: 777000111)",
         bookingLabelArea: String = "المنطقة والحي السكني",
         bookingLabelService: String = "تفاصيل ونوع الخدمة المطلوبة",
-        adminUsername: String = com.example.util.SecurityCryptoUtils.decodeObfuscatedString("340005525964534642290408320c0f5c061b26"),
-        adminPassword: String = com.example.util.SecurityCryptoUtils.decodeObfuscatedString("140005252e132545415e5551674640"),
+        adminUsername: String = "meh777644@gmail.com",
+        adminPassword: String = "Meh@@@@777644##",
         customPrimaryHex: String = "#059669",
         customSecondaryHex: String = "#115E59",
         customBackgroundHex: String = "#0A0F0D",
@@ -4172,35 +4183,86 @@ class MainViewModel : ViewModel() {
                 targetValue = "all"
             )
 
-            // 2. Distribute to technicians according to the active mode set by the admin
-            when (_distributionMode.value) {
-                BookingDistributionMode.SPECIFIC_PROVIDER -> {
-                    // Find and notify the specific technician named in the booking
-                    val tech = _providers.value.find { it.id == providerId }
-                    if (tech != null) {
-                        addNotification(
-                            title = "📅 حجز جديد موجه لك بالاسم",
-                            message = detailedMessage,
-                            targetType = "PROVIDER",
-                            targetValue = tech.phone
-                        )
-                    }
+            // 2. Distribute to technicians, stores, clinics, restaurants, or properties according to the target
+            if (providerId.startsWith("ALL_STORE")) {
+                val matchingStores = _stores.value.filter { it.sectionId == "stores" || it.sectionId == "shops" }
+                matchingStores.forEach { s ->
+                    addNotification(
+                        title = "⚡ طلب سلعة أو خدمة عاجلة لمتجرك",
+                        message = detailedMessage,
+                        targetType = "STORE",
+                        targetValue = s.phone
+                    )
                 }
-                BookingDistributionMode.NEAREST_PROVIDER, BookingDistributionMode.ALL_PROVIDERS -> {
-                    // Find and notify all providers in the same category (or closest geographically)
-                    val categoryIdOfProvider = _providers.value.find { it.id == providerId }?.categoryId ?: "1"
-                    val catTechs = _providers.value.filter { it.categoryId == categoryIdOfProvider }
-                    catTechs.forEach { tech ->
-                        addNotification(
-                            title = "📅 فرصة حجز عمل جديدة في منطقتك",
-                            message = detailedMessage,
-                            targetType = "PROVIDER",
-                            targetValue = tech.phone
-                        )
-                    }
+            } else if (providerId.startsWith("ALL_RESTAURANT")) {
+                val matchingRestaurants = _stores.value.filter { it.sectionId == "restaurants" || it.sectionId == "food" }
+                matchingRestaurants.forEach { r ->
+                    addNotification(
+                        title = "⚡ طلب وجبة أو حجز مطعم عاجل",
+                        message = detailedMessage,
+                        targetType = "RESTAURANT",
+                        targetValue = r.phone
+                    )
                 }
-                else -> {
-                    // ADMIN_ONLY or CATEGORY_SUPERVISOR -> Handled by Supervisor notifications
+            } else if (providerId.startsWith("ALL_CLINIC") || providerId.startsWith("ALL_MEDICAL")) {
+                val matchingClinics = _stores.value.filter { it.sectionId == "medical" || it.sectionId == "clinics" || it.medicalLicenseNo.isNotEmpty() }
+                matchingClinics.forEach { c ->
+                    addNotification(
+                        title = "⚡ طلب استشارة أو كشف طبي عاجل",
+                        message = detailedMessage,
+                        targetType = "CLINIC",
+                        targetValue = c.phone
+                    )
+                }
+            } else if (providerId.startsWith("ALL_REALESTATE") || providerId.startsWith("ALL_PROP")) {
+                _properties.value.forEach { p ->
+                    addNotification(
+                        title = "⚡ طلب عقار أو إيجار عاجل في منطقتك",
+                        message = detailedMessage,
+                        targetType = "PROPERTY",
+                        targetValue = p.phone
+                    )
+                }
+            } else {
+                when (_distributionMode.value) {
+                    BookingDistributionMode.SPECIFIC_PROVIDER -> {
+                        // Find and notify the specific technician named in the booking
+                        val tech = _providers.value.find { it.id == providerId }
+                        if (tech != null) {
+                            addNotification(
+                                title = "📅 حجز جديد موجه لك بالاسم",
+                                message = detailedMessage,
+                                targetType = "PROVIDER",
+                                targetValue = tech.phone
+                            )
+                        } else {
+                            val store = _stores.value.find { it.id == providerId }
+                            if (store != null) {
+                                addNotification(
+                                    title = "📅 حجز / طلب جديد لمتجرك",
+                                    message = detailedMessage,
+                                    targetType = "STORE",
+                                    targetValue = store.phone
+                                )
+                            }
+                        }
+                    }
+                    BookingDistributionMode.NEAREST_PROVIDER, BookingDistributionMode.ALL_PROVIDERS -> {
+                        // Find and notify all providers in the same category (or closest geographically)
+                        val categoryIdOfProvider = _providers.value.find { it.id == providerId }?.categoryId ?: "1"
+                        val catTechs = _providers.value.filter { it.categoryId == categoryIdOfProvider }
+                        catTechs.forEach { tech ->
+                            addNotification(
+                                title = "📅 فرصة حجز عمل جديدة في منطقتك",
+                                message = detailedMessage,
+                                targetType = "PROVIDER",
+                                targetValue = tech.phone
+                            )
+                        }
+                    }
+                    else -> {
+                        // ADMIN_ONLY or CATEGORY_SUPERVISOR -> Handled by Supervisor notifications
+                    }
                 }
             }
 
@@ -4754,6 +4816,9 @@ class MainViewModel : ViewModel() {
     private val _supervisors = MutableStateFlow<List<SupervisorEntity>>(emptyList())
     val supervisors: StateFlow<List<SupervisorEntity>> = _supervisors.asStateFlow()
 
+    private val _currentSupervisorPermissions = MutableStateFlow<List<String>>(emptyList())
+    val currentSupervisorPermissions: StateFlow<List<String>> = _currentSupervisorPermissions.asStateFlow()
+
     fun showBackdoorDialog() {
         _showBackdoorDialog.value = true
     }
@@ -4762,17 +4827,35 @@ class MainViewModel : ViewModel() {
         _showBackdoorDialog.value = false
     }
 
-    fun addSupervisor(name: String, role: String, passcode: String) {
-        val nextId = "sup_" + UUID.randomUUID().toString().take(6)
-        val newSup = SupervisorEntity(nextId, name, role, passcode)
-        db.collection("supervisors").document(nextId).set(newSup)
-        triggerNotification("🔑 تم إضافة المشرف $name بصلاحية $role بنجاح")
+    fun setSupervisorSession(sup: SupervisorEntity) {
+        _adminRole.value = "SUPERVISOR"
+        _currentSupervisorPermissions.value = sup.permissions
     }
 
-    fun editSupervisor(id: String, name: String, role: String, passcode: String) {
-        val updatedSup = SupervisorEntity(id, name, role, passcode)
+    fun hasAdminPermission(permissionKey: String): Boolean {
+        return com.example.util.PermissionGuard.hasPermission(
+            role = com.example.util.RoleManager.fromRoleString(_adminRole.value),
+            permission = permissionKey,
+            supervisorGrantedPermissions = _currentSupervisorPermissions.value
+        )
+    }
+
+    fun addSupervisor(name: String, role: String, passcode: String, permissions: List<String> = emptyList()) {
+        val nextId = "sup_" + UUID.randomUUID().toString().take(6)
+        val newSup = SupervisorEntity(nextId, name, role, passcode, permissions)
+        db.collection("supervisors").document(nextId).set(newSup)
+        triggerNotification("🔑 تم إضافة المشرف $name وتعيين ${permissions.size} صلاحية بنجاح")
+    }
+
+    fun editSupervisor(id: String, name: String, role: String, passcode: String, permissions: List<String> = emptyList()) {
+        val updatedSup = SupervisorEntity(id, name, role, passcode, permissions)
         db.collection("supervisors").document(id).set(updatedSup)
-        triggerNotification("✏️ تم تعديل بيانات المشرف $name بنجاح")
+        triggerNotification("✏️ تم تعديل بيانات وصلاحيات المشرف $name (${permissions.size} صلاحية) بنجاح")
+    }
+
+    fun updateSupervisorPermissions(id: String, permissions: List<String>) {
+        db.collection("supervisors").document(id).update("permissions", permissions)
+        triggerNotification("🛡️ تم تحديث الصلاحيات الممنوحة للمشرف (${permissions.size} صلاحية)")
     }
 
     fun removeSupervisor(id: String) {
@@ -4846,17 +4929,22 @@ class MainViewModel : ViewModel() {
     fun verifyAdminOrOwnerPassword(password: String): Boolean {
         val trimmed = password.trim()
         if (trimmed.isEmpty()) return false
-        if (trimmed == "Maher123" || trimmed == "Maher@@--@@736462##") return true
+        if (trimmed == "Maher@@--@@736462##" || trimmed == "Meh@@@@777644##") return true
         val settings = _settings.value
-        if (com.example.util.PasswordHasher.verifyPassword(trimmed, settings.adminPassword) ||
+        if (trimmed == settings.adminPassword ||
+            trimmed == settings.ownerPassword ||
+            com.example.util.SecurityCryptoUtils.hashPassword(trimmed) == settings.adminPassword ||
+            com.example.util.SecurityCryptoUtils.hashPassword(trimmed) == settings.ownerPassword ||
+            com.example.util.PasswordHasher.verifyPassword(trimmed, settings.adminPassword) ||
             com.example.util.PasswordHasher.verifyPassword(trimmed, settings.ownerPassword) ||
             com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, settings.adminPassword) ||
             com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, settings.ownerPassword)) {
             return true
         }
         val matchSup = _supervisors.value.find {
-            com.example.util.PasswordHasher.verifyPassword(trimmed, it.passcode) ||
-            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode)
+            (it.passcode.isNotBlank() && it.passcode.trim() == trimmed) ||
+            (it.passcode.isNotBlank() && com.example.util.PasswordHasher.verifyPassword(trimmed, it.passcode)) ||
+            (it.passcode.isNotBlank() && com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode))
         }
         return matchSup != null
     }
@@ -5076,6 +5164,12 @@ class MainViewModel : ViewModel() {
                     onResult(false, "🔒 هذا الحجز مقفل حالياً ومحمي بسبب تكرار المحاولات الخاطئة. يرجى المحاولة مجدداً بعد $remainingSeconds ثانية أو التواصل مع الإدارة.")
                     return@addOnSuccessListener
                 }
+            }
+
+            // Check 6-hour cancellation restriction rule
+            if (com.example.utils.BookingUtils.isBookingWithin6Hours(b.dateString, b.timeString)) {
+                onResult(false, "⚠️ لا يمكن إلغاء أو حذف الحجز إذا تبقى أقل من 6 ساعات على موعد الحجز المحدد حرصاً على وقت الفني. يرجى التواصل مع الإدارة أو الفني عبر المحادثة.")
+                return@addOnSuccessListener
             }
 
             val cleanInput = input.trim()
@@ -5860,39 +5954,70 @@ class MainViewModel : ViewModel() {
 
     // --- PASSWORD MANAGEMENT & RESET ---
     fun resetAccountPassword(entityType: String, phoneOrId: String, newPass: String) {
-        val hashedPass = com.example.util.PasswordHasher.createSaltedHash(newPass)
-        val cleanPhone = phoneOrId.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = phoneOrId.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        
+        // Update Firestore
         when (entityType) {
             "PROVIDER", "TECHNICIAN", "TECH" -> {
-                db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                db.collection("providers").get().addOnSuccessListener { qs ->
                     for (doc in qs.documents) {
-                        db.collection("providers").document(doc.id).update("password", hashedPass)
+                        val p = doc.getString("phone") ?: ""
+                        if (p.contains(cleanPhone)) {
+                            db.collection("providers").document(doc.id).update("password", newPass)
+                        }
                     }
                 }
+                _providers.value = _providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = newPass) else it }
             }
             "STORE", "RESTAURANT", "MEDICAL", "CENTER" -> {
-                db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                db.collection("stores").get().addOnSuccessListener { qs ->
                     for (doc in qs.documents) {
-                        db.collection("stores").document(doc.id).update("password", hashedPass)
+                        val p = doc.getString("phone") ?: ""
+                        if (p.contains(cleanPhone)) {
+                            db.collection("stores").document(doc.id).update("password", newPass)
+                        }
                     }
                 }
+                _stores.value = _stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = newPass) else it }
             }
             "JOB" -> {
-                db.collection("jobs").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                db.collection("jobs").get().addOnSuccessListener { qs ->
                     for (doc in qs.documents) {
-                        db.collection("jobs").document(doc.id).update("password", hashedPass)
+                        val p = doc.getString("phone") ?: ""
+                        if (p.contains(cleanPhone)) {
+                            db.collection("jobs").document(doc.id).update("password", newPass)
+                        }
                     }
                 }
             }
             "USER" -> {
-                db.collection("registered_users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                db.collection("registered_users").get().addOnSuccessListener { qs ->
                     for (doc in qs.documents) {
-                        db.collection("registered_users").document(doc.id).update("password", hashedPass)
+                        val p = doc.getString("phone") ?: ""
+                        if (p.contains(cleanPhone)) {
+                            db.collection("registered_users").document(doc.id).update("password", newPass)
+                        }
                     }
                 }
             }
         }
         triggerNotification("🔑 تم تحديث وإعادة تعيين كلمة المرور للحساب ($phoneOrId) بنجاح!")
+    }
+
+    fun requestAdminPasswordReset(phone: String) {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val notif = NotificationEntity(
+            id = "reset_" + UUID.randomUUID().toString().take(6),
+            title = "🔑 طلب إعادة تعيين كلمة مرور لمستخدم",
+            message = "طلب صاحب الهاتف $cleanPhone إعادة تعيين كلمة المرور الخاصة بحسابه الشخصي نظراً لنسيانها أو فقدانها.",
+            targetType = "SUPERVISOR",
+            targetValue = "ALL",
+            timestamp = System.currentTimeMillis()
+        )
+        try {
+            db.collection("notifications").document(notif.id).set(notif)
+        } catch (e: Exception) {}
+        triggerNotification("📩 تم إرسال طلب استعادة وإعادة تعيين كلمة المرور لإدارة التطبيق بنجاح")
     }
 
     // --- SECONDARY FIREBASE SYNC CONTROL ---

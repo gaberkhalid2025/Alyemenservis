@@ -22,4 +22,33 @@ object BookingUtils {
         }
         return builder.toString()
     }
+
+    fun isBookingWithin6Hours(dateString: String, timeString: String): Boolean {
+        return try {
+            val cleanDate = dateString.trim().replace("/", "-")
+            val cleanTime = timeString.trim().replace("م", "PM").replace("ص", "AM")
+            val combined = "$cleanDate $cleanTime"
+            val formats = listOf(
+                SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.US),
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US),
+                SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            )
+            var parsedDate: Date? = null
+            for (fmt in formats) {
+                try {
+                    parsedDate = fmt.parse(combined) ?: fmt.parse(cleanDate)
+                    if (parsedDate != null) break
+                } catch (e: Exception) {}
+            }
+            if (parsedDate != null) {
+                val diffMs = parsedDate.time - System.currentTimeMillis()
+                val sixHoursMs = 6 * 60 * 60 * 1000L
+                diffMs in 0..sixHoursMs
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

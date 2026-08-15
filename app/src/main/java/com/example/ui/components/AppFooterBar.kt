@@ -106,7 +106,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = settingsState.footerMessage.ifBlank { "WAM2026" },
+                        text = if (settingsState.footerMessage.startsWith("card_custom_")) "WAM2026" else settingsState.footerMessage.ifBlank { "WAM2026" },
                         fontSize = 10.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color(0xFFE2E8F0),

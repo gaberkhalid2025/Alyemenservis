@@ -60,10 +60,27 @@ object PasswordHasher {
     }
 
     /**
-     * Verifies if an input password matches the stored "salt:hash" string.
+     * Verifies if an input password matches the stored "salt:hash" string, raw text, or sha256.
      */
     fun verifyPassword(inputPassword: String, storedSaltedHash: String): Boolean {
-        // Disabled password hashing checks for developer/modification convenience
-        return true
+        if (inputPassword.isBlank() || storedSaltedHash.isBlank()) return false
+        val trimmedInput = inputPassword.trim()
+        val trimmedStored = storedSaltedHash.trim()
+        if (trimmedInput == trimmedStored) return true
+        if (sha256(trimmedInput).equals(trimmedStored, ignoreCase = true)) return true
+        return try {
+            if (trimmedStored.contains(":")) {
+                val parts = trimmedStored.split(":")
+                if (parts.size == 2) {
+                    val salt = Base64.decode(parts[0], Base64.NO_WRAP)
+                    val expectedHash = parts[1]
+                    val computedHash = hashPassword(trimmedInput, salt)
+                    return computedHash == expectedHash
+                }
+            }
+            false
+        } catch (e: Exception) {
+            false
+        }
     }
 }

@@ -29,9 +29,11 @@ fun AdminQuickServicePanel(
     themeColors: VisualThemePalette
 ) {
     val adminRoleStr by viewModel.adminRole.collectAsState()
+    val supervisorPermissions by viewModel.currentSupervisorPermissions.collectAsState()
     if (!PermissionGuard.hasPermission(
-            RoleManager.fromRoleString(adminRoleStr),
-            PermissionGuard.PERMISSION_BOOKINGS
+            role = RoleManager.fromRoleString(adminRoleStr),
+            permission = PermissionGuard.PERMISSION_QUICK_SERVICE,
+            supervisorGrantedPermissions = supervisorPermissions
         )
     ) {
         PermissionGuard.UnauthorizedView()

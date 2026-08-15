@@ -188,33 +188,10 @@ fun ClientPersonalAccountDashboard(
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
+            Icon(imageVector = Icons.Default.Email, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("💬 محادثة فورية مباشرة مع الإدارة والدعم الفني", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
-
-        // Product & Services Attachments Management Section for Profile
-        val stores by viewModel.stores.collectAsState()
-        val providers by viewModel.providers.collectAsState()
-        val myStore = stores.find { it.ownerId == currentUserPhone || it.phone == currentUserPhone }
-        val myProvider = providers.find { it.phone == currentUserPhone }
-
-        var dashboardAttachments by remember(myStore, myProvider) {
-            val json = myStore?.productAttachmentsJson ?: myProvider?.productAttachmentsJson ?: ""
-            mutableStateOf(com.example.data.ProductAttachment.parseList(json))
-        }
-
-        com.example.ui.ProductAttachmentsSection(
-            attachments = dashboardAttachments,
-            onAttachmentsChanged = { updatedList ->
-                dashboardAttachments = updatedList
-                val json = com.example.data.ProductAttachment.serializeList(updatedList)
-                if (myStore != null) {
-                    val updatedStore = myStore.copy(productAttachmentsJson = json)
-                    viewModel.saveStore(updatedStore)
-                }
-            },
-            mode = "MANAGEMENT",
-            themeColors = themeColors
-        )
 
         // Restore Account reminder / button
         Card(
@@ -226,7 +203,7 @@ fun ClientPersonalAccountDashboard(
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("🔄 حماية واسترجاع حسابك والدردشات", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                 Text(
-                    text = "حسابك مشفر سحابياً برقم هاتفك. في حال قمت بمسح بيانات الهاتف أو الانتقال لهاتف جديد، يمكنك الضغط على 'استرجاع الحساب' لاسترداد كافة حجوزاتك ومحادثاتك فوراً.",
+                    text = "حسابك مشفر سحابياً برقم هاتفك. في حال قمت بحذف التطبيق أو مسح البيانات أو الانتقال لهاتف جديد، يمكنك استرجاع حسابك بواسطة رقم هاتفك وكلمة المرور فوراً.",
                     fontSize = 10.sp,
                     color = Color.LightGray
                 )
@@ -238,7 +215,7 @@ fun ClientPersonalAccountDashboard(
                     modifier = Modifier.fillMaxWidth().height(36.dp),
                     contentPadding = PaddingValues(0.dp)
                 ) {
-                    Text("🔓 اضغط لاسترجاع حساب سابق الآن", color = themeColors.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("🔓 اضغط لاسترجاع حسابك بواسطة رقم الهاتف وكلمة المرور", color = themeColors.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -426,6 +403,24 @@ fun ClientPersonalAccountDashboard(
                         TextButton(onClick = { showRestoreDialog = false }) {
                             Text("إلغاء", color = Color.White, fontSize = 11.sp)
                         }
+                    }
+
+                    Divider(color = Color.Gray.copy(alpha = 0.2f))
+
+                    TextButton(
+                        onClick = {
+                            val cleanPhone = restorePhone.trim().replace(" ", "")
+                            if (cleanPhone.length == 9) {
+                                viewModel.requestAdminPasswordReset(cleanPhone)
+                                android.widget.Toast.makeText(context, "📩 تم إرسال طلب إعادة تعيين كلمة المرور لإدارة التطبيق لرقمك ($cleanPhone)", android.widget.Toast.LENGTH_LONG).show()
+                                showRestoreDialog = false
+                            } else {
+                                android.widget.Toast.makeText(context, "⚠️ يرجى إدخال رقم هاتفك في الحقل أولاً لطلب إعادة التعيين من الإدارة", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("❓ نسيت كلمة المرور؟ اضغط لطلب إعادة تعيينها من الإدارة", color = themeColors.accent, fontSize = 11.sp)
                     }
                 }
             }
