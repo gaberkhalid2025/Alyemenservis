@@ -32,6 +32,12 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.BannerEntity
 import com.example.utils.VisualThemePalette
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 
 @Composable
 fun CustomFilterChip(
@@ -608,4 +614,97 @@ fun AppAsyncImage(
         )
     }
 }
+
+@Composable
+fun SkeletonLoader(
+    modifier: Modifier = Modifier,
+    width: androidx.compose.ui.unit.Dp = 100.dp,
+    height: androidx.compose.ui.unit.Dp = 100.dp,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp)
+) {
+    val shimmerColors = listOf(
+        Color(0xFF334155).copy(alpha = 0.6f),
+        Color(0xFF475569).copy(alpha = 0.3f),
+        Color(0xFF334155).copy(alpha = 0.6f)
+    )
+
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1200,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer_translate"
+    )
+
+    val brush = Brush.linearGradient(
+        colors = shimmerColors,
+        start = androidx.compose.ui.geometry.Offset.Zero,
+        end = androidx.compose.ui.geometry.Offset(x = translateAnim.value, y = translateAnim.value)
+    )
+
+    Box(
+        modifier = modifier
+            .size(width = width, height = height)
+            .background(brush = brush, shape = shape)
+    )
+}
+
+@Composable
+fun ProviderListSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier = modifier.padding(16.dp)) {
+        repeat(3) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SkeletonLoader(width = 60.dp, height = 60.dp, shape = CircleShape)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        SkeletonLoader(width = 120.dp, height = 16.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        SkeletonLoader(width = 180.dp, height = 12.dp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GroupChatListSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier = modifier.padding(16.dp)) {
+        repeat(4) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SkeletonLoader(width = 50.dp, height = 50.dp, shape = CircleShape)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    SkeletonLoader(width = 100.dp, height = 14.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SkeletonLoader(width = 200.dp, height = 12.dp)
+                }
+            }
+        }
+    }
+}
+
 

@@ -105,6 +105,7 @@ fun AllConversationsDialogView(
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val chatChannels by viewModel.chatChannels.collectAsState()
+    val isChatChannelsLoading by viewModel.isChatChannelsLoading.collectAsState()
     val providers by viewModel.providers.collectAsState()
     val settingsState by viewModel.settings.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
@@ -408,7 +409,9 @@ fun AllConversationsDialogView(
                 }
 
                 if (selectedChannelId == null) {
-                    if (myChannels.isEmpty()) {
+                    if (isChatChannelsLoading) {
+                        com.example.ui.components.GroupChatListSkeleton()
+                    } else if (myChannels.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("💬", fontSize = 36.sp)

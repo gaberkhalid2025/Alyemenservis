@@ -107,6 +107,7 @@ fun ServicesBrowserLayout(
 ) {
     val categories by viewModel.categories.collectAsState()
     val filteredProviders by viewModel.filteredProviders.collectAsState()
+    val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
     val selectedCategory by viewModel.selectedCategoryId.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isVipOnly by viewModel.filterVipOnly.collectAsState()
@@ -661,7 +662,11 @@ fun ServicesBrowserLayout(
         }
 
         // List of Service providers
-        if (filteredProviders.isEmpty()) {
+        if (isProvidersLoading) {
+            item {
+                com.example.ui.components.ProviderListSkeleton()
+            }
+        } else if (filteredProviders.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier

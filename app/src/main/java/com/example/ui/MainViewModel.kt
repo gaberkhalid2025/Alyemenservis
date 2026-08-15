@@ -43,49 +43,49 @@ class MainViewModel : ViewModel() {
     }
 
     // ------------------- StateFlows -------------------
-    private val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
+    internal val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
 
-    private val _providers = MutableStateFlow<List<ProviderEntity>>(emptyList())
+    internal val _providers = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val providers: StateFlow<List<ProviderEntity>> = _providers.asStateFlow()
 
-    private val _deletedProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
+    internal val _deletedProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val deletedProviders: StateFlow<List<ProviderEntity>> = _deletedProviders.asStateFlow()
 
-    private val _filteredProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
+    internal val _filteredProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val filteredProviders: StateFlow<List<ProviderEntity>> = _filteredProviders.asStateFlow()
 
-    private val _pendingProviders = MutableStateFlow<List<PendingProviderEntity>>(emptyList())
+    internal val _pendingProviders = MutableStateFlow<List<PendingProviderEntity>>(emptyList())
     val pendingProviders: StateFlow<List<PendingProviderEntity>> = _pendingProviders.asStateFlow()
 
-    private val _banners = MutableStateFlow<List<BannerEntity>>(emptyList())
+    internal val _banners = MutableStateFlow<List<BannerEntity>>(emptyList())
     val banners: StateFlow<List<BannerEntity>> = _banners.asStateFlow()
 
-    private val _settings = MutableStateFlow(AdminSettingsEntity())
+    internal val _settings = MutableStateFlow(AdminSettingsEntity())
     val settings: StateFlow<AdminSettingsEntity> = _settings.asStateFlow()
 
-    private val _reports = MutableStateFlow<List<ReportEntity>>(emptyList())
+    internal val _reports = MutableStateFlow<List<ReportEntity>>(emptyList())
     val reports: StateFlow<List<ReportEntity>> = _reports.asStateFlow()
 
-    private val _activityLogs = MutableStateFlow<List<ActivityLogEntity>>(emptyList())
+    internal val _activityLogs = MutableStateFlow<List<ActivityLogEntity>>(emptyList())
     val activityLogs: StateFlow<List<ActivityLogEntity>> = _activityLogs.asStateFlow()
 
-    private val _callsLog = MutableStateFlow<List<CallEntity>>(emptyList())
+    internal val _callsLog = MutableStateFlow<List<CallEntity>>(emptyList())
     val callsLog: StateFlow<List<CallEntity>> = _callsLog.asStateFlow()
 
-    private val _coupons = MutableStateFlow<List<CouponEntity>>(emptyList())
+    internal val _coupons = MutableStateFlow<List<CouponEntity>>(emptyList())
     val coupons: StateFlow<List<CouponEntity>> = _coupons.asStateFlow()
 
-    private val _internalWallets = MutableStateFlow<List<com.example.data.InternalWalletEntity>>(emptyList())
+    internal val _internalWallets = MutableStateFlow<List<com.example.data.InternalWalletEntity>>(emptyList())
     val internalWallets: StateFlow<List<com.example.data.InternalWalletEntity>> = _internalWallets.asStateFlow()
 
-    private val _walletTransactions = MutableStateFlow<List<com.example.data.WalletTransactionEntity>>(emptyList())
+    internal val _walletTransactions = MutableStateFlow<List<com.example.data.WalletTransactionEntity>>(emptyList())
     val walletTransactions: StateFlow<List<com.example.data.WalletTransactionEntity>> = _walletTransactions.asStateFlow()
 
-    private val _userLatitude = MutableStateFlow(15.3694)
+    internal val _userLatitude = MutableStateFlow(15.3694)
     val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
 
-    private val _userLongitude = MutableStateFlow(44.1910)
+    internal val _userLongitude = MutableStateFlow(44.1910)
     val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
 
     fun updateUserLocation(lat: Double, lng: Double) {
@@ -93,25 +93,31 @@ class MainViewModel : ViewModel() {
         _userLongitude.value = lng
     }
 
-    private val _cities = MutableStateFlow<List<CityEntity>>(emptyList())
+    internal val _isProvidersLoading = MutableStateFlow(true)
+    val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
+
+    internal val _isChatChannelsLoading = MutableStateFlow(true)
+    val isChatChannelsLoading: StateFlow<Boolean> = _isChatChannelsLoading.asStateFlow()
+
+    internal val _cities = MutableStateFlow<List<CityEntity>>(emptyList())
     val cities: StateFlow<List<CityEntity>> = _cities.asStateFlow()
 
-    private val _chatMessages = MutableStateFlow<List<ChatMessageEntity>>(emptyList())
+    internal val _chatMessages = MutableStateFlow<List<ChatMessageEntity>>(emptyList())
     val chatMessages: StateFlow<List<ChatMessageEntity>> = _chatMessages.asStateFlow()
 
-    private val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
+    internal val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
     val bookings: StateFlow<List<BookingEntity>> = _bookings.asStateFlow()
 
-    private val _paymentWallets = MutableStateFlow<List<PaymentWalletEntity>>(emptyList())
+    internal val _paymentWallets = MutableStateFlow<List<PaymentWalletEntity>>(emptyList())
     val paymentWallets: StateFlow<List<PaymentWalletEntity>> = _paymentWallets.asStateFlow()
 
-    private val _payments = MutableStateFlow<List<PaymentEntity>>(emptyList())
+    internal val _payments = MutableStateFlow<List<PaymentEntity>>(emptyList())
     val payments: StateFlow<List<PaymentEntity>> = _payments.asStateFlow()
 
-    private val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
+    internal val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
     val notifications: StateFlow<List<NotificationEntity>> = _notifications.asStateFlow()
 
-    private val _passwordRecoveryWaitingPhone = MutableStateFlow<String>("")
+    internal val _passwordRecoveryWaitingPhone = MutableStateFlow<String>("")
     val passwordRecoveryWaitingPhone: StateFlow<String> = _passwordRecoveryWaitingPhone.asStateFlow()
 
     fun setPasswordRecoveryWaitingPhone(phone: String) {
@@ -123,10 +129,10 @@ class MainViewModel : ViewModel() {
     var selectedProperty: com.example.data.PropertyEntity? = null
     var showQuickServiceDialog by androidx.compose.runtime.mutableStateOf(false)
 
-    private val _chatChannels = MutableStateFlow<List<ChatChannelEntity>>(emptyList())
+    internal val _chatChannels = MutableStateFlow<List<ChatChannelEntity>>(emptyList())
     val chatChannels: StateFlow<List<ChatChannelEntity>> = _chatChannels.asStateFlow()
 
-    private val _activeChatChannel = MutableStateFlow<ChatChannelEntity?>(null)
+    internal val _activeChatChannel = MutableStateFlow<ChatChannelEntity?>(null)
     val activeChatChannel: StateFlow<ChatChannelEntity?> = _activeChatChannel.asStateFlow()
 
     fun openChatChannel(channel: ChatChannelEntity?) {
@@ -137,19 +143,19 @@ class MainViewModel : ViewModel() {
         _activeChatChannel.value = null
     }
 
-    private val _stores = MutableStateFlow<List<com.example.data.StoreEntity>>(getDefaultStoresList())
+    internal val _stores = MutableStateFlow<List<com.example.data.StoreEntity>>(getDefaultStoresList())
     val stores: StateFlow<List<com.example.data.StoreEntity>> = _stores.asStateFlow()
 
-    private val _products = MutableStateFlow<List<com.example.data.ProductEntity>>(emptyList())
+    internal val _products = MutableStateFlow<List<com.example.data.ProductEntity>>(emptyList())
     val products: StateFlow<List<com.example.data.ProductEntity>> = _products.asStateFlow()
 
-    private val _properties = MutableStateFlow<List<com.example.data.PropertyEntity>>(getDefaultPropertiesList())
+    internal val _properties = MutableStateFlow<List<com.example.data.PropertyEntity>>(getDefaultPropertiesList())
     val properties: StateFlow<List<com.example.data.PropertyEntity>> = _properties.asStateFlow()
 
-    private val _jobs = MutableStateFlow<List<com.example.data.JobEntity>>(emptyList())
+    internal val _jobs = MutableStateFlow<List<com.example.data.JobEntity>>(emptyList())
     val jobs: StateFlow<List<com.example.data.JobEntity>> = _jobs.asStateFlow()
 
-    private val _jobApplications = MutableStateFlow<List<com.example.data.JobApplicationEntity>>(emptyList())
+    internal val _jobApplications = MutableStateFlow<List<com.example.data.JobApplicationEntity>>(emptyList())
     val jobApplications: StateFlow<List<com.example.data.JobApplicationEntity>> = _jobApplications.asStateFlow()
 
     private val _ratings = MutableStateFlow<List<com.example.data.RatingEntity>>(emptyList())
@@ -243,13 +249,13 @@ class MainViewModel : ViewModel() {
     private val _registeredUsersCount = MutableStateFlow(0)
     val registeredUsersCount: StateFlow<Int> = _registeredUsersCount.asStateFlow()
 
-    private val _currentUserName = MutableStateFlow("")
+    internal val _currentUserName = MutableStateFlow("")
     val currentUserName: StateFlow<String> = _currentUserName.asStateFlow()
 
-    private val _currentUserPhone = MutableStateFlow("")
+    internal val _currentUserPhone = MutableStateFlow("")
     val currentUserPhone: StateFlow<String> = _currentUserPhone.asStateFlow()
 
-    private val _currentUserResidence = MutableStateFlow("")
+    internal val _currentUserResidence = MutableStateFlow("")
     val currentUserResidence: StateFlow<String> = _currentUserResidence.asStateFlow()
 
     private val _adminRole = MutableStateFlow("GUEST")
@@ -852,6 +858,7 @@ class MainViewModel : ViewModel() {
 
         // 5. Providers
         db.collection("providers").addSnapshotListener { snapshot, error ->
+            _isProvidersLoading.value = false
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -957,6 +964,7 @@ class MainViewModel : ViewModel() {
 
         // 9. Chat Channels
         db.collection("chat_channels").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
+            _isChatChannelsLoading.value = false
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1689,11 +1697,31 @@ class MainViewModel : ViewModel() {
     fun selectCategory(categoryId: String?) {
         _selectedCategoryId.value = categoryId
         applyFilters()
+        
+        // Log custom Firebase Analytics event
+        try {
+            val bundle = android.os.Bundle().apply {
+                putString("category_id", categoryId ?: "all")
+            }
+            com.example.MyApplication.logFirebaseEvent("select_category", bundle)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
         applyFilters()
+
+        // Log custom Firebase Analytics event
+        try {
+            val bundle = android.os.Bundle().apply {
+                putString("search_query", query)
+            }
+            com.example.MyApplication.logFirebaseEvent("search_query", bundle)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun toggleVipFilter() {
@@ -4001,8 +4029,29 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // Bookings Management
+    // Bookings Management (Now modularized in MainViewModelBookings.kt)
     fun addBooking(
+        name: String, 
+        phone: String, 
+        area: String, 
+        serviceType: String, 
+        providerId: String, 
+        providerName: String, 
+        dateString: String = "2026-06-20", 
+        timeString: String = "12:00 م",
+        couponCode: String = "",
+        pinCode: String = "",
+        customBookingId: String = "",
+        customPassword: String = ""
+    ) {
+        addBookingImpl(
+            name, phone, area, serviceType, providerId, providerName,
+            dateString, timeString, couponCode, pinCode, customBookingId, customPassword
+        )
+        return
+    }
+
+    fun addBooking_disabled_unused(
         name: String, 
         phone: String, 
         area: String, 
@@ -4284,64 +4333,19 @@ class MainViewModel : ViewModel() {
     }
 
     fun updateBookingStatus(bookingId: String, newStatus: String, rejectionReason: String = "") {
-        db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
-            val b = snapshot.toObject(BookingEntity::class.java)
-            if (b != null) {
-                val updated = b.copy(status = newStatus, rejectionReason = rejectionReason)
-                db.collection("bookings").document(bookingId).set(updated)
-                
-                val arabicStatusMsg = when(newStatus) {
-                    "APPROVED", "ACCEPTED", "IN_PROGRESS" -> "قبول وتأكيد حجزك بنجاح وسيتواصل معك الفني قريباً"
-                    "PENDING", "UNDER_REVIEW" -> "وضع حجزك قيد المراجعة والتدقيق الإداري"
-                    "REJECTED" -> "رفض وإلغاء حجزك" + (if (rejectionReason.isNotBlank()) " لسبب: $rejectionReason" else "")
-                    "COMPLETED" -> "إكمال وإنجاز الخدمة بنجاح وتقييم العمل"
-                    else -> "تعديل حالة طلب حجزك إلى: $newStatus"
-                }
-
-                // Always send critical user notifications for booking transitions so they can track progress
-                addNotification(
-                    title = "📅 تحديث حالة الحجز (رقم ${b.id})",
-                    message = "عزيزي العميل، تم $arabicStatusMsg للخدمة المقدمة من ${b.providerName}.",
-                    targetType = "USER",
-                    targetValue = b.customerPhone
-                )
-            }
-        }
-        val toastMsg = when(newStatus) {
-            "APPROVED", "ACCEPTED", "IN_PROGRESS" -> "⚡ تم قبول وتأكيد الحجز بنجاح"
-            "PENDING", "UNDER_REVIEW" -> "⏳ تم وضع الحجز قيد المراجعة"
-            "REJECTED" -> "❌ تم رفض الحجز وإلغائه"
-            "COMPLETED" -> "🎉 تم إكمال الخدمة بنجاح وتوثيق الإنجاز"
-            else -> "تم تحديث حالة الحجز بنجاح"
-        }
-        triggerNotification(toastMsg)
+        updateBookingStatusImpl(bookingId, newStatus, rejectionReason)
     }
 
     fun deleteBooking(bookingId: String) {
-        _bookings.value = _bookings.value.filter { it.id != bookingId }
-        db.collection("bookings").document(bookingId).delete()
-        triggerNotification("🗑️ تم حذف الحجز من السجلات")
+        deleteBookingImpl(bookingId)
     }
 
     fun deleteAllBookings(customerPhone: String) {
-        _bookings.value = _bookings.value.filter { it.customerPhone != customerPhone }
-        db.collection("bookings")
-            .whereEqualTo("customerPhone", customerPhone)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                val batch = db.batch()
-                for (doc in querySnapshot.documents) {
-                    batch.delete(doc.reference)
-                }
-                batch.commit().addOnSuccessListener {
-                    triggerNotification("🗑️ تم تصفية وحذف سجل جميع الحجوزات بنجاح.")
-                }
-            }
+        deleteAllBookingsImpl(customerPhone)
     }
 
     fun updateBooking(booking: BookingEntity) {
-        db.collection("bookings").document(booking.id).set(booking)
-        triggerNotification("💾 تم تحديث بيانات الحجز بنجاح")
+        updateBookingImpl(booking)
     }
 
     // Targeted Notifications Management
@@ -5063,10 +5067,10 @@ class MainViewModel : ViewModel() {
         ADMIN_ONLY("للأدمن أولاً")
     }
 
-    private val _bookingFormFields = MutableStateFlow(BookingFormFields())
+    internal val _bookingFormFields = MutableStateFlow(BookingFormFields())
     val bookingFormFields: StateFlow<BookingFormFields> = _bookingFormFields.asStateFlow()
 
-    private val _distributionMode = MutableStateFlow(BookingDistributionMode.ADMIN_ONLY)
+    internal val _distributionMode = MutableStateFlow(BookingDistributionMode.ADMIN_ONLY)
     val distributionMode: StateFlow<BookingDistributionMode> = _distributionMode.asStateFlow()
 
     fun updateBookingFormFields(fields: BookingFormFields) {
@@ -5115,168 +5119,23 @@ class MainViewModel : ViewModel() {
     }
 
     fun cancelBookingByUser(bookingId: String) {
-        val b = _bookings.value.find { it.id == bookingId }
-        _bookings.value = _bookings.value.map { booking ->
-            if (booking.id == bookingId) {
-                booking.copy(status = "CANCELLED")
-            } else booking
-        }
-        try {
-            db.collection("bookings").document(bookingId).update("status", "CANCELLED")
-                .addOnSuccessListener {
-                    triggerNotification("✅ تم إلغاء الحجز وإرسال إشعار للإدارة والفني")
-                    val custName = b?.customerName?.ifBlank { "العميل" } ?: "العميل"
-                    val custPhone = b?.customerPhone ?: ""
-                    val provName = b?.providerName ?: ""
-                    val srvName = b?.serviceType?.ifBlank { "خدمة" } ?: "خدمة"
-                    
-                    // 1. Notify Admin
-                    addNotification(
-                        title = "🚨 إلغاء حجز من قبل العميل",
-                        message = "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName) لدى ($provName).",
-                        targetType = "ADMIN_ONLY",
-                        targetValue = ""
-                    )
-                    
-                    // 2. Notify Provider
-                    if (b != null && b.providerPhone.isNotBlank()) {
-                        addNotification(
-                            title = "❌ إلغاء حجز من العميل",
-                            message = "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName).",
-                            targetType = "PROVIDER",
-                            targetValue = b.providerPhone
-                        )
-                    }
-                }
-                .addOnFailureListener {
-                    triggerNotification("❌ فشل إلغاء الحجز، حاول مجدداً")
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        cancelBookingByUserImpl(bookingId)
     }
 
     fun attemptCancelBooking(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", onResult: (Boolean, String) -> Unit) {
-        db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
-            val b = snapshot.toObject(BookingEntity::class.java)
-            if (b == null) {
-                onResult(false, "❌ الحجز غير موجود في قاعدة البيانات")
-                return@addOnSuccessListener
-            }
-
-            // Check if locked
-            if (b.isLocked) {
-                val until = b.lockedUntil ?: 0L
-                if (System.currentTimeMillis() < until) {
-                    val remainingSeconds = (until - System.currentTimeMillis()) / 1000
-                    onResult(false, "🔒 هذا الحجز مقفل حالياً ومحمي بسبب تكرار المحاولات الخاطئة. يرجى المحاولة مجدداً بعد $remainingSeconds ثانية أو التواصل مع الإدارة.")
-                    return@addOnSuccessListener
-                }
-            }
-
-            // Check 6-hour cancellation restriction rule
-            if (com.example.utils.BookingUtils.isBookingWithin6Hours(b.dateString, b.timeString)) {
-                onResult(false, "⚠️ لا يمكن إلغاء أو حذف الحجز إذا تبقى أقل من 6 ساعات على موعد الحجز المحدد حرصاً على وقت الفني. يرجى التواصل مع الإدارة أو الفني عبر المحادثة.")
-                return@addOnSuccessListener
-            }
-
-            val cleanInput = input.trim()
-            val isPassCorrect = cleanInput == b.bookingPassword && b.bookingPassword.isNotEmpty()
-            val isNumCorrect = cleanInput == b.bookingNumber && b.bookingNumber.isNotEmpty()
-            val isPinCorrect = cleanInput == b.pinCode && b.pinCode.isNotEmpty()
-
-            if (isPassCorrect || isNumCorrect || isPinCorrect) {
-                // Correct input! Do the cancellation
-                val updated = b.copy(
-                    status = "CANCELLED",
-                    cancellationReason = reason,
-                    cancelledAt = System.currentTimeMillis(),
-                    cancelledBy = "USER",
-                    cancellationAttempts = 0,
-                    isLocked = false,
-                    lockedUntil = 0L,
-                    updatedAt = System.currentTimeMillis()
-                )
-                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
-                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
-                    
-                    // Trigger in-app notifications
-                    addNotification(
-                        title = "❌ تم إلغاء حجزك بنجاح",
-                        message = "عزيزي العميل، تم إلغاء حجز الخدمة بنجاح بطلب منك. رقم الحجز: ${b.bookingNumber.ifEmpty { b.id }}",
-                        targetType = "USER",
-                        targetValue = b.customerPhone
-                    )
-                    
-                    if (b.providerId.isNotEmpty()) {
-                        addNotification(
-                            title = "❌ تم إلغاء حجز قائم لديك",
-                            message = "الفني العزيز ${b.providerName}، نود إبلاغك بأن العميل قد ألغى الحجز رقم ${b.bookingNumber.ifEmpty { b.id }} والمحدد في تاريخ ${b.dateString} ${b.timeString}.",
-                            targetType = "PROVIDER",
-                            targetValue = b.providerPhone.ifEmpty { b.customerPhone }
-                        )
-                    }
-                    onResult(true, "✅ تم إلغاء الحجز بنجاح")
-                }.addOnFailureListener {
-                    onResult(false, "❌ فشل تحديث حالة الحجز في الخادم")
-                }
-            } else {
-                // Wrong input!
-                val newAttempts = b.cancellationAttempts + 1
-                val maxAttempts = 3
-                val shouldLock = newAttempts >= maxAttempts
-                val lockTime = if (shouldLock) System.currentTimeMillis() + 5 * 60 * 1000 else 0L // 5 minutes lock
-                
-                val updated = b.copy(
-                    cancellationAttempts = newAttempts,
-                    isLocked = shouldLock,
-                    lockedUntil = if (shouldLock) lockTime else null
-                )
-                
-                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
-                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
-                    if (shouldLock) {
-                        onResult(false, "🔒 تم قفل عمليات إلغاء هذا الحجز مؤقتاً لمدة 5 دقائق لحماية مقدم الخدمة من الإلغاءات غير المصرح بها.")
-                    } else {
-                        onResult(false, "❌ كلمة المرور أو رقم الحجز غير صحيح! المحاولات المتبقية: ${maxAttempts - newAttempts}")
-                    }
-                }.addOnFailureListener {
-                    onResult(false, "❌ إدخال خاطئ وفشل حفظ محاولة التحقق")
-                }
-            }
-        }.addOnFailureListener {
-            onResult(false, "❌ فشل الاتصال بقاعدة البيانات")
-        }
+        attemptCancelBookingImpl(bookingId, input, reason, onResult)
     }
 
     fun getBookingStatusColor(status: String): String {
-        return when (status.uppercase()) {
-            "PENDING", "UNDER_REVIEW" -> "#F97316" // Orange
-            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> "#3B82F6" // Blue
-            "COMPLETED" -> "#10B981" // Green
-            "REJECTED", "CANCELLED" -> "#EF4444" // Red
-            else -> "#9E9E9E"
-        }
+        return getBookingStatusColorImpl(status)
     }
 
     fun getBookingStatusLabel(status: String): String {
-        return when (status.uppercase()) {
-            "PENDING", "UNDER_REVIEW" -> "🔍 قيد المراجعة والتدقيق (33%)"
-            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> "⚡ جاري تنفيذ الخدمة (66%)"
-            "COMPLETED" -> "🎉 مكتملة بنجاح (100%)"
-            "REJECTED" -> "❌ مرفوضة من الإدارة"
-            "CANCELLED" -> "❌ ملغية"
-            else -> status
-        }
+        return getBookingStatusLabelImpl(status)
     }
 
     fun getBookingProgress(status: String): Float {
-        return when (status.uppercase()) {
-            "PENDING", "UNDER_REVIEW" -> 0.33f
-            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> 0.66f
-            "COMPLETED" -> 1.00f
-            else -> 0.0f
-        }
+        return getBookingProgressImpl(status)
     }
 
     // ============================================================

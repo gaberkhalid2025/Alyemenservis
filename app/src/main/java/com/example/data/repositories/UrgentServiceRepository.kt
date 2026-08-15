@@ -152,4 +152,62 @@ class UrgentServiceRepository(
 
         awaitClose { listener.remove() }
     }
+
+    /**
+     * Listen to user's own urgent requests
+     */
+    fun getUserRequestsFlow(customerId: String): Flow<List<UrgentRequestEntity>> = callbackFlow {
+        if (customerId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val listener = requestsCollection
+            .whereEqualTo("customerId", customerId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(UrgentRequestEntity::class.java)?.copy(id = doc.id)
+                    }.sortedByDescending { it.createdAt }
+                    trySend(list)
+                }
+            }
+
+        awaitClose { listener.remove() }
+    }
+
+    /**
+     * Listen to active offers for a specific request ID
+     */
+    fun getOffersForRequestFlow(requestId: String): Flow<List<OfferEntity>> = callbackFlow {
+        if (requestId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val listener = offersCollection
+            .whereEqualTo("requestId", requestId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(OfferEntity::class.java)?.copy(id = doc.id)
+                    }.sortedBy { it.price }
+                    trySend(list)
+                }
+            }
+
+        awaitClose { listener.remove() }
+    }
 }
