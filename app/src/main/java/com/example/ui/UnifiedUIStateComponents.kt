@@ -240,18 +240,79 @@ fun UnifiedErrorStateComposable(
 }
 
 // ==========================================
-// 5. 🔀 Smooth Page Transition Wrapper
+// 6. 💀 Skeleton Shimmer / Placeholder Loading Screens (Services, Restaurants, Jobs)
 // ==========================================
 @Composable
-fun <T> UnifiedPageTransitionWrapper(
-    targetState: T,
-    content: @Composable (T) -> Unit
+fun SkeletonPlaceholderCard(
+    height: androidx.compose.ui.unit.Dp = 110.dp,
+    themeColors: VisualThemePalette
 ) {
-    Crossfade(
-        targetState = targetState,
-        animationSpec = tween(durationMillis = 250),
-        label = "UnifiedPageTransition"
-    ) { state ->
-        content(state)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp, horizontal = 12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B18).copy(alpha = 0.8f)),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Placeholder Image Box
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            // Text placeholders
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Title
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(14.dp)
+                        .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                )
+                // Subtitle
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.4f)
+                        .height(10.dp)
+                        .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
+                )
+                // Bottom badge placeholder
+                Box(
+                    modifier = Modifier
+                        .size(width = 80.dp, height = 18.dp)
+                        .background(themeColors.accent.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                )
+            }
+        }
     }
 }
+
+@Composable
+fun UnifiedSkeletonListScreen(
+    itemsCount: Int = 4,
+    themeColors: VisualThemePalette
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        repeat(itemsCount) {
+            SkeletonPlaceholderCard(themeColors = themeColors)
+        }
+    }
+}
+

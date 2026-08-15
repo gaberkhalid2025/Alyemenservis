@@ -59,7 +59,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
 
     val myUrgentRequests = remember(bookings, activePhone) {
         if (activePhone.isBlank()) {
-            bookings.filter { it.timeString.contains("المزاد") || it.providerId == "ALL" || it.dateString.contains("عاجل") }
+            emptyList()
         } else {
             bookings.filter { 
                 (it.customerPhone.trim() == activePhone.trim() || activePhone == "ALL") &&

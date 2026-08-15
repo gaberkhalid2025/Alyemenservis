@@ -269,7 +269,9 @@ class MainViewModel : ViewModel() {
     ) { notificationsList, userId, phone, joinPhone, adminRoleState ->
         val distinctList = notificationsList.distinctBy { it.id }
         val now = System.currentTimeMillis()
-        val visibleList = if (adminRoleState != "GUEST") {
+        val isAdmin = adminRoleState == "OWNER" || adminRoleState == "SUPER_ADMIN" || adminRoleState == "ADMIN"
+        
+        val visibleList = if (isAdmin) {
             distinctList
         } else {
             distinctList.filter {
@@ -279,16 +281,22 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        if (adminRoleState != "GUEST") {
+        if (isAdmin) {
             visibleList
+        } else if (adminRoleState == "SUPERVISOR") {
+            visibleList.filter {
+                it.targetType == "ALL" ||
+                it.targetType == "SUPERVISOR" ||
+                (it.targetType == "USER" && (it.targetValue == userId || it.targetValue == phone || it.targetValue == joinPhone)) ||
+                (it.targetType == "PROVIDER" && (it.targetValue == userId || it.targetValue == phone))
+            }
         } else if (userId == "guest" && joinPhone.isEmpty()) {
             visibleList.filter { it.targetType == "ALL" }
         } else {
             visibleList.filter {
                 it.targetType == "ALL" || 
                 (it.targetType == "USER" && (it.targetValue == userId || it.targetValue == phone || it.targetValue == joinPhone)) ||
-                (it.targetType == "PROVIDER" && (it.targetValue == userId || it.targetValue == phone)) ||
-                (it.targetType == "SUPERVISOR" && adminRoleState == "SUPERVISOR")
+                (it.targetType == "PROVIDER" && (it.targetValue == userId || it.targetValue == phone))
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -905,7 +913,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 7. Bookings
-        db.collection("bookings").addSnapshotListener { snapshot, error ->
+        db.collection("bookings").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -924,7 +932,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 8. Notifications
-        db.collection("notifications").addSnapshotListener { snapshot, error ->
+        db.collection("notifications").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -948,7 +956,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 9. Chat Channels
-        db.collection("chat_channels").addSnapshotListener { snapshot, error ->
+        db.collection("chat_channels").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1026,7 +1034,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 14. Calls Log
-        db.collection("calls").addSnapshotListener { snapshot, error ->
+        db.collection("calls").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(30).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1083,7 +1091,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 17. Payments
-        db.collection("payments").addSnapshotListener { snapshot, error ->
+        db.collection("payments").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1203,7 +1211,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 21. Ratings
-        db.collection("ratings").addSnapshotListener { snapshot, error ->
+        db.collection("ratings").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1218,7 +1226,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 22. Orders
-        db.collection("orders").addSnapshotListener { snapshot, error ->
+        db.collection("orders").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1233,7 +1241,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 23. Activity Logs
-        db.collection("activity_logs").addSnapshotListener { snapshot, error ->
+        db.collection("activity_logs").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {

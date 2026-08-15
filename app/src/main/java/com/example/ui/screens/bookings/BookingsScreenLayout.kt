@@ -142,15 +142,26 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
     }
 
     // Filter customer bookings strictly to protect user privacy
-    val myCustomerBookings = remember(bookings, activeSearchPhone, currentUserPhone) {
-        if (activeSearchPhone == "ALL" || activeSearchPhone.isEmpty()) {
-            bookings.sortedByDescending { it.id }
+    val myCustomerBookings = remember(bookings, activeSearchPhone, currentUserPhone, adminRole) {
+        val isAdmin = adminRole != "GUEST" && adminRole != "SUPERVISOR"
+        val phoneToMatch = activeSearchPhone.trim()
+        val currentPhoneToMatch = currentUserPhone.trim()
+        
+        if (isAdmin) {
+            if (phoneToMatch.isEmpty()) {
+                bookings.sortedByDescending { it.id }
+            } else {
+                bookings.filter { it.customerPhone.trim() == phoneToMatch }.sortedByDescending { it.id }
+            }
         } else {
-            val phoneToMatch = activeSearchPhone.trim()
-            bookings.filter { 
-                it.customerPhone.trim() == phoneToMatch || 
-                (currentUserPhone.isNotEmpty() && it.customerPhone.trim() == currentUserPhone.trim())
-            }.sortedByDescending { it.id }
+            if (phoneToMatch.isEmpty() && currentPhoneToMatch.isEmpty()) {
+                emptyList()
+            } else {
+                bookings.filter { 
+                    (phoneToMatch.isNotEmpty() && it.customerPhone.trim() == phoneToMatch) ||
+                    (currentPhoneToMatch.isNotEmpty() && it.customerPhone.trim() == currentPhoneToMatch)
+                }.sortedByDescending { it.id }
+            }
         }
     }
 

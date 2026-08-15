@@ -109,6 +109,7 @@ fun QuickServiceRequestDialog(
     val context = LocalContext.current
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
+    val settingsState by viewModel.settings.collectAsState()
 
     var nameInput by remember(currentUserName, currentUserPhone) { mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotBlank()) "عميل ($currentUserPhone)" else "" }) }
     var phoneInput by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
@@ -117,6 +118,12 @@ fun QuickServiceRequestDialog(
     var selectedServiceType by remember { mutableStateOf("سباكة وتمديدات") }
     var problemDescription by remember { mutableStateOf("") }
     var pinCodeInput by remember { mutableStateOf("") }
+
+    val labelName = settingsState.bookingLabelName.ifBlank { "اسم العميل / صاحب الطلب" }
+    val labelPhone = settingsState.bookingLabelPhone.ifBlank { "رقم الهاتف اليمني للتواصل (9 أرقام)" }
+    val labelArea = settingsState.bookingLabelArea.ifBlank { "المدينة / المحافظة" }
+    val labelService = settingsState.bookingLabelService.ifBlank { "وصف المشكلة أو الخدمة بالتفصيل" }
+    val bookingTerms = settingsState.bookingTerms
 
     val yemeniCities = listOf("صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت", "ذمار", "عمران", "صعدة", "مأرب", "شبوة", "البيضاء", "لحج", "أبين", "المهرة")
     
@@ -166,9 +173,22 @@ fun QuickServiceRequestDialog(
 
                 Divider(color = themeColors.accent.copy(alpha = 0.2f))
 
+                if (bookingTerms.isNotBlank()) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7).copy(alpha = 0.1f)),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("💡", fontSize = 14.sp)
+                            Text(bookingTerms, fontSize = 11.sp, color = Color(0xFFFEF3C7), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
                 // Customer Name Input
                 Column {
-                    Text("👤 اسم العميل / صاحب الطلب:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("👤 $labelName:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { nameInput = it },
@@ -184,7 +204,7 @@ fun QuickServiceRequestDialog(
 
                 // Phone Input
                 Column {
-                    Text("📱 رقم الهاتف اليمني للتواصل (9 أرقام):", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("📱 $labelPhone:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = phoneInput,
                         onValueChange = { phoneInput = it },
@@ -201,7 +221,7 @@ fun QuickServiceRequestDialog(
 
                 // City Choice
                 Column {
-                    Text("🏙️ اختر المدينة / المحافظة:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("🏙️ $labelArea:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                         items(yemeniCities.size) { idx ->
                             val c = yemeniCities[idx]
@@ -267,7 +287,7 @@ fun QuickServiceRequestDialog(
 
                 // Problem Description
                 Column {
-                    Text("📝 وصف المشكلة أو الخدمة بالتفصيل:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("📝 $labelService:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = problemDescription,
                         onValueChange = { problemDescription = it },
