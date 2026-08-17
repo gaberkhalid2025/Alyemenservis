@@ -105,7 +105,7 @@ fun AppHeaderBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (showBackButton) {
@@ -113,16 +113,16 @@ fun AppHeaderBar(
                         onClick = { viewModel.goBack() },
                         modifier = Modifier
                             .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                            .size(34.dp)
+                            .size(24.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = if (isEn) "Back" else "رجوع",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(13.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                 }
 
                 val defaultTitle = if (isEn) "Yemen Services Directory" else "دليل خدمات اليمن"
@@ -141,7 +141,7 @@ fun AppHeaderBar(
 
                 Text(
                     text = titleText,
-                    fontSize = 14.sp,
+                    fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     maxLines = 1,
@@ -151,63 +151,63 @@ fun AppHeaderBar(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // [ طلباتي ] Icon Button in Header
+                // [ طلباتي ] Icon Button in Header (Reduced 30%)
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(themeColors.accent)
                         .clickable { viewModel.navigateTo("ORDERS_VIEW") }
-                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.5.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        Text("📋", fontSize = 12.sp)
+                        Text("📋", fontSize = 9.5.sp)
                         val isProvider = viewModel.selectedProvider != null || viewModel.selectedStore != null || viewModel.selectedProperty != null
                         Text(
                             text = if (isEn) (if (isProvider) "Requests" else "My Requests") else (if (isProvider) "الطلبات" else "طلباتي"),
-                            fontSize = 11.sp,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
                 val isRefreshingHeader by viewModel.isRefreshing.collectAsState()
                 IconButton(
                     onClick = { viewModel.refreshData() },
                     modifier = Modifier
                         .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                        .size(32.dp)
+                        .size(24.dp)
                 ) {
                     if (isRefreshingHeader) {
                         CircularProgressIndicator(
                             color = Color.White,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(16.dp)
+                            strokeWidth = 1.5.dp,
+                            modifier = Modifier.size(12.dp)
                         )
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = if (isEn) "Refresh" else "تحديث البيانات",
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(12.dp)
                         )
                     }
                 }
             }
         }
 
-        // Row 2: Navigation Items (5 luxury 3D golden icons)
+        // Row 2: Navigation Items (5 luxury 3D golden icons - Reduced 30%)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-                .background(Color(0xFF1E293B), RoundedCornerShape(10.dp))
-                .padding(vertical = 3.dp),
+                .padding(horizontal = 4.dp, vertical = 1.dp)
+                .background(Color(0xFF1E293B), RoundedCornerShape(8.dp))
+                .padding(vertical = 1.5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {

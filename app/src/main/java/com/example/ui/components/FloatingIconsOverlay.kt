@@ -39,32 +39,32 @@ fun BoxScope.FloatingIconsOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = 14.dp)
-                .shadow(8.dp, RoundedCornerShape(24.dp))
-                .clip(RoundedCornerShape(24.dp))
+                .padding(start = 10.dp, bottom = 10.dp)
+                .shadow(4.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xFFE11D48), Color(0xFFBE123C))
                     )
                 )
                 .clickable { onRequestServiceClick() }
-                .border(1.2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
-                .padding(horizontal = 11.dp, vertical = 7.dp),
+                .border(0.9.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 8.dp, vertical = 4.5.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Send,
                     contentDescription = "اطلب خدمتك الآن",
                     tint = Color.White,
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(11.dp)
                 )
                 Text(
                     text = "اطلب خدمتك الآن ⚡",
-                    fontSize = 11.sp,
+                    fontSize = 8.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -77,27 +77,27 @@ fun BoxScope.FloatingIconsOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 14.dp)
-                .shadow(8.dp, RoundedCornerShape(24.dp))
-                .clip(RoundedCornerShape(24.dp))
+                .padding(end = 10.dp, bottom = 10.dp)
+                .shadow(4.dp, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
                     )
                 )
                 .clickable { onAssistantClick() }
-                .border(1.2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
-                .padding(horizontal = 11.dp, vertical = 7.dp),
+                .border(0.9.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 8.dp, vertical = 4.5.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("🤖", fontSize = 14.sp)
+                Text("🤖", fontSize = 10.sp)
                 Text(
                     text = "المساعد الذكي",
-                    fontSize = 11.sp,
+                    fontSize = 8.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )

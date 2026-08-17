@@ -12,29 +12,49 @@ enum class PermissionLevel(val arabicTitle: String, val colorHex: String) {
 
 @Keep
 enum class PermissionCategory(
-    val mainKey: String,
+    val tabKey: String,
     val arabicTitle: String,
     val iconEmoji: String,
-    val count: Int
+    val expectedCount: Int
 ) {
-    NOTIFICATIONS("MANAGE_NOTIFICATIONS", "صلاحيات الإشعارات والتنبيهات", "🔔", 40),
-    BANNERS("MANAGE_BANNERS", "صلاحيات البنرات الإعلانية", "🖼️", 35),
-    REGISTRATION_FORMS("MANAGE_REG_FORMS", "صلاحيات استمارات التسجيل والانضمام", "📝", 30),
-    BOOKING_FORMS("MANAGE_BOOKINGS", "صلاحيات استمارات الحجز والمواعيد", "📅", 30),
-    QUICK_SERVICE("MANAGE_QUICK_SERVICE", "صلاحيات استمارة اطلب خدمتك الفورية", "⚡", 25),
-    CHAT("MANAGE_ADVANCED_CHAT", "صلاحيات المحادثات والدردشة الفورية", "💬", 45),
-    THEMES_ICONS("MANAGE_THEMES", "صلاحيات الأيقونات الذهبية والثيمات", "🎨", 25),
-    NEW_SECTIONS("MANAGE_NEW_SECTIONS", "صلاحيات الأقسام والتصنيفات", "📂", 35),
-    MAPS("MANAGE_MAP", "صلاحيات الخرائط والمواقع الجغرافية", "🗺️", 35),
-    STORES("MANAGE_STORES", "صلاحيات إدارة المحلات والمراكز", "🏬", 35),
-    RESTAURANTS("MANAGE_RESTAURANTS", "صلاحيات إدارة المطاعم والكافيهات", "🍽️", 35),
-    MEDICAL("MANAGE_MEDICAL", "صلاحيات إدارة المراكز الطبية والعيادات", "🏥", 35),
-    PROPERTIES("MANAGE_PROPERTIES", "صلاحيات إدارة العقارات والأملاك", "🏢", 35),
-    JOBS("MANAGE_JOBS", "صلاحيات إدارة الوظائف والشركات", "💼", 35),
-    CUSTOM_TABS("MANAGE_CUSTOM_TABS", "صلاحيات التبويبات المخصصة والتنقل", "📑", 30),
-    SECURITY_AUDIT("MANAGE_SECURITY", "صلاحيات الرقابة الأمنية والحظر", "🛡️", 30),
-    FINANCIAL("MANAGE_FINANCIAL", "صلاحيات الإدارة المالية والاشتراكات", "💰", 25),
-    SYSTEM_BACKUP("MANAGE_SYSTEM", "صلاحيات النظام وقواعد البيانات السحابية", "⚙️", 13)
+    BACKDOOR("BACKDOOR", "البوابة الخلفية (BACKDOOR)", "⚙️", 45),
+    REG_REQ("REG_REQ", "طلبات الانضمام والاعتماد", "⌛", 18),
+    MANUAL_ADD("MANUAL_ADD", "الإضافة اليدوية", "➕", 15),
+    STORES("STORES", "المحلات والمراكز التجارية", "🏪", 18),
+    RESTAURANTS("RESTAURANTS", "المطاعم والكافيهات", "🍔", 18),
+    MEDICAL("MEDICAL", "المراكز الطبية والعيادات", "🏥", 18),
+    PROPERTIES("PROPERTIES", "العقارات والأراضي", "🏠", 18),
+    JOBS("JOBS", "إعلانات الوظائف", "💼", 14),
+    APPLICANTS("APPLICANTS", "المتقدمين للوظائف", "📄", 8),
+    STATS("STATS", "الإحصائيات الشاملة", "📊", 10),
+    BOOKINGS("BOOKINGS", "نظام الحجوزات والمواعيد", "📅", 22),
+    CHATS("CHATS", "المحادثات والدردشة الفورية", "💬", 48),
+    PROVIDERS("PROVIDERS", "أعضاء الدليل والتميز", "👥", 14),
+    PASSWORDS_RESET("PASSWORDS_RESET", "إعادة تعيين كلمات المرور", "🔑", 8),
+    BANNERS("BANNERS", "البنرات الإعلانية والتوجيه", "📢", 18),
+    CATEGORIES("CATEGORIES", "تحكم الأقسام والتصنيفات", "🗂️", 12),
+    CITIES("CITIES", "تحكم المدن والمحافظات", "🗺️", 7),
+    COMPLAINTS("COMPLAINTS", "الشكاوى والبلاغات", "⚠️", 7),
+    VIP("VIP", "ترقيات واشتراكات VIP", "🏆", 6),
+    SUPERVISORS("SUPERVISORS", "المشرفين ومصفوفة الصلاحيات", "🛡️", 12),
+    COLORS("COLORS", "تخصيص الألوان والمظهر", "🎨", 34),
+    NOTIFICATIONS("NOTIFICATIONS", "بث وإدارة الإشعارات", "🔔", 20),
+    BACKUP("BACKUP", "النسخ الاحتياطي والمزامنة", "💾", 7),
+    CLEAN("CLEAN", "تنظيف وتهيئة البيانات", "🧹", 16),
+    REVIEWS("REVIEWS", "إدارة التقييمات والتعليقات", "⭐", 4),
+    CALLS("CALLS", "مراقبة سجلات المكالمات", "📞", 3),
+    COUPONS("COUPONS", "إدارة الكوبونات والخصومات", "🎫", 8),
+    BLOCKED("BLOCKED", "قائمة المحظورين المركزية", "🚫", 3),
+    DELETED("DELETED", "سلة المحذوفات المركزية", "🗑️", 3),
+    PAYMENTS("PAYMENTS", "المدفوعات ونظام المحافظ", "💳", 32),
+    CUSTOM_TABS("CUSTOM_TABS", "التبويبات المخصصة للملفات", "📑", 7),
+    GOLDEN_ICONS("GOLDEN_ICONS", "الأيقونات الذهبية والخطوط", "👑", 14),
+    ADVANCED_CHAT("ADVANCED_CHAT", "الدردشات المتقدمة", "⚡", 4),
+    CARD_CUSTOMIZER("CARD_CUSTOMIZER", "تخصيص أزرار وأشكال البطاقات", "🎛️", 5),
+    NEW_SECTION_CREATOR("NEW_SECTION_CREATOR", "إنشاء الأقسام الجديدة", "➕", 10),
+    REG_FORMS_MANAGER("REG_FORMS_MANAGER", "تخصيص استمارات التسجيل", "📋", 4),
+    ROLES_PERMISSIONS("ROLES_PERMISSIONS", "الصلاحيات والأدوار", "🛡️", 6),
+    MAP_CONTROLS("MAP_CONTROLS", "التحكم بشاشة الخرائط", "🗺️", 28)
 }
 
 @Keep
@@ -53,723 +73,872 @@ object AdminPermissionsRegistry {
 
     val allPermissions: List<AdminPermissionItem> by lazy {
         val list = mutableListOf<AdminPermissionItem>()
-        
-        // 1. الإشعارات والتنبيهات (40 صلاحية)
-        val notifItems = listOf(
-            "NOTIF_SEND_ALL" to "صلاحية إرسال إشعار للجميع",
-            "NOTIF_SEND_USERS" to "صلاحية إرسال إشعار للمستخدمين فقط",
-            "NOTIF_SEND_PROVIDERS" to "صلاحية إرسال إشعار للفنيين فقط",
-            "NOTIF_SEND_STORES" to "صلاحية إرسال إشعار للمحلات فقط",
-            "NOTIF_SEND_RESTAURANTS" to "صلاحية إرسال إشعار للمطاعم فقط",
-            "NOTIF_SEND_MEDICAL" to "صلاحية إرسال إشعار للمراكز الطبية فقط",
-            "NOTIF_SEND_PROPERTIES" to "صلاحية إرسال إشعار للعقارات فقط",
-            "NOTIF_SEND_JOBS" to "صلاحية إرسال إشعار لمعلني الوظائف فقط",
-            "NOTIF_SEND_AREA" to "صلاحية إرسال إشعار لمنطقة أو مدينة محددة",
-            "NOTIF_SEND_CATEGORY" to "صلاحية إرسال إشعار لتصنيف أو نشاط محدد",
-            "NOTIF_SEND_INDIVIDUAL" to "صلاحية إرسال إشعار لشخص أو حساب محدد",
-            "NOTIF_SEND_TOPIC" to "صلاحية إرسال إشعار حسب موضوع أو قناة معينة",
-            "NOTIF_SEND_SCHEDULED" to "صلاحية جدولة إرسال الإشعارات مسبقاً",
-            "NOTIF_SEND_AUTOMATED" to "صلاحية تفعيل الإشعارات التلقائية للنظام",
-            "NOTIF_SEND_URGENT" to "صلاحية إرسال إشعارات طارئة وعالية الأهمية",
-            "NOTIF_SEND_SOUND" to "صلاحية تخصيص نغمة وصوت الإشعار",
-            "NOTIF_SEND_SILENT" to "صلاحية إرسال إشعارات صامتة بدون صوت",
-            "NOTIF_SEND_WITH_IMAGE" to "صلاحية إرفاق صورة أو بانر مع الإشعار",
-            "NOTIF_SEND_WITH_ACTION" to "صلاحية إضافة أزرار إجراء وتوجيه سريع مع الإشعار",
-            "NOTIF_SEND_WITH_LINK" to "صلاحية إرفاق رابط خارجي أو داخلي مع الإشعار",
-            "NOTIF_DELETE" to "صلاحية حذف الإشعارات المرسلة من السجل",
-            "NOTIF_CANCEL" to "صلاحية إلغاء إشعار مجدول قبل موعد إرساله",
-            "NOTIF_REPORT" to "صلاحية الاطلاع على تقارير تسليم ونسبة قراءة الإشعارات",
-            "NOTIF_LOG_CLEAR" to "صلاحية مسح سجل الإشعارات المؤقتة",
-            "NOTIF_TEMPLATE_ADD" to "صلاحية إنشاء وحفظ قوالب الإشعارات الجاهزة",
-            "NOTIF_TEMPLATE_EDIT" to "صلاحية تعديل قوالب الإشعارات المخزنة",
-            "NOTIF_TEMPLATE_DELETE" to "صلاحية حذف قوالب الإشعارات",
-            "NOTIF_WHATSAPP_SYNC" to "صلاحية إرسال الإشعار عبر واتساب للمستخدم",
-            "NOTIF_SMS_GATEWAY" to "صلاحية إرسال الإشعار عبر رسائل SMS القصيرة",
-            "NOTIF_EMAIL_SYNC" to "صلاحية إرسال نسخة من الإشعار عبر البريد الإلكتروني",
-            "NOTIF_IN_APP_POPUP" to "صلاحية إظهار الإشعار كنافذة منبثقة ملء الشاشة",
-            "NOTIF_PIN_TOP" to "صلاحية تثبيت الإشعار في مركز الإشعارات بالهاتف",
-            "NOTIF_GEO_FENCE" to "صلاحية إرسال الإشعار الجغرافي للمتواجدين في نطاق معين",
-            "NOTIF_DEVICE_TOKEN" to "صلاحية فحص وتدقيق توكنات الأجهزة المستلمة",
-            "NOTIF_RATE_LIMIT" to "صلاحية تحديد وتعديل معدل تكرار الإشعارات",
-            "NOTIF_ANALYTICS" to "صلاحية تحليل معدل التفاعل والنقر على الإشعارات",
-            "NOTIF_CUSTOM_ICON" to "صلاحية تغيير أيقونة الإشعار المخصصة",
-            "NOTIF_LANGUAGE_FILTER" to "صلاحية إرسال الإشعار بلغة محددة",
-            "NOTIF_EXPORT_LOGS" to "صلاحية تصدير سجلات وتواريخ الإشعارات كملف",
-            "NOTIF_RETRY_FAILED" to "صلاحية إعادة إرسال الإشعارات التي فشل وصولها"
-        )
-        notifItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(0, 14, 20, 23, 27, 28)) PermissionLevel.SENSITIVE else if (idx in listOf(1, 2, 3, 4, 5, 6, 7, 8, 12, 13)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("1.${idx+1}", k, n, "تمكين $n داخل النظام بشكل كامل", "إشعارات النظام", "نظام الإشعارات الشامل", lvl, PermissionCategory.NOTIFICATIONS))
+
+        fun addGroup(cat: PermissionCategory, level: PermissionLevel, items: List<Pair<String, Pair<String, String>>>) {
+            items.forEachIndexed { index, (key, info) ->
+                val (title, desc) = info
+                list.add(
+                    AdminPermissionItem(
+                        id = "${cat.tabKey}_${index + 1}",
+                        key = key,
+                        name = title,
+                        description = desc,
+                        targetGroup = cat.arabicTitle,
+                        scope = "لوحة تحكم الأدمن -> ${cat.arabicTitle}",
+                        level = level,
+                        category = cat
+                    )
+                )
+            }
         }
 
-        // 2. البنرات الإعلانية (35 صلاحية)
-        val bannerItems = listOf(
-            "BANNER_VIEW" to "صلاحية عرض جميع البنرات الإعلانية",
-            "BANNER_ADD" to "صلاحية إضافة بنر إعلاني جديد",
-            "BANNER_EDIT" to "صلاحية تعديل بيانات البنر وتصميمه",
-            "BANNER_DELETE" to "صلاحية حذف البنر الإعلاني نهائياً",
-            "BANNER_ACTIVATE" to "صلاحية تفعيل ظهور البنر فورياً",
-            "BANNER_DEACTIVATE" to "صلاحية إيقاف البنر مؤقتاً",
-            "BANNER_REORDER" to "صلاحية تغيير ترتيب تسلسل البنرات",
-            "BANNER_SCHEDULE" to "صلاحية جدولة البنر بمواعيد بداية ونهاية",
-            "BANNER_SET_LOCATION" to "صلاحية تحديد مكان وموضع ظهور البنر",
-            "BANNER_LINK_EXTERNAL" to "صلاحية ربط البنر برابط موقع خارجي",
-            "BANNER_LINK_SECTION" to "صلاحية ربط البنر بقسم أو صفحة داخلية",
-            "BANNER_LINK_STORE" to "صلاحية ربط البنر بمتجر أو مزود خدمة محدد",
-            "BANNER_TARGET_CITY" to "صلاحية استهداف مدينة محددة بالبنر",
-            "BANNER_TARGET_USER_TYPE" to "صلاحية استهداف نوع مستخدمين محدد",
-            "BANNER_ANALYTICS" to "صلاحية مشاهدة إحصائيات النقرات والمشاهدات",
-            "BANNER_CLICK_TRACKING" to "صلاحية تتبع روابط وإحالات البنر",
-            "BANNER_AUTO_SLIDE_SPEED" to "صلاحية ضبط سرعة انتقال البنرات التلقائي",
-            "BANNER_RESIZE" to "صلاحية تعديل مقاسات وأبعاد البنر بالواجهة",
-            "BANNER_CATEGORY_HEADER" to "صلاحية وضع بنرات مخصصة لرؤوس الأقسام",
-            "BANNER_POPUP_PROMO" to "صلاحية إنشاء بنر نافذة إعلانية منبثقة",
-            "BANNER_FLOATING" to "صلاحية تفعيل بنر عائم سريع التفاعل",
-            "BANNER_VIDEO_SUPPORT" to "صلاحية تفعيل بنرات الفيديو المتحركة",
-            "BANNER_BADGE_OVERLAY" to "صلاحية إضافة شارات ترويجية فوق البنر",
-            "BANNER_PRICE_TAG" to "صلاحية إضافة شريط العروض والأسعار للبنر",
-            "BANNER_CUSTOM_ANIMATION" to "صلاحية تخصيص تأثيرات حركة وانتقال البنرات",
-            "BANNER_EXPORT_METRICS" to "صلاحية تصدير تقارير حملات البنرات الإعلانية",
-            "BANNER_EXPIRY_ALERT" to "صلاحية ضبط تنبيه انتهاء مدة الإعلان للمعلن",
-            "BANNER_MAX_DISPLAY_COUNT" to "صلاحية تحديد الحد الأقصى للمشاهدات",
-            "BANNER_CALL_TO_ACTION" to "صلاحية تخصيص نص وزر اتخاذ الإجراء",
-            "BANNER_SPONSOR_TAG" to "صلاحية إضافة علامة الإعلان الممول للبنر",
-            "BANNER_DARK_MODE_STYLE" to "صلاحية ضبط مظهر البنر في الوضع الليلي",
-            "BANNER_DIRECT_PHONE_CALL" to "صلاحية ربط زر البنر بالاتصال المباشر",
-            "BANNER_DIRECT_WHATSAPP" to "صلاحية ربط زر البنر بمحادثة واتساب فورية",
-            "BANNER_GEO_RADIUS" to "صلاحية تحديد النطاق الجغرافي بالكيلومتر",
-            "BANNER_PRIORITY_BOOST" to "صلاحية رفع أولوية ظهور البنر في الصدارة"
+        // 1. البوابة الخلفية (BACKDOOR) - 45 صلاحية
+        addGroup(
+            PermissionCategory.BACKDOOR,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "BD_APP_NAME" to ("تغيير اسم التطبيق" to "تغيير الاسم الذي يظهر للمستخدمين في التطبيق"),
+                "BD_WELCOME_MSG" to ("تغيير رسالة الترحيب" to "تغيير رسالة الترحيب في شاشة البداية"),
+                "BD_FOOTER_MSG" to ("تغيير رسالة الفوتر" to "تغيير النص الذي يظهر في أسفل التطبيق"),
+                "BD_FOOTER_BG" to ("تغيير لون خلفية الفوتر" to "تغيير لون خلفية الشريط السفلي للتطبيق"),
+                "BD_FOOTER_ICONS" to ("التحكم في أيقونات الفوتر" to "إظهار أو إخفاء أيقونات الفوتر (عن التطبيق، الحجوزات، اللغة، الإدارة)"),
+                "BD_FOOTER_ORDER" to ("تحديد ترتيب أيقونات الفوتر" to "تحديد ترتيب ظهور أيقونات الشريط السفلي"),
+                "BD_APP_VERSION" to ("تغيير رقم الإصدار" to "تغيير رقم إصدار التطبيق المعروض للمستخدمين"),
+                "BD_APP_THEME" to ("تغيير ثيم التطبيق" to "تغيير الثيم والألوان العامة للتطبيق"),
+                "BD_MAINTENANCE" to ("تفعيل/تعطيل وضع الصيانة" to "وضع التطبيق بالكامل في وضع الصيانة المؤقت"),
+                "BD_SUPPORT_INFO" to ("تغيير بيانات الدعم" to "تغيير رقم الهاتف، البريد الإلكتروني، وواتساب الدعم الفني"),
+                "BD_APP_DOWNLOAD" to ("تغيير رابط تحميل التطبيق" to "تغيير رابط تحميل وتحديث التطبيق المباشر"),
+                "BD_SOCIAL_LINKS" to ("تغيير روابط التواصل الاجتماعي" to "تغيير روابط فيسبوك، تويتر، إنستغرام، يوتيوب، وتليجرام"),
+                "BD_HIDE_SOCIAL" to ("إخفاء/إظهار روابط التواصل الاجتماعي" to "التحكم في ظهور روابط منصات التواصل الاجتماعي"),
+                "BD_ABOUT_ORDER" to ("تغيير ترتيب صفحة عن التطبيق" to "تحديد ترتيب ظهور العناصر والبطاقات في صفحة عن التطبيق"),
+                "BD_ABOUT_COVER" to ("تغيير صورة غلاف صفحة عن التطبيق" to "تغيير صورة الغلاف المخصصة في صفحة عن التطبيق"),
+                "BD_ABOUT_TEXT" to ("تغيير النص المخصص في صفحة عن التطبيق" to "تغيير المحتوى النصي والشرح في صفحة عن التطبيق"),
+                "BD_ENCRYPTION" to ("تغيير مستوى التشفير" to "تغيير بروتوكول ومستوى التشفير المستخدم في المنظومة"),
+                "BD_SPLASH_MSG" to ("تغيير رسالة شاشة البداية" to "تغيير الرسالة التي تظهر في شاشة البداية (Splash)"),
+                "BD_BANNER_TOGGLE" to ("تفعيل/تعطيل البنر الإعلاني" to "تفعيل أو تعطيل البنر الإعلاني في الصفحة الرئيسية"),
+                "BD_BANNER_TYPE" to ("تغيير نوع البنر الإعلاني" to "تغيير نوع البنر (نصي، صورة، فيديو)"),
+                "BD_BANNER_CONTENT" to ("تغيير محتوى البنر الإعلاني" to "تغيير المحتوى النصي أو رابط الصورة أو الفيديو للبنر"),
+                "BD_BANNER_DURATION" to ("تغيير مدة ظهور البنر" to "تحديد مدة ظهور البنر الإعلاني بالثواني"),
+                "BD_BANNER_POSITION" to ("تغيير موقع البنر" to "تغيير موقع ظهور البنر (أعلى، أسفل)"),
+                "BD_BANNER_STYLE" to ("تغيير نمط عرض البنر" to "تغيير نمط العرض والتأثير (انزلاق، تلاشي، وميض، تمرير)"),
+                "BD_ADMIN_USERNAME" to ("تغيير اسم مستخدم الأدمن" to "تغيير اسم المستخدم والبريد الخاص بحساب الأدمن"),
+                "BD_ADMIN_PASSWORD" to ("تغيير كلمة مرور الأدمن" to "تغيير كلمة المرور الخاصة بحساب الأدمن الرئيسي"),
+                "BD_SPEECH_SEARCH" to ("تفعيل/تعطيل البحث الصوتي" to "تفعيل أو تعطيل خاصية ومحرك البحث الصوتي"),
+                "BD_VISITOR_REG" to ("تفعيل/تعطيل تسجيل الزائرين" to "السماح للزائرين باستخدام واستعراض التطبيق دون تسجيل"),
+                "BD_CHAT_FIREWALL" to ("تفعيل/تعطيل جدار حماية المحادثات" to "تفعيل أو تعطيل جدار الحماية والفلترة للمحادثات"),
+                "BD_BOOKING_FIREWALL" to ("تفعيل/تعطيل جدار حماية الحجوزات" to "تفعيل أو تعطيل جدار حماية وتدقيق الحجوزات"),
+                "BD_MAP_TOGGLE" to ("تفعيل/تعطيل ميزة الخرائط" to "تفعيل أو تعطيل ميزة الخرائط في التطبيق بالكامل"),
+                "BD_MAP_PROVIDER" to ("تغيير مزود الخرائط" to "تغيير مزود الخرائط (MapLibre، Google Maps، Mapbox)"),
+                "BD_REG_FORMS_TOGGLE" to ("تفعيل/تعطيل استمارات التسجيل" to "تفعيل أو تعطيل استمارات التسجيل للأقسام المختلفة"),
+                "BD_REFRESH_ICON" to ("تفعيل/تعطيل أيقونة التحديث" to "تفعيل أو تعطيل أيقونة التحديث في شريط الرأس العلوي"),
+                "BD_SETTINGS_ICON" to ("تفعيل/تعطيل أيقونة الإعدادات" to "تفعيل أو تعطيل أيقونة الإعدادات في شريط الرأس"),
+                "BD_HEADER_ORDER" to ("تغيير ترتيب أيقونات الرأس" to "تحديد وترتيب ظهور أيقونات شريط الرأس العلوي"),
+                "BD_CATEGORIES_LAYOUT" to ("تغيير نوع عرض الأقسام" to "تغيير نوع عرض الأقسام (شبكة أفقية، صف، شبكة عمودية)"),
+                "BD_BOOKING_TERMS" to ("تغيير شروط الحجز" to "تعديل وتغيير النص المعروض في شروط الحجز الرسمية"),
+                "BD_BOOKING_LABELS" to ("تغيير تسميات حقول الحجز" to "تغيير تسميات حقول استمارة الحجز (الاسم، الهاتف، المنطقة)"),
+                "BD_MANAGER_CREDENTIALS" to ("تغيير بيانات المدير" to "تغيير اسم المستخدم وكلمة المرور لمدير المنظومة"),
+                "BD_DELETE_MOCK" to ("حذف البيانات الوهمية" to "حذف جميع البيانات الوهمية والتجريبية بضغطة زر"),
+                "BD_ALLOW_IMG_CHAT" to ("تفعيل إرسال الصور بالشات" to "السماح للأعضاء والزوار بتبادل الصور عبر الدردشة"),
+                "BD_ALLOW_VID_CHAT" to ("تفعيل إرسال الفيديو بالشات" to "السماح برفع وتبادل مقاطع الفيديو عبر الدردشة"),
+                "BD_LOYALTY_BANNER" to ("تفعيل بنر نقاط الولاء" to "عرض بنر مكافآت ونقاط الولاء في الواجهة"),
+                "BD_SEARCH_RADIUS" to ("تعديل أقصى نطاق بحث جغرافي" to "تحديد نطاق البحث الجغرافي بالكيلومترات (Radius)")
+            )
         )
-        bannerItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(3, 7, 19, 34)) PermissionLevel.SENSITIVE else if (idx in listOf(1, 2, 4, 5, 8, 12, 13)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("2.${idx+1}", k, n, "تمكين $n بكامل الصلاحيات", "البنرات الإعلانية", "الحملات الإعلانية", lvl, PermissionCategory.BANNERS))
-        }
 
-        // 3. استمارات التسجيل والانضمام (30 صلاحية)
-        val regItems = listOf(
-            "REG_VIEW_ALL_FIELDS" to "صلاحية استعراض جميع حقول استمارات التسجيل",
-            "REG_ADD_CUSTOM_FIELD" to "صلاحية إضافة حقل مخصص جديد للاستمارة",
-            "REG_EDIT_FIELD" to "صلاحية تعديل اسم وخيارات الحقل الإضافي",
-            "REG_DELETE_FIELD" to "صلاحية حذف حقل من استمارة التسجيل",
-            "REG_REORDER_FIELDS" to "صلاحية إعادة ترتيب تسلسل حقول الاستمارة",
-            "REG_SET_MANDATORY" to "صلاحية تعيين الحقل كإجباري أو اختياري",
-            "REG_TOGGLE_DOCS_UPLOAD" to "صلاحية طلب إرفاق المستندات والوثائق",
-            "REG_TOGGLE_PHOTO_UPLOAD" to "صلاحية طلب صورة شخصية / هوية من المتقدم",
-            "REG_TOGGLE_COMMERCIAL_REG" to "صلاحية طلب رقم السجل التجاري أو الترخيص",
-            "REG_TOGGLE_LOCATION_SELECT" to "صلاحية إلزامية تحديد الموقع بدقة على الخريطة",
-            "REG_PROVIDER_FORM_CONFIG" to "صلاحية تخصيص استمارة انضمام الفنيين والخدمات",
-            "REG_STORE_FORM_CONFIG" to "صلاحية تخصيص استمارة انضمام المحلات والمراكز",
-            "REG_RESTAURANT_FORM_CONFIG" to "صلاحية تخصيص استمارة انضمام المطاعم والكافيهات",
-            "REG_MEDICAL_FORM_CONFIG" to "صلاحية تخصيص استمارة انضمام المراكز الطبية",
-            "REG_PROPERTY_FORM_CONFIG" to "صلاحية تخصيص استمارة نشر العقارات",
-            "REG_JOB_FORM_CONFIG" to "صلاحية تخصيص استمارة الإعلان عن وظيفة",
-            "REG_TERMS_EDIT" to "صلاحية تعديل شروط وسياسات الانضمام المعروضة",
-            "REG_AUTO_APPROVAL" to "صلاحية تفعيل القبول التلقائي للطلبات المستوفية",
-            "REG_SMS_VERIFICATION" to "صلاحية تفعيل التحقق من الهاتف برمز SMS",
-            "REG_WHATSAPP_CONFIRM" to "صلاحية إرسال إشعار واتساب تأكيدي عند إرسال الطلب",
-            "REG_WELCOME_NOTE" to "صلاحية تخصيص رسالة الترحيب بعد اكتمال التسجيل",
-            "REG_FIELD_MAX_LENGTH" to "صلاحية ضبط الحد الأقصى لطول النصوص والمدخلات",
-            "REG_FIELD_REGEX_RULE" to "صلاحية ضبط قواعد التحقق والأنماط (Regex)",
-            "REG_DOCUMENT_FORMATS" to "صلاحية تحديد صيغ الملفات المسموح رفعها",
-            "REG_MAX_FILE_SIZE" to "صلاحية تحديد الحجم الأقصى لملفات الوثائق",
-            "REG_EXPORT_APPLICATIONS" to "صلاحية تصدير بيانات طلبات الانضمام إلى ملف",
-            "REG_ARCHIVE_REQUESTS" to "صلاحية أرشفة طلبات الانضمام القديمة",
-            "REG_CUSTOM_DROPDOWN_OPTIONS" to "صلاحية تخصيص خيارات القوائم المنسدلة",
-            "REG_NOTIFICATION_RECIPIENTS" to "صلاحية تحديد المشرفين المستلمين لإشعار الطلب الجديد",
-            "REG_REJECTION_REASONS_LIST" to "صلاحية إدارة قائمة أسباب الرفض الجاهزة"
+        // 2. طلبات الانضمام والاعتماد (REG_REQ) - 18 صلاحية
+        addGroup(
+            PermissionCategory.REG_REQ,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "REQ_VIEW_ALL" to ("عرض جميع طلبات الانضمام" to "مشاهدة جميع الطلبات المعلقة الواردة"),
+                "REQ_FILTER_SECTION" to ("تصفية الطلبات حسب القسم" to "تصفية الطلبات حسب (الخدمات، العقارات، المحلات، الطبية، المطاعم، الوظائف)"),
+                "REQ_VIEW_DETAILS" to ("عرض تفاصيل الطلب" to "مشاهدة جميع بيانات الطلب والوثائق والصور المرفقة"),
+                "REQ_ACCEPT_PROVIDER" to ("قبول طلب فني" to "قبول طلب انضمام فني وتفعيل حسابه بالدليل"),
+                "REQ_REJECT_PROVIDER" to ("رفض طلب فني" to "رفض طلب انضمام فني مع كتابة وتوثيق سبب الرفض"),
+                "REQ_ACCEPT_STORE" to ("قبول طلب محل" to "قبول طلب انضمام محل تجاري وتفعيل حسابه"),
+                "REQ_REJECT_STORE" to ("رفض طلب محل" to "رفض طلب انضمام محل مع كتابة سبب الرفض"),
+                "REQ_ACCEPT_RESTAURANT" to ("قبول طلب مطعم" to "قبول طلب انضمام مطعم أو كافيه وتفعيله"),
+                "REQ_REJECT_RESTAURANT" to ("رفض طلب مطعم" to "رفض طلب انضمام مطعم مع كتابة سبب الرفض"),
+                "REQ_ACCEPT_MEDICAL" to ("قبول طلب مركز طبي" to "قبول طلب انضمام مركز طبي أو عيادة وتفعيلها"),
+                "REQ_REJECT_MEDICAL" to ("رفض طلب مركز طبي" to "رفض طلب انضمام مركز طبي مع كتابة سبب الرفض"),
+                "REQ_ACCEPT_PROPERTY" to ("قبول طلب عقار" to "قبول طلب إدراج عقار جديد وتفعيله بالمنظومة"),
+                "REQ_REJECT_PROPERTY" to ("رفض طلب عقار" to "رفض طلب إدراج عقار مع كتابة سبب الرفض"),
+                "REQ_ACCEPT_JOB" to ("قبول طلب وظيفة" to "قبول طلب نشر إعلان وظيفي وتفعيله للجمهور"),
+                "REQ_REJECT_JOB" to ("رفض طلب وظيفة" to "رفض طلب نشر وظيفة مع كتابة سبب الرفض"),
+                "REQ_VIEW_ATTACHMENTS" to ("عرض الصور والمستندات المرفقة" to "مشاهدة الصور الشخصية، بطاقة الهوية، وصور الأعمال"),
+                "REQ_DELETE_PERMANENT" to ("حذف طلب انضمام نهائياً" to "حذف طلب الانضمام والمعاملة بشكل نهائي"),
+                "REQ_EXPORT_CSV" to ("تصدير تقرير طلبات الانضمام" to "تصدير سجل طلبات الانضمام بصيغة ملف CSV")
+            )
         )
-        regItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(3, 17, 18)) PermissionLevel.SENSITIVE else if (idx in listOf(1, 2, 5, 10, 11, 12, 13, 14, 15)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("3.${idx+1}", k, n, "تمكين $n باستمارات التسجيل", "استمارات التسجيل", "نماذج الانضمام", lvl, PermissionCategory.REGISTRATION_FORMS))
-        }
 
-        // 4. استمارات الحجز والمواعيد (30 صلاحية)
-        val bookingItems = listOf(
-            "BOOKING_VIEW_ALL" to "صلاحية استعراض ومتابعة جميع الحجوزات النشطة",
-            "BOOKING_ACCEPT" to "صلاحية قبول وتأكيد الحجز نيابة عن المزود",
-            "BOOKING_REJECT" to "صلاحية رفض وإلغاء الحجز مع توضيح السبب",
-            "BOOKING_RESCHEDULE" to "صلاحية تعديل موعد الحجز ووقت الخدمة",
-            "BOOKING_ADD_CUSTOM_FIELD" to "صلاحية إضافة حقول مخصصة لاستمارة الحجز",
-            "BOOKING_EDIT_FIELDS" to "صلاحية تعديل حقول استمارة الحجز",
-            "BOOKING_DELETE_FIELD" to "صلاحية إزالة حقول من نموذج الحجز",
-            "BOOKING_SET_TIME_SLOTS" to "صلاحية إدارة وتحديد فترات الأوقات المتاحة",
-            "BOOKING_TOGGLE_DEPOSIT" to "صلاحية طلب عربون مسبق للحجز",
-            "BOOKING_PRICE_CALCULATION" to "صلاحية ضبط آلية تسعير وحساب رسوم الحجز",
-            "BOOKING_AUTO_CONFIRM" to "صلاحية تفعيل التأكيد الآلي للحجوزات",
-            "BOOKING_CANCEL_WINDOW" to "صلاحية تحديد مهلة الإلغاء المجاني المسموحة",
-            "BOOKING_EXPORT_CALENDAR" to "صلاحية مزامنة وتصدير الحجوزات للتقويم",
-            "BOOKING_SMS_REMINDER" to "صلاحية تفعيل تذكير الرسائل النصية قبل الموعد",
-            "BOOKING_WHATSAPP_REMINDER" to "صلاحية تفعيل تذكير واتساب التلقائي قبل الموعد",
-            "BOOKING_RATING_REQUEST" to "صلاحية إرسال طلب التقييم التلقائي بعد انتهاء الموعد",
-            "BOOKING_DISPUTE_RESOLVE" to "صلاحية التدخل وحل النزاعات على الحجوزات",
-            "BOOKING_REFUND_PROCESS" to "صلاحية معالجة وإرجاع مبالغ الحجوزات الملغاة",
-            "BOOKING_CAPACITY_LIMIT" to "صلاحية تحديد الحد الأقصى للحجوزات اليومية",
-            "BOOKING_HOLIDAYS_CONFIG" to "صلاحية إدارة أيام العطلات والإجازات الرسمية",
-            "BOOKING_EMERGENCY_SLOTS" to "صلاحية فتح مواعيد طوارئ استثنائية",
-            "BOOKING_LOG_AUDIT" to "صلاحية الاطلاع على سجل تدقيق التعديلات على الحجز",
-            "BOOKING_ASSIGN_SUPERVISOR" to "صلاحية تعيين مشرف لمتابعة حجز معين",
-            "BOOKING_STATUS_OVERRIDE" to "صلاحية التغيير اليدوي لحالة الحجز",
-            "BOOKING_CLIENT_BLACKLIST" to "صلاحية حظر العملاء المسيئين من نظام الحجز",
-            "BOOKING_INVOICE_GENERATE" to "صلاحية إنشاء وإصدار فاتورة الحجز الإلكترونية",
-            "BOOKING_REPEAT_SCHEDULE" to "صلاحية تفعيل جدولة الحجوزات الدورية المتكررة",
-            "BOOKING_LOCATION_MAP_PIN" to "صلاحية إلزامية تثبيت موقع الخدمة المنزلية",
-            "BOOKING_SPECIAL_REQUESTS" to "صلاحية تفعيل خانة الطلبات والملاحظات الخاصة",
-            "BOOKING_STATISTICS_DASHBOARD" to "صلاحية مشاهدة إحصائيات ونسب إنجاز الحجوزات"
+        // 3. الإضافة اليدوية (MANUAL_ADD) - 15 صلاحية
+        addGroup(
+            PermissionCategory.MANUAL_ADD,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "ADD_PROVIDER" to ("إضافة فني جديد" to "إضافة فني يدوياً مع جميع بياناته الكاملة"),
+                "ADD_STORE" to ("إضافة محل جديد" to "إضافة محل تجاري يدوياً مع جميع بياناته"),
+                "ADD_RESTAURANT" to ("إضافة مطعم جديد" to "إضافة مطعم يدوياً مع المنيو وساعات العمل"),
+                "ADD_MEDICAL" to ("إضافة مركز طبي جديد" to "إضافة مركز طبي أو عيادة يدوياً مع التخصصات"),
+                "ADD_PROPERTY" to ("إضافة عقار جديد" to "إضافة عقار يدوياً مع التفاصيل والأسعار"),
+                "ADD_JOB" to ("إضافة وظيفة جديدة" to "إضافة إعلان وظيفة يدوياً مع شروط التقديم"),
+                "ADD_UPLOAD_AVATAR" to ("رفع صورة شخصية" to "رفع صورة شخصية للمهني أو الكيان من المعرض"),
+                "ADD_UPLOAD_COVER" to ("رفع صورة غلاف" to "رفع صورة غلاف للملف التعريفي من المعرض"),
+                "ADD_UPLOAD_ID" to ("رفع صورة بطاقة الهوية" to "رفع صورة الهوية الوطنية أو السجل التجاري"),
+                "ADD_UPLOAD_CERT" to ("رفع صورة الفحص الجنائي والمؤهل" to "رفع شهادات الخبرة والفحص الجنائي"),
+                "ADD_SELECT_SECTION" to ("اختيار وتعيين القسم" to "اختيار القسم الرئيسي والفرعي من القائمة"),
+                "ADD_SELECT_CITY" to ("اختيار وتعيين المدينة" to "اختيار المدينة والمنطقة الجغرافية"),
+                "ADD_GRANT_VIP" to ("تفعيل عضوية VIP فوراً" to "منح العضوية الذهبية VIP للمنشأة المضافة فوراً"),
+                "ADD_SET_PRICE" to ("تحديد السعر التقديري" to "تحديد تسعيرة الخدمة أو السلعة المضافة"),
+                "ADD_SAVE_SYNC" to ("حفظ ومزامنة البيانات" to "حفظ البيانات ومزامنتها فورياً بقاعدة البيانات السحابية")
+            )
         )
-        bookingItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(2, 16, 17, 23, 24)) PermissionLevel.SENSITIVE else if (idx in listOf(1, 3, 4, 8, 9, 10)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("4.${idx+1}", k, n, "تمكين $n في منظومة الحجز", "استمارات الحجز", "المواعيد والحجوزات", lvl, PermissionCategory.BOOKING_FORMS))
-        }
 
-        // 5. استمارة اطلب خدمتك الفورية (25 صلاحية)
-        val quickItems = listOf(
-            "QUICK_DISPATCH_ALL" to "صلاحية توجيه الطلبات الفورية لكافة الفنيين",
-            "QUICK_DISPATCH_AREA" to "صلاحية توجيه الطلب لأقرب فني في المنطقة جغرافياً",
-            "QUICK_CANCEL_REQUEST" to "صلاحية إلغاء الطلب الفوري وحذفه من النظام",
-            "QUICK_CHANGE_PRICE" to "صلاحية تسعير وتعديل التكلفة التقديرية للخدمة",
-            "QUICK_ASSIGN_PROVIDER" to "صلاحية إسناد الطلب لفني أو مركز معين يدوياً",
-            "QUICK_EMERGENCY_RADAR" to "صلاحية تفعيل رادار الطوارئ السريع للإشعارات",
-            "QUICK_CUSTOMIZE_FIELDS" to "صلاحية تخصيص وتعديل حقول استمارة الطلب الفوري",
-            "QUICK_SET_DEADLINE" to "صلاحية ضبط مهلة قبول الفني للطلب (بالثواني)",
-            "QUICK_AUDIO_NOTE" to "صلاحية تفعيل إرفاق تسجيل صوتي مع وصف المشكلة",
-            "QUICK_PHOTO_ATTACH" to "صلاحية تفعيل إرفاق صور للمشكلة أو العطل",
-            "QUICK_AUTO_ESCALATE" to "صلاحية التصعيد التلقائي في حال عدم استجابة الفني",
-            "QUICK_LIVE_TRACKING" to "صلاحية التتبع المباشر لوصول الفني إلى العميل",
-            "QUICK_FEE_COMMISSION" to "صلاحية ضبط نسبة عمولة التطبيق من الطلب الفوري",
-            "QUICK_CLIENT_CALL" to "صلاحية الاتصال السريع بين العميل ومقدم الخدمة",
-            "QUICK_WHATSAPP_BROADCAST" to "صلاحية إرسال الطلب لقروبات واتساب المعتمدة",
-            "QUICK_NIGHT_SHIFT_MODE" to "صلاحية تفعيل تسعيرة ونظام الورديات الليلية",
-            "QUICK_MINIMUM_CHARGE" to "صلاحية تحديد الحد الأدنى لأجرة الفحص والزيارة",
-            "QUICK_DISPUTE_MANAGEMENT" to "صلاحية فض الخلافات الفورية بين الطرفين",
-            "QUICK_CANCEL_PENALTY" to "صلاحية فرض غرامة على الإلغاء بعد انطلاق الفني",
-            "QUICK_STATUS_REPORT" to "صلاحية استخراج تقارير سرعة الاستجابة ومتوسط الوصول",
-            "QUICK_TAG_VIP_ORDERS" to "صلاحية وسم الطلبات المستعجلة كأولوية قصوى VIP",
-            "QUICK_SERVICE_HOURS" to "صلاحية تحديد ساعات توفر الخدمة الفورية",
-            "QUICK_SURGE_PRICING" to "صلاحية تفعيل التسعير الديناميكي وقت الذروة",
-            "QUICK_BLOCK_ABUSE" to "صلاحية حظر الأرقام التي تنشئ طلبات وهمية",
-            "QUICK_EXPORT_LOGS" to "صلاحية تصدير كافة سجلات الطلبات الفورية التاريخية"
+        // 4. المحلات التجارية (STORES) - 18 صلاحية
+        addGroup(
+            PermissionCategory.STORES,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "STORE_VIEW_ALL" to ("عرض جميع المحلات" to "مشاهدة جميع المحلات والمراكز التجارية المسجلة"),
+                "STORE_SEARCH" to ("البحث في المحلات" to "البحث عن محل معين بالاسم أو رقم الهاتف أو النشاط"),
+                "STORE_VIEW_DETAILS" to ("عرض تفاصيل محل" to "مشاهدة ملف وتفاصيل محل تجاري معين"),
+                "STORE_EDIT" to ("تعديل بيانات محل" to "تعديل بيانات وأسعار وتفاصيل محل موجود"),
+                "STORE_DELETE" to ("حذف محل نهائياً" to "حذف محل تجاري نهائياً من قاعدة البيانات"),
+                "STORE_BLOCK" to ("حظر محل تجاري" to "حظر المحل ومنعه من الظهور للعملاء"),
+                "STORE_UNBLOCK" to ("إلغاء حظر محل" to "إلغاء الحظر عن محل تجاري وإعادة تفعيله"),
+                "STORE_GRANT_VIP" to ("تفعيل VIP لمحل" to "منح محل تجاري عضوية VIP والظهور المميز"),
+                "STORE_REVOKE_VIP" to ("إلغاء VIP لمحل" to "إلغاء عضوية VIP عن محل تجاري"),
+                "STORE_VERIFY" to ("توثيق محل تجاري" to "منح المحل شارة التوثيق الرسمية المعتمدة"),
+                "STORE_UNVERIFY" to ("إلغاء توثيق محل" to "إلغاء شارة التوثيق عن محل تجاري"),
+                "STORE_RECOMMEND" to ("توصية محل" to "منح محل شارة التوصية للمستخدمين"),
+                "STORE_UNRECOMMEND" to ("إلغاء توصية محل" to "إلغاء شارة التوصية عن محل تجاري"),
+                "STORE_DISABLE_CHAT" to ("تعطيل الدردشة عن محل" to "إيقاف خاصية الدردشة والمراسلة عن محل معين"),
+                "STORE_ENABLE_CHAT" to ("تفعيل الدردشة عن محل" to "تفعيل خاصية الدردشة والمراسلة لمحل معين"),
+                "STORE_DISABLE_NOTIF" to ("تعطيل الإشعارات عن محل" to "إيقاف الإشعارات التنبيهية عن محل معين"),
+                "STORE_ENABLE_NOTIF" to ("تفعيل الإشعارات عن محل" to "تفعيل الإشعارات التنبيهية لمحل معين"),
+                "STORE_PRODUCTS_MANAGE" to ("إدارة منتجات المحل" to "إضافة وتعديل وحذف المنتجات والسلع التابعة للمحل")
+            )
         )
-        quickItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(2, 3, 12, 17, 23)) PermissionLevel.SENSITIVE else if (idx in listOf(0, 1, 4, 5, 6, 10)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("5.${idx+1}", k, n, "تمكين $n بالخدمة الفورية", "الخدمة الفورية", "اطلب خدمتك الآن", lvl, PermissionCategory.QUICK_SERVICE))
-        }
 
-        // 6. المحادثات والدردشة الفورية والرقابة (45 صلاحية)
-        val chatItems = listOf(
-            "CHAT_MONITOR_ALL" to "صلاحية الرقابة والإشراف العام على جميع المحادثات",
-            "CHAT_READ_USER_PROVIDER" to "صلاحية قراءة محادثات العملاء والفنيين للتحقق الأمني",
-            "CHAT_READ_STORE_CHAT" to "صلاحية قراءة محادثات العملاء والمتاجر للتأكد من الجودة",
-            "CHAT_SEND_ADMIN_MSG" to "صلاحية إرسال رسائل رسمية باسم إدارة التطبيق",
-            "CHAT_DELETE_MESSAGE" to "صلاحية حذف أي رسالة مسيئة أو مخالفة من الطرفين",
-            "CHAT_DELETE_CONVERSATION" to "صلاحية حذف المحادثة بالكامل وسجلها نهائياً",
-            "CHAT_BLOCK_USER" to "صلاحية حظر مستخدم من استخدام ميزة الشات والمراسلة",
-            "CHAT_BLOCK_WORDS" to "صلاحية إدارة قائمة الكلمات والأرقام المحظورة تلقائياً",
-            "CHAT_ATTACH_IMAGE" to "صلاحية السماح برفع وإرسال الصور في المحادثات",
-            "CHAT_ATTACH_VOICE" to "صلاحية السماح بإرسال التسجيلات الصوتية في الشات",
-            "CHAT_ATTACH_FILE" to "صلاحية السماح برفع المستندات وملفات PDF في الشات",
-            "CHAT_ATTACH_LOCATION" to "صلاحية إرسال ومشاركة الموقع الجغرافي المباشر",
-            "CHAT_DISABLE_CHAT_STORE" to "صلاحية إيقاف الدردشة عن متجر أو فني محدد",
-            "CHAT_ENABLE_CHAT_STORE" to "صلاحية إعادة تفعيل الدردشة لمتجر أو فني",
-            "CHAT_AI_ASSISTANT_TOGGLE" to "صلاحية تفعيل وتعطيل المساعد الذكي في الشات",
-            "CHAT_AI_MODEL_SETTINGS" to "صلاحية ضبط خيارات ونموذج الذكاء الاصطناعي",
-            "CHAT_EXPORT_TRANSCRIPT" to "صلاحية تصدير نص المحادثة كملف للتحقيق والمراجعة",
-            "CHAT_REPORT_HANDLING" to "صلاحية معالجة بلاغات المستخدمين ضد الرسائل المسيئة",
-            "CHAT_AUTO_REPLY_ADD" to "صلاحية إضافة وتعديل الردود التلقائية والترحيبية",
-            "CHAT_AUTO_REPLY_DELETE" to "صلاحية حذف الردود التلقائية",
-            "CHAT_WORKING_HOURS" to "صلاحية تحديد أوقات عمل الشات وإظهار رسالة غير متصل",
-            "CHAT_MESSAGE_EDIT_ALLOW" to "صلاحية تفعيل خيار تعديل الرسائل للمستخدمين",
-            "CHAT_MESSAGE_UNSEND_ALLOW" to "صلاحية تفعيل خيار التراجع عن إرسال الرسائل",
-            "CHAT_UNREAD_BADGE_SYNC" to "صلاحية مزامنة شارات الرسائل غير المقروءة",
-            "CHAT_TYPING_INDICATOR" to "صلاحية تفعيل مؤشر جاري الكتابة الآن...",
-            "CHAT_READ_RECEIPTS" to "صلاحية تفعيل علامات قراءة الرسالة (صحين زرقاء)",
-            "CHAT_SPAM_PROTECTION" to "صلاحية ضبط فلاتر الحماية من الرسائل المكررة (Spam)",
-            "CHAT_BROADCAST_CHANNEL" to "صلاحية إنشاء قنوات وقوائم رسائل جماعية",
-            "CHAT_PIN_CONVERSATION" to "صلاحية تثبيت محادثات مهمة في أعلى قائمة الشات",
-            "CHAT_SEARCH_ARCHIVE" to "صلاحية البحث في أرشيف كافة المحادثات السابقة",
-            "CHAT_MEDIA_PREVIEW_LIMIT" to "صلاحية ضبط حجم الوسائط المسموح إرسالها",
-            "CHAT_FORWARD_MESSAGE" to "صلاحية تفعيل ميزة إعادة توجيه الرسائل",
-            "CHAT_STICKERS_EMOJI" to "صلاحية إدارة باقات الملصقات والرموز التعبيرية",
-            "CHAT_SUPPORT_TRANSFER" to "صلاحية تحويل تذكرة الدعم الفني بين المشرفين",
-            "CHAT_CALL_IN_APP" to "صلاحية تفعيل المكالمات الصوتية المباشرة داخل التطبيق",
-            "CHAT_VIDEO_CALL_IN_APP" to "صلاحية تفعيل مكالمات الفيديو داخل الشات",
-            "CHAT_END_TO_END_ENCRYPT" to "صلاحية تفعيل التشفير التام للمحادثات الحساسة",
-            "CHAT_WATERMARK_PHOTOS" to "صلاحية إضافة علامة مائية تلقائية على صور الشات",
-            "CHAT_CUSTOMER_SATISFACTION" to "صلاحية إظهار تقييم الرضا عن خدمة الشات",
-            "CHAT_PRIORITY_ROUTING" to "صلاحية توجيه العملاء المميزين VIP لمشرف مباشر",
-            "CHAT_DISAPPEARING_MSGS" to "صلاحية تفعيل الرسائل ذاتية الاختفاء بعد مدة",
-            "CHAT_OFFLINE_STORAGE" to "صلاحية تفعيل حفظ الرسائل محلياً بدون إنترنت",
-            "CHAT_TRANSLATE_TEXT" to "صلاحية تفعيل الترجمة الفورية للنصوص داخل الشات",
-            "CHAT_SYSTEM_ALERTS_FEED" to "صلاحية إرسال تنبيهات النظام داخل نافذة الشات",
-            "CHAT_QUICK_SNIPPETS" to "صلاحية إنشاء واختصار الردود السريعة للمشرفين"
+        // 5. المطاعم والكافيهات (RESTAURANTS) - 18 صلاحية
+        addGroup(
+            PermissionCategory.RESTAURANTS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "REST_VIEW_ALL" to ("عرض جميع المطاعم" to "مشاهدة جميع المطاعم والكافيهات المسجلة"),
+                "REST_SEARCH" to ("البحث في المطاعم" to "البحث عن مطعم معين بالاسم أو الوجبات أو الهاتف"),
+                "REST_VIEW_DETAILS" to ("عرض تفاصيل مطعم" to "مشاهدة تفاصيل المطعم والمنيو وأوقات العمل"),
+                "REST_EDIT" to ("تعديل بيانات مطعم" to "تعديل بيانات مطعم وقائمة الوجبات والأسعار"),
+                "REST_DELETE" to ("حذف مطعم نهائياً" to "حذف مطعم نهائياً من قاعدة البيانات"),
+                "REST_BLOCK" to ("حظر مطعم" to "حظر مطعم ومنعه من استقبال الطلبات"),
+                "REST_UNBLOCK" to ("إلغاء حظر مطعم" to "إلغاء الحظر عن مطعم وإعادة تشغيله"),
+                "REST_GRANT_VIP" to ("تفعيل VIP لمطعم" to "منح مطعم عضوية VIP والترتيب المتقدم"),
+                "REST_REVOKE_VIP" to ("إلغاء VIP لمطعم" to "إلغاء عضوية VIP عن مطعم"),
+                "REST_VERIFY" to ("توثيق مطعم" to "منح المطعم شارة التوثيق الصحية والتجارية"),
+                "REST_UNVERIFY" to ("إلغاء توثيق مطعم" to "إلغاء شارة التوثيق عن مطعم"),
+                "REST_RECOMMEND" to ("توصية مطعم" to "منح مطعم شارة الأكثر طلباً والتوصية"),
+                "REST_UNRECOMMEND" to ("إلغاء توصية مطعم" to "إلغاء شارة التوصية عن مطعم"),
+                "REST_DISABLE_CHAT" to ("تعطيل الدردشة عن مطعم" to "إيقاف خاصية الدردشة لطلبات المطعم"),
+                "REST_ENABLE_CHAT" to ("تفعيل الدردشة عن مطعم" to "تفعيل خاصية الدردشة لمطعم معين"),
+                "REST_DISABLE_NOTIF" to ("تعطيل الإشعارات عن مطعم" to "إيقاف تنبيهات الطلبات عن مطعم"),
+                "REST_ENABLE_NOTIF" to ("تفعيل الإشعارات عن مطعم" to "تفعيل تنبيهات الطلبات لمطعم معين"),
+                "REST_MENU_MANAGE" to ("إدارة منيو ووجبات المطعم" to "إضافة وتعديل وحذف الوجبات وقائمة الطعام")
+            )
         )
-        chatItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(0, 1, 2, 4, 5, 6, 7, 12)) PermissionLevel.SENSITIVE else if (idx in listOf(3, 14, 15, 16, 17, 33, 34, 35)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("6.${idx+1}", k, n, "تمكين $n بنظام المحادثات", "المحادثات الفورية", "الشات والدردشة", lvl, PermissionCategory.CHAT))
-        }
 
-        // 7. الأيقونات الذهبية والثيمات والواجهات (25 صلاحية)
-        val themeItems = listOf(
-            "THEME_CHANGE_ACTIVE" to "صلاحية تغيير الثيم النشط للتطبيق كاملاً",
-            "THEME_CUSTOM_COLORS" to "صلاحية تخصيص أكواد الألوان الرئيسية والفرعية",
-            "THEME_DARK_MODE_TOGGLE" to "صلاحية فرض الوضع الليلي الداكن أو الفاتح",
-            "THEME_GOLDEN_ICONS" to "صلاحية تفعيل حزمة الأيقونات الذهبية الفاخرة",
-            "THEME_ICON_PACK_SELECT" to "صلاحية التبديل بين حزم ومكتبات الأيقونات",
-            "THEME_FONT_FAMILY" to "صلاحية تغيير الخط العربي الافتراضي للتطبيق",
-            "THEME_CARD_RADIUS" to "صلاحية ضبط درجة انحناء واستدارة زوايا الكروت",
-            "THEME_HEADER_STYLE" to "صلاحية تخصيص شكل وترتيب الهيدر والشريط العلوي",
-            "THEME_BOTTOM_NAV_STYLE" to "صلاحية تخصيص شريط التنقل السفلي وأيقوناته",
-            "THEME_SPLASH_SCREEN" to "صلاحية تعديل شاشة البداية واللوجو والشعار",
-            "THEME_BACKGROUND_ART" to "صلاحية إضافة وتغيير الخلفيات الفنية للواجهات",
-            "THEME_SEASONAL_EFFECTS" to "صلاحية تفعيل تأثيرات المناسبات (رمضان، الأعياد)",
-            "THEME_ACCENT_GLOW" to "صلاحية تفعيل تأثير التوهج اللوني على الأزرار",
-            "THEME_TRANSPARENCY_BLUR" to "صلاحية تفعيل تأثيرات الزجاج والشفافية (Blur)",
-            "THEME_STATUS_BAR_COLOR" to "صلاحية ضبط لون شريط حالة النظام وإشعارات الهاتف",
-            "THEME_DIALOG_SHAPES" to "صلاحية تخصيص شكل النوافذ المنبثقة والتنبيهات",
-            "THEME_EXPORT_CONFIG" to "صلاحية تصدير إعدادات الثيم ومشاركتها كملف",
-            "THEME_IMPORT_CONFIG" to "صلاحية استيراد ثيم جاهز وتطبيقه فورياً",
-            "THEME_ANIMATION_SPEED" to "صلاحية تسريع أو إبطاء حركات الانتقال والتأثيرات",
-            "THEME_HIGH_CONTRAST" to "صلاحية تفعيل وضع التباين العالي لسهولة القراءة",
-            "THEME_CUSTOM_CSS_RULES" to "صلاحية تطبيق أنماط متقدمة مخصصة على الواجهات",
-            "THEME_SECTION_BADGES" to "صلاحية تخصيص ألوان شارات الأقسام والمتاجر",
-            "THEME_RTL_MIRRORING" to "صلاحية ضبط اتجاهات النصوص والمحاذاة للغة العربية",
-            "THEME_RESET_DEFAULTS" to "صلاحية إعادة ضبط جميع الألوان والثيمات للافتراضي",
-            "THEME_PREVIEW_MODE" to "صلاحية معاينة التعديلات على الثيم قبل اعتمادها"
+        // 6. المراكز الطبية والعيادات (MEDICAL) - 18 صلاحية
+        addGroup(
+            PermissionCategory.MEDICAL,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "MED_VIEW_ALL" to ("عرض جميع المراكز الطبية" to "مشاهدة جميع المراكز الطبية والعيادات المسجلة"),
+                "MED_SEARCH" to ("البحث في المراكز الطبية" to "البحث عن عيادة أو دكتور بالاسم أو التخصص"),
+                "MED_VIEW_DETAILS" to ("عرض تفاصيل مركز طبي" to "مشاهدة بيانات المركز والتخصصات وأوقات الكشف"),
+                "MED_EDIT" to ("تعديل بيانات مركز طبي" to "تعديل بيانات مركز طبي والأطباء والأسعار"),
+                "MED_DELETE" to ("حذف مركز طبي نهائياً" to "حذف مركز طبي أو عيادة من المنظومة"),
+                "MED_BLOCK" to ("حظر مركز طبي" to "حظر مركز طبي ومنعه من حجز المواعيد"),
+                "MED_UNBLOCK" to ("إلغاء حظر مركز طبي" to "إلغاء الحظر عن مركز طبي وإعادة تفعيله"),
+                "MED_GRANT_VIP" to ("تفعيل VIP لمركز طبي" to "منح المركز الطبي عضوية VIP للظهور المميز"),
+                "MED_REVOKE_VIP" to ("إلغاء VIP لمركز طبي" to "إلغاء عضوية VIP عن مركز طبي"),
+                "MED_VERIFY" to ("توثيق مركز طبي" to "منح المركز شارة التوثيق والرخصة الطبية المعتمدة"),
+                "MED_UNVERIFY" to ("إلغاء توثيق مركز طبي" to "إلغاء شارة التوثيق عن مركز طبي"),
+                "MED_RECOMMEND" to ("توصية مركز طبي" to "منح مركز طبي شارة التوصية الطبية"),
+                "MED_UNRECOMMEND" to ("إلغاء توصية مركز طبي" to "إلغاء شارة التوصية عن مركز طبي"),
+                "MED_DISABLE_CHAT" to ("تعطيل الدردشة عن مركز طبي" to "إيقاف الدردشة عن مركز طبي معين"),
+                "MED_ENABLE_CHAT" to ("تفعيل الدردشة عن مركز طبي" to "تفعيل خاصية الدردشة لمركز طبي"),
+                "MED_DISABLE_NOTIF" to ("تعطيل الإشعارات عن مركز طبي" to "إيقاف إشعارات المواعيد عن مركز طبي"),
+                "MED_ENABLE_NOTIF" to ("تفعيل الإشعارات عن مركز طبي" to "تفعيل إشعارات المواعيد لمركز طبي"),
+                "MED_DOCTORS_MANAGE" to ("إدارة أطباء وتخصصات المركز" to "إضافة وتعديل جدول الأطباء ومواعيد الكشف")
+            )
         )
-        themeItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(0, 1, 23)) PermissionLevel.SENSITIVE else if (idx in listOf(3, 4, 5, 9, 10, 11)) PermissionLevel.ADVANCED else PermissionLevel.BASIC
-            list.add(AdminPermissionItem("7.${idx+1}", k, n, "تمكين $n للواجهات والمظهر", "الأيقونات والثيمات", "المظهر والتخصيص", lvl, PermissionCategory.THEMES_ICONS))
-        }
 
-        // 8. الأقسام الرئيسية والفرعية والتصنيفات (35 صلاحية)
-        val catItems = listOf(
-            "CAT_VIEW_ALL" to "صلاحية استعراض جميع الأقسام والتصنيفات",
-            "CAT_ADD_MAIN" to "صلاحية إضافة قسم رئيسي جديد في التطبيق",
-            "CAT_ADD_SUB" to "صلاحية إضافة قسم فرعي تحت أي قسم رئيسي",
-            "CAT_EDIT_NAME" to "صلاحية تعديل اسم القسم ووصفه بالعربية والإنجليزية",
-            "CAT_CHANGE_ICON" to "صلاحية تغيير أيقونة أو صورة القسم",
-            "CAT_DELETE" to "صلاحية حذف القسم نهائياً من قاعدة البيانات",
-            "CAT_HIDE_SHOW" to "صلاحية إخفاء أو إظهار القسم من الواجهة مؤقتاً",
-            "CAT_REORDER" to "صلاحية إعادة ترتيب تسلسل ظهور الأقسام بالصفحة",
-            "CAT_PIN_HOMEPAGE" to "صلاحية تثبيت القسم في الصفحة الرئيسية للتطبيق",
-            "CAT_SET_COLOR" to "صلاحية تخصيص لون مميز لبطاقة وخلفية القسم",
-            "CAT_MOVE_ITEMS" to "صلاحية نقل مقدمي الخدمات والمحلات بين الأقسام",
-            "CAT_MERGE_CATEGORIES" to "صلاحية دمج قسمين فرعيين في قسم واحد",
-            "CAT_SPLIT_CATEGORY" to "صلاحية فصل قسم فرعي وتحويله لقسم مستقل",
-            "CAT_SET_BADGE" to "صلاحية إضافة شارة مميزة على القسم (جديد، عروض)",
-            "CAT_COMMISSION_RATE" to "صلاحية ضبط نسبة عمولة أو رسوم اشتراك مخصصة للقسم",
-            "CAT_CUSTOM_FORM_LINK" to "صلاحية ربط القسم باستمارة تسجيل أو حجز مخصصة",
-            "CAT_GEO_AVAILABILITY" to "صلاحية تحديد المحافظات والمدن التي يظهر فيها القسم",
-            "CAT_REQUIRED_DOCUMENTS" to "صلاحية تحديد الوثائق الإلزامية لمقدمي خدمة القسم",
-            "CAT_AGE_RESTRICTION" to "صلاحية ضبط تقييد العمر للمحتوى الخاص بالقسم",
-            "CAT_TAGS_KEYWORDS" to "صلاحية إدارة الكلمات المفتاحية لتسهيل البحث عن القسم",
-            "CAT_EXPORT_STRUCTURE" to "صلاحية تصدير شجرة وهيكلية الأقسام بالكامل",
-            "CAT_IMPORT_STRUCTURE" to "صلاحية استيراد هيكلية أقسام جديدة مسبقة الصنع",
-            "CAT_BULK_DELETE" to "صلاحية الحذف الجماعي للأقسام غير المستخدمة",
-            "CAT_COUNT_STATS" to "صلاحية مشاهدة إحصائيات عدد المنشآت والطلبات بالقسم",
-            "CAT_DEFAULT_IMAGE_FALLBACK" to "صلاحية تعيين صورة افتراضية لمقدمي خدمة القسم",
-            "CAT_BANNER_LINK" to "صلاحية ربط القسم ببنر إعلاني خاص يظهر في قمته",
-            "CAT_DIRECT_DISPATCH_RULE" to "صلاحية ضبط قواعد التوجيه السريع الخاصة بالقسم",
-            "CAT_MINIMUM_PRICE_RULE" to "صلاحية وضع حد أدنى لأسعار الخدمات في هذا القسم",
-            "CAT_VERIFICATION_BADGE_REQ" to "صلاحية فرض التوثيق الإلزامي للمنضمين للقسم",
-            "CAT_SUBSCRIPTION_PLAN_LINK" to "صلاحية ربط القسم بباقات اشتراك مدفوعة محددة",
-            "CAT_SHOW_IN_DRAWER" to "صلاحية إظهار القسم في القائمة الجانبية للتطبيق",
-            "CAT_SHOW_IN_EXPLORE" to "صلاحية إظهار القسم في شاشة الاستكشاف والبحث",
-            "CAT_CUSTOM_HEADER_TITLE" to "صلاحية تخصيص عنوان فرعي إرشادي أعلى القسم",
-            "CAT_SEO_META_TAGS" to "صلاحية ضبط نصوص المشاركة والروابط العميقة للقسم",
-            "CAT_RESTORE_DELETED" to "صلاحية استرجاع قسم محذوف من سلة المحذوفات"
+        // 7. العقارات والأراضي (PROPERTIES) - 18 صلاحية
+        addGroup(
+            PermissionCategory.PROPERTIES,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "PROP_VIEW_ALL" to ("عرض جميع العقارات" to "مشاهدة جميع العقارات والأراضي المسجلة"),
+                "PROP_SEARCH" to ("البحث في العقارات" to "البحث عن عقار بالعنوان أو النوع أو السعر"),
+                "PROP_VIEW_DETAILS" to ("عرض تفاصيل عقار" to "مشاهدة بيانات العقار والمساحة والصور والخرائط"),
+                "PROP_EDIT" to ("تعديل بيانات عقار" to "تعديل تفاصيل وأسعار وموقع عقار موجود"),
+                "PROP_DELETE" to ("حذف عقار نهائياً" to "حذف عقار من قاعدة البيانات بشكل نهائي"),
+                "PROP_BLOCK" to ("حظر عقار" to "حظر إعلان العقار ومنعه من الظهور"),
+                "PROP_UNBLOCK" to ("إلغاء حظر عقار" to "إلغاء الحظر عن عقار وإعادة نشره"),
+                "PROP_GRANT_VIP" to ("تفعيل VIP لعقار" to "منح العقار ميزة الإعلان المميز VIP"),
+                "PROP_REVOKE_VIP" to ("إلغاء VIP لعقار" to "إلغاء ميزة VIP عن العقار"),
+                "PROP_VERIFY" to ("توثيق عقار" to "منح العقار شارة الملكية الموثقة رسمياً"),
+                "PROP_UNVERIFY" to ("إلغاء توثيق عقار" to "إلغاء شارة التوثيق عن عقار"),
+                "PROP_RECOMMEND" to ("توصية عقار" to "منح العقار شارة أفضل صفقة وموصى به"),
+                "PROP_UNRECOMMEND" to ("إلغاء توصية عقار" to "إلغاء شارة التوصية عن عقار"),
+                "PROP_DISABLE_CHAT" to ("تعطيل الدردشة عن عقار" to "إيقاف المراسلة الفورية عن إعلان العقار"),
+                "PROP_ENABLE_CHAT" to ("تفعيل الدردشة عن عقار" to "تفعيل المراسلة الفورية للعقار"),
+                "PROP_DISABLE_NOTIF" to ("تعطيل الإشعارات عن عقار" to "إيقاف التنبيهات عن العقار"),
+                "PROP_ENABLE_NOTIF" to ("تفعيل الإشعارات عن عقار" to "تفعيل التنبيهات لعقار معين"),
+                "PROP_MEDIA_MANAGE" to ("إدارة صور ومخططات العقار" to "رفع وتحديث الصور ومخططات البناء والأراضي")
+            )
         )
-        catItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(5, 11, 22)) PermissionLevel.SENSITIVE else if (idx in listOf(1, 2, 3, 4, 10, 14, 16)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("8.${idx+1}", k, n, "تمكين $n لهيكلية التطبيق", "الأقسام والتصنيفات", "التصنيفات والهيكلية", lvl, PermissionCategory.NEW_SECTIONS))
-        }
 
-        // 9. الخرائط والمواقع الجغرافية (35 صلاحية)
-        val mapItems = listOf(
-            "MAP_VIEW_ALL_PINS" to "صلاحية استعراض جميع النقاط والمنشآت على الخريطة",
-            "MAP_FILTER_BY_CATEGORY" to "صلاحية تصفية المنشآت على الخريطة حسب النشاط",
-            "MAP_FILTER_BY_CITY" to "صلاحية التبديل والتركيز على أي محافظة أو مدينة",
-            "MAP_RADAR_SEARCH" to "صلاحية استخدام رادار البحث بنطاق الكيلومترات (Radius)",
-            "MAP_CUSTOM_PIN_ICONS" to "صلاحية تخصيص أيقونات ودبابيس المواقع على الخريطة",
-            "MAP_PROVIDER_LIVE_TRACK" to "صلاحية التتبع المباشر لحركة الفنيين والمناديب",
-            "MAP_EDIT_STORE_LOCATION" to "صلاحية تعديل إحداثيات موقع أي متجر أو فني",
-            "MAP_GEO_FENCING_MANAGE" to "صلاحية رسم وتحديد النطاقات الجغرافية والمناطق",
-            "MAP_ROUTING_NAVIGATION" to "صلاحية تفعيل حساب المسارات والاتجاهات الملاحية",
-            "MAP_SATELLITE_VIEW_TOGGLE" to "صلاحية التبديل لنمط خريطة القمر الصناعي",
-            "MAP_HEATMAP_ORDERS" to "صلاحية عرض الخريطة الحرارية (Heatmap) لكثافة الطلبات",
-            "MAP_CLUSTER_MARKERS" to "صلاحية تجميع النقاط المتقاربة في مجموعات (Clustering)",
-            "MAP_OFFLINE_TILES_CACHE" to "صلاحية تنزيل وتخزين الخرائط للعمل دون إنترنت",
-            "MAP_ADD_NEW_POINT_MANUAL" to "صلاحية إضافة نقطة أو معلم جديد على الخريطة يدوياً",
-            "MAP_DELETE_POINT_PIN" to "صلاحية حذف نقطة أو معلم من الخريطة",
-            "MAP_DISTANCE_CALCULATOR" to "صلاحية حساب وقياس المسافات المباشرة بين نقطتين",
-            "MAP_COVERAGE_ZONES" to "صلاحية تحديد مناطق التغطية والمناطق غير المخدومة",
-            "MAP_STREET_VIEW_LINK" to "صلاحية ربط النقاط بمشاهد الشوارع الافتراضية",
-            "MAP_DEFAULT_CENTER_ZOOM" to "صلاحية تحديد مركز الخريطة الافتراضي ومستوى التكبير",
-            "MAP_TRAFFIC_LAYER" to "صلاحية تفعيل طبقة الازدحام المروري وحالة الطرق",
-            "MAP_NEIGHBORHOOD_BOUNDS" to "صلاحية تحديد حدود وأسماء الأحياء والحارات",
-            "MAP_EXPORT_GEOJSON" to "صلاحية تصدير بيانات المواقع بصيغة GeoJSON و KML",
-            "MAP_IMPORT_GEOJSON" to "صلاحية استيراد قوائم المعالم والمواقع الجغرافية",
-            "MAP_ACCURACY_THRESHOLD" to "صلاحية ضبط الحد الأدنى لدقة GPS المقبولة",
-            "MAP_AUTO_LOCATE_USER" to "صلاحية التحديد التلقائي لموقع المستخدم عند الفتح",
-            "MAP_FAVORITE_PLACES_LAYER" to "صلاحية إظهار الأماكن الأكثر زيارة وتقييماً",
-            "MAP_STORE_OPEN_STATUS_PIN" to "صلاحية تلوين الدبابيس حسب حالة الفتح والإغلاق",
-            "MAP_VIP_PINS_ENLARGE" to "صلاحية تكبير وتألق دبابيس الحسابات المميزة VIP",
-            "MAP_SPEED_LIMIT_ALERTS" to "صلاحية تتبع سرعة حركة الفنيين وتنبيهات التجاوز",
-            "MAP_RESTRICTED_ZONES" to "صلاحية تحديد المناطق المحظورة أمنياً أو المحظور التوصيل لها",
-            "MAP_CUSTOM_MAPBOX_STYLE" to "صلاحية ربط ستايل مخصص للخرائط من خوادم السحاب",
-            "MAP_DIRECTIONS_API_SWITCH" to "صلاحية التبديل بين مزودي خدمات الملاحة والاتجاهات",
-            "MAP_COORDINATES_CLIPBOARD" to "صلاحية نسخ ومشاركة الإحداثيات الجغرافية بدقة",
-            "MAP_GEOFENCE_NOTIFY" to "صلاحية إرسال إشعار تلقائي عند دخول نطاق جغرافي",
-            "MAP_SUMMARY_METRICS" to "صلاحية تقرير توزيع المنشآت حسب المحافظات والمديريات"
+        // 8. إعلانات الوظائف (JOBS) - 14 صلاحية
+        addGroup(
+            PermissionCategory.JOBS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "JOB_VIEW_ALL" to ("عرض جميع الوظائف" to "مشاهدة جميع إعلانات الوظائف المنشورة"),
+                "JOB_SEARCH" to ("البحث في الوظائف" to "البحث عن وظيفة بالمسمى أو الشركة أو الراتب"),
+                "JOB_VIEW_DETAILS" to ("عرض تفاصيل وظيفة" to "مشاهدة متطلبات وشروط وراتب الوظيفة"),
+                "JOB_EDIT" to ("تعديل إعلان وظيفة" to "تعديل بيانات وشروط وموعد التقديم على الوظيفة"),
+                "JOB_DELETE" to ("حذف وظيفة نهائياً" to "حذف إعلان الوظيفة نهائياً من التطبيق"),
+                "JOB_BLOCK" to ("حظر وظيفة" to "حظر إعلان الوظيفة ومنع المتقدمين من رؤيتها"),
+                "JOB_UNBLOCK" to ("إلغاء حظر وظيفة" to "إلغاء الحظر عن إعلان الوظيفة"),
+                "JOB_GRANT_VIP" to ("تفعيل VIP لوظيفة" to "تثبيت ومنح إعلان الوظيفة شارة VIP المميزة"),
+                "JOB_REVOKE_VIP" to ("إلغاء VIP لوظيفة" to "إلغاء شارة VIP عن إعلان الوظيفة"),
+                "JOB_PIN_TOP" to ("تثبيت وظيفة بأعلى القائمة" to "تثبيت إعلان الوظيفة في صدارة قائمة الوظائف"),
+                "JOB_UNPIN_TOP" to ("إلغاء تثبيت وظيفة" to "إلغاء تثبيت الوظيفة من الصدارة"),
+                "JOB_DISABLE_CHAT" to ("تعطيل الدردشة عن وظيفة" to "إيقاف المحادثات مع معلن الوظيفة"),
+                "JOB_ENABLE_CHAT" to ("تفعيل الدردشة عن وظيفة" to "تفعيل المحادثات مع معلن الوظيفة"),
+                "JOB_APPLICANTS_LINK" to ("ربط المتقدمين بالسيرة الذاتية" to "إتاحة استقبال وإدارة ملفات السيرة الذاتية للمتقدمين")
+            )
         )
-        mapItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(6, 7, 14, 29)) PermissionLevel.SENSITIVE else if (idx in listOf(0, 3, 5, 8, 10, 16)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("9.${idx+1}", k, n, "تمكين $n بشاشة الخرائط", "الخرائط والمواقع", "المواقع والملاحة", lvl, PermissionCategory.MAPS))
-        }
 
-        // 10. المحلات والمراكز التجارية (35 صلاحية)
-        val storeItems = listOf(
-            "STORE_VIEW_ALL" to "صلاحية عرض جميع المحلات والمراكز التجارية",
-            "STORE_VIEW_SPECIFIC" to "صلاحية عرض وتفقد بيانات محل محدد بدقة",
-            "STORE_ADD" to "صلاحية إضافة محل أو مركز تجاري جديد يدوياً",
-            "STORE_EDIT" to "صلاحية تعديل بيانات المحل وهاتفه وموقعه",
-            "STORE_DELETE" to "صلاحية حذف المحل نهائياً من قاعدة البيانات",
-            "STORE_BLOCK" to "صلاحية حظر المحل ومنعه من الظهور والتفاعل",
-            "STORE_UNBLOCK" to "صلاحية فك الحظر وإعادة تنشيط المحل",
-            "STORE_ACTIVATE" to "صلاحية قبول وتفعيل طلب انضمام المحل",
-            "STORE_DEACTIVATE" to "صلاحية تعطيل وإيقاف المحل مؤقتاً",
-            "STORE_PIN" to "صلاحية تثبيت المحل في صدارة القوائم والبحث",
-            "STORE_UNPIN" to "صلاحية إلغاء تثبيت المحل وإعادته للترتيب الطبيعي",
-            "STORE_SET_VIP" to "صلاحية منح المحل شارة وعضوية VIP الذهبية",
-            "STORE_UNSET_VIP" to "صلاحية سحب شارة وعضوية VIP عن المحل",
-            "STORE_VERIFY" to "صلاحية توثيق المحل ومنحه شارة التوثيق الرسمية",
-            "STORE_UNVERIFY" to "صلاحية إلغاء التوثيق عن المحل وسحب الشارة",
-            "STORE_RECOMMEND" to "صلاحية ترشيح المحل كموصى به في الصفحة الرئيسية",
-            "STORE_UNRECOMMEND" to "صلاحية إلغاء ترشيح المحل كموصى به",
-            "STORE_PASSWORD_RESET" to "صلاحية تغيير وتعيين كلمة مرور جديدة للمحل",
-            "STORE_PASSWORD_VIEW" to "صلاحية الاطلاع وإظهار كلمة المرور الحالية للمحل",
-            "STORE_PRODUCTS_MANAGE" to "صلاحية إدارة منتجات وقوائم أسعار المحل",
-            "STORE_WORKING_HOURS" to "صلاحية ضبط أوقات دوام وساعات فتح وإغلاق المحل",
-            "STORE_GALLERY_MANAGE" to "صلاحية إدارة وتدقيق صور المعرض التابعة للمحل",
-            "STORE_COMMISSION_CUSTOM" to "صلاحية تحديد نسبة عمولة مخصصة لهذا المحل",
-            "STORE_SUBSCRIPTION_EXPIRY" to "صلاحية تعديل تاريخ انتهاء اشتراك المحل",
-            "STORE_TRANSFER_OWNERSHIP" to "صلاحية نقل ملكية المحل لرقم هاتف مستخدم آخر",
-            "STORE_BRANCHES_MANAGE" to "صلاحية إضافة وإدارة فروع المحل المتعددة",
-            "STORE_DISCOUNT_COUPONS" to "صلاحية إصدار وتفعيل كوبونات خصم خاصة بالمحل",
-            "STORE_REVIEWS_MODERATE" to "صلاحية مراجعة وحذف التقييمات والتعليقات المسيئة",
-            "STORE_DIRECT_CHAT_ACCESS" to "صلاحية التحكم في استقبال المحل للدردشة المباشرة",
-            "STORE_EXPORT_LIST" to "صلاحية تصدير قائمة كاملة بالمحلات كملف إكسل",
-            "STORE_COMMERCIAL_REG_VERIFY" to "صلاحية تدقيق ومطابقة السجل التجاري المرفق",
-            "STORE_OFFERS_APPROVE" to "صلاحية الموافقة على عروض التخفيضات التي ينشرها المحل",
-            "STORE_VISITS_ANALYTICS" to "صلاحية مشاهدة تقارير الزيارات والمشاهدات للمحل",
-            "STORE_BADGE_ASSIGN" to "صلاحية إضافة وسام مخصص للمحل (الأكثر مبيعاً، حصري)",
-            "STORE_AUDIT_LOG" to "صلاحية فحص سجل العمليات والتعديلات التي تمت على المحل"
+        // 9. المتقدمين للوظائف (APPLICANTS) - 8 صلاحيات
+        addGroup(
+            PermissionCategory.APPLICANTS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "APP_VIEW_ALL" to ("عرض جميع المتقدمين" to "مشاهدة جميع طلبات التقديم على الوظائف"),
+                "APP_SEARCH" to ("البحث في المتقدمين" to "البحث عن متقدم معين بالاسم أو الهاتف أو المؤهل"),
+                "APP_VIEW_DETAILS" to ("عرض تفاصيل طلب التقديم" to "مشاهدة السيرة الذاتية والبيانات المرفقة للمتقدم"),
+                "APP_ACCEPT" to ("قبول طلب المتقدم" to "قبول طلب التقديم وتأهيله للمقابلة"),
+                "APP_REJECT" to ("رفض طلب المتقدم" to "رفض طلب التقديم مع كتابة سبب الرفض"),
+                "APP_DELETE" to ("حذف طلب تقديم نهائياً" to "حذف طلب التقديم وملف المتقدم من السجل"),
+                "APP_EXPORT_CSV" to ("تصدير قائمة المتقدمين CSV" to "تصدير بيانات وسير المتقدمين بصيغة ملف CSV"),
+                "APP_BROADCAST_NOTIF" to ("إرسال إشعار للمتقدمين" to "إرسال إشعار جماعي لجميع المتقدمين على الوظيفة")
+            )
         )
-        storeItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(4, 5, 6, 17, 18, 24)) PermissionLevel.SENSITIVE else if (idx in listOf(2, 3, 7, 8, 11, 13, 15, 23)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("10.${idx+1}", k, n, "تمكين $n لإدارة المحلات", "المحلات والمراكز", "المراكز التجارية", lvl, PermissionCategory.STORES))
-        }
 
-        // 11. المطاعم والكافيهات (35 صلاحية)
-        val restItems = listOf(
-            "REST_VIEW_ALL" to "صلاحية عرض جميع المطاعم والكافيهات",
-            "REST_VIEW_SPECIFIC" to "صلاحية عرض بيانات وتفاصيل مطعم محدد",
-            "REST_ADD" to "صلاحية إضافة مطعم أو كافيه جديد إلى النظام",
-            "REST_EDIT" to "صلاحية تعديل بيانات المطعم ومعلومات التواصل",
-            "REST_DELETE" to "صلاحية حذف المطعم نهائياً وسجلاته",
-            "REST_BLOCK" to "صلاحية حظر المطعم ومنعه من استقبال الطلبات",
-            "REST_UNBLOCK" to "صلاحية فك الحظر وإعادة تنشيط المطعم",
-            "REST_ACTIVATE" to "صلاحية تفعيل والموافقة على انضمام المطعم",
-            "REST_DEACTIVATE" to "صلاحية إيقاف المطعم وتعطيله مؤقتاً",
-            "REST_PIN" to "صلاحية تثبيت المطعم في أعلى قائمة المطاعم",
-            "REST_UNPIN" to "صلاحية إلغاء تثبيت المطعم",
-            "REST_SET_VIP" to "صلاحية منح المطعم شارة وعضوية VIP",
-            "REST_UNSET_VIP" to "صلاحية إلغاء شارة وعضوية VIP للمطعم",
-            "REST_VERIFY" to "صلاحية توثيق حساب المطعم رسمياً",
-            "REST_UNVERIFY" to "صلاحية إلغاء توثيق حساب المطعم",
-            "REST_RECOMMEND" to "صلاحية ترشيح المطعم في قائمة الموصى بها",
-            "REST_UNRECOMMEND" to "صلاحية إلغاء ترشيح المطعم",
-            "REST_MENU_MANAGE" to "صلاحية تعديل وإدارة قائمة الطعام والوجبات (Menu)",
-            "REST_MENU_PRICES" to "صلاحية تعديل وتحديث أسعار الوجبات والمشروبات",
-            "REST_TABLE_RESERVATION" to "صلاحية إدارة وتأكيد طلبات حجز الطاولات",
-            "REST_DELIVERY_RADIUS" to "صلاحية تحديد نطاق ومناطق التوصيل للمطعم",
-            "REST_MIN_ORDER_AMOUNT" to "صلاحية تحديد الحد الأدنى لقيمة طلب التوصيل",
-            "REST_PASSWORD_RESET" to "صلاحية تعيين كلمة مرور جديدة لحساب المطعم",
-            "REST_PASSWORD_VIEW" to "صلاحية إظهار كلمة المرور الحالية للمطعم",
-            "REST_MEAL_OFFERS" to "صلاحية تفعيل وإدارة العروض والوجبات التوفيرية",
-            "REST_PHOTOS_GALLERY" to "صلاحية إدارة صور الأطباق وجلسات المطعم",
-            "REST_HEALTH_LICENSE_VERIFY" to "صلاحية تدقيق ومطابقة كرت البلدية والترخيص الصحي",
-            "REST_FAMILY_SECTION_TAG" to "صلاحية إضافة شارات التوفر (قسم عوائل، ألعاب أطفال)",
-            "REST_EXPORT_LIST" to "صلاحية تصدير قائمة المطاعم وإحصائياتها",
-            "REST_ORDERS_LOG" to "صلاحية مراجعة سجل الطلبات المنفذة عبر المطعم",
-            "REST_WORKING_HOURS" to "صلاحية ضبط مواعيد الوجبات (فطور، غداء، عشاء)",
-            "REST_REVIEWS_MODERATE" to "صلاحية إدارة وحذف تقييمات وتعليقات العملاء",
-            "REST_SUBSCRIPTION_EXPIRY" to "صلاحية ضبط وتمديد اشتراك المطعم بالدليل",
-            "REST_DIRECT_WHATSAPP" to "صلاحية تفعيل الطلب المباشر عبر واتساب المطعم",
-            "REST_AUDIT_LOG" to "صلاحية الاطلاع على سجل تعديلات إدارة المطعم"
+        // 10. الإحصائيات الشاملة (STATS) - 10 صلاحيات
+        addGroup(
+            PermissionCategory.STATS,
+            PermissionLevel.BASIC,
+            listOf(
+                "STAT_PROVIDERS_COUNT" to ("عرض عدد الفنيين" to "مشاهدة إجمالي وإحصائيات الفنيين المعتمدين"),
+                "STAT_STORES_COUNT" to ("عرض عدد المحلات" to "مشاهدة إجمالي وإحصائيات المحلات المسجلة"),
+                "STAT_REST_COUNT" to ("عرض عدد المطاعم" to "مشاهدة إجمالي وإحصائيات المطاعم والكافيهات"),
+                "STAT_MED_COUNT" to ("عرض عدد المراكز الطبية" to "مشاهدة إحصائيات المراكز والعيادات الطبية"),
+                "STAT_PROP_COUNT" to ("عرض عدد العقارات" to "مشاهدة إجمالي وإحصائيات العقارات المسجلة"),
+                "STAT_JOBS_COUNT" to ("عرض عدد الوظائف" to "مشاهدة إجمالي وإحصائيات إعلانات الوظائف"),
+                "STAT_BOOKINGS_COUNT" to ("عرض عدد الحجوزات" to "مشاهدة إجمالي الحجوزات ومعدل الإنجاز"),
+                "STAT_CHATS_COUNT" to ("عرض عدد المحادثات" to "مشاهدة عدد قنوات المحادثة والرسائل النشطة"),
+                "STAT_CHARTS_VIEW" to ("عرض الرسوم البيانية" to "مشاهدة المخططات البيانية لتوزيع الأنشطة"),
+                "STAT_EXPORT_PDF" to ("تصدير تقرير إحصائي PDF" to "تصدير تقرير الأداء الشامل كملف PDF رسمي")
+            )
         )
-        restItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(4, 5, 6, 22, 23)) PermissionLevel.SENSITIVE else if (idx in listOf(2, 3, 7, 8, 11, 13, 15, 17)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("11.${idx+1}", k, n, "تمكين $n لإدارة المطاعم", "المطاعم والكافيهات", "المطاعم والمأكولات", lvl, PermissionCategory.RESTAURANTS))
-        }
 
-        // 12. المراكز الطبية والعيادات (35 صلاحية)
-        val medItems = listOf(
-            "MED_VIEW_ALL" to "صلاحية عرض جميع المراكز الطبية والمستشفيات والعيادات",
-            "MED_VIEW_SPECIFIC" to "صلاحية تفقد بيانات مركز طبي أو عيادة محددة",
-            "MED_ADD" to "صلاحية إضافة عيادة أو مركز طبي أو صيدلية جديدة",
-            "MED_EDIT" to "صلاحية تعديل بيانات المركز الطبي وهواتف التواصل",
-            "MED_DELETE" to "صلاحية حذف المنشأة الطبية نهائياً من الدليل",
-            "MED_BLOCK" to "صلاحية حظر المركز الطبي ومنعه من الظهور",
-            "MED_UNBLOCK" to "صلاحية فك الحظر وإعادة تنشيط المنشأة الطبية",
-            "MED_ACTIVATE" to "صلاحية تفعيل وقبول طلب انضمام المركز الطبي",
-            "MED_DEACTIVATE" to "صلاحية تعطيل وإيقاف المركز الطبي مؤقتاً",
-            "MED_PIN" to "صلاحية تثبيت المركز الطبي في أعلى قائمة القطاع الصحي",
-            "MED_UNPIN" to "صلاحية إلغاء تثبيت المركز الطبي",
-            "MED_SET_VIP" to "صلاحية منح المركز الطبي شارة VIP المميزة",
-            "MED_UNSET_VIP" to "صلاحية إلغاء شارة VIP عن المركز الطبي",
-            "MED_VERIFY" to "صلاحية توثيق المركز الطبي وشارة الاعتماد الطبي",
-            "MED_UNVERIFY" to "صلاحية إلغاء التوثيق والاعتماد الطبي",
-            "MED_RECOMMEND" to "صلاحية ترشيح العيادة في قائمة المراكز الموصى بها",
-            "MED_UNRECOMMEND" to "صلاحية إلغاء ترشيح العيادة",
-            "MED_SPECIALTIES_MANAGE" to "صلاحية إدارة قائمة التخصصات الطبية للعيادة",
-            "MED_DOCTORS_LIST" to "صلاحية إضافة وإدارة أسماء ومواعيد الأطباء والاستشاريين",
-            "MED_APPOINTMENTS_SCHEDULE" to "صلاحية تنظيم ومتابعة حجوزات المواعيد الطبية",
-            "MED_EMERGENCY_24H_TAG" to "صلاحية تفعيل شارة طوارئ 24 ساعة للصيدليات والمستشفيات",
-            "MED_INSURANCE_COMPANIES" to "صلاحية إدارة قائمة شركات التأمين المعتمدة لدى المركز",
-            "MED_LICENSE_VERIFICATION" to "صلاحية تدقيق ومطابقة ترخيص مزاولة المهنة الطبي",
-            "MED_PASSWORD_RESET" to "صلاحية إعادة تعيين كلمة مرور حساب المركز الطبي",
-            "MED_PASSWORD_VIEW" to "صلاحية إظهار كلمة المرور الحالية للمنشأة الطبية",
-            "MED_HOME_VISIT_SERVICE" to "صلاحية تفعيل ميزة الكشف والزيارات المنزلية للتمريض",
-            "MED_PRICING_CONSULTATION" to "صلاحية عرض وتعديل رسوم كشف الاستشارات الطبية",
-            "MED_EXPORT_DIRECTORY" to "صلاحية تصدير الدليل الطبي والعيادات كملف",
-            "MED_GALLERY_PHOTOS" to "صلاحية تدقيق صور المرافق والتجهيزات الطبية",
-            "MED_WORKING_HOURS" to "صلاحية ضبط أوقات الدوام واستقبال الحالات",
-            "MED_PHARMACY_DUTY_ROSTER" to "صلاحية إدارة جدول الصيدليات المناوبة ليلياً",
-            "MED_REVIEWS_MODERATE" to "صلاحية الرقابة على التقييمات وحذف التعليقات غير اللائقة",
-            "MED_SUBSCRIPTION_EXPIRY" to "صلاحية تعديل وتجديد اشتراك المركز الطبي",
-            "MED_DIRECT_CONSULT_CHAT" to "صلاحية تمكين الاستشارات الطبية السريعة عبر الشات",
-            "MED_AUDIT_LOG" to "صلاحية مراجعة سجل العمليات بالقطاع الطبي"
+        // 11. الحجوزات والمواعيد (BOOKINGS) - 22 صلاحية
+        addGroup(
+            PermissionCategory.BOOKINGS,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "BOOK_VIEW_ALL" to ("عرض جميع الحجوزات" to "مشاهدة جميع الحجوزات والطلبات المسجلة"),
+                "BOOK_FILTER_SECTION" to ("تصفية الحجوزات حسب القسم" to "تصفية الحجوزات حسب (الخدمات، العقارات، المحلات، الطبية، المطاعم، الوظائف)"),
+                "BOOK_VIEW_DETAILS" to ("عرض تفاصيل حجز" to "مشاهدة تفاصيل الحجز، العميل، المهني، والعنوان"),
+                "BOOK_ACCEPT" to ("قبول حجز" to "تغيير حالة الحجز إلى (مقبول) وإشعار الأطراف"),
+                "BOOK_REJECT" to ("رفض حجز" to "تغيير حالة الحجز إلى (مرفوض) مع توثيق السبب"),
+                "BOOK_START_PROGRESS" to ("بدء تنفيذ حجز" to "تغيير حالة الحجز إلى (قيد التنفيذ والمتابعة)"),
+                "BOOK_COMPLETE" to ("إكمال حجز" to "تغيير حالة الحجز إلى (مكتمل وناجح)"),
+                "BOOK_DISPATCH_REROUTE" to ("توجيه حجز لمهني آخر" to "إعادة توجيه الحجز لفني بديل أو للأدمن مباشرة"),
+                "BOOK_EDIT" to ("تعديل حجز" to "تعديل بيانات وتوقيت وسعر حجز موجود"),
+                "BOOK_DELETE" to ("حذف حجز نهائياً" to "حذف الحجز نهائياً من سجلات المنظومة"),
+                "BOOK_START_CHAT" to ("فتح محادثة مع العميل" to "بدء محادثة فورية مباشرة مع صاحب الحجز"),
+                "BOOK_CUSTOMIZE_FORM" to ("تخصيص استمارة الحجز" to "إضافة وتعديل حقول وشروط استمارة الحجز"),
+                "BOOK_SET_ROUTING" to ("تحديد طريقة توجيه الحجوزات" to "تحديد آلية التوجيه (للأدمن، للفني، لكليهما)"),
+                "BOOK_BLOCK_PHONES" to ("حظر أرقام من الحجوزات" to "إضافة أرقام هواتف غير الجادين لقائمة حظر الحجز"),
+                "BOOK_STATS_VIEW" to ("عرض إحصائيات الحجوزات" to "عرض أعداد الحجوزات حسب الحالة والأقسام"),
+                "BOOK_SYSTEM_TOGGLE" to ("تفعيل/تعطيل نظام الحجوزات" to "تشغيل أو إيقاف نظام الحجوزات بالكامل في التطبيق"),
+                "BOOK_ACCESS_CONTROL" to ("تحديد صلاحية الحجز" to "تحديد من يمكنه الحجز (الكل، المسجلين فقط، معطل)"),
+                "BOOK_CANCEL_ATTEMPTS" to ("تحديد عدد محاولات الإلغاء" to "تحديد أقصى عدد لمحاولات إلغاء الحجز"),
+                "BOOK_PASSWORD_PROTECT" to ("تفعيل كلمة مرور الحجز" to "تفعيل نظام كود وكلمة المرور لتأمين وتعديل الحجز"),
+                "BOOK_8HOUR_RULE" to ("تطبيق شرط الـ 8 ساعات للإلغاء" to "منع تعديل أو إلغاء الحجز قبل أقل من 8 ساعات من الموعد"),
+                "BOOK_EXPORT_LOGS" to ("تصدير سجل الحجوزات" to "تصدير كشف الحجوزات كملف إكسل CSV"),
+                "BOOK_COMMISSION_CALC" to ("احتساب وتتبع عمولة الحجز" to "حساب نسبة العمولة والأرباح من عمليات الحجز")
+            )
         )
-        medItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(4, 5, 6, 22, 23, 24)) PermissionLevel.SENSITIVE else if (idx in listOf(2, 3, 7, 8, 11, 13, 15, 18)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("12.${idx+1}", k, n, "تمكين $n لإدارة القطاع الطبي", "المراكز الطبية والعيادات", "القطاع الطبي والصحي", lvl, PermissionCategory.MEDICAL))
-        }
 
-        // 13. العقارات والأملاك (35 صلاحية)
-        val propItems = listOf(
-            "PROP_VIEW_ALL" to "صلاحية عرض جميع العقارات المعروضة بالدليل",
-            "PROP_VIEW_SPECIFIC" to "صلاحية فحص وتفقد بيانات عقار محدد بالتفصيل",
-            "PROP_ADD" to "صلاحية إضافة عقار جديد (شقة، فيلا، أرض، عمارة) يدوياً",
-            "PROP_EDIT" to "صلاحية تعديل مواصفات العقار وسعره وهواتف المعلن",
-            "PROP_DELETE" to "صلاحية حذف إعلان العقار نهائياً من التطبيق",
-            "PROP_BLOCK" to "صلاحية حظر إعلان العقار ومنعه من الظهور",
-            "PROP_UNBLOCK" to "صلاحية فك الحظر وإعادة تنشيط إعلان العقار",
-            "PROP_ACTIVATE" to "صلاحية قبول ونشر إعلان العقار للجمهور",
-            "PROP_DEACTIVATE" to "صلاحية إيقاف العقار مؤقتاً (تم البيع أو التأجير)",
-            "PROP_PIN" to "صلاحية تثبيت العقار في صدارة نتائج البحث العقاري",
-            "PROP_UNPIN" to "صلاحية إلغاء تثبيت العقار",
-            "PROP_SET_VIP" to "صلاحية منح العقار شارة VIP المميزة",
-            "PROP_UNSET_VIP" to "صلاحية إلغاء شارة VIP عن العقار",
-            "PROP_VERIFY" to "صلاحية توثيق ملكية العقار ومنحه شارة التوثيق",
-            "PROP_UNVERIFY" to "صلاحية إلغاء توثيق إعلان العقار",
-            "PROP_RECOMMEND" to "صلاحية ترشيح العقار كفرصة ذهبية أو لقطة",
-            "PROP_UNRECOMMEND" to "صلاحية إلغاء ترشيح العقار",
-            "PROP_PRICE_CURRENCY" to "صلاحية تحديد وتغيير عملة السعر (ريال يمني، سعودي، دولار)",
-            "PROP_MAP_LOCATION_ACCURACY" to "صلاحية تثبيت ومراجعة موقع العقار على الخريطة",
-            "PROP_PHOTOS_VIDEOS_MANAGE" to "صلاحية إدارة صور وفيديوهات الجولة الافتراضية للعقار",
-            "PROP_DEED_DOCUMENT_VERIFY" to "صلاحية تدقيق وثائق وبصيرة ملكية العقار",
-            "PROP_PASSWORD_RESET" to "صلاحية إعادة تعيين كلمة مرور حساب المعلن العقاري",
-            "PROP_PASSWORD_VIEW" to "صلاحية إظهار كلمة المرور الحالية للمعلن العقاري",
-            "PROP_AGENCY_OFFICES_MANAGE" to "صلاحية إضافة وإدارة المكاتب والشركات العقارية",
-            "PROP_COMMISSION_CALCULATOR" to "صلاحية حساب وإدارة نسبة السعاية والعمولة العقارية",
-            "PROP_RENT_INSTALLMENTS" to "صلاحية تحديد دورية الإيجار (شهري، سنوي، مقدم)",
-            "PROP_FURNISHED_STATUS" to "صلاحية تصنيف العقار (مفروش بالكامل، غير مفروش)",
-            "PROP_EXPORT_LISTINGS" to "صلاحية تصدير جدول العقارات المتاحة كملف",
-            "PROP_INQUIRIES_LOG" to "صلاحية متابعة طلبات الشراء والمعاينة المرسلة للعقار",
-            "PROP_EXPIRY_DATE_EXTEND" to "صلاحية تمديد فترة صلاحية وبقاء الإعلان العقاري",
-            "PROP_WATERMARK_PHOTOS" to "صلاحية وضع علامة مائية باسم التطبيق على صور العقار",
-            "PROP_DIRECT_WHATSAPP_CALL" to "صلاحية تفعيل أزرار الاتصال والواتساب المباشر للمالك",
-            "PROP_AUCTION_BIDDING" to "صلاحية تفعيل نظام المزادات العقارية على الأملاك",
-            "PROP_REVIEWS_MODERATE" to "صلاحية إدارة تعليقات وتقييمات العملاء على العقار",
-            "PROP_AUDIT_LOG" to "صلاحية مراجعة سجل التعديلات العقارية"
+        // 12. المحادثات والدردشة الفورية (CHATS) - 48 صلاحية
+        addGroup(
+            PermissionCategory.CHATS,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "CHAT_VIEW_ALL" to ("عرض جميع المحادثات" to "مشاهدة جميع قنوات وغرف المحادثة في المنصة"),
+                "CHAT_FILTER_SECTION" to ("تصفية المحادثات حسب القسم" to "تصفية المحادثات حسب أقسام المنظومة المختلفة"),
+                "CHAT_VIEW_DETAILS" to ("عرض تفاصيل المحادثة" to "مشاهدة محتوى المحادثة والرسائل المتبادلة"),
+                "CHAT_REPLY_AS_ADMIN" to ("الرد كأدمن في المحادثة" to "إرسال رسالة توجيهية رسمية باسم الإدارة"),
+                "CHAT_EDIT_MESSAGE" to ("تعديل رسالة مرسلة" to "تعديل محتوى رسالة داخل المحادثة"),
+                "CHAT_DELETE_MESSAGE" to ("حذف رسالة من المحادثة" to "حذف رسالة مسيئة أو خاطئة من الشات"),
+                "CHAT_BLOCK_CHANNEL" to ("حظر المحادثة بالكامل" to "حظر غرفة المحادثة ومنع أطرافها من المراسلة"),
+                "CHAT_UNBLOCK_CHANNEL" to ("إلغاء حظر المحادثة" to "إلغاء الحظر عن غرفة المحادثة"),
+                "CHAT_BLOCK_PROVIDER" to ("حظر فني من الشات" to "منع فني معين من استخدام نظام الدردشة"),
+                "CHAT_UNBLOCK_PROVIDER" to ("إلغاء حظر فني من الشات" to "إلغاء الحظر عن الفني في نظام الدردشة"),
+                "CHAT_BLOCK_STORE" to ("حظر محل من الشات" to "منع محل تجاري من استخدام نظام الدردشة"),
+                "CHAT_UNBLOCK_STORE" to ("إلغاء حظر محل من الشات" to "إلغاء حظر المحل التجاري في الشات"),
+                "CHAT_BLOCK_REST" to ("حظر مطعم من الشات" to "منع مطعم معين من استخدام الدردشة"),
+                "CHAT_UNBLOCK_REST" to ("إلغاء حظر مطعم من الشات" to "إلغاء حظر المطعم في الدردشة"),
+                "CHAT_BLOCK_MED" to ("حظر مركز طبي من الشات" to "منع مركز طبي من استخدام الشات"),
+                "CHAT_UNBLOCK_MED" to ("إلغاء حظر مركز طبي" to "إلغاء الحظر عن المركز الطبي في الشات"),
+                "CHAT_BLOCK_PROP" to ("حظر عقار من الشات" to "منع معلن عقار من استخدام الشات"),
+                "CHAT_UNBLOCK_PROP" to ("إلغاء حظر عقار من الشات" to "إلغاء حظر معلن العقار في الشات"),
+                "CHAT_BLOCK_JOB" to ("حظر معلن وظيفة" to "منع صاحب إعلان وظيفي من استخدام الشات"),
+                "CHAT_UNBLOCK_JOB" to ("إلغاء حظر معلن وظيفة" to "إلغاء حظر صاحب الإعلان الوظيفي في الشات"),
+                "CHAT_BLOCK_PHONE" to ("حظر رقم هاتف من الشات" to "منع رقم هاتف معين من التراسل عبر الشات"),
+                "CHAT_UNBLOCK_PHONE" to ("إلغاء حظر رقم هاتف" to "إلغاء حظر رقم الهاتف في الشات"),
+                "CHAT_BLOCK_CATEGORY" to ("حظر قسم كامل من الشات" to "تعطيل الشات لجميع منسوبي قسم معين"),
+                "CHAT_UNBLOCK_CATEGORY" to ("إلغاء حظر قسم كامل" to "إعادة تفعيل الشات لمنسوبي القسم"),
+                "CHAT_TRANSFER_PROVIDER" to ("تحويل المحادثة لفني" to "تحويل المحادثة من الأدمن إلى فني مختص"),
+                "CHAT_DELETE_PERMANENT" to ("حذف المحادثة بالكامل" to "حذف غرفة المحادثة وجميع رسائلها نهائياً"),
+                "CHAT_EXPORT_CSV" to ("تصدير سجل المحادثة CSV" to "تصدير محتوى المحادثة كملف نصي أو CSV"),
+                "CHAT_CLEAR_ARCHIVE" to ("مسح أرشيف الشات بالكامل" to "حذف أرشيف المحادثات القديمة دفعة واحدة"),
+                "CHAT_SYSTEM_TOGGLE" to ("تفعيل/تعطيل نظام المحادثات" to "تشغيل أو إيقاف نظام المحادثات بالكامل في التطبيق"),
+                "CHAT_DISABLE_USERS" to ("تعطيل المحادثات عن العملاء" to "منع العملاء من إرسال رسائل جديدة"),
+                "CHAT_DISABLE_PROVIDERS" to ("تعطيل المحادثات عن الفنيين" to "منع الفنيين من إرسال رسائل جديدة"),
+                "CHAT_DISABLE_STORES" to ("تعطيل المحادثات عن المحلات" to "منع المحلات من استقبال أو إرسال رسائل"),
+                "CHAT_DISABLE_REST" to ("تعطيل المحادثات عن المطاعم" to "منع المطاعم من استقبال أو إرسال رسائل"),
+                "CHAT_DISABLE_MED" to ("تعطيل المحادثات عن المراكز الطبية" to "منع المراكز الطبية من استقبال رسائل"),
+                "CHAT_DISABLE_PROP" to ("تعطيل المحادثات عن العقارات" to "منع معلني العقارات من استقبال رسائل"),
+                "CHAT_DISABLE_JOBS" to ("تعطيل المحادثات عن معلني الوظائف" to "منع معلني الوظائف من استقبال رسائل"),
+                "CHAT_ROUTING_MODE" to ("تحديد نمط توجيه المحادثات" to "تحديد التوجيه (مباشر، للأدمن فقط، للأدمن والمشرفين)"),
+                "CHAT_IDENTITY_MODE" to ("تحديد طريقة عرض الهوية" to "تحديد عرض الهوية (الاسم + الرقم، الاسم فقط، الاسم + ID)"),
+                "CHAT_MEDIA_CONTROL" to ("تفعيل/تعطيل وسائط الشات" to "التحكم في (نص، صوت، صورة، فيديو، مكالمة)"),
+                "CHAT_FONT_SIZE" to ("تحديد حجم خط الشات" to "تعديل وتحديد حجم خط رسائل الشات بالـ SP"),
+                "CHAT_BG_COLOR" to ("تحديد لون خلفية الشات" to "تخصيص لون خلفية شاشة المحادثة (Hex)"),
+                "CHAT_ICON_SIZE" to ("تحديد حجم أيقونة الشات" to "تعديل حجم أيقونة الشات العائمة"),
+                "CHAT_ICON_POS" to ("تحديد موقع أيقونة الشات" to "تعديل موقع وإحداثيات أيقونة الشات على الشاشة"),
+                "CHAT_VOICE_INPUT" to ("تفعيل الإدخال الصوتي بالشات" to "السماح بتحويل الصوت إلى نص داخل الشات"),
+                "CHAT_TTS_OUTPUT" to ("تفعيل النطق الصوتي للرسائل" to "السماح بقراءة الرسائل النصية صوتياً للمستخدم"),
+                "CHAT_IMAGE_UPLOAD" to ("تفعيل رفع الصور بالشات" to "السماح للأطراف بإرسال الصور والوثائق"),
+                "CHAT_VIDEO_UPLOAD" to ("تفعيل رفع الفيديو بالشات" to "السماح بإرسال ومشاركة مقاطع الفيديو القصيرة"),
+                "CHAT_HIDE_ICON" to ("إخفاء أيقونة الشات العائمة" to "إخفاء أيقونة الشات من الشاشة الرئيسية")
+            )
         )
-        propItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(4, 5, 6, 20, 21, 22)) PermissionLevel.SENSITIVE else if (idx in listOf(2, 3, 7, 8, 11, 13, 15, 23)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("13.${idx+1}", k, n, "تمكين $n للعقارات والأملاك", "العقارات والأملاك", "سوق العقارات", lvl, PermissionCategory.PROPERTIES))
-        }
 
-        // 14. الوظائف والشركات والتوظيف (35 صلاحية)
-        val jobItems = listOf(
-            "JOB_VIEW_ALL" to "صلاحية عرض جميع الوظائف الشاغرة المعلنة",
-            "JOB_VIEW_SPECIFIC" to "صلاحية فحص تفاصيل إعلان وظيفة محددة",
-            "JOB_ADD" to "صلاحية نشر إعلان وظيفة جديدة يدوياً من لوحة التحكم",
-            "JOB_EDIT" to "صلاحية تعديل المسمى الوظيفي والمتطلبات والراتب",
-            "JOB_DELETE" to "صلاحية حذف إعلان الوظيفة نهائياً",
-            "JOB_BLOCK" to "صلاحية حظر إعلان الوظيفة أو الشركة المعلنة",
-            "JOB_UNBLOCK" to "صلاحية فك الحظر وإعادة تنشيط إعلان الوظيفة",
-            "JOB_ACTIVATE" to "صلاحية قبول ونشر إعلان الوظيفة للباحثين عن عمل",
-            "JOB_DEACTIVATE" to "صلاحية إغلاق الوظيفة (اكتفاء بالعدد المطلوب)",
-            "JOB_PIN" to "صلاحية تثبيت الوظيفة في صدارة قائمة الوظائف الشاغرة",
-            "JOB_UNPIN" to "صلاحية إلغاء تثبيت الوظيفة",
-            "JOB_SET_VIP" to "صلاحية منح إعلان الوظيفة شارة VIP المميزة",
-            "JOB_UNSET_VIP" to "صلاحية إلغاء شارة VIP عن الوظيفة",
-            "JOB_VERIFY_COMPANY" to "صلاحية توثيق حساب الشركة المشغلة ومنحها شارة التوثيق",
-            "JOB_UNVERIFY_COMPANY" to "صلاحية إلغاء توثيق الشركة المعلنة",
-            "JOB_RECOMMEND" to "صلاحية ترشيح الوظيفة في الوظائف المميزة والموصى بها",
-            "JOB_UNRECOMMEND" to "صلاحية إلغاء ترشيح الوظيفة",
-            "JOB_CV_VIEW_ALL" to "صلاحية الاطلاع ومراجعة السير الذاتية (CV) للمتقدمين",
-            "JOB_CV_DOWNLOAD" to "صلاحية تحميل وتنزيل ملفات السير الذاتية والمستندات",
-            "JOB_APPLICATION_STATUS" to "صلاحية تغيير حالة المتقدم (مقبول مبدئياً، مقابلة، مرفوض)",
-            "JOB_SALARY_RANGE_CONFIG" to "صلاحية تحديد وإخفاء نطاق الراتب المتوقع",
-            "JOB_PASSWORD_RESET" to "صلاحية إعادة تعيين كلمة مرور حساب الشركة المعلنة",
-            "JOB_PASSWORD_VIEW" to "صلاحية إظهار كلمة المرور الحالية للشركة المعلنة",
-            "JOB_EXPERIENCE_LEVEL_TAG" to "صلاحية تصنيف مستوى الخبرة (مبتدئ، متوسط، محترف)",
-            "JOB_EMPLOYMENT_TYPE" to "صلاحية تصنيف نوع الدوام (دوام كامل، جزئي، عن بعد)",
-            "JOB_EDUCATION_DEGREE" to "صلاحية تحديد المؤهل العلمي المطلوب (ثانوية، بكالوريوس)",
-            "JOB_EXPORT_APPLICANTS" to "صلاحية تصدير كشف كامل بأسماء المتقدمين وإيميلاتهم",
-            "JOB_AUTOMATED_INTERVIEW_EMAIL" to "صلاحية إرسال بريد دعوة المقابلة التلقائي",
-            "JOB_APPLICATION_DEADLINE" to "صلاحية ضبط آخر موعد لاستقبال طلبات التوظيف",
-            "JOB_GENDER_PREFERENCE" to "صلاحية تحديد الفئة المطلوبة (ذكور، إناث، كلاهما)",
-            "JOB_BENEFITS_TAGS" to "صلاحية إضافة مزايا العمل (تأمين طبي، سكن، مواصلات)",
-            "JOB_INTERVIEW_QUIZ" to "صلاحية إضافة اختبار تقييم مبدئي للمتقدمين",
-            "JOB_NOTIFICATION_ALERT" to "صلاحية إرسال إشعار فوري للباحثين عند نشر وظيفة تناسبهم",
-            "JOB_SUBSCRIPTION_EXPIRY" to "صلاحية تمديد وتعديل اشتراك باقة التوظيف للشركة",
-            "JOB_AUDIT_LOG" to "صلاحية مراجعة سجل تعديلات وحركات بوابة التوظيف"
+        // 13. أعضاء الدليل (PROVIDERS) - 14 صلاحية
+        addGroup(
+            PermissionCategory.PROVIDERS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "PROV_VIEW_ALL" to ("عرض جميع الفنيين" to "مشاهدة جميع الفنيين المسجلين في الدليل"),
+                "PROV_SEARCH" to ("البحث في الفنيين" to "البحث عن فني بالاسم، الهاتف، أو المهنة"),
+                "PROV_VIEW_DETAILS" to ("عرض تفاصيل فني" to "مشاهدة ملف الفني والتقييمات وصور الأعمال"),
+                "PROV_EDIT" to ("تعديل فني" to "تعديل بيانات الفني ومهنته والأسعار والمنطقة"),
+                "PROV_DELETE" to ("حذف فني نهائياً" to "حذف حساب الفني بالكامل من المنظومة"),
+                "PROV_GRANT_VIP" to ("تفعيل VIP لفني" to "منح الفني عضوية VIP والظهور في صدارة الدليل"),
+                "PROV_REVOKE_VIP" to ("إلغاء VIP لفني" to "إلغاء عضوية VIP عن الفني"),
+                "PROV_VERIFY" to ("توثيق فني" to "منح الفني شارة الهوية المهنية الموثقة"),
+                "PROV_UNVERIFY" to ("إلغاء توثيق فني" to "إلغاء شارة التوثيق عن الفني"),
+                "PROV_RECOMMEND" to ("توصية فني" to "منح الفني شارة الأفضل تقييماً والتوصية"),
+                "PROV_UNRECOMMEND" to ("إلغاء توصية فني" to "إلغاء شارة التوصية عن الفني"),
+                "PROV_DISABLE_CHAT" to ("تعطيل الدردشة عن فني" to "إيقاف خاصية الدردشة عن فني معين"),
+                "PROV_ENABLE_CHAT" to ("تفعيل الدردشة عن فني" to "تفعيل خاصية الدردشة لفني معين"),
+                "PROV_LINK_PAYMENT" to ("ربط الفني بالدفع والمحفظة" to "ربط حساب الفني بنظام المحافظ والتحويلات المالية")
+            )
         )
-        jobItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(4, 5, 6, 17, 21, 22)) PermissionLevel.SENSITIVE else if (idx in listOf(2, 3, 7, 8, 11, 13, 15, 18, 19)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("14.${idx+1}", k, n, "تمكين $n لسوق الوظائف والشركات", "الوظائف والشركات", "بوابة التوظيف", lvl, PermissionCategory.JOBS))
-        }
 
-        // 15. التبويبات المخصصة والتنقل (30 صلاحية)
-        val tabItems = listOf(
-            "TAB_CREATE" to "صلاحية إنشاء وإضافة تبويب مخصص جديد في الواجهة",
-            "TAB_SET_NAME" to "صلاحية كتابة وتعديل اسم التبويب المعروض للمستخدم",
-            "TAB_SET_ICON" to "صلاحية اختيار وتغيير أيقونة التبويب",
-            "TAB_SET_CONTENT_TYPE" to "صلاحية تحديد نوع محتوى التبويب (نص، روابط، نماذج)",
-            "TAB_SET_FIELDS_COUNT" to "صلاحية تحديد عدد الحقول داخل التبويب",
-            "TAB_SET_FIELDS_ORDER" to "صلاحية تحديد ترتيب تسلسل ظهور الحقول",
-            "TAB_SET_SIZE" to "صلاحية ضبط مقاس وحجم التبويب في الشاشة",
-            "TAB_SHOW_ALL" to "صلاحية إظهار التبويب لكافة مستخدمي التطبيق",
-            "TAB_SHOW_USERS" to "صلاحية إظهار التبويب للعملاء والمواطنين فقط",
-            "TAB_SHOW_PROVIDERS" to "صلاحية إظهار التبويب للفنيين ومقدمي الخدمات فقط",
-            "TAB_SHOW_STORES" to "صلاحية إظهار التبويب للمحلات والمراكز التجارية فقط",
-            "TAB_SHOW_RESTAURANTS" to "صلاحية إظهار التبويب للمطاعم والكافيهات فقط",
-            "TAB_SHOW_MEDICAL" to "صلاحية إظهار التبويب للمراكز الطبية والعيادات فقط",
-            "TAB_SHOW_PROPERTIES" to "صلاحية إظهار التبويب لمالكي العقارات فقط",
-            "TAB_SHOW_JOBS" to "صلاحية إظهار التبويب لمعلني الوظائف فقط",
-            "TAB_SHOW_AREA" to "صلاحية تقييد إظهار التبويب لمحافظة أو مدينة معينة",
-            "TAB_EDIT" to "صلاحية تعديل بيانات وإعدادات تبويب موجود",
-            "TAB_DELETE" to "صلاحية حذف التبويب نهائياً ومحتوياته",
-            "TAB_ACTIVATE" to "صلاحية تفعيل وجعل التبويب مرئياً للجميع",
-            "TAB_DEACTIVATE" to "صلاحية تعطيل وإخفاء التبويب مؤقتاً",
-            "TAB_REORDER" to "صلاحية تغيير ترتيب موقع التبويب بين التبويبات الأخرى",
-            "TAB_RESIZE" to "صلاحية تعديل أبعاد وأحجام العناصر داخل التبويب",
-            "TAB_SET_COLOR" to "صلاحية تخصيص لون خلفية وأزرار التبويب",
-            "TAB_SET_FONT" to "صلاحية تغيير نوع خط النصوص داخل التبويب",
-            "TAB_ADD_FIELD" to "صلاحية إضافة حقل إدخال جديد للتبويب",
-            "TAB_EDIT_FIELD" to "صلاحية تعديل خيارات الحقل المضاف بالتبويب",
-            "TAB_DELETE_FIELD" to "صلاحية حذف حقل معين من داخل التبويب",
-            "TAB_BADGE_ALERT" to "صلاحية إضافة شارة تنبيهية حمراء فوق التبويب",
-            "TAB_EXPORT_LAYOUT" to "صلاحية تصدير تخطيط وهيكلية التبويبات المخصصة",
-            "TAB_IMPORT_LAYOUT" to "صلاحية استيراد تصميم وهيكلية تبويبات جاهزة"
+        // 14. كلمات المرور (PASSWORDS_RESET) - 8 صلاحيات
+        addGroup(
+            PermissionCategory.PASSWORDS_RESET,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "PASS_VIEW_PROVIDERS" to ("عرض كلمات مرور الفنيين" to "الاطلاع على كلمات مرور الفنيين المسجلين"),
+                "PASS_VIEW_STORES" to ("عرض كلمات مرور المحلات" to "الاطلاع على كلمات مرور أصحاب المحلات"),
+                "PASS_VIEW_REST" to ("عرض كلمات مرور المطاعم" to "الاطلاع على كلمات مرور أصحاب المطاعم"),
+                "PASS_VIEW_MED" to ("عرض كلمات مرور المراكز الطبية" to "الاطلاع على كلمات مرور المراكز الطبية"),
+                "PASS_VIEW_PROP" to ("عرض كلمات مرور العقارات" to "الاطلاع على كلمات مرور معلني العقارات"),
+                "PASS_RESET_DIRECT" to ("إعادة تعيين كلمة المرور" to "تغيير وتعيين كلمة مرور جديدة لأي حساب"),
+                "PASS_SEND_WHATSAPP" to ("إرسال كلمة المرور عبر واتساب" to "إرسال بيانات الدخول الجديدة للمستخدم عبر واتساب"),
+                "PASS_SEND_SMS" to ("إرسال كلمة المرور عبر SMS" to "إرسال كلمة المرور للمستخدم برسالة نصية قصيرة")
+            )
         )
-        tabItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(0, 17, 18, 19)) PermissionLevel.SENSITIVE else if (idx in listOf(1, 2, 7, 8, 9, 10, 15, 16)) PermissionLevel.ADVANCED else PermissionLevel.BASIC
-            list.add(AdminPermissionItem("15.${idx+1}", k, n, "تمكين $n للتبويبات المخصصة", "التبويبات المخصصة", "التنقل والواجهات", lvl, PermissionCategory.CUSTOM_TABS))
-        }
 
-        // 16. الرقابة الأمنية وحظر الحسابات وفحص الثغرات (30 صلاحية)
-        val secItems = listOf(
-            "SEC_VIEW_AUDIT_LOGS" to "صلاحية الاطلاع على سجل العمليات والتدقيق الأمني العام",
-            "SEC_SCAN_VULNERABILITIES" to "صلاحية تشغيل الفحص الأمني التلقائي وكشف الثغرات",
-            "SEC_ENFORCE_ENCRYPTION" to "صلاحية فرض وتدقيق تشفير البيانات الحساسة (AES-256)",
-            "SEC_BLOCK_IP_DEVICE" to "صلاحية حظر عنوان IP أو معرف الجهاز المريب نهائياً",
-            "SEC_UNBLOCK_IP_DEVICE" to "صلاحية فك الحظر عن عنوان IP أو جهاز تم حظره",
-            "SEC_RATE_LIMIT_MANAGE" to "صلاحية ضبط جدران الحماية ضد هجمات DDoS والطلبات الكثيفة",
-            "SEC_MEDIA_SCAN_GUARD" to "صلاحية تفعيل الفاحص الآلي للصور ومنع المحتوى المحظور",
-            "SEC_MEDIA_METADATA_STRIP" to "صلاحية تفريغ البيانات الوصفية (EXIF) من الصور المرفوعة لحماية الخصوصية",
-            "SEC_SESSION_TERMINATE_ALL" to "صلاحية تسجيل الخروج الإجباري لكافة الجلسات والأجهزة",
-            "SEC_FORCE_PASSWORD_CHANGE" to "صلاحية إجبار مستخدم أو فني على تغيير كلمة مروره",
-            "SEC_TWO_FACTOR_TOGGLE" to "صلاحية تفعيل التحقق بخطوتين (2FA) لحسابات الإدارة",
-            "SEC_SUPERVISORS_MANAGE" to "صلاحية إضافة وتعديل المشرفين وتعيين صلاحياتهم",
-            "SEC_SUPERVISORS_DELETE" to "صلاحية حذف حساب مشرف وسحب كامل صلاحياته فورياً",
-            "SEC_ROOT_JAILBREAK_DETECT" to "صلاحية منع تشغيل التطبيق على الهواتف المكسورة الحماية (Rooted)",
-            "SEC_SCREENSHOT_PREVENT" to "صلاحية منع التقاط الشاشة في الصفحات الحساسة",
-            "SEC_EXPORT_SECURITY_REPORT" to "صلاحية تصدير التقرير الأمني الرسمي لسجلات النظام",
-            "SEC_FAILED_LOGINS_MONITOR" to "صلاحية مراقبة وتتبع محاولات تسجيل الدخول الفاشلة",
-            "SEC_SUSPICIOUS_ALERTS" to "صلاحية استلام تنبيهات الأنشطة المشبوهة اللحظية",
-            "SEC_CLEAR_TEMP_CACHE" to "صلاحية تفريغ الذاكرة المؤقتة ومسح الملفات غير الآمنة",
-            "SEC_API_KEY_REVOKE" to "صلاحية إبطال وتوليد مفاتيح الربط السحابية (API Keys)",
-            "SEC_FIREBASE_RULES_AUDIT" to "صلاحية تدقيق قواعد أمان وتصاريح Firestore و Cloud Storage",
-            "SEC_BACKDOOR_ACCESS" to "صلاحية الدخول لبوابة الإدارة العليا والتحكم الشامل",
-            "SEC_DATA_RETENTION_POLICY" to "صلاحية ضبط سياسات الاحتفاظ بالبيانات وحذف السجلات القديمة",
-            "SEC_GEO_IP_RESTRICTIONS" to "صلاحية تقييد استخدام لوحة التحكم لدول أو نطاقات محددة",
-            "SEC_DATABASE_LEAK_TEST" to "صلاحية فحص واختبار تسريب البيانات وتأمين المنافذ",
-            "SEC_TAMPER_PROTECTION" to "صلاحية تفعيل حماية توقيع التطبيق ومكافحة التعديل",
-            "SEC_DEVICE_INTEGRITY_CHECK" to "صلاحية فحص نزاهة جهاز المستخدم عبر Play Integrity",
-            "SEC_HONEYPOT_ALERTS" to "صلاحية تفعيل مصائد الاختراق لكشف محاولات التسلل",
-            "SEC_AUDIT_EXPORTS_LOG" to "صلاحية تسجيل وتتبع كل عملية تصدير للبيانات",
-            "SEC_EMERGENCY_LOCKDOWN" to "صلاحية الإغلاق الأمني الشامل للنظام في حالات الطوارئ"
+        // 15. البنرات (BANNERS) - 18 صلاحية
+        addGroup(
+            PermissionCategory.BANNERS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "BAN_CREATE_NEW" to ("إنشاء بنر إعلاني جديد" to "إضافة بنر ترويجي جديد في التطبيق"),
+                "BAN_SELECT_TYPE" to ("اختيار نوع البنر" to "تحديد نوع البنر (نصي، صورة، فيديو)"),
+                "BAN_UPLOAD_IMAGE" to ("رفع صورة للبنر" to "رفع صورة البنر من معرض الهاتف بجودة عالية"),
+                "BAN_UPLOAD_VIDEO" to ("رفع فيديو للبنر" to "رفع مقطع فيديو إعلاني للبنر"),
+                "BAN_SET_DURATION" to ("تحديد مدة العرض" to "تحديد مدة ظهور البنر بالثواني"),
+                "BAN_SET_STYLE" to ("تحديد نمط العرض" to "تحديد تأثير البنر (انزلاق، تلاشي، وميض، تمرير)"),
+                "BAN_SET_POSITION" to ("تحديد موقع البنر" to "تحديد موقع البنر (أعلى الشاشة، أسفل الشاشة)"),
+                "BAN_SET_SIZE" to ("تحديد حجم البنر" to "تحديد حجم البنر (صغير، متوسط، كبير، عرض كامل)"),
+                "BAN_LINK_SECTION" to ("توجيه البنر لقسم محدد" to "تحديد القسم الذي ينتقل إليه المستخدم عند النقر"),
+                "BAN_TARGET_GROUP" to ("توجيه البنر لفئة محددة" to "تحديد الفئة المستهدفة (الكل، فنيين، محلات، إلخ)"),
+                "BAN_TARGET_AREA" to ("توجيه البنر لمنطقة محددة" to "تحديد المدينة أو المحافظة المستهدفة بالبنر"),
+                "BAN_EDIT" to ("تعديل البنر" to "تعديل محتوى وتفاصيل وتوجيه بنر موجود"),
+                "BAN_DELETE" to ("حذف البنر نهائياً" to "حذف البنر الإعلاني بشكل نهائي"),
+                "BAN_REORDER" to ("ترتيب أولوية البنرات" to "رفع أو خفض ترتيب ظهور البنرات الترويجية"),
+                "BAN_PREVIEW" to ("معاينة البنر الفورية" to "معاينة شكل وحركة البنر قبل النشر الفعلي"),
+                "BAN_STATS_VIEW" to ("عرض إحصائيات البنر" to "مشاهدة عدد المشاهدات ونسب النقر على البنر"),
+                "BAN_TOGGLE_ACTIVE" to ("تفعيل/تعطيل البنر" to "تشغيل أو إيقاف البنر دون حذفه"),
+                "BAN_EXPORT_REPORT" to ("تصدير تقرير البنرات" to "تصدير تقرير أداء ونقرات الحملات الإعلانية")
+            )
         )
-        secItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(1, 3, 8, 11, 12, 19, 21, 29)) PermissionLevel.SENSITIVE else if (idx in listOf(0, 2, 4, 5, 6, 7, 10, 13, 20)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("16.${idx+1}", k, n, "تمكين $n للرقابة والحماية", "الرقابة والحماية الأمنية", "الأمان والرقابة", lvl, PermissionCategory.SECURITY_AUDIT))
-        }
 
-        // 17. الإدارة المالية والاشتراكات والمدفوعات (25 صلاحية)
-        val finItems = listOf(
-            "FIN_VIEW_DASHBOARD" to "صلاحية استعراض لوحة الإحصائيات المالية والإيرادات",
-            "FIN_SUBSCRIPTION_PLANS" to "صلاحية إنشاء وتعديل باقات وأسعار الاشتراكات الشهرية والسنوية",
-            "FIN_COLLECT_COMMISSIONS" to "صلاحية تحصيل وتسجيل عمولات الفنيين والمنشآت",
-            "FIN_PAYMENT_GATEWAYS" to "صلاحية ضبط بوابات الدفع الإلكتروني والمحافظ (كريمي، ون كاش)",
-            "FIN_INVOICES_MANAGE" to "صلاحية إصدار ومراجعة الفواتير وسندات القبض الإلكترونية",
-            "FIN_MANUAL_PAYMENT_APPROVE" to "صلاحية تدقيق وقبول إشعارات التحويل البنكي اليدوية",
-            "FIN_REFUND_TRANSACTIONS" to "صلاحية اعتماد وتنفيذ عمليات استرجاع المبالغ للعملاء",
-            "FIN_DISCOUNT_PROMO_CODES" to "صلاحية إنشاء وإدارة أكواد وقسائم الخصم الترويجية",
-            "FIN_WALLET_BALANCE_ADJUST" to "صلاحية شحن أو تعديل رصيد المحفظة لحساب أي مستخدم أو فني",
-            "FIN_TRANSACTION_LOGS" to "صلاحية تدقيق ومراجعة سجل كافة الحركات والتحويلات المالية",
-            "FIN_EXPORT_FINANCIAL_SHEET" to "صلاحية تصدير الكشوفات والتقارير المالية كملف Excel",
-            "FIN_TAX_SETTING" to "صلاحية ضبط نسب الضرائب والرسوم الحكومية إن وجدت",
-            "FIN_SETTLEMENTS_PAYOUT" to "صلاحية اعتماد وتصفية مستحقات مقدمي الخدمات",
-            "FIN_BANK_ACCOUNTS_CONFIG" to "صلاحية تعديل أرقام الحسابات البنكية لاستقبال الدفعات",
-            "FIN_SUBSCRIPTION_REMINDERS" to "صلاحية إرسال إشعارات التذكير التلقائي بقرب انتهاء الاشتراك",
-            "FIN_VIP_PACKAGES_PRICE" to "صلاحية تسعير باقات التمييز وعضوية VIP الذهبية",
-            "FIN_REVENUE_CHART_ANALYTICS" to "صلاحية مشاهدة الرسوم البيانية لمعدل نمو الأرباح",
-            "FIN_OVERDUE_PENALTIES" to "صلاحية إدارة وتطبيق غرامات التأخير في سداد العمولات",
-            "FIN_RECEIPT_TEMPLATE_EDIT" to "صلاحية تخصيص قالب وشعار سندات القبض المطبوعة",
-            "FIN_CURRENCY_EXCHANGE_RATES" to "صلاحية تحديث أسعار صرف العملات المعتمدة بالتطبيق",
-            "FIN_RECURRING_BILLING" to "صلاحية تفعيل نظام الخصم والتجديد التلقائي للاشتراك",
-            "FIN_PROVIDER_EARNINGS_LIMIT" to "صلاحية ضبط سقف السحب اليومي والأسبوعي للأرصدة",
-            "FIN_AUDIT_DISCREPANCIES" to "صلاحية مراجعة الفروقات المحاسبية ومطابقة الأرصدة",
-            "FIN_AGENT_COMMISSION_SHARE" to "صلاحية إدارة حصص ونسب الوكلاء والمسوقين",
-            "FIN_FINANCIAL_LOCK_MONTH" to "صلاحية إقفال الشهر المالي ومنع التعديل على القيود"
+        // 16. الأقسام والتصنيفات (CATEGORIES) - 12 صلاحية
+        addGroup(
+            PermissionCategory.CATEGORIES,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "CAT_VIEW_ALL" to ("عرض جميع الأقسام" to "مشاهدة جميع الأقسام الرئيسية والفرعية المسجلة"),
+                "CAT_ADD_NEW" to ("إضافة قسم جديد" to "إضافة قسم وتصنيف خدمي جديد في المنظومة"),
+                "CAT_SET_NAME" to ("تحديد اسم القسم" to "تحديد وتسمية القسم باللغتين العربية والإنجليزية"),
+                "CAT_SET_ICON" to ("تحديد أيقونة القسم" to "اختيار أيقونة أو إيموجي مميز للقسم"),
+                "CAT_SET_TYPE" to ("تحديد نوع القسم" to "تحديد ما إذا كان القسم رئيسياً أو فرعياً"),
+                "CAT_SET_PARENT" to ("تحديد القسم الرئيسي التابع له" to "ربط القسم الفرعي بالقسم الرئيسي الصحيح"),
+                "CAT_EDIT" to ("تعديل بيانات القسم" to "تعديل اسم أو أيقونة أو وصف أي قسم موجود"),
+                "CAT_DELETE" to ("حذف قسم نهائياً" to "حذف قسم من المنظومة وقاعدة البيانات"),
+                "CAT_MERGE" to ("دمج الأقسام" to "دمج قسمين أو تصنيفين مع نقل بياناتهما"),
+                "CAT_REORDER" to ("ترتيب ظهور الأقسام" to "تغيير وترتيب أسبقية ظهور الأقسام في القوائم"),
+                "CAT_PIN_TOP" to ("تثبيت قسم بالصدارة" to "تثبيت قسم معين في أعلى الصفحة الرئيسية"),
+                "CAT_UNPIN_TOP" to ("إلغاء تثبيت قسم" to "إلغاء تثبيت القسم من صدارة الصفحة الرئيسية")
+            )
         )
-        finItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(1, 3, 5, 6, 8, 12, 13, 24)) PermissionLevel.SENSITIVE else if (idx in listOf(0, 2, 4, 7, 9, 10, 15)) PermissionLevel.ADVANCED else PermissionLevel.MEDIUM
-            list.add(AdminPermissionItem("17.${idx+1}", k, n, "تمكين $n للمنظومة المالية", "الإدارة المالية والاشتراكات", "المالية والمدفوعات", lvl, PermissionCategory.FINANCIAL))
-        }
 
-        // 18. النظام وقواعد البيانات السحابية (13 صلاحية)
-        val sysItems = listOf(
-            "SYS_BACKUP_DATABASE" to "صلاحية إنشاء نسخة احتياطية سحابية فورية لكامل قاعدة البيانات",
-            "SYS_RESTORE_DATABASE" to "صلاحية استرجاع قاعدة البيانات من نسخة احتياطية سابقة",
-            "SYS_MAINTENANCE_MODE_TOGGLE" to "صلاحية تفعيل وإلغاء وضع الصيانة العام للتطبيق",
-            "SYS_FORCE_UPDATE_APP" to "صلاحية فرض التحديث الإجباري للتطبيق لجميع المستخدمين",
-            "SYS_AUTO_DISPATCH_CONFIG" to "صلاحية ضبط خوارزميات التوجيه الذكي وتوزيع الطلبات",
-            "SYS_API_KEYS_CONFIG" to "صلاحية إدارة مفاتيح الخدمات السحابية (Google Maps, Firebase, AI)",
-            "SYS_STORAGE_CLEANUP" to "صلاحية تنظيف وضغط الملفات والبيانات المؤقتة من السيرفر",
-            "SYS_APP_CONFIG_PARAMS" to "صلاحية تعديل إعدادات النظام العامة (اسم التطبيق، أرقام الدعم)",
-            "SYS_CRON_JOBS_SCHEDULE" to "صلاحية جدولة وإدارة المهام التلقائية الدورية في السيرفر",
-            "SYS_SERVER_HEALTH_MONITOR" to "صلاحية مراقبة كفاءة واستقرار السيرفر وسرعة الاستجابة",
-            "SYS_EXPORT_ALL_DATA" to "صلاحية تصدير أرشيف كامل لجميع جداول ومحتويات التطبيق",
-            "SYS_FACTORY_RESET_MODULE" to "صلاحية إعادة تهيئة وتصفير قسم معين للوضع المصنعي الافتراضي",
-            "SYS_RESTART_SERVICES" to "صلاحية إعادة تشغيل الخدمات السحابية ومزامنة المستمعين"
+        // 17. المدن والمحافظات (CITIES) - 7 صلاحيات
+        addGroup(
+            PermissionCategory.CITIES,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "CITY_VIEW_ALL" to ("عرض جميع المدن" to "مشاهدة جميع المدن والمحافظات والمديريات المسجلة"),
+                "CITY_ADD_NEW" to ("إضافة مدينة جديدة" to "إضافة محافظة أو مدينة يمنية جديدة للدليل"),
+                "CITY_NAME_AR" to ("تحديد اسم المدينة بالعربية" to "كتابة الاسم العربي الصحيح للمدينة"),
+                "CITY_NAME_EN" to ("تحديد اسم المدينة بالإنجليزية" to "كتابة الاسم الإنجليزي للمدينة"),
+                "CITY_SET_ICON" to ("تحديد أيقونة المدينة" to "اختيار رمز أو أيقونة معبرة عن المدينة"),
+                "CITY_EDIT" to ("تعديل بيانات مدينة" to "تعديل اسم أو تفاصيل أي مدينة مسجلة"),
+                "CITY_DELETE" to ("حذف مدينة نهائياً" to "حذف مدينة من قائمة التغطية الجغرافية")
+            )
         )
-        sysItems.forEachIndexed { idx, (k, n) ->
-            val lvl = if (idx in listOf(0, 1, 2, 3, 5, 10, 11)) PermissionLevel.SENSITIVE else PermissionLevel.ADVANCED
-            list.add(AdminPermissionItem("18.${idx+1}", k, n, "تمكين $n لإدارة السيرفر والنظام", "النظام وقواعد البيانات", "السيرفر وقواعد البيانات", lvl, PermissionCategory.SYSTEM_BACKUP))
-        }
+
+        // 18. الشكاوى والبلاغات (COMPLAINTS) - 7 صلاحيات
+        addGroup(
+            PermissionCategory.COMPLAINTS,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "COMP_VIEW_ALL" to ("عرض جميع الشكاوى" to "مشاهدة جميع الشكاوى والبلاغات الواردة من المستخدمين"),
+                "COMP_SEARCH" to ("البحث في الشكاوى" to "البحث عن شكوى معينة برقم البلاغ أو الهاتف"),
+                "COMP_VIEW_DETAILS" to ("عرض تفاصيل الشكوى" to "الاطلاع على تفاصيل البلاغ والأطراف والرسائل المرفقة"),
+                "COMP_DELETE" to ("حذف شكوى من السجل" to "حذف البلاغ والشكوى بعد المعالجة والإغلاق"),
+                "COMP_EXPORT_CSV" to ("تصدير سجل الشكاوى CSV" to "تصدير سجل البلاغات كملف بيانات CSV"),
+                "COMP_EXPORT_PDF" to ("تصدير تقرير الشكاوى PDF" to "تصدير تقرير رسمي بالشكاوى ومعالجتها"),
+                "COMP_FREEZE_ACCOUNT" to ("تجميد حساب المشكو ضده" to "تجميد حساب الفني أو المحل المشكو ضده احترازياً")
+            )
+        )
+
+        // 19. ترقيات واشتراكات VIP (VIP) - 6 صلاحيات
+        addGroup(
+            PermissionCategory.VIP,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "VIP_VIEW_ALL" to ("عرض جميع أعضاء VIP" to "مشاهدة جميع الفنيين والمتاجر المشتركة في VIP"),
+                "VIP_VIEW_EXPIRY" to ("عرض المدة المتبقية للاشتراك" to "الاطلاع على تواريخ انتهاء الاشتراكات المميزة"),
+                "VIP_RENEW" to ("تجديد اشتراك VIP" to "تمديد وتجديد اشتراك VIP لفني أو منشأة"),
+                "VIP_CANCEL" to ("إلغاء اشتراك VIP" to "إلغاء عضوية VIP وسحب الميزات الترويجية"),
+                "VIP_BROADCAST_48H" to ("بث تنبيهات الـ 48 ساعة" to "إرسال تنبيهات تلقائية للاشتراكات التي ستنتهي خلال 48 ساعة"),
+                "VIP_PASSWORD_REMIND" to ("إرسال تذكير بكلمة المرور" to "إرسال تذكير ببيانات الحساب لعضو VIP")
+            )
+        )
+
+        // 20. المشرفين والصلاحيات (SUPERVISORS) - 12 صلاحية
+        addGroup(
+            PermissionCategory.SUPERVISORS,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "SUP_VIEW_ALL" to ("عرض جميع المشرفين" to "مشاهدة جميع حسابات المشرفين والمدراء المساعدين"),
+                "SUP_ADD_NEW" to ("إضافة مشرف جديد" to "إنشاء وإضافة حساب مشرف جديد في لوحة التحكم"),
+                "SUP_SET_NAME" to ("تحديد اسم المشرف" to "تعيين الاسم والبريد الإلكتروني للمشرف"),
+                "SUP_ASSIGN_ROLE" to ("تحديد صلاحيات المشرف" to "اختيار دور المشرف (ADMIN, AUDITOR, SUPPORT, OPERATIONS)"),
+                "SUP_SET_PASSWORD" to ("تعيين كلمة مرور المشرف" to "توليد وتعيين كلمة مرور آمنة لحساب المشرف"),
+                "SUP_EDIT" to ("تعديل بيانات مشرف" to "تعديل صلاحيات وبيانات أي مشرف موجود"),
+                "SUP_DELETE" to ("حذف مشرف نهائياً" to "حذف حساب المشرف وسحب جميع صلاحياته فوراً"),
+                "SUP_ADD_PALETTE" to ("إضافة لوحة ألوان مخصصة" to "إضافة لوحة ألوان وثيم جديد للنظام"),
+                "SUP_NAME_PALETTE" to ("تحديد اسم لوحة الألوان" to "تسمية الثيم أو اللوحة اللونية المضافة"),
+                "SUP_SET_PALETTE_COLORS" to ("تحديد الألوان الأساسية والثانوية" to "اختيار درجات ألوان الثيم بدقة (Hex)"),
+                "SUP_APPLY_PALETTE" to ("تطبيق لوحة ألوان فوراً" to "تطبيق الثيم الجديد فورياً على جميع واجهات التطبيق"),
+                "SUP_DELETE_PALETTE" to ("حذف لوحة ألوان" to "حذف أي لوحة ألوان مخصصة غير مستخدمة")
+            )
+        )
+
+        // 21. الألوان والمظهر والبطاقات (COLORS) - 34 صلاحية
+        addGroup(
+            PermissionCategory.COLORS,
+            PermissionLevel.BASIC,
+            listOf(
+                "COL_PRIMARY" to ("تخصيص اللون الأساسي" to "تحديد اللون الأساسي للتطبيق بدقة (Primary Hex)"),
+                "COL_SECONDARY" to ("تخصيص اللون الثانوي" to "تحديد اللون الثانوي المميز للتطبيق (Secondary Hex)"),
+                "COL_CARD_BG" to ("تخصيص لون خلفية البطاقة" to "تحديد لون خلفية بطاقات الفنيين والمنشآت"),
+                "COL_NAME_COLOR" to ("تخصيص لون اسم مقدم الخدمة" to "تحديد لون خط عنوان واسم مقدم الخدمة"),
+                "COL_LOCATION_COLOR" to ("تخصيص لون نصوص الموقع" to "تحديد لون خط العنوان الجغرافي والمدينة"),
+                "COL_RATING_COLOR" to ("تخصيص لون التقييم والنجوم" to "تحديد لون النجوم ونصوص التقييم"),
+                "COL_VIP_BADGE" to ("تخصيص لون شارة VIP" to "تحديد لون شارة التميز VIP"),
+                "COL_VERIFIED_BADGE" to ("تخصيص لون شارة التوثيق" to "تحديد لون شارة الحساب الموثق المعتمد"),
+                "COL_RECOMMEND_BADGE" to ("تخصيص لون شارة التوصية" to "تحديد لون شارة الموصى بهم"),
+                "COL_FONT_FAMILY" to ("اختيار نوع الخط العربي" to "تحديد الخط العام (Cairo، Amiri، Tahoma، System)"),
+                "COL_CHAT_ICON_SIZE" to ("تحديد حجم أيقونة الدردشة" to "تعديل وتحديد حجم أيقونة الدردشة العائمة"),
+                "COL_CHAT_ICON_POS" to ("تحديد موقع أيقونة الدردشة" to "تحديد إحداثيات وموقع أيقونة الدردشة على الشاشة"),
+                "COL_ASSISTANT_SIZE" to ("تحديد حجم أيقونة المساعد الذكي" to "تعديل وتحديد حجم أيقونة المساعد الذكي العائمة"),
+                "COL_ASSISTANT_POS" to ("تحديد موقع أيقونة المساعد الذكي" to "تحديد إحداثيات وموقع أيقونة المساعد على الشاشة"),
+                "COL_REG_TERMS_MANAGE" to ("إدارة شروط التسجيل" to "إضافة وتعديل وحذف شروط وقوانين التسجيل"),
+                "COL_COVER_HEIGHT" to ("تحديد ارتفاع غلاف البطاقة" to "تعديل ارتفاع ومقاس صورة غلاف البطاقة"),
+                "COL_AVATAR_SIZE" to ("تحديد حجم الصورة الشخصية" to "تعديل حجم دائرة أو مربع الصورة الشخصية"),
+                "COL_CARD_SPACING" to ("تحديد تباعد عناصر البطاقة" to "تحديد المسافات البينية والتباعد داخل البطاقة"),
+                "COL_CARD_PADDING" to ("تحديد حشو وهوامش البطاقة" to "تحديد الحشو الداخلي والخارجي للبطاقة (Padding)"),
+                "COL_SHOW_VIP_BADGE" to ("إظهار/إخفاء شارة VIP" to "التحكم في ظهور أو إخفاء شارة VIP"),
+                "COL_SHOW_VERIFIED" to ("إظهار/إخفاء شارة التوثيق" to "التحكم في ظهور أو إخفاء شارة التوثيق"),
+                "COL_SHOW_RECOMMEND" to ("إظهار/إخفاء شارة التوصية" to "التحكم في ظهور أو إخفاء شارة التوصية"),
+                "COL_SHOW_CALL_BTN" to ("إظهار/إخفاء زر الاتصال" to "التحكم في ظهور زر الاتصال المباشر بالبطاقة"),
+                "COL_SHOW_WHATSAPP_BTN" to ("إظهار/إخفاء زر الواتساب" to "التحكم في ظهور زر الواتساب بالبطاقة"),
+                "COL_SHOW_DETAILS_BTN" to ("إظهار/إخفاء زر التفاصيل" to "التحكم في ظهور زر عرض التفاصيل والملف"),
+                "COL_SHOW_BOOK_BTN" to ("إظهار/إخفاء زر الحجز" to "التحكم في ظهور زر الحجز الفوري بالبطاقة"),
+                "COL_CALL_BTN_COLOR" to ("تخصيص لون زر الاتصال" to "تحديد لون خلفية زر الاتصال الهاتفي"),
+                "COL_WHATSAPP_BTN_COLOR" to ("تخصيص لون زر الواتساب" to "تحديد لون خلفية زر مراسلة الواتساب"),
+                "COL_DETAILS_BTN_COLOR" to ("تخصيص لون زر التفاصيل" to "تحديد لون خلفية زر عرض التفاصيل"),
+                "COL_BOOK_BTN_COLOR" to ("تخصيص لون زر الحجز" to "تحديد لون خلفية زر الحجز أو الطلب"),
+                "COL_LOYALTY_SYSTEM" to ("تفعيل نقاط ومكافآت الولاء" to "تفعيل نظام جمع النقاط والمكافآت للمستخدمين"),
+                "COL_MAX_WORK_PHOTOS" to ("تحديد أقصى عدد لصور الأعمال" to "تحديد الحد الأقصى لصور نماذج الأعمال لكل فني"),
+                "COL_THEME_CUSTOM_HEX" to ("إدخال أكواد ألوان مخصصة" to "إمكانية إدخال أي كود لوني Hex مباشر للواجهات"),
+                "COL_THEME_INSTANT_SYNC" to ("مزامنة المظهر فورياً" to "مزامنة التعديلات المظهرية فورياً عبر الأجهزة")
+            )
+        )
+
+        // 22. بث وإدارة الإشعارات (NOTIFICATIONS) - 20 صلاحية
+        addGroup(
+            PermissionCategory.NOTIFICATIONS,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "NOTIF_CREATE_NEW" to ("إنشاء وبث إشعار جديد" to "كتابة عنوان ومحتوى الإشعار وبثه فورياً"),
+                "NOTIF_SELECT_TARGET" to ("اختيار الفئة المستهدفة" to "تحديد المستهدف (الكل، مستخدمين، فنيين، محلات، مطاعم، طب، عقارات، وظائف، مشرفين، منطقة)"),
+                "NOTIF_TARGET_VALUE" to ("تحديد قيمة المستهدف" to "إدخال رقم الهاتف أو اسم المنطقة أو معرف الحساب المستهدف"),
+                "NOTIF_SCHEDULE_TIME" to ("جدولة وقت الإرسال" to "إرسال فوري أو جدولة الإشعار لوقت وتاريخ لاحق"),
+                "NOTIF_SET_EXPIRY" to ("تحديد مدة صلاحية الإشعار" to "تحديد المدة التي يبقى فيها الإشعار فعالاً في الصندوق"),
+                "NOTIF_BROADCAST_ALL" to ("إرسال إشعار للجميع" to "بث إشعار عام لكافة مستخدمي التطبيق دفعة واحدة"),
+                "NOTIF_SEND_USER" to ("إرسال إشعار لمستخدم محدد" to "إرسال إشعار مخصص لمستخدم معين برقم هاتفه"),
+                "NOTIF_SEND_PROVIDER" to ("إرسال إشعار لفني محدد" to "إرسال إشعار وتنبيه لفني معين"),
+                "NOTIF_SEND_STORE" to ("إرسال إشعار لمحل محدد" to "إرسال إشعار لمتجر أو محل تجاري محدد"),
+                "NOTIF_SEND_REST" to ("إرسال إشعار لمطعم محدد" to "إرسال إشعار لمطعم أو كافيه محدد"),
+                "NOTIF_SEND_MED" to ("إرسال إشعار لمركز طبي" to "إرسال إشعار لمركز طبي أو عيادة محددة"),
+                "NOTIF_SEND_PROP" to ("إرسال إشعار لعقار محدد" to "إرسال إشعار لصاحب إعلان عقاري معين"),
+                "NOTIF_SEND_JOB" to ("إرسال إشعار لمعلن وظيفة" to "إرسال إشعار لصاحب إعلان وظيفي"),
+                "NOTIF_SEND_SUPERVISOR" to ("إرسال إشعار لمشرف محدد" to "إرسال تنبيه إداري لمشرف محدد"),
+                "NOTIF_SEND_AREA" to ("إرسال إشعار لمنطقة محددة" to "إرسال إشعار لجميع المتواجدين في محافظة أو منطقة معينة"),
+                "NOTIF_VIEW_LOGS" to ("عرض سجل الإشعارات" to "مشاهدة سجل وتاريخ جميع الإشعارات المرسلة"),
+                "NOTIF_DELETE_ONE" to ("حذف إشعار من السجل" to "حذف إشعار معين من سجل الإشعارات"),
+                "NOTIF_DELETE_ALL" to ("حذف جميع الإشعارات" to "مسح وتفريغ سجل الإشعارات بالكامل دفعة واحدة"),
+                "NOTIF_REMINDER_AUTO" to ("إرسال إشعار تذكير تلقائي" to "إرسال إشعار تذكير قبل موعد الحجز بـ 24 ساعة أو ساعة"),
+                "NOTIF_MANAGE_PASSWORD_RESET" to ("إدارة استعادة كلمة المرور" to "إدارة وتأكيد طلبات استعادة كلمات المرور عبر الإشعارات")
+            )
+        )
+
+        // 23. النسخ الاحتياطي والمزامنة (BACKUP) - 7 صلاحيات
+        addGroup(
+            PermissionCategory.BACKUP,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "BAK_CREATE_SNAPSHOT" to ("إنشاء نسخة احتياطية" to "أخذ لقطة ونسخة احتياطية شاملة من كافة بيانات المنظومة"),
+                "BAK_SAVE_LOCAL" to ("حفظ النسخة على الهاتف" to "تنزيل وحفظ ملف النسخة الاحتياطية بذاكرة الهاتف الداخلية"),
+                "BAK_COPY_JSON" to ("نسخ الكود إلى الحافظة" to "نسخ نص النسخة الاحتياطية بصيغة كود JSON إلى الحافظة"),
+                "BAK_RESTORE_DATA" to ("استعادة البيانات من نسخة" to "استرجاع واستعادة بيانات التطبيق من ملف نسخة احتياطية"),
+                "BAK_DUAL_SYNC" to ("إعداد المزامنة المزدوجة" to "ربط قاعدة بيانات ثانوية للمزامنة السحابية الاحتياطية"),
+                "BAK_EXPORT_REPORTS" to ("تصدير تقارير CSV و PDF" to "تصدير نسخ الجداول بصيغ CSV وملفات PDF"),
+                "BAK_SYNC_STATUS" to ("عرض ومراقبة حالة المزامنة" to "التحقق من حالة اتصال ومزامنة البيانات مع السيرفر السحابي")
+            )
+        )
+
+        // 24. تنظيف وتهيئة البيانات (CLEAN) - 16 صلاحية
+        addGroup(
+            PermissionCategory.CLEAN,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "CLN_SELECT_TYPES" to ("تحديد البيانات المراد مسحها" to "اختيار وتحديد أنواع الجداول المطلوب تنظيفها"),
+                "CLN_SELECT_ALL" to ("تحديد الكل للتنظيف" to "اختيار كافة جداول وبيانات المنظومة دفعة واحدة"),
+                "CLN_EXPORT_BEFORE" to ("نسخ البيانات قبل المسح" to "تصدير نسخة احتياطية مؤقتة كـ JSON قبل التنظيف"),
+                "CLN_SHARE_DATA" to ("مشاركة وتصدير البيانات" to "مشاركة ملفات البيانات مع التطبيقات الخارجية"),
+                "CLN_REQUIRE_PASSWORD" to ("تأكيد المسح بكلمة المرور" to "طلب إدخال كلمة مرور المالك قبل تنفيذ أي مسح"),
+                "CLN_PROVIDERS" to ("مسح الفنيين" to "مسح وتفريغ جدول الفنيين من قاعدة البيانات"),
+                "CLN_BOOKINGS" to ("مسح الحجوزات" to "مسح وتفريغ سجل الحجوزات من قاعدة البيانات"),
+                "CLN_CHATS" to ("مسح المحادثات" to "مسح وتفريغ جميع غرف ورسائل المحادثات"),
+                "CLN_NOTIFICATIONS" to ("مسح الإشعارات" to "مسح وتفريغ سجل الإشعارات والتنبيهات"),
+                "CLN_REPORTS" to ("مسح البلاغات والشكاوى" to "مسح سجل البلاغات والشكاوى المسجلة"),
+                "CLN_CATEGORIES" to ("مسح الأقسام والتصنيفات" to "مسح وإعادة ضبط جدول الأقسام والمهن"),
+                "CLN_REQUESTS" to ("مسح الطلبات المعلقة" to "مسح طلبات الانضمام والاعتماد المعلقة"),
+                "CLN_BANNERS" to ("مسح البنرات الإعلانية" to "مسح جميع البنرات والحملات الترويجية"),
+                "CLN_SUPERVISORS" to ("مسح حسابات المشرفين" to "مسح جميع المشرفين المساعدين وإبقاء المالك فقط"),
+                "CLN_CITIES" to ("مسح المدن والمحافظات" to "مسح قائمة المدن والمحافظات وإعادة ضبطها"),
+                "CLN_THEMES" to ("مسح الثيمات المخصصة" to "مسح لوحات الألوان المضافة واستعادة الثيم الافتراضي")
+            )
+        )
+
+        // 25. التقييمات والتعليقات (REVIEWS) - 4 صلاحيات
+        addGroup(
+            PermissionCategory.REVIEWS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "REV_VIEW_ALL" to ("عرض تقييمات الفنيين" to "مشاهدة تقييمات وتعليقات العملاء لكافة الفنيين"),
+                "REV_EDIT_RATING" to ("تعديل تقييم فني" to "تعديل وتصحيح قيمة تقييم فني أو منشأة معينة"),
+                "REV_EDIT_COUNT" to ("تعديل عدد التقييمات" to "تعديل إجمالي عدد المقيمين المسجلين للحساب"),
+                "REV_SAVE_SYNC" to ("حفظ ومزامنة التقييمات" to "حفظ التعديلات على التقييمات ومزامنتها فورياً")
+            )
+        )
+
+        // 26. سجلات المكالمات (CALLS) - 3 صلاحيات
+        addGroup(
+            PermissionCategory.CALLS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "CALL_VIEW_LOGS" to ("عرض سجلات المكالمات" to "مشاهدة جميع سجلات المكالمات والاتصالات المنفذة"),
+                "CALL_VIEW_DETAILS" to ("عرض تفاصيل المكالمة" to "مشاهدة مدة وتاريخ وأطراف الاتصال الصوتي"),
+                "CALL_DELETE_LOG" to ("حذف سجل مكالمة" to "حذف سجل المكالمة من قاعدة البيانات")
+            )
+        )
+
+        // 27. الكوبونات والخصومات (COUPONS) - 8 صلاحيات
+        addGroup(
+            PermissionCategory.COUPONS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "COUP_CREATE_NEW" to ("إنشاء كوبون خصم جديد" to "إنشاء كود قسيمة أو كوبون خصم ترويجي جديد"),
+                "COUP_SET_CODE" to ("تحديد رمز الكوبون" to "كتابة الرمز الفريد للكوبون (مثل YEMEN2026)"),
+                "COUP_SET_POINTS" to ("تحديد قيمة النقاط" to "تحديد عدد نقاط المكافأة المستحقة من الكوبون"),
+                "COUP_SET_EXPIRY" to ("تحديد مدة صلاحية الكوبون" to "تحديد تاريخ انتهاء وصلاحية الكوبون بالأيام"),
+                "COUP_SET_DISCOUNT" to ("تحديد نسبة الخصم المئوية" to "تحديد نسبة الخصم المئوية على الخدمات والسلع"),
+                "COUP_SET_MAX_USE" to ("تحديد الحد الأقصى للاستخدام" to "تحديد أقصى عدد مرات مسموح بها لاستخدام الكوبون"),
+                "COUP_VIEW_ACTIVE" to ("عرض الكوبونات المتاحة" to "مشاهدة قائمة الكوبونات والخصومات النشطة حالياً"),
+                "COUP_DELETE" to ("حذف كوبون" to "حذف أو تعطيل كوبون خصم موجود")
+            )
+        )
+
+        // 28. المحظورين المركزية (BLOCKED) - 3 صلاحيات
+        addGroup(
+            PermissionCategory.BLOCKED,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "BLK_VIEW_ALL" to ("عرض قائمة الفنيين المحظورين" to "مشاهدة جميع الفنيين والمستخدمين المحظورين مركزياً"),
+                "BLK_VIEW_DETAILS" to ("عرض تفاصيل حساب محظور" to "مشاهدة أسباب وتاريخ وتفاصيل حظر الحساب"),
+                "BLK_UNBLOCK" to ("إلغاء حظر فني محظور" to "فك الحظر المركزي وإعادة تفعيل الحساب فورياً")
+            )
+        )
+
+        // 29. المحذوفين وسلة المهملات (DELETED) - 3 صلاحيات
+        addGroup(
+            PermissionCategory.DELETED,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "DEL_VIEW_ALL" to ("عرض الفنيين والبيانات المحذوفة" to "مشاهدة سلة المحذوفات المركزية للحسابات والخدمات"),
+                "DEL_VIEW_DETAILS" to ("عرض تفاصيل عنصر محذوف" to "مشاهدة تفاصيل وبيانات العنصر المحذوف قبل الحذف النهائي"),
+                "DEL_RESTORE" to ("استعادة فني محذوف" to "استرجاع وإعادة الحساب المحذوف إلى قائمة الدليل النشطة")
+            )
+        )
+
+        // 30. المدفوعات ونظام المحافظ (PAYMENTS) - 32 صلاحية
+        addGroup(
+            PermissionCategory.PAYMENTS,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "PAY_SYSTEM_TOGGLE" to ("تفعيل نظام الدفع الإلكتروني" to "تفعيل أو إيقاف بوابات ونظام الدفع بالكامل"),
+                "PAY_LINK_BOOKING" to ("ربط الدفع باستمارة الحجز" to "إجبار أو إتاحة الدفع الإلكتروني عند حجز الخدمة"),
+                "PAY_REQUIRE_ADVANCE" to ("طلب دفع عربون مقدم" to "طلب دفع نسبة مئوية مقدمة لتأكيد جدية الحجز"),
+                "PAY_SET_ADVANCE_PCT" to ("تحديد نسبة الدفع المقدم" to "تحديد النسبة المئوية للعربون المطلوب (مثل 30%)"),
+                "PAY_MIN_ADVANCE" to ("تحديد الحد الأدنى للمقدم" to "تحديد أدنى مبلغ مقبول كعربون للحجز"),
+                "PAY_MAX_ADVANCE" to ("تحديد الحد الأقصى للمقدم" to "تحديد أقصى مبلغ مقبول كعربون للحجز"),
+                "PAY_COMMISSION_TOGGLE" to ("تفعيل اقتطاع العمولة" to "تفعيل اقتطاع عمولة المنصة من الفنيين والمنشآت"),
+                "PAY_SET_COMMISSION_RATE" to ("تحديد نسبة عمولة المنصة" to "تحديد النسبة المئوية للعمولة (مثل 10%)"),
+                "PAY_SHOW_WALLET_PROFILE" to ("إظهار المحفظة في الملف الشخصي" to "إظهار رصيد وقسم المحفظة بملفات الأعضاء"),
+                "PAY_LINK_INSTANT_SECTIONS" to ("تحديد أقسام الحجز الفوري" to "تحديد وتعيين الأقسام المرتبطة بالحجز الفوري"),
+                "PAY_SET_DEPOSIT_PROVIDERS" to ("تحديد الفنيين المشترط عليهم عربون" to "إلزام فنيين محددين بشرط دفع العربون"),
+                "PAY_EXEMPT_USERS_DEPOSIT" to ("تحديد المستخدمين المعفيين من العربون" to "إعفاء عملاء موثوقين من دفع العربون"),
+                "PAY_VOICE_CALLS_TOGGLE" to ("تفعيل المكالمات الصوتية بالدفع" to "تفعيل وإدارة ميزة الاتصال الصوتي الداخلي"),
+                "PAY_VOICE_SECTIONS" to ("تحديد الأقسام المصرح لها بالمكالمات" to "تحديد الأقسام المسموح لمنسوبيها بإجراء مكالمات"),
+                "PAY_VOICE_PROVIDERS" to ("تحديد الفنيين المصرح لهم بالمكالمات" to "تحديد فنيين محددين لاستخدام ميزة الاتصال"),
+                "PAY_VOICE_USERS" to ("تحديد المستخدمين المصرح لهم بالمكالمات" to "تحديد عملاء محددين لإجراء المكالمات"),
+                "PAY_HIDE_VOICE_BTN" to ("إخفاء زر المكالمات الصوتية" to "إخفاء أيقونة الاتصال الصوتي من بطاقات العرض"),
+                "PAY_HIDE_TOP_HEADER" to ("إخفاء الشريط العلوي" to "إخفاء شريط العنوان العلوي بالكامل"),
+                "PAY_SET_CUSTOM_NAME" to ("تخصيص وتغيير اسم التطبيق" to "تعديل اسم التطبيق المالي والتجاري"),
+                "PAY_CREATE_INTERNAL_WALLET" to ("إنشاء محفظة رقمية داخلية" to "إنشاء محفظة إلكترونية لحساب فني أو متجر"),
+                "PAY_WALLET_DEPOSIT_WITHDRAW" to ("إيداع وسحب من المحفظة" to "تنفيذ عمليات إيداع أرصدة أو سحب مالي مباشر"),
+                "PAY_ADD_MOBILE_WALLET" to ("إضافة محفظة جوالية للاستقبال" to "إضافة حساب ككريمي، جيب، جوالي، كاش، ون كاش"),
+                "PAY_EDIT_MOBILE_WALLET" to ("تعديل بيانات محفظة جوالية" to "تعديل رقم الحساب أو اسم صاحب المحفظة"),
+                "PAY_TOGGLE_WALLET_VISIBILITY" to ("إظهار/إخفاء المحفظة للعملاء" to "التحكم في ظهور المحفظة للمستخدمين عند التحويل"),
+                "PAY_SET_DEFAULT_WALLET" to ("تعيين المحفظة كافتراضية" to "تعيين محفظة معينة لاستقبال الدفع كخيار أساسي"),
+                "PAY_TOGGLE_WALLET_ACTIVE" to ("تعطيل/تنشيط محفظة معينة" to "إيقاف أو تفعيل استقبال الحوالات على محفظة"),
+                "PAY_DELETE_WALLET" to ("حذف محفظة مالية" to "حذف محفظة جوالية من قائمة خيارات الدفع"),
+                "PAY_APPROVE_TRANSACTION" to ("قبول وتأكيد عملية الدفع" to "مراجعة سند الحوالة واعتماد عملية الدفع بنجاح"),
+                "PAY_REJECT_TRANSACTION" to ("رفض عملية الدفع" to "رفض سند الحوالة مع كتابة وتوثيق سبب الرفض"),
+                "PAY_REFUND_AMOUNT" to ("استرداد وإرجاع المبلغ للعميل" to "تنفيذ عملية إعادة المبلغ المالي للعميل"),
+                "PAY_FINANCIAL_LOGS" to ("عرض سجل المعاملات المالية" to "مشاهدة وتدقيق كشف الحسابات والحوالات المالية"),
+                "PAY_EXPORT_FINANCIAL_CSV" to ("تصدير تقرير الإيرادات والعمولات" to "تصدير الكشف المالي كملف CSV أو إكسل")
+            )
+        )
+
+        // 31. التبويبات المخصصة للملفات (CUSTOM_TABS) - 7 صلاحيات
+        addGroup(
+            PermissionCategory.CUSTOM_TABS,
+            PermissionLevel.MEDIUM,
+            listOf(
+                "TAB_CREATE_NEW" to ("إنشاء تبويب مخصص جديد" to "إضافة تبويب ومحتوى إضافي جديد لملفات الأعضاء"),
+                "TAB_SET_NAME" to ("تحديد اسم التبويب" to "كتابة عنوان واسم التبويب المخصص"),
+                "TAB_SET_ICON" to ("تحديد أيقونة التبويب" to "اختيار أيقونة مناسبة للتبويب المخصص"),
+                "TAB_SET_TARGET" to ("تحديد النطاق المستهدف للتبويب" to "تحديد الفئة المستهدفة (الكل، فنيين، محلات، عقارات)"),
+                "TAB_SET_CONTENT" to ("تحديد محتوى التبويب" to "كتابة وصياغة النص والمحتوى الداخلي للتبويب"),
+                "TAB_TOGGLE_ACTIVE" to ("تفعيل/تعطيل التبويب" to "تشغيل أو إيقاف التبويب المخصص دون حذفه"),
+                "TAB_DELETE" to ("حذف التبويب نهائياً" to "حذف التبويب المخصص بشكل نهائي")
+            )
+        )
+
+        // 32. الأيقونات الذهبية والخطوط (GOLDEN_ICONS) - 14 صلاحية
+        addGroup(
+            PermissionCategory.GOLDEN_ICONS,
+            PermissionLevel.BASIC,
+            listOf(
+                "ICON_STYLE_SELECT" to ("اختيار نمط الأيقونات" to "اختيار النمط (ذهبي ثلاثي الأبعاد 3D، معدني فاخر، خطي)"),
+                "ICON_SIZE_SELECT" to ("تحديد حجم أيقونات التنقل" to "تعديل مقاس وحجم أيقونات أشرطة التنقل بالـ DP"),
+                "ICON_FONT_SCALE" to ("تحديد مقياس حجم الخط العام" to "تعديل مقياس وضبط حجم الخطوط في التطبيق"),
+                "ICON_SET_HOME" to ("تخصيص أيقونة تبويب الرئيسية" to "تغيير وتعيين الرمز الخاص بالصفحة الرئيسية"),
+                "ICON_SET_MAPS" to ("تخصيص أيقونة تبويب الخرائط" to "تغيير وتعيين رمز شاشة الخرائط"),
+                "ICON_SET_JOIN" to ("تخصيص أيقونة تبويب الانضمام" to "تغيير وتعيين رمز شاشة طلبات الانضمام"),
+                "ICON_SET_NOTIF" to ("تخصيص أيقونة تبويب الإشعارات" to "تغيير وتعيين رمز شاشة الإشعارات"),
+                "ICON_SET_CHATS" to ("تخصيص أيقونة تبويب المحادثات" to "تغيير وتعيين رمز شاشة المحادثات"),
+                "ICON_SET_INFO" to ("تخصيص أيقونة عن التطبيق" to "تغيير وتعيين رمز صفحة عن التطبيق والدعم"),
+                "ICON_SET_BOOKINGS" to ("تخصيص أيقونة تبويب الحجوزات" to "تغيير وتعيين رمز شاشة الحجوزات والطلبات"),
+                "ICON_SET_LANG" to ("تخصيص أيقونة تبديل اللغة" to "تغيير وتعيين رمز زر تغيير لغة التطبيق"),
+                "ICON_SET_ADMIN" to ("تخصيص أيقونة لوحة الإدارة" to "تغيير وتعيين رمز زر الدخول للوحة التحكم"),
+                "ICON_SAVE_SYNC" to ("حفظ ومزامنة الأيقونات" to "حفظ وتثبيت وتطبيق مظهر الأيقونات فورياً"),
+                "ICON_RESET_DEFAULT" to ("استعادة الأيقونات الافتراضية" to "إعادة ضبط جميع الأيقونات إلى المظهر الافتراضي")
+            )
+        )
+
+        // 33. الدردشات المتقدمة (ADVANCED_CHAT) - 4 صلاحيات
+        addGroup(
+            PermissionCategory.ADVANCED_CHAT,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "ADCHAT_ROUTING" to ("تحديد نمط توجيه المحادثات المتقدم" to "تحديد آلية توجيه الشات (مباشر، للأدمن، للأدمن والمشرفين)"),
+                "ADCHAT_IDENTITY" to ("تحديد طريقة عرض هوية أطراف الشات" to "تحديد ظهور الهوية (الاسم + الرقم، الاسم فقط، الرقم فقط)"),
+                "ADCHAT_MEDIA_RULES" to ("تفعيل/تعطيل وسائط الشات المتقدمة" to "التحكم في قيود إرسال الصور والفيديوهات والرسائل الصوتية"),
+                "ADCHAT_SYNC_SERVER" to ("حفظ ومزامنة إعدادات الدردشة" to "مزامنة إعدادات وسياسات الدردشة المتقدمة سحابياً")
+            )
+        )
+
+        // 34. تخصيص البطاقات (CARD_CUSTOMIZER) - 5 صلاحيات
+        addGroup(
+            PermissionCategory.CARD_CUSTOMIZER,
+            PermissionLevel.BASIC,
+            listOf(
+                "CARD_SELECT_SECTION" to ("اختيار القسم المستهدف للتخصيص" to "تحديد القسم المطلوب تعديل شكل بطاقاته"),
+                "CARD_SET_SHAPE" to ("تحديد شكل وزوايا البطاقة" to "اختيار الشكل (زوايا دائرية، كبسولة، مربع حاد)"),
+                "CARD_SET_SIZE" to ("تحديد حجم وكثافة عناصر البطاقة" to "اختيار الكثافة (مضغوط، عادي، كبير بارز)"),
+                "CARD_TOGGLE_ACTION_BTNS" to ("تفعيل/تعطيل أزرار التفاعل" to "التحكم في ظهور (واتساب، اتصال، خريطة، حجز)"),
+                "CARD_SAVE_SYNC" to ("حفظ ومزامنة تخصيص البطاقات" to "حفظ وتطبيق شكل البطاقات فورياً لجميع الأجهزة")
+            )
+        )
+
+        // 35. إنشاء الأقسام الجديدة (NEW_SECTION_CREATOR) - 10 صلاحيات
+        addGroup(
+            PermissionCategory.NEW_SECTION_CREATOR,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "SEC_CREATE_NEW" to ("إنشاء قسم جديد بالكامل" to "إضافة قسم جديد (توصيل، محفظة، خدمي) للمنظومة"),
+                "SEC_SET_NAME" to ("تحديد اسم القسم الجديد" to "كتابة الاسم الرسمي للقسم الجديد"),
+                "SEC_SET_TYPE" to ("تحديد طبيعة وتصنيف القسم" to "تحديد نوع القسم (توصيل، محفظة رقمية، خدمي عام)"),
+                "SEC_SET_ICON" to ("تحديد أيقونة القسم الجديد" to "اختيار أيقونة أو إيموجي معبر للقسم الجديد"),
+                "SEC_LINK_MAP" to ("ربط القسم بشاشة الخرائط" to "تمكين إظهار منسوبي ومواقع القسم على الخريطة"),
+                "SEC_LINK_ORDERS" to ("ربط القسم بشاشة الطلبات" to "تمكين استقبال وتتبع طلبات القسم في صفحة طلباتي"),
+                "SEC_LINK_PAYMENT" to ("ربط القسم بأنظمة الدفع والمحافظ" to "تمكين التحويلات والدفع المالي المباشر للقسم"),
+                "SEC_ENABLE_NOTIF" to ("تمكين إشعارات التنبيه للقسم" to "تفعيل إرسال واستقبال التنبيهات المباشرة للقسم"),
+                "SEC_ENABLE_BOOKINGS" to ("تمكين نظام الحجوزات للقسم" to "تفعيل ميزة الحجز المسبق لخدمات القسم الجديد"),
+                "SEC_LAUNCH_SYNC" to ("إنشاء وتفعيل القسم فورياً" to "إطلاق القسم الجديد وتوفيره في التطبيق مباشرة")
+            )
+        )
+
+        // 36. استمارات التسجيل والشروط (REG_FORMS_MANAGER) - 4 صلاحيات
+        addGroup(
+            PermissionCategory.REG_FORMS_MANAGER,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "FORM_SELECT_SECTION" to ("اختيار القسم المستهدف للاستمارة" to "تحديد القسم المطلوب تعديل استمارة تسجيله"),
+                "FORM_ADD_CUSTOM_FIELD" to ("إضافة حقل جديد للاستمارة" to "إضافة حقل مخصص (نص، هاتف، صورة، قائمة)"),
+                "FORM_TERMS_EDIT" to ("تعديل وإدارة شروط الانضمام" to "إضافة وتعديل وحذف شروط وقوانين التسجيل بالقسم"),
+                "FORM_SAVE_SYNC" to ("حفظ ومزامنة استمارات التسجيل" to "حفظ وتطبيق نموذج الاستمارة والشروط فورياً")
+            )
+        )
+
+        // 37. الصلاحيات والأدوار (ROLES_PERMISSIONS) - 6 صلاحيات
+        addGroup(
+            PermissionCategory.ROLES_PERMISSIONS,
+            PermissionLevel.SENSITIVE,
+            listOf(
+                "ROLE_VIEW_ALL" to ("عرض جميع الأدوار والمصفوفة" to "مشاهدة جميع الأدوار والصلاحيات في المنظومة"),
+                "ROLE_ASSIGN_USER" to ("تعيين صلاحية لمستخدم أو مشرف" to "منح أو سحب صلاحيات محددة من أي حساب"),
+                "ROLE_CHANGE_USER_ROLE" to ("تغيير دور مستخدم" to "ترقية أو تعديل مسمى ودور أي مستخدم"),
+                "ROLE_VIEW_ROLE_PERMS" to ("عرض صلاحيات دور معين" to "مشاهدة حزمة الصلاحيات الممنوحة لدور معين"),
+                "ROLE_ADD_CUSTOM_ROLE" to ("إضافة دور مخصص جديد" to "إنشاء دور إداري جديد بحزمة صلاحيات مخصصة"),
+                "ROLE_SAVE_MATRIX_SYNC" to ("حفظ ومزامنة مصفوفة الصلاحيات" to "حفظ وتطبيق مصفوفة الـ 538 صلاحية في Firestore")
+            )
+        )
+
+        // 38. التحكم بشاشة الخرائط (MAP_CONTROLS) - 28 صلاحية
+        addGroup(
+            PermissionCategory.MAP_CONTROLS,
+            PermissionLevel.ADVANCED,
+            listOf(
+                "MAP_SHOW_ALL" to ("إظهار الخريطة للجميع" to "عرض شاشة الخرائط لكافة المستخدمين والزوار"),
+                "MAP_HIDE_ALL" to ("إخفاء الخريطة عن الجميع" to "إخفاء شاشة وميزة الخرائط بالكامل في التطبيق"),
+                "MAP_SHOW_USERS_ONLY" to ("إظهار الخريطة للمستخدمين فقط" to "حصر استخدام الخرائط على العملاء المسجلين فقط"),
+                "MAP_HIDE_PROVIDERS" to ("إخفاء الخريطة عن الفنيين" to "منع الفنيين من رؤية شاشة ومواقع الخريطة"),
+                "MAP_HIDE_STORES" to ("إخفاء الخريطة عن المحلات" to "منع أصحاب المتاجر من رؤية شاشة الخريطة"),
+                "MAP_HIDE_REST" to ("إخفاء الخريطة عن المطاعم" to "منع المطاعم من استعراض مواقع الخريطة"),
+                "MAP_HIDE_MED" to ("إخفاء الخريطة عن المراكز الطبية" to "منع المراكز الطبية من رؤية الخريطة"),
+                "MAP_HIDE_PROP" to ("إخفاء الخريطة عن العقارات" to "منع معلني العقارات من استعراض الخريطة"),
+                "MAP_SYSTEM_ALL" to ("تغيير نظام ومزود الخريطة للجميع" to "تغيير مزود الخرائط العام لكافة المستخدمين"),
+                "MAP_SYSTEM_USERS" to ("تغيير نظام الخريطة للمستخدمين" to "تحديد مزود خريطة مخصص للعملاء فقط"),
+                "MAP_SYSTEM_PROVIDERS" to ("تغيير نظام الخريطة للفنيين" to "تحديد مزود خريطة مخصص للمهنيين"),
+                "MAP_SELECT_ENGINE" to ("تحديد محرك الخرائط" to "اختيار المحرك (MapLibre، Google Maps، Mapbox)"),
+                "MAP_LINK_SECTION" to ("ربط الخريطة بقسم محدد" to "عرض فنيي ومنشآت قسم معين فقط على الخريطة"),
+                "MAP_LINK_PROVIDER" to ("ربط الخريطة بفني محدد" to "إظهار وتتبع موقع فني معين على الخريطة"),
+                "MAP_LINK_STORE" to ("ربط الخريطة بمحل محدد" to "إظهار موقع محل تجاري معين على الخريطة"),
+                "MAP_LINK_REST" to ("ربط الخريطة بمطعم محدد" to "إظهار موقع مطعم معين على الخريطة"),
+                "MAP_LINK_MED" to ("ربط الخريطة بمركز طبي محدد" to "إظهار موقع عيادة أو مركز طبي على الخريطة"),
+                "MAP_LINK_PROP" to ("ربط الخريطة بعقار محدد" to "إظهار موقع أرض أو عقار معين على الخريطة"),
+                "MAP_UNLINK_SECTION" to ("إلغاء ربط الخريطة بقسم" to "إلغاء ربط الخريطة وتصفية القسم"),
+                "MAP_REMOVE_PROVIDER" to ("إزالة فني من الخريطة" to "إخفاء موقع فني معين من الخريطة"),
+                "MAP_REMOVE_STORE" to ("إزالة محل من الخريطة" to "إخفاء موقع محل معين من الخريطة"),
+                "MAP_REMOVE_REST" to ("إزالة مطعم من الخريطة" to "إخفاء موقع مطعم معين من الخريطة"),
+                "MAP_REMOVE_MED" to ("إزالة مركز طبي من الخريطة" to "إخفاء موقع مركز طبي من الخريطة"),
+                "MAP_REMOVE_PROP" to ("إزالة عقار من الخريطة" to "إخفاء موقع عقار معين من الخريطة"),
+                "MAP_REMOVE_SECTION_ALL" to ("إزالة جميع فنيي قسم من الخريطة" to "إخفاء جميع منسوبي قسم معين من الخريطة"),
+                "MAP_REMOVE_STORES_ALL" to ("إزالة جميع المحلات من الخريطة" to "إخفاء جميع المحلات التجارية من الخريطة"),
+                "MAP_REMOVE_REST_ALL" to ("إزالة جميع المطاعم من الخريطة" to "إخفاء جميع المطاعم والكافيهات من الخريطة"),
+                "MAP_REMOVE_MED_ALL" to ("إزالة جميع المراكز الطبية من الخريطة" to "إخفاء جميع المراكز الطبية من الخريطة")
+            )
+        )
 
         list
     }
@@ -778,19 +947,18 @@ object AdminPermissionsRegistry {
         return allPermissions.filter { it.category == category }
     }
 
-    fun getByLevel(level: PermissionLevel): List<AdminPermissionItem> {
-        return allPermissions.filter { it.level == level }
+    fun search(query: String): List<AdminPermissionItem> {
+        if (query.isBlank()) return allPermissions
+        val q = query.trim().lowercase()
+        return allPermissions.filter {
+            it.name.lowercase().contains(q) ||
+            it.key.lowercase().contains(q) ||
+            it.description.lowercase().contains(q) ||
+            it.targetGroup.lowercase().contains(q)
+        }
     }
 
-    fun searchPermissions(query: String): List<AdminPermissionItem> {
-        if (query.isBlank()) return allPermissions
-        val clean = query.trim().lowercase()
-        return allPermissions.filter {
-            it.name.lowercase().contains(clean) ||
-            it.key.lowercase().contains(clean) ||
-            it.description.lowercase().contains(clean) ||
-            it.targetGroup.lowercase().contains(clean) ||
-            it.category.arabicTitle.lowercase().contains(clean)
-        }
+    fun getByKey(key: String): AdminPermissionItem? {
+        return allPermissions.find { it.key == key }
     }
 }

@@ -68,7 +68,7 @@ object PermissionGuard {
         // Category-level check (e.g. if supervisor has "MANAGE_BOOKINGS", they can access all booking permissions)
         val permItem = AdminPermissionsRegistry.allPermissions.find { it.key == permission || it.id == permission }
         if (permItem != null) {
-            val mainCatKey = permItem.category.mainKey
+            val mainCatKey = permItem.category.tabKey
             if (supervisorGrantedPermissions.contains(mainCatKey)) return true
         }
 

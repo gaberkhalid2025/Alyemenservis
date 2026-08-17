@@ -38,8 +38,8 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 
     Surface(
         color = footerBg,
-        shadowElevation = 10.dp,
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(Color(0xFF0F5243), Color(0xFF1B8A72), Color(0xFF0F5243)))),
+        shadowElevation = 6.dp,
+        border = BorderStroke(0.8.dp, Brush.horizontalGradient(listOf(Color(0xFF0F5243), Color(0xFF1B8A72), Color(0xFF0F5243)))),
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
@@ -48,7 +48,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 2.dp),
+                .padding(horizontal = 4.dp, vertical = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {
@@ -102,15 +102,15 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
             // 3. Center Brand Text ("WAM2026")
             if (settingsState.showFooterText) {
                 Box(
-                    modifier = Modifier.padding(horizontal = 4.dp),
+                    modifier = Modifier.padding(horizontal = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (settingsState.footerMessage.startsWith("card_custom_")) "WAM2026" else settingsState.footerMessage.ifBlank { "WAM2026" },
-                        fontSize = 10.sp,
+                        fontSize = 8.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color(0xFFE2E8F0),
-                        letterSpacing = 1.sp,
+                        letterSpacing = 0.5.sp,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

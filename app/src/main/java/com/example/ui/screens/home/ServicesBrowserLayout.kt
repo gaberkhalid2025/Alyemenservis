@@ -170,85 +170,107 @@ fun ServicesBrowserLayout(
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (settingsState.bannerEnabled && settingsState.bannerLocation == "TOP") {
-            item {
-                com.example.ui.components.AdminCustomBannerView(settingsState = settingsState, themeColors = themeColors)
-            }
-        }
-
-        // Horizontal banners list
-        if (bannersList.isNotEmpty()) {
-            item {
-                com.example.ui.components.BannerSliderView(banners = bannersList, themeColors = themeColors) { catTarget ->
-                    if (catTarget.isNotEmpty()) viewModel.selectCategory(catTarget)
+        // Show Top Banners & Cross-Search ONLY on "الرئيسية" (Home Tab)
+        // This ensures Stores, Restaurants, Medical Centers, Real Estate, etc. occupy the full screen
+        if (activeTabName == "الرئيسية") {
+            if (settingsState.bannerEnabled && settingsState.bannerLocation == "TOP") {
+                item {
+                    com.example.ui.components.AdminCustomBannerView(settingsState = settingsState, themeColors = themeColors)
                 }
             }
-        }
 
-        // Search Bar Block (Smart Cross Search - Matches Theme Perfectly)
-        item {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "بحث",
-                        tint = themeColors.accent,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { viewModel.updateSearchQuery(it) },
-                        placeholder = {
-                            Text(
-                                text = "البحث الذكي المتقاطع 🔍 (فنيين، محلات، استشارات...)",
-                                fontSize = 11.sp,
-                                color = themeColors.textSecondary.copy(alpha = 0.7f)
-                            )
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("search_text_input"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = themeColors.textPrimary,
-                            unfocusedTextColor = themeColors.textPrimary
-                        ),
-                        singleLine = true
-                    )
-                    
-                    Surface(
-                        onClick = { showFiltersPanel = !showFiltersPanel },
-                        shape = RoundedCornerShape(20.dp),
-                        color = themeColors.accent
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("بحث ذكي ⚙️", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
+            // Horizontal banners list
+            if (bannersList.isNotEmpty()) {
+                item {
+                    com.example.ui.components.BannerSliderView(banners = bannersList, themeColors = themeColors) { catTarget ->
+                        if (catTarget.isNotEmpty()) viewModel.selectCategory(catTarget)
                     }
+                }
+            }
 
-                    if (settingsState.isSpeechSearchEnabled) {
-                        IconButton(onClick = {
-                            VoiceManager.onHear?.invoke { spokenText ->
-                                viewModel.updateSearchQuery(spokenText)
-                                viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
+            // Search Bar Block (Smart Cross Search - Reduced 50% & Ultra-Sleek)
+            item {
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                    border = BorderStroke(0.8.dp, themeColors.accent.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "بحث",
+                            tint = themeColors.accent,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = 2.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { viewModel.updateSearchQuery(it) },
+                                singleLine = true,
+                                maxLines = 1,
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    color = themeColors.textPrimary,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Normal
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("search_text_input"),
+                                decorationBox = { innerTextField ->
+                                    if (searchQuery.isEmpty()) {
+                                        Text(
+                                            text = "البحث الذكي المتقاطع 🔍 (فنيين، محلات، استشارات...)",
+                                            fontSize = 10.sp,
+                                            color = themeColors.textSecondary.copy(alpha = 0.7f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        Surface(
+                            onClick = { showFiltersPanel = !showFiltersPanel },
+                            shape = RoundedCornerShape(12.dp),
+                            color = themeColors.accent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("بحث ذكي ⚙️", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                             }
-                        }) {
-                            Text("🎙️", fontSize = 18.sp)
+                        }
+
+                        if (settingsState.isSpeechSearchEnabled) {
+                            IconButton(
+                                onClick = {
+                                    VoiceManager.onHear?.invoke { spokenText ->
+                                        viewModel.updateSearchQuery(spokenText)
+                                        viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
+                                    }
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Text("🎙️", fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -262,8 +284,27 @@ fun ServicesBrowserLayout(
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                if (activeTabName != "الرئيسية") {
+                    Surface(
+                        onClick = { activeTabName = "الرئيسية" },
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White.copy(alpha = 0.15f),
+                        modifier = Modifier.padding(end = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🏠", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("الرئيسية", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
                 activeTabs.forEach { tabName ->
                     val isSelected = activeTabName == tabName
                     val icon = when (tabName) {
@@ -285,11 +326,11 @@ fun ServicesBrowserLayout(
                                 if (isSelected) themeColors.accent else themeColors.accent.copy(alpha = 0.2f),
                                 RoundedCornerShape(24.dp)
                             )
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(icon, fontSize = 14.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(icon, fontSize = 13.sp)
+                            Spacer(modifier = Modifier.width(5.dp))
                             val currentLangState by viewModel.currentLanguage.collectAsState()
                             val displayTabName = if (currentLangState == "en") {
                                 when (tabName) {
@@ -305,7 +346,7 @@ fun ServicesBrowserLayout(
                             Text(
                                 text = displayTabName,
                                 color = if (isSelected) Color.Black else Color.White,
-                                fontSize = 12.sp,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }

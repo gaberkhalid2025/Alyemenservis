@@ -162,7 +162,7 @@ fun ProviderRegisterFormLayout(
     var propArea by remember { mutableStateOf("") }
     var propPhone by remember { mutableStateOf("") }
 
-    var selectedCategoryTab by remember { mutableStateOf(0) }
+    var selectedCategoryTab by remember { mutableStateOf(6) }
 
     // Store Registration Fields
     var storeOwnerName by remember { mutableStateOf("") }
@@ -381,17 +381,49 @@ fun ProviderRegisterFormLayout(
     }
 
     if (currentUserPhone.isNotEmpty() && !showRegistrationFormsAnyway) {
-        ClientPersonalAccountDashboard(
-            viewModel = viewModel,
-            themeColors = themeColors,
-            context = context,
-            currentUserName = currentUserName,
-            currentUserPhone = currentUserPhone,
-            currentUserResidence = currentUserResidence,
-            currentUserId = currentUserId,
-            bookings = bookings,
-            onShowRegistrationFormsAnyway = { showRegistrationFormsAnyway = true }
-        )
+        val matchingApprovedTech = providers.find { it.phone.trim() == currentUserPhone.trim() }
+        val matchingStore = stores.find { it.phone.trim() == currentUserPhone.trim() || it.ownerId.trim() == currentUserPhone.trim() }
+        val matchingProperty = properties.find { it.phone.trim() == currentUserPhone.trim() || it.ownerId.trim() == currentUserPhone.trim() }
+
+        when {
+            matchingApprovedTech != null -> {
+                com.example.ui.UnifiedBusinessDashboardScreen(
+                    account = com.example.data.UnifiedBusinessAccount.fromProvider(matchingApprovedTech),
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onBackClick = { showRegistrationFormsAnyway = true }
+                )
+            }
+            matchingStore != null -> {
+                com.example.ui.UnifiedBusinessDashboardScreen(
+                    account = com.example.data.UnifiedBusinessAccount.fromStore(matchingStore),
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onBackClick = { showRegistrationFormsAnyway = true }
+                )
+            }
+            matchingProperty != null -> {
+                com.example.ui.UnifiedBusinessDashboardScreen(
+                    account = com.example.data.UnifiedBusinessAccount.fromProperty(matchingProperty),
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onBackClick = { showRegistrationFormsAnyway = true }
+                )
+            }
+            else -> {
+                ClientPersonalAccountDashboard(
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    context = context,
+                    currentUserName = currentUserName,
+                    currentUserPhone = currentUserPhone,
+                    currentUserResidence = currentUserResidence,
+                    currentUserId = currentUserId,
+                    bookings = bookings,
+                    onShowRegistrationFormsAnyway = { showRegistrationFormsAnyway = true }
+                )
+            }
+        }
         return
     }
 
@@ -520,6 +552,7 @@ fun ProviderRegisterFormLayout(
             val isAdmin = adminRoleState != "GUEST"
 
             val allTabs = listOf(
+                Triple("👤 مستخدم عادي", 6, true), // Always enabled
                 Triple("🛠️ خدمات ومهن", 0, settingsState.enableProvidersRegistration),
                 Triple("🏪 محل/معرض", 1, settingsState.enableStoresRegistration),
                 Triple("🍔 مطعم/كافيه", 2, settingsState.enableRestaurantsRegistration),
@@ -602,7 +635,216 @@ fun ProviderRegisterFormLayout(
                 }
             }
 
-            if (selectedCategoryTab == 0) {
+            if (selectedCategoryTab == 6) {
+                // Regular User (Client) Registration Form
+                var clientNameInput by remember { mutableStateOf("") }
+                var clientPhoneInput by remember { mutableStateOf("") }
+                var clientCityAddressInput by remember { mutableStateOf("") }
+                var clientPasswordInput by remember { mutableStateOf("") }
+                var clientConfirmPasswordInput by remember { mutableStateOf("") }
+                var clientAgreementChecked by remember { mutableStateOf(false) }
+
+                var clientPasswordVisible by remember { mutableStateOf(false) }
+                var clientConfirmPasswordVisible by remember { mutableStateOf(false) }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "👤 تسجيل حساب مستخدم جديد (عميل)",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColors.accent
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "أنشئ حسابك الشخصي الآن للاستفادة من خدمات دليل اليمن وتتبع حجوزاتك ومحادثاتك الفورية مع الفنيين والمحلات.",
+                            fontSize = 11.sp,
+                            color = themeColors.textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { 
+                                viewModel.triggerRestoreAccountDialog.value = true
+                                showRestoreAccountDialog = true 
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, themeColors.accent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text("🔄 هل لديك حساب سابق؟ اضغط لاسترجاعه", color = themeColors.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = clientNameInput,
+                    onValueChange = { clientNameInput = it },
+                    label = { Text("الاسم الثلاثي للمستخدم *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    leadingIcon = if (settingsState.allowTextToSpeechJoinForm) {
+                        {
+                            IconButton(onClick = { VoiceManager.onSpeak?.invoke(clientNameInput.ifBlank { "الاسم الثلاثي للمستخدم" }) }) {
+                                Text("🔊", fontSize = 16.sp)
+                            }
+                        }
+                    } else null,
+                    trailingIcon = if (settingsState.allowVoiceInputJoinForm) {
+                        {
+                            IconButton(onClick = {
+                                VoiceManager.onHear?.invoke { spokenText -> clientNameInput = spokenText }
+                            }) {
+                                Text("🎙️", fontSize = 16.sp)
+                            }
+                        }
+                    } else null
+                )
+
+                OutlinedTextField(
+                    value = clientPhoneInput,
+                    onValueChange = { clientPhoneInput = it },
+                    label = { Text("رقم الهاتف *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    leadingIcon = if (settingsState.allowTextToSpeechJoinForm) {
+                        {
+                            IconButton(onClick = { VoiceManager.onSpeak?.invoke(clientPhoneInput.ifBlank { "رقم الهاتف" }) }) {
+                                Text("🔊", fontSize = 16.sp)
+                            }
+                        }
+                    } else null,
+                    trailingIcon = if (settingsState.allowVoiceInputJoinForm) {
+                        {
+                            IconButton(onClick = {
+                                VoiceManager.onHear?.invoke { spokenText -> clientPhoneInput = spokenText }
+                            }) {
+                                Text("🎙️", fontSize = 16.sp)
+                            }
+                        }
+                    } else null
+                )
+
+                OutlinedTextField(
+                    value = clientCityAddressInput,
+                    onValueChange = { clientCityAddressInput = it },
+                    label = { Text("المدينة والعنوان *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    leadingIcon = if (settingsState.allowTextToSpeechJoinForm) {
+                        {
+                            IconButton(onClick = { VoiceManager.onSpeak?.invoke(clientCityAddressInput.ifBlank { "المدينة والعنوان" }) }) {
+                                Text("🔊", fontSize = 16.sp)
+                            }
+                        }
+                    } else null,
+                    trailingIcon = if (settingsState.allowVoiceInputJoinForm) {
+                        {
+                            IconButton(onClick = {
+                                VoiceManager.onHear?.invoke { spokenText -> clientCityAddressInput = spokenText }
+                            }) {
+                                Text("🎙️", fontSize = 16.sp)
+                            }
+                        }
+                    } else null
+                )
+
+                OutlinedTextField(
+                    value = clientPasswordInput,
+                    onValueChange = { clientPasswordInput = it },
+                    label = { Text("كلمة المرور *") },
+                    visualTransformation = if (clientPasswordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    trailingIcon = {
+                        IconButton(onClick = { clientPasswordVisible = !clientPasswordVisible }) {
+                            Text(if (clientPasswordVisible) "👁️" else "🙈", fontSize = 16.sp)
+                        }
+                    }
+                )
+
+                OutlinedTextField(
+                    value = clientConfirmPasswordInput,
+                    onValueChange = { clientConfirmPasswordInput = it },
+                    label = { Text("تأكيد كلمة المرور *") },
+                    visualTransformation = if (clientConfirmPasswordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    trailingIcon = {
+                        IconButton(onClick = { clientConfirmPasswordVisible = !clientConfirmPasswordVisible }) {
+                            Text(if (clientConfirmPasswordVisible) "👁️" else "🙈", fontSize = 16.sp)
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { clientAgreementChecked = !clientAgreementChecked },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = clientAgreementChecked,
+                        onCheckedChange = { clientAgreementChecked = it },
+                        colors = CheckboxDefaults.colors(checkedColor = themeColors.accent)
+                    )
+                    Text(
+                        text = "أوافق على شروط الخدمة وسياسة الخصوصية بالمنصة",
+                        color = Color.LightGray,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        val missingList = mutableListOf<String>()
+                        if (clientNameInput.trim().isEmpty()) missingList.add("الاسم الثلاثي")
+                        if (clientPhoneInput.trim().isEmpty()) missingList.add("رقم الهاتف")
+                        if (clientCityAddressInput.trim().isEmpty()) missingList.add("المدينة والعنوان")
+                        if (clientPasswordInput.trim().isEmpty()) missingList.add("كلمة المرور")
+
+                        if (missingList.isNotEmpty()) {
+                            Toast.makeText(context, "الرجاء تعبئة الحقول المطلوبة: ${missingList.joinToString("، ")}", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        if (clientPasswordInput != clientConfirmPasswordInput) {
+                            Toast.makeText(context, "❌ كلمة المرور وتأكيدها غير متطابقين!", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        if (!clientAgreementChecked) {
+                            Toast.makeText(context, "⚠️ يجب الموافقة على شروط الاستخدام للمتابعة.", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        viewModel.registerGuestUser(
+                            context = context,
+                            name = clientNameInput.trim(),
+                            phone = clientPhoneInput.trim(),
+                            residence = clientCityAddressInput.trim(),
+                            password = clientPasswordInput
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "تسجيل العضوية وتفعيل الحساب 🚀",
+                        color = Color.Black,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else if (selectedCategoryTab == 0) {
                 Card(
                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                 shape = RoundedCornerShape(12.dp)

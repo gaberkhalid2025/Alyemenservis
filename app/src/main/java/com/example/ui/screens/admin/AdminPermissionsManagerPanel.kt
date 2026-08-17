@@ -131,13 +131,13 @@ fun AdminPermissionsSelectorView(
                 })
                 PresetChip(title = "🔍 مدقق ومراقب أمني", isSelected = false, onClick = {
                     val keys = AdminPermissionsRegistry.allPermissions
-                        .filter { it.level == PermissionLevel.BASIC || it.level == PermissionLevel.MEDIUM || it.category == PermissionCategory.SECURITY_AUDIT }
+                        .filter { it.level == PermissionLevel.BASIC || it.level == PermissionLevel.MEDIUM || it.category == PermissionCategory.COMPLAINTS || it.category == PermissionCategory.BLOCKED }
                         .map { it.key }
                     onPermissionsChanged(keys)
                 })
                 PresetChip(title = "📞 دعم فني ومحادثات", isSelected = false, onClick = {
                     val keys = AdminPermissionsRegistry.allPermissions
-                        .filter { it.category == PermissionCategory.CHAT || it.category == PermissionCategory.NOTIFICATIONS || it.category == PermissionCategory.BOOKING_FORMS || it.category == PermissionCategory.QUICK_SERVICE }
+                        .filter { it.category == PermissionCategory.CHATS || it.category == PermissionCategory.NOTIFICATIONS || it.category == PermissionCategory.BOOKINGS || it.category == PermissionCategory.REVIEWS }
                         .map { it.key }
                     onPermissionsChanged(keys)
                 })
@@ -246,7 +246,7 @@ fun AdminPermissionsSelectorView(
                                         Text(category.iconEmoji, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "${category.arabicTitle} (${activeInCat}/${category.count})",
+                                            text = "${category.arabicTitle} (${activeInCat}/${category.expectedCount})",
                                             color = Color.White,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,

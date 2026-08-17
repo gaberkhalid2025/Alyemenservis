@@ -232,7 +232,7 @@ data class AdminSettingsEntity(
     
     // 3D Golden Icons, Font Scaling, & Icon Customization Settings
     val topNavIconStyle: String = "GOLDEN_3D", // "GOLDEN_3D", "METALLIC", "MINIMAL"
-    val navIconSizeDp: Int = 26,
+    val navIconSizeDp: Int = 18,
     val globalFontScale: Float = 1.0f,
     val topHomeIcon: String = "🏠",
     val topMapsIcon: String = "🗺️",

@@ -504,10 +504,10 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                                .background(themeColors.surface, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .padding(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                .padding(bottom = 6.dp)
+                                .background(themeColors.surface, shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                .padding(2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             val customerTabs = listOf(
                                 "URGENT" to "⚡ طلباتي العاجلة",
@@ -519,16 +519,16 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
                                         .background(if (isSel) themeColors.accent else Color.Transparent)
                                         .clickable { customerSubTab = tabId }
-                                        .padding(vertical = 8.dp),
+                                        .padding(vertical = 4.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = label,
                                         color = if (isSel) Color.Black else Color.White,
-                                        fontSize = 11.sp,
+                                        fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -536,14 +536,14 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                         }
                     }
 
-                    // Status Categorization Sub-Tabs: ACTIVE, COMPLETED, CANCELLED
+                    // Status Categorization Sub-Tabs: ACTIVE, COMPLETED, CANCELLED (Reduced 50%)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            .padding(bottom = 6.dp)
+                            .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         val subTabs = listOf(
                             Triple("ACTIVE", "📅 نشطة", Color(0xFFF59E0B)),
@@ -555,17 +555,17 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(5.dp))
                                     .background(if (isSel) tabColor.copy(alpha = 0.2f) else Color.Transparent)
-                                    .border(1.dp, if (isSel) tabColor else Color.Transparent, RoundedCornerShape(6.dp))
+                                    .border(0.8.dp, if (isSel) tabColor else Color.Transparent, RoundedCornerShape(5.dp))
                                     .clickable { filterStatusTab = tabId }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = label,
                                     color = if (isSel) Color.White else Color.Gray,
-                                    fontSize = 11.sp,
+                                    fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1521,14 +1521,14 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
             title = { Text("📝 تعديل موعد الحجز", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
             containerColor = themeColors.secondary,
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text("قم بتعديل تفاصيل حجز الخدمة:", color = themeColors.textSecondary, fontSize = 11.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text("قم بتعديل تفاصيل حجز الخدمة:", color = themeColors.textSecondary, fontSize = 10.sp)
                     
                     OutlinedTextField(
                         value = editServiceType,
                         onValueChange = { editServiceType = it },
-                        label = { Text("نوع الخدمة المطلوبة", fontSize = 10.sp) },
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = Color.White),
+                        label = { Text("نوع الخدمة المطلوبة", fontSize = 9.sp) },
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 10.5.sp, color = Color.White),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -1536,8 +1536,8 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                     OutlinedTextField(
                         value = editDate,
                         onValueChange = { editDate = it },
-                        label = { Text("تاريخ الموعد (مثال: 2026-07-25)", fontSize = 10.sp) },
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = Color.White),
+                        label = { Text("تاريخ الموعد (مثال: 2026-07-25)", fontSize = 9.sp) },
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 10.5.sp, color = Color.White),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -1545,8 +1545,8 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                     OutlinedTextField(
                         value = editTime,
                         onValueChange = { editTime = it },
-                        label = { Text("وقت الموعد (مثال: 16:30)", fontSize = 10.sp) },
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = Color.White),
+                        label = { Text("وقت الموعد (مثال: 16:30)", fontSize = 9.sp) },
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 10.5.sp, color = Color.White),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
