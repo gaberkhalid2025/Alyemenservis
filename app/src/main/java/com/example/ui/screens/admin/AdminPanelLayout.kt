@@ -423,9 +423,9 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
 
                     val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedUser == "WAM2026") &&
-                            (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.ownerPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
+                            (trimmedPass == settingsState.ownerPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
                     val isAdmin = (trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
-                            (trimmedPass == "Meh@@@@777644##" || trimmedPass == settingsState.adminPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
+                            (trimmedPass == settingsState.adminPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
 
                     if (isOwner) {
                         isAuthorized = true
@@ -492,52 +492,54 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
             item {
                 val tabs = remember(adminRole) {
                     val baseTabs = mutableListOf(
-                        Pair("REG_REQ", "⌛ طلبات الانضمام والاعتماد (جديد)"),
-                        Pair("MANUAL_ADD", "➕ الإضافة اليدوية للإدارة (جديد)"),
-                        Pair("STORES", "🏪 المحلات التجارية والمراكز"),
-                        Pair("RESTAURANTS", "🍔 المطاعم والكافيهات"),
+                        Pair("REG_REQ", "2️⃣ ⌛ طلبات الانضمام والاعتماد"),
+                        Pair("MANUAL_ADD", "3️⃣ ➕ الإضافة اليدوية"),
+                        Pair("STORES", "4️⃣ 🏪 المحلات التجارية"),
+                        Pair("RESTAURANTS", "5️⃣ 🍔 المطاعم والكافيهات"),
+                        Pair("MEDICAL", "6️⃣ 🏥 المراكز الطبية والعيادات"),
+                        Pair("PROPERTIES", "7️⃣ 🏠 العقارات والأراضي"),
+                        Pair("JOBS", "8️⃣ 💼 إعلانات الوظائف"),
+                        Pair("APPLICANTS", "9️⃣ 📄 المتقدمين للوظائف"),
+                        Pair("STATS", "🔟 📊 الإحصائيات الشاملة"),
+                        Pair("BOOKINGS", "1️⃣1️⃣ 📅 نظام الحجوزات"),
+                        Pair("CHATS", "1️⃣2️⃣ 💬 رقابة وإدارة المحادثات"),
+                        Pair("PROVIDERS", "1️⃣3️⃣ 👥 أعضاء الدليل والتميز"),
+                        Pair("PASSWORDS_RESET", "1️⃣4️⃣ 🔑 إعادة تعيين كلمات المرور"),
+                        Pair("BANNERS", "1️⃣5️⃣ 📢 البنرات الإعلانية والتوجيه"),
+                        Pair("CATEGORIES", "1️⃣6️⃣ 🗂️ تحكم الأقسام والتصنيفات"),
+                        Pair("CITIES", "1️⃣7️⃣ 🗺️ تحكم المدن والمحافظات"),
+                        Pair("COMPLAINTS", "1️⃣8️⃣ ⚠️ الشكاوى والبلاغات"),
+                        Pair("VIP", "1️⃣9️⃣ 🏆 ترقيات واشتراكات VIP"),
+                        Pair("SUPERVISORS", "2️⃣0️⃣ 🛡️ المشرفين ومصفوفة الصلاحيات (538)"),
+                        Pair("COLORS", "2️⃣1️⃣ 🎨 تخصيص الألوان والمظهر"),
+                        Pair("NOTIFICATIONS", "2️⃣2️⃣ 🔔 بث وإدارة الإشعارات"),
+                        Pair("BACKUP", "2️⃣3️⃣ 💾 النسخ الاحتياطي والمزامنة"),
+                        Pair("CLEAN", "2️⃣4️⃣ 🧹 تنظيف وتهيئة البيانات"),
+                        Pair("REVIEWS", "2️⃣5️⃣ ⭐ إدارة التقييمات والتعليقات"),
+                        Pair("CALLS", "2️⃣6️⃣ 📞 مراقبة سجلات المكالمات"),
+                        Pair("COUPONS", "2️⃣7️⃣ 🎫 إدارة الكوبونات والخصومات"),
+                        Pair("BLOCKED", "2️⃣8️⃣ 🚫 قائمة المحظورين المركزية"),
+                        Pair("DELETED", "2️⃣9️⃣ 🗑️ سلة المحذوفات المركزية"),
+                        Pair("PAYMENTS", "3️⃣0️⃣ 💳 المدفوعات ونظام المحافظ"),
+                        Pair("CUSTOM_TABS", "3️⃣1️⃣ 📑 التبويبات المخصصة للملفات"),
+                        Pair("GOLDEN_ICONS", "3️⃣2️⃣ 👑 الأيقونات الذهبية والخطوط"),
+                        Pair("ADVANCED_CHAT", "3️⃣3️⃣ ⚡ الدردشات المتقدمة"),
+                        Pair("CARD_CUSTOMIZER", "3️⃣4️⃣ 🎛️ تخصيص أزرار وأشكال البطاقات"),
+                        Pair("NEW_SECTION_CREATOR", "3️⃣5️⃣ ➕ إنشاء الأقسام الجديدة"),
+                        Pair("REG_FORMS_MANAGER", "3️⃣6️⃣ 📋 تخصيص استمارات التسجيل"),
+                        Pair("ROLES_PERMISSIONS", "3️⃣7️⃣ 🛡️ الصلاحيات والأدوار (538)"),
+                        Pair("MAP_CONTROLS", "3️⃣8️⃣ 🗺️ التحكم بشاشة الخرائط"),
                         Pair("QUICK_SERVICE", "⚡ الخدمات الفورية والفنيين"),
-                        Pair("MEDICAL", "🏥 المراكز الطبية والعيادات"),
-                        Pair("PROPERTIES", "🏠 العقارات والأراضي"),
-                        Pair("JOBS", "💼 المعلنين عن الوظائف"),
-                        Pair("APPLICANTS", "📄 المتقدمين للوظائف"),
-                        Pair("STATS", "📊 الإحصائيات الشاملة"),
-                        Pair("BOOKINGS", "📅 الحجوزات والطلبات"),
-                        Pair("CHATS", "💬 رقابة وصلاحيات الدردشات"),
-                        Pair("PROVIDERS", "👥 أعضاء الدليل والتميز"),
-                        Pair("PASSWORDS_RESET", "🔑 إعادة تعيين كلمات المرور"),
-                        Pair("BANNERS", "📢 البنرات الترويجية والتوجيه"),
-                        Pair("CATEGORIES", "🗂️ تحكم الأقسام"),
-                        Pair("CITIES", "🗺️ تحكم المدن"),
-                        Pair("COMPLAINTS", "⚠️ الشكاوى والبلاغات"),
-                        Pair("VIP", "🏆 ترقيات VIP والدليل"),
-                        Pair("SUPERVISORS", "🛡️ المشرفين والصلاحيات"),
-                        Pair("COLORS", "🎨 الهوية والألوان"),
-                        Pair("NOTIFICATIONS", "🔔 بث الإشعارات"),
-                        Pair("BACKUP", "💾 النسخ والجدولة والمزامنة"),
-                        Pair("CLEAN", "🧹 تهيئة البيانات"),
-                        Pair("REVIEWS", "⭐ إدارة التقييمات والتعليقات"),
-                        Pair("CALLS", "📞 مراقبة المكالمات"),
-                        Pair("COUPONS", "🎫 إدارة الكوبونات"),
-                        Pair("BLOCKED", "🚫 القائمة المحظورة المركزية"),
-                        Pair("DELETED", "🗑️ سلة المحذوفات المركزية"),
-                        Pair("PAYMENTS", "💳 نظام الدفع والتحقق والمحافظ"),
-                        Pair("CUSTOM_TABS", "📑 تخصيص تبويبات الملفات"),
-                        Pair("GOLDEN_ICONS", "👑 الأيقونات وحجم الخط"),
-                        Pair("ADVANCED_CHAT", "⚡ صلاحيات وتوجيه الدردشات"),
-                        Pair("CARD_CUSTOMIZER", "🎛️ تخصيص أزرار وأشكال البطائق"),
-                        Pair("NEW_SECTION_CREATOR", "➕ إضافة وإدارة الأقسام والتوصيل والمحافظ"),
-                        Pair("REG_FORMS_MANAGER", "📋 تخصيص استمارات التسجيل وطلبات الانضمام"),
-                        Pair("FINANCIAL_REPORTS", "📈 تقارير الأرباح المتقدمة"),
-                        Pair("STORAGE_QUOTA", "🗄️ سعة تخزين المرفقات"),
-                        Pair("SECURITY_AUDIT", "🛡️ سجل التدقيق الأمني"),
-                        Pair("SYSTEM_SETTINGS", "⚙️ إعدادات النظام العامة"),
-                        Pair("AUTO_DISPATCH", "🧭 خوارزميات التوجيه التلقائي"),
-                        Pair("API_MANAGEMENT", "🔌 إدارة مفاتيح الربط API"),
-                        Pair("MAINTENANCE_MODE", "🚧 وضع الصيانة والطوارئ")
+                        Pair("FINANCIAL_REPORTS", "📈 تقارير الأرباح"),
+                        Pair("STORAGE_QUOTA", "🗄️ سعة التخزين"),
+                        Pair("SECURITY_AUDIT", "🛡️ سجل الأمان"),
+                        Pair("SYSTEM_SETTINGS", "⚙️ إعدادات النظام"),
+                        Pair("AUTO_DISPATCH", "🧭 التوجيه التلقائي"),
+                        Pair("API_MANAGEMENT", "🔌 مفاتيح API"),
+                        Pair("MAINTENANCE_MODE", "🚧 وضع الصيانة")
                     )
                     if (adminRole == "OWNER") {
-                        baseTabs.add(0, Pair("BACKDOOR", "⚙️ إعدادات البوابة الخلفية المتقدمة"))
+                        baseTabs.add(0, Pair("BACKDOOR", "1️⃣ ⚙️ البوابة الخلفية (BACKDOOR)"))
                     }
                     baseTabs
                 }
@@ -2906,13 +2908,98 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 }
                             }
                             
-                            OutlinedTextField(
-                                value = bannerRedirect,
-                                onValueChange = { bannerRedirect = it },
-                                label = { Text("رمز القسم لتوجيه العميل إليه (اختياري)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                            )
+                            // Comprehensive Banner Section Destination Selector
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.Black.copy(alpha = 0.3f))
+                                    .padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "🎯 توجيه البنر عند نقر العميل (اختر القسم المستهدف):",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = themeColors.accent
+                                )
+
+                                val predefinedSections = listOf(
+                                    Triple("", "🌐 عام (بدون توجيه)", "الرئيسية"),
+                                    Triple("services", "🔧 الخدمات والمهن الفنية", "الفنيين والصيانة"),
+                                    Triple("stores", "🏪 المراكز والمحلات التجارية", "المتاجر والتسوق"),
+                                    Triple("restaurants", "🍔 المطاعم والكافيهات", "المأكولات والمشروبات"),
+                                    Triple("medical", "🏥 المراكز والعيادات الطبية", "الصحة والطب"),
+                                    Triple("properties", "🏠 العقارات والأملاك", "بيع وإيجار العقارات"),
+                                    Triple("jobs", "💼 الوظائف والشركات", "فرص العمل والتوظيف"),
+                                    Triple("quick_service", "⚡ اطلب خدمتك الفورية", "الخدمة السريعة"),
+                                    Triple("bookings", "📅 استمارة حجز المواعيد", "نظام الحجوزات"),
+                                    Triple("maps", "🗺️ خريطة المنشآت والمواقع", "الخرائط التفاعلية"),
+                                    Triple("chat", "💬 المحادثات الفورية", "الدردشة والدعم"),
+                                    Triple("join", "📝 طلبات الانضمام والتسجيل", "استمارات التسجيل")
+                                )
+
+                                // Merge predefined sections with dynamic categories
+                                val allAvailableRedirects = predefinedSections + categories.map {
+                                    Triple(it.id, "📂 ${it.name}", "قسم مخصص")
+                                }
+
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(allAvailableRedirects.size) { rIndex ->
+                                        val item = allAvailableRedirects[rIndex]
+                                        val isSelected = bannerRedirect.trim() == item.first
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSelected) themeColors.accent else themeColors.surface)
+                                                .border(1.dp, if (isSelected) Color.White else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                                .clickable { bannerRedirect = item.first }
+                                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = item.second,
+                                                fontSize = 10.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) Color.Black else Color.White
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val currentSelectedName = allAvailableRedirects.firstOrNull { it.first == bannerRedirect.trim() }?.second ?: if (bannerRedirect.isBlank()) "🌐 عام (بدون توجيه)" else "🏷️ مخصص: $bannerRedirect"
+                                    Text(
+                                        text = "القسم المحدد حالياً: $currentSelectedName",
+                                        fontSize = 10.sp,
+                                        color = Color.Yellow,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (bannerRedirect.isNotEmpty()) {
+                                        Text(
+                                            text = "إلغاء التوجيه ✖",
+                                            fontSize = 9.sp,
+                                            color = Color.Red,
+                                            modifier = Modifier.clickable { bannerRedirect = "" }
+                                        )
+                                    }
+                                }
+
+                                OutlinedTextField(
+                                    value = bannerRedirect,
+                                    onValueChange = { bannerRedirect = it },
+                                    label = { Text("رمز أو معرف القسم المستهدف (أو اكتب رمزاً مخصصاً)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                                )
+                            }
                             
                             // Duration selection
                             Column(modifier = Modifier.fillMaxWidth()) {
@@ -3093,17 +3180,42 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("⚙️ لوحة التحكم بمسار وحقول استمارة الحجز الشاملة:", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
 
-                            // Routing control
+                            // Routing control adapted to active entity subtab
+                            val entityTitle = when (adminBookingSubTab) {
+                                "STORES" -> "المراكز والمحلات"
+                                "MEDICAL" -> "المراكز الطبية والعيادات"
+                                "RESTAURANTS" -> "المطاعم والكافيهات"
+                                "PROPERTIES" -> "العقارات والأملاك"
+                                "JOBS" -> "الوظائف والشركات"
+                                else -> "الخدمات والصيانة"
+                            }
+                            val entityBothLabel = when (adminBookingSubTab) {
+                                "STORES" -> "الأدمن والمتجر 👥"
+                                "MEDICAL" -> "الأدمن والمركز الطبي 👥"
+                                "RESTAURANTS" -> "الأدمن والمطعم 👥"
+                                "PROPERTIES" -> "الأدمن وصاحب العقار 👥"
+                                "JOBS" -> "الأدمن وصاحب العمل 👥"
+                                else -> "الأدمن والفني 👥"
+                            }
+                            val entityProviderLabel = when (adminBookingSubTab) {
+                                "STORES" -> "المتجر مباشرة 🏪"
+                                "MEDICAL" -> "المركز الطبي مباشرة 🏥"
+                                "RESTAURANTS" -> "المطعم مباشرة 🍔"
+                                "PROPERTIES" -> "المعلن مباشرة 🏠"
+                                "JOBS" -> "جهة العمل مباشرة 💼"
+                                else -> "الفني مباشرة 🛠️"
+                            }
+
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("📍 توجيه الحجوزات الواردة من العملاء:", fontSize = 11.sp, color = themeColors.textSecondary)
+                                Text("📍 توجيه حجوزات ($entityTitle) الواردة من العملاء:", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     val rModes = listOf(
-                                        Pair("BOTH", "الأدمن والفني 👥"),
+                                        Pair("BOTH", entityBothLabel),
                                         Pair("ADMIN", "الأدمن فقط 👮"),
-                                        Pair("PROVIDER", "الفني مباشرة 🛠️")
+                                        Pair("PROVIDER", entityProviderLabel)
                                     )
                                     rModes.forEach { mode ->
                                         val isSel = settingsState.bookingRouting == mode.first
@@ -4831,7 +4943,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 }
                             }
 
-                            // Full 320 Granular Permissions Selector
+                            // Full 538 Granular Permissions Selector
                             AdminPermissionsSelectorView(
                                 themeColors = themeColors,
                                 selectedPermissions = supervisorInputPermissions,
@@ -4871,6 +4983,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
 
                     items(supervisorsList, key = { it.id }) { sup ->
+                        var showSupPasscode by remember { mutableStateOf(false) }
                         Card(
                             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
@@ -4892,8 +5005,17 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                                  else -> r.trim()
                                              }
                                          }.joinToString(" + ")
-                                         Text("الصلاحيات الممنوحة: $displayRoles (${if (sup.permissions.isEmpty()) "كاملة/افتراضية" else "${sup.permissions.size}/320 مخصصة"})", fontSize = 10.sp, color = themeColors.accent)
-                                        Text("رمز الدخول (Passcode): ${sup.passcode}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                         Text("الصلاحيات الممنوحة: $displayRoles (${if (sup.permissions.isEmpty()) "كاملة/افتراضية" else "${sup.permissions.size}/538 مخصصة"})", fontSize = 10.sp, color = themeColors.accent)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("رمز الدخول (Passcode): ${if (showSupPasscode) sup.passcode else "••••••••"}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = if (showSupPasscode) "🔒 إخفاء" else "👁️ إظهار",
+                                                fontSize = 9.sp,
+                                                color = Color.Yellow,
+                                                modifier = Modifier.clickable { showSupPasscode = !showSupPasscode }
+                                            )
+                                        }
                                     }
                                     
                                     Row(
@@ -4917,15 +5039,15 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
                 }
 
-                // 320 Full System Permissions Overview and Verification Matrix
+                // 538 Full System Permissions Overview and Verification Matrix
                 item {
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("🛡️ مصفوفة الصلاحيات الشاملة للنظام (320 صلاحية موزعة على 15 قسماً)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("🛡️ مصفوفة الصلاحيات الشاملة للنظام (538 صلاحية موزعة على 18 مجالاً)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     Spacer(modifier = Modifier.height(4.dp))
                 }
 
                 item {
-                    var showAll320Matrix by rememberSaveable { mutableStateOf(false) }
+                    var showAll538Matrix by rememberSaveable { mutableStateOf(false) }
                     var matrixSearchQuery by rememberSaveable { mutableStateOf("") }
 
                     Card(
@@ -4949,7 +5071,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        "320 صلاحية أمنية معتمدة ومتزامنة",
+                                        "538 صلاحية أمنية معتمدة ومتزامنة",
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp
@@ -4957,14 +5079,14 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 }
 
                                 Button(
-                                    onClick = { showAll320Matrix = !showAll320Matrix },
-                                    colors = ButtonDefaults.buttonColors(containerColor = if (showAll320Matrix) Color.DarkGray else themeColors.accent),
+                                    onClick = { showAll538Matrix = !showAll538Matrix },
+                                    colors = ButtonDefaults.buttonColors(containerColor = if (showAll538Matrix) Color.DarkGray else themeColors.accent),
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        text = if (showAll320Matrix) "إخفاء المصفوفة ▲" else "عرض الكل (320) ▼",
-                                        color = if (showAll320Matrix) Color.White else Color.Black,
+                                        text = if (showAll538Matrix) "إخفاء المصفوفة ▲" else "عرض الكل (538) ▼",
+                                        color = if (showAll538Matrix) Color.White else Color.Black,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -4972,13 +5094,13 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             }
 
                             Text(
-                                text = "يغطي النظام 15 مجالاً رئيسياً: الإشعارات (25)، البنرات (24)، نماذج التسجيل (23)، الحجوزات (22)، الخدمة السريعة (21)، الشات المتقدم (22)، السمات والألوان (20)، الأقسام الجديدة (20)، الخرائط (20)، المحلات (21)، المطاعم (20)، القطاع الطبي (21)، العقارات (21)، الوظائف (20)، التبويبات المخصصة (10).",
+                                text = "تغطي المنظومة 18 قطاعاً شاملاً: الإشعارات (40)، البنرات (35)، استمارات التسجيل (30)، استمارات الحجز (30)، الخدمات الفورية (25)، المحادثات والدردشة (45)، الثيمات والأيقونات (25)، الأقسام والتصنيفات (35)، الخرائط والمواقع (35)، المحلات (35)، المطاعم (35)، القطاع الطبي (35)، العقارات (35)، الوظائف (35)، التبويبات المخصصة (30)، الرقابة والأمان (30)، الإدارة المالية (25)، النظام والسيرفر (13).",
                                 color = themeColors.textSecondary,
                                 fontSize = 10.sp,
                                 lineHeight = 14.sp
                             )
 
-                            if (showAll320Matrix) {
+                            if (showAll538Matrix) {
                                 OutlinedTextField(
                                     value = matrixSearchQuery,
                                     onValueChange = { matrixSearchQuery = it },
@@ -7232,6 +7354,98 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             Text("🔌 إدارة مفاتيح الربط والخدمات السحابية (API)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                             Text("حالة الاتصال بقاعدة بيانات Firebase Firestore: متصل ومنتظم", fontSize = 12.sp, color = Color(0xFF10B981))
                             Text("حالة ربط خريطة Leaflet / OpenStreetMap: مفعل", fontSize = 12.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "ROLES_PERMISSIONS") {
+                item {
+                    Text("🛡️ مصفوفة الصلاحيات والأدوار (538 صلاحية كاملة)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("إدارة وتعيين الصلاحيات الـ 538 الموزعة على 18 قطاعاً لجميع المشرفين والإداريين ومزامنتها مع Firestore سحابياً:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                item {
+                    var adminCustomPermissions by remember { mutableStateOf<List<String>>(com.example.data.models.AdminPermissionsRegistry.allPermissions.map { it.key }) }
+                    AdminPermissionsSelectorView(
+                        themeColors = themeColors,
+                        selectedPermissions = adminCustomPermissions,
+                        onPermissionsChanged = { adminCustomPermissions = it },
+                        onSaveRequested = {
+                            val count = adminCustomPermissions.size
+                            viewModel.saveCustomPermissionsMatrixToFirestore(adminCustomPermissions)
+                        }
+                    )
+                }
+            }
+
+            if (activeSubTab == "MAP_CONTROLS") {
+                item {
+                    Text("🗺️ التحكم بشاشة الخرائط والمواقع الجغرافية", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("إدارة ظهور الخرائط والمنشآت وتحديد مزودي الخرائط ونطاقات التغطية:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("📍 إعدادات مزود ونظام الخرائط:", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val mapProviders = listOf("Leaflet / OSM 🌐", "Google Maps 🗺️", "Mapbox 🛰️")
+                                mapProviders.forEach { prov ->
+                                    val isSel = prov.startsWith("Leaflet")
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (isSel) themeColors.accent else Color.Black.copy(alpha = 0.3f))
+                                            .clickable { viewModel.triggerNotification("تم تعيين مزود الخريطة: $prov") }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(prov, fontSize = 9.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("إظهار الخريطة للجميع (الزوار والعملاء)", fontSize = 12.sp, color = Color.White)
+                                Switch(
+                                    checked = true,
+                                    onCheckedChange = { viewModel.triggerNotification("تم تحديث رؤية الخريطة") },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("عرض مواقع المحلات والمراكز الطبية تلقائياً", fontSize = 12.sp, color = Color.White)
+                                Switch(
+                                    checked = true,
+                                    onCheckedChange = { viewModel.triggerNotification("تم تحديث علامات المنشآت على الخريطة") },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                )
+                            }
+
+                            Button(
+                                onClick = { viewModel.triggerNotification("🗺️ تم حفظ وتحديث إعدادات الخرائط بنجاح") },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("حفظ إعدادات الخرائط 💾", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

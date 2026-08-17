@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -55,7 +58,8 @@ fun AdminPermissionsSelectorView(
     themeColors: VisualThemePalette,
     selectedPermissions: List<String>,
     onPermissionsChanged: (List<String>) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSaveRequested: (() -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedLevelFilter by remember { mutableStateOf<PermissionLevel?>(null) }
@@ -78,7 +82,10 @@ fun AdminPermissionsSelectorView(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Lock,
                         contentDescription = null,
@@ -87,10 +94,12 @@ fun AdminPermissionsSelectorView(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "تفويض الصلاحيات (320 صلاحية كاملة)",
+                        text = "تفويض الصلاحيات (538 صلاحية كاملة)",
                         color = Color.White,
                         fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -101,37 +110,38 @@ fun AdminPermissionsSelectorView(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "${selectedPermissions.size} / 320 مفعّلة",
+                        text = "${selectedPermissions.size} / 538 مفعّلة",
                         color = themeColors.accent,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
                 }
             }
 
             // Quick Presets
-            Text("قوالب سريعة للتعيين:", color = themeColors.textSecondary, fontSize = 10.sp)
+            Text("قوالب سريعة للتعيين الفوري:", color = themeColors.textSecondary, fontSize = 10.sp)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                PresetChip(title = "👑 مدير كامل (320)", isSelected = selectedPermissions.size == 320, onClick = {
+                PresetChip(title = "👑 مدير كامل (538)", isSelected = selectedPermissions.size >= 538, onClick = {
                     onPermissionsChanged(AdminPermissionsRegistry.allPermissions.map { it.key })
                 })
-                PresetChip(title = "🔍 مدقق ومراقب (أساسي+متوسط)", isSelected = false, onClick = {
+                PresetChip(title = "🔍 مدقق ومراقب أمني", isSelected = false, onClick = {
                     val keys = AdminPermissionsRegistry.allPermissions
-                        .filter { it.level == PermissionLevel.BASIC || it.level == PermissionLevel.MEDIUM }
+                        .filter { it.level == PermissionLevel.BASIC || it.level == PermissionLevel.MEDIUM || it.category == PermissionCategory.SECURITY_AUDIT }
                         .map { it.key }
                     onPermissionsChanged(keys)
                 })
-                PresetChip(title = "📞 دعم فني (شات+إشعارات+حجوزات)", isSelected = false, onClick = {
+                PresetChip(title = "📞 دعم فني ومحادثات", isSelected = false, onClick = {
                     val keys = AdminPermissionsRegistry.allPermissions
                         .filter { it.category == PermissionCategory.CHAT || it.category == PermissionCategory.NOTIFICATIONS || it.category == PermissionCategory.BOOKING_FORMS || it.category == PermissionCategory.QUICK_SERVICE }
                         .map { it.key }
                     onPermissionsChanged(keys)
                 })
-                PresetChip(title = "🏬 مراكز ومحلات ومطاعم", isSelected = false, onClick = {
+                PresetChip(title = "🏬 مراكز ومحلات وتجارة", isSelected = false, onClick = {
                     val keys = AdminPermissionsRegistry.allPermissions
                         .filter { it.category == PermissionCategory.STORES || it.category == PermissionCategory.RESTAURANTS || it.category == PermissionCategory.MEDICAL || it.category == PermissionCategory.PROPERTIES || it.category == PermissionCategory.JOBS }
                         .map { it.key }
@@ -146,7 +156,7 @@ fun AdminPermissionsSelectorView(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text("بحث في الصلاحيات (الاسم، الوصف، الفئة)...", fontSize = 11.sp) },
+                label = { Text("بحث في الصلاحيات (الاسم، الوصف، الرمز)...", fontSize = 11.sp) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
@@ -229,18 +239,26 @@ fun AdminPermissionsSelectorView(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    ) {
                                         Text(category.iconEmoji, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = "${category.arabicTitle} (${activeInCat}/${category.count})",
                                             color = Color.White,
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
 
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
                                         // Toggle all in category
                                         Box(
                                             modifier = Modifier
@@ -255,17 +273,17 @@ fun AdminPermissionsSelectorView(
                                                     }
                                                     onPermissionsChanged(newSet.toList())
                                                 }
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) {
                                             Text(
                                                 text = if (isAllSelectedInCat) "إلغاء القسم" else "تحديد القسم",
                                                 color = if (isAllSelectedInCat) Color.Black else Color.White,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1
                                             )
                                         }
 
-                                        Spacer(modifier = Modifier.width(6.dp))
                                         Icon(
                                             imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                             contentDescription = null,
@@ -325,43 +343,38 @@ fun AdminPermissionsSelectorView(
                                                     ) {
                                                         Text(
                                                             text = perm.name,
-                                                            color = if (isPermSelected) Color.White else Color.LightGray,
+                                                            color = Color.White,
                                                             fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.weight(1f, fill = false)
+                                                        )
+                                                        Text(
+                                                            text = perm.level.arabicTitle,
+                                                            color = when(perm.level) {
+                                                                PermissionLevel.BASIC -> Color(0xFF10B981)
+                                                                PermissionLevel.MEDIUM -> Color(0xFF3B82F6)
+                                                                PermissionLevel.ADVANCED -> Color(0xFFF59E0B)
+                                                                PermissionLevel.SENSITIVE -> Color(0xFFEF4444)
+                                                            },
+                                                            fontSize = 9.sp,
                                                             fontWeight = FontWeight.Bold
                                                         )
-
-                                                        // Level tag
-                                                        val (lvlText, lvlColor) = when (perm.level) {
-                                                            PermissionLevel.BASIC -> "أساسي" to Color(0xFF10B981)
-                                                            PermissionLevel.MEDIUM -> "متوسط" to Color(0xFF3B82F6)
-                                                            PermissionLevel.ADVANCED -> "متقدم" to Color(0xFFF59E0B)
-                                                            PermissionLevel.SENSITIVE -> "حساس ⚠️" to Color(0xFFEF4444)
-                                                        }
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .clip(RoundedCornerShape(4.dp))
-                                                                .background(lvlColor.copy(alpha = 0.2f))
-                                                                .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                        ) {
-                                                            Text(lvlText, color = lvlColor, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                                        }
                                                     }
-
                                                     Text(
                                                         text = perm.description,
-                                                        color = themeColors.textSecondary,
+                                                        color = Color.LightGray,
                                                         fontSize = 9.sp,
                                                         maxLines = 2,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
-
-                                                    Row(
-                                                        modifier = Modifier.padding(top = 2.dp),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                    ) {
-                                                        Text("🎯 الفئة: ${perm.targetGroup}", color = Color.Gray, fontSize = 8.sp)
-                                                        Text("🌐 النطاق: ${perm.scope}", color = Color.Gray, fontSize = 8.sp)
-                                                    }
+                                                    Text(
+                                                        text = "الرمز: ${perm.key}",
+                                                        color = Color.Gray,
+                                                        fontSize = 8.sp,
+                                                        maxLines = 1
+                                                    )
                                                 }
                                             }
                                         }
@@ -370,6 +383,24 @@ fun AdminPermissionsSelectorView(
                             }
                         }
                     }
+                }
+            }
+
+            // Save button if provided
+            if (onSaveRequested != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Button(
+                    onClick = onSaveRequested,
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "💾 حفظ ومزامنة الصلاحيات (${selectedPermissions.size} مفعّلة)",
+                        color = Color.Black,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -384,16 +415,17 @@ private fun PresetChip(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) Color(0xFF10B981) else Color(0xFF1E293B))
-            .clickable { onClick() }
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isSelected) Color(0xFF3B82F6) else Color(0xFF1E293B))
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
             text = title,
-            color = if (isSelected) Color.Black else Color.White,
+            color = if (isSelected) Color.White else Color.LightGray,
             fontSize = 9.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1
         )
     }
 }
@@ -406,16 +438,17 @@ private fun LevelFilterBadge(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) Color(0xFF334155) else Color(0xFF0F172A))
-            .clickable { onClick() }
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) Color(0xFF3B82F6) else Color(0xFF1E293B))
+            .clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 4.dp)
     ) {
         Text(
             text = title,
             color = if (isSelected) Color.White else Color.Gray,
             fontSize = 9.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
         )
     }
 }

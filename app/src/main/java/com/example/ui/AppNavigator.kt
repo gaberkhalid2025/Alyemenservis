@@ -824,7 +824,7 @@ fun AppNavigator(
                         val trimmedEmail = bdEmailInput.trim()
                         val trimmedPass = bdPasswordInput.trim()
                         val isValidEmail = trimmedEmail.isNotEmpty() && (trimmedEmail.equals("mah73646@gmail.com", ignoreCase = true) || trimmedEmail.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedEmail == "WAM2026")
-                        val isValidPass = trimmedPass.isNotEmpty() && (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.ownerPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
+                        val isValidPass = trimmedPass.isNotEmpty() && (trimmedPass == settingsState.ownerPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
 
                         if (isValidEmail && isValidPass) {
                             viewModel.authenticateAdmin("OWNER")
@@ -2557,7 +2557,9 @@ fun ProviderCard(
                                 text = "📍 ${provider.area}، ${provider.localNeighborhood}",
                                 fontSize = 8.sp,
                                 color = locationColor,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             if (isAdminActive) {
                                 Text(

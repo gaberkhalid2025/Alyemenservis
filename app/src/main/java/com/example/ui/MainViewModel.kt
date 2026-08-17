@@ -2008,6 +2008,45 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun markChannelMessagesAsRead(channelId: String) {
+        val currentId = _currentUserId.value
+        if (channelId.isBlank() || currentId == "guest") return
+        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+            val ch = snapshot.toObject(ChatChannelEntity::class.java) ?: return@addOnSuccessListener
+            var updated = false
+            val newMessages = ch.messages.map { msg ->
+                if (msg.senderId != currentId && msg.status != "READ") {
+                    updated = true
+                    msg.copy(status = "READ", statusTime = System.currentTimeMillis())
+                } else {
+                    msg
+                }
+            }
+            if (updated) {
+                db.collection("chat_channels").document(channelId).update("messages", newMessages)
+            }
+        }
+    }
+
+    fun markMessageAsRead(channelId: String, messageId: String) {
+        val currentId = _currentUserId.value
+        if (channelId.isBlank() || messageId.isBlank() || currentId == "guest") return
+
+        db.collection("chat_channels")
+            .document(channelId)
+            .collection("messages")
+            .document(messageId)
+            .update(
+                mapOf(
+                    "status" to "READ",
+                    "statusTime" to System.currentTimeMillis()
+                )
+            ).addOnFailureListener {
+                // Fallback to channel level update
+                markChannelMessagesAsRead(channelId)
+            }
+    }
+
     fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) {
         val channelId = "chat_p_${providerId}_u_${customerId}"
         val dispCustomerName = customerName.ifEmpty { "عميل" }
@@ -2857,6 +2896,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun deleteStorePermanently(storeId: String) {
+        _stores.value = _stores.value.filter { it.id != storeId }
         db.collection("stores").document(storeId).delete()
             .addOnSuccessListener {
                 triggerNotification("🗑️ تم حذف المتجر نهائياً من النظام")
@@ -2875,6 +2915,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setStoreActive(storeId: String, isActive: Boolean) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isActive = isActive, isApproved = isActive) else it
+        }
         val updates = mapOf(
             "isActive" to isActive,
             "isApproved" to isActive,
@@ -3114,6 +3157,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun deletePropertyPermanently(propertyId: String) {
+        _properties.value = _properties.value.filter { it.id != propertyId }
         db.collection("properties").document(propertyId).delete()
             .addOnSuccessListener {
                 triggerNotification("🗑️ تم حذف العقار نهائياً من النظام")
@@ -3132,6 +3176,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyActive(propertyId: String, isActive: Boolean) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isActive = isActive, isApproved = isActive) else it
+        }
         val updates = mapOf(
             "isActive" to isActive,
             "isApproved" to isActive,
@@ -4941,7 +4988,6 @@ class MainViewModel : ViewModel() {
     fun verifyAdminOrOwnerPassword(password: String): Boolean {
         val trimmed = password.trim()
         if (trimmed.isEmpty()) return false
-        if (trimmed == "Maher@@--@@736462##" || trimmed == "Meh@@@@777644##") return true
         val settings = _settings.value
         if (trimmed == settings.adminPassword ||
             trimmed == settings.ownerPassword ||
@@ -6285,6 +6331,21 @@ class MainViewModel : ViewModel() {
                     triggerNotification("❌ تعذر رفع نسختك المحلية لحل التعارض")
                 }
         }
+    }
+
+    fun saveCustomPermissionsMatrixToFirestore(permissions: List<String>) {
+        val payload = mapOf(
+            "activePermissions" to permissions,
+            "totalCount" to permissions.size,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        db.collection("settings").document("admin_permissions_matrix").set(payload)
+            .addOnSuccessListener {
+                triggerNotification("💾 تم حفظ وتحديث مصفوفة الصلاحيات (${permissions.size} / 538) في قاعدة بيانات Firestore بنجاح!")
+            }
+            .addOnFailureListener {
+                triggerNotification("❌ تعذر حفظ مصفوفة الصلاحيات في Firestore: ${it.localizedMessage}")
+            }
     }
 }
 

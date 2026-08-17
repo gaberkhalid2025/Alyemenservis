@@ -777,12 +777,27 @@ fun StoreListItemCard(
                     }
                     Spacer(modifier = Modifier.height(3.dp))
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("🕒 ${store.workingHours.ifEmpty { "09:00 ص - 10:00 م" }}", fontSize = 9.sp, color = themeColors.textSecondary)
+                        Text(
+                            text = "🕒 ${store.workingHours.ifEmpty { "09:00 ص - 10:00 م" }}",
+                            fontSize = 9.sp,
+                            color = themeColors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
                         if (store.localNeighborhood.isNotEmpty()) {
-                            Text("📍 ${store.localNeighborhood}", fontSize = 9.sp, color = themeColors.textSecondary)
+                            Text(
+                                text = "📍 ${store.localNeighborhood}",
+                                fontSize = 9.sp,
+                                color = themeColors.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
                         }
                     }
                 }
@@ -1395,7 +1410,13 @@ fun PropertyListItemCard(
                                 .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text("📍 الحي: ${prop.localNeighborhood}", fontSize = 9.sp, color = Color.White)
+                            Text(
+                                text = "📍 الحي: ${prop.localNeighborhood}",
+                                fontSize = 9.sp,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -1684,36 +1705,39 @@ fun StoreDetailsDialog(
                     // Basic Badges (Rating, Neighborhood, Hours)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
                             color = themeColors.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
+                            modifier = Modifier.weight(1f, fill = false)
                         ) {
                             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("⭐ ${store.rating} (${store.numReviews} تقييم)", fontSize = 11.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                                Text("⭐ ${store.rating} (${store.numReviews} تقييم)", fontSize = 11.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
 
                         Surface(
                             color = themeColors.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
+                            modifier = Modifier.weight(1f, fill = false)
                         ) {
                             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("📍 ${store.localNeighborhood.ifEmpty { "اليمن" }}", fontSize = 11.sp, color = Color.White)
+                                Text("📍 ${store.localNeighborhood.ifEmpty { "اليمن" }}", fontSize = 11.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
 
                         Surface(
                             color = themeColors.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f))
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
+                            modifier = Modifier.weight(1f, fill = false)
                         ) {
                             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("🕒 ${store.workingHours.ifEmpty { "24 ساعة" }}", fontSize = 10.sp, color = Color.LightGray)
+                                Text("🕒 ${store.workingHours.ifEmpty { "24 ساعة" }}", fontSize = 10.sp, color = Color.LightGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }

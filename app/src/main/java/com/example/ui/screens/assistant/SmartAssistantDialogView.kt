@@ -287,7 +287,7 @@ fun SmartAssistantDialogView(
                                         bottomEnd = if (msg.isUser) 0.dp else 12.dp
                                     ),
                                     border = BorderStroke(1.dp, if (msg.isUser) themeColors.primary else themeColors.accent.copy(alpha = 0.5f)),
-                                    modifier = Modifier.widthIn(max = 280.dp)
+                                    modifier = Modifier.widthIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.75f).dp)
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Text(

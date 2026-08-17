@@ -103,7 +103,13 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ChatPanelDialogView(viewModel: MainViewModel, themeColors: VisualThemePalette, onDismiss: () -> Unit) {
     val chatMessages by viewModel.chatMessages.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
     var typedText by remember { mutableStateOf("") }
+
+    LaunchedEffect(chatMessages, currentUserId) {
+        val channelId = "support_$currentUserId"
+        viewModel.markChannelMessagesAsRead(channelId)
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -203,8 +209,12 @@ fun ChatPanelDialogView(viewModel: MainViewModel, themeColors: VisualThemePalett
                                     }
                                 }
 
+                                val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+                                val maxBubbleWidth = (screenWidthDp * 0.75f).dp
+
                                 Box(
                                     modifier = Modifier
+                                        .widthIn(max = maxBubbleWidth)
                                         .clip(
                                             RoundedCornerShape(
                                                 topStart = 12.dp,
