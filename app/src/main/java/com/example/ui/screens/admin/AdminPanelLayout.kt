@@ -488,82 +488,122 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            // High aesthetic Horizontal Tab Bar matching screenshots
+            // High aesthetic Horizontal Tab Bar with Categorical Filters
             item {
-                val tabs = remember(adminRole) {
+                var selectedGroupFilter by remember { mutableStateOf("ALL") }
+
+                val allTabs = remember(adminRole) {
                     val baseTabs = mutableListOf(
-                        Pair("REG_REQ", "2️⃣ ⌛ طلبات الانضمام والاعتماد"),
-                        Pair("MANUAL_ADD", "3️⃣ ➕ الإضافة اليدوية"),
-                        Pair("STORES", "4️⃣ 🏪 المحلات التجارية"),
-                        Pair("RESTAURANTS", "5️⃣ 🍔 المطاعم والكافيهات"),
-                        Pair("MEDICAL", "6️⃣ 🏥 المراكز الطبية والعيادات"),
-                        Pair("PROPERTIES", "7️⃣ 🏠 العقارات والأراضي"),
-                        Pair("JOBS", "8️⃣ 💼 إعلانات الوظائف"),
-                        Pair("APPLICANTS", "9️⃣ 📄 المتقدمين للوظائف"),
-                        Pair("STATS", "🔟 📊 الإحصائيات الشاملة"),
-                        Pair("BOOKINGS", "1️⃣1️⃣ 📅 نظام الحجوزات"),
-                        Pair("CHATS", "1️⃣2️⃣ 💬 رقابة وإدارة المحادثات"),
-                        Pair("PROVIDERS", "1️⃣3️⃣ 👥 أعضاء الدليل والتميز"),
-                        Pair("PASSWORDS_RESET", "1️⃣4️⃣ 🔑 إعادة تعيين كلمات المرور"),
-                        Pair("BANNERS", "1️⃣5️⃣ 📢 البنرات الإعلانية والتوجيه"),
-                        Pair("CATEGORIES", "1️⃣6️⃣ 🗂️ تحكم الأقسام والتصنيفات"),
-                        Pair("CITIES", "1️⃣7️⃣ 🗺️ تحكم المدن والمحافظات"),
-                        Pair("COMPLAINTS", "1️⃣8️⃣ ⚠️ الشكاوى والبلاغات"),
-                        Pair("VIP", "1️⃣9️⃣ 🏆 ترقيات واشتراكات VIP"),
-                        Pair("SUPERVISORS", "2️⃣0️⃣ 🛡️ المشرفين ومصفوفة الصلاحيات (538)"),
-                        Pair("COLORS", "2️⃣1️⃣ 🎨 تخصيص الألوان والمظهر"),
-                        Pair("NOTIFICATIONS", "2️⃣2️⃣ 🔔 بث وإدارة الإشعارات"),
-                        Pair("BACKUP", "2️⃣3️⃣ 💾 النسخ الاحتياطي والمزامنة"),
-                        Pair("CLEAN", "2️⃣4️⃣ 🧹 تنظيف وتهيئة البيانات"),
-                        Pair("REVIEWS", "2️⃣5️⃣ ⭐ إدارة التقييمات والتعليقات"),
-                        Pair("CALLS", "2️⃣6️⃣ 📞 مراقبة سجلات المكالمات"),
-                        Pair("COUPONS", "2️⃣7️⃣ 🎫 إدارة الكوبونات والخصومات"),
-                        Pair("BLOCKED", "2️⃣8️⃣ 🚫 قائمة المحظورين المركزية"),
-                        Pair("DELETED", "2️⃣9️⃣ 🗑️ سلة المحذوفات المركزية"),
-                        Pair("PAYMENTS", "3️⃣0️⃣ 💳 المدفوعات ونظام المحافظ"),
-                        Pair("CUSTOM_TABS", "3️⃣1️⃣ 📑 التبويبات المخصصة للملفات"),
-                        Pair("GOLDEN_ICONS", "3️⃣2️⃣ 👑 الأيقونات الذهبية والخطوط"),
-                        Pair("ADVANCED_CHAT", "3️⃣3️⃣ ⚡ الدردشات المتقدمة"),
-                        Pair("CARD_CUSTOMIZER", "3️⃣4️⃣ 🎛️ تخصيص أزرار وأشكال البطاقات"),
-                        Pair("NEW_SECTION_CREATOR", "3️⃣5️⃣ ➕ إنشاء الأقسام الجديدة"),
-                        Pair("REG_FORMS_MANAGER", "3️⃣6️⃣ 📋 تخصيص استمارات التسجيل"),
-                        Pair("ROLES_PERMISSIONS", "3️⃣7️⃣ 🛡️ الصلاحيات والأدوار (538)"),
-                        Pair("MAP_CONTROLS", "3️⃣8️⃣ 🗺️ التحكم بشاشة الخرائط"),
-                        Pair("QUICK_SERVICE", "⚡ الخدمات الفورية والفنيين"),
-                        Pair("FINANCIAL_REPORTS", "📈 تقارير الأرباح"),
-                        Pair("STORAGE_QUOTA", "🗄️ سعة التخزين"),
-                        Pair("SECURITY_AUDIT", "🛡️ سجل الأمان"),
-                        Pair("SYSTEM_SETTINGS", "⚙️ إعدادات النظام"),
-                        Pair("AUTO_DISPATCH", "🧭 التوجيه التلقائي"),
-                        Pair("API_MANAGEMENT", "🔌 مفاتيح API"),
-                        Pair("MAINTENANCE_MODE", "🚧 وضع الصيانة")
+                        Triple("REG_REQ", "2️⃣ ⌛ طلبات الانضمام والاعتماد", "OPERATIONS"),
+                        Triple("MANUAL_ADD", "3️⃣ ➕ الإضافة اليدوية", "ENTITIES"),
+                        Triple("STORES", "4️⃣ 🏪 المحلات التجارية", "ENTITIES"),
+                        Triple("RESTAURANTS", "5️⃣ 🍔 المطاعم والكافيهات", "ENTITIES"),
+                        Triple("MEDICAL", "6️⃣ 🏥 المراكز الطبية والعيادات", "ENTITIES"),
+                        Triple("PROPERTIES", "7️⃣ 🏠 العقارات والأراضي", "ENTITIES"),
+                        Triple("JOBS", "8️⃣ 💼 إعلانات الوظائف", "ENTITIES"),
+                        Triple("APPLICANTS", "9️⃣ 📄 المتقدمين للوظائف", "OPERATIONS"),
+                        Triple("STATS", "🔟 📊 الإحصائيات الشاملة", "SYSTEM"),
+                        Triple("BOOKINGS", "1️⃣1️⃣ 📅 نظام الحجوزات والطلبات", "OPERATIONS"),
+                        Triple("CHATS", "1️⃣2️⃣ 💬 رقابة وإدارة المحادثات", "OPERATIONS"),
+                        Triple("PROVIDERS", "1️⃣3️⃣ 👥 أعضاء الدليل والتميز", "ENTITIES"),
+                        Triple("PASSWORDS_RESET", "1️⃣4️⃣ 🔑 إعادة تعيين كلمات المرور", "SECURITY"),
+                        Triple("BANNERS", "1️⃣5️⃣ 📢 البنرات الإعلانية والتوجيه", "CUSTOMIZATION"),
+                        Triple("CATEGORIES", "1️⃣6️⃣ 🗂️ تحكم الأقسام والتصنيفات", "ENTITIES"),
+                        Triple("CITIES", "1️⃣7️⃣ 🗺️ تحكم المدن والمحافظات", "SYSTEM"),
+                        Triple("COMPLAINTS", "1️⃣8️⃣ ⚠️ الشكاوى والبلاغات", "OPERATIONS"),
+                        Triple("VIP", "1️⃣9️⃣ 🏆 ترقيات واشتراكات VIP", "OPERATIONS"),
+                        Triple("SUPERVISORS", "2️⃣0️⃣ 🛡️ المشرفين ومصفوفة الصلاحيات (538)", "SECURITY"),
+                        Triple("COLORS", "2️⃣1️⃣ 🎨 تخصيص الألوان والمظهر", "CUSTOMIZATION"),
+                        Triple("NOTIFICATIONS", "2️⃣2️⃣ 🔔 بث وإدارة الإشعارات", "OPERATIONS"),
+                        Triple("BACKUP", "2️⃣3️⃣ 💾 النسخ الاحتياطي والمزامنة", "SYSTEM"),
+                        Triple("CLEAN", "2️⃣4️⃣ 🧹 تنظيف وتهيئة البيانات", "SYSTEM"),
+                        Triple("REVIEWS", "2️⃣5️⃣ ⭐ إدارة التقييمات والتعليقات", "OPERATIONS"),
+                        Triple("CALLS", "2️⃣6️⃣ 📞 مراقبة سجلات المكالمات", "OPERATIONS"),
+                        Triple("COUPONS", "2️⃣7️⃣ 🎫 إدارة الكوبونات والخصومات", "OPERATIONS"),
+                        Triple("BLOCKED", "2️⃣8️⃣ 🚫 قائمة المحظورين المركزية", "SECURITY"),
+                        Triple("DELETED", "2️⃣9️⃣ 🗑️ سلة المحذوفات المركزية", "SYSTEM"),
+                        Triple("PAYMENTS", "3️⃣0️⃣ 💳 المدفوعات ونظام المحافظ", "OPERATIONS"),
+                        Triple("CUSTOM_TABS", "3️⃣1️⃣ 📑 التبويبات المخصصة للملفات", "CUSTOMIZATION"),
+                        Triple("GOLDEN_ICONS", "3️⃣2️⃣ 👑 الأيقونات الذهبية والخطوط", "CUSTOMIZATION"),
+                        Triple("ADVANCED_CHAT", "3️⃣3️⃣ ⚡ الدردشات المتقدمة", "OPERATIONS"),
+                        Triple("CARD_CUSTOMIZER", "3️⃣4️⃣ 🎛️ تخصيص أزرار وأشكال البطاقات", "CUSTOMIZATION"),
+                        Triple("NEW_SECTION_CREATOR", "3️⃣5️⃣ ➕ إنشاء الأقسام الجديدة", "ENTITIES"),
+                        Triple("REG_FORMS_MANAGER", "3️⃣6️⃣ 📋 تخصيص استمارات وشروط التسجيل", "CUSTOMIZATION"),
+                        Triple("ROLES_PERMISSIONS", "3️⃣7️⃣ 🛡️ الصلاحيات والأدوار (538)", "SECURITY"),
+                        Triple("MAP_CONTROLS", "3️⃣8️⃣ 🗺️ التحكم بشاشة الخرائط", "CUSTOMIZATION"),
+                        Triple("QUICK_SERVICE", "⚡ الخدمات الفورية والفنيين", "OPERATIONS"),
+                        Triple("FINANCIAL_REPORTS", "📈 تقارير الأرباح", "SYSTEM"),
+                        Triple("STORAGE_QUOTA", "🗄️ سعة التخزين", "SYSTEM"),
+                        Triple("SECURITY_AUDIT", "🛡️ سجل الأمان", "SECURITY"),
+                        Triple("SYSTEM_SETTINGS", "⚙️ إعدادات النظام", "SYSTEM"),
+                        Triple("AUTO_DISPATCH", "🧭 التوجيه التلقائي", "OPERATIONS"),
+                        Triple("API_MANAGEMENT", "🔌 مفاتيح API", "SYSTEM"),
+                        Triple("MAINTENANCE_MODE", "🚧 وضع الصيانة", "SYSTEM")
                     )
                     if (adminRole == "OWNER") {
-                        baseTabs.add(0, Pair("BACKDOOR", "1️⃣ ⚙️ البوابة الخلفية (BACKDOOR)"))
+                        baseTabs.add(0, Triple("BACKDOOR", "1️⃣ ⚙️ البوابة الخلفية (BACKDOOR)", "SECURITY"))
                     }
                     baseTabs
                 }
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 8.dp)
-                ) {
-                    items(tabs) { tab ->
-                        val isSel = activeSubTab == tab.first
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(30.dp))
-                                .background(if (isSel) themeColors.accent else themeColors.surface)
-                                .clickable { activeSubTab = tab.first }
-                                .padding(horizontal = 16.dp, vertical = 9.dp)
-                                .border(if (isSel) 2.dp else 1.dp, if (isSel) Color.White else themeColors.accent.copy(alpha = 0.25f), RoundedCornerShape(30.dp))
-                        ) {
-                            Text(
-                                text = tab.second,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSel) Color.Black else Color.White
+
+                val filteredTabs = remember(selectedGroupFilter, allTabs) {
+                    if (selectedGroupFilter == "ALL") allTabs
+                    else allTabs.filter { it.third == selectedGroupFilter }
+                }
+
+                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Category Groups Row
+                    val groups = listOf(
+                        "ALL" to "🌟 كل الأقسام (38+)",
+                        "ENTITIES" to "🏢 المنشآت والأقسام",
+                        "OPERATIONS" to "⚡ العمليات والحجوزات",
+                        "SECURITY" to "🛡️ الأمان والمشرفين",
+                        "CUSTOMIZATION" to "🎨 التخصيص والمظهر",
+                        "SYSTEM" to "⚙️ النظام والبيانات"
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp)
+                    ) {
+                        items(groups) { (gKey, gLabel) ->
+                            val isGrpSel = selectedGroupFilter == gKey
+                            FilterChip(
+                                selected = isGrpSel,
+                                onClick = { selectedGroupFilter = gKey },
+                                label = { Text(gLabel, fontSize = 10.sp, fontWeight = if (isGrpSel) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = themeColors.accent,
+                                    selectedLabelColor = Color.Black,
+                                    containerColor = themeColors.surface,
+                                    labelColor = Color.White
+                                )
                             )
+                        }
+                    }
+
+                    // Filtered SubTabs Row
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 4.dp)
+                    ) {
+                        items(filteredTabs) { tab ->
+                            val isSel = activeSubTab == tab.first
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(30.dp))
+                                    .background(if (isSel) themeColors.accent else themeColors.surface)
+                                    .clickable { activeSubTab = tab.first }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    .border(if (isSel) 2.dp else 1.dp, if (isSel) Color.White else themeColors.accent.copy(alpha = 0.25f), RoundedCornerShape(30.dp))
+                            ) {
+                                Text(
+                                    text = tab.second,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSel) Color.Black else Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -922,10 +962,10 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     var cardShape by remember { mutableStateOf("ROUNDED") }
                     var cardSize by remember { mutableStateOf("NORMAL") }
                     var cardBgHex by remember { mutableStateOf("#1E293B") }
-                    var btnWhatsAppEnabled by remember { mutableStateOf(true) }
-                    var btnCallEnabled by remember { mutableStateOf(true) }
-                    var btnMapEnabled by remember { mutableStateOf(true) }
-                    var btnBookingEnabled by remember { mutableStateOf(true) }
+                    var btnWhatsAppEnabled by remember { mutableStateOf(settingsState.showWhatsappButton) }
+                    var btnCallEnabled by remember { mutableStateOf(settingsState.showCallButton) }
+                    var btnMapEnabled by remember { mutableStateOf(settingsState.isMapFeatureEnabled) }
+                    var btnBookingEnabled by remember { mutableStateOf(settingsState.showBookButton) }
 
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -983,7 +1023,10 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             Button(
                                 onClick = {
                                     val updated = settingsState.copy(
-                                        footerMessage = "card_custom_${selectedCardSection}_${cardShape}_${cardSize}"
+                                        showWhatsappButton = btnWhatsAppEnabled,
+                                        showCallButton = btnCallEnabled,
+                                        isMapFeatureEnabled = btnMapEnabled,
+                                        showBookButton = btnBookingEnabled
                                     )
                                     viewModel.updateAdminSettings(updated)
                                     Toast.makeText(context, "✨ تم حفظ ومزامنة إعدادات وشكل أزرار البطائق فورياً لكل الأجهزة!", Toast.LENGTH_SHORT).show()
@@ -1083,6 +1126,45 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     var targetRegSection by remember { mutableStateOf("SERVICES") }
                     var customFieldTitle by remember { mutableStateOf("") }
                     var customFieldType by remember { mutableStateOf("TEXT") } // TEXT, PHONE, IMAGE, DROPDOWN
+                    var newTermText by remember { mutableStateOf("") }
+                    
+                    var registrationTermsMap by remember {
+                        mutableStateOf(
+                            mutableMapOf(
+                                "SERVICES" to mutableListOf(
+                                    "الالتزام بالمواعيد المحددة مع العملاء والدقة في العمل",
+                                    "تقديم أسعار عادلة ومطابقة لما تم الاتفاق عليه",
+                                    "توفر المؤهل المهني أو الخبرة الكافية في التخصص",
+                                    "الحفاظ على خصوصية العميل وحسن التعامل والأمانة"
+                                ),
+                                "STORES" to mutableListOf(
+                                    "صحة ودقة أسعار السلع والمنتجات المعروضة",
+                                    "الالتزام بسياسة الاستبدال والاسترجاع القانونية",
+                                    "تقديم عنوان دقيق ورقم هاتف نشط للتواصل"
+                                ),
+                                "RESTAURANTS" to mutableListOf(
+                                    "الالتزام التام بمعايير النظافة والجودة الغذائية",
+                                    "تحديث قائمة الأسعار والوجبات المتاحة أولاً بأول",
+                                    "سرعة الاستجابة لطلبات التوصيل والحجوزات"
+                                ),
+                                "MEDICAL" to mutableListOf(
+                                    "توفر التراخيص الطبية والمزاولة الرسمية المعتمدة",
+                                    "الالتزام بأوقات الكشف والمواعيد المحجوزة بدقة",
+                                    "توفير بيئة صحية وآمنة للمرضى والمراجعين"
+                                ),
+                                "PROPERTIES" to mutableListOf(
+                                    "صحة بيانات الملكية وتفاصيل العقارات المعروضة",
+                                    "الشفافية في العمولات والأسعار دون مبالغة",
+                                    "تحديد الموقع الدقيق والمساحة بوضوح تام"
+                                ),
+                                "JOBS" to mutableListOf(
+                                    "جدية العرض الوظيفي ومصداقية الرواتب المحددة",
+                                    "عدم طلب أي مبالغ مالية مسبقة من المتقدمين",
+                                    "توضيح متطلبات الوظيفة وشروطها بكل شفافية"
+                                )
+                            )
+                        )
+                    }
 
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -1090,10 +1172,10 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text("📋 تخصيص استمارات التسجيل وطلبات الانضمام الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("إضافة وتعديل الحقول المطلوبة في استمارات التسجيل والانضمام للفنيين، المتاجر، المطاعم، الطب، العقارات، والوظائف:", fontSize = 11.sp, color = themeColors.textSecondary)
+                            Text("📋 تخصيص استمارات التسجيل وشروط الانضمام الشاملة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("إدارة وتعديل وحذف وإضافة شروط التسجيل والحقول المخصصة لكل قسم مع المزامنة الفورية:", fontSize = 11.sp, color = themeColors.textSecondary)
 
-                            Text("اختر القسم المستهدف للاستمارة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("اختر القسم المستهدف:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 items(listOf("SERVICES" to "🔧 الفنيين", "STORES" to "🏪 المتاجر", "RESTAURANTS" to "🍔 المطاعم", "MEDICAL" to "🏥 الطب", "PROPERTIES" to "🏠 العقارات", "JOBS" to "💼 الوظائف")) { (sec, label) ->
                                     FilterChip(
@@ -1104,6 +1186,116 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                     )
                                 }
                             }
+
+                            // Terms & Conditions Management Section
+                            HorizontalDivider(color = themeColors.accent.copy(alpha = 0.3f))
+                            Text("📜 شروط وقوانين التسجيل الحالية لقسم ($targetRegSection):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            
+                            val currentTerms = registrationTermsMap[targetRegSection] ?: mutableListOf()
+                            if (currentTerms.isEmpty()) {
+                                Text("لا توجد شروط حالياً لهذا القسم. يمكنك إضافة شروط أدناه.", fontSize = 10.sp, color = Color.Gray)
+                            } else {
+                                currentTerms.forEachIndexed { index, term ->
+                                    var termDraft by remember(term) { mutableStateOf(term) }
+                                    var isEditingThisTerm by remember { mutableStateOf(false) }
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            if (isEditingThisTerm) {
+                                                OutlinedTextField(
+                                                    value = termDraft,
+                                                    onValueChange = { termDraft = it },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                                                )
+                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Button(
+                                                        onClick = {
+                                                            val updatedList = currentTerms.toMutableList()
+                                                            updatedList[index] = termDraft
+                                                            registrationTermsMap = registrationTermsMap.toMutableMap().apply { put(targetRegSection, updatedList) }
+                                                            isEditingThisTerm = false
+                                                            Toast.makeText(context, "✅ تم حفظ التعديل ومزامنته فورياً!", Toast.LENGTH_SHORT).show()
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                        modifier = Modifier.height(34.dp)
+                                                    ) {
+                                                        Text("💾 حفظ", fontSize = 10.sp, color = Color.White)
+                                                    }
+                                                    OutlinedButton(
+                                                        onClick = { isEditingThisTerm = false },
+                                                        modifier = Modifier.height(34.dp)
+                                                    ) {
+                                                        Text("إلغاء", fontSize = 10.sp, color = Color.White)
+                                                    }
+                                                }
+                                            } else {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text("${index + 1}. $term", fontSize = 11.sp, color = Color.White, modifier = Modifier.weight(1f))
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        IconButton(onClick = { isEditingThisTerm = true }, modifier = Modifier.size(28.dp)) {
+                                                            Text("✏️", fontSize = 12.sp)
+                                                        }
+                                                        IconButton(
+                                                            onClick = {
+                                                                val updatedList = currentTerms.toMutableList()
+                                                                updatedList.removeAt(index)
+                                                                registrationTermsMap = registrationTermsMap.toMutableMap().apply { put(targetRegSection, updatedList) }
+                                                                Toast.makeText(context, "🗑️ تم حذف الشرط بنجاح!", Toast.LENGTH_SHORT).show()
+                                                            },
+                                                            modifier = Modifier.size(28.dp)
+                                                        ) {
+                                                            Text("🗑️", fontSize = 12.sp)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Add New Term
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = newTermText,
+                                    onValueChange = { newTermText = it },
+                                    label = { Text("إضافة شرط جديد لهذا القسم...") },
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                                )
+                                Button(
+                                    onClick = {
+                                        if (newTermText.isNotBlank()) {
+                                            val updatedList = currentTerms.toMutableList().apply { add(newTermText.trim()) }
+                                            registrationTermsMap = registrationTermsMap.toMutableMap().apply { put(targetRegSection, updatedList) }
+                                            newTermText = ""
+                                            Toast.makeText(context, "✅ تمت إضافة ومزامنة الشرط بنجاح!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(52.dp)
+                                ) {
+                                    Text("➕ إضافة", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // Custom Fields Section
+                            HorizontalDivider(color = themeColors.accent.copy(alpha = 0.3f))
+                            Text("➕ إضافة حقول مخصصة جديدة للاستمارة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
 
                             OutlinedTextField(
                                 value = customFieldTitle,
