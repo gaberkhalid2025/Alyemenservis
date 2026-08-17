@@ -815,6 +815,12 @@ fun ProviderRegisterFormLayout(
                             return@Button
                         }
 
+                        val phoneVal = com.example.util.Validators.validateYemenPhone(clientPhoneInput.trim())
+                        if (!phoneVal.isValid) {
+                            Toast.makeText(context, "❌ ${phoneVal.errorMessage}", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
                         if (clientPasswordInput != clientConfirmPasswordInput) {
                             Toast.makeText(context, "❌ كلمة المرور وتأكيدها غير متطابقين!", Toast.LENGTH_LONG).show()
                             return@Button
