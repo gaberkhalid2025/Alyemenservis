@@ -1,0 +1,20 @@
+package com.example.data.models
+
+import androidx.annotation.Keep
+
+@Keep
+data class RequestOfferEntity(
+    val id: String = "",
+    val requestId: String = "",
+    val requestCode: String = "",
+    val technicianId: String = "",
+    val technicianName: String = "",
+    val technicianPhone: String = "",
+    val technicianAvatar: String = "",
+    val technicianRating: Float = 5.0f,
+    val price: Double = 0.0,
+    val estimatedDuration: String = "",
+    val notes: String = "",
+    val status: String = "PENDING", // PENDING, ACCEPTED, REJECTED
+    val createdAt: Long = System.currentTimeMillis()
+)

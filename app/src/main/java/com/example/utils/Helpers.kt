@@ -288,13 +288,13 @@ fun getDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double 
 
 fun convertUriToBase64(context: Context, uri: Uri): String {
     return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return ""
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return uri.toString()
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeStream(inputStream, null, options)
         inputStream.close()
 
-        val reqWidth = 220
-        val reqHeight = 220
+        val reqWidth = 1024
+        val reqHeight = 1024
         var inSampleSize = 1
         if (options.outHeight > reqHeight || options.outWidth > reqWidth) {
             val halfHeight = options.outHeight / 2
@@ -305,7 +305,7 @@ fun convertUriToBase64(context: Context, uri: Uri): String {
         }
 
         val finalOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
-        val nextInputStream = context.contentResolver.openInputStream(uri) ?: return ""
+        val nextInputStream = context.contentResolver.openInputStream(uri) ?: return uri.toString()
         val decodedBitmap = BitmapFactory.decodeStream(nextInputStream, null, finalOptions)
         nextInputStream.close()
 
@@ -323,12 +323,12 @@ fun convertUriToBase64(context: Context, uri: Uri): String {
             }
 
             val outputStream = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 65, outputStream)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, outputStream)
             val bytes = outputStream.toByteArray()
             Base64.encodeToString(bytes, Base64.NO_WRAP)
-        } else ""
+        } else uri.toString()
     } catch (e: Exception) {
-        ""
+        uri.toString()
     }
 }
 

@@ -56,10 +56,17 @@ fun UnifiedBusinessProfileDashboard(
     val ratings by viewModel.ratings.collectAsState()
     val products by viewModel.products.collectAsState()
 
-    // Find entities safely
-    val activeProvider = remember(providers, providerId) { providers.find { it.id == providerId } }
-    val activeStore = remember(stores, providerId) { stores.find { it.id == providerId || it.ownerId == providerId } }
-    val activeProperty = remember(properties, providerId) { properties.find { it.id == providerId || it.phone == providerId } }
+    // Find entities safely with phone normalization
+    val cleanId = providerId.trim().replace(" ", "").replace("+", "")
+    val activeProvider = remember(providers, providerId) {
+        providers.find { it.id == providerId || it.phone.trim().replace(" ", "").replace("+", "") == cleanId }
+    }
+    val activeStore = remember(stores, providerId) {
+        stores.find { it.id == providerId || it.ownerId == providerId || it.phone.trim().replace(" ", "").replace("+", "") == cleanId || it.ownerId.trim().replace(" ", "").replace("+", "") == cleanId }
+    }
+    val activeProperty = remember(properties, providerId) {
+        properties.find { it.id == providerId || it.phone.trim().replace(" ", "").replace("+", "") == cleanId || it.ownerId.trim().replace(" ", "").replace("+", "") == cleanId }
+    }
 
     val name = activeProvider?.name ?: activeStore?.name ?: activeProperty?.title ?: "ملف تجاري معتمد"
     val description = if (activeProvider != null) {

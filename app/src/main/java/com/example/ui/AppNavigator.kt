@@ -86,6 +86,8 @@ import com.example.ui.screens.about.*
 import com.example.ui.screens.chat.*
 import com.example.ui.screens.dashboard.*
 import com.example.ui.screens.notifications.*
+import com.example.ui.screens.entities.*
+import com.example.ui.screens.owner.*
 import com.example.viewmodels.*
 import java.util.UUID
 import kotlinx.coroutines.delay
@@ -109,6 +111,7 @@ fun AppNavigator(
     val context = LocalContext.current
 
     val currentUserIdState by viewModel.currentUserId.collectAsState()
+    val currentUserPhoneState by viewModel.currentUserPhone.collectAsState()
     var showGuestRegisterDialogForAction by remember { mutableStateOf<String?>(null) } // null, "CHAT"
     var activeSectionIdForCreation by remember { mutableStateOf("") }
     var preselectedRegistrationType by remember { mutableStateOf("TECHNICIAN") }
@@ -332,6 +335,7 @@ fun AppNavigator(
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                                 "BOOKINGS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
+                                "INSTANT_REQUESTS_VIEW" -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
                                 "ORDERS_VIEW" -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { showRequestServiceModal = true })
                                 "MAP_VIEW" -> com.example.ui.MapScreen(
                                     viewModel = viewModel,
@@ -353,6 +357,143 @@ fun AppNavigator(
                                         viewModel.navigateTo("CREATE_BOOKING")
                                     }
                                 )
+                                "CATEGORIES_VIEW" -> CategoriesScreen(
+                                    viewModel = viewModel,
+                                    themeColors = themeColors,
+                                    onCategoryClick = { catId ->
+                                        when (catId) {
+                                            "stores" -> viewModel.navigateTo("STORES_VIEW")
+                                            "medical" -> viewModel.navigateTo("MEDICAL_VIEW")
+                                            "restaurants" -> viewModel.navigateTo("RESTAURANTS_VIEW")
+                                            "properties" -> viewModel.navigateTo("PROPERTIES_VIEW")
+                                            else -> {
+                                                viewModel.selectCategory(catId)
+                                                viewModel.navigateTo("HOME")
+                                            }
+                                        }
+                                    }
+                                )
+                                "STORES_VIEW" -> StoresScreen(
+                                    viewModel = viewModel,
+                                    themeColors = themeColors,
+                                    onStoreClick = { store ->
+                                        viewModel.selectedStore = store
+                                        viewModel.navigateTo("STORE_DETAILS")
+                                    },
+                                    onChatClick = { store ->
+                                        preSelectedChannelId = "chat_store_${store.id}"
+                                        showAllConversationsDialog = true
+                                    },
+                                    onRequestServiceClick = { store ->
+                                        viewModel.selectedStore = store
+                                        showRequestServiceModal = true
+                                    }
+                                )
+                                "MEDICAL_VIEW" -> MedicalCentersScreen(
+                                    viewModel = viewModel,
+                                    themeColors = themeColors,
+                                    onMedicalCenterClick = { medical ->
+                                        viewModel.selectedProvider = medical
+                                        viewModel.navigateTo("PROVIDER_DETAILS")
+                                    },
+                                    onChatClick = { medical ->
+                                        preSelectedChannelId = "chat_p_${medical.id}"
+                                        showAllConversationsDialog = true
+                                    },
+                                    onBookAppointmentClick = { medical ->
+                                        viewModel.selectedProvider = medical
+                                        viewModel.navigateTo("CREATE_BOOKING")
+                                    }
+                                )
+                                "RESTAURANTS_VIEW" -> RestaurantsScreen(
+                                    viewModel = viewModel,
+                                    themeColors = themeColors,
+                                    onRestaurantClick = { rest ->
+                                        viewModel.selectedStore = rest
+                                        viewModel.navigateTo("STORE_DETAILS")
+                                    },
+                                    onChatClick = { rest ->
+                                        preSelectedChannelId = "chat_store_${rest.id}"
+                                        showAllConversationsDialog = true
+                                    },
+                                    onOrderMealClick = { rest ->
+                                        viewModel.selectedStore = rest
+                                        showRequestServiceModal = true
+                                    }
+                                )
+                                "PROPERTIES_VIEW" -> PropertiesScreen(
+                                    viewModel = viewModel,
+                                    themeColors = themeColors,
+                                    onPropertyClick = { prop ->
+                                        viewModel.selectedProperty = prop
+                                        viewModel.navigateTo("PROPERTY_DETAILS")
+                                    },
+                                    onChatClick = { prop ->
+                                        preSelectedChannelId = "chat_prop_${prop.id}"
+                                        showAllConversationsDialog = true
+                                    },
+                                    onRequestInspectionClick = { prop ->
+                                        viewModel.selectedProperty = prop
+                                        showRequestServiceModal = true
+                                    }
+                                )
+                                "OWNER_PROFILE_VIEW" -> {
+                                    val myAccount = UnifiedBusinessAccount(
+                                        id = currentUserIdState.ifBlank { "owner_123" },
+                                        name = currentUserPhoneState.ifBlank { "مالك الحساب التجاري" },
+                                        phone = currentUserPhoneState.ifBlank { "777644123" }
+                                    )
+                                    OwnerProfileScreen(
+                                        account = myAccount,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors,
+                                        onBackClick = { viewModel.goBack() }
+                                    )
+                                }
+                                "PRODUCTS_MGMT_VIEW" -> {
+                                    val myAccount = UnifiedBusinessAccount(
+                                        id = currentUserIdState.ifBlank { "owner_123" },
+                                        name = currentUserPhoneState.ifBlank { "مالك الحساب التجاري" }
+                                    )
+                                    ProductServiceManagementScreen(
+                                        account = myAccount,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors
+                                    )
+                                }
+                                "PRICE_MGMT_VIEW" -> {
+                                    val myAccount = UnifiedBusinessAccount(
+                                        id = currentUserIdState.ifBlank { "owner_123" },
+                                        name = currentUserPhoneState.ifBlank { "مالك الحساب التجاري" }
+                                    )
+                                    PriceManagementScreen(
+                                        account = myAccount,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors
+                                    )
+                                }
+                                "OFFERS_MGMT_VIEW" -> {
+                                    val myAccount = UnifiedBusinessAccount(
+                                        id = currentUserIdState.ifBlank { "owner_123" },
+                                        name = currentUserPhoneState.ifBlank { "مالك الحساب التجاري" }
+                                    )
+                                    OffersManagementScreen(
+                                        account = myAccount,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors
+                                    )
+                                }
+                                "GALLERY_MGMT_VIEW" -> {
+                                    val myAccount = UnifiedBusinessAccount(
+                                        id = currentUserIdState.ifBlank { "owner_123" },
+                                        name = currentUserPhoneState.ifBlank { "مالك الحساب التجاري" }
+                                    )
+                                    GalleryManagementScreen(
+                                        account = myAccount,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors
+                                    )
+                                }
                                 else -> ServicesBrowserLayout(
                                     viewModel = viewModel,
                                     themeColors = themeColors,

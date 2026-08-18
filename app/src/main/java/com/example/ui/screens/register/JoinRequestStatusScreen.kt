@@ -128,10 +128,20 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
     val ratings by viewModel.ratings.collectAsState()
 
     val matchingStore = remember(stores, joinPhone) {
-        stores.find { it.ownerId.trim() == joinPhone.trim() && joinPhone.isNotEmpty() && !it.isDeleted }
+        val cleanJoin = joinPhone.trim().replace(" ", "").replace("+", "")
+        stores.find { 
+            (it.ownerId.trim().replace(" ", "").replace("+", "") == cleanJoin || 
+             it.phone.trim().replace(" ", "").replace("+", "") == cleanJoin) && 
+            cleanJoin.isNotEmpty() && !it.isDeleted 
+        }
     }
     val matchingProperty = remember(properties, joinPhone) {
-        properties.find { it.phone.trim() == joinPhone.trim() && joinPhone.isNotEmpty() && !it.isDeleted }
+        val cleanJoin = joinPhone.trim().replace(" ", "").replace("+", "")
+        properties.find { 
+            (it.ownerId.trim().replace(" ", "").replace("+", "") == cleanJoin || 
+             it.phone.trim().replace(" ", "").replace("+", "") == cleanJoin) && 
+            cleanJoin.isNotEmpty() && !it.isDeleted 
+        }
     }
 
     if (matchingStore != null && matchingStore.isActive) {

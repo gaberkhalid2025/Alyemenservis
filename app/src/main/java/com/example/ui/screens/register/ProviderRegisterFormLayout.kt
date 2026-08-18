@@ -1291,15 +1291,11 @@ fun ProviderRegisterFormLayout(
         Button(
             onClick = {
                 val missingList = mutableListOf<String>()
-                if (isNameMandatory && name.trim().isEmpty()) missingList.add("الاسم الثلاثي للفني")
-                if (isPhoneMandatory && phone.trim().isEmpty()) missingList.add("رقم الهاتف")
-                if (isCatMandatory && selectedCatId.isEmpty()) missingList.add("قسم الصيانة")
-                if (selectedCatId == "other" && customProfession.trim().isEmpty()) missingList.add("التخصص المكتوب يدوياً")
-                if (isAreaMandatory && area.trim().isEmpty()) missingList.add("المدينة والمحافظة")
-                if (isNeighbourMandatory && neighborhood.trim().isEmpty()) missingList.add("الحي أو الشارع")
-                if (isSelfieMandatory && selfiePhotoBase64.isEmpty()) missingList.add("صورة سيلفي شخصية")
-                if (isIdMandatory && idPhotoBase64.isEmpty()) missingList.add("صورة بطاقة الهوية")
-
+                if (name.trim().isEmpty()) missingList.add("الاسم الثلاثي للفني")
+                if (phone.trim().isEmpty()) missingList.add("رقم الهاتف")
+                if (selectedCatId.isEmpty() && customProfession.trim().isEmpty()) missingList.add("قسم الصيانة أو التخصص")
+                if (area.trim().isEmpty()) missingList.add("المدينة والمحافظة")
+                if (neighborhood.trim().isEmpty()) missingList.add("الحي أو الشارع")
                 if (password.trim().isEmpty()) missingList.add("كلمة المرور")
                 if (confirmPassword.trim().isEmpty()) missingList.add("تأكيد كلمة المرور")
 
@@ -1586,8 +1582,6 @@ fun ProviderRegisterFormLayout(
                     viewModel.triggerNotification("⚠️ يرجى إكمال الحقول الإلزامية المطلوبة: ${missing.joinToString("، ")}")
                 } else if (storePassword != storeConfirmPassword) {
                     viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
-                } else if (!storeAgreementChecked) {
-                    viewModel.triggerNotification("⚠️ يجب الموافقة والتعهد بصحة جميع البيانات أولاً!")
                 } else {
                     val cleanPhone = storePhone.trim().replace(" ", "").replace("+", "")
                     val duplicateType = viewModel.checkAndGetDuplicateAccountType(cleanPhone, "")
@@ -1617,6 +1611,7 @@ fun ProviderRegisterFormLayout(
                         viewModel.saveStore(newStore)
                         viewModel.setJoinRequestPhone(context, cleanPhone)
                         android.widget.Toast.makeText(context, "📨 تم إرسال طلب انضمام المحل للإدارة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                        viewModel.navigateTo("JOIN_REQUEST_STATUS")
                     }
                 }
             },
@@ -1834,8 +1829,6 @@ fun ProviderRegisterFormLayout(
                     viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول الإلزامية: ${missing.joinToString("، ")}")
                 } else if (restPassword != restConfirmPassword) {
                     viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
-                } else if (!restAgreementChecked) {
-                    viewModel.triggerNotification("⚠️ يجب التعهد بالنظافة وجودة الأطعمة أولاً!")
                 } else {
                     val cleanPhone = restPhone.trim().replace(" ", "").replace("+", "")
                     val duplicateType = viewModel.checkAndGetDuplicateAccountType(cleanPhone, "")
@@ -1864,6 +1857,7 @@ fun ProviderRegisterFormLayout(
                         viewModel.saveStore(newRest)
                         viewModel.setJoinRequestPhone(context, cleanPhone)
                         android.widget.Toast.makeText(context, "📨 تم إرسال طلب انضمام المطعم/الكافيه للإدارة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                        viewModel.navigateTo("JOIN_REQUEST_STATUS")
                     }
                 }
             },
@@ -2087,8 +2081,6 @@ fun ProviderRegisterFormLayout(
                     viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول الإلزامية: ${missing.joinToString("، ")}")
                 } else if (propPassword != propConfirmPassword) {
                     viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
-                } else if (!propAgreementChecked) {
-                    viewModel.triggerNotification("⚠️ يجب التعهد بملكية العقار أولاً!")
                 } else {
                     val cleanPhone = propPhone.trim().replace(" ", "").replace("+", "")
                     val duplicateType = viewModel.checkAndGetDuplicateAccountType(cleanPhone, "")
@@ -2122,6 +2114,7 @@ fun ProviderRegisterFormLayout(
                         viewModel.saveProperty(newProperty)
                         viewModel.setJoinRequestPhone(context, cleanPhone)
                         android.widget.Toast.makeText(context, "📨 تم إرسال طلب إدراج العقار للإدارة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                        viewModel.navigateTo("JOIN_REQUEST_STATUS")
                     }
                 }
             },
@@ -2357,8 +2350,6 @@ fun ProviderRegisterFormLayout(
                     viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول الإلزامية: ${missing.joinToString("، ")}")
                 } else if (medPassword != medConfirmPassword) {
                     viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
-                } else if (!medAgreementChecked) {
-                    viewModel.triggerNotification("⚠️ يجب التعهد بسريان الترخيص الطبي أولاً!")
                 } else {
                     val cleanPhone = medPhone.trim().replace(" ", "").replace("+", "")
                     val duplicateType = viewModel.checkAndGetDuplicateAccountType(cleanPhone, "")
@@ -2386,6 +2377,7 @@ fun ProviderRegisterFormLayout(
                         viewModel.saveStore(newMed)
                         viewModel.setJoinRequestPhone(context, cleanPhone)
                         android.widget.Toast.makeText(context, "📨 تم إرسال طلب انضمام المركز الطبي للإدارة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                        viewModel.navigateTo("JOIN_REQUEST_STATUS")
                     }
                 }
             },
@@ -2567,19 +2559,14 @@ fun ProviderRegisterFormLayout(
                 if (jobManagerNameInput.trim().isEmpty()) missing.add("مسؤول التوظيف")
                 if (jobTitleInput.trim().isEmpty()) missing.add("المسمى الوظيفي")
                 if (jobPhoneInput.trim().isEmpty()) missing.add("رقم الهاتف")
-                if (jobCityInput.trim().isEmpty()) missing.add("المافظة")
+                if (jobCityInput.trim().isEmpty()) missing.add("المحافظة")
                 if (jobAddressInput.trim().isEmpty()) missing.add("العنوان")
-                if (jobSalaryInput.trim().isEmpty()) missing.add("الراتب المتوقع")
-                if (jobDescInput.trim().isEmpty()) missing.add("تفاصيل المهام")
-                if (jobRequirementsInput.trim().isEmpty()) missing.add("الشروط والمؤهلات")
                 if (jobPasswordInput.trim().isEmpty()) missing.add("كلمة المرور")
 
                 if (missing.isNotEmpty()) {
                     viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول الإلزامية: ${missing.joinToString("، ")}")
                 } else if (jobPasswordInput != jobConfirmPasswordInput) {
                     viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
-                } else if (!jobAgreementChecked) {
-                    viewModel.triggerNotification("⚠️ يجب التعهد بجدية الإعلان الوظيفي أولاً!")
                 } else {
                     val cleanPhone = jobPhoneInput.trim().replace(" ", "").replace("+", "")
                     val newJob = com.example.data.JobEntity(
@@ -2591,9 +2578,9 @@ fun ProviderRegisterFormLayout(
                         cityId = jobCityInput.trim(),
                         address = jobAddressInput.trim(),
                         jobType = jobTypeInput,
-                        salary = jobSalaryInput.trim(),
-                        description = jobDescInput.trim(),
-                        requirements = jobRequirementsInput.trim(),
+                        salary = jobSalaryInput.trim().ifEmpty { "حسب الاتفاق والتوافق" },
+                        description = jobDescInput.trim().ifEmpty { "إعلان توظيف متاح، يرجى التواصل لمعرفة التفاصيل والمهام." },
+                        requirements = jobRequirementsInput.trim().ifEmpty { "جدية العمل والالتزام بالمسؤولية." },
                         isApproved = false,
                         isActive = false
                     )

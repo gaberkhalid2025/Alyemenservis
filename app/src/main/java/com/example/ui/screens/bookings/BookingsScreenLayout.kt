@@ -278,6 +278,16 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { viewModel.navigateTo("INSTANT_REQUESTS_VIEW") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(26.dp)
+                ) {
+                    Text("⚡ المزايدة الفورية (30د)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
             }
         }
     ) { padding ->
