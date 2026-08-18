@@ -249,6 +249,9 @@ class MainViewModel : ViewModel() {
     private val _registeredUsersCount = MutableStateFlow(0)
     val registeredUsersCount: StateFlow<Int> = _registeredUsersCount.asStateFlow()
 
+    internal val _registeredUsersList = MutableStateFlow<List<Map<String, Any>>>(emptyList())
+    val registeredUsersList: StateFlow<List<Map<String, Any>>> = _registeredUsersList.asStateFlow()
+
     internal val _currentUserName = MutableStateFlow("")
     val currentUserName: StateFlow<String> = _currentUserName.asStateFlow()
 
@@ -462,20 +465,20 @@ class MainViewModel : ViewModel() {
         auth.createUserWithEmailAndPassword(authEmail, password)
             .addOnSuccessListener { authResult ->
                 val firebaseUid = authResult.user?.uid ?: ("usr_" + System.currentTimeMillis())
-                completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId)
+                completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId, password)
             }
             .addOnFailureListener { e ->
                 if (e.message?.contains("already in use") == true || e.message?.contains("EMAIL_EXISTS") == true) {
                     auth.signInWithEmailAndPassword(authEmail, password)
                         .addOnSuccessListener { authResult ->
                             val firebaseUid = authResult.user?.uid ?: ("usr_" + System.currentTimeMillis())
-                            completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId)
+                            completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId, password)
                         }
                         .addOnFailureListener {
                             triggerNotification("❌ كلمة المرور المدخلة غير صحيحة لهذا الحساب المسجل سابقاً.")
                         }
                 } else {
-                    completeGuestRegistration(context, "user_" + (100000..999999).random(), name, cleanPhone, residence, androidId)
+                    completeGuestRegistration(context, "user_" + (100000..999999).random(), name, cleanPhone, residence, androidId, password)
                 }
             }
     }
@@ -486,7 +489,8 @@ class MainViewModel : ViewModel() {
         name: String,
         phone: String,
         residence: String,
-        androidId: String
+        androidId: String,
+        password: String = ""
     ) {
         _currentUserId.value = userId
         _currentUserName.value = name
@@ -502,17 +506,41 @@ class MainViewModel : ViewModel() {
             apply()
         }
 
-        // Save profile WITHOUT password field!
+        // Save profile WITH password field!
         val regUser = mapOf(
             "id" to userId,
             "name" to name,
             "phone" to phone,
             "residence" to residence,
+            "password" to password,
             "androidId" to androidId,
             "timestamp" to System.currentTimeMillis()
         )
         db.collection("registered_users").document(userId).set(regUser)
         triggerNotification("🎉 أهلاً بك في الدليل $name، تم تسجيل وحماية حسابك آمنياً بنجاح عبر Firebase Auth!")
+    }
+
+    fun approveRegisteredUser(userId: String, userName: String = "") {
+        db.collection("registered_users").document(userId).update("isApproved", true)
+            .addOnSuccessListener {
+                triggerNotification("✅ تم قبول وتأكيد طلب انضمام المستخدم $userName بنجاح من قبل الأدمن!")
+            }
+    }
+
+    fun toggleBlockRegisteredUser(userId: String, currentBlocked: Boolean, userName: String = "") {
+        val newBlockedState = !currentBlocked
+        db.collection("registered_users").document(userId).update("isBlocked", newBlockedState)
+            .addOnSuccessListener {
+                val actionText = if (newBlockedState) "حظر" else "إلغاء حظر"
+                triggerNotification("🛡️ تم $actionText حساب المستخدم $userName بنجاح.")
+            }
+    }
+
+    fun deleteRegisteredUser(userId: String, userName: String = "") {
+        db.collection("registered_users").document(userId).delete()
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف حساب المستخدم $userName من القاعدة بنجاح.")
+            }
     }
 
     fun restoreUserAccountByPhoneAndPassword(
@@ -818,6 +846,12 @@ class MainViewModel : ViewModel() {
         db.collection("registered_users").addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 _registeredUsersCount.value = snapshot.size()
+                val list = snapshot.documents.mapNotNull { doc ->
+                    val data = doc.data?.toMutableMap() ?: mutableMapOf()
+                    data["id"] = doc.id
+                    data
+                }
+                _registeredUsersList.value = list
             }
         }
 
@@ -2052,26 +2086,45 @@ class MainViewModel : ViewModel() {
         val dispCustomerName = customerName.ifEmpty { "عميل" }
         val displayName = "دردشة: $providerName مع $dispCustomerName"
         
-        db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
-            if (!snapshot.exists()) {
-                val newCh = ChatChannelEntity(
-                    id = channelId,
-                    userName = displayName,
-                    lastMessage = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
+        val localCh = ChatChannelEntity(
+            id = channelId,
+            userName = displayName,
+            targetId = providerId,
+            targetName = providerName,
+            customerId = customerId,
+            customerName = dispCustomerName,
+            lastMessage = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
+            timestamp = System.currentTimeMillis(),
+            isProvider = false,
+            messages = listOf(
+                ChatMessageEntity(
+                    id = UUID.randomUUID().toString(),
+                    senderId = "system",
+                    message = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
                     timestamp = System.currentTimeMillis(),
-                    isProvider = false,
-                    messages = listOf(
-                        ChatMessageEntity(
-                            id = UUID.randomUUID().toString(),
-                            senderId = "system",
-                            message = "مرحباً! تم بدء محادثة فورية جديدة لتنسيق الخدمة.",
-                            timestamp = System.currentTimeMillis(),
-                            senderName = "النظام"
-                        )
-                    )
+                    senderName = "النظام"
                 )
-                db.collection("chat_channels").document(channelId).set(newCh)
+            )
+        )
+        
+        // Immediately set local active channel for 0ms instant UI opening
+        _activeChatChannel.value = localCh
+
+        try {
+            db.collection("chat_channels").document(channelId).get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    val existing = snapshot.toObject(ChatChannelEntity::class.java)
+                    if (existing != null) {
+                        _activeChatChannel.value = existing
+                    }
+                } else {
+                    db.collection("chat_channels").document(channelId).set(localCh)
+                }
+            }.addOnFailureListener {
+                // Keep local channel active when offline
             }
+        } catch (e: Exception) {
+            // Offline fallback
         }
     }
 
@@ -4468,11 +4521,13 @@ class MainViewModel : ViewModel() {
     }
 
     fun deleteNotification(notifId: String) {
+        _notifications.value = _notifications.value.filter { it.id != notifId }
         db.collection("notifications").document(notifId).delete()
         triggerNotification("🗑️ تم حذف الإشعار")
     }
 
     fun deleteAllNotifications() {
+        _notifications.value = emptyList()
         db.collection("notifications").get().addOnSuccessListener { snapshot ->
             snapshot?.documents?.forEach { doc -> doc.reference.delete() }
             triggerNotification("🧹 تم حذف جميع الإشعارات بنجاح")
@@ -4716,45 +4771,52 @@ class MainViewModel : ViewModel() {
 
         val chanId = "chat_${effectiveTargetType.lowercase()}_${effectiveTargetId}_u_${currUser.ifEmpty { currPhone.ifEmpty { "guest" } }}"
 
-        db.collection("chat_channels").document(chanId).get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val existing = snapshot.toObject(ChatChannelEntity::class.java)
-                if (existing != null) {
-                    _activeChatChannel.value = existing
-                    onCreated(existing)
-                    return@addOnSuccessListener
-                }
-            }
-            val newCh = ChatChannelEntity(
-                id = chanId,
-                channelType = effectiveTargetType,
-                targetId = effectiveTargetId,
-                targetName = effectiveTargetName,
-                targetPhone = targetPhone,
-                targetCategory = targetCategory,
-                customerId = currUser,
-                customerName = currName,
-                customerPhone = currPhone,
-                userName = effectiveTargetName,
-                lastMessage = "بدء محادثة فورية جديدة مع $effectiveTargetName",
-                lastMessageTime = System.currentTimeMillis(),
-                timestamp = System.currentTimeMillis(),
-                messages = listOf(
-                    ChatMessageEntity(
-                        id = UUID.randomUUID().toString(),
-                        senderId = "system",
-                        senderName = "النظام",
-                        message = "مرحباً بكم في خدمة المحادثة الفورية مع $effectiveTargetName. يسعدنا خدمتكم!",
-                        timestamp = System.currentTimeMillis(),
-                        mediaType = "TEXT",
-                        status = "READ"
-                    )
+        val newCh = ChatChannelEntity(
+            id = chanId,
+            channelType = effectiveTargetType,
+            targetId = effectiveTargetId,
+            targetName = effectiveTargetName,
+            targetPhone = targetPhone,
+            targetCategory = targetCategory,
+            customerId = currUser,
+            customerName = currName,
+            customerPhone = currPhone,
+            userName = effectiveTargetName,
+            lastMessage = "بدء محادثة فورية جديدة مع $effectiveTargetName",
+            lastMessageTime = System.currentTimeMillis(),
+            timestamp = System.currentTimeMillis(),
+            messages = listOf(
+                ChatMessageEntity(
+                    id = UUID.randomUUID().toString(),
+                    senderId = "system",
+                    senderName = "النظام",
+                    message = "مرحباً بكم في خدمة المحادثة الفورية مع $effectiveTargetName. يسعدنا خدمتكم!",
+                    timestamp = System.currentTimeMillis(),
+                    mediaType = "TEXT",
+                    status = "READ"
                 )
             )
-            db.collection("chat_channels").document(chanId).set(newCh).addOnSuccessListener {
-                _activeChatChannel.value = newCh
-                onCreated(newCh)
+        )
+
+        // Set state synchronously for 0ms instant response regardless of network connectivity
+        _activeChatChannel.value = newCh
+        onCreated(newCh)
+
+        try {
+            db.collection("chat_channels").document(chanId).get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    val existing = snapshot.toObject(ChatChannelEntity::class.java)
+                    if (existing != null) {
+                        _activeChatChannel.value = existing
+                    }
+                } else {
+                    db.collection("chat_channels").document(chanId).set(newCh)
+                }
+            }.addOnFailureListener {
+                // Keep local channel active when offline
             }
+        } catch (e: Exception) {
+            // Offline fallback
         }
     }
 

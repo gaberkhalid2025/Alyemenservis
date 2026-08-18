@@ -114,6 +114,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     val properties by viewModel.properties.collectAsState()
     val jobs by viewModel.jobs.collectAsState()
     val jobApplications by viewModel.jobApplications.collectAsState()
+    val registeredUsersList by viewModel.registeredUsersList.collectAsState()
 
     var inputPasscode by remember { mutableStateOf("") }
     var isAuthorized by remember(adminRole) { mutableStateOf(adminRole != "GUEST") }
@@ -249,6 +250,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
     // Section 5 state variables
     var complaintsSearchQuery by remember { mutableStateOf("") }
+    var registeredUsersSearchQuery by remember { mutableStateOf("") }
 
     // Section 7 state variables
     var activeProvidersSearchQuery by remember { mutableStateOf("") }
@@ -1904,6 +1906,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
                     val subTabs = listOf(
                         Triple("SERVICES", "🔧 الخدمات والمهن", pendingProviders.size),
+                        Triple("USERS", "👤 إدارة المستخدمين والعملاء", registeredUsersList.size),
                         Triple("PROPERTIES", "🏠 العقارات", pendingPropertiesCount),
                         Triple("STORES", "🏪 المراكز والمحلات", pendingStoresCount),
                         Triple("MEDICAL", "🏥 المراكز الطبية", pendingMedicalCount),
@@ -2015,6 +2018,111 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Text("رفض الطلب ❌", color = Color.White, fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (adminReqSubTab == "USERS") {
+                    item {
+                        OutlinedTextField(
+                            value = registeredUsersSearchQuery,
+                            onValueChange = { registeredUsersSearchQuery = it },
+                            label = { Text("البحث باسم المستخدم، رقم الهاتف، أو المدينة...") },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                            trailingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = themeColors.accent) }
+                        )
+                    }
+
+                    val filteredUsers = registeredUsersList.filter { u ->
+                        val uName = u["name"]?.toString() ?: ""
+                        val uPhone = u["phone"]?.toString() ?: ""
+                        val uRes = u["residence"]?.toString() ?: ""
+                        val query = registeredUsersSearchQuery.trim()
+                        query.isEmpty() || uName.contains(query, ignoreCase = true) || uPhone.contains(query, ignoreCase = true) || uRes.contains(query, ignoreCase = true)
+                    }
+
+                    if (filteredUsers.isEmpty()) {
+                        item {
+                            Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                                Text("لا يوجد مستخدمون مسجلون مطبقون لشروط البحث.", fontSize = 11.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
+                            }
+                        }
+                    } else {
+                        items(filteredUsers, key = { it["id"]?.toString() ?: UUID.randomUUID().toString() }) { user ->
+                            val uId = user["id"]?.toString() ?: ""
+                            val uName = user["name"]?.toString() ?: "مستخدم بدون اسم"
+                            val uPhone = user["phone"]?.toString() ?: "بدون هاتف"
+                            val uResidence = user["residence"]?.toString() ?: "غير محدد"
+                            val isApproved = user["isApproved"] as? Boolean ?: false
+                            val isBlocked = user["isBlocked"] as? Boolean ?: false
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, if (isBlocked) Color.Red else if (isApproved) Color.Green else themeColors.accent),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("👤 $uName", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(
+                                                    if (isBlocked) Color.Red.copy(alpha = 0.2f)
+                                                    else if (isApproved) Color.Green.copy(alpha = 0.2f)
+                                                    else Color(0xFFF59E0B).copy(alpha = 0.2f)
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isBlocked) "محظور 🚫" else if (isApproved) "حساب موثق ومفعل ✅" else "بانتظار موافقة الأدمن ⏳",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isBlocked) Color.Red else if (isApproved) Color.Green else Color(0xFFF59E0B)
+                                            )
+                                        }
+                                    }
+
+                                    Text("📞 رقم الهاتف: $uPhone", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    Text("📍 المدينة والعنوان: $uResidence", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    if (uId.isNotEmpty()) {
+                                        Text("🆔 معرف الحساب: $uId", fontSize = 9.sp, color = Color.Gray)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                                        if (!isApproved) {
+                                            Button(
+                                                onClick = { viewModel.approveRegisteredUser(uId, uName) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
+                                                modifier = Modifier.weight(1f).height(36.dp)
+                                            ) {
+                                                Text("قبول الحساب ✅", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = { viewModel.toggleBlockRegisteredUser(uId, isBlocked, uName) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = if (isBlocked) Color(0xFF3B82F6) else Color(0xFFEF4444)),
+                                            modifier = Modifier.weight(1f).height(36.dp)
+                                        ) {
+                                            Text(if (isBlocked) "إلغاء الحظر 🔓" else "حظر الحساب 🚫", color = Color.White, fontSize = 10.sp)
+                                        }
+
+                                        Button(
+                                            onClick = { viewModel.deleteRegisteredUser(uId, uName) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                            modifier = Modifier.weight(1f).height(36.dp)
+                                        ) {
+                                            Text("حذف 🗑️", color = Color.White, fontSize = 10.sp)
                                         }
                                     }
                                 }
@@ -3795,9 +3903,14 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             ) {
                                 listOf(
                                     Pair("ALL", "الجميع 🌍"),
-                                    Pair("USER", "عميل 👤"),
-                                    Pair("PROVIDER", "فني 🔧"),
-                                    Pair("SUPERVISOR", "مشرف 👮"),
+                                    Pair("USER", "العملاء 👤"),
+                                    Pair("PROVIDER", "الفنيون 🔧"),
+                                    Pair("STORE", "المتاجر 🏪"),
+                                    Pair("RESTAURANT", "المطاعم 🍔"),
+                                    Pair("MEDICAL", "المراكز الطبية 🏥"),
+                                    Pair("PROPERTY", "العقارات 🏢"),
+                                    Pair("JOB", "الوظائف 💼"),
+                                    Pair("SUPERVISOR", "المشرفون 👮"),
                                     Pair("AREA", "محافظة 📍")
                                 ).forEach { (type, label) ->
                                     Row(

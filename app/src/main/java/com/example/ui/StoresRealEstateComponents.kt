@@ -887,7 +887,7 @@ fun StoreListItemCard(
                     }
                 }
 
-                // Details & Booking
+                // Details
                 Button(
                     onClick = onClick,
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),

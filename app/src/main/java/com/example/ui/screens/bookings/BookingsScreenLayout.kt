@@ -257,21 +257,25 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                     .fillMaxWidth()
                     .background(themeColors.secondary)
                     .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { viewModel.navigateTo("USER_BROWSE") }) {
+                IconButton(
+                    onClick = { viewModel.navigateTo("USER_BROWSE") },
+                    modifier = Modifier.size(28.dp)
+                ) {
                     Icon(
                         imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
                         contentDescription = "رجوع",
-                        tint = themeColors.accent
+                        tint = themeColors.accent,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "📋 طلباتي وحجوزاتي العاجلة",
                     color = Color.White,
-                    fontSize = 15.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -282,7 +286,7 @@ fun BookingsScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalet
                 .fillMaxSize()
                 .padding(padding)
                 .background(themeColors.background)
-                .padding(16.dp)
+                .padding(6.dp)
         ) {
             if (settingsState.bookingsAccessControl == "DISABLED") {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

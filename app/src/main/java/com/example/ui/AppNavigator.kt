@@ -1000,8 +1000,9 @@ fun AppHeaderBar(
         allNotifications.filter { notif ->
             when (notif.targetType) {
                 "ALL" -> true
-                "USER" -> notif.targetValue == userPhoneState
-                "PROVIDER" -> notif.targetValue == userPhoneState
+                "USER" -> notif.targetValue.isEmpty() || notif.targetValue == userPhoneState
+                "PROVIDER" -> notif.targetValue.isEmpty() || notif.targetValue == userPhoneState
+                "STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB" -> notif.targetValue.isEmpty() || notif.targetValue == userPhoneState
                 "SUPERVISOR" -> adminRoleState != "GUEST"
                 else -> true
             }
@@ -3268,6 +3269,18 @@ fun ProviderCard(
                         Switch(
                             checked = settingsState.showVoiceCallButton,
                             onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showVoiceCallButton = it)) }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📅 زر حجز وتنسيق المواعيد المباشر", color = Color.White, fontSize = 11.sp)
+                        Switch(
+                            checked = settingsState.showBookButton,
+                            onCheckedChange = { viewModel.saveCustomSettingsState(settingsState.copy(showBookButton = it)) }
                         )
                     }
 

@@ -296,6 +296,20 @@ fun ProviderRegisterFormLayout(
         storePhotosList = (storePhotosList + converted).take(5)
     }
 
+    val restPhotosPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<android.net.Uri> ->
+        val converted = uris.map { convertUriToBase64(context, it) }.filter { it.isNotEmpty() }
+        restPhotosList = (restPhotosList + converted).take(5)
+    }
+
+    val medPhotosPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<android.net.Uri> ->
+        val converted = uris.map { convertUriToBase64(context, it) }.filter { it.isNotEmpty() }
+        medPhotosList = (medPhotosList + converted).take(5)
+    }
+
     val propPdfPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: android.net.Uri? ->
@@ -1563,15 +1577,10 @@ fun ProviderRegisterFormLayout(
                 val missing = mutableListOf<String>()
                 if (storeOwnerName.trim().isEmpty()) missing.add("اسم المالك")
                 if (storeName.trim().isEmpty()) missing.add("الاسم التجاري للمحل")
-                if (storeCommercialRegisterNo.trim().isEmpty()) missing.add("رقم السجل التجاري")
                 if (storePhone.trim().isEmpty()) missing.add("رقم هاتف المحل")
-                if (storeDesc.trim().isEmpty()) missing.add("الوصف التفصيلي")
-                if (storeWorkingHours.trim().isEmpty()) missing.add("ساعات العمل")
                 if (storeCity.trim().isEmpty()) missing.add("المحافظة")
                 if (storeAddress.trim().isEmpty()) missing.add("الحي السكني")
-                if (storeCategorySelection.trim().isEmpty()) missing.add("الفئة أو التصنيف")
                 if (storePassword.trim().isEmpty()) missing.add("كلمة المرور")
-                if (storePhotosList.isEmpty()) missing.add("صورة واحدة على الأقل للمحل")
 
                 if (missing.isNotEmpty()) {
                     viewModel.triggerNotification("⚠️ يرجى إكمال الحقول الإلزامية المطلوبة: ${missing.joinToString("، ")}")
@@ -1790,7 +1799,7 @@ fun ProviderRegisterFormLayout(
                     }
                 }
                 if (restPhotosList.size < 5) {
-                    Button(onClick = { storePhotosPicker.launch("image/*") }, colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { restPhotosPicker.launch("image/*") }, colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary), modifier = Modifier.fillMaxWidth()) {
                         Text("إضافة صور المكان والوجبات (${restPhotosList.size}/5)", fontSize = 11.sp, color = Color.White)
                     }
                 }
@@ -1817,12 +1826,9 @@ fun ProviderRegisterFormLayout(
                 if (restOwnerName.trim().isEmpty()) missing.add("اسم المالك")
                 if (restName.trim().isEmpty()) missing.add("اسم المطعم/الكافيه")
                 if (restPhone.trim().isEmpty()) missing.add("رقم الهاتف")
-                if (restDesc.trim().isEmpty()) missing.add("وصف الوجبات والمنيو")
-                if (restWorkingHours.trim().isEmpty()) missing.add("ساعات الدوام")
                 if (restCity.trim().isEmpty()) missing.add("المحافظة")
                 if (restAddress.trim().isEmpty()) missing.add("الحي والشارع")
                 if (restPassword.trim().isEmpty()) missing.add("كلمة المرور")
-                if (restPhotosList.isEmpty()) missing.add("صورة واحدة على الأقل للمطعم أو المأكولات")
 
                 if (missing.isNotEmpty()) {
                     viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول الإلزامية: ${missing.joinToString("، ")}")
@@ -2073,12 +2079,9 @@ fun ProviderRegisterFormLayout(
                 if (propOwnerName.trim().isEmpty()) missing.add("اسم المالك")
                 if (propPhone.trim().isEmpty()) missing.add("رقم هاتف المالك")
                 if (propTitle.trim().isEmpty()) missing.add("عنوان الإعلان")
-                if (propDesc.trim().isEmpty()) missing.add("مواصفات العقار")
-                if (propPrice.trim().isEmpty() || dPrice <= 0.0) missing.add("السعر بشكل صحيح")
                 if (propCity.trim().isEmpty()) missing.add("المحافظة")
                 if (propArea.trim().isEmpty()) missing.add("المنطقة")
                 if (propPassword.trim().isEmpty()) missing.add("كلمة المرور")
-                if (propPhotosList.isEmpty()) missing.add("صورة واحدة على الأقل للعقار")
 
                 if (missing.isNotEmpty()) {
                     viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول الإلزامية: ${missing.joinToString("، ")}")
@@ -2281,6 +2284,41 @@ fun ProviderRegisterFormLayout(
             }
         )
 
+        // Photos
+        Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("🖼️ صور المركز الطبي والعيادة (حد أقصى 5 صور) (اختياري)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                if (medPhotosList.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(medPhotosList.size) { index ->
+                            val photo = medPhotosList[index]
+                            val bitmap = remember(photo) {
+                                try {
+                                    val bytes = android.util.Base64.decode(photo, android.util.Base64.DEFAULT)
+                                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                                } catch(e: Exception) { null }
+                            }
+                            Box(modifier = Modifier.size(70.dp)) {
+                                if (bitmap != null) {
+                                    Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                }
+                                Box(
+                                    modifier = Modifier.size(20.dp).align(Alignment.TopEnd).background(Color.Red, shape = CircleShape)
+                                        .clickable { medPhotosList = medPhotosList.filterIndexed { i, _ -> i != index } },
+                                    contentAlignment = Alignment.Center
+                                ) { Text("×", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                            }
+                        }
+                    }
+                }
+                if (medPhotosList.size < 5) {
+                    Button(onClick = { medPhotosPicker.launch("image/*") }, colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary), modifier = Modifier.fillMaxWidth()) {
+                        Text("إضافة صور المركز الطبي (${medPhotosList.size}/5)", fontSize = 11.sp, color = Color.White)
+                    }
+                }
+            }
+        }
+
         // License PDF
         Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2310,10 +2348,7 @@ fun ProviderRegisterFormLayout(
                 val missing = mutableListOf<String>()
                 if (medOwnerName.trim().isEmpty()) missing.add("اسم الطبيب/المدير")
                 if (medName.trim().isEmpty()) missing.add("اسم المركز الطبي")
-                if (medMedicalLicenseNo.trim().isEmpty()) missing.add("رقم الترخيص الطبي")
                 if (medPhone.trim().isEmpty()) missing.add("رقم الهاتف")
-                if (medDesc.trim().isEmpty()) missing.add("التخصصات المتاحة")
-                if (medWorkingHours.trim().isEmpty()) missing.add("ساعات الدوام والطوارئ")
                 if (medCity.trim().isEmpty()) missing.add("المحافظة")
                 if (medAddress.trim().isEmpty()) missing.add("الحي والشارع")
                 if (medPassword.trim().isEmpty()) missing.add("كلمة المرور")
