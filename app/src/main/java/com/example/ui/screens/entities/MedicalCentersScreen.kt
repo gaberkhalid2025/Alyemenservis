@@ -44,13 +44,25 @@ fun MedicalCentersScreen(
 
     val medicalProviders = remember(providers, searchQuery, selectedCategory) {
         providers.filter { provider ->
-            val isMedical = provider.profession.contains("طب", ignoreCase = true) ||
-                    provider.profession.contains("صيدل", ignoreCase = true) ||
-                    provider.specialization.contains("طب", ignoreCase = true) ||
+            val isMedical = provider.categoryId == "medical" ||
+                    provider.categoryId == "health" ||
                     provider.categoryId.contains("med", ignoreCase = true) ||
                     provider.categoryId.contains("health", ignoreCase = true) ||
                     provider.categoryId.contains("طبي", ignoreCase = true) ||
-                    true // Show in medical centers list for unified view
+                    provider.categoryId.contains("مستشفى", ignoreCase = true) ||
+                    provider.categoryId.contains("صيدل", ignoreCase = true) ||
+                    provider.profession.contains("طب", ignoreCase = true) ||
+                    provider.profession.contains("صيدل", ignoreCase = true) ||
+                    provider.profession.contains("مستشفى", ignoreCase = true) ||
+                    provider.profession.contains("عيادة", ignoreCase = true) ||
+                    provider.profession.contains("مختبر", ignoreCase = true) ||
+                    provider.profession.contains("أشعة", ignoreCase = true) ||
+                    provider.specialization.contains("طب", ignoreCase = true) ||
+                    provider.specialization.contains("صيدل", ignoreCase = true) ||
+                    provider.specialization.contains("عيادة", ignoreCase = true) ||
+                    provider.customCategoryName.contains("طبي", ignoreCase = true) ||
+                    provider.customCategoryName.contains("مستشفى", ignoreCase = true) ||
+                    provider.customCategoryName.contains("صيدلية", ignoreCase = true)
 
             val matchesSearch = searchQuery.isBlank() ||
                     provider.name.contains(searchQuery, ignoreCase = true) ||

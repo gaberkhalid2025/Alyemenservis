@@ -45,6 +45,15 @@ fun UserNotificationsScreen(
 
     val filteredNotifs = remember(allNotifications, userPhone, adminRole) {
         allNotifications.filter { notif ->
+            // Do not show private urgent requests to general visitors
+            if (notif.title.contains("طلب عاجل") || notif.title.contains("حجز عاجل")) {
+                if (userPhone.isBlank()) return@filter false
+                if (notif.targetType == "USER" || notif.targetType == "PROVIDER") {
+                    return@filter notif.targetValue.isEmpty() || notif.targetValue == userPhone
+                }
+                return@filter false
+            }
+            
             when (notif.targetType) {
                 "ALL" -> true
                 "USER" -> notif.targetValue == userPhone
@@ -171,49 +180,74 @@ fun UserNotificationsScreen(
                         val isUnread = !readIds.contains(notif.id)
 
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isUnread) Color(0xFF1E293B) else Color(0xFF151E2E)
+                            ),
                             shape = RoundedCornerShape(14.dp),
-                            border = if (isUnread) BorderStroke(1.5.dp, Color(0xFF10B981)) else BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f)),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isUnread) themeColors.accent.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f)
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = if (isUnread) 4.dp else 1.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { viewModel.markNotificationAsRead(context, notif.id) }
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .padding(14.dp)
+                                    .padding(12.dp)
                                     .fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text(iconText, fontSize = 24.sp, modifier = Modifier.padding(end = 12.dp))
+                                // Icon badge
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isUnread) themeColors.accent.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f),
+                                    border = BorderStroke(0.8.dp, if (isUnread) themeColors.accent else Color.White.copy(alpha = 0.15f)),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(iconText, fontSize = 16.sp)
+                                    }
+                                }
+
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text(
                                             text = notif.title,
-                                            fontSize = 13.sp,
+                                            fontSize = 12.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = themeColors.accent
+                                            color = if (isUnread) themeColors.accent else Color.White
                                         )
                                         if (isUnread) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(Color(0xFF10B981))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFF10B981)
                                             ) {
-                                                Text("جديد", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                Text(
+                                                    "جديد",
+                                                    color = Color.White,
+                                                    fontSize = 8.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
                                             }
                                         }
                                     }
+
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = notif.message,
-                                        fontSize = 12.sp,
-                                        color = Color.White,
-                                        lineHeight = 18.sp
+                                        fontSize = 11.sp,
+                                        color = if (isUnread) Color.White else Color(0xFF94A3B8),
+                                        lineHeight = 16.sp
                                     )
+
                                     Spacer(modifier = Modifier.height(6.dp))
                                     val formattedTime = remember(notif.timestamp) {
                                         try {
@@ -223,22 +257,28 @@ fun UserNotificationsScreen(
                                             ""
                                         }
                                     }
-                                    Text(
-                                        text = formattedTime,
-                                        fontSize = 10.sp,
-                                        color = Color.Gray
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { viewModel.deleteNotification(notif.id) },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "حذف الإشعار",
-                                        tint = Color.Red.copy(alpha = 0.8f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = formattedTime,
+                                            fontSize = 9.5.sp,
+                                            color = Color.Gray
+                                        )
+                                        IconButton(
+                                            onClick = { viewModel.deleteNotification(notif.id) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "حذف الإشعار",
+                                                tint = Color.Red.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

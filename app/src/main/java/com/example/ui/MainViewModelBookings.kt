@@ -328,6 +328,14 @@ fun MainViewModel.attemptCancelBookingImpl(bookingId: String, input: String, rea
                         targetValue = b.providerPhone.ifEmpty { b.customerPhone }
                     )
                 }
+
+                // Add Admin notification for monitoring
+                addNotification(
+                    title = "🚨 إلغاء حجز بواسطة العميل",
+                    message = "قام العميل ${b.customerName} (${b.customerPhone}) بإلغاء الحجز رقم ${b.bookingNumber.ifEmpty { b.id }} الخاص بالفني ${b.providerName}. السبب: $reason",
+                    targetType = "ADMIN_ONLY",
+                    targetValue = ""
+                )
                 onResult(true, "✅ تم إلغاء الحجز بنجاح")
             }.addOnFailureListener {
                 onResult(false, "❌ فشل تحديث حالة الحجز في الخادم")
@@ -358,6 +366,80 @@ fun MainViewModel.attemptCancelBookingImpl(bookingId: String, input: String, rea
         }
     }.addOnFailureListener {
         onResult(false, "❌ فشل الاتصال بقاعدة البيانات")
+    }
+}
+
+fun MainViewModel.cancelBookingByTechnicianImpl(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
+    db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
+        val b = snapshot.toObject(BookingEntity::class.java)
+        if (b != null) {
+            val updated = b.copy(
+                status = "CANCELLED",
+                cancellationReason = "إلغاء من قبل الفني: $reason",
+                cancelledAt = System.currentTimeMillis(),
+                cancelledBy = "PROVIDER",
+                updatedAt = System.currentTimeMillis()
+            )
+            db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
+                _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
+                
+                // Notify Customer
+                addNotification(
+                    title = "🚫 قام الفني بإلغاء حجزك",
+                    message = "عزيزي العميل، اعتذر الفني ${b.providerName} عن إتمام الحجز رقم ${b.bookingNumber.ifEmpty { b.id }}. السبب: $reason",
+                    targetType = "USER",
+                    targetValue = b.customerPhone
+                )
+                
+                // Notify Admin
+                addNotification(
+                    title = "🚨 قام الفني بإلغاء حجز",
+                    message = "قام الفني ${b.providerName} بإلغاء حجز العميل ${b.customerName} (${b.customerPhone}). السبب: $reason",
+                    targetType = "ADMIN_ONLY",
+                    targetValue = ""
+                )
+                triggerNotification("❌ تم إلغاء الحجز وإشعار العميل والإدارة")
+                onComplete()
+            }
+        }
+    }
+}
+
+fun MainViewModel.cancelBookingByAdminImpl(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
+    db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
+        val b = snapshot.toObject(BookingEntity::class.java)
+        if (b != null) {
+            val updated = b.copy(
+                status = "CANCELLED",
+                cancellationReason = "إلغاء من قبل الإدارة: $reason",
+                cancelledAt = System.currentTimeMillis(),
+                cancelledBy = "ADMIN",
+                updatedAt = System.currentTimeMillis()
+            )
+            db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
+                _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
+                
+                // Notify Customer
+                addNotification(
+                    title = "🚫 تم إلغاء حجزك من قبل الإدارة",
+                    message = "عزيزي العميل، تم إلغاء حجزك رقم ${b.bookingNumber.ifEmpty { b.id }} بواسطة إدارة المنصة. السبب: $reason",
+                    targetType = "USER",
+                    targetValue = b.customerPhone
+                )
+                
+                // Notify Technician
+                if (b.providerPhone.isNotBlank()) {
+                    addNotification(
+                        title = "🚫 تم إلغاء حجزك من قبل الإدارة",
+                        message = "الفني العزيز ${b.providerName}، تم إلغاء حجز العميل ${b.customerName} من قبل الإدارة. السبب: $reason",
+                        targetType = "PROVIDER",
+                        targetValue = b.providerPhone
+                    )
+                }
+                triggerNotification("❌ تم إلغاء الحجز وإشعار جميع الأطراف")
+                onComplete()
+            }
+        }
     }
 }
 

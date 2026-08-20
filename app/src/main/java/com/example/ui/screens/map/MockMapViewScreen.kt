@@ -413,37 +413,43 @@ fun MockMapViewScreen(viewModel: MainViewModel, themeColors: VisualThemePalette,
         }
 
         // Apply coordinates filter to get nearby providers
-        val nearbyProviders = providers.filter { p ->
-            val baseCoords = getProviderCoords(p)
-            val walkOffset = dynamicOffsets[p.id] ?: Pair(0.0, 0.0)
-            val liveLat = baseCoords.first + walkOffset.first
-            val liveLng = baseCoords.second + walkOffset.second
+        val nearbyProviders = remember(providers, userCoords, radiusKm, selectedUserCityId, selectedCategoryId, selectedAvailability, selectedMinRating, dynamicOffsets) {
+            providers.filter { p ->
+                val baseCoords = getProviderCoords(p)
+                val walkOffset = dynamicOffsets[p.id] ?: Pair(0.0, 0.0)
+                val liveLat = baseCoords.first + walkOffset.first
+                val liveLng = baseCoords.second + walkOffset.second
 
-            val distMeters = calculateDistanceInMeters(userCoords.first, userCoords.second, liveLat, liveLng)
-            val distKm = (distMeters / 1000f).toDouble()
-            
-            val matchesCategory = selectedCategoryId == null || p.categoryId == selectedCategoryId
-            val matchesAvailability = when (selectedAvailability) {
-                "AVAILABLE" -> p.isAvailable
-                "BUSY" -> !p.isAvailable
-                else -> true
+                val distMeters = calculateDistanceInMeters(userCoords.first, userCoords.second, liveLat, liveLng)
+                val distKm = (distMeters / 1000f).toDouble()
+                
+                val matchesCategory = selectedCategoryId == null || p.categoryId == selectedCategoryId
+                val matchesAvailability = when (selectedAvailability) {
+                    "AVAILABLE" -> p.isAvailable
+                    "BUSY" -> !p.isAvailable
+                    else -> true
+                }
+                val matchesRating = p.rating >= selectedMinRating.toDouble()
+                
+                distKm <= radiusKm.toDouble() && p.cityId == selectedUserCityId && (p.isVip || p.subscriptionStatus == "APPROVED") && matchesCategory && matchesAvailability && matchesRating && !p.isBlocked
             }
-            val matchesRating = p.rating >= selectedMinRating.toDouble()
-            
-            distKm <= radiusKm.toDouble() && p.cityId == selectedUserCityId && (p.isVip || p.subscriptionStatus == "APPROVED") && matchesCategory && matchesAvailability && matchesRating && !p.isBlocked
         }
 
-        val nearbyStores = stores.filter { s ->
-            val distMeters = calculateDistanceInMeters(userCoords.first, userCoords.second, s.latitude, s.longitude)
-            val distKm = distMeters / 1000.0
-            val matchesCategory = selectedCategoryId == null || s.categoryId == selectedCategoryId
-            distKm <= radiusKm.toDouble() && s.cityId == selectedUserCityId && matchesCategory && !s.isDeleted
+        val nearbyStores = remember(stores, userCoords, radiusKm, selectedUserCityId, selectedCategoryId) {
+            stores.filter { s ->
+                val distMeters = calculateDistanceInMeters(userCoords.first, userCoords.second, s.latitude, s.longitude)
+                val distKm = distMeters / 1000.0
+                val matchesCategory = selectedCategoryId == null || s.categoryId == selectedCategoryId
+                distKm <= radiusKm.toDouble() && s.cityId == selectedUserCityId && matchesCategory && !s.isDeleted
+            }
         }
 
-        val nearbyProperties = properties.filter { pr ->
-            val distMeters = calculateDistanceInMeters(userCoords.first, userCoords.second, pr.latitude, pr.longitude)
-            val distKm = distMeters / 1000.0
-            distKm <= radiusKm.toDouble() && pr.cityId == selectedUserCityId && !pr.isDeleted
+        val nearbyProperties = remember(properties, userCoords, radiusKm, selectedUserCityId) {
+            properties.filter { pr ->
+                val distMeters = calculateDistanceInMeters(userCoords.first, userCoords.second, pr.latitude, pr.longitude)
+                val distKm = distMeters / 1000.0
+                distKm <= radiusKm.toDouble() && pr.cityId == selectedUserCityId && !pr.isDeleted
+            }
         }
 
         // --- MAP CONTAINER OVERLAY ---
@@ -455,30 +461,28 @@ fun MockMapViewScreen(viewModel: MainViewModel, themeColors: VisualThemePalette,
                 .background(Color(0xFF0B0F19)) // Space dark color
         ) {
             if (activeMapType == "OSM") {
-                key(userCoords, nearbyProviders.size + nearbyStores.size + nearbyProperties.size) {
-                    RealLeafletMapView(
-                        userCoords = userCoords,
-                        nearbyProviders = nearbyProviders,
-                        nearbyStores = nearbyStores,
-                        nearbyProperties = nearbyProperties,
-                        dynamicOffsets = dynamicOffsets,
-                        onProviderSelected = { 
-                            selectedProviderForMap = it
-                            selectedStoreForMap = null
-                            selectedPropertyForMap = null
-                        },
-                        onStoreSelected = {
-                            selectedStoreForMap = it
-                            selectedProviderForMap = null
-                            selectedPropertyForMap = null
-                        },
-                        onPropertySelected = {
-                            selectedPropertyForMap = it
-                            selectedProviderForMap = null
-                            selectedStoreForMap = null
-                        }
-                    )
-                }
+                RealLeafletMapView(
+                    userCoords = userCoords,
+                    nearbyProviders = nearbyProviders,
+                    nearbyStores = nearbyStores,
+                    nearbyProperties = nearbyProperties,
+                    dynamicOffsets = dynamicOffsets,
+                    onProviderSelected = { 
+                        selectedProviderForMap = it
+                        selectedStoreForMap = null
+                        selectedPropertyForMap = null
+                    },
+                    onStoreSelected = {
+                        selectedStoreForMap = it
+                        selectedProviderForMap = null
+                        selectedPropertyForMap = null
+                    },
+                    onPropertySelected = {
+                        selectedPropertyForMap = it
+                        selectedProviderForMap = null
+                        selectedStoreForMap = null
+                    }
+                )
             } else {
                 // Radar Vector Canvas Mode
                 Box(

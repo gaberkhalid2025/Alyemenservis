@@ -587,103 +587,121 @@ fun MapScreen(
                 }
             }
 
-            // 4. FLOATING ACTION CONTROLS (Right Side Overlay)
-            Column(
+            // 4. FLOATING ACTION CONTROLS (Unified Sleek Vertical Toolbar)
+            Surface(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 12.dp, top = 220.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(end = 10.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.92f),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
+                shadowElevation = 8.dp
             ) {
-                // Re-center Button
-                FloatingActionButton(
-                    onClick = {
-                        val sanaa = getCityCenterCoords("ye_san")
-                        userLat = sanaa.first
-                        userLng = sanaa.second
-                        Toast.makeText(context, "📍 تم إعادة التمركز في صنعاء", Toast.LENGTH_SHORT).show()
-                    },
-                    containerColor = Color(0xFF0F172A),
-                    contentColor = Color(0xFFF59E0B),
-                    modifier = Modifier.size(44.dp)
+                Column(
+                    modifier = Modifier.padding(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = "تمركز")
-                }
+                    // Re-center Button
+                    IconButton(
+                        onClick = {
+                            val sanaa = getCityCenterCoords("ye_san")
+                            userLat = sanaa.first
+                            userLng = sanaa.second
+                            Toast.makeText(context, "📍 تم إعادة التمركز في صنعاء", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.Default.LocationOn, contentDescription = "تمركز", tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                    }
 
-                // Zoom In
-                FloatingActionButton(
-                    onClick = { mapZoom = (mapZoom + 1).coerceAtMost(18) },
-                    containerColor = Color(0xFF0F172A),
-                    contentColor = Color.White,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "تكبير")
-                }
+                    HorizontalDivider(color = Color(0xFF334155), modifier = Modifier.width(24.dp), thickness = 0.8.dp)
 
-                // Zoom Out
-                FloatingActionButton(
-                    onClick = { mapZoom = (mapZoom - 1).coerceAtLeast(5) },
-                    containerColor = Color(0xFF0F172A),
-                    contentColor = Color.White,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(Icons.Default.Clear, contentDescription = "تصغير")
-                }
+                    // Zoom In
+                    IconButton(
+                        onClick = { mapZoom = (mapZoom + 1).coerceAtMost(18) },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "تكبير", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
 
-                // Closest Suggestions Button
-                FloatingActionButton(
-                    onClick = { showClosestSuggestions = !showClosestSuggestions },
-                    containerColor = Color(0xFFF59E0B),
-                    contentColor = Color.Black,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(Icons.Default.Star, contentDescription = "مقترحات")
-                }
+                    // Zoom Out
+                    IconButton(
+                        onClick = { mapZoom = (mapZoom - 1).coerceAtLeast(5) },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.Default.Clear, contentDescription = "تصغير", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
 
-                // Share Location Button
-                FloatingActionButton(
-                    onClick = {
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, "📍 موقعي الحالي على خريطة دليل خدمات اليمن: https://maps.google.com/?q=$userLat,$userLng")
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "مشاركة موقعي"))
-                    },
-                    containerColor = Color(0xFF059669),
-                    contentColor = Color.White,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "مشاركة")
+                    HorizontalDivider(color = Color(0xFF334155), modifier = Modifier.width(24.dp), thickness = 0.8.dp)
+
+                    // Closest Suggestions Button
+                    IconButton(
+                        onClick = { showClosestSuggestions = !showClosestSuggestions },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(if (showClosestSuggestions) Color(0xFFF59E0B) else Color.Transparent, CircleShape)
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = "مقترحات", tint = if (showClosestSuggestions) Color.Black else Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                    }
+
+                    // Share Location Button
+                    IconButton(
+                        onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, "📍 موقعي الحالي على خريطة دليل خدمات اليمن: https://maps.google.com/?q=$userLat,$userLng")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "مشاركة موقعي"))
+                        },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "مشاركة", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                    }
                 }
             }
 
-            // 5. QUICK CITY SELECTOR (Bottom Left Floating)
-            LazyRow(
+            // 5. QUICK CITY SELECTOR (Modern Glassmorphic Pills)
+            Surface(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = if (selectedProvider != null || selectedStore != null || selectedProperty != null) 210.dp else 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(start = 10.dp, bottom = if (selectedProvider != null || selectedStore != null || selectedProperty != null) 210.dp else 24.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF0F172A).copy(alpha = 0.88f),
+                border = BorderStroke(0.8.dp, Color(0xFF334155))
             ) {
-                val cities = listOf(
-                    "صنعاء" to Pair(15.3694, 44.1910),
-                    "عدن" to Pair(12.7855, 45.0186),
-                    "تعز" to Pair(13.5794, 44.0205),
-                    "الحديدة" to Pair(14.7979, 42.9530),
-                    "حضرموت" to Pair(14.5424, 49.1242)
-                )
-                items(cities) { (cityName, coords) ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF0F172A).copy(alpha = 0.9f))
-                            .border(1.dp, Color(0xFF334155), RoundedCornerShape(12.dp))
-                            .clickable {
+                LazyRow(
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val cities = listOf(
+                        "صنعاء" to Pair(15.3694, 44.1910),
+                        "عدن" to Pair(12.7855, 45.0186),
+                        "تعز" to Pair(13.5794, 44.0205),
+                        "الحديدة" to Pair(14.7979, 42.9530),
+                        "حضرموت" to Pair(14.5424, 49.1242)
+                    )
+                    items(cities) { (cityName, coords) ->
+                        val isNear = kotlin.math.abs(userLat - coords.first) < 0.2 && kotlin.math.abs(userLng - coords.second) < 0.2
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isNear) Color(0xFFF59E0B) else Color(0xFF1E293B),
+                            border = BorderStroke(0.6.dp, if (isNear) Color.Transparent else Color(0xFF334155)),
+                            modifier = Modifier.clickable {
                                 userLat = coords.first
                                 userLng = coords.second
                                 Toast.makeText(context, "📍 الانتقال إلى $cityName", Toast.LENGTH_SHORT).show()
                             }
-                            .padding(horizontal = 8.dp, vertical = 5.dp)
-                    ) {
-                        Text("📍 $cityName", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        ) {
+                            Text(
+                                text = "📍 $cityName",
+                                fontSize = 10.sp,
+                                color = if (isNear) Color.Black else Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }

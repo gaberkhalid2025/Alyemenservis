@@ -115,6 +115,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     val jobs by viewModel.jobs.collectAsState()
     val jobApplications by viewModel.jobApplications.collectAsState()
     val registeredUsersList by viewModel.registeredUsersList.collectAsState()
+    val instantRequests by viewModel.instantRequests.collectAsState()
+    val requestOffers by viewModel.requestOffers.collectAsState()
 
     var inputPasscode by remember { mutableStateOf("") }
     var isAuthorized by remember(adminRole) { mutableStateOf(adminRole != "GUEST") }
@@ -1744,6 +1746,25 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                     Text("💬 المحادثات الفعالة", fontSize = 10.sp, color = themeColors.textSecondary)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text("${chatChannels.size}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF06B6D4))
+                                }
+                            }
+                        }
+
+                        // Live Instant Requests Statistics Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                            border = BorderStroke(1.dp, Color(0xFF10B981)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("⚡ إحصائيات الطلبات الفورية والمزايدات المباشرة (Live Stats):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                    Text("إجمالي الطلبات الفورية: ${instantRequests.size}", fontSize = 10.sp, color = Color.White)
+                                    Text("قيد المزايدة النشطة: ${instantRequests.count { it.status == "WAITING_FOR_OFFERS" || it.status == "REVIEWING_OFFERS" }}", fontSize = 10.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold)
+                                }
+                                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                    Text("عروض المزايدة المقدمة: ${requestOffers.size}", fontSize = 10.sp, color = Color.LightGray)
+                                    Text("الطلبات المنفذة بنجاح: ${instantRequests.count { it.status == "COMPLETED" || it.status == "ACCEPTED" }}", fontSize = 10.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

@@ -49,7 +49,9 @@ fun RestaurantsScreen(
                     store.categoryId.contains("food", ignoreCase = true) ||
                     store.categoryId.contains("مطعم", ignoreCase = true) ||
                     store.categoryId.contains("وجب", ignoreCase = true) ||
-                    true // Show in restaurants list for unified view
+                    store.name.contains("مطعم", ignoreCase = true) ||
+                    store.name.contains("كافيه", ignoreCase = true) ||
+                    store.name.contains("وجبات", ignoreCase = true)
 
             val matchesSearch = searchQuery.isBlank() ||
                     store.name.contains(searchQuery, ignoreCase = true) ||

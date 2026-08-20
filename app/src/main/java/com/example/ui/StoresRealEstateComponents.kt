@@ -84,21 +84,21 @@ fun SmartRecommendationsSection(
     val activeStores = remember(stores) { stores.filter { it.isActive && !it.isDeleted } }
     val activeProps = remember(properties) { properties.filter { it.isActive && !it.isDeleted } }
 
-    // Logic: Pinned by admin only
+    // Logic: Recommended or Pinned by Admin ONLY
     val recommendedStores = remember(activeStores, settingsState.isStoresEnabled) {
         if (!settingsState.isStoresEnabled) emptyList()
-        else activeStores.filter { it.isPinned }
+        else activeStores.filter { it.isRecommended || it.isPinned }
             .sortedWith(compareByDescending<StoreEntity> { it.rating }
                 .thenByDescending { it.createdAt })
-            .take(5)
+            .take(10)
     }
 
     val recommendedProps = remember(activeProps, settingsState.isPropertiesEnabled) {
         if (!settingsState.isPropertiesEnabled) emptyList()
-        else activeProps.filter { it.isPinned }
+        else activeProps.filter { it.isRecommended || it.isPinned }
             .sortedWith(compareByDescending<PropertyEntity> { it.rating }
                 .thenByDescending { it.createdAt })
-            .take(5)
+            .take(10)
     }
 
     if (recommendedStores.isNotEmpty() || recommendedProps.isNotEmpty()) {
@@ -140,9 +140,11 @@ fun SmartRecommendationsSection(
                         RecommendationItemCard(
                             title = store.name,
                             subtitle = store.description,
-                            image = store.logoImage.ifEmpty { store.coverImage },
+                            coverImage = store.coverImage.ifEmpty { store.logoImage },
+                            avatarImage = store.logoImage,
                             rating = store.rating,
                             badge = "متجر مميز",
+                            badgeColor = Color(0xFFF59E0B),
                             themeColors = themeColors,
                             onClick = { onStoreClick(store) }
                         )
@@ -152,9 +154,11 @@ fun SmartRecommendationsSection(
                         RecommendationItemCard(
                             title = prop.title,
                             subtitle = "${prop.price} YER - $label",
-                            image = prop.images.firstOrNull() ?: "",
+                            coverImage = prop.images.firstOrNull() ?: "",
+                            avatarImage = "",
                             rating = prop.rating,
                             badge = "عقار متميز",
+                            badgeColor = Color(0xFF10B981),
                             themeColors = themeColors,
                             onClick = { onPropertyClick(prop) }
                         )
@@ -169,72 +173,170 @@ fun SmartRecommendationsSection(
 fun RecommendationItemCard(
     title: String,
     subtitle: String,
-    image: String,
+    coverImage: String,
+    avatarImage: String,
     rating: Float,
     badge: String,
+    badgeColor: Color = Color(0xFFF59E0B),
     themeColors: VisualThemePalette,
     onClick: () -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
-        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(0.8.dp, themeColors.accent.copy(alpha = 0.25f)),
         modifier = Modifier
-            .width(160.dp)
+            .width(170.dp)
+            .height(200.dp)
             .clickable { onClick() }
-            .border(1.dp, themeColors.accent.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Dual-image layout: Cover Banner + Avatar Overlay
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(90.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.DarkGray)
+                    .height(95.dp)
             ) {
-                if (image.isNotEmpty()) {
-                    // Simulating high-quality local image load placeholder
-                    Box(modifier = Modifier.fillMaxSize().background(themeColors.primary.copy(alpha = 0.2f))) {
-                        Text(
-                            text = "📸",
-                            modifier = Modifier.align(Alignment.Center),
-                            fontSize = 24.sp
+                // 1. Cover image / Banner background
+                if (coverImage.isNotBlank()) {
+                    AsyncImage(
+                        model = coverImage,
+                        contentDescription = title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(themeColors.primary.copy(alpha = 0.6f), Color(0xFF1E293B))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = themeColors.accent.copy(alpha = 0.4f),
+                            modifier = Modifier.size(32.dp)
                         )
                     }
-                } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Default.Home, contentDescription = null, tint = Color.Gray)
-                    }
                 }
+
+                // Dark gradient overlay on top for badge readability
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(alpha = 0.4f), Color.Transparent, Color.Black.copy(alpha = 0.6f))
+                            )
+                        )
+                )
+
+                // Top Badge
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .background(themeColors.accent, RoundedCornerShape(bottomEnd = 8.dp))
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(badgeColor.copy(alpha = 0.9f))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    Text(badge, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    Text(badge, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                }
+
+                // Rating Badge Top-End
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⭐", fontSize = 8.sp)
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(String.format("%.1f", rating), fontSize = 9.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Circular Logo/Avatar Overlay at Bottom-Start
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 8.dp, bottom = 4.dp)
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(themeColors.surface)
+                        .border(1.5.dp, themeColors.accent, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarImage.isNotBlank()) {
+                        AsyncImage(
+                            model = avatarImage,
+                            contentDescription = title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    } else {
+                        Text(
+                            text = title.take(1).ifEmpty { "🏪" },
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColors.accent
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = title,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = subtitle,
-                fontSize = 9.sp,
-                color = themeColors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("⭐", fontSize = 10.sp)
-                Spacer(modifier = Modifier.width(3.dp))
-                Text(String.format("%.1f", rating), fontSize = 10.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+            // Card Body Content (Title, Subtitle & Action)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = title,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle.ifEmpty { "خدمات متكاملة وعروض متميزة" },
+                        fontSize = 9.5.sp,
+                        color = themeColors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 13.sp
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = themeColors.accent.copy(alpha = 0.15f),
+                    border = BorderStroke(0.7.dp, themeColors.accent.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "عرض التفاصيل 🔍",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.accent,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 3.dp)
+                    )
+                }
             }
         }
     }
@@ -315,13 +417,34 @@ fun StoresTabContent(
     var itemsToShowLimit by remember { mutableStateOf(10) }
 
     val activeStores = remember(stores, searchQuery, selectedCityId, selectedCatId, sectionId) {
-        stores.filter {
-            !it.isDeleted &&
-            (it.sectionId == sectionId || (sectionId == "medical" && it.sectionId == "centers") || (sectionId == "centers" && it.sectionId == "medical")) &&
-            (it.isActive || adminRole != "GUEST" || it.ownerId == currentPhone) &&
-            (searchQuery.isEmpty() || it.name.contains(searchQuery, true) || it.description.contains(searchQuery, true)) &&
-            (selectedCityId.isEmpty() || it.cityId == selectedCityId) &&
-            (selectedCatId.isEmpty() || it.categoryId == selectedCatId)
+        stores.filter { store ->
+            if (store.isDeleted) return@filter false
+            
+            val sec = store.sectionId.lowercase()
+            val name = store.name.lowercase()
+            val desc = store.description.lowercase()
+            val cat = store.categoryId.lowercase()
+
+            val isFoodOrRest = sec == "restaurants" || sec == "food" || cat == "restaurants" || cat == "food" ||
+                    name.contains("مطعم") || name.contains("كافيه") || name.contains("وجبات") || name.contains("أسماك") || name.contains("مأكولات") || name.contains("شاورما") || name.contains("بيتزا") ||
+                    desc.contains("مطعم") || desc.contains("وجبات") || desc.contains("أسماك") || desc.contains("كافيه")
+
+            val isMedical = sec == "medical" || sec == "centers" || cat == "medical" || cat == "centers" ||
+                    name.contains("مستشفى") || name.contains("عيادة") || name.contains("مركز طبي") || name.contains("مختبر") || name.contains("صيدلية") ||
+                    desc.contains("مستشفى") || desc.contains("عيادة") || desc.contains("طبي")
+
+            val matchesSection = when (sectionId.lowercase()) {
+                "restaurants", "food" -> isFoodOrRest
+                "medical", "centers" -> isMedical
+                "stores", "shops", "malls" -> !isFoodOrRest && !isMedical
+                else -> store.sectionId == sectionId
+            }
+
+            matchesSection &&
+            (store.isActive || adminRole != "GUEST" || store.ownerId == currentPhone) &&
+            (searchQuery.isEmpty() || store.name.contains(searchQuery, true) || store.description.contains(searchQuery, true)) &&
+            (selectedCityId.isEmpty() || store.cityId == selectedCityId) &&
+            (selectedCatId.isEmpty() || store.categoryId == selectedCatId)
         }.sortedWith(compareByDescending<StoreEntity> { it.isPinned }.thenBy { it.displayOrder })
     }
 

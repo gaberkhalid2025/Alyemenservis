@@ -45,6 +45,11 @@ fun StoresScreen(
 
     val filteredStores = remember(stores, searchQuery, selectedCategory) {
         stores.filter { store ->
+            val isPureStore = store.sectionId != "restaurants" &&
+                    !store.categoryId.contains("rest", ignoreCase = true) &&
+                    !store.categoryId.contains("food", ignoreCase = true) &&
+                    !store.name.contains("مطعم", ignoreCase = true)
+
             val matchesSearch = searchQuery.isBlank() ||
                     store.name.contains(searchQuery, ignoreCase = true) ||
                     store.localNeighborhood.contains(searchQuery, ignoreCase = true) ||
@@ -52,7 +57,7 @@ fun StoresScreen(
 
             val matchesCat = selectedCategory == "الكل" || store.categoryId.contains(selectedCategory, ignoreCase = true)
 
-            matchesSearch && matchesCat
+            isPureStore && matchesSearch && matchesCat
         }
     }
 

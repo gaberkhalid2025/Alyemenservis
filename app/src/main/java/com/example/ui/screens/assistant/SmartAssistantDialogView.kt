@@ -428,19 +428,64 @@ fun SmartAssistantDialogView(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                // Quick Suggestion Chips (Prompting shortcuts)
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val quickPrompts = listOf(
+                        "🔧 أقرب سباك معتمد",
+                        "⚡ كهربائي منازل فوري",
+                        "❄️ صيانة وتعبئة تكييف",
+                        "🩺 طبيب استشاري",
+                        "🚗 ميكانيكي سيارات متنقل",
+                        "🧹 شركة نظافة وتعقيم"
+                    )
+                    items(quickPrompts) { prompt ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(themeColors.surface.copy(alpha = 0.9f))
+                                .border(0.8.dp, themeColors.accent.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    typedText = prompt.substringAfter(" ")
+                                }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = prompt,
+                                fontSize = 9.5.sp,
+                                color = themeColors.accent,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
-                // Control panel
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Control panel (Floating Input Dock)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF1E293B), RoundedCornerShape(24.dp))
+                        .border(1.dp, themeColors.accent.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
                         value = typedText,
                         onValueChange = { typedText = it },
-                        placeholder = { Text("اطرح أي سؤال حول خدمات اليمن...", fontSize = 11.sp) },
+                        placeholder = { Text("اكتب سؤالك أو اطلب خدمة هنا...", fontSize = 11.sp, color = Color.Gray) },
                         modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent
+                        ),
                         singleLine = true,
                         trailingIcon = if (settings.allowVoiceInputAssistant) {
                             {

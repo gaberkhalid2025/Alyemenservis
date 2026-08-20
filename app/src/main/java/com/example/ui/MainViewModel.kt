@@ -179,7 +179,7 @@ class MainViewModel : ViewModel() {
     val isProviderUser: Boolean
         get() = selectedProvider != null || selectedStore != null || selectedProperty != null
 
-    private val _isInitialized = MutableStateFlow(false)
+    private val _isInitialized = MutableStateFlow(true)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
     private val _isOnline = MutableStateFlow(true)
@@ -339,6 +339,14 @@ class MainViewModel : ViewModel() {
 
     private val _filterAvailableOnly = MutableStateFlow(false)
     val filterAvailableOnly: StateFlow<Boolean> = _filterAvailableOnly.asStateFlow()
+
+    internal val _filterByCurrentCityOnly = MutableStateFlow(false)
+    val filterByCurrentCityOnly: StateFlow<Boolean> = _filterByCurrentCityOnly.asStateFlow()
+
+    fun toggleFilterByCurrentCityOnly(enabled: Boolean? = null) {
+        _filterByCurrentCityOnly.value = enabled ?: !_filterByCurrentCityOnly.value
+        applyFilters()
+    }
 
     private val _filterCityId = MutableStateFlow<String?>(null)
     val filterCityId: StateFlow<String?> = _filterCityId.asStateFlow()
@@ -527,6 +535,11 @@ class MainViewModel : ViewModel() {
     }
 
     fun approveRegisteredUser(userId: String, userName: String = "") {
+        _registeredUsersList.value = _registeredUsersList.value.map { u ->
+            if (u["id"]?.toString() == userId) {
+                u.toMutableMap().apply { put("isApproved", true) }
+            } else u
+        }
         db.collection("registered_users").document(userId).update("isApproved", true)
             .addOnSuccessListener {
                 triggerNotification("✅ تم قبول وتأكيد طلب انضمام المستخدم $userName بنجاح من قبل الأدمن!")
@@ -535,6 +548,11 @@ class MainViewModel : ViewModel() {
 
     fun toggleBlockRegisteredUser(userId: String, currentBlocked: Boolean, userName: String = "") {
         val newBlockedState = !currentBlocked
+        _registeredUsersList.value = _registeredUsersList.value.map { u ->
+            if (u["id"]?.toString() == userId) {
+                u.toMutableMap().apply { put("isBlocked", newBlockedState) }
+            } else u
+        }
         db.collection("registered_users").document(userId).update("isBlocked", newBlockedState)
             .addOnSuccessListener {
                 val actionText = if (newBlockedState) "حظر" else "إلغاء حظر"
@@ -543,6 +561,7 @@ class MainViewModel : ViewModel() {
     }
 
     fun deleteRegisteredUser(userId: String, userName: String = "") {
+        _registeredUsersList.value = _registeredUsersList.value.filter { u -> u["id"]?.toString() != userId }
         db.collection("registered_users").document(userId).delete()
             .addOnSuccessListener {
                 triggerNotification("🗑️ تم حذف حساب المستخدم $userName من القاعدة بنجاح.")
@@ -1166,17 +1185,32 @@ class MainViewModel : ViewModel() {
                         if (obj != null) {
                             val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
                             val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
+                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: act
                             val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
-                            obj.copy(id = doc.id, isDeleted = isDel, isActive = act, isPinned = pin)
+                            val vip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true
+                            val rec = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true
+                            val ver = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true
+                            val blk = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
+                            val chatDis = doc.getBoolean("isChatDisabled") == true || doc.getBoolean("chatDisabled") == true
+                            obj.copy(
+                                id = doc.id,
+                                isDeleted = isDel,
+                                isActive = act,
+                                isApproved = appr,
+                                isPinned = pin,
+                                isVip = vip,
+                                isRecommended = rec,
+                                isVerified = ver,
+                                isBlocked = blk,
+                                isChatDisabled = chatDis
+                            )
                         } else null
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
                     }
                 }
-                val defStores = getDefaultStoresList()
-                val merged = (fetched + defStores.filter { def -> fetched.none { it.id == def.id } })
-                _stores.value = merged
+                _stores.value = fetched.filter { !it.isDeleted }
             }
         }
 
@@ -1195,7 +1229,7 @@ class MainViewModel : ViewModel() {
                         null
                     }
                 }
-                _products.value = fetched
+                _products.value = fetched.filter { !it.isDeleted }
             }
         }
 
@@ -1208,17 +1242,30 @@ class MainViewModel : ViewModel() {
                         if (obj != null) {
                             val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
                             val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
+                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: act
                             val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
-                            obj.copy(id = doc.id, isDeleted = isDel, isActive = act, isPinned = pin)
+                            val vip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true
+                            val rec = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true
+                            val ver = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true
+                            val blk = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
+                            obj.copy(
+                                id = doc.id,
+                                isDeleted = isDel,
+                                isActive = act,
+                                isApproved = appr,
+                                isPinned = pin,
+                                isVip = vip,
+                                isRecommended = rec,
+                                isVerified = ver,
+                                isBlocked = blk
+                            )
                         } else null
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
                     }
                 }
-                val defProps = getDefaultPropertiesList()
-                val merged = (fetched + defProps.filter { def -> fetched.none { it.id == def.id } })
-                _properties.value = merged
+                _properties.value = fetched.filter { !it.isDeleted }
             }
         }
 
@@ -1555,175 +1602,31 @@ class MainViewModel : ViewModel() {
     }
 
     private fun writeDefaultProviders() {
-        val fbProviders = listOf(
-            ProviderEntity("p_amin", "أمين الغرباني", "777703195", "1", "صنعاء", true, "APPROVED", true, "ye_san", "منطقة الدائري جوار مدرسة أسماء للبنات", 5.0f, 300, previewPrice = 1500.0, latitude = 15.3694, longitude = 44.1910, subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000))
-        )
-        fbProviders.forEach { prov ->
-            db.collection("providers").document(prov.id).set(prov)
-        }
+        // Empty - No fake mock providers
     }
 
     fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
-        return listOf(
-            com.example.data.StoreEntity(
-                id = "store_city_mart", sectionId = "stores", name = "سيتي مارت - صنعاء (City Mart Supermarket)",
-                description = "أضخم سوبرماركت ومركز تجاري متكامل في صنعاء (شارع حدة/السبعين). يوفر كافة المستلزمات العائلية والمواد الغذائية والأجهزة المنزلية والمنتجات الاستهلاكية بأقل الأسعار والتخفيضات اليومية.",
-                ownerId = "owner_city_mart", ownerName = "إدارة سيتي مارت - صنعاء", phone = "777111222", password = "Maher123",
-                categoryId = "sub_store_4", cityId = "ye_san", localNeighborhood = "صنعاء - شارع حدة - تقاطع الرويشان",
-                rating = 4.9f, numReviews = 480, isActive = true, isPinned = true, displayOrder = 1,
-                workingHours = "7:00 AM - 12:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
-                coverImage = "https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800",
-                logoImage = "https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=400",
-                images = listOf("https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800", "https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=400")
-            ),
-            com.example.data.StoreEntity(
-                id = "restaurant_shaibani", sectionId = "restaurants", name = "مطعم الشيباني الملكي - صنعاء",
-                description = "أعرق وأفخم المطاعم الملكية في أمانة العاصمة صنعاء. نقدم المأكولات اليمنية والشرقية الأصلية: السلتة والفحسة الصنعانية الساخنة، أطباق اللحم البلدي والمندي، المشويات والمأكولات البحرية العصرية.",
-                ownerId = "owner_shaibani", ownerName = "إدارة مطاعم الشيباني الملكية", phone = "777333444", password = "Maher123",
-                categoryId = "sub_rest_1", cityId = "ye_san", localNeighborhood = "صنعاء - شارع الزبيري - جوار تقاطع حدة",
-                rating = 4.9f, numReviews = 620, isActive = true, isPinned = true, displayOrder = 2,
-                workingHours = "10:00 AM - 1:00 AM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
-                coverImage = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800",
-                logoImage = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=400",
-                images = listOf("https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800")
-            ),
-            com.example.data.StoreEntity(
-                id = "medical_mutawakkil", sectionId = "medical", name = "مستشفى د. عبدالقادر المتوكل النموذجي - صنعاء",
-                description = "من أحدث المراكز والمستشفيات الطبية النموذجية في اليمن. يقدم رعاية صحية متكاملة عبر نخبة من استشاريي الطب في الباطنية، جراحة القلب، الأطفال، العظام، والطوارئ والعناية المركزة 24/7.",
-                ownerId = "owner_mutawakkil", ownerName = "د. عبدالقادر المتوكل", phone = "777777888", password = "Maher123",
-                categoryId = "sub_center_2", cityId = "ye_san", localNeighborhood = "صنعاء - شارع بغداد - مقابل مركز العاصمة",
-                rating = 4.9f, numReviews = 540, isActive = true, isPinned = true, displayOrder = 3,
-                workingHours = "طوارئ 24/7 - العيادات (8:00 AM - 8:00 PM)", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
-                coverImage = "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?q=80&w=800",
-                logoImage = "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=400",
-                images = listOf("https://images.unsplash.com/photo-1586773860418-d37222d8fce3?q=80&w=800")
-            ),
-            com.example.data.StoreEntity(
-                id = "medical_awalqi_lab", sectionId = "medical", name = "مختبرات العولقي الطبية المركزية - صنعاء",
-                description = "المختبر الطبي المرجعي الأول والأحدث في صنعاء. أجهزة آلية متطورة ودقة متناهية في فحوصات الدم، الهرمونات، الفيروسات، والأنسجة بأعلى معايير الجودة العالمية.",
-                ownerId = "owner_awalqi", ownerName = "د. صادق العولقي", phone = "777888999", password = "Maher123",
-                categoryId = "sub_center_2", cityId = "ye_san", localNeighborhood = "صنعاء - شارع الزبيري - مقابل مستشفى الجمهوري",
-                rating = 4.9f, numReviews = 410, isActive = true, isPinned = true, displayOrder = 4,
-                workingHours = "7:00 AM - 11:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
-                coverImage = "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?q=80&w=800",
-                logoImage = "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=400",
-                images = listOf("https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?q=80&w=800")
-            ),
-            com.example.data.StoreEntity(
-                id = "medical_pearl_dental", sectionId = "medical", name = "عيادة لؤلؤة صنعاء لطب وجراحة الأسنان",
-                description = "مركز متخصص في تجميل، زراعة، وتقويم الأسنان وتبييض الليزر الزوم. أحدث التقنيات وأفضل الكوادر الطبية المتخصصة لابتسامة ساحرة بدون ألم.",
-                ownerId = "owner_pearl", ownerName = "د. رزان الريمي", phone = "777999000", password = "Maher123",
-                categoryId = "sub_center_1", cityId = "ye_san", localNeighborhood = "صنعاء - شارع حدة - العمارة البيضاء",
-                rating = 4.8f, numReviews = 310, isActive = true, isPinned = true, displayOrder = 5,
-                workingHours = "9:00 AM - 8:00 PM", isApproved = true, isVip = true, isVerified = true, isRecommended = true,
-                coverImage = "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=800",
-                logoImage = "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=400",
-                images = listOf("https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=800")
-            )
-        )
+        return emptyList()
     }
 
     fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> {
-        return listOf(
-            com.example.data.PropertyEntity(
-                id = "property_hadda_center", sectionId = "properties",
-                title = "مركز حدة العقاري المتميز - صنعاء (شقق، فيلات، محلات، أراضي)",
-                description = "أكبر وكالة عقارية معتمدة في العاصمة صنعاء. توفر أفضل الشقق الفاخرة للإيجار والبيع، الفلل المودرن، والمحلات التجارية والأراضي الاستثمارية في أرقى أحياء صنعاء (حدة، الأصبحي، شارع بغداد، الحي السياسي).",
-                price = 250000.0, currency = "YER", type = "rent", propertyType = "apartment",
-                ownerId = "owner_hadda", ownerName = "الشيخ عبدالرحمن الحداد", phone = "777555666", password = "Maher123",
-                cityId = "ye_san", localNeighborhood = "صنعاء - شارع حدة الرئيسي - جوار فندق حدة",
-                rating = 4.9f, numReviews = 190, isActive = true, isPinned = true, displayOrder = 1,
-                isApproved = true, isVip = true, isVerified = true, isRecommended = true,
-                images = listOf("https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=800", "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800")
-            )
-        )
+        return emptyList()
     }
 
     private fun writeDefaultStores() {
-        val fbStores = getDefaultStoresList()
-        fbStores.forEach { store ->
-            db.collection("stores").document(store.id).set(store)
-        }
-        writeDefaultProducts()
+        // Empty - No fake mock stores
     }
 
     private fun writeDefaultProperties() {
-        val fbProperties = getDefaultPropertiesList()
-        fbProperties.forEach { prop ->
-            db.collection("properties").document(prop.id).set(prop)
-            db.collection("realestate").document(prop.id).set(prop)
-        }
+        // Empty - No fake mock properties
     }
 
     private fun writeDefaultJobs() {
-        val fbJobs = listOf(
-            com.example.data.JobEntity(
-                id = "job_yemen_mobile", sectionId = "jobs",
-                title = "وظيفة: مهندس شبكات اتصالات ومطور نظم Android/iOS",
-                companyName = "شركة يمن موبايل للهاتف النقال (صنعاء)",
-                managerName = "إدارة الموارد البشرية - يمن موبايل",
-                phone = "777000111", cityId = "ye_san",
-                address = "صنعاء - الجراف - المقر الرئيسي لشركة يمن موبايل",
-                jobType = "دوام كامل", salary = "600,000 YER + حوافز وتأمين صحي",
-                description = "تعلن شركة يمن موبايل عن حاجتها لشغل وظيفة مهندس اتصالات ومطور تطبيقات الهاتف المحمول. تشمل المهام إدارة البنية التحتية للشبكة وتطوير خدمات الاتصالات الذكية.",
-                requirements = "بكالوريوس هندسة اتصالات/حاسوب، خبرة 3 سنوات على الأقل في شبكات 4G/5G وتطبيقات Android/Kotlin.",
-                isApproved = true, isActive = true, isPinned = true, isVip = true
-            )
-        )
-        fbJobs.forEach { job ->
-            db.collection("jobs").document(job.id).set(job)
-        }
-
-        val app = com.example.data.JobApplicationEntity(
-            id = "app_ahmed_ansi",
-            jobId = "job_yemen_mobile",
-            jobTitle = "وظيفة: مهندس شبكات اتصالات ومطور نظم Android/iOS",
-            companyName = "شركة يمن موبايل للهاتف النقال (صنعاء)",
-            applicantName = "م. أحمد العنسي",
-            applicantPhone = "777222333",
-            applicantQuals = "بكالوريوس هندسة حاسوب وشبكات - جامعة صنعاء (امتياز) + شهادة CCNA و 4 سنوات خبرة وتطوير تطبيقات Android.",
-            status = "PENDING",
-            createdAt = System.currentTimeMillis()
-        )
-        db.collection("job_applications").document(app.id).set(app)
+        // Empty - No fake mock jobs
     }
 
     private fun writeDefaultProducts() {
-        val prods = listOf(
-            com.example.data.ProductEntity("prod_cm_01", "store_city_mart", "أرز أبيض بنجابي فاخر 10 كجم", "أرز أبيض ممتاز طويل الحبة عالي الجودة", 18500.0, "YER", "https://images.unsplash.com/photo-1586201375761-83865001e31c?q=80&w=400", isAvailable = true, category = "معلبات ومؤن", isOffer = true, discountPercent = 15, oldPrice = 21800.0),
-            com.example.data.ProductEntity("prod_cm_02", "store_city_mart", "زيت طهي عافية فاخر 5 ليتر", "زيت ذرة نقّي وصحي للطهي والقلي", 14200.0, "YER", "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?q=80&w=400", isAvailable = true, category = "معلبات ومؤن", isOffer = true, discountPercent = 20, oldPrice = 17750.0),
-            com.example.data.ProductEntity("prod_cm_03", "store_city_mart", "حليب المراعي كامل الدسم 1 ليتر", "حليب طازج معزز بالفيتامينات", 1800.0, "YER", "https://images.unsplash.com/photo-1563636619-e9143da7973b?q=80&w=400", isAvailable = true, category = "ألبان وأجبان"),
-            com.example.data.ProductEntity("prod_cm_04", "store_city_mart", "جبنة شيدر كرافت أصلية 500 جرام", "جبنة شيدر ممتازة للسندويشات", 3200.0, "YER", "https://images.unsplash.com/photo-1452195100486-9cc805987862?q=80&w=400", isAvailable = true, category = "ألبان وأجبان"),
-            com.example.data.ProductEntity("prod_cm_05", "store_city_mart", "عصير راني حبوب مشكل 1.5 ليتر", "عصير فاكهة طبيعي مع قطع الفاكهة", 1200.0, "YER", "https://images.unsplash.com/photo-1621263764928-df1444c5e859?q=80&w=400", isAvailable = true, category = "أغذية ومشروبات", isOffer = true, discountPercent = 10, oldPrice = 1350.0),
-            com.example.data.ProductEntity("prod_cm_06", "store_city_mart", "تفاح سكري طازج (كيلو)", "تفاح أحمر سكري مستورد ممتاز", 2500.0, "YER", "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?q=80&w=400", isAvailable = true, category = "خضار وفواكه طازجة"),
-            com.example.data.ProductEntity("prod_cm_07", "store_city_mart", "موز بلدي فاخر من مأرب (كيلو)", "موز بلدي طازج وحلو المذاق", 1500.0, "YER", "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?q=80&w=400", isAvailable = true, category = "خضار وفواكه طازجة"),
-            com.example.data.ProductEntity("prod_cm_08", "store_city_mart", "شوكولاتة جالاكسي جواهر فاخرة", "علبة شوكولاتة مشكلة للهدايا والمناسبات", 7500.0, "YER", "https://images.unsplash.com/photo-1549007994-cb92caebd54b?q=80&w=400", isAvailable = true, category = "حلويات وسناكات", isOffer = true, discountPercent = 25, oldPrice = 10000.0),
-            com.example.data.ProductEntity("prod_cm_09", "store_city_mart", "منظف ومطهر ديتول الأصلي 1 ليتر", "مطهر قوي وقاتل للجراثيم للبلاط والأسطح", 4200.0, "YER", "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=400", isAvailable = true, category = "مستلزمات منزلية"),
-            com.example.data.ProductEntity("prod_cm_10", "store_city_mart", "مسحوق غسيل أرييل اتوماتيك 5 كجم", "مسحوق ناصع للغسالات الأتوماتيكية", 11500.0, "YER", "https://images.unsplash.com/photo-1585421514284-efb74c2b69ba?q=80&w=400", isAvailable = true, category = "مستلزمات منزلية"),
-
-            com.example.data.ProductEntity("prod_sh_01", "restaurant_shaibani", "فحسة صنعانية باللحم البلدي والحلبه الساخنة", "طبق الفحسة التقليدي الصنعاني الساخن في المدرة مع الحلبه واللحم البلدي الطازج", 4500.0, "YER", "https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=400", isAvailable = true, category = "مصلق وسلتة وفحسة"),
-            com.example.data.ProductEntity("prod_sh_02", "restaurant_shaibani", "سلتة صنعانية مشكلة بالخضار والبيض والحلبه", "السلتة الصنعانية الأصلية بالمدرة الساخنة مع المرق والبيض والخضار والحلبه", 3000.0, "YER", "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=400", isAvailable = true, category = "مصلق وسلتة وفحسة"),
-            com.example.data.ProductEntity("prod_sh_03", "restaurant_shaibani", "وجبة مندي لحم بلدي طازج مع الأرز والصلصة", "لحم بلدي طازج مطبوخ على جمر المندي مع الأرز البسمتي الفاخر والصلصة والشفوت", 8500.0, "YER", "https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?q=80&w=400", isAvailable = true, category = "وجبات يمنية شعبية", isOffer = true, discountPercent = 12, oldPrice = 9700.0),
-            com.example.data.ProductEntity("prod_sh_04", "restaurant_shaibani", "صينية مشويات ملكية مشكلة (كباب، أوصال، شيش طاووق)", "مشويات طازجة مشوية على الفحم مع المقبلات الشامية والسلطات الحارة", 12000.0, "YER", "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=400", isAvailable = true, category = "مشويات ملكية"),
-            com.example.data.ProductEntity("prod_sh_05", "restaurant_shaibani", "سمك ديرك فرن على الطريقة العدنية مع الأرز", "سمك ديرك طازج متبل بالبهارات العدنية ومخبوز بالفرن مع الأرز الحامض", 9500.0, "YER", "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=400", isAvailable = true, category = "مأكولات بحرية"),
-            com.example.data.ProductEntity("prod_sh_06", "restaurant_shaibani", "عصير عرائسي طبيعي بالمكسرات والعسل والعمبا", "مزيج العصائر الطبيعية مع قطع الفاكهة والعسل والمكسرات الصنعانية", 2000.0, "YER", "https://images.unsplash.com/photo-1553530666-ba11a7da3888?q=80&w=400", isAvailable = true, category = "مقبلات وعصائر فرِش"),
-
-            com.example.data.ProductEntity("prod_mut_01", "medical_mutawakkil", "معاينة استشاري الباطنية والقلب", "كشف واستشارة طبية شاملة لدى استشاري أمراض الباطنية والقلب", 5000.0, "YER", "https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400", isAvailable = true, category = "رسوم المعاينة والعيادات"),
-            com.example.data.ProductEntity("prod_mut_02", "medical_mutawakkil", "معاينة عيادة الأطفال والتطعيمات", "كشف وفحص صحة الأطفال والنمو ومتابعة التطعيمات الأسبوعية", 4000.0, "YER", "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=400", isAvailable = true, category = "رسوم المعاينة والعيادات"),
-            com.example.data.ProductEntity("prod_mut_03", "medical_mutawakkil", "برنامج الفحص الطبي الشامل (دم، وظائف كبد وكلى، سكر)", "باقة فحص طبي شاملة تشمل فحوصات الدم الكاملة ووظائف الأعضاء الحيوية", 18000.0, "YER", "https://images.unsplash.com/photo-1579154204601-01588f351e67?q=80&w=400", isAvailable = true, category = "الفحوصات والأشعة", isOffer = true, discountPercent = 20, oldPrice = 22500.0),
-            com.example.data.ProductEntity("prod_mut_04", "medical_mutawakkil", "أشعة تلفزيونية وموجات فوق صوتية سونار 4D", "تصوير إشعاعي ثلاثي ورباعي الأبعاد للتشخيص الأكيد", 9000.0, "YER", "https://images.unsplash.com/photo-1516549655169-df83a0774514?q=80&w=400", isAvailable = true, category = "الفحوصات والأشعة"),
-
-            com.example.data.ProductEntity("prod_aw_01", "medical_awalqi_lab", "باقة فحص الفيتامينات الكاملة (D, B12, حديد، زنك)", "فحص مخبري دقيق لمستويات الفيتامينات والمعادن الأساسية للجسم", 15000.0, "YER", "https://images.unsplash.com/photo-1579154204601-01588f351e67?q=80&w=400", isAvailable = true, category = "باقات الفحص الدوري", isOffer = true, discountPercent = 25, oldPrice = 20000.0),
-            com.example.data.ProductEntity("prod_aw_02", "medical_awalqi_lab", "فحص الغدة الدرقية التخصصي (TSH, T3, T4)", "تحليل دقيق لنشاط ووظائف الغدة الدرقية", 8000.0, "YER", "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=400", isAvailable = true, category = "الهرمونات والفيروسات"),
-            com.example.data.ProductEntity("prod_aw_03", "medical_awalqi_lab", "فحص صورة الدم الكاملة CBC دقيقة", "تحليل تعداد كريات الدم ونسبة الهموجلوبين بأحدث الأجهزة", 3500.0, "YER", "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?q=80&w=400", isAvailable = true, category = "الفحوصات العامة"),
-
-            com.example.data.ProductEntity("prod_pd_01", "medical_pearl_dental", "جلسة تنظيف وتبييض الأسنان بالليزر الزوم", "جلسة تبييض فاخرة بليزر الزوم للحصول على ابتسامة نصاعة بدون تحسس", 22000.0, "YER", "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?q=80&w=400", isAvailable = true, category = "تجميل وتبييض الأسنان", isOffer = true, discountPercent = 30, oldPrice = 31500.0),
-            com.example.data.ProductEntity("prod_pd_02", "medical_pearl_dental", "حشوة ضوئية تجميلية زيركون للسن الواحد", "حشوة زيركون بنفس لون السن الطبيعي ومقاومة للتكسر", 12000.0, "YER", "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=400", isAvailable = true, category = "العلاجات والحشوات"),
-            com.example.data.ProductEntity("prod_pd_03", "medical_pearl_dental", "استشارة ومعاينة وأشعة الأسنان البانورامية", "فحص شامل وتصوير بانورامي للفكين وتحديد خطة العلاج المناسبة", 3000.0, "YER", "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=400", isAvailable = true, category = "المعاينة والأشعة")
-        )
-        prods.forEach { product ->
-            db.collection("products").document(product.id).set(product)
-        }
+        // Empty - No fake mock products
     }
 
     // ------------------- Filters Engine -------------------
@@ -1757,6 +1660,15 @@ class MainViewModel : ViewModel() {
         }
         if (cityId != null) {
             filtered = filtered.filter { it.cityId == cityId }
+        }
+        val userResidence = _currentUserResidence.value.trim().lowercase()
+        if (_filterByCurrentCityOnly.value && userResidence.isNotEmpty() && userResidence != "الكل" && userResidence != "اليمن") {
+            filtered = filtered.filter { p ->
+                p.area.lowercase().contains(userResidence) ||
+                p.cityId.lowercase().contains(userResidence) ||
+                p.localNeighborhood.lowercase().contains(userResidence) ||
+                userResidence.contains(p.area.lowercase())
+            }
         }
         if (neighborhood.isNotEmpty()) {
             filtered = filtered.filter { it.localNeighborhood.lowercase().contains(neighborhood) }
@@ -1942,6 +1854,32 @@ class MainViewModel : ViewModel() {
     var appContext: android.content.Context? = null
 
     // ------------------- Notifications -------------------
+    fun triggerNotification(
+        title: String,
+        message: String,
+        targetType: String = "ALL",
+        targetValue: String = "",
+        context: android.content.Context? = null
+    ) {
+        val newNotif = com.example.data.NotificationEntity(
+            id = java.util.UUID.randomUUID().toString(),
+            title = title,
+            message = message,
+            targetType = targetType,
+            targetValue = targetValue,
+            timestamp = System.currentTimeMillis()
+        )
+        val currentList = _notifications.value.toMutableList()
+        currentList.add(0, newNotif)
+        _notifications.value = currentList
+
+        try {
+            db.collection("notifications").document(newNotif.id).set(newNotif)
+        } catch (e: Exception) {}
+
+        triggerNotification("$title: $message", context)
+    }
+
     fun triggerNotification(msg: String, context: android.content.Context? = null) {
         _toastMessage.value = msg
         val ctx = context ?: appContext
@@ -1969,7 +1907,7 @@ class MainViewModel : ViewModel() {
                 )
                 val builder = androidx.core.app.NotificationCompat.Builder(ctx, channelId)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle("منصة WAM 2026 🔔")
+                    .setContentTitle("دليل خدمات اليمن 🔔")
                     .setContentText(msg)
                     .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(msg))
                     .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
@@ -1979,6 +1917,20 @@ class MainViewModel : ViewModel() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    fun triggerOpenChatForRequest(requestId: String, customerPhone: String, serviceType: String) {
+        val targetPhone = customerPhone.ifBlank { _currentUserPhone.value }
+        if (targetPhone.isNotBlank()) {
+            getOrCreateChatChannel(
+                providerId = "request_$requestId",
+                providerName = "صاحب الطلب ($targetPhone)",
+                customerId = _currentUserPhone.value.ifBlank { "guest" },
+                customerName = _currentUserName.value.ifBlank { "مستخدم الدليل" }
+            )
+        } else {
+            triggerNotification("💬 يمكنك التحدث مع مقدمي العروض عبر شاشة المحادثات")
         }
     }
 
@@ -2397,8 +2349,27 @@ class MainViewModel : ViewModel() {
             else -> "ye_san"
         }
 
+        val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+        
+        // Helper to remove from pending_providers permanently
+        val clearPendingFromDbAndState = {
+            db.collection("pending_providers").document(request.id).delete()
+            if (cleanPhone.isNotEmpty()) {
+                db.collection("pending_providers").whereEqualTo("phone", request.phone).get().addOnSuccessListener { qs ->
+                    qs?.documents?.forEach { doc ->
+                        db.collection("pending_providers").document(doc.id).delete()
+                    }
+                }
+            }
+            _pendingProviders.value = _pendingProviders.value.filter { 
+                it.id != request.id && (cleanPhone.isEmpty() || it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone)
+            }
+        }
+
+        clearPendingFromDbAndState()
+
         if (request.profession == "STORE_OWNER") {
-            val storeId = "store_" + request.phone.trim().replace(" ", "").replace("+", "")
+            val storeId = "store_" + cleanPhone
             val newStore = com.example.data.StoreEntity(
                 id = storeId,
                 name = request.name,
@@ -2409,13 +2380,16 @@ class MainViewModel : ViewModel() {
                 localNeighborhood = request.localNeighborhood,
                 cityId = finalCityId,
                 isActive = true,
+                isApproved = true,
                 isPinned = false,
                 isDeleted = false,
                 password = request.password,
                 pdfFileBase64 = request.idPhotoBase64
             )
             db.collection("stores").document(storeId).set(newStore)
-            db.collection("pending_providers").document(request.id).delete()
+            
+            // Instant Local Sync for stores
+            _stores.value = _stores.value.filter { it.id != storeId && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newStore
 
             addNotification(
                 title = "🎉 تهانينا! تم تفعيل متجرك بنجاح",
@@ -2425,7 +2399,7 @@ class MainViewModel : ViewModel() {
             )
             triggerNotification("✅ تم تفعيل متجر ${request.name}")
         } else if (request.profession == "PROPERTY_OWNER") {
-            val propId = "prop_" + request.phone.trim().replace(" ", "").replace("+", "")
+            val propId = "prop_" + cleanPhone
             val propPrice = try { request.chatRecipientId.toDouble() } catch(e: Exception) { 0.0 }
             val newProp = com.example.data.PropertyEntity(
                 id = propId,
@@ -2435,6 +2409,7 @@ class MainViewModel : ViewModel() {
                 localNeighborhood = request.localNeighborhood,
                 cityId = finalCityId,
                 isActive = true,
+                isApproved = true,
                 isPinned = false,
                 isDeleted = false,
                 password = request.password,
@@ -2442,7 +2417,9 @@ class MainViewModel : ViewModel() {
                 pdfFileBase64 = request.idPhotoBase64
             )
             db.collection("properties").document(propId).set(newProp)
-            db.collection("pending_providers").document(request.id).delete()
+            
+            // Instant Local Sync for properties
+            _properties.value = _properties.value.filter { it.id != propId && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newProp
 
             addNotification(
                 title = "🎉 تهانينا! تم تفعيل إعلان عقارك بنجاح",
@@ -2452,7 +2429,7 @@ class MainViewModel : ViewModel() {
             )
             triggerNotification("✅ تم تفعيل عقار ${request.name}")
         } else {
-            val providerId = "prov_" + request.phone.trim().replace(" ", "").replace("+", "")
+            val providerId = "prov_" + cleanPhone
             val approvedProvider = ProviderEntity(
                 id = providerId,
                 name = request.name,
@@ -2472,10 +2449,9 @@ class MainViewModel : ViewModel() {
                 deletedAt = null
             )
             db.collection("providers").document(approvedProvider.id).set(approvedProvider)
-            db.collection("pending_providers").document(request.id).delete()
             
             // Instant Local Sync
-            val currentProviders = _providers.value.filter { it.id != approvedProvider.id }.toMutableList()
+            val currentProviders = _providers.value.filter { it.id != approvedProvider.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone }.toMutableList()
             currentProviders.add(approvedProvider)
             _providers.value = currentProviders
             applyFilters()
@@ -2978,6 +2954,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun deleteStore(storeId: String) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isDeleted = true, deletedAt = System.currentTimeMillis()) else it
+        }
         val updates = mapOf(
             "isDeleted" to true,
             "deleted" to true,
@@ -2985,16 +2964,15 @@ class MainViewModel : ViewModel() {
         )
         db.collection("stores").document(storeId).update(updates)
             .addOnSuccessListener {
-                triggerNotification("🗑️ تم حذف المتجر بنجاح")
+                triggerNotification("🗑️ تم حذف المتجر ونقله للمحذوفات")
             }
             .addOnFailureListener { e ->
-                // Fallback in case of document structure issues or non-existent fields
                 db.collection("stores").document(storeId).get().addOnSuccessListener { snapshot ->
                     val store = snapshot.toObject(com.example.data.StoreEntity::class.java)
                     if (store != null) {
                         db.collection("stores").document(storeId).set(store.copy(isDeleted = true, deletedAt = System.currentTimeMillis()))
                             .addOnSuccessListener {
-                                triggerNotification("🗑️ تم حذف المتجر بنجاح")
+                                triggerNotification("🗑️ تم حذف المتجر ونقله للمحذوفات")
                             }
                     }
                 }
@@ -3002,6 +2980,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun restoreStore(storeId: String) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isDeleted = false, deletedAt = null) else it
+        }
         val updates = hashMapOf<String, Any?>(
             "isDeleted" to false,
             "deleted" to false,
@@ -3022,6 +3003,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setStorePinned(storeId: String, isPinned: Boolean) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isPinned = isPinned) else it
+        }
         val updates = mapOf(
             "isPinned" to isPinned,
             "pinned" to isPinned
@@ -3033,21 +3017,63 @@ class MainViewModel : ViewModel() {
     }
 
     fun setStoreActive(storeId: String, isActive: Boolean) {
+        val cleanTargetId = storeId.trim()
+        val targetStore = _stores.value.find { it.id == cleanTargetId || it.phone.trim().replace(" ", "").replace("+", "") == cleanTargetId.replace(" ", "").replace("+", "") }
+        val docId = targetStore?.id ?: cleanTargetId
+
         _stores.value = _stores.value.map {
-            if (it.id == storeId) it.copy(isActive = isActive, isApproved = isActive) else it
+            if (it.id == docId || it.id == cleanTargetId) it.copy(isActive = isActive, isApproved = isActive) else it
         }
+
         val updates = mapOf(
             "isActive" to isActive,
             "isApproved" to isActive,
             "active" to isActive
         )
-        db.collection("stores").document(storeId).update(updates)
+
+        if (targetStore != null && isActive) {
+            val cleanPhone = targetStore.phone.trim().replace(" ", "").replace("+", "")
+            if (cleanPhone.isNotEmpty()) {
+                db.collection("pending_providers").whereEqualTo("phone", targetStore.phone).get().addOnSuccessListener { qs ->
+                    qs?.documents?.forEach { doc ->
+                        db.collection("pending_providers").document(doc.id).delete()
+                    }
+                }
+                _pendingProviders.value = _pendingProviders.value.filter { 
+                    it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone 
+                }
+            }
+
+            val notification = NotificationEntity(
+                id = UUID.randomUUID().toString(),
+                title = "🎉 تم قبول واعتماد طلبك بنجاح!",
+                message = "تهانينا! تم قبول واعتماد منشأتك (${targetStore.name}) بالدليل اليمني بنجاح!",
+                targetType = "USER",
+                targetValue = targetStore.phone,
+                timestamp = System.currentTimeMillis()
+            )
+            _notifications.value = listOf(notification) + _notifications.value
+            try { db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
+        }
+
+        db.collection("stores").document(docId).update(updates)
             .addOnSuccessListener {
                 triggerNotification(if (isActive) "✅ تم تفعيل المتجر والموافقة عليه" else "🔒 تم إلغاء تفعيل المتجر")
+            }
+            .addOnFailureListener {
+                if (targetStore != null) {
+                    db.collection("stores").document(docId).set(targetStore.copy(isActive = isActive, isApproved = isActive))
+                        .addOnSuccessListener {
+                            triggerNotification(if (isActive) "✅ تم تفعيل المتجر والموافقة عليه" else "🔒 تم إلغاء تفعيل المتجر")
+                        }
+                }
             }
     }
 
     fun setStoreVip(storeId: String, isVip: Boolean) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isVip = isVip) else it
+        }
         db.collection("stores").document(storeId).update("isVip", isVip)
             .addOnSuccessListener {
                 triggerNotification(if (isVip) "🏆 تم تمييز المتجر بشارة VIP" else "🔒 تم إلغاء شارة VIP عن المتجر")
@@ -3055,6 +3081,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setStoreVerified(storeId: String, isVerified: Boolean) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isVerified = isVerified) else it
+        }
         db.collection("stores").document(storeId).update("isVerified", isVerified)
             .addOnSuccessListener {
                 triggerNotification(if (isVerified) "🛡️ تم توثيق حساب المتجر" else "🔒 تم إلغاء التوثيق عن المتجر")
@@ -3062,6 +3091,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setStoreRecommended(storeId: String, isRecommended: Boolean) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isRecommended = isRecommended) else it
+        }
         db.collection("stores").document(storeId).update("isRecommended", isRecommended)
             .addOnSuccessListener {
                 triggerNotification(if (isRecommended) "💖 تم ترشيح المتجر كموصى به" else "🔒 تم إلغاء ترشيح المتجر")
@@ -3069,6 +3101,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setStoreChatDisabled(storeId: String, isDisabled: Boolean) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isChatDisabled = isDisabled) else it
+        }
         db.collection("stores").document(storeId).update("isChatDisabled", isDisabled)
             .addOnSuccessListener {
                 triggerNotification(if (isDisabled) "🔇 تم إيقاف الدردشة للمتجر" else "💬 تم تفعيل الدردشة للمتجر")
@@ -3076,6 +3111,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setStoreNotificationsDisabled(storeId: String, isDisabled: Boolean) {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isNotificationsDisabled = isDisabled) else it
+        }
         db.collection("stores").document(storeId).update("isNotificationsDisabled", isDisabled)
             .addOnSuccessListener {
                 triggerNotification(if (isDisabled) "🔕 تم كتم الإشعارات للمتجر" else "🔔 تم تفعيل الإشعارات للمتجر")
@@ -3094,6 +3132,13 @@ class MainViewModel : ViewModel() {
     // --- PRODUCTS MANAGEMENT ---
     fun saveProduct(product: com.example.data.ProductEntity) {
         val targetId = if (product.id.isEmpty()) db.collection("products").document().id else product.id
+        val localProduct = product.copy(id = targetId)
+        
+        // Instant Local State Sync
+        val currentProds = _products.value.filter { it.id != targetId }.toMutableList()
+        currentProds.add(localProduct)
+        _products.value = currentProds
+
         viewModelScope.launch {
             val ctx = appContext
             val finalImg = if (ctx != null && product.imageUrl.isNotEmpty() && !product.imageUrl.startsWith("http")) {
@@ -3109,10 +3154,13 @@ class MainViewModel : ViewModel() {
     }
 
     fun deleteProduct(productId: String) {
+        _products.value = _products.value.filter { it.id != productId }
         db.collection("products").document(productId).get().addOnSuccessListener { snapshot ->
             val product = snapshot.toObject(com.example.data.ProductEntity::class.java)
             if (product != null) {
                 db.collection("products").document(productId).set(product.copy(isDeleted = true))
+            } else {
+                db.collection("products").document(productId).update("isDeleted", true)
             }
         }
     }
@@ -3196,6 +3244,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun deleteProperty(propertyId: String) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isDeleted = true, deletedAt = System.currentTimeMillis()) else it
+        }
         val updates = mapOf(
             "isDeleted" to true,
             "deleted" to true,
@@ -3206,7 +3257,6 @@ class MainViewModel : ViewModel() {
                 triggerNotification("🗑️ تم حذف العقار بنجاح")
             }
             .addOnFailureListener { e ->
-                // Fallback in case of document structure issues or non-existent fields
                 db.collection("properties").document(propertyId).get().addOnSuccessListener { snapshot ->
                     val property = snapshot.toObject(com.example.data.PropertyEntity::class.java)
                     if (property != null) {
@@ -3232,7 +3282,7 @@ class MainViewModel : ViewModel() {
 
         db.collection("jobs").document(targetId).set(finalJob)
             .addOnSuccessListener {
-                triggerNotification(if (finalJob.isApproved) "✅ تم حفظ ونشر الإعلان الوظيفي بنجاح!" else "📨 تم تقديم إعلان الوظيفة للمراجعة من قبل الأدمن!")
+                triggerNotification(if (finalJob.isApproved) "✅ تم حفظ ونشر الإعلان الوظيفي بنجاح!" else "📨 تم تقديم إعلان الوظيفة للمراجع من قبل الأدمن!")
             }
             .addOnFailureListener {
                 triggerNotification("⚠️ تم إدراج الوظيفة محلياً وفي انتظار المزامنة")
@@ -3240,6 +3290,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setJobApproved(jobId: String, isApproved: Boolean) {
+        _jobs.value = _jobs.value.map {
+            if (it.id == jobId) it.copy(isApproved = isApproved, isActive = isApproved) else it
+        }
         val updates = mapOf(
             "isApproved" to isApproved,
             "isActive" to isApproved
@@ -3251,6 +3304,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun deleteJob(jobId: String) {
+        _jobs.value = _jobs.value.map {
+            if (it.id == jobId) it.copy(isDeleted = true) else it
+        }
         val updates = hashMapOf<String, Any?>(
             "isDeleted" to true,
             "deletedAt" to System.currentTimeMillis()
@@ -3262,6 +3318,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun restoreJob(jobId: String) {
+        _jobs.value = _jobs.value.map {
+            if (it.id == jobId) it.copy(isDeleted = false) else it
+        }
         val updates = hashMapOf<String, Any?>(
             "isDeleted" to false,
             "deletedAt" to null
@@ -3292,6 +3351,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun restoreProperty(propertyId: String) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isDeleted = false, deletedAt = null) else it
+        }
         val updates = hashMapOf<String, Any?>(
             "isDeleted" to false,
             "deleted" to false,
@@ -3312,6 +3374,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyPinned(propertyId: String, isPinned: Boolean) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isPinned = isPinned) else it
+        }
         val updates = mapOf(
             "isPinned" to isPinned,
             "pinned" to isPinned
@@ -3323,21 +3388,63 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyActive(propertyId: String, isActive: Boolean) {
+        val cleanTargetId = propertyId.trim()
+        val targetProp = _properties.value.find { it.id == cleanTargetId || it.phone.trim().replace(" ", "").replace("+", "") == cleanTargetId.replace(" ", "").replace("+", "") }
+        val docId = targetProp?.id ?: cleanTargetId
+
         _properties.value = _properties.value.map {
-            if (it.id == propertyId) it.copy(isActive = isActive, isApproved = isActive) else it
+            if (it.id == docId || it.id == cleanTargetId) it.copy(isActive = isActive, isApproved = isActive) else it
         }
+
         val updates = mapOf(
             "isActive" to isActive,
             "isApproved" to isActive,
             "active" to isActive
         )
-        db.collection("properties").document(propertyId).update(updates)
+
+        if (targetProp != null && isActive) {
+            val cleanPhone = targetProp.phone.trim().replace(" ", "").replace("+", "")
+            if (cleanPhone.isNotEmpty()) {
+                db.collection("pending_providers").whereEqualTo("phone", targetProp.phone).get().addOnSuccessListener { qs ->
+                    qs?.documents?.forEach { doc ->
+                        db.collection("pending_providers").document(doc.id).delete()
+                    }
+                }
+                _pendingProviders.value = _pendingProviders.value.filter { 
+                    it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone 
+                }
+            }
+
+            val notification = NotificationEntity(
+                id = UUID.randomUUID().toString(),
+                title = "🎉 تم قبول وإعتماد إعلان عقارك",
+                message = "تهانينا! تم قبول ونشر إعلان العقار (${targetProp.title}) للجميع!",
+                targetType = "USER",
+                targetValue = targetProp.phone,
+                timestamp = System.currentTimeMillis()
+            )
+            _notifications.value = listOf(notification) + _notifications.value
+            try { db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
+        }
+
+        db.collection("properties").document(docId).update(updates)
             .addOnSuccessListener {
                 triggerNotification(if (isActive) "✅ تم تفعيل ونشر العقار للجميع" else "🔒 تم إلغاء تفعيل ونشر العقار")
+            }
+            .addOnFailureListener {
+                if (targetProp != null) {
+                    db.collection("properties").document(docId).set(targetProp.copy(isActive = isActive, isApproved = isActive))
+                        .addOnSuccessListener {
+                            triggerNotification(if (isActive) "✅ تم تفعيل ونشر العقار للجميع" else "🔒 تم إلغاء تفعيل ونشر العقار")
+                        }
+                }
             }
     }
 
     fun setPropertyVip(propertyId: String, isVip: Boolean) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isVip = isVip) else it
+        }
         db.collection("properties").document(propertyId).update("isVip", isVip)
             .addOnSuccessListener {
                 triggerNotification(if (isVip) "🏆 تم تمييز العقار بشارة VIP" else "🔒 تم إلغاء شارة VIP عن العقار")
@@ -3345,6 +3452,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyVerified(propertyId: String, isVerified: Boolean) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isVerified = isVerified) else it
+        }
         db.collection("properties").document(propertyId).update("isVerified", isVerified)
             .addOnSuccessListener {
                 triggerNotification(if (isVerified) "🛡️ تم توثيق إعلان العقار" else "🔒 تم إلغاء التوثيق عن العقار")
@@ -3352,6 +3462,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyRecommended(propertyId: String, isRecommended: Boolean) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isRecommended = isRecommended) else it
+        }
         db.collection("properties").document(propertyId).update("isRecommended", isRecommended)
             .addOnSuccessListener {
                 triggerNotification(if (isRecommended) "💖 تم ترشيح العقار كموصى به" else "🔒 تم إلغاء ترشيح العقار")
@@ -3359,6 +3472,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyChatDisabled(propertyId: String, isDisabled: Boolean) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isChatDisabled = isDisabled) else it
+        }
         db.collection("properties").document(propertyId).update("isChatDisabled", isDisabled)
             .addOnSuccessListener {
                 triggerNotification(if (isDisabled) "🔇 تم إيقاف الدردشة للمعلن" else "💬 تم تفعيل الدردشة للمعلن")
@@ -3366,6 +3482,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyNotificationsDisabled(propertyId: String, isDisabled: Boolean) {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isNotificationsDisabled = isDisabled) else it
+        }
         db.collection("properties").document(propertyId).update("isNotificationsDisabled", isDisabled)
             .addOnSuccessListener {
                 triggerNotification(if (isDisabled) "🔕 تم كتم الإشعارات للمعلن" else "🔔 تم تفعيل الإشعارات للمعلن")
@@ -3375,6 +3494,9 @@ class MainViewModel : ViewModel() {
     // --- EXTENDED ADMIN MANAGEMENT & ENTITY CONTROLS ---
 
     fun setStoreBlocked(storeId: String, isBlocked: Boolean, reason: String = "") {
+        _stores.value = _stores.value.map {
+            if (it.id == storeId) it.copy(isBlocked = isBlocked, blockReason = reason) else it
+        }
         val updates = mapOf(
             "isBlocked" to isBlocked,
             "blockReason" to reason
@@ -3393,6 +3515,9 @@ class MainViewModel : ViewModel() {
     }
 
     fun setPropertyBlocked(propertyId: String, isBlocked: Boolean, reason: String = "") {
+        _properties.value = _properties.value.map {
+            if (it.id == propertyId) it.copy(isBlocked = isBlocked, blockReason = reason) else it
+        }
         val updates = mapOf(
             "isBlocked" to isBlocked,
             "blockReason" to reason
@@ -5328,6 +5453,14 @@ class MainViewModel : ViewModel() {
         attemptCancelBookingImpl(bookingId, input, reason, onResult)
     }
 
+    fun cancelBookingByTechnician(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
+        cancelBookingByTechnicianImpl(bookingId, reason, onComplete)
+    }
+
+    fun cancelBookingByAdmin(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
+        cancelBookingByAdminImpl(bookingId, reason, onComplete)
+    }
+
     fun getBookingStatusColor(status: String): String {
         return getBookingStatusColorImpl(status)
     }
@@ -5740,6 +5873,7 @@ class MainViewModel : ViewModel() {
         val provider = _providers.value.find { it.id == providerId }
         provider?.let {
             val updated = it.copy(isVip = !it.isVip)
+            _providers.value = _providers.value.map { item -> if (item.id == providerId) updated else item }
             db.collection("providers").document(providerId).set(updated)
         }
     }
@@ -5748,6 +5882,7 @@ class MainViewModel : ViewModel() {
         val provider = _providers.value.find { it.id == providerId }
         provider?.let {
             val updated = it.copy(isVerified = !it.isVerified)
+            _providers.value = _providers.value.map { item -> if (item.id == providerId) updated else item }
             db.collection("providers").document(providerId).set(updated)
         }
     }
@@ -5756,6 +5891,7 @@ class MainViewModel : ViewModel() {
         val provider = _providers.value.find { it.id == providerId }
         provider?.let {
             val updated = it.copy(isRecommended = !it.isRecommended)
+            _providers.value = _providers.value.map { item -> if (item.id == providerId) updated else item }
             db.collection("providers").document(providerId).set(updated)
         }
     }
@@ -5764,11 +5900,13 @@ class MainViewModel : ViewModel() {
         val provider = _providers.value.find { it.id == providerId }
         provider?.let {
             val updated = it.copy(subscriptionStatus = if (it.subscriptionStatus == "APPROVED") "EXPIRED" else "APPROVED")
+            _providers.value = _providers.value.map { item -> if (item.id == providerId) updated else item }
             db.collection("providers").document(providerId).set(updated)
         }
     }
 
     fun updateProviderEntity(provider: ProviderEntity) {
+        _providers.value = _providers.value.map { item -> if (item.id == provider.id) provider else item }
         db.collection("providers").document(provider.id).set(provider)
         triggerNotification("💾 تم تحديث بيانات مقدم الخدمة ${provider.name} بنجاح")
     }
@@ -5817,6 +5955,7 @@ class MainViewModel : ViewModel() {
         val provider = _providers.value.find { it.id == providerId }
         provider?.let {
             val updated = it.copy(isBlocked = !it.isBlocked)
+            _providers.value = _providers.value.map { item -> if (item.id == providerId) updated else item }
             db.collection("providers").document(providerId).set(updated)
             if (updated.isBlocked) {
                 triggerNotification("🚫 تم حظر الفني ${it.name} بنجاح")
@@ -6523,13 +6662,24 @@ class MainViewModel : ViewModel() {
         categoryName: String,
         serviceTitle: String,
         description: String,
-        images: List<String> = emptyList()
+        images: List<String> = emptyList(),
+        urgencyTime: String = "فوراً (خلال 30 دقيقة)",
+        deliveryMethod: String = "",
+        customPin: String = "",
+        onResult: (Boolean, String, String) -> Unit = { _, _, _ -> }
     ) {
         val reqId = java.util.UUID.randomUUID().toString()
         val randomNum = (100000..999999).random()
         val requestCode = "R-$randomNum"
-        val secretPin = (100000..999999).random().toString()
-        val cancelPass = (1000..9999).random().toString()
+        val secretPin = if (customPin.isNotBlank()) customPin.trim() else (1000..9999).random().toString()
+        val cancelPass = secretPin
+
+        val validityMillis = when {
+            urgencyTime.contains("30") -> 30 * 60 * 1000L
+            urgencyTime.contains("ساعتين") -> 2 * 60 * 60 * 1000L
+            urgencyTime.contains("ساعة") -> 60 * 60 * 1000L
+            else -> 30 * 60 * 1000L // default 30 min
+        }
 
         val req = com.example.data.models.InstantRequestEntity(
             id = reqId,
@@ -6548,16 +6698,109 @@ class MainViewModel : ViewModel() {
             images = images,
             status = "WAITING_FOR_OFFERS",
             createdAt = System.currentTimeMillis(),
-            expiresAt = System.currentTimeMillis() + (30 * 60 * 1000L), // 30 minutes
-            offersCount = 0
+            expiresAt = System.currentTimeMillis() + validityMillis,
+            offersCount = 0,
+            deliveryMethod = deliveryMethod,
+            urgencyTime = urgencyTime
         )
 
         db.collection("instant_requests").document(reqId).set(req)
             .addOnSuccessListener {
-                triggerNotification("⚡ تم إنشاء الطلب الفوري بنجاح! كود الطلب: $requestCode - ينتهي العرض خلال 30 دقيقة.")
+                triggerNotification("⚡ تم إنشاء الطلب العاجل بنجاح! كود الطلب: $requestCode ($urgencyTime)")
+
+                // Also add to bookings system so it is visible in the bookings list
+                val bookingDesc = "[طلب عاجل - $categoryName] $serviceTitle | $description ${if(deliveryMethod.isNotBlank()) " | التسليم: $deliveryMethod" else ""}"
+                addBooking(
+                    name = userName.ifBlank { "عميل" },
+                    phone = userPhone,
+                    area = if (userNeighborhood.isNotBlank()) "$userCity - $userNeighborhood" else userCity,
+                    serviceType = bookingDesc,
+                    providerId = "ALL_${categoryId.uppercase()}",
+                    providerName = "جميع مزودي $categoryName",
+                    dateString = "طلب عاجل الآن ⚡ [$requestCode]",
+                    timeString = urgencyTime,
+                    customPassword = secretPin
+                )
+
+                // 1. If Services/Technicians: notify matching active providers in same city/category
+                if (categoryId.equals("SERVICES", ignoreCase = true) || categoryId.equals("services", ignoreCase = true) || categoryName.contains("خدمات") || categoryName.contains("فني")) {
+                    val matchingProvPhones = _providers.value.filter { prov ->
+                        val matchesCat = prov.profession.contains(categoryName, true) ||
+                                         prov.specialization.contains(categoryName, true) ||
+                                         prov.customCategoryName.contains(categoryName, true) ||
+                                         categoryName.contains("خدمات", true) || categoryName.contains("فني", true)
+                        val matchesCity = prov.area.contains(userCity, true) || userCity.isBlank() || prov.area.isBlank()
+                        val isActive = !prov.isBlocked && !prov.isDeleted && prov.isAvailable
+                        matchesCat && matchesCity && isActive && prov.phone.isNotBlank()
+                    }.map { it.phone }.toSet()
+
+                    matchingProvPhones.forEach { pPhone ->
+                        addNotification(
+                            title = "🚨 طلب خدمة عاجل $requestCode - $serviceTitle",
+                            message = "عميل في $userCity ($userNeighborhood) يطلب: $serviceTitle ($urgencyTime). اضغط لتقديم عرض سعر الآن.",
+                            targetType = "PROVIDER",
+                            targetValue = pPhone
+                        )
+                    }
+                }
+
+                // 2. If Stores/Goods: notify matching active stores in same city
+                if (categoryId.equals("STORES", ignoreCase = true) || categoryName.contains("متاجر") || categoryName.contains("سلع") || categoryName.contains("مراكز")) {
+                    val matchingStorePhones = _stores.value.filter { store ->
+                        val matchesCity = store.cityId.contains(userCity, true) || userCity.isBlank() || store.cityId.isBlank()
+                        val isActive = store.isActive && !store.isDeleted
+                        matchesCity && isActive && store.phone.isNotBlank()
+                    }.map { it.phone }.toSet()
+
+                    matchingStorePhones.forEach { sPhone ->
+                        addNotification(
+                            title = "🏪 طلب سلعة/منتج عاجل $requestCode",
+                            message = "طلب شراء وتوفير في $userCity ($userNeighborhood): $serviceTitle. اضغط لتقديم عرضك والتوصيل.",
+                            targetType = "STORE",
+                            targetValue = sPhone
+                        )
+                    }
+                }
+
+                // 3. If Restaurants/Meals: notify matching active restaurants in same city
+                if (categoryId.equals("RESTAURANTS", ignoreCase = true) || categoryName.contains("مطاعم") || categoryName.contains("وجبات")) {
+                    val matchingRestPhones = _stores.value.filter { store ->
+                        val matchesCat = store.name.contains("مطعم", true) || store.description.contains("وجبات", true) || store.description.contains("مطعم", true) || store.categoryId.contains("rest", true)
+                        val matchesCity = store.cityId.contains(userCity, true) || userCity.isBlank() || store.cityId.isBlank()
+                        matchesCat && matchesCity && store.isActive && !store.isDeleted && store.phone.isNotBlank()
+                    }.map { it.phone }.toSet()
+
+                    matchingRestPhones.forEach { rPhone ->
+                        addNotification(
+                            title = "🍽️ طلب وجبة عاجل $requestCode",
+                            message = "طلب وجبات/طعام في $userCity ($userNeighborhood): $serviceTitle ($deliveryMethod). اضغط لتأكيد الطلب.",
+                            targetType = "STORE",
+                            targetValue = rPhone
+                        )
+                    }
+                }
+
+                // Admin Notification
+                addNotification(
+                    title = "⚡ طلب عاجل جديد: $requestCode",
+                    message = "تم إطلاق طلب عاجل ($categoryName): $serviceTitle للعميل $userName ($userPhone) في $userCity.",
+                    targetType = "ADMIN_ONLY",
+                    targetValue = ""
+                )
+
+                // Customer confirmation notification
+                addNotification(
+                    title = "⚡ تم إطلاق طلبك العاجل $requestCode",
+                    message = "تم توجيه طلبك بنجاح للمزودين المتخصصين بـ $userCity. الرمز السري لمتابعة الطلب: $secretPin. المهلة: $urgencyTime.",
+                    targetType = "USER",
+                    targetValue = userPhone
+                )
+
+                onResult(true, requestCode, secretPin)
             }
             .addOnFailureListener {
-                triggerNotification("❌ فشل إنشاء الطلب الفوري: ${it.localizedMessage}")
+                triggerNotification("❌ فشل إنشاء الطلب العاجل: ${it.localizedMessage}")
+                onResult(false, "", "")
             }
     }
 
@@ -6570,8 +6813,9 @@ class MainViewModel : ViewModel() {
         technicianAvatar: String,
         technicianRating: Float,
         price: Double,
-        estimatedDuration: String,
-        notes: String
+        estimatedArrivalTime: String = "خلال 30 دقيقة",
+        estimatedDuration: String = "ساعتان",
+        notes: String = ""
     ) {
         val offerId = java.util.UUID.randomUUID().toString()
         val offer = com.example.data.models.RequestOfferEntity(
@@ -6584,6 +6828,7 @@ class MainViewModel : ViewModel() {
             technicianAvatar = technicianAvatar,
             technicianRating = technicianRating,
             price = price,
+            estimatedArrivalTime = estimatedArrivalTime,
             estimatedDuration = estimatedDuration,
             notes = notes,
             status = "PENDING",
@@ -6602,6 +6847,17 @@ class MainViewModel : ViewModel() {
                     ))
                 }
                 triggerNotification("💰 تم تقديم عرض السعر ($price ر.ي) بنجاح للطلب $requestCode!")
+
+                // Notify customer about new offer
+                val targetReq = _instantRequests.value.find { it.id == requestId }
+                if (targetReq != null && targetReq.userPhone.isNotBlank()) {
+                    addNotification(
+                        title = "💰 عرض جديد من $technicianName على طلبك $requestCode",
+                        message = "قدم الفني $technicianName عرض سعر قدره $price ر.ي بوقت وصول $estimatedArrivalTime. افتح العروض لمقارنة الخيارات والاختيار.",
+                        targetType = "USER",
+                        targetValue = targetReq.userPhone
+                    )
+                }
             }
             .addOnFailureListener {
                 triggerNotification("❌ تعذر تقديم العرض: ${it.localizedMessage}")
@@ -6653,6 +6909,29 @@ class MainViewModel : ViewModel() {
 
         db.collection("bookings").document(bookingId).set(booking)
         triggerNotification("🎉 تم قبول عرض ${offer.technicianName} بنجاح وتحويل الطلب إلى حجز مؤكد!")
+
+        // Notify winning provider
+        addNotification(
+            title = "🎉 تم اختيار عرضك للطلب ${req.requestCode}",
+            message = "تهانينا $offer.technicianName! اختار العميل $req.userName عرضك بسعر $offer.price ر.ي للطلب $req.requestCode. يمكنك البدء في التواصل والمباشرة الآن.",
+            targetType = "PROVIDER",
+            targetValue = offer.technicianPhone
+        )
+
+        // Notify other bidders
+        val otherOffers = _requestOffers.value.filter { it.requestId == req.id && it.id != offer.id }
+        otherOffers.forEach { otherOffer ->
+            db.collection("request_offers").document(otherOffer.id).update("status", "REJECTED")
+            addNotification(
+                title = "📢 تم اختيار عرض آخر للطلب ${req.requestCode}",
+                message = "شكراً لمشاركتك. تم اختيار عرض أسعار آخر من قبل العميل للطلب ${req.requestCode}.",
+                targetType = "PROVIDER",
+                targetValue = otherOffer.technicianPhone
+            )
+        }
+
+        // Create active chat channel between customer & winning provider
+        getOrCreateChatChannel(offer.technicianId, offer.technicianName, req.userPhone, req.userName)
     }
 
     fun completeInstantRequest(requestId: String) {

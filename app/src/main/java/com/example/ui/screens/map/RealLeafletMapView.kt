@@ -323,11 +323,14 @@ fun RealLeafletMapView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
             android.webkit.WebView(ctx).apply {
+                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                isHapticFeedbackEnabled = true
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
                     useWideViewPort = true
                     loadWithOverviewMode = true
+                    cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                     mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
                 webViewClient = object : android.webkit.WebViewClient() {
@@ -374,11 +377,15 @@ fun RealLeafletMapView(
                         }
                     }
                 }, "AndroidBridge")
+                tag = htmlContent
                 loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
             }
         },
         update = { webView ->
-            // Re-creation of WebView when data changes is managed via Compose keys in parent caller
+            if (webView.tag != htmlContent) {
+                webView.tag = htmlContent
+                webView.loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
+            }
         }
     )
 }

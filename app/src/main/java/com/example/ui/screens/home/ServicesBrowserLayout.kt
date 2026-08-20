@@ -119,6 +119,8 @@ fun ServicesBrowserLayout(
     val phoneOrNameFilter by viewModel.phoneOrNameFilter.collectAsState()
     val bannersList by viewModel.banners.collectAsState()
     val settingsState by viewModel.settings.collectAsState()
+    val filterByCurrentCityOnly by viewModel.filterByCurrentCityOnly.collectAsState()
+    val currentUserResidence by viewModel.currentUserResidence.collectAsState()
 
     val currentUserIdState by viewModel.currentUserId.collectAsState()
     val currentUserPhoneState by viewModel.currentUserPhone.collectAsState()
@@ -188,27 +190,28 @@ fun ServicesBrowserLayout(
                 }
             }
 
-            // Search Bar Block (Smart Cross Search - Reduced 50% & Ultra-Sleek)
+            // Search Bar Block (Modern Sleek with subtle filter icon)
             item {
+                val isFilterActive = phoneOrNameFilter.isNotEmpty() || neighborFilter.isNotEmpty() || isVipOnly || isAvailableOnly || radiusKm != 15 || filterByCurrentCityOnly
                 Card(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    border = BorderStroke(0.8.dp, themeColors.accent.copy(alpha = 0.35f)),
+                    border = BorderStroke(0.8.dp, if (isFilterActive) themeColors.accent else themeColors.accent.copy(alpha = 0.25f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "بحث",
                             tint = themeColors.accent,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         
                         Box(
                             modifier = Modifier
@@ -223,7 +226,7 @@ fun ServicesBrowserLayout(
                                 maxLines = 1,
                                 textStyle = androidx.compose.ui.text.TextStyle(
                                     color = themeColors.textPrimary,
-                                    fontSize = 10.5.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Normal
                                 ),
                                 modifier = Modifier
@@ -232,8 +235,8 @@ fun ServicesBrowserLayout(
                                 decorationBox = { innerTextField ->
                                     if (searchQuery.isEmpty()) {
                                         Text(
-                                            text = "البحث الذكي المتقاطع 🔍 (فنيين، محلات، استشارات...)",
-                                            fontSize = 10.sp,
+                                            text = "ابحث عن فني، متجر، خدمة، عقار...",
+                                            fontSize = 11.sp,
                                             color = themeColors.textSecondary.copy(alpha = 0.7f),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -244,18 +247,41 @@ fun ServicesBrowserLayout(
                             )
                         }
 
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { viewModel.updateSearchQuery("") },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                            }
+                        }
+
                         Spacer(modifier = Modifier.width(4.dp))
                         
-                        Surface(
-                            onClick = { showFiltersPanel = !showFiltersPanel },
-                            shape = RoundedCornerShape(12.dp),
-                            color = themeColors.accent
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        // Subtle interactive Filter Icon button with Active badge indicator
+                        Box(contentAlignment = Alignment.TopEnd) {
+                            Surface(
+                                onClick = { showFiltersPanel = true },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isFilterActive) themeColors.accent else Color.White.copy(alpha = 0.08f),
+                                border = BorderStroke(0.7.dp, if (isFilterActive) themeColors.accent else Color.White.copy(alpha = 0.15f)),
+                                modifier = Modifier.size(34.dp)
                             ) {
-                                Text("بحث ذكي ⚙️", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "فلترة وبحث متقدم",
+                                        tint = if (isFilterActive) Color.Black else Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            if (isFilterActive) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(Color(0xFF10B981), CircleShape)
+                                )
                             }
                         }
 
@@ -267,9 +293,9 @@ fun ServicesBrowserLayout(
                                         viewModel.triggerNotification("🎙️ تم سماع صوتك اليمني: $spokenText")
                                     }
                                 },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(30.dp)
                             ) {
-                                Text("🎙️", fontSize = 12.sp)
+                                Text("🎙️", fontSize = 13.sp)
                             }
                         }
                     }
@@ -486,128 +512,53 @@ fun ServicesBrowserLayout(
             }
         }
 
-        // Expanded Filter Panel drawer settings
-        if (showFiltersPanel) {
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("🔍 معايير البحث المتقدم والفلترة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                        Spacer(modifier = Modifier.height(8.dp))
+        // Clean Main Categories & Subcategories Selector
+        item {
+            val mainCats = remember(categories) {
+                categories.filter { it.isMainCategory || it.parentId.isNullOrEmpty() }
+            }
+            val displayCats = if (mainCats.isNotEmpty()) mainCats else categories
 
-                        OutlinedTextField(
-                            value = phoneOrNameFilter,
-                            onValueChange = { viewModel.setPhoneOrNameFilter(it) },
-                            placeholder = { Text("البحث بالاسم أو رقم الهاتف...", fontSize = 11.sp, color = themeColors.textSecondary) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                            singleLine = true
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("المدينة اليمنية:", fontSize = 10.sp, color = themeColors.textSecondary)
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color.Black.copy(alpha = 0.3f))
-                                        .clickable {
-                                            val idx = citiesList.indexOfFirst { it.id == activeCityId }
-                                            val nextIdx = if (idx == -1) 0 else if (idx == citiesList.size -1) -1 else idx + 1
-                                            viewModel.setCityFilter(if (nextIdx == -1) null else citiesList[nextIdx].id)
-                                        }
-                                        .padding(10.dp),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = citiesList.firstOrNull { it.id == activeCityId }?.nameAr ?: "كل المدن",
-                                            fontSize = 11.sp,
-                                            color = Color.White
-                                        )
-                                        Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("المنطقة / الحي:", fontSize = 10.sp, color = themeColors.textSecondary)
-                                OutlinedTextField(
-                                    value = neighborFilter,
-                                    onValueChange = { viewModel.setNeighborhoodFilter(it) },
-                                    placeholder = { Text("مثال: حدة، الحصبة...", fontSize = 11.sp, color = themeColors.textSecondary) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                                    singleLine = true
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("البحث بنطاق جغرافي (دائرة):", fontSize = 11.sp, color = themeColors.textPrimary)
-                                Text("${radiusKm} كم (الحد الأدنى)", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-                            }
-                            Slider(
-                                value = radiusKm.toFloat(),
-                                onValueChange = { viewModel.setRadiusKm(it.toInt().coerceAtMost(settingsState.maxSearchRadiusKm)) },
-                                valueRange = 5f..50f,
-                                steps = 5,
-                                colors = SliderDefaults.colors(thumbColor = themeColors.accent, activeTrackColor = themeColors.accent)
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = isVipOnly, onCheckedChange = { viewModel.toggleVipFilter() })
-                                Text("العضوية الذهبية معتمدة", fontSize = 11.sp, color = Color.White)
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = isAvailableOnly, onCheckedChange = { viewModel.toggleAvailableFilter() })
-                                Text("المتاحين الآن فقط", fontSize = 11.sp, color = Color.White)
-                            }
-                        }
-                    }
+            val activeSubCategories = remember(selectedCategory, categories) {
+                if (selectedCategory != null) {
+                    categories.filter { it.parentId == selectedCategory }
+                } else {
+                    emptyList()
                 }
             }
-        }
 
-        // Clean Category Chips Filter Row for Service Categories
-        item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = "📂 التخصصات والقطاعات المتاحة:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📂 الأقسام والتخصصات الرئيسية:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    if (selectedCategory != null) {
+                        Text(
+                            text = "عرض الكل 🔄",
+                            fontSize = 10.sp,
+                            color = themeColors.accent,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { viewModel.selectCategory(null) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
 
+                // Main Categories Horizontal Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -634,11 +585,9 @@ fun ServicesBrowserLayout(
                         )
                     }
 
-                    // Display categories
-                    val mainCats = categories.filter { it.isMainCategory || it.parentId.isNullOrEmpty() }
-                    val displayCats = if (mainCats.isNotEmpty()) mainCats else categories
                     displayCats.forEach { cat ->
                         val isSelected = selectedCategory == cat.id
+                        val hasSub = categories.any { it.parentId == cat.id }
                         Surface(
                             modifier = Modifier
                                 .clickable {
@@ -671,6 +620,66 @@ fun ServicesBrowserLayout(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                                if (hasSub) {
+                                    Icon(
+                                        imageVector = if (isSelected) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.Black else Color.Gray,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Subcategories smooth expandable row if selected category has subcategories
+                if (activeSubCategories.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF1E293B).copy(alpha = 0.7f),
+                        border = BorderStroke(0.6.dp, themeColors.accent.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = "الخدمات الفرعية والتخصصات الدقيقة:",
+                                fontSize = 10.sp,
+                                color = themeColors.accent,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                activeSubCategories.forEach { subCat ->
+                                    Surface(
+                                        modifier = Modifier.clickable {
+                                            viewModel.selectCategory(subCat.id)
+                                        },
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (selectedCategory == subCat.id) themeColors.accent else Color.White.copy(alpha = 0.08f),
+                                        border = BorderStroke(0.6.dp, if (selectedCategory == subCat.id) Color.Transparent else Color.White.copy(alpha = 0.15f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Text(subCat.icon, fontSize = 10.sp)
+                                            Text(
+                                                text = subCat.name,
+                                                color = if (selectedCategory == subCat.id) Color.Black else Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -987,6 +996,210 @@ fun ServicesBrowserLayout(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("إلغاء", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Advanced Search & Filter Modal Dialog
+    if (showFiltersPanel) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showFiltersPanel = false }
+        ) {
+            Surface(
+                color = Color(0xFF0F172A),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.2.dp, themeColors.accent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(18.dp))
+                            Text("معايير التصفية والبحث المتقدم", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                        IconButton(onClick = { showFiltersPanel = false }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Clear, contentDescription = "إغلاق", tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    Divider(color = Color.White.copy(alpha = 0.15f))
+
+                    OutlinedTextField(
+                        value = phoneOrNameFilter,
+                        onValueChange = { viewModel.setPhoneOrNameFilter(it) },
+                        placeholder = { Text("البحث بالاسم أو رقم الهاتف...", fontSize = 11.sp, color = themeColors.textSecondary) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = themeColors.accent,
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                            focusedContainerColor = Color(0xFF1E293B),
+                            unfocusedContainerColor = Color(0xFF1E293B)
+                        ),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("المدينة اليمنية:", fontSize = 10.sp, color = themeColors.textSecondary)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF1E293B))
+                                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val idx = citiesList.indexOfFirst { it.id == activeCityId }
+                                        val nextIdx = if (idx == -1) 0 else if (idx == citiesList.size - 1) -1 else idx + 1
+                                        viewModel.setCityFilter(if (nextIdx == -1) null else citiesList[nextIdx].id)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 12.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = citiesList.firstOrNull { it.id == activeCityId }?.nameAr ?: "كل المدن",
+                                        fontSize = 11.sp,
+                                        color = Color.White
+                                    )
+                                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("المنطقة / الحي:", fontSize = 10.sp, color = themeColors.textSecondary)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = neighborFilter,
+                                onValueChange = { viewModel.setNeighborhoodFilter(it) },
+                                placeholder = { Text("مثال: حدة، الحصبة...", fontSize = 11.sp, color = themeColors.textSecondary) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = themeColors.accent,
+                                    unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                                    focusedContainerColor = Color(0xFF1E293B),
+                                    unfocusedContainerColor = Color(0xFF1E293B)
+                                ),
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+                    }
+
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("نطاق البحث الجغرافي:", fontSize = 11.sp, color = Color.White)
+                            Text("${radiusKm} كم", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                        }
+                        Slider(
+                            value = radiusKm.toFloat(),
+                            onValueChange = { viewModel.setRadiusKm(it.toInt().coerceAtMost(settingsState.maxSearchRadiusKm)) },
+                            valueRange = 5f..50f,
+                            steps = 5,
+                            colors = SliderDefaults.colors(thumbColor = themeColors.accent, activeTrackColor = themeColors.accent)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = isVipOnly,
+                                onCheckedChange = { viewModel.toggleVipFilter() },
+                                colors = CheckboxDefaults.colors(checkedColor = themeColors.accent)
+                            )
+                            Text("الذهبيون VIP", fontSize = 11.sp, color = Color.White)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = isAvailableOnly,
+                                onCheckedChange = { viewModel.toggleAvailableFilter() },
+                                colors = CheckboxDefaults.colors(checkedColor = Color(0xFF10B981))
+                            )
+                            Text("المتاحون الآن ⚡", fontSize = 11.sp, color = Color.White)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = filterByCurrentCityOnly,
+                            onCheckedChange = { viewModel.toggleFilterByCurrentCityOnly(it) },
+                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFF10B981))
+                        )
+                        Text(
+                            text = if (currentUserResidence.isNotBlank()) "تصفية حسب مدينتي ($currentUserResidence)" else "تصفية عروض مدينتي القريبة",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.setPhoneOrNameFilter("")
+                                viewModel.setNeighborhoodFilter("")
+                                viewModel.setCityFilter(null)
+                                viewModel.setRadiusKm(15)
+                                if (isVipOnly) viewModel.toggleVipFilter()
+                                if (isAvailableOnly) viewModel.toggleAvailableFilter()
+                                if (filterByCurrentCityOnly) viewModel.toggleFilterByCurrentCityOnly(false)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("إعادة ضبط 🔄", color = Color.White, fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = { showFiltersPanel = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("تطبيق الفلاتر ✅", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }

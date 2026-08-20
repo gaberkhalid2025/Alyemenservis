@@ -343,6 +343,8 @@ fun AllConversationsDialogView(
                     )
                 }
 
+                var showChatOptionsMenu by remember { mutableStateOf(false) }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -355,7 +357,7 @@ fun AllConversationsDialogView(
                         color = Color.White,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (selectedChannelId != null && !settingsState.disableVoiceCalls) {
                             Button(
                                 onClick = {
@@ -369,8 +371,43 @@ fun AllConversationsDialogView(
                                 Text("🎙️ اتصال", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+
+                        // 3-dots overflow menu for conversation actions
+                        if (selectedChannelId == null && myChannels.isNotEmpty()) {
+                            Box {
+                                IconButton(
+                                    onClick = { showChatOptionsMenu = true },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "خيارات إضافية", tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                                DropdownMenu(
+                                    expanded = showChatOptionsMenu,
+                                    onDismissRequest = { showChatOptionsMenu = false },
+                                    modifier = Modifier.background(Color(0xFF1E293B))
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("حذف جميع المحادثات 🗑️", color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                        onClick = {
+                                            showChatOptionsMenu = false
+                                            myChannels.forEach { ch ->
+                                                viewModel.deleteChatChannel(ch.id)
+                                            }
+                                            viewModel.triggerNotification("🗑️ تم حذف جميع المحادثات بنجاح.")
+                                            onReadTrigger()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
                         IconButton(onClick = { if (selectedChannelId != null) selectedChannelId = null else onDismiss() }, modifier = Modifier.size(28.dp)) {
-                            Text(if (selectedChannelId != null) "🔙" else "❌", color = Color.White, fontSize = 14.sp)
+                            Icon(
+                                imageVector = if (selectedChannelId != null) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.Close,
+                                contentDescription = "إغلاق / رجوع",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
@@ -429,29 +466,7 @@ fun AllConversationsDialogView(
                         }
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            item {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            myChannels.forEach { ch ->
-                                                viewModel.deleteChatChannel(ch.id)
-                                            }
-                                            viewModel.triggerNotification("🗑️ تم حذف جميع المحادثات بنجاح.")
-                                            onReadTrigger()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f)),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
-                                        Text("حذف جميع المحادثات 🗑️", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            items(myChannels) { ch ->
+                            items(myChannels, key = { it.id }) { ch ->
                                 val displayItemTitle = remember(ch, providers, stores, properties, currentUserId, currentUserPhone, myProvider, myStore, myProperty, settingsState) {
                                     if (ch.id.startsWith("support_")) {
                                         "💬 الدعم الفني المباشر"
@@ -519,24 +534,78 @@ fun AllConversationsDialogView(
                                 }
 
                                 Card(
-                                    colors = CardDefaults.cardColors(containerColor = if (unreadThisChat) themeColors.accent.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.05f)),
-                                    border = BorderStroke(if (unreadThisChat) 1.dp else 0.5.dp, if (unreadThisChat) themeColors.accent else Color.White.copy(alpha = 0.1f)),
-                                    modifier = Modifier.fillMaxWidth()
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (unreadThisChat) Color(0xFF1E293B) else Color(0xFF151E2E)
+                                    ),
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (unreadThisChat) themeColors.accent.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f)
+                                    ),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = if (unreadThisChat) 3.dp else 1.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedChannelId = ch.id }
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier = Modifier
+                                            .padding(12.dp)
+                                            .fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Row(
-                                            modifier = Modifier.weight(1f).clickable { selectedChannelId = ch.id },
-                                            verticalAlignment = Alignment.CenterVertically
+                                        // Avatar badge
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = if (unreadThisChat) themeColors.accent.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f),
+                                            border = BorderStroke(0.8.dp, if (unreadThisChat) themeColors.accent else Color.White.copy(alpha = 0.15f)),
+                                            modifier = Modifier.size(38.dp)
                                         ) {
-                                            Text("💬", fontSize = 18.sp)
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
-                                                Text(displayItemTitle, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (unreadThisChat) themeColors.accent else Color.White)
-                                                Text(ch.lastMessage, fontSize = 10.sp, color = if (unreadThisChat) themeColors.accent.copy(alpha = 0.8f) else Color.LightGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = if (displayItemTitle.contains("دعم")) "🎧" else if (displayItemTitle.contains("فني")) "🛠️" else "💬",
+                                                    fontSize = 16.sp
+                                                )
                                             }
+                                        }
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = displayItemTitle,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (unreadThisChat) themeColors.accent else Color.White,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                if (unreadThisChat) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = Color(0xFF10B981)
+                                                    ) {
+                                                        Text(
+                                                            text = "رسالة جديدة",
+                                                            color = Color.White,
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            Text(
+                                                text = ch.lastMessage.ifEmpty { "لا توجد رسائل سابقة" },
+                                                fontSize = 10.5.sp,
+                                                color = if (unreadThisChat) Color.White.copy(alpha = 0.9f) else Color(0xFF94A3B8),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         }
 
                                         IconButton(
@@ -544,19 +613,15 @@ fun AllConversationsDialogView(
                                                 viewModel.deleteChatChannel(ch.id)
                                                 onReadTrigger()
                                             },
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.size(26.dp)
                                         ) {
-                                            Text("🗑️", fontSize = 14.sp)
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "حذف المحادثة",
+                                                tint = Color.Red.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(15.dp)
+                                            )
                                         }
-
-                                        Spacer(modifier = Modifier.width(4.dp))
-
-                                        Text(
-                                            text = "◀️",
-                                            fontSize = 11.sp,
-                                            color = themeColors.accent,
-                                            modifier = Modifier.clickable { selectedChannelId = ch.id }
-                                        )
                                     }
                                 }
                             }

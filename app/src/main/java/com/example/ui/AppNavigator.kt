@@ -2500,11 +2500,11 @@ fun ProviderCard(
         return "★".repeat(filled) + "☆".repeat(empty)
     }
 
-    // --- Card View Body (Miniature & Edge-to-Edge with zero margins & 70% of original layout - 30% smaller) ---
+    // --- Card View Body (Miniature & Edge-to-Edge with optimized compact spacing - fits 5-6 per screen) ---
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 1.dp, horizontal = 0.dp)
+            .padding(vertical = 2.dp, horizontal = 2.dp)
             .scale(scaleFactor)
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -2516,46 +2516,29 @@ fun ProviderCard(
                 )
             },
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, Brush.linearGradient(listOf(themeColors.accent.copy(alpha = 0.3f), themeColors.accent.copy(alpha = 0.05f))))
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(0.8.dp, Brush.linearGradient(listOf(themeColors.accent.copy(alpha = 0.35f), themeColors.accent.copy(alpha = 0.08f))))
     ) {
         Box(
             modifier = Modifier
                 .background(metallicGlassBrush)
-                .padding((if (settingsState.cardPadding > 0) (settingsState.cardPadding * 0.60f).toInt().coerceAtLeast(3) else 4).dp)
+                .padding(6.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy((if (settingsState.elementSpacing > 0) (settingsState.elementSpacing * 0.60f).toInt().coerceAtLeast(2) else 3).dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 
-                // Top Cover Banner if enabled and present
-                if (settingsState.coverHeight > 0 && provider.coverImage.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height((settingsState.coverHeight * 0.60f).dp)
-                            .clip(RoundedCornerShape(4.dp))
-                    ) {
-                        AsyncImage(
-                            model = provider.coverImage,
-                            contentDescription = "صورة غلاف الفني",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
-                    }
-                }
-
-                // 1. Core Profile Row (Compact Circular Avatar + Dynamic Name & Details + Rating + Location)
+                // 1. Core Profile Row (Ultra-compact 40x40 avatar + Name + Rating + Status + Location)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // [Compact] Circular Avatar Image (40% smaller)
+                    // [Compact 40x40] Avatar Image
                     Box(
                         modifier = Modifier
-                            .size((if (settingsState.avatarSize > 0) (settingsState.avatarSize * 0.60f) else 30f).dp)
-                            .clip(if (settingsState.avatarShape == "ROUNDED") RoundedCornerShape(6.dp) else CircleShape)
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(Color.Black)
-                            .border(1.dp, themeColors.accent, if (settingsState.avatarShape == "ROUNDED") RoundedCornerShape(6.dp) else CircleShape)
+                            .border(1.dp, themeColors.accent, RoundedCornerShape(8.dp))
                     ) {
                         val isValidUrl = provider.profileImage.startsWith("http://") || provider.profileImage.startsWith("https://") || provider.profileImage.startsWith("content://") || provider.profileImage.startsWith("file://")
                         val isBase64 = provider.profileImage.length > 20 && !isValidUrl
@@ -2598,162 +2581,154 @@ fun ProviderCard(
                                 Text(
                                     text = provider.name.trim().take(1).ifEmpty { "👤" },
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
+                                    fontSize = 14.sp,
                                     color = Color.Black
                                 )
                             }
                         }
                     }
 
-                    // Provider Information Details Column (Compact)
+                    // Provider Information Details Column (Compact & Organized)
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        // Name and Profile Popup Trigger
+                        // Row 1: Name + Profile View Button + Rating + Status Pill
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically, 
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Text(
+                                    text = provider.name,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = nameColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (provider.isVip) {
+                                    Text("⭐", fontSize = 9.sp)
+                                }
+                                // 👤 زر عرض الملف الشخصي بجوار اسم الفني
+                                Text(
+                                    text = "👤 الملف",
+                                    fontSize = 7.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = themeColors.accent,
+                                    modifier = Modifier
+                                        .background(themeColors.accent.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                        .clickable { showDetailsDialog = true }
+                                )
+                            }
+                            
+                            // Rating Badge & Status
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "★ ${provider.rating}",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFD700)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(if (provider.isAvailable) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.2f))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = if (provider.isAvailable) "🟢 متاح" else "🔴 مشغول",
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (provider.isAvailable) Color(0xFF34D399) else Color(0xFFF87171)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Row 2: Profession + Location
+                        val cardCatName = if (provider.categoryId == "other" && provider.customCategoryName.isNotEmpty()) provider.customCategoryName else (categories.find { it.id == provider.categoryId }?.name ?: "صيانة فنية")
+                        val cardProfessionText = provider.profession.ifEmpty { cardCatName }
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = provider.name,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = nameColor,
+                                text = "🔧 $cardProfessionText",
+                                fontSize = 9.sp,
+                                color = themeColors.accent,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
                             
-                            // 👤 عرض الملف الشخصي (شاشة منبثقة)
                             Text(
-                                text = "👤 عرض الملف",
-                                fontSize = 7.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = themeColors.accent,
-                                modifier = Modifier
-                                    .background(themeColors.accent.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
-                                    .padding(horizontal = 3.dp, vertical = 1.dp)
-                                    .clickable { showDetailsDialog = true }
-                            )
-                        }
-
-                        // Profession and Specialization badges
-                        val cardCatName = if (provider.categoryId == "other" && provider.customCategoryName.isNotEmpty()) provider.customCategoryName else (categories.find { it.id == provider.categoryId }?.name ?: "صيانة فنية")
-                        val cardProfessionText = provider.profession.ifEmpty { cardCatName }
-                        val cardSpecializationText = provider.specialization.ifEmpty { "متخصص معتمد" }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            modifier = Modifier.padding(vertical = 1.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(themeColors.primary.copy(alpha = 0.2f))
-                                    .padding(horizontal = 3.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = "💼 $cardProfessionText",
-                                    fontSize = 7.5.sp,
-                                    color = themeColors.accent,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(themeColors.accent.copy(alpha = 0.15f))
-                                    .padding(horizontal = 3.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = "🎓 $cardSpecializationText",
-                                    fontSize = 7.5.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // Rating: ★★★★☆ 4.8 (0 تقييمات)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = getStarsString(provider.rating),
-                                fontSize = 8.sp,
-                                color = Color(0xFFFFD700),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "${provider.rating} (${provider.numReviews} تقييم)",
-                                fontSize = 7.5.sp,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
-                        }
-
-                        // Location: 📍 صنعاء ✏️
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "📍 ${provider.area}، ${provider.localNeighborhood}",
-                                fontSize = 8.sp,
-                                color = locationColor,
-                                fontWeight = FontWeight.Medium,
+                                text = "📍 ${provider.area.ifEmpty { "اليمن" }}",
+                                fontSize = 8.5.sp,
+                                color = Color.LightGray,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            if (isAdminActive) {
-                                Text(
-                                    text = "✏️",
-                                    fontSize = 8.sp,
-                                    modifier = Modifier
-                                        .clickable { showAdminEditLocation = true }
-                                        .padding(horizontal = 1.dp)
-                                )
-                            }
                         }
 
-                        // Profession & Specialization
-                        if (provider.profession.isNotEmpty() || provider.specialization.isNotEmpty()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                modifier = Modifier.padding(top = 1.dp)
-                            ) {
-                                val profText = listOfNotNull(
-                                    if (provider.profession.isNotEmpty()) "المهنة: ${provider.profession}" else null,
-                                    if (provider.specialization.isNotEmpty()) "التخصص: ${provider.specialization}" else null
-                                ).joinToString(" | ")
-                                Icon(
-                                    imageVector = Icons.Default.Build,
-                                    contentDescription = null,
-                                    tint = themeColors.accent,
-                                    modifier = Modifier.size(8.dp)
-                                )
-                                Text(
-                                    text = profText,
-                                    fontSize = 7.5.sp,
-                                    color = themeColors.accent,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                        // Row 3: Price Tag / Status
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "💰 2,000 ريال",
+                                fontSize = 9.sp,
+                                color = priceColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            Text(
+                                text = "⭐ موثوق ومعتمد",
+                                fontSize = 8.sp,
+                                color = Color.Gray
+                            )
                         }
                     }
                 }
 
-                HorizontalDivider(color = themeColors.accent.copy(alpha = 0.15f))
-
-                // 2. Compact Communication Methods
+                // 2. Action Row: [📞 اتصال] [💬 محادثة] [💬 الآراء والتجارب] [⭐ تقييم]
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 1.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 📩 مراسلة فورية
+                    // 1. 📞 اتصال مباشر
+                    if (settingsState.showCallButton) {
+                        Button(
+                            onClick = {
+                                viewModel.logCall(provider.id, provider.name)
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(27.dp),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                        ) {
+                            Icon(Icons.Default.Phone, contentDescription = "اتصال", tint = Color.White, modifier = Modifier.size(10.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("اتصال", fontSize = 8.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // 2. 💬 مراسلة فورية داخل التطبيق
                     if (settingsState.showInstantChatButton) {
                         Button(
                             onClick = {
@@ -2774,81 +2749,49 @@ fun ProviderCard(
                                     onChatOpen(chatRoomId)
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary.copy(alpha = 0.15f)),
-                            shape = RoundedCornerShape(4.dp),
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(vertical = 2.dp, horizontal = 2.dp),
-                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(27.dp),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                         ) {
-                            Text("📩 مراسلة", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.Email, contentDescription = "مراسلة", tint = Color.White, modifier = Modifier.size(10.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("محادثة", fontSize = 8.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
 
-                    // 📞 اتصال مباشر
-                    if (settingsState.showCallButton) {
-                        Button(
-                            onClick = {
-                                viewModel.logCall(provider.id, provider.name)
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
-                                context.startActivity(intent)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                            shape = RoundedCornerShape(4.dp),
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(vertical = 2.dp, horizontal = 2.dp)
-                        ) {
-                            Text("📞 اتصال", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    // 🎙️ مكالمة صوتية
-                    if (settingsState.showVoiceCallButton && !settingsState.disableVoiceCalls) {
-                        Button(
-                            onClick = {
-                                viewModel.logCall(provider.id, provider.name)
-                                activeVoiceCallForProvider = Pair(provider.name, "فني / مقدم خدمة")
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                            shape = RoundedCornerShape(4.dp),
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(vertical = 2.dp, horizontal = 2.dp)
-                        ) {
-                            Text("🎙️ مكالمة", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                // 3. Compact Extra Options ("💬 آراء وتجارب | ✍️ أضف تعليق")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    // 💬 آراء وتجارب
+                    // 3. 💬 الآراء والتجارب
                     Button(
                         onClick = { showReviewsListDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 1.5.dp, horizontal = 2.dp),
-                        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(27.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                        border = BorderStroke(0.8.dp, Color.Gray.copy(alpha = 0.35f))
                     ) {
-                        Text("💬 آراء العملاء", fontSize = 7.5.sp, color = themeColors.textSecondary)
+                        Text("💬 التجارب", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Medium)
                     }
 
-                    // ✍️ أضف تعليق
+                    // 4. ⭐ تقييم / تعليق
                     Button(
                         onClick = { showAddCommentDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 1.5.dp, horizontal = 2.dp),
-                        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent.copy(alpha = 0.18f)),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .weight(0.9f)
+                            .height(27.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                        border = BorderStroke(0.8.dp, themeColors.accent.copy(alpha = 0.5f))
                     ) {
-                        Text("✍️ تعليق جديد", fontSize = 7.5.sp, color = themeColors.textSecondary)
+                        Text("⭐ تقييم", fontSize = 8.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                // 4. Compact Main Service Button ("📅 حجز موعد خدمة فورية")
+                // 3. Compact Main Service Booking Button ("📅 حجز موعد خدمة فورية")
                 Button(
                     onClick = {
                         if (currentUserIdState == "guest" && !settingsState.bypassVisitorRegistration && !settingsState.disableBookingFirewall) {
