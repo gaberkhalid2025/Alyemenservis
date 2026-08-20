@@ -179,7 +179,7 @@ class MainViewModel : ViewModel() {
     val isProviderUser: Boolean
         get() = selectedProvider != null || selectedStore != null || selectedProperty != null
 
-    private val _isInitialized = MutableStateFlow(true)
+    private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
     private val _isOnline = MutableStateFlow(true)
@@ -715,10 +715,8 @@ class MainViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            kotlinx.coroutines.delay(1500)
-            if (!_isInitialized.value) {
-                _isInitialized.value = true
-            }
+            kotlinx.coroutines.delay(2200)
+            _isInitialized.value = true
         }
 
         // Initialization complete

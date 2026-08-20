@@ -96,6 +96,13 @@ data class ChatChannelEntity(
     val timestamp: Long = 0L,
     val unreadCountUser: Int = 0,
     val unreadCountTarget: Int = 0,
+    val providerId: String = "",
+    val providerName: String = "",
+    val providerPhoto: String = "",
+    val clientId: String = "",
+    val clientName: String = "",
+    val clientPhoto: String = "",
+    val unreadCount: Int = 0,
     val messages: List<ChatMessageEntity> = emptyList()
 )
 

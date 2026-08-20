@@ -384,60 +384,81 @@ class MainActivity : ComponentActivity() {
                     ) {
                         if (!isInitialized) {
                             Box(
-                                modifier = Modifier.fillMaxSize().background(Color.Black),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.padding(24.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 28.dp)
                                 ) {
+                                    // الدائرة والشعار WAM
                                     Box(
                                         modifier = Modifier
-                                            .size(130.dp)
+                                            .size(140.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF0E4CB0)),
+                                            .background(Color(0xFF1D58B8)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = "WAM",
-                                            color = Color(0xFF10B981),
+                                            color = Color(0xFF00DC82),
                                             fontWeight = FontWeight.ExtraBold,
-                                            fontSize = 32.sp,
+                                            fontSize = 36.sp,
                                             letterSpacing = 1.sp
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(32.dp))
+
+                                    Spacer(modifier = Modifier.height(36.dp))
+
+                                    // العنوان الرئيسي
                                     Text(
                                         text = "كل خدمات اليمن",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 28.sp,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = "دليلك الشامل لكل الخدمات والمهن",
-                                        fontSize = 15.sp,
-                                        color = Color.LightGray,
+                                        color = Color.White,
                                         textAlign = TextAlign.Center
                                     )
-                                    Spacer(modifier = Modifier.height(36.dp))
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // العنوان الفرعي
+                                    Text(
+                                        text = "دليلك الشامل لكل الخدمات والمهن",
+                                        fontSize = 16.sp,
+                                        color = Color(0xFFD1D5DB),
+                                        textAlign = TextAlign.Center
+                                    )
+
+                                    Spacer(modifier = Modifier.height(38.dp))
+
+                                    // مؤشر التحميل الأخضر/الفيروزي
                                     CircularProgressIndicator(
-                                        color = Color(0xFF10B981),
+                                        color = Color(0xFF00DC82),
                                         modifier = Modifier.size(24.dp),
                                         strokeWidth = 2.5.dp
                                     )
-                                    Spacer(modifier = Modifier.height(14.dp))
-                                    if (settingsState.splashWelcomeMessage.isNotBlank()) {
-                                        Text(
-                                            text = settingsState.splashWelcomeMessage,
-                                            fontSize = 13.sp,
-                                            color = Color.White.copy(alpha = 0.85f),
-                                            textAlign = TextAlign.Center,
-                                            lineHeight = 20.sp,
-                                            modifier = Modifier.padding(horizontal = 16.dp)
-                                        )
+
+                                    Spacer(modifier = Modifier.height(38.dp))
+
+                                    // النص الترحيبي التعريفي
+                                    val splashMessage = if (settingsState.splashWelcomeMessage.isNotBlank()) {
+                                        settingsState.splashWelcomeMessage
+                                    } else {
+                                        "التطبيق الأول في اليمن والوطن العربي الذي يربط مقدمي الخدمات وأصحاب المهن بالمستخدمين فورياً"
                                     }
+                                    Text(
+                                        text = splashMessage,
+                                        fontSize = 14.sp,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        textAlign = TextAlign.Center,
+                                        lineHeight = 22.sp,
+                                        modifier = Modifier.padding(horizontal = 12.dp)
+                                    )
                                 }
                             }
                         } else {
