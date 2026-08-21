@@ -7,14 +7,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -24,14 +22,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 
 /**
- * 🌟 Universal Smart Image Renderer
- * Seamlessly handles:
- * 1. Firebase Storage / Web URLs via Coil with disk cache & memory cache
- * 2. Legacy Base64 image strings with graceful decoding
- * 3. Contextual, attractive 3D icon fallbacks instead of empty grey boxes
+ * 🌟 Universal Smart Image Renderer & Optimizer
+ * تحسينات الأداء وتوفير البيانات:
+ * 1. Memory Cache + Disk Cache Policy لتوفير استهلاك باقة الإنترنت والتحميل السريع
+ * 2. Crossfade animations
+ * 3. Base64 fallback & Attractive 3D placeholder graphics
  */
 @Composable
 fun SmartAsyncImage(
@@ -81,11 +80,18 @@ fun SmartAsyncImage(
         }
     } else if (modelStr.isNotBlank() && (modelStr.startsWith("http://") || modelStr.startsWith("https://") || modelStr.startsWith("content://") || modelStr.startsWith("file://"))) {
         val context = LocalContext.current
-        SubcomposeAsyncImage(
-            model = ImageRequest.Builder(context)
+        val imageRequest = remember(modelStr) {
+            ImageRequest.Builder(context)
                 .data(modelStr)
                 .crossfade(true)
-                .build(),
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .build()
+        }
+
+        SubcomposeAsyncImage(
+            model = imageRequest,
             contentDescription = contentDescription,
             modifier = modifier,
             contentScale = contentScale,
@@ -98,7 +104,7 @@ fun SmartAsyncImage(
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = Color(0xFFF59E0B),
+                        color = Color(0xFF00E5FF),
                         strokeWidth = 2.dp
                     )
                 }
@@ -145,4 +151,3 @@ private fun DefaultImageFallback(
         )
     }
 }
-

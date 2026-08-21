@@ -161,6 +161,23 @@ class MainViewModel : ViewModel() {
     private val _ratings = MutableStateFlow<List<com.example.data.RatingEntity>>(emptyList())
     val ratings: StateFlow<List<com.example.data.RatingEntity>> = _ratings.asStateFlow()
 
+    private val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
+    val favoriteIds: StateFlow<Set<String>> = _favoriteIds.asStateFlow()
+
+    fun toggleFavorite(id: String) {
+        val current = _favoriteIds.value.toMutableSet()
+        if (current.contains(id)) {
+            current.remove(id)
+            triggerNotification("💔 تم الحذف من قائمة المفضلة")
+        } else {
+            current.add(id)
+            triggerNotification("❤️ تمت الإضافة إلى المفضلة!")
+        }
+        _favoriteIds.value = current
+    }
+
+    fun isFavorite(id: String): Boolean = _favoriteIds.value.contains(id)
+
     private val _customProfileTabs = MutableStateFlow<List<com.example.data.CustomProfileTabEntity>>(emptyList())
     val customProfileTabs: StateFlow<List<com.example.data.CustomProfileTabEntity>> = _customProfileTabs.asStateFlow()
 
@@ -1946,6 +1963,34 @@ class MainViewModel : ViewModel() {
 
     fun submitRating(providerId: String, rating: Int) {
         triggerNotification("⭐ شكراً لتقييمك $rating نجوم!")
+    }
+
+    fun submitRating(ratingEntity: com.example.data.RatingEntity, onComplete: () -> Unit = {}) {
+        val list = _ratings.value.toMutableList()
+        list.removeAll { it.id == ratingEntity.id }
+        list.add(0, ratingEntity)
+        _ratings.value = list
+        try {
+            db.collection("ratings").document(ratingEntity.id).set(ratingEntity)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        triggerNotification("⭐ شكراً لتقييمك المعتمد!")
+        onComplete()
+    }
+
+    fun submitReport(report: com.example.data.ReportEntity, onComplete: () -> Unit = {}) {
+        val list = _reports.value.toMutableList()
+        list.removeAll { it.id == report.id }
+        list.add(0, report)
+        _reports.value = list
+        try {
+            db.collection("reports").document(report.id).set(report)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        triggerNotification("🚨 تم إرسال البلاغ للتحقيق الرسمي!")
+        onComplete()
     }
 
     fun toggleProviderStatus(provider: ProviderEntity) {

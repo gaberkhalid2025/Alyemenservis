@@ -69,12 +69,23 @@ data class ChatMessageEntity(
     val recipientId: String = "",
     val message: String = "",
     val timestamp: Long = 0L,
-    val mediaType: String = "TEXT", // "TEXT", "AUDIO", "IMAGE", "VIDEO", "CALL"
+    val mediaType: String = "TEXT", // "TEXT", "AUDIO", "IMAGE", "VIDEO", "FILE", "CALL"
     val mediaUrl: String = "",
     val audioDurationSec: Int = 0,
     val status: String = "SENT", // "SENT", "DELIVERED", "READ"
     val statusTime: Long = 0L,
-    val imageUrl: String = ""
+    val imageUrl: String = "",
+    val replyToId: String = "",
+    val replyToText: String = "",
+    val replyToSender: String = "",
+    val reactions: String = "", // e.g. "👍,❤️"
+    val isDeleted: Boolean = false,
+    val deletedBy: String = "",
+    val fileName: String = "",
+    val fileSize: Long = 0L,
+    val fileType: String = "",
+    val forwardedFrom: String = "",
+    val readAt: Long = 0L
 )
 
 @Keep

@@ -494,6 +494,91 @@ fun AppNavigator(
                                         themeColors = themeColors
                                     )
                                 }
+                                "PROVIDER_DETAILS" -> {
+                                    DynamicPolymorphicProfileScreen(
+                                        provider = viewModel.selectedProvider,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors,
+                                        onBackClick = { viewModel.goBack() },
+                                        onOpenChat = { channelId ->
+                                            preSelectedChannelId = channelId
+                                            showAllConversationsDialog = true
+                                        },
+                                        onRequestBooking = {
+                                            viewModel.navigateTo("CREATE_BOOKING")
+                                        }
+                                    )
+                                }
+                                "STORE_DETAILS" -> {
+                                    DynamicPolymorphicProfileScreen(
+                                        store = viewModel.selectedStore,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors,
+                                        onBackClick = { viewModel.goBack() },
+                                        onOpenChat = { channelId ->
+                                            preSelectedChannelId = channelId
+                                            showAllConversationsDialog = true
+                                        },
+                                        onOrderProduct = {
+                                            showRequestServiceModal = true
+                                        }
+                                    )
+                                }
+                                "PROPERTY_DETAILS" -> {
+                                    DynamicPolymorphicProfileScreen(
+                                        property = viewModel.selectedProperty,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors,
+                                        onBackClick = { viewModel.goBack() },
+                                        onOpenChat = { channelId ->
+                                            preSelectedChannelId = channelId
+                                            showAllConversationsDialog = true
+                                        },
+                                        onRequestBooking = {
+                                            showRequestServiceModal = true
+                                        }
+                                    )
+                                }
+                                "DYNAMIC_PROFILE" -> {
+                                    DynamicPolymorphicProfileScreen(
+                                        provider = viewModel.selectedProvider,
+                                        store = viewModel.selectedStore,
+                                        property = viewModel.selectedProperty,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors,
+                                        onBackClick = { viewModel.goBack() },
+                                        onOpenChat = { channelId ->
+                                            preSelectedChannelId = channelId
+                                            showAllConversationsDialog = true
+                                        },
+                                        onRequestBooking = {
+                                            viewModel.navigateTo("CREATE_BOOKING")
+                                        }
+                                    )
+                                }
+                                "FAVORITES_VIEW" -> {
+                                    com.example.ui.screens.home.FavoritesScreenLayout(
+                                        viewModel = viewModel,
+                                        themeColors = themeColors,
+                                        onBackClick = { viewModel.goBack() },
+                                        onOpenProviderDetails = { provider ->
+                                            viewModel.selectedProvider = provider
+                                            viewModel.navigateTo("PROVIDER_DETAILS")
+                                        },
+                                        onOpenStoreDetails = { store ->
+                                            viewModel.selectedStore = store
+                                            viewModel.navigateTo("STORE_DETAILS")
+                                        },
+                                        onOpenPropertyDetails = { property ->
+                                            viewModel.selectedProperty = property
+                                            viewModel.navigateTo("PROPERTY_DETAILS")
+                                        },
+                                        onOpenChat = { channelId ->
+                                            preSelectedChannelId = channelId
+                                            showAllConversationsDialog = true
+                                        }
+                                    )
+                                }
                                 else -> ServicesBrowserLayout(
                                     viewModel = viewModel,
                                     themeColors = themeColors,
@@ -516,10 +601,22 @@ fun AppNavigator(
                             ) || showGuestRegisterDialogForAction != null || 
                               showAssistantDialog || showRequestServiceModal
 
+                            val isClientUser = remember(currentUserPhoneState, providers, stores, properties) {
+                                if (currentUserPhoneState.isBlank() || currentUserPhoneState.equals("guest", ignoreCase = true)) {
+                                    false
+                                } else {
+                                    val isProv = providers.any { it.phone.trim() == currentUserPhoneState.trim() }
+                                    val isStore = stores.any { it.phone.trim() == currentUserPhoneState.trim() }
+                                    val isProp = properties.any { it.phone.trim() == currentUserPhoneState.trim() }
+                                    !isProv && !isStore && !isProp
+                                }
+                            }
+
                             if (!isRegistrationOrFormOpen) {
                                 FloatingIconsOverlay(
                                     settings = settingsState,
                                     themeColors = themeColors,
+                                    isClientUser = isClientUser,
                                     onAssistantClick = { showAssistantDialog = true },
                                     onRequestServiceClick = { showRequestServiceModal = true }
                                 )
@@ -1500,11 +1597,12 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 fun BoxScope.FloatingIconsOverlay(
     settings: AdminSettingsEntity,
     themeColors: VisualThemePalette,
+    isClientUser: Boolean = false,
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
     // 1. Primary Action FAB: "اطلب خدمتك الآن" (Reduced 30%)
-    if (!settings.footerMessage.contains("hide_urgent_fab")) {
+    if (isClientUser && !settings.footerMessage.contains("hide_urgent_fab")) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 class ChatViewModel(
     private val chatRepository: ChatRepository = ChatRepository()
@@ -31,19 +32,50 @@ class ChatViewModel(
     private val _otherUserTyping = MutableStateFlow(false)
     val otherUserTyping: StateFlow<Boolean> = _otherUserTyping.asStateFlow()
 
+    private val _replyingTo = MutableStateFlow<ChatMessageEntity?>(null)
+    val replyingTo: StateFlow<ChatMessageEntity?> = _replyingTo.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _isSearchActive = MutableStateFlow(false)
+    val isSearchActive: StateFlow<Boolean> = _isSearchActive.asStateFlow()
+
+    private val _isChannelBlocked = MutableStateFlow(false)
+    val isChannelBlocked: StateFlow<Boolean> = _isChannelBlocked.asStateFlow()
+
     private var messagesJob: Job? = null
+    private var typingJob: Job? = null
     private var typingTimeoutJob: Job? = null
+    private var currentChannelId: String = ""
 
     /**
-     * Start listening to messages for a specific channel
+     * Start listening to messages and typing status for a specific channel
      */
-    fun startListeningToChannel(channelId: String) {
+    fun startListeningToChannel(channelId: String, currentUserId: String = "", otherUserId: String = "") {
+        currentChannelId = channelId
         messagesJob?.cancel()
+        typingJob?.cancel()
         _isLoading.value = true
+
         messagesJob = viewModelScope.launch {
             chatRepository.listenToMessages(channelId).collect { msgs ->
                 _messages.value = msgs
                 _isLoading.value = false
+                // Auto mark incoming messages as read
+                if (currentUserId.isNotBlank()) {
+                    msgs.filter { it.recipientId == currentUserId && it.status != "READ" }.forEach { unread ->
+                        chatRepository.markMessageAsRead(channelId, unread.id)
+                    }
+                }
+            }
+        }
+
+        if (otherUserId.isNotBlank()) {
+            typingJob = viewModelScope.launch {
+                chatRepository.listenToTypingStatus(channelId, otherUserId).collect { typing ->
+                    _otherUserTyping.value = typing
+                }
             }
         }
     }
@@ -52,8 +84,26 @@ class ChatViewModel(
      * Stop listening to the active channel
      */
     fun stopListening() {
+        if (currentChannelId.isNotBlank()) {
+            setTypingState(currentChannelId, "", false)
+        }
         messagesJob?.cancel()
+        typingJob?.cancel()
         messagesJob = null
+        typingJob = null
+    }
+
+    fun setReplyingTo(message: ChatMessageEntity?) {
+        _replyingTo.value = message
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun toggleSearchActive(active: Boolean) {
+        _isSearchActive.value = active
+        if (!active) _searchQuery.value = ""
     }
 
     /**
@@ -66,7 +116,6 @@ class ChatViewModel(
             setTypingState(channelId, currentUserId, true)
         }
 
-        // Debounce/Timeout for typing indicator (disappear after 3 seconds of inactivity)
         typingTimeoutJob?.cancel()
         typingTimeoutJob = viewModelScope.launch {
             delay(3000)
@@ -74,35 +123,70 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * Update typing status in Firestore / Local state
-     */
     private fun setTypingState(channelId: String, userId: String, isTyping: Boolean) {
         _isTyping.value = isTyping
-        // This can be synced to Firestore collection "chat_typing" if desired
+        if (channelId.isNotBlank() && userId.isNotBlank()) {
+            chatRepository.setTypingStatus(channelId, userId, isTyping)
+        }
     }
 
     /**
      * Send message inside the active channel
      */
-    fun sendMessage(channelId: String, senderId: String, senderName: String, recipientId: String, msgText: String) {
-        if (msgText.isBlank()) return
+    fun sendMessage(
+        channelId: String,
+        senderId: String,
+        senderName: String,
+        recipientId: String,
+        msgText: String,
+        mediaType: String = "TEXT",
+        mediaUrl: String = "",
+        fileName: String = "",
+        fileSize: Long = 0L,
+        forwardedFrom: String = ""
+    ) {
+        if (msgText.isBlank() && mediaUrl.isBlank() && fileName.isBlank()) return
 
+        val reply = _replyingTo.value
         val msg = ChatMessageEntity(
-            id = java.util.UUID.randomUUID().toString(),
+            id = UUID.randomUUID().toString(),
             senderId = senderId,
             senderName = senderName,
             recipientId = recipientId,
             message = msgText,
             timestamp = System.currentTimeMillis(),
-            mediaType = "TEXT"
+            mediaType = mediaType,
+            mediaUrl = mediaUrl,
+            imageUrl = if (mediaType == "IMAGE") mediaUrl else "",
+            replyToId = reply?.id ?: "",
+            replyToText = reply?.message ?: "",
+            replyToSender = reply?.senderName ?: "",
+            fileName = fileName,
+            fileSize = fileSize,
+            forwardedFrom = forwardedFrom,
+            status = "SENT"
         )
 
         chatRepository.sendMessage(channelId, msg) { success, _ ->
             if (success) {
                 _inputText.value = ""
-                _isTyping.value = false
+                _replyingTo.value = null
+                setTypingState(channelId, senderId, false)
             }
+        }
+    }
+
+    fun deleteMessage(channelId: String, messageId: String, deletedBy: String, deleteForEveryone: Boolean = true) {
+        chatRepository.deleteMessage(channelId, messageId, deletedBy, deleteForEveryone)
+    }
+
+    fun toggleReaction(channelId: String, messageId: String, emoji: String, currentReactions: String) {
+        chatRepository.toggleReaction(channelId, messageId, emoji, currentReactions)
+    }
+
+    fun toggleBlockChannel(channelId: String, isBlocked: Boolean) {
+        chatRepository.setChannelBlocked(channelId, isBlocked) { success ->
+            if (success) _isChannelBlocked.value = isBlocked
         }
     }
 

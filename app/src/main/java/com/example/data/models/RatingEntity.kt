@@ -5,11 +5,18 @@ import androidx.annotation.Keep
 @Keep
 data class RatingEntity(
     val id: String = "",
-    val targetId: String = "", // storeId or propertyId
-    val targetType: String = "STORE", // STORE, PROPERTY
+    val targetId: String = "", // providerId, storeId, propertyId
+    val targetType: String = "STORE", // PROVIDER, STORE, PROPERTY, RESTAURANT, MEDICAL
     val userId: String = "",
     val userName: String = "",
+    val userPhone: String = "",
+    val bookingId: String = "",
     val rating: Float = 5.0f,
+    val qualityRating: Float = 5.0f,
+    val speedRating: Float = 5.0f,
+    val professionalismRating: Float = 5.0f,
+    val priceFairnessRating: Float = 5.0f,
+    val photoUrl: String = "",
     val comment: String = "",
     val isApproved: Boolean = true,
     val timestamp: Long = System.currentTimeMillis(),
