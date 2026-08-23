@@ -69,13 +69,13 @@ object ImageAndCacheOptimizer {
         return cacheDir
     }
 
-    // 3. Smart Ultra-Compress Image for Firebase Storage Spark Plan (Max target 800x800, quality 65%)
+    // 3. Smart Ultra-Compress Image for Firebase Storage Spark Plan (On-device WebP compression, max 800px, 75% quality)
     fun compressAndScaleImage(
         context: Context,
         imageUri: Uri,
         maxWidth: Int = 800,
         maxHeight: Int = 800,
-        targetQuality: Int = 65
+        targetQuality: Int = 75
     ): File? {
         return try {
             val inputStream = context.contentResolver.openInputStream(imageUri) ?: return null
@@ -98,9 +98,17 @@ object ImageAndCacheOptimizer {
             val scaledBitmap = BitmapFactory.decodeStream(stream2, null, scaleOptions) ?: return null
             stream2.close()
 
-            val compressedFile = File(getDiskCacheDir(context), "upload_compressed_${System.currentTimeMillis()}.jpg")
+            val compressedFile = File(getDiskCacheDir(context), "upload_webp_${System.currentTimeMillis()}.webp")
             val fos = FileOutputStream(compressedFile)
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, targetQuality, fos)
+            
+            val compressFormat = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                Bitmap.CompressFormat.WEBP_LOSSY
+            } else {
+                @Suppress("DEPRECATION")
+                Bitmap.CompressFormat.WEBP
+            }
+
+            scaledBitmap.compress(compressFormat, targetQuality, fos)
             fos.flush()
             fos.close()
 

@@ -223,9 +223,15 @@ class MainActivity : ComponentActivity() {
             }
             try {
                 val firebaseAppCheck = com.google.firebase.appcheck.FirebaseAppCheck.getInstance()
-                firebaseAppCheck.installAppCheckProviderFactory(
-                    com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
-                )
+                if (BuildConfig.DEBUG) {
+                    firebaseAppCheck.installAppCheckProviderFactory(
+                        com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
+                    )
+                } else {
+                    firebaseAppCheck.installAppCheckProviderFactory(
+                        com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory.getInstance()
+                    )
+                }
             } catch (appCheckEx: Exception) {
                 appCheckEx.printStackTrace()
             }

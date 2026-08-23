@@ -183,15 +183,15 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                     scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
                 )
             } else {
-                val primary = Color(0xFF2563EB)
-                val secondary = Color(0xFF1D4ED8)
-                val background = Color(0xFF0F172A)
-                val surface = Color(0xFF1E293B)
-                val textPrimary = Color(0xFFF8FAFC)
-                val textSecondary = Color(0xFF94A3B8)
-                val accent = Color(0xFF38BDF8)
+                val primary = Color(0xFFFF9800)
+                val secondary = Color(0xFF1A2128)
+                val background = Color(0xFF101418)
+                val surface = Color(0xFF1A2128)
+                val textPrimary = Color(0xFFFFFFFF)
+                val textSecondary = Color(0xFF9EA9B5)
+                val accent = Color(0xFFFF9800)
                 VisualThemePalette(
-                    activeId = "ROYAL_BLUE",
+                    activeId = "DEEP_SLATE_SUPERAPP",
                     primary = primary,
                     secondary = secondary,
                     background = background,
@@ -199,7 +199,7 @@ fun resolveThemePalette(settings: AdminSettingsEntity): VisualThemePalette {
                     textPrimary = textPrimary,
                     textSecondary = textSecondary,
                     accent = accent,
-                    gradientBrush = Brush.verticalGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))),
+                    gradientBrush = Brush.verticalGradient(listOf(Color(0xFF1A2128), Color(0xFF101418))),
                     scheme = darkColorScheme(primary = primary, secondary = secondary, background = background, surface = surface)
                 )
             }

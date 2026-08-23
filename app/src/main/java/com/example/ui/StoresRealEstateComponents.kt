@@ -632,13 +632,42 @@ fun StoresTabContent(
             }
         }
 
+        val sectionTitleAr = when (sectionId.lowercase()) {
+            "restaurants", "food" -> "🍔 المطاعم والكافيهات اليمنية"
+            "medical", "centers" -> "🏥 المراكز والعيادات الطبية والصيدليات"
+            "realestate", "properties" -> "🏢 العقارات والمقاولات"
+            "jobs" -> "💼 إعلانات الوظائف وفرص العمل"
+            else -> "🏪 المتاجر والمحلات المسجلة"
+        }
+        val sectionTitleEn = when (sectionId.lowercase()) {
+            "restaurants", "food" -> "🍔 Yemeni Restaurants & Cafes"
+            "medical", "centers" -> "🏥 Medical Centers & Clinics"
+            "realestate", "properties" -> "🏢 Real Estate & Properties"
+            "jobs" -> "💼 Job Opportunities"
+            else -> "🏪 Registered Yemeni Stores"
+        }
+        val addBtnTextAr = when (sectionId.lowercase()) {
+            "restaurants", "food" -> "إضافة مطعم"
+            "medical", "centers" -> "إضافة مركز"
+            "realestate", "properties" -> "إضافة عقار"
+            "jobs" -> "إضافة وظيفة"
+            else -> "إضافة متجر"
+        }
+        val addBtnTextEn = when (sectionId.lowercase()) {
+            "restaurants", "food" -> "Add Restaurant"
+            "medical", "centers" -> "Add Medical"
+            "realestate", "properties" -> "Add Property"
+            "jobs" -> "Add Job"
+            else -> "Add Store"
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = if (isEn) "🏪 Registered Yemeni Stores (${activeStores.size}):" else "🏪 المتاجر اليمنية المسجلة (${activeStores.size}):",
+                text = if (isEn) "$sectionTitleEn (${activeStores.size}):" else "$sectionTitleAr (${activeStores.size}):",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -661,7 +690,7 @@ fun StoresTabContent(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(2.dp))
-                    Text(if (isEn) "Add Store" else "إضافة متجر", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isEn) addBtnTextEn else addBtnTextAr, color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -671,7 +700,7 @@ fun StoresTabContent(
                 modifier = Modifier.fillMaxWidth().padding(40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(if (isEn) "No stores match the current search filters." else "لم يتم العثور على أي متجر يطابق فلاتر البحث الحالية.", color = themeColors.textSecondary, fontSize = 12.sp)
+                Text(if (isEn) "No listings match the current search filters." else "لم يتم العثور على أي نتائج تطابق فلاتر البحث الحالية.", color = themeColors.textSecondary, fontSize = 12.sp)
             }
         } else {
             activeStores.take(itemsToShowLimit).forEach { store ->
@@ -683,7 +712,7 @@ fun StoresTabContent(
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                 ) {
-                    Text(if (isEn) "Load More Stores ⏬" else "عرض المزيد من المتاجر اليمنية ⏬", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isEn) "Load More ⏬" else "عرض المزيد ⏬", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1521,7 +1550,7 @@ fun PropertyListItemCard(
                 ) {
                     Column {
                         Text("سعر الطلب:", fontSize = 8.sp, color = themeColors.textSecondary)
-                        Text("${prop.price} ${prop.currency}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                        Text("🔽 ${prop.price} ${prop.currency}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
                     }
 
                     Row(
@@ -2095,9 +2124,48 @@ fun StoreDetailsDialog(
                     val sectionTitle = when {
                         isMedical -> "🏥 الخدمات الطبية والأقسام الصحية للحجز (${storeProducts.size}):"
                         isRestaurant -> "🍽️ الوجبات والأطباق المتاحة للطلب (${storeProducts.size}):"
-                        else -> "🛍️ السلع والمنتجات المتاحة (${storeProducts.size}):"
+                        else -> "🛍️ السلع والمنتجات والخدمات (${storeProducts.size}):"
                     }
-                    Text(sectionTitle, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(sectionTitle, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                        
+                        if (isOwnerOrAdmin) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Surface(
+                                    onClick = { showAddProductDialog = true },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFF10B981),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    ) {
+                                        Text("➕ إضافة ${if (isMedical) "خدمة" else if (isRestaurant) "وجبة" else "سلعة/خدمة"}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                }
+
+                                Surface(
+                                    onClick = { showBulkPriceDialog = true },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFFF59E0B),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    ) {
+                                        Text("📈 رفع/تعديل الأسعار", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     if (productCategories.isNotEmpty()) {
                         ScrollableTabRow(
@@ -2252,7 +2320,7 @@ fun StoreDetailsDialog(
 
 
 /**
- * 📈 Bulk Price Adjuster Modal for Store Owner / Admin
+ * 📈 Price Adjuster Modal for Store Owner / Admin (Supports All Items OR Single Selected Item)
  */
 @Composable
 fun BulkPriceAdjusterDialog(
@@ -2262,53 +2330,221 @@ fun BulkPriceAdjusterDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
+    var targetScope by remember { mutableStateOf("SINGLE") } // "ALL" or "SINGLE"
+    var selectedProductId by remember { mutableStateOf(products.firstOrNull()?.id ?: "") }
+    var singleNewPriceInput by remember {
+        mutableStateOf(products.find { it.id == (products.firstOrNull()?.id ?: "") }?.price?.toString() ?: "")
+    }
     var percentInput by remember { mutableStateOf("10") }
     var actionType by remember { mutableStateOf("INCREASE") } // INCREASE or DECREASE
+    var singleAdjustMode by remember { mutableStateOf("DIRECT") } // "DIRECT" (new price) or "PERCENT" (%)
     val context = LocalContext.current
+
+    val currentSelectedProduct = remember(selectedProductId, products) {
+        products.find { it.id == selectedProductId }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
             shape = RoundedCornerShape(16.dp),
             border = BorderStroke(2.dp, themeColors.accent),
-            modifier = Modifier.fillMaxWidth().padding(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(12.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("📈 تعديل / رفع أسعار جميع السلع والمنتجات:", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("سيتم تطبيق نسبة التعديل على جميع المنتجات التابعة لـ هذا المتجر (${products.size} منتج)", fontSize = 10.sp, color = themeColors.textSecondary)
-
+                Text("📈 رفع وتعديل الأسعار:", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                
+                // Scope selector: Single item vs All items
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
-                        selected = actionType == "INCREASE",
-                        onClick = { actionType = "INCREASE" },
-                        label = { Text("📈 رفع الأسعار (+)") },
+                        selected = targetScope == "SINGLE",
+                        onClick = {
+                            targetScope = "SINGLE"
+                            if (selectedProductId.isEmpty() && products.isNotEmpty()) {
+                                selectedProductId = products.first().id
+                                singleNewPriceInput = products.first().price.toString()
+                            }
+                        },
+                        label = { Text("🎯 سلعة/خدمة واحدة فقط", fontSize = 11.sp) },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
-                        selected = actionType == "DECREASE",
-                        onClick = { actionType = "DECREASE" },
-                        label = { Text("📉 تخفيض الأسعار (-)") },
+                        selected = targetScope == "ALL",
+                        onClick = { targetScope = "ALL" },
+                        label = { Text("🌐 جميع السلع (${products.size})", fontSize = 11.sp) },
                         modifier = Modifier.weight(1f)
                     )
                 }
 
-                OutlinedTextField(
-                    value = percentInput,
-                    onValueChange = { percentInput = it },
-                    label = { Text("النسبة المئوية (%)", color = themeColors.textSecondary) },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                if (targetScope == "SINGLE") {
+                    if (products.isEmpty()) {
+                        Text("⚠️ لا توجد منتجات أو خدمات مضافة حالياً لتعديل سعرها.", fontSize = 12.sp, color = Color(0xFFEF4444))
+                    } else {
+                        // Product Picker
+                        var expandedPicker by remember { mutableStateOf(false) }
+                        Text("اختر السلعة أو الخدمة المراد تعديل سعرها:", fontSize = 11.sp, color = themeColors.textSecondary)
+                        
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedCard(
+                                onClick = { expandedPicker = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
+                                colors = CardDefaults.outlinedCardColors(containerColor = Color.Black.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = currentSelectedProduct?.name ?: "اختر منتج...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "السعر الحالي: ${currentSelectedProduct?.price ?: 0} ${currentSelectedProduct?.currency ?: "ريال"}",
+                                            fontSize = 10.sp,
+                                            color = themeColors.accent
+                                        )
+                                    }
+                                    Text("▼", color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = expandedPicker,
+                                onDismissRequest = { expandedPicker = false },
+                                modifier = Modifier.background(Color(0xFF1E293B)).fillMaxWidth(0.85f)
+                            ) {
+                                products.forEach { p ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(p.name, color = Color.White, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                                Text("${p.price} ${p.currency}", color = themeColors.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        },
+                                        onClick = {
+                                            selectedProductId = p.id
+                                            singleNewPriceInput = p.price.toString()
+                                            expandedPicker = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Single adjustment method: Direct Price or Percentage
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = singleAdjustMode == "DIRECT",
+                                onClick = { singleAdjustMode = "DIRECT" },
+                                label = { Text("💰 إدخال السعر الجديد مباشرة", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = singleAdjustMode == "PERCENT",
+                                onClick = { singleAdjustMode = "PERCENT" },
+                                label = { Text("📊 نسبة مئوية (%)", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        if (singleAdjustMode == "DIRECT") {
+                            OutlinedTextField(
+                                value = singleNewPriceInput,
+                                onValueChange = { singleNewPriceInput = it },
+                                label = { Text("السعر الجديد (${currentSelectedProduct?.currency ?: "ريال"})", color = themeColors.textSecondary) },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                )
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = actionType == "INCREASE",
+                                    onClick = { actionType = "INCREASE" },
+                                    label = { Text("📈 رفع (+)") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = actionType == "DECREASE",
+                                    onClick = { actionType = "DECREASE" },
+                                    label = { Text("📉 تخفيض (-)") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = percentInput,
+                                onValueChange = { percentInput = it },
+                                label = { Text("النسبة المئوية (%)", color = themeColors.textSecondary) },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    // ALL ITEMS
+                    Text("سيتم تطبيق نسبة التعديل على جميع السلع والخدمات (${products.size} عنصر):", fontSize = 11.sp, color = themeColors.textSecondary)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = actionType == "INCREASE",
+                            onClick = { actionType = "INCREASE" },
+                            label = { Text("📈 رفع أسعار الجميع (+)") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = actionType == "DECREASE",
+                            onClick = { actionType = "DECREASE" },
+                            label = { Text("📉 تخفيض أسعار الجميع (-)") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = percentInput,
+                        onValueChange = { percentInput = it },
+                        label = { Text("النسبة المئوية لجميع المنتجات (%)", color = themeColors.textSecondary) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
                     )
-                )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -2321,20 +2557,36 @@ fun BulkPriceAdjusterDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            val pct = percentInput.toDoubleOrNull() ?: 0.0
-                            if (pct > 0) {
-                                val factor = if (actionType == "INCREASE") (1.0 + pct / 100.0) else (1.0 - pct / 100.0)
-                                products.forEach { p ->
-                                    val newP = (p.price * factor).let { Math.round(it * 10.0) / 10.0 }
-                                    viewModel.saveProduct(p.copy(price = newP))
+                            if (targetScope == "SINGLE") {
+                                val prod = currentSelectedProduct
+                                if (prod != null) {
+                                    val newPrice = if (singleAdjustMode == "DIRECT") {
+                                        singleNewPriceInput.toDoubleOrNull() ?: prod.price
+                                    } else {
+                                        val pct = percentInput.toDoubleOrNull() ?: 0.0
+                                        val factor = if (actionType == "INCREASE") (1.0 + pct / 100.0) else (1.0 - pct / 100.0)
+                                        (prod.price * factor).let { Math.round(it * 10.0) / 10.0 }
+                                    }
+                                    viewModel.saveProduct(prod.copy(price = newPrice))
+                                    android.widget.Toast.makeText(context, "✅ تم تحديث سعر '${prod.name}' إلى $newPrice ${prod.currency} بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                                    onDismiss()
                                 }
-                                android.widget.Toast.makeText(context, "✅ تم تحديث أسعار ${products.size} منتج بنجاح!", android.widget.Toast.LENGTH_LONG).show()
-                                onDismiss()
+                            } else {
+                                val pct = percentInput.toDoubleOrNull() ?: 0.0
+                                if (pct > 0) {
+                                    val factor = if (actionType == "INCREASE") (1.0 + pct / 100.0) else (1.0 - pct / 100.0)
+                                    products.forEach { p ->
+                                        val newP = (p.price * factor).let { Math.round(it * 10.0) / 10.0 }
+                                        viewModel.saveProduct(p.copy(price = newP))
+                                    }
+                                    android.widget.Toast.makeText(context, "✅ تم تحديث أسعار ${products.size} منتج وخدمة بنجاح!", android.widget.Toast.LENGTH_LONG).show()
+                                    onDismiss()
+                                }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
                     ) {
-                        Text("تطبيق على المنتجات", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text(if (targetScope == "SINGLE") "حفظ السعر المحدد" else "تطبيق على جميع المنتجات", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }

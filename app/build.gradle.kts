@@ -120,6 +120,7 @@ dependencies {
   // implementation(libs.firebase.ai)
   implementation(libs.firebase.auth)
   implementation(libs.firebase.appcheck)
+  implementation(libs.firebase.appcheck.playintegrity)
   implementation(libs.firebase.appcheck.debug)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.storage)

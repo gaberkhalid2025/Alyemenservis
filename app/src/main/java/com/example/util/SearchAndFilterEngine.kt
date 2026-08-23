@@ -62,7 +62,7 @@ object SearchAndFilterEngine {
             else -> query.orderBy("rating", Query.Direction.DESCENDING)
         }
 
-        return query.limit(50) // Paginated & bandwidth-saving
+        return query.limit(10) // Cursor pagination batch of 10 items for Free-Tier cost optimization
     }
 
     // 3. Search History & Suggestions Storage

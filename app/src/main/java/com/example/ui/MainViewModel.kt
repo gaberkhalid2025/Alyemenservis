@@ -930,8 +930,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 5. Providers
-        db.collection("providers").addSnapshotListener { snapshot, error ->
+        // 5. Providers (Paginated / limited to 20 for Spark Plan efficiency)
+        db.collection("providers").limit(20).addSnapshotListener { snapshot, error ->
             _isProvidersLoading.value = false
             if (error != null) {
                 error.printStackTrace()
@@ -956,8 +956,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 6. Pending Providers
-        db.collection("pending_providers").addSnapshotListener { snapshot, error ->
+        // 6. Pending Providers (Paginated / limited to 20)
+        db.collection("pending_providers").limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -993,8 +993,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 7. Bookings
-        db.collection("bookings").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListener { snapshot, error ->
+        // 7. Bookings (Paginated / limited to 20)
+        db.collection("bookings").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1012,8 +1012,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 8. Notifications
-        db.collection("notifications").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
+        // 8. Notifications (Paginated / limited to 20)
+        db.collection("notifications").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1036,8 +1036,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 9. Chat Channels
-        db.collection("chat_channels").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
+        // 9. Chat Channels (Paginated / limited to 20)
+        db.collection("chat_channels").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             _isChatChannelsLoading.value = false
             if (error != null) {
                 error.printStackTrace()
@@ -1058,8 +1058,8 @@ class MainViewModel : ViewModel() {
 
         // 10. General Support Chat Messages are handled dynamically based on currentUserId
 
-        // 11. Reports
-        db.collection("reports").addSnapshotListener { snapshot, error ->
+        // 11. Reports (Paginated / limited to 20)
+        db.collection("reports").limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1078,7 +1078,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 12. Supervisors (Instantly synced)
-        db.collection("supervisors").addSnapshotListener { snapshot, error ->
+        db.collection("supervisors").limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1115,8 +1115,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 14. Calls Log
-        db.collection("calls").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(30).addSnapshotListener { snapshot, error ->
+        // 14. Calls Log (Paginated / limited to 20)
+        db.collection("calls").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1135,7 +1135,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 15. Coupons
-        db.collection("coupons").addSnapshotListener { snapshot, error ->
+        db.collection("coupons").limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1154,7 +1154,7 @@ class MainViewModel : ViewModel() {
         }
 
         // 16. Payment Wallets
-        db.collection("payment_wallets").addSnapshotListener { snapshot, error ->
+        db.collection("payment_wallets").limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1172,8 +1172,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 17. Payments
-        db.collection("payments").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
+        // 17. Payments (Paginated / limited to 20)
+        db.collection("payments").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1191,8 +1191,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 18. Stores
-        db.collection("stores").addSnapshotListener { snapshot, error ->
+        // 18. Stores (Paginated / limited to 20)
+        db.collection("stores").limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1229,8 +1229,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 19. Products
-        db.collection("products").addSnapshotListener { snapshot, error ->
+        // 19. Products (Paginated / limited to 20)
+        db.collection("products").limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1248,8 +1248,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 20. Properties
-        db.collection("properties").addSnapshotListener { snapshot, error ->
+        // 20. Properties (Paginated / limited to 20)
+        db.collection("properties").limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1284,8 +1284,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 20.1 Jobs
-        db.collection("jobs").addSnapshotListener { snapshot, error ->
+        // 20.1 Jobs (Paginated / limited to 20)
+        db.collection("jobs").limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1305,8 +1305,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 20.2 Job Applications
-        db.collection("job_applications").addSnapshotListener { snapshot, error ->
+        // 20.2 Job Applications (Paginated / limited to 20)
+        db.collection("job_applications").limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1320,8 +1320,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 21. Ratings
-        db.collection("ratings").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListener { snapshot, error ->
+        // 21. Ratings (Paginated / limited to 20)
+        db.collection("ratings").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1335,8 +1335,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 22. Orders
-        db.collection("orders").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListener { snapshot, error ->
+        // 22. Orders (Paginated / limited to 20)
+        db.collection("orders").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1350,8 +1350,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 23. Activity Logs
-        db.collection("activity_logs").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListener { snapshot, error ->
+        // 23. Activity Logs (Paginated / limited to 20)
+        db.collection("activity_logs").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1364,8 +1364,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 24. Instant Requests
-        db.collection("instant_requests").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListener { snapshot, error ->
+        // 24. Instant Requests (Paginated / limited to 20)
+        db.collection("instant_requests").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1386,8 +1386,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 25. Request Offers
-        db.collection("request_offers").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(200).addSnapshotListener { snapshot, error ->
+        // 25. Request Offers (Paginated / limited to 20)
+        db.collection("request_offers").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -2863,6 +2863,20 @@ class MainViewModel : ViewModel() {
 
             db.collection("stores").document(targetId).set(uploadedStore)
                 .addOnSuccessListener {
+                    // Send admin notification if it's a new pending store
+                    if (!uploadedStore.isActive || !uploadedStore.isApproved) {
+                        val adminNotif = NotificationEntity(
+                            id = UUID.randomUUID().toString(),
+                            title = "🏪 طلب انضمام نشاط تجاري جديد",
+                            message = "قدم النشاط التجاري '${uploadedStore.name}' (${uploadedStore.categoryId}) طلب انضمام جديد بمنطقة ${uploadedStore.cityId}.",
+                            targetType = "SUPERVISOR",
+                            targetValue = "ALL",
+                            timestamp = System.currentTimeMillis()
+                        )
+                        try {
+                            db.collection("notifications").document(adminNotif.id).set(adminNotif)
+                        } catch (e: Exception) {}
+                    }
                     triggerNotification("✅ تم حفظ وتأكيد بيانات الطلب بنجاح!")
                 }
                 .addOnFailureListener {
@@ -3252,6 +3266,19 @@ class MainViewModel : ViewModel() {
 
             db.collection("properties").document(targetId).set(uploadedProp)
                 .addOnSuccessListener {
+                    if (!uploadedProp.isActive || !uploadedProp.isApproved) {
+                        val adminNotif = NotificationEntity(
+                            id = UUID.randomUUID().toString(),
+                            title = "🏡 طلب انضمام عقار/مكتب عقاري جديد",
+                            message = "قدم المكتب/العقار '${uploadedProp.title}' طلب انضمام جديد بمنطقة ${uploadedProp.cityId}.",
+                            targetType = "SUPERVISOR",
+                            targetValue = "ALL",
+                            timestamp = System.currentTimeMillis()
+                        )
+                        try {
+                            db.collection("notifications").document(adminNotif.id).set(adminNotif)
+                        } catch (e: Exception) {}
+                    }
                     triggerNotification("✅ تم تسجيل بيانات العقار بنجاح!")
                 }
                 .addOnFailureListener {

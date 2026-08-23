@@ -4,6 +4,7 @@ package com.example.ui.dialogs
 
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -115,9 +116,17 @@ fun QuickServiceRequestScreen(
         selectedSpecialty = currentSpecialties.first()
     }
 
+    BackHandler {
+        if (currentStep > 1) {
+            currentStep--
+        } else {
+            onBack()
+        }
+    }
+
     Surface(
         color = Color(0xFF0F172A),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize().statusBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header Bar
@@ -260,7 +269,7 @@ fun QuickServiceRequestScreen(
             Surface(
                 color = Color(0xFF1E293B),
                 shadowElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier

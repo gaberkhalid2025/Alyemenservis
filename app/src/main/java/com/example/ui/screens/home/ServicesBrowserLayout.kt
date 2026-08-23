@@ -142,6 +142,10 @@ fun ServicesBrowserLayout(
     var userTransferPhotoInput by remember { mutableStateOf("") }
 
     var showFiltersPanel by remember { mutableStateOf(false) }
+    var sortByCheapestFirst by remember { mutableStateOf(false) }
+    var selectedSortMode by remember { mutableStateOf("DEFAULT") } // DEFAULT, CHEAPEST, RATING, NEWEST
+    var citySearchQuery by remember { mutableStateOf("") }
+    var isCityDropdownOpen by remember { mutableStateOf(false) }
 
     // --- STORES & REAL ESTATE COMPONENT STATES ---
     val parsedSections = remember(settingsState.dynamicSectionsData) {
@@ -165,6 +169,18 @@ fun ServicesBrowserLayout(
     var showStoreCreateDialog by remember { mutableStateOf(false) }
     var showPropertyCreateDialog by remember { mutableStateOf(false) }
     var productToOrderElectronic by remember { mutableStateOf<com.example.data.ProductEntity?>(null) }
+
+    val displayProviders = remember(filteredProviders, selectedSortMode, sortByCheapestFirst) {
+        when {
+            sortByCheapestFirst || selectedSortMode == "CHEAPEST" -> {
+                filteredProviders.sortedBy { if (it.previewPrice <= 0) Double.MAX_VALUE else it.previewPrice }
+            }
+            selectedSortMode == "RATING" -> {
+                filteredProviders.sortedByDescending { it.rating }
+            }
+            else -> filteredProviders
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -297,6 +313,101 @@ fun ServicesBrowserLayout(
                             ) {
                                 Text("🎙️", fontSize = 13.sp)
                             }
+                        }
+                    }
+                }
+            }
+
+            // Price Comparison & Quick Sorting Bar (Cross-Store Discovery)
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Filter 1: Cheapest (الأرخص سعراً)
+                    val isCheapest = selectedSortMode == "CHEAPEST" || sortByCheapestFirst
+                    Surface(
+                        onClick = {
+                            sortByCheapestFirst = !sortByCheapestFirst
+                            selectedSortMode = if (sortByCheapestFirst) "CHEAPEST" else "DEFAULT"
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isCheapest) Color(0xFF00C853) else Color(0xFF1A2128),
+                        border = BorderStroke(1.dp, if (isCheapest) Color(0xFF00C853) else Color.White.copy(alpha = 0.12f)),
+                        modifier = Modifier.weight(1f).height(38.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
+                        ) {
+                            Text("🏷️", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = if (isCheapest) "الأرخص سعراً 🟢" else "الأرخص سعراً",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isCheapest) Color.Black else Color.White
+                            )
+                        }
+                    }
+
+                    // Filter 2: Top Rated (الأعلى تقييماً)
+                    val isTopRated = selectedSortMode == "RATING"
+                    Surface(
+                        onClick = {
+                            selectedSortMode = if (isTopRated) "DEFAULT" else "RATING"
+                            if (selectedSortMode == "RATING") sortByCheapestFirst = false
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isTopRated) Color(0xFFFF9800) else Color(0xFF1A2128),
+                        border = BorderStroke(1.dp, if (isTopRated) Color(0xFFFF9800) else Color.White.copy(alpha = 0.12f)),
+                        modifier = Modifier.weight(1f).height(38.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
+                        ) {
+                            Text("⭐", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "الأعلى تقييماً",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isTopRated) Color.Black else Color.White
+                            )
+                        }
+                    }
+
+                    // Filter 3: Nearest (الأقرب لي)
+                    val isNearest = selectedSortMode == "NEAREST"
+                    Surface(
+                        onClick = {
+                            selectedSortMode = if (isNearest) "DEFAULT" else "NEAREST"
+                            if (selectedSortMode == "NEAREST") sortByCheapestFirst = false
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isNearest) Color(0xFF3B82F6) else Color(0xFF1A2128),
+                        border = BorderStroke(1.dp, if (isNearest) Color(0xFF3B82F6) else Color.White.copy(alpha = 0.12f)),
+                        modifier = Modifier.weight(1f).height(38.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)
+                        ) {
+                            Text("📍", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "الأقرب لي",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isNearest) Color.White else Color.White
+                            )
                         }
                     }
                 }
@@ -689,23 +800,33 @@ fun ServicesBrowserLayout(
 
         // Services Providers Headers
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "💼 مقدمو الخدمات المتوفرون (${filteredProviders.size}):",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                if (selectedCategory != null) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "إلغاء الفلترة",
-                        fontSize = 11.sp,
-                        color = themeColors.accent,
-                        modifier = Modifier.clickable { viewModel.selectCategory(null) }
+                        text = "💼 مقدمو الخدمات المتوفرون (${displayProviders.size}):",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    if (selectedCategory != null) {
+                        Text(
+                            text = "إلغاء الفلترة",
+                            fontSize = 11.sp,
+                            color = themeColors.accent,
+                            modifier = Modifier.clickable { viewModel.selectCategory(null) }
+                        )
+                    }
+                }
+                if (sortByCheapestFirst) {
+                    Text(
+                        text = "🏷️ تم ترتيب مقدمي الخدمات من الأرخص سعراً للأعلى لمقارنة الأسعار بسهولة",
+                        fontSize = 10.5.sp,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -716,7 +837,7 @@ fun ServicesBrowserLayout(
             item {
                 com.example.ui.components.ProviderListSkeleton()
             }
-        } else if (filteredProviders.isEmpty()) {
+        } else if (displayProviders.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -732,7 +853,7 @@ fun ServicesBrowserLayout(
                 }
             }
         } else {
-            items(filteredProviders.take(providersLimit), key = { it.id }) { provider ->
+            items(displayProviders.take(providersLimit), key = { it.id }) { provider ->
                 ProviderCard(
                     provider = provider,
                     themeColors = themeColors,
@@ -740,7 +861,7 @@ fun ServicesBrowserLayout(
                     onChatOpen = onChatOpen
                 )
             }
-            if (filteredProviders.size > providersLimit) {
+            if (displayProviders.size > providersLimit) {
                 item {
                     Button(
                         onClick = { providersLimit += 10 },
@@ -1062,31 +1183,92 @@ fun ServicesBrowserLayout(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("المدينة اليمنية:", fontSize = 10.sp, color = themeColors.textSecondary)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF1E293B))
-                                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        val idx = citiesList.indexOfFirst { it.id == activeCityId }
-                                        val nextIdx = if (idx == -1) 0 else if (idx == citiesList.size - 1) -1 else idx + 1
-                                        viewModel.setCityFilter(if (nextIdx == -1) null else citiesList[nextIdx].id)
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 12.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                val selectedCityName = citiesList.firstOrNull { it.id == activeCityId }?.nameAr ?: (if (activeCityId.isNullOrEmpty()) "كل المدن" else activeCityId ?: "كل المدن")
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF1E293B))
+                                        .border(1.dp, themeColors.accent.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                        .clickable { isCityDropdownOpen = true }
+                                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                                    contentAlignment = Alignment.CenterStart
                                 ) {
-                                    Text(
-                                        text = citiesList.firstOrNull { it.id == activeCityId }?.nameAr ?: "كل المدن",
-                                        fontSize = 11.sp,
-                                        color = Color.White
+                                    Row(
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = selectedCityName,
+                                            fontSize = 11.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Icon(Icons.Default.ArrowDropDown, null, tint = themeColors.accent, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+
+                                DropdownMenu(
+                                    expanded = isCityDropdownOpen,
+                                    onDismissRequest = { isCityDropdownOpen = false },
+                                    modifier = Modifier
+                                        .background(Color(0xFF0F172A))
+                                        .border(1.dp, themeColors.accent, RoundedCornerShape(8.dp))
+                                        .width(220.dp)
+                                        .heightIn(max = 280.dp)
+                                ) {
+                                    // Search / Custom Input
+                                    OutlinedTextField(
+                                        value = citySearchQuery,
+                                        onValueChange = { 
+                                            citySearchQuery = it
+                                            if (it.isNotBlank()) {
+                                                viewModel.setCityFilter(it)
+                                            }
+                                        },
+                                        placeholder = { Text("اكتب اسم المدينة...", fontSize = 10.sp, color = Color.Gray) },
+                                        singleLine = true,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
+                                            focusedContainerColor = Color(0xFF1E293B),
+                                            unfocusedContainerColor = Color(0xFF1E293B)
+                                        )
                                     )
-                                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(16.dp))
+
+                                    DropdownMenuItem(
+                                        text = { Text("🌍 كل المدن", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                        onClick = {
+                                            viewModel.setCityFilter(null)
+                                            citySearchQuery = ""
+                                            isCityDropdownOpen = false
+                                        }
+                                    )
+
+                                    val baseCities = listOf(
+                                        "صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت", "المكلا", "سيئون",
+                                        "مأرب", "ذمار", "حجة", "صعدة", "أبين", "لحج", "شبوة", "المهرة",
+                                        "عمران", "البيضاء", "الضالع", "ريمة", "المحويت", "سقطرى"
+                                    )
+                                    val dynamicCityNames = (citiesList.map { it.nameAr } + baseCities).distinct()
+                                    val filteredCityNames = if (citySearchQuery.isBlank()) dynamicCityNames else dynamicCityNames.filter { it.contains(citySearchQuery, ignoreCase = true) }
+
+                                    filteredCityNames.forEach { cityName ->
+                                        DropdownMenuItem(
+                                            text = { Text("📍 $cityName", color = Color.White, fontSize = 11.sp) },
+                                            onClick = {
+                                                val matchingId = citiesList.firstOrNull { it.nameAr == cityName }?.id ?: cityName
+                                                viewModel.setCityFilter(matchingId)
+                                                citySearchQuery = ""
+                                                isCityDropdownOpen = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

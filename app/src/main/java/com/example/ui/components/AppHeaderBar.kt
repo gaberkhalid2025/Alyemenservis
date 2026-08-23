@@ -1,6 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -201,13 +203,15 @@ fun AppHeaderBar(
             }
         }
 
-        // Row 2: Navigation Items (5 luxury 3D golden icons - Reduced 30%)
+        // Row 2: Navigation Items (5 luxury 3D golden icons - Preserved in order & iconography)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 1.dp)
-                .background(Color(0xFF1E293B), RoundedCornerShape(8.dp))
-                .padding(vertical = 1.5.dp),
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1A2128))
+                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(16.dp))
+                .padding(vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {

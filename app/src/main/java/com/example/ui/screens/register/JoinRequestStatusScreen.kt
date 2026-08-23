@@ -241,11 +241,121 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
                             Text("إعادة محاولة الدخول 🔄", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
-                    matchingStore != null -> {
+                    matchingStore != null && matchingStore.isActive -> {
                         StoreOwnerDashboardLayout(store = matchingStore, viewModel = viewModel, themeColors = themeColors, ratings = ratings)
                     }
-                    matchingProperty != null -> {
+                    matchingStore != null && !matchingStore.isActive -> {
+                        // Store / Restaurant / Medical Center Pending Approval Screen
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(Color(0xFFF59E0B).copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "⏳", fontSize = 28.sp)
+                        }
+
+                        Text(
+                            text = "⏳ طلب انضمام نشاطك التجاري قيد المراجعة",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFF59E0B),
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "تم استلام طلب انضمام '${matchingStore.name}' بنجاح وهو قيد المراجعة والتدقيق الإداري. فور تفعيل حسابك من قبل الإدارة ستتمكن من إدارة المنتجات واستقبال الطلبات مباشرة.",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.85f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 16.sp
+                        )
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2214)),
+                            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("📋 تفاصيل النشاط المقدم:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                                Text("• الاسم: ${matchingStore.name}", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("• المالك: ${matchingStore.ownerName}", fontSize = 11.sp, color = Color.White)
+                                Text("• الهاتف: ${matchingStore.phone}", fontSize = 11.sp, color = Color.White)
+                                Text("• المحافظة والحي: ${matchingStore.cityId} - ${matchingStore.localNeighborhood}", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = { viewModel.cancelOrResetJoinRequest(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(38.dp)
+                        ) {
+                            Text("❌ إلغاء والعودة لشاشة التسجيل", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                    matchingProperty != null && matchingProperty.isActive -> {
                         PropertyOwnerDashboardLayout(property = matchingProperty, viewModel = viewModel, themeColors = themeColors, ratings = ratings)
+                    }
+                    matchingProperty != null && !matchingProperty.isActive -> {
+                        // Property / Real Estate Pending Approval Screen
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(Color(0xFFF59E0B).copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "⏳", fontSize = 28.sp)
+                        }
+
+                        Text(
+                            text = "⏳ إعلان عقارك قيد المراجعة",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFF59E0B),
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "تم استلام إعلان العقار '${matchingProperty.title}' بنجاح وهو قيد التدقيق الإداري للتأكد من صحة التفاصيل. فور الاعتماد سيظهر للجميع في قسم العقارات.",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.85f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 16.sp
+                        )
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
+
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2214)),
+                            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("📋 تفاصيل العقار المقدم:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                                Text("• العنوان: ${matchingProperty.title}", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("• السعر المعلن: ${matchingProperty.price} ${matchingProperty.currency}", fontSize = 11.sp, color = Color.White)
+                                Text("• الهاتف: ${matchingProperty.phone}", fontSize = 11.sp, color = Color.White)
+                                Text("• المحافظة والحي: ${matchingProperty.cityId} - ${matchingProperty.localNeighborhood}", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = { viewModel.cancelOrResetJoinRequest(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(38.dp)
+                        ) {
+                            Text("❌ إلغاء والعودة لشاشة التسجيل", color = Color.White, fontSize = 11.sp)
+                        }
                     }
                     matchingApproved != null -> {
                         // Accepted (Image 2 design style + Full Interactive Provider Dashboard)

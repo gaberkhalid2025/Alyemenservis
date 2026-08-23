@@ -114,9 +114,9 @@ fun CreateBookingScreen(
     val timePickerDialog = TimePickerDialog(
         context,
         { _, hourOfDay, minute ->
-            val amPm = if (hourOfDay < 12) "ص" else "م"
+            val period = if (hourOfDay < 12) "صباحاً" else "مساءً"
             val hourFormatted = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
-            selectedTime = String.format(Locale.US, "%02d:%02d %s", hourFormatted, minute, amPm)
+            selectedTime = String.format(Locale.US, "\u200E%02d:%02d %s", hourFormatted, minute, period)
         },
         calendar.get(Calendar.HOUR_OF_DAY),
         calendar.get(Calendar.MINUTE),

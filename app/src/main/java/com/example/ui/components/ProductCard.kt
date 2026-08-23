@@ -81,7 +81,7 @@ fun ProductListItemCard(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = product.name,
-                        fontSize = 13.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         maxLines = 1,
@@ -90,10 +90,19 @@ fun ProductListItemCard(
                     if (product.isOffer || product.discountPercent > 0) {
                         Box(
                             modifier = Modifier
-                                .background(Color.Red, RoundedCornerShape(4.dp))
+                                .background(Color(0xFFEF4444), RoundedCornerShape(4.dp))
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         ) {
                             Text("🔥 خصم", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    if (product.isOffer || product.price > 0 && product.price <= 2000) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFFFD700), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text("🏷️ أرخص سعر", fontSize = 8.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -146,10 +155,10 @@ fun ProductListItemCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "${product.price} YER",
-                            fontSize = 12.sp,
+                            text = "🔽 ${if (product.price % 1.0 == 0.0) product.price.toLong() else product.price} ريال",
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = themeColors.accent
+                            color = Color(0xFF10B981)
                         )
                         if (isOwnerOrAdmin) {
                             Text(

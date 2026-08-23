@@ -252,18 +252,21 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                     OutlinedTextField(
                         value = customPhoneInput,
                         onValueChange = { customPhoneInput = it },
-                        placeholder = { Text("مثال: 777123456", color = Color.Gray, fontSize = 11.sp) },
+                        placeholder = { Text("مثال: 777123456", color = Color.Gray, fontSize = 12.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "الهاتف", tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "الهاتف", tint = themeColors.accent, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
                             focusedBorderColor = themeColors.accent,
-                            unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f)
+                            unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f),
+                            focusedContainerColor = Color(0xFF1E293B),
+                            unfocusedContainerColor = Color(0xFF1E293B)
                         ),
-                        singleLine = true
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
             }

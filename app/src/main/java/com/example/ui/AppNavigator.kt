@@ -318,7 +318,13 @@ fun AppNavigator(
                         )
                     }
 
-                    Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                            .widthIn(max = 900.dp)
+                            .align(Alignment.CenterHorizontally)
+                    ) {
                         if (settingsState.isMaintenanceActive && adminRole == "GUEST") {
                             MaintenanceSplashView(settingsState = settingsState, themeColors = themeColors, viewModel = viewModel)
                         } else {
@@ -1601,36 +1607,36 @@ fun BoxScope.FloatingIconsOverlay(
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن" (Reduced 30%)
-    if (isClientUser && !settings.footerMessage.contains("hide_urgent_fab")) {
+    // 1. Primary Action FAB: "اطلب خدمتك الآن ⚡" (Bottom Start - Right in RTL)
+    if (!settings.footerMessage.contains("hide_urgent_fab")) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 10.dp, bottom = 10.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .padding(start = 12.dp, bottom = 12.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .background(
                     Brush.horizontalGradient(
-                        listOf(Color(0xFF10B981), Color(0xFF059669))
+                        listOf(Color(0xFFEF4444), Color(0xFFDC2626))
                     )
                 )
                 .clickable { onRequestServiceClick() }
-                .border(0.8.dp, Color.White, RoundedCornerShape(16.dp))
-                .padding(horizontal = 8.dp, vertical = 4.5.dp),
+                .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 12.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Send,
                     contentDescription = "اطلب خدمتك الآن",
                     tint = Color.White,
-                    modifier = Modifier.size(11.dp)
+                    modifier = Modifier.size(13.dp)
                 )
                 Text(
                     text = "اطلب خدمتك الآن ⚡",
-                    fontSize = 8.5.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -1638,27 +1644,27 @@ fun BoxScope.FloatingIconsOverlay(
         }
     }
 
-    // 2. Secondary FAB: "المساعد الذكي" (Reduced 30%)
+    // 2. Secondary FAB: "المساعد الذكي" (Bottom End - Left in RTL)
     if (!settings.assistantHidden) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 10.dp, bottom = 10.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .padding(end = 12.dp, bottom = 12.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .background(themeColors.accent)
                 .clickable { onAssistantClick() }
-                .border(0.8.dp, Color.White, RoundedCornerShape(16.dp))
-                .padding(horizontal = 8.dp, vertical = 4.5.dp),
+                .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("🤖", fontSize = 10.sp)
+                Text("🤖", fontSize = 11.sp)
                 Text(
                     text = "المساعد الذكي",
-                    fontSize = 8.5.sp,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
@@ -2775,23 +2781,24 @@ fun ProviderCard(
                             )
                         }
 
-                        // Row 3: Price Tag / Status
+                        // Row 3: Status / Verification Info (No price)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "💰 2,000 ريال",
-                                fontSize = 9.sp,
-                                color = priceColor,
-                                fontWeight = FontWeight.Bold
+                                text = if (provider.localNeighborhood.isNotEmpty()) "📍 ${provider.localNeighborhood}" else "🛡️ موثق ومعتمد",
+                                fontSize = 8.5.sp,
+                                color = Color.LightGray.copy(alpha = 0.85f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             
                             Text(
-                                text = "⭐ موثوق ومعتمد",
+                                text = "⭐ فني معتمد",
                                 fontSize = 8.sp,
-                                color = Color.Gray
+                                color = Color(0xFFFFD700).copy(alpha = 0.9f)
                             )
                         }
                     }
@@ -4070,14 +4077,16 @@ fun ProviderCard(
                         }
                     }
 
-                    // Date Picker Input
+                    // Date & Time Picker Row (Side by side with clean formatting)
                     val context = LocalContext.current
                     val calendar = java.util.Calendar.getInstance()
                     val datePickerDialog = remember(context) {
                         android.app.DatePickerDialog(
                             context,
                             { _, year, month, dayOfMonth ->
-                                bookingDateInput = "$year/${month + 1}/$dayOfMonth"
+                                val formattedMonth = String.format("%02d", month + 1)
+                                val formattedDay = String.format("%02d", dayOfMonth)
+                                bookingDateInput = "$year-$formattedMonth-$formattedDay"
                             },
                             calendar.get(java.util.Calendar.YEAR),
                             calendar.get(java.util.Calendar.MONTH),
@@ -4085,29 +4094,15 @@ fun ProviderCard(
                         )
                     }
 
-                    OutlinedTextField(
-                        value = bookingDateInput,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("تاريخ الحجز المفضل", color = themeColors.textSecondary, fontSize = 11.sp) },
-                        modifier = Modifier.fillMaxWidth().clickable { datePickerDialog.show() },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        trailingIcon = {
-                            IconButton(onClick = { datePickerDialog.show() }) {
-                                Text("📅", fontSize = 16.sp)
-                            }
-                        }
-                    )
-
-                    // Time Picker Input
                     val timePickerDialog = remember(context) {
                         android.app.TimePickerDialog(
                             context,
                             { _, hourOfDay, minute ->
-                                val amPm = if (hourOfDay < 12) "ص" else "م"
-                                val hour = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
+                                val period = if (hourOfDay < 12) "صباحاً" else "مساءً"
+                                val displayHour = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
+                                val formattedHour = String.format("%02d", displayHour)
                                 val formattedMin = String.format("%02d", minute)
-                                bookingTimeInput = "$hour:$formattedMin $amPm"
+                                bookingTimeInput = "\u200E$formattedHour:$formattedMin $period"
                             },
                             calendar.get(java.util.Calendar.HOUR_OF_DAY),
                             calendar.get(java.util.Calendar.MINUTE),
@@ -4115,19 +4110,60 @@ fun ProviderCard(
                         )
                     }
 
-                    OutlinedTextField(
-                        value = bookingTimeInput,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("وقت الحجز المفضل", color = themeColors.textSecondary, fontSize = 11.sp) },
-                        modifier = Modifier.fillMaxWidth().clickable { timePickerDialog.show() },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        trailingIcon = {
-                            IconButton(onClick = { timePickerDialog.show() }) {
-                                Text("🕒", fontSize = 16.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedCard(
+                            onClick = { datePickerDialog.show() },
+                            modifier = Modifier.weight(1f).height(56.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, if (bookingDateInput.isNotEmpty()) themeColors.accent else Color.Gray.copy(alpha = 0.5f)),
+                            colors = CardDefaults.outlinedCardColors(containerColor = Color.Black.copy(alpha = 0.25f))
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("📅", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text("تاريخ الحجز", fontSize = 9.sp, color = themeColors.textSecondary)
+                                    Text(
+                                        text = bookingDateInput.ifEmpty { "اختر اليوم" },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (bookingDateInput.isNotEmpty()) Color.White else Color.Gray
+                                    )
+                                }
                             }
                         }
-                    )
+
+                        OutlinedCard(
+                            onClick = { timePickerDialog.show() },
+                            modifier = Modifier.weight(1f).height(56.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, if (bookingTimeInput.isNotEmpty()) themeColors.accent else Color.Gray.copy(alpha = 0.5f)),
+                            colors = CardDefaults.outlinedCardColors(containerColor = Color.Black.copy(alpha = 0.25f))
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🕒", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text("وقت الحجز", fontSize = 9.sp, color = themeColors.textSecondary)
+                                    Text(
+                                        text = bookingTimeInput.ifEmpty { "اختر الوقت" },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (bookingTimeInput.isNotEmpty()) Color.White else Color.Gray
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = customerServiceInput,

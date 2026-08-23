@@ -1304,20 +1304,11 @@ fun ProviderRegisterFormLayout(
                         viewModel.triggerNotification("⚠️ كلمتا المرور غير متطابقتين!")
                     } else {
                         val attsJson = com.example.data.ProductAttachment.serializeList(providerAttachmentsList)
-                        viewModel.submitJoinForm(context, name, phone, selectedCatId, area, neighborhood, selfiePhotoBase64, idPhotoBase64, "", workPhotosList, customProfession, password, attsJson)
-                        name = ""
-                        phone = ""
-                        password = ""
-                        confirmPassword = ""
-                        selectedCatId = ""
-                        customProfession = ""
-                        area = ""
-                        neighborhood = ""
-                        selfiePhotoBase64 = ""
-                        idPhotoBase64 = ""
-                        workPhotosList = emptyList()
-                        providerAttachmentsList = emptyList()
+                        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+                        viewModel.submitJoinForm(context, name.trim(), cleanPhone, selectedCatId, area.trim(), neighborhood.trim(), selfiePhotoBase64, idPhotoBase64, "", workPhotosList, customProfession.trim(), password, attsJson)
+                        viewModel.setJoinRequestPhone(context, cleanPhone)
                         android.widget.Toast.makeText(context, "📨 تم تقديم طلبك بنجاح! جاري عرض حالة الطلب التفاعلية.", android.widget.Toast.LENGTH_LONG).show()
+                        viewModel.navigateTo("JOIN_REQUEST_STATUS")
                     }
                 } else {
                     viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول الإلزامية المطلوبة: ${missingList.joinToString("، ")}")
