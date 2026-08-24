@@ -9,6 +9,7 @@ enum class BookingStatus(val label: String, val colorHex: String) {
     PENDING("قيد الانتظار", "#F59E0B"),
     UNDER_REVIEW("قيد المراجعة", "#FCD34D"),
     ACCEPTED("مقبول", "#10B981"),
+    REJECTED("مرفوض", "#EF4444"),
     IN_PROGRESS("قيد التنفيذ", "#3B82F6"),
     COMPLETED("مكتمل", "#059669"),
     PAID("تم الدفع", "#8B5CF6"),
@@ -23,14 +24,15 @@ enum class BookingStatus(val label: String, val colorHex: String) {
 object BookingStateMachine {
 
     private val allowedTransitions = mapOf(
-        "PENDING" to listOf("UNDER_REVIEW", "ACCEPTED", "CANCELLED"),
-        "UNDER_REVIEW" to listOf("ACCEPTED", "CANCELLED", "PENDING"),
+        "PENDING" to listOf("UNDER_REVIEW", "ACCEPTED", "REJECTED", "CANCELLED"),
+        "UNDER_REVIEW" to listOf("ACCEPTED", "REJECTED", "CANCELLED", "PENDING"),
         "ACCEPTED" to listOf("IN_PROGRESS", "CANCELLED"),
         "IN_PROGRESS" to listOf("COMPLETED", "CANCELLED"),
         "COMPLETED" to listOf("PAID", "CLOSED"),
         "PAID" to listOf("CLOSED"),
         "CLOSED" to emptyList(),
-        "CANCELLED" to emptyList()
+        "CANCELLED" to emptyList(),
+        "REJECTED" to emptyList()
     )
 
     /**

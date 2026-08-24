@@ -419,7 +419,9 @@ fun SpecialOffersSection(
                     "🔥 العروض والتخفيضات الحصرية",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = themeColors.accent
+                    color = themeColors.accent,
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 1
                 )
                 if (isEditable) {
                     Button(
@@ -430,7 +432,14 @@ fun SpecialOffersSection(
                     ) {
                         Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("+ إضافة عرض جديد", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "+ إضافة عرض جديد",
+                            color = Color.Black,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }

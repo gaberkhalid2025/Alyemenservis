@@ -21,5 +21,11 @@ data class RatingEntity(
     val isApproved: Boolean = true,
     val timestamp: Long = System.currentTimeMillis(),
     val reply: String = "",
-    val replyTimestamp: Long? = null
+    val replyTimestamp: Long? = null,
+    val helpfulCount: Int = 0,
+    val unhelpfulCount: Int = 0,
+    val helpfulUserIds: List<String> = emptyList(),
+    val unhelpfulUserIds: List<String> = emptyList(),
+    val isReported: Boolean = false,
+    val reportReason: String = ""
 )

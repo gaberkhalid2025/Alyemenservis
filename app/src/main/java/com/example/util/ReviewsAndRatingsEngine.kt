@@ -1,150 +1,213 @@
 package com.example.util
 
-import com.example.utils.*
-
+import com.example.data.RatingEntity
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 /**
- * ⭐ Problem 13 Solution: Verified Reviews & Multi-Dimensional Rating Engine
- * Ties reviews strictly to COMPLETED bookings, multi-dimensional score rating,
- * anti-fraud detection, 30-day lock, provider replies, and review moderation reporting.
+ * ⭐ Reviews & Ratings Engine
+ * - يربط التقييمات بالحجوزات المكتملة حصراً (COMPLETED) ويمنع التكرار (isRated = true).
+ * - تقييم متعدد الأبعاد (الجودة، السرعة، الاحترافية، مناسبة السعر).
+ * - التصويت على التقييمات (مفيد / غير مفيد).
+ * - ردود المزودين على التقييمات وإمكانية الإبلاغ.
+ * - ترشيد استهلاك Firebase بالاعتماد على الكاش المحلي.
  */
 object ReviewsAndRatingsEngine {
 
     private val db = FirebaseFirestore.getInstance()
+
+    // Local In-Memory Cache to minimize Firestore reads on Free Tier
+    private val reviewsCache = mutableMapOf<String, List<RatingEntity>>()
 
     // 1. Multi-Dimensional Rating Criteria Model
     data class MultiDimensionalRating(
         val quality: Float = 5.0f,
         val speed: Float = 5.0f,
         val professionalism: Float = 5.0f,
-        val priceFairness: Float = 5.0f,
-        val cleanliness: Float = 5.0f
+        val priceFairness: Float = 5.0f
     ) {
-        fun calculateOverallAverage(): Double {
-            val sum = quality + speed + professionalism + priceFairness + cleanliness
-            return (sum / 5.0).coerceIn(1.0, 5.0)
+        fun calculateOverallAverage(): Float {
+            val sum = quality + speed + professionalism + priceFairness
+            return (sum / 4.0f).coerceIn(1.0f, 5.0f)
         }
     }
 
     // 2. Verified Booking Check
     fun verifyCompletedBookingEligibility(
         userId: String,
-        providerId: String,
+        bookingId: String,
         onResult: (Boolean, String?) -> Unit
     ) {
+        if (bookingId.isBlank()) {
+            onResult(false, "عفواً، لا يمكن التقييم إلا برقم حجز مكتمل وصحيح.")
+            return
+        }
+
         db.collection("bookings")
-            .whereEqualTo("userId", userId)
-            .whereEqualTo("providerId", providerId)
-            .whereEqualTo("status", "COMPLETED")
-            .limit(1)
+            .document(bookingId)
             .get()
-            .addOnSuccessListener { snapshots ->
-                if (snapshots.isEmpty) {
-                    onResult(false, "عفواً، لا يمكنك التقييم إلا بعد إكمال حجز وإنجاز خدمة فعلياً مع هذا المزود.")
+            .addOnSuccessListener { doc ->
+                if (!doc.exists()) {
+                    onResult(false, "الحجز غير موجود في النظام.")
+                    return@addOnSuccessListener
+                }
+
+                val status = doc.getString("status") ?: ""
+                val isRated = doc.getBoolean("isRated") ?: false
+
+                if (status != "COMPLETED") {
+                    onResult(false, "لا يمكنك التقييم إلا بعد إكمال وإنجاز الخدمة فعلياً (حالة الحجز مكتمل).")
+                } else if (isRated) {
+                    onResult(false, "لقد قمت بتقييم هذه الخدمة مسبقاً! شكراً لمشاركتك.")
                 } else {
                     onResult(true, null)
                 }
             }
             .addOnFailureListener {
-                onResult(false, "حدث خطأ في التحقق من سجل الحجوزات: ${it.localizedMessage}")
+                onResult(false, "تعذر التحقق من حالة الحجز: ${it.localizedMessage}")
             }
     }
 
-    // 3. Fraud / Spam Detection Rule Engine
-    fun isSuspiciousRatingFrequency(
-        userId: String,
-        onCheckComplete: (isSuspicious: Boolean) -> Unit
-    ) {
-        val oneHourAgo = System.currentTimeMillis() - (60 * 60 * 1000)
-        db.collection("reviews")
-            .whereEqualTo("userId", userId)
-            .whereGreaterThan("timestamp", oneHourAgo)
-            .get()
-            .addOnSuccessListener { snapshots ->
-                // Flag if user submitted > 4 reviews in 1 hour
-                onCheckComplete(snapshots.size() >= 4)
-            }
-            .addOnFailureListener {
-                onCheckComplete(false)
-            }
-    }
-
-    // 4. Submit Verified Review with Multi-Dimensional Scores
+    // 3. Submit Verified Multi-Dimensional Rating
     fun submitVerifiedReview(
         bookingId: String,
         userId: String,
         userName: String,
-        providerId: String,
+        userPhone: String = "",
+        targetId: String,
+        targetType: String = "PROVIDER",
         comment: String,
         ratings: MultiDimensionalRating,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        verifyCompletedBookingEligibility(userId, providerId) { isValid, errorMsg ->
+        verifyCompletedBookingEligibility(userId, bookingId) { isValid, errorMsg ->
             if (!isValid) {
-                onError(errorMsg ?: "حجز غير مؤكد")
+                onError(errorMsg ?: "حجز غير مؤهل للتقييم")
                 return@verifyCompletedBookingEligibility
             }
 
-            isSuspiciousRatingFrequency(userId) { isSpam ->
-                val reviewId = EntityIdGenerator.generate(EntityIdGenerator.Prefix.REVIEW)
-                val reviewPayload = hashMapOf<String, Any?>(
-                    "id" to reviewId,
-                    "bookingId" to bookingId,
-                    "userId" to userId,
-                    "userName" to userName,
-                    "providerId" to providerId,
-                    "comment" to SecurityCryptoUtils.sanitizeInput(comment),
-                    "overallRating" to ratings.calculateOverallAverage(),
-                    "qualityScore" to ratings.quality,
-                    "speedScore" to ratings.speed,
-                    "profScore" to ratings.professionalism,
-                    "priceScore" to ratings.priceFairness,
-                    "cleanScore" to ratings.cleanliness,
-                    "timestamp" to System.currentTimeMillis(),
-                    "isUnderReview" to isSpam, // Flag for admin moderation
-                    "providerReply" to null,
-                    "replyTimestamp" to null
-                )
+            val reviewId = "rev_${System.currentTimeMillis()}_${(1000..9999).random()}"
+            val overallAvg = ratings.calculateOverallAverage()
 
-                db.collection("reviews")
-                    .document(reviewId)
-                    .set(reviewPayload)
-                    .addOnSuccessListener {
-                        if (isSpam) {
-                            AuditTrailLogger.logSecurityEvent(
-                                userId = userId,
-                                actionType = "SUSPICIOUS_REVIEW_FLAGGED",
-                                targetEntityId = reviewId,
-                                details = "تم وضع التقييم قيد المراجعة لكثرة التقييمات في زمن قصير"
-                            )
-                        }
-                        onSuccess()
-                    }
-                    .addOnFailureListener { onError(it.localizedMessage ?: "فشل حفظ التقييم") }
-            }
+            val ratingEntity = RatingEntity(
+                id = reviewId,
+                targetId = targetId,
+                targetType = targetType,
+                userId = userId,
+                userName = userName.ifEmpty { "عميل معتمد" },
+                userPhone = userPhone,
+                bookingId = bookingId,
+                rating = overallAvg,
+                qualityRating = ratings.quality,
+                speedRating = ratings.speed,
+                professionalismRating = ratings.professionalism,
+                priceFairnessRating = ratings.priceFairness,
+                comment = comment.trim(),
+                isApproved = true,
+                timestamp = System.currentTimeMillis()
+            )
+
+            // Save rating to ratings collection
+            db.collection("ratings")
+                .document(reviewId)
+                .set(ratingEntity)
+                .addOnSuccessListener {
+                    // Mark the booking as rated
+                    db.collection("bookings")
+                        .document(bookingId)
+                        .update("isRated", true)
+
+                    // Invalidate local cache
+                    reviewsCache.remove(targetId)
+
+                    onSuccess()
+                }
+                .addOnFailureListener {
+                    onError(it.localizedMessage ?: "فشل حفظ التقييم")
+                }
         }
     }
 
-    // 5. Submit Provider Reply
+    // 4. Submit Provider Reply
     fun submitProviderReply(
         reviewId: String,
         replyText: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val cleanReply = SecurityCryptoUtils.sanitizeInput(replyText)
-        db.collection("reviews")
+        if (replyText.isBlank()) {
+            onError("الرجاء كتابة نص الرد أولاً")
+            return
+        }
+
+        db.collection("ratings")
             .document(reviewId)
             .update(
                 mapOf(
-                    "providerReply" to cleanReply,
+                    "reply" to replyText.trim(),
                     "replyTimestamp" to System.currentTimeMillis()
                 )
             )
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل حفظ الرد") }
+    }
+
+    // 5. Vote Review as Helpful / Unhelpful
+    fun voteReviewHelpful(
+        reviewId: String,
+        userId: String,
+        isHelpful: Boolean,
+        onSuccess: (newHelpful: Int, newUnhelpful: Int) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (userId.isBlank()) {
+            onError("يجب تسجيل الدخول للتصويت على التقييم")
+            return
+        }
+
+        val docRef = db.collection("ratings").document(reviewId)
+        docRef.get().addOnSuccessListener { snapshot ->
+            if (!snapshot.exists()) {
+                onError("التقييم غير موجود")
+                return@addOnSuccessListener
+            }
+
+            val helpfulList = (snapshot.get("helpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
+            val unhelpfulList = (snapshot.get("unhelpfulUserIds") as? List<*>)?.filterIsInstance<String>()?.toMutableList() ?: mutableListOf()
+
+            if (isHelpful) {
+                if (helpfulList.contains(userId)) {
+                    helpfulList.remove(userId) // Toggle off
+                } else {
+                    helpfulList.add(userId)
+                    unhelpfulList.remove(userId)
+                }
+            } else {
+                if (unhelpfulList.contains(userId)) {
+                    unhelpfulList.remove(userId) // Toggle off
+                } else {
+                    unhelpfulList.add(userId)
+                    helpfulList.remove(userId)
+                }
+            }
+
+            val updates = mapOf(
+                "helpfulCount" to helpfulList.size,
+                "unhelpfulCount" to unhelpfulList.size,
+                "helpfulUserIds" to helpfulList,
+                "unhelpfulUserIds" to unhelpfulList
+            )
+
+            docRef.update(updates).addOnSuccessListener {
+                onSuccess(helpfulList.size, unhelpfulList.size)
+            }.addOnFailureListener {
+                onError(it.localizedMessage ?: "فشل تحديث التصويت")
+            }
+        }.addOnFailureListener {
+            onError(it.localizedMessage ?: "فشل جلب التقييم")
+        }
     }
 
     // 6. Report Abusive Review
@@ -155,20 +218,33 @@ object ReviewsAndRatingsEngine {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val reportId = EntityIdGenerator.generate(EntityIdGenerator.Prefix.REVIEW)
-        val payload = hashMapOf<String, Any?>(
+        if (reason.isBlank()) {
+            onError("الرجاء تحديد سبب الإبلاغ")
+            return
+        }
+
+        val reportId = "rep_${System.currentTimeMillis()}"
+        val reportPayload = hashMapOf<String, Any?>(
             "id" to reportId,
             "reviewId" to reviewId,
             "reporterUserId" to reporterUserId,
-            "reason" to SecurityCryptoUtils.sanitizeInput(reason),
+            "reason" to reason.trim(),
             "status" to "PENDING",
             "timestamp" to System.currentTimeMillis()
         )
 
         db.collection("review_reports")
             .document(reportId)
-            .set(payload)
-            .addOnSuccessListener { onSuccess() }
+            .set(reportPayload)
+            .addOnSuccessListener {
+                db.collection("ratings").document(reviewId).update(
+                    mapOf(
+                        "isReported" to true,
+                        "reportReason" to reason.trim()
+                    )
+                )
+                onSuccess()
+            }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل إرسال البلاغ") }
     }
 }

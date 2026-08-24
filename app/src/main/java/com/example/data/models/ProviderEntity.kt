@@ -38,7 +38,8 @@ data class ProviderEntity(
     val isPaymentRequired: Boolean = false,
     val password: String = "",
     val isDeleted: Boolean = false,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    val providerType: String = ""
 )
 
 @Keep
@@ -59,5 +60,6 @@ data class PendingProviderEntity(
     val profession: String = "",
     val specialization: String = "",
     val chatRecipientId: String = "",
-    val password: String = ""
+    val password: String = "",
+    val providerType: String = ""
 )

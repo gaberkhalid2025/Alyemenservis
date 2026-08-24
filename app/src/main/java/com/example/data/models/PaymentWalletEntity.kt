@@ -5,6 +5,9 @@ import androidx.annotation.Keep
 @Keep
 data class PaymentWalletEntity(
     val id: String = "",
+    val ownerId: String = "",
+    val balance: Double = 0.0,
+    val isFrozen: Boolean = false,
     val provider: String = "other", // jeeb, alKarimi, jawaly, floosi, cashExchange, foreignCurrency, yemenMobile, mtc, sabafon, youssef, other
     val walletNumber: String = "",
     val accountName: String = "",

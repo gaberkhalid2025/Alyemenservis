@@ -25,6 +25,7 @@ data class PaymentEntity(
     val bankName: String = "",
     val accountNumber: String = "",
     val accountHolderName: String = "",
+    val serviceType: String = "", // BOOKINGS, STORES, RESTAURANTS, MEDICAL, PROPERTIES, JOBS
     val isLinkedToBooking: Boolean = false,
     val bookingDate: Long? = null,
     val bookingServiceType: String = "",

@@ -46,5 +46,6 @@ data class StoreEntity(
     val blockReason: String = "",
     val backgroundColorHex: String = "",
     val commercialRegisterNo: String = "",
-    val medicalLicenseNo: String = ""
+    val medicalLicenseNo: String = "",
+    val providerType: String = ""
 )

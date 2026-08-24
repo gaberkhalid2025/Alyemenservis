@@ -420,29 +420,50 @@ fun StoresTabContent(
         stores.filter { store ->
             if (store.isDeleted) return@filter false
             
-            val sec = store.sectionId.lowercase()
-            val name = store.name.lowercase()
-            val desc = store.description.lowercase()
-            val cat = store.categoryId.lowercase()
+            val sec = store.sectionId.lowercase().trim()
+            val nameNorm = store.name.lowercase().trim()
+                .replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه")
+            val descNorm = store.description.lowercase().trim()
+                .replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه")
+            val cat = store.categoryId.lowercase().trim()
 
             val isFoodOrRest = sec == "restaurants" || sec == "food" || cat == "restaurants" || cat == "food" ||
-                    name.contains("مطعم") || name.contains("كافيه") || name.contains("وجبات") || name.contains("أسماك") || name.contains("مأكولات") || name.contains("شاورما") || name.contains("بيتزا") ||
-                    desc.contains("مطعم") || desc.contains("وجبات") || desc.contains("أسماك") || desc.contains("كافيه")
+                    nameNorm.contains("مطعم") || nameNorm.contains("كافيه") || nameNorm.contains("وجب") ||
+                    nameNorm.contains("اسماك") || nameNorm.contains("ماكولات") || nameNorm.contains("شاورما") ||
+                    nameNorm.contains("بيتزا") || nameNorm.contains("حلويات") || nameNorm.contains("مخبز") ||
+                    nameNorm.contains("عصائر") || nameNorm.contains("عصير") || nameNorm.contains("كيك") ||
+                    descNorm.contains("مطعم") || descNorm.contains("وجبات") || descNorm.contains("ماكولات") || descNorm.contains("كافيه")
 
             val isMedical = sec == "medical" || sec == "centers" || cat == "medical" || cat == "centers" ||
-                    name.contains("مستشفى") || name.contains("عيادة") || name.contains("مركز طبي") || name.contains("مختبر") || name.contains("صيدلية") ||
-                    desc.contains("مستشفى") || desc.contains("عيادة") || desc.contains("طبي")
+                    nameNorm.contains("مستشفى") || nameNorm.contains("عياد") || nameNorm.contains("مركز طبي") ||
+                    nameNorm.contains("مختبر") || nameNorm.contains("صيدلي") || nameNorm.contains("دكتور") ||
+                    nameNorm.contains("طبي") || nameNorm.contains("اطباء") || nameNorm.contains("اسنان") ||
+                    descNorm.contains("مستشفى") || descNorm.contains("عياد") || descNorm.contains("طبي")
+
+            val isRealEstate = sec == "realestate" || sec == "properties" || cat == "realestate" ||
+                    nameNorm.contains("عقار") || nameNorm.contains("ارض") || nameNorm.contains("فيلا") || nameNorm.contains("شقه") ||
+                    descNorm.contains("عقار") || descNorm.contains("ارض")
 
             val matchesSection = when (sectionId.lowercase()) {
                 "restaurants", "food" -> isFoodOrRest
                 "medical", "centers" -> isMedical
-                "stores", "shops", "malls" -> !isFoodOrRest && !isMedical
+                "realestate", "properties" -> isRealEstate
+                "stores", "shops", "malls" -> !isFoodOrRest && !isMedical && !isRealEstate
                 else -> store.sectionId == sectionId
             }
 
+            val queryNorm = searchQuery.trim().lowercase()
+                .replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه")
+
+            val matchesSearch = queryNorm.isEmpty() ||
+                    nameNorm.contains(queryNorm) ||
+                    descNorm.contains(queryNorm) ||
+                    store.productAttachmentsJson.lowercase().replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").contains(queryNorm) ||
+                    store.specialOffersJson.lowercase().replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").contains(queryNorm)
+
             matchesSection &&
             (store.isActive || adminRole != "GUEST" || store.ownerId == currentPhone) &&
-            (searchQuery.isEmpty() || store.name.contains(searchQuery, true) || store.description.contains(searchQuery, true)) &&
+            matchesSearch &&
             (selectedCityId.isEmpty() || store.cityId == selectedCityId) &&
             (selectedCatId.isEmpty() || store.categoryId == selectedCatId)
         }.sortedWith(compareByDescending<StoreEntity> { it.isPinned }.thenBy { it.displayOrder })

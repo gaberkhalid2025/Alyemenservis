@@ -47,5 +47,8 @@ data class BookingEntity(
     
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    val isRated: Boolean = false,
+    val isRecurring: Boolean = false,
+    val recurrenceRule: String = "NONE" // NONE, WEEKLY, MONTHLY
 )

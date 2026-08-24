@@ -585,6 +585,22 @@ fun AppNavigator(
                                         }
                                     )
                                 }
+                                "CREATE_BOOKING", "BOOKING_CALENDAR" -> {
+                                    val prov = viewModel.selectedProvider ?: ProviderEntity(
+                                        id = "prov_general",
+                                        name = "فني معتمد",
+                                        profession = "خدمة صيانة ومعاينة"
+                                    )
+                                    BookingCalendarScreen(
+                                        provider = prov,
+                                        viewModel = viewModel,
+                                        themeColors = themeColors,
+                                        onBack = { viewModel.goBack() },
+                                        onBookingSuccess = {
+                                            viewModel.navigateTo("BOOKINGS_VIEW")
+                                        }
+                                    )
+                                }
                                 else -> ServicesBrowserLayout(
                                     viewModel = viewModel,
                                     themeColors = themeColors,

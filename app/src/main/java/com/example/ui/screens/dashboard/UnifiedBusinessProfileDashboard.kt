@@ -141,149 +141,133 @@ fun UnifiedBusinessProfileDashboard(
             .fillMaxSize()
             .background(themeColors.background)
     ) {
-        // 🌟 GORGEOUS HIGH-FIDELITY HEADER DESIGN
+        // 🌟 COMPACT & ELEGANT HEADER DESIGN
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(115.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(themeColors.primary, themeColors.secondary)
+                    )
+                )
         ) {
-            // Background Header Banner
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(themeColors.primary, themeColors.secondary)
-                        )
-                    )
-            ) {
-                // Diagonal accent lines for modern feel
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawPath(
-                        path = Path().apply {
-                            moveTo(0f, size.height * 0.4f)
-                            lineTo(size.width, size.height * 0.1f)
-                            lineTo(size.width, 0f)
-                            lineTo(0f, 0f)
-                            close()
-                        },
-                        color = Color.White.copy(alpha = 0.05f)
-                    )
-                }
-            }
-
-            // Top Header Action Buttons Overlay
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                // Top Badges Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = when (accountType) {
-                            "TECHNICIAN" -> "👷 حساب مهني فني معتمد"
-                            "STORE" -> "🏪 حساب متجر معتمد"
-                            "RESTAURANT" -> "🍔 حساب مطعم معتمد"
-                            "MEDICAL" -> "🏥 حساب مركز طبي معتمد"
-                            "REAL_ESTATE" -> "🏠 حساب مكتب عقاري"
-                            else -> "✨ حساب تجاري معتمد"
-                        },
-                        color = themeColors.accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Points Badge
-                val points = activeProvider?.points ?: 100
-                Box(
-                    modifier = Modifier
-                        .background(themeColors.accent, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "⭐ $points نقطة متميزة",
-                        color = Color.Black,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // Business Info Overlay Block
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Profile Photo / Avatar
-                Box(
-                    modifier = Modifier
-                        .size(68.dp)
-                        .clip(CircleShape)
-                        .background(Color.DarkGray)
-                        .border(2.dp, themeColors.accent, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = when (accountType) {
-                            "TECHNICIAN" -> "👷"
-                            "STORE" -> "🏪"
-                            "RESTAURANT" -> "🍔"
-                            "MEDICAL" -> "🏥"
-                            else -> "🏠"
-                        },
-                        fontSize = 32.sp
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = name,
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "موثق",
-                            tint = themeColors.accent,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    Text(
-                        text = description.take(45) + (if (description.length > 45) "..." else ""),
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 10.sp,
-                        lineHeight = 14.sp
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 2.dp)
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "⭐ $ratingValue ($reviewCount تقييم)",
-                            color = Color.Yellow,
+                            text = when (accountType) {
+                                "TECHNICIAN" -> "👷 حساب مهني فني معتمد"
+                                "STORE" -> "🏪 حساب متجر معتمد"
+                                "RESTAURANT" -> "🍔 حساب مطعم معتمد"
+                                "MEDICAL" -> "🏥 حساب مركز طبي معتمد"
+                                "REAL_ESTATE" -> "🏠 حساب مكتب عقاري"
+                                else -> "✨ حساب تجاري معتمد"
+                            },
+                            color = themeColors.accent,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
+                    }
+
+                    // Points Badge
+                    val points = activeProvider?.points ?: 100
+                    Surface(
+                        color = themeColors.accent,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
                         Text(
-                            text = "📍 $address",
-                            color = Color.LightGray,
-                            fontSize = 10.sp
+                            text = "⭐ $points نقطة",
+                            color = Color.Black,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
+                    }
+                }
+
+                // Compact Store / Provider Profile Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Profile Photo / Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.DarkGray)
+                            .border(1.5.dp, themeColors.accent, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = when (accountType) {
+                                "TECHNICIAN" -> "👷"
+                                "STORE" -> "🏪"
+                                "RESTAURANT" -> "🍔"
+                                "MEDICAL" -> "🏥"
+                                else -> "🏠"
+                            },
+                            fontSize = 22.sp
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = name,
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "موثق",
+                                tint = themeColors.accent,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Text(
+                            text = description.take(35) + (if (description.length > 35) "..." else ""),
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 9.sp,
+                            maxLines = 1
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 1.dp)
+                        ) {
+                            Text(
+                                text = "⭐ $ratingValue ($reviewCount تقييم)",
+                                color = Color.Yellow,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "📍 $address",
+                                color = Color.LightGray,
+                                fontSize = 9.sp,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
@@ -551,44 +535,116 @@ fun TabProductsServices(
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showBulkPriceDialog by remember { mutableStateOf(false) }
+
+    // Item form inputs
     var pName by remember { mutableStateOf("") }
     var pDesc by remember { mutableStateOf("") }
     var pPrice by remember { mutableStateOf("") }
+    var pWholesalePrice by remember { mutableStateOf("") }
+    var pCategoryName by remember { mutableStateOf("الكل") }
+    var pSizesColors by remember { mutableStateOf("") }
+
+    // Doctor form inputs for Medical
+    var doctorName by remember { mutableStateOf("") }
+    var doctorSpecialty by remember { mutableStateOf("أسنان") }
+    var doctorFee by remember { mutableStateOf("") }
+
+    // Bulk price adjustment inputs
+    var bulkCategory by remember { mutableStateOf("الكل") }
+    var bulkMode by remember { mutableStateOf("PERCENTAGE") } // PERCENTAGE or FIXED
+    var bulkValue by remember { mutableStateOf("10") }
 
     val products by viewModel.products.collectAsState()
     val storeProducts = remember(products, providerId) {
         products.filter { it.storeId == providerId && !it.isDeleted }
     }
 
+    // Technician availability state
+    var isTechAvailable by remember(activeProvider) {
+        mutableStateOf(activeProvider?.isAvailable ?: true)
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // --- TECHNICIAN AVAILABILITY BAR ---
+        if (accountType == "TECHNICIAN" && activeProvider != null) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = if (isTechAvailable) Color(0xFF0F291E) else Color(0xFF2D1515)),
+                border = BorderStroke(1.dp, if (isTechAvailable) Color(0xFF10B981) else Color.Red),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (isTechAvailable) "🟢 حالة العمل: متاح واستقبل الطلبات" else "🔴 حالة العمل: مشغول حالياً",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                        Text("اضغط لتغيير حالتك ليراها العملاء فوراً في خريطة التطبيق", color = Color.Gray, fontSize = 9.sp)
+                    }
+                    Switch(
+                        checked = isTechAvailable,
+                        onCheckedChange = { checked ->
+                            isTechAvailable = checked
+                            viewModel.updateProviderEntity(activeProvider.copy(isAvailable = checked))
+                            Toast.makeText(context, if (checked) "🟢 أنت الآن متاح للعمل!" else "🔴 تم إيقاف استقبال الطلبات المؤقت", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF10B981))
+                    )
+                }
+            }
+        }
+
+        // --- TOP BAR WITH ACTIONS ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "📁 إدارة الكتالوج وملفات السلع:",
+                text = when (accountType) {
+                    "RESTAURANT" -> "🍽️ إدارة منيو الأكلات والوجبات:"
+                    "MEDICAL" -> "🩺 إدارة الكادر الطبي والتخصصات والخدمات:"
+                    "TECHNICIAN" -> "🔧 قائمة الخدمات وأسعار الفحص:"
+                    else -> "🛒 إدارة السلع والمنتجات:"
+                },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = themeColors.accent
             )
 
-            if (accountType == "STORE" || accountType == "RESTAURANT") {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (storeProducts.isNotEmpty()) {
+                    Button(
+                        onClick = { showBulkPriceDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Text("⚡ تعديل أسعار جماعي", color = Color.Black, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
                 Button(
                     onClick = { showAddDialog = true },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier.height(30.dp)
                 ) {
-                    Text("إضافة مادة ➕", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("إضافة جديد ➕", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        // Render Product Attachments list
+        // --- PRODUCT ATTACHMENTS & CATALOG FILES SECTION ---
         ProductAttachmentsSection(
             attachments = dashboardAttachments,
             onAttachmentsChanged = { updatedList ->
@@ -599,15 +655,17 @@ fun TabProductsServices(
                 } else if (activeProvider != null) {
                     viewModel.updateProviderEntity(activeProvider.copy(productAttachmentsJson = json))
                 }
-                Toast.makeText(context, "✅ تم تحديث المرفقات وحفظها بنجاح!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "✅ تم تحديث المرفقات والكتالوج وحفظها بنجاح!", Toast.LENGTH_SHORT).show()
             },
             mode = "MANAGEMENT",
-            themeColors = themeColors
+            themeColors = themeColors,
+            departmentType = accountType
         )
 
+        // --- PRODUCTS / ITEMS LIST ---
         if (storeProducts.isNotEmpty()) {
             Text(
-                text = "🛒 قائمة المواد والسلع الحالية:",
+                text = "📋 المواد المسجلة بالتطبيق (${storeProducts.size}):",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -615,12 +673,12 @@ fun TabProductsServices(
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.heightIn(max = 300.dp)
+                modifier = Modifier.heightIn(max = 350.dp)
             ) {
                 items(storeProducts) { prod ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                        border = BorderStroke(0.5.dp, Color.Gray.copy(alpha = 0.3f)),
+                        border = BorderStroke(0.5.dp, themeColors.accent.copy(alpha = 0.3f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -630,15 +688,23 @@ fun TabProductsServices(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(prod.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Text(prod.description, color = Color.LightGray, fontSize = 10.sp)
-                                Text("${prod.price} ريال يمني", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                if (prod.description.isNotEmpty()) {
+                                    Text(prod.description, color = Color.LightGray, fontSize = 10.sp, maxLines = 2)
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                ) {
+                                    Text("${prod.price.toInt()} ريال يمني", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
 
                             IconButton(onClick = {
                                 viewModel.deleteProduct(prod.id)
-                                Toast.makeText(context, "🗑️ تم حذف المنتج بنجاح!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "🗑️ تم حذف العنصر بنجاح!", Toast.LENGTH_SHORT).show()
                             }) {
                                 Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red)
                             }
@@ -649,23 +715,132 @@ fun TabProductsServices(
         }
     }
 
+    // --- BULK PRICE ADJUSTMENT MODAL (تعديل الأسعار الجماعي) ---
+    if (showBulkPriceDialog) {
+        AlertDialog(
+            onDismissRequest = { showBulkPriceDialog = false },
+            title = {
+                Text("⚡ تعديل أسعار المنيو/السلع جماعياً", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            },
+            containerColor = themeColors.secondary,
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "قم بزيادة أو تخفيض أسعار كافة الأصناف المسجلة بنسبة مئوية أو قيمة ثابتة بكبسة زر واحدة:",
+                        color = Color.LightGray,
+                        fontSize = 11.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { bulkMode = "PERCENTAGE" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (bulkMode == "PERCENTAGE") themeColors.accent else Color.DarkGray),
+                            modifier = Modifier.weight(1f).height(36.dp)
+                        ) {
+                            Text("نسبة مئوية (%)", color = if (bulkMode == "PERCENTAGE") Color.Black else Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { bulkMode = "FIXED" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (bulkMode == "FIXED") themeColors.accent else Color.DarkGray),
+                            modifier = Modifier.weight(1f).height(36.dp)
+                        ) {
+                            Text("مبلغ ثابت (ريال)", color = if (bulkMode == "FIXED") Color.Black else Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = bulkValue,
+                        onValueChange = { bulkValue = it },
+                        label = { Text(if (bulkMode == "PERCENTAGE") "النسبة (مثال: 10 لزيادة 10% أو -5 لتخفيض 5%)" else "المبلغ بالريال اليمني (مثال: 500 أو -200)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 12.sp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val valD = bulkValue.toDoubleOrNull() ?: 0.0
+                        if (valD != 0.0) {
+                            storeProducts.forEach { p ->
+                                val newPrice = if (bulkMode == "PERCENTAGE") {
+                                    val factor = 1.0 + (valD / 100.0)
+                                    (p.price * factor).coerceAtLeast(0.0)
+                                } else {
+                                    (p.price + valD).coerceAtLeast(0.0)
+                                }
+                                viewModel.saveProduct(p.copy(price = newPrice))
+                            }
+                            showBulkPriceDialog = false
+                            Toast.makeText(context, "✅ تم تعديل أسعار كافة الأصناف بنجاح!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "⚠️ يرجى إدخال قيمة تعديل صحيحة!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))
+                ) {
+                    Text("تطبيق التعديل الجماعي 🚀", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkPriceDialog = false }) {
+                    Text("إلغاء", color = Color.LightGray)
+                }
+            }
+        )
+    }
+
+    // --- ADD ITEM DIALOG ---
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("📦 إضافة مادة جديدة للكتالوج", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            title = {
+                Text(
+                    when (accountType) {
+                        "RESTAURANT" -> "🍱 إضافة وجبة / صنف جديد للمنيو"
+                        "MEDICAL" -> "🩺 إضافة طبيب أو خدمة طبية"
+                        "TECHNICIAN" -> "🔧 إضافة خدمة أو سعر معاينة"
+                        else -> "📦 إضافة منتج جديد للكتالوج"
+                    },
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             containerColor = themeColors.secondary,
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = pName, onValueChange = { pName = it }, label = { Text("اسم المادة/الأكلة/الخدمة") })
-                    OutlinedTextField(value = pDesc, onValueChange = { pDesc = it }, label = { Text("الوصف والتفاصيل") })
-                    OutlinedTextField(value = pPrice, onValueChange = { pPrice = it }, label = { Text("السعر بالريال اليمني") })
+                    OutlinedTextField(
+                        value = pName,
+                        onValueChange = { pName = it },
+                        label = { Text(if (accountType == "MEDICAL") "اسم الطبيب / الخدمة الطبية" else "الاسم") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 12.sp)
+                    )
+                    OutlinedTextField(
+                        value = pDesc,
+                        onValueChange = { pDesc = it },
+                        label = { Text(if (accountType == "MEDICAL") "التخصص الدقيق والمؤهلات" else "الوصف والتفاصيل والمكونات") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 12.sp)
+                    )
+                    OutlinedTextField(
+                        value = pPrice,
+                        onValueChange = { pPrice = it },
+                        label = { Text(if (accountType == "MEDICAL") "رسوم المعاينة / الفحص بالريال اليمني" else "السعر بالريال اليمني") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 12.sp)
+                    )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         val priceD = pPrice.toDoubleOrNull() ?: 0.0
-                        if (pName.trim().isNotEmpty() && priceD > 0.0) {
+                        if (pName.trim().isNotEmpty() && priceD >= 0.0) {
                             viewModel.saveProduct(
                                 ProductEntity(
                                     id = java.util.UUID.randomUUID().toString(),
@@ -680,14 +855,19 @@ fun TabProductsServices(
                             pDesc = ""
                             pPrice = ""
                             showAddDialog = false
-                            Toast.makeText(context, "✅ تم إضافة المنتج بنجاح!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "✅ تم الإضافة بنجاح!", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(context, "⚠️ يرجى إدخال اسم وسعر صحيح!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "⚠️ يرجى تعبئة الاسم والسعر بشكل صحيح!", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
                 ) {
-                    Text("إضافة المنتج ✅", color = Color.Black)
+                    Text("حفظ وإضافة ✅", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) {
+                    Text("إلغاء", color = Color.LightGray)
                 }
             }
         )

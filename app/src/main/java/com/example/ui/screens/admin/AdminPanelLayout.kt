@@ -535,6 +535,9 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         Triple("REG_FORMS_MANAGER", "3️⃣6️⃣ 📋 تخصيص استمارات وشروط التسجيل", "CUSTOMIZATION"),
                         Triple("ROLES_PERMISSIONS", "3️⃣7️⃣ 🛡️ الصلاحيات والأدوار (538)", "SECURITY"),
                         Triple("MAP_CONTROLS", "3️⃣8️⃣ 🗺️ التحكم بشاشة الخرائط", "CUSTOMIZATION"),
+                        Triple("AI_ASSISTANT_PANEL", "3️⃣9️⃣ 🤖 المساعد الذكي وقاموس الصيانة", "CUSTOMIZATION"),
+                        Triple("ADMIN_PAYMENT_PANEL", "4️⃣0️⃣ 💳 المدفوعات والاشتراكات والربط الشامل", "SYSTEM"),
+                        Triple("VOICE_CALLS_PANEL", "4️⃣1️⃣ 🎙️ إدارة المكالمات الصوتية", "SYSTEM"),
                         Triple("QUICK_SERVICE", "⚡ الخدمات الفورية والفنيين", "OPERATIONS"),
                         Triple("FINANCIAL_REPORTS", "📈 تقارير الأرباح", "SYSTEM"),
                         Triple("STORAGE_QUOTA", "🗄️ سعة التخزين", "SYSTEM"),
@@ -7774,6 +7777,29 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             }
                         }
                     }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AdminMapPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "AI_ASSISTANT_PANEL") {
+                item {
+                    AdminAssistantPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "ADMIN_PAYMENT_PANEL") {
+                item {
+                    AdminPaymentPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "VOICE_CALLS_PANEL") {
+                item {
+                    AdminVoiceCallPanel(viewModel = viewModel, themeColors = themeColors)
                 }
             }
 

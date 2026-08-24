@@ -27,8 +27,9 @@ import com.example.utils.getProviderCoords
 
 /**
  * 🗺️ RealLeafletMapView
- * خريطة تفاعلية متطورة تعتمد على OpenStreetMap و Leaflet JS بدون أي تكاليف
- * تشمل تحديد الموقع المباشر، رادار الفنيين والمحلات، حساب المسافات، وأزرار الملاحة والاتصال السريع
+ * خريطة تفاعلية متطورة تعتمد على OpenStreetMap مع دعم Marker Clustering الكامل
+ * وألوان تمييزية حسب نوع الخدمة (فنيون، متاجر، مطاعم، مراكز طبية، عقارات)
+ * وحساب وقت الوصول التقديري (ETA) وأزرار توجيه عبر Google Maps
  */
 @Composable
 fun RealLeafletMapView(
@@ -43,20 +44,21 @@ fun RealLeafletMapView(
 ) {
     val context = LocalContext.current
 
-    // Build JSON data for Leaflet
-    val providerMarkers = nearbyProviders.map { p ->
+    // Build JSON data for Leaflet with distinct categories & colors
+    val providerMarkers = nearbyProviders.filter { it.latitude != 0.0 || it.longitude != 0.0 || it.cityId.isNotBlank() || it.area.isNotBlank() }.map { p ->
         val baseCoords = getProviderCoords(p)
         val walkOffset = dynamicOffsets[p.id] ?: Pair(0.0, 0.0)
         val liveLat = baseCoords.first + walkOffset.first
         val liveLng = baseCoords.second + walkOffset.second
         val categoryEmoji = when {
-            p.categoryId.contains("spaka") -> "🔧"
-            p.categoryId.contains("kahraba") -> "⚡"
-            p.categoryId.contains("dehan") -> "🎨"
-            p.categoryId.contains("hadada") -> "🔨"
-            p.categoryId.contains("ac") || p.categoryId.contains("tabreed") -> "❄️"
-            p.categoryId.contains("car") || p.categoryId.contains("mechanic") -> "🚗"
-            p.categoryId.contains("carpentry") || p.categoryId.contains("najjara") -> "🪚"
+            p.categoryId.contains("spaka") || p.profession.contains("سباك") -> "🔧"
+            p.categoryId.contains("kahraba") || p.profession.contains("كهربا") -> "⚡"
+            p.categoryId.contains("solar") || p.profession.contains("طاقة") -> "☀️"
+            p.categoryId.contains("dehan") || p.profession.contains("دهان") -> "🎨"
+            p.categoryId.contains("hadada") || p.profession.contains("حداد") -> "🔨"
+            p.categoryId.contains("ac") || p.categoryId.contains("tabreed") || p.profession.contains("تكييف") -> "❄️"
+            p.categoryId.contains("car") || p.categoryId.contains("mechanic") || p.profession.contains("ميكانيك") -> "🚗"
+            p.categoryId.contains("carpentry") || p.categoryId.contains("najjara") || p.profession.contains("نجار") -> "🪚"
             else -> "👷"
         }
         val safeName = p.name.replace("\"", "\\\"").replace("'", "\\'")
@@ -75,15 +77,19 @@ fun RealLeafletMapView(
             phone: "$safePhone",
             rating: "${p.rating}",
             status: "${if (p.isAvailable) "متاح لاستقبال الطلبات 🟢" else "مشغول حالياً 🟡"}",
-            badgeColor: "#00E5FF"
+            badgeColor: "#00E5FF",
+            serviceCategory: "فنيون صيانة"
         }
         """
     }
 
-    val storeMarkers = nearbyStores.map { s ->
+    val storeMarkers = nearbyStores.filter { it.latitude != 0.0 && it.longitude != 0.0 }.map { s ->
+        val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("عيادة") || s.name.contains("صيدلية")
+        val isRestaurant = s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("مأكولات") || s.name.contains("كافيه") || s.name.contains("شاورما")
+        
         val emoji = when {
-            s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("عيادة") || s.name.contains("صيدلية") -> "🏥"
-            s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("مأكولات") || s.name.contains("كافيه") -> "🍔"
+            isMedical -> "🏥"
+            isRestaurant -> "🍔"
             s.sectionId.contains("supermarket") || s.name.contains("بقالة") || s.name.contains("هايبر") -> "🛒"
             else -> "🏪"
         }
@@ -91,7 +97,13 @@ fun RealLeafletMapView(
         val safeDesc = s.description.replace("\"", "\\\"").replace("'", "\\'").take(60)
         val cleanDesc = if (safeDesc.isEmpty()) "محل / متجر معتمد" else safeDesc
         val safePhone = s.phone.replace("\"", "")
-        val badgeColor = if (emoji == "🏥") "#EC4899" else if (emoji == "🍔") "#F59E0B" else "#10B981"
+        
+        val (badgeColor, categoryLabel) = when {
+            isMedical -> Pair("#EC4899", "مراكز طبية وصيدليات")
+            isRestaurant -> Pair("#F59E0B", "مطاعم وكافيهات")
+            else -> Pair("#10B981", "متاجر وأسواق")
+        }
+
         """
         {
             id: "${s.id}",
@@ -104,12 +116,13 @@ fun RealLeafletMapView(
             phone: "$safePhone",
             rating: "${s.rating}",
             status: "${if (s.isActive) "مفتوح ويستقبل الطلبات 🟢" else "مغلق حالياً 🔴"}",
-            badgeColor: "$badgeColor"
+            badgeColor: "$badgeColor",
+            serviceCategory: "$categoryLabel"
         }
         """
     }
 
-    val propertyMarkers = nearbyProperties.map { pr ->
+    val propertyMarkers = nearbyProperties.filter { it.latitude != 0.0 && it.longitude != 0.0 }.map { pr ->
         val safeTitle = pr.title.replace("\"", "\\\"").replace("'", "\\'")
         val safeDesc = pr.description.replace("\"", "\\\"").replace("'", "\\'").take(60)
         val cleanDesc = if (safeDesc.isEmpty()) "عقار معروض" else safeDesc
@@ -127,7 +140,8 @@ fun RealLeafletMapView(
             phone: "$safePhone",
             rating: "5.0",
             status: "معروض للإيجار / البيع 🟢",
-            badgeColor: "#8B5CF6"
+            badgeColor: "#8B5CF6",
+            serviceCategory: "عقارات وشقق"
         }
         """
     }
@@ -141,22 +155,25 @@ fun RealLeafletMapView(
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
             <style>
                 * {
                     box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
                 }
                 html, body, #map {
                     height: 100%;
                     width: 100%;
-                    margin: 0;
-                    padding: 0;
                     background: #0B0F19;
                     font-family: system-ui, -apple-system, sans-serif;
                     overflow: hidden;
                 }
                 .leaflet-tile-container img {
-                    filter: brightness(0.85) contrast(1.1);
+                    filter: brightness(0.88) contrast(1.08);
                 }
                 .leaflet-popup-content-wrapper {
                     background: #1E293B !important;
@@ -164,7 +181,7 @@ fun RealLeafletMapView(
                     border: 2px solid #00E5FF;
                     border-radius: 16px;
                     padding: 4px;
-                    box-shadow: 0 12px 30px rgba(0,0,0,0.7);
+                    box-shadow: 0 12px 30px rgba(0,0,0,0.8);
                 }
                 .leaflet-popup-tip {
                     background: #1E293B !important;
@@ -174,7 +191,17 @@ fun RealLeafletMapView(
                     text-align: right;
                     direction: rtl;
                     color: #FFFFFF;
-                    padding: 8px 4px;
+                    padding: 8px 6px;
+                    min-width: 210px;
+                }
+                .popup-cat-badge {
+                    display: inline-block;
+                    font-size: 10px;
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    background: rgba(255,255,255,0.1);
+                    margin-bottom: 4px;
+                    font-weight: 600;
                 }
                 .popup-title {
                     font-size: 15px;
@@ -190,23 +217,38 @@ fun RealLeafletMapView(
                 }
                 .popup-meta {
                     display: flex;
-                    justify-content: space-between;
+                    flex-direction: column;
+                    gap: 3px;
                     font-size: 11px;
                     margin-bottom: 10px;
                     color: #94A3B8;
+                    border-top: 1px solid rgba(255,255,255,0.1);
                     border-bottom: 1px solid rgba(255,255,255,0.1);
-                    padding-bottom: 6px;
+                    padding: 6px 0;
+                }
+                .popup-meta-row {
+                    display: flex;
+                    justify-content: space-between;
+                }
+                .popup-eta {
+                    color: #38BDF8;
+                    font-weight: bold;
                 }
                 .popup-buttons {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+                .popup-buttons-row {
                     display: flex;
                     gap: 6px;
                 }
                 .btn-details {
-                    flex: 2;
+                    width: 100%;
                     background: linear-gradient(135deg, #00E5FF, #00B4D8);
                     color: #0F172A;
                     border: none;
-                    padding: 8px 10px;
+                    padding: 9px 10px;
                     border-radius: 10px;
                     font-weight: bold;
                     font-size: 12px;
@@ -228,6 +270,7 @@ fun RealLeafletMapView(
                     cursor: pointer;
                     text-align: center;
                     text-decoration: none;
+                    display: inline-block;
                 }
                 .btn-nav {
                     flex: 1;
@@ -256,16 +299,16 @@ fun RealLeafletMapView(
                     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 }
                 .custom-pin:active, .custom-pin:hover {
-                    transform: scale(1.25);
+                    transform: scale(1.22);
                 }
                 .user-marker-container {
                     position: relative;
-                    width: 30px;
-                    height: 30px;
+                    width: 32px;
+                    height: 32px;
                 }
                 .user-marker {
-                    width: 20px;
-                    height: 20px;
+                    width: 22px;
+                    height: 22px;
                     background: #00E5FF;
                     border: 3px solid #FFFFFF;
                     border-radius: 50%;
@@ -277,8 +320,8 @@ fun RealLeafletMapView(
                 }
                 .user-pulse {
                     position: absolute;
-                    width: 44px;
-                    height: 44px;
+                    width: 46px;
+                    height: 46px;
                     background: rgba(0, 229, 255, 0.4);
                     border-radius: 50%;
                     top: -7px;
@@ -288,6 +331,30 @@ fun RealLeafletMapView(
                 @keyframes pulseRing {
                     0% { transform: scale(0.4); opacity: 1; }
                     100% { transform: scale(1.8); opacity: 0; }
+                }
+                .marker-cluster-small {
+                    background-color: rgba(0, 229, 255, 0.4);
+                }
+                .marker-cluster-small div {
+                    background-color: #00E5FF;
+                    color: #0F172A;
+                    font-weight: 800;
+                }
+                .marker-cluster-medium {
+                    background-color: rgba(245, 158, 11, 0.4);
+                }
+                .marker-cluster-medium div {
+                    background-color: #F59E0B;
+                    color: #0F172A;
+                    font-weight: 800;
+                }
+                .marker-cluster-large {
+                    background-color: rgba(236, 72, 153, 0.4);
+                }
+                .marker-cluster-large div {
+                    background-color: #EC4899;
+                    color: #FFFFFF;
+                    font-weight: 800;
                 }
             </style>
         </head>
@@ -302,7 +369,17 @@ fun RealLeafletMapView(
                             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                             Math.sin(dLon/2) * Math.sin(dLon/2);
                     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                    return (R * c).toFixed(1);
+                    return (R * c);
+                }
+
+                function computeEtaText(distKm) {
+                    if (distKm < 1.0) {
+                        var mins = Math.max(1, Math.round(distKm / 4.5 * 60));
+                        return '⏱️ ~ ' + mins + ' دقيقة سيراً (' + Math.round(distKm * 1000) + ' م)';
+                    } else {
+                        var mins = Math.max(2, Math.round(distKm / 35.0 * 60));
+                        return '🚘 ~ ' + mins + ' دقيقة بالسيارة (' + distKm.toFixed(1) + ' كم)';
+                    }
                 }
 
                 var userLat = ${userCoords.first};
@@ -318,58 +395,87 @@ fun RealLeafletMapView(
                     subdomains: 'abcd'
                 }).addTo(map);
 
-                // User Location
+                // User Location Marker
                 var userIcon = L.divIcon({
                     className: 'user-marker-container',
                     html: '<div class="user-pulse"></div><div class="user-marker"></div>',
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
                 });
-                L.marker([userLat, userLng], {icon: userIcon}).addTo(map)
-                    .bindPopup("<div class='popup-card'><b style='color:#00E5FF;'>📍 موقعك الحالي المباشر</b><br/><span style='font-size:11px;color:#94A3B8;'>يتم قياس المسافات من هنا</span></div>");
+                L.marker([userLat, userLng], {icon: userIcon, zIndexOffset: 1000}).addTo(map)
+                    .bindPopup("<div class='popup-card'><b style='color:#00E5FF;'>📍 موقعك الحالي المباشر</b><br/><span style='font-size:11px;color:#94A3B8;'>نقطة ارتكاز البحث وحساب المسافات</span></div>");
+
+                // Initialize Marker Cluster Group
+                var clusterGroup = L.markerClusterGroup ? L.markerClusterGroup({
+                    chunkedLoading: true,
+                    maxClusterRadius: 40,
+                    spiderfyOnMaxZoom: true,
+                    showCoverageOnHover: false
+                }) : null;
 
                 var bounds = [ [userLat, userLng] ];
-                var markers = [$markersJson];
+                var rawMarkers = [$markersJson];
 
-                markers.forEach(function(item) {
-                    var dist = calculateDistKm(userLat, userLng, item.lat, item.lng);
+                rawMarkers.forEach(function(item) {
+                    if (!item.lat || !item.lng) return;
+                    var distNum = calculateDistKm(userLat, userLng, item.lat, item.lng);
+                    var etaString = computeEtaText(distNum);
+
                     var customIcon = L.divIcon({
                         className: 'custom-pin-wrapper',
-                        html: '<div class="custom-pin" style="border-color:' + item.badgeColor + ';">' + item.emoji + '</div>',
+                        html: '<div class="custom-pin" style="border-color:' + item.badgeColor + '; box-shadow: 0 0 12px ' + item.badgeColor + '66;">' + item.emoji + '</div>',
                         iconSize: [44, 44],
                         iconAnchor: [22, 22]
                     });
 
-                    var m = L.marker([item.lat, item.lng], {icon: customIcon}).addTo(map);
+                    var m = L.marker([item.lat, item.lng], {icon: customIcon});
                     bounds.push([item.lat, item.lng]);
 
                     var callBtnHtml = item.phone ? '<a href="tel:' + item.phone + '" class="btn-call">📞 اتصال</a>' : '';
-                    var navBtnHtml = '<button onclick="AndroidBridge.openNavigation(' + item.lat + ',' + item.lng + ',\'' + item.name + '\')" class="btn-nav">🗺️ ملاحة</button>';
+                    var navBtnHtml = '<button onclick="AndroidBridge.openNavigation(' + item.lat + ',' + item.lng + ',\'' + item.name + '\')" class="btn-nav">🗺️ اتجاهات</button>';
 
                     var popupHtml = "<div class='popup-card'>" +
+                        "<div class='popup-cat-badge' style='color:" + item.badgeColor + "; border: 1px solid " + item.badgeColor + "44;'>" + item.serviceCategory + "</div>" +
                         "<div class='popup-title'>" + item.name + "</div>" +
                         "<div class='popup-spec'>" + item.spec + "</div>" +
                         "<div class='popup-meta'>" +
-                            "<span>⭐ " + item.rating + "</span>" +
-                            "<span>📏 تبعد " + dist + " كم</span>" +
-                            "<span>" + item.status + "</span>" +
+                            "<div class='popup-meta-row'><span>⭐ تقييم: " + item.rating + "</span><span>" + item.status + "</span></div>" +
+                            "<div class='popup-eta'>" + etaString + "</div>" +
                         "</div>" +
                         "<div class='popup-buttons'>" +
                             "<button onclick=\"AndroidBridge.onMarkerClicked('" + item.type + "', '" + item.id + "')\" class='btn-details'>عرض التفاصيل والطلب 🔍</button>" +
-                            callBtnHtml +
-                            navBtnHtml +
+                            "<div class='popup-buttons-row'>" +
+                                callBtnHtml +
+                                navBtnHtml +
+                            "</div>" +
                         "</div>" +
                         "</div>";
 
                     m.bindPopup(popupHtml);
+
+                    if (clusterGroup) {
+                        clusterGroup.addLayer(m);
+                    } else {
+                        m.addTo(map);
+                    }
                 });
 
+                if (clusterGroup) {
+                    map.addLayer(clusterGroup);
+                }
+
                 if (bounds.length > 1) {
-                    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
                 }
 
                 window.recenterToUser = function() {
-                    map.flyTo([userLat, userLng], 15, { animate: true, duration: 1 });
+                    map.flyTo([userLat, userLng], 15, { animate: true, duration: 0.8 });
+                };
+
+                window.setMapLocation = function(newLat, newLng) {
+                    userLat = newLat;
+                    userLng = newLng;
+                    map.flyTo([newLat, newLng], 15, { animate: true, duration: 0.8 });
                 };
             </script>
         </body>
@@ -417,11 +523,23 @@ fun RealLeafletMapView(
                         fun openNavigation(lat: Double, lng: Double, label: String) {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
                                 try {
-                                    val gmmIntentUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($label)")
-                                    val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                                    ctx.startActivity(mapIntent)
+                                    val gmmIntentUri = Uri.parse("google.navigation:q=$lat,$lng")
+                                    val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+                                        setPackage("com.google.android.apps.maps")
+                                    }
+                                    if (mapIntent.resolveActivity(ctx.packageManager) != null) {
+                                        ctx.startActivity(mapIntent)
+                                    } else {
+                                        val browserUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
+                                        ctx.startActivity(Intent(Intent.ACTION_VIEW, browserUri))
+                                    }
                                 } catch (e: Exception) {
-                                    Toast.makeText(ctx, "جاري الملاحة إلى: $label ($lat, $lng)", Toast.LENGTH_SHORT).show()
+                                    try {
+                                        val fallbackUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($label)")
+                                        ctx.startActivity(Intent(Intent.ACTION_VIEW, fallbackUri))
+                                    } catch (ex: Exception) {
+                                        Toast.makeText(ctx, "جاري فتح الخريطة: $label", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         }

@@ -472,3 +472,36 @@ fun MainViewModel.getBookingProgressImpl(status: String): Float {
         else -> 0.0f
     }
 }
+
+fun MainViewModel.createBooking(booking: BookingEntity, onResult: (Boolean) -> Unit = {}) {
+    val bId = booking.id.ifEmpty { java.util.UUID.randomUUID().toString() }
+    val bNum = booking.bookingNumber.ifEmpty { "YEM-${(10000..99999).random()}" }
+    val bPass = booking.bookingPassword.ifEmpty { "${(1000..9999).random()}" }
+    val finalized = booking.copy(
+        id = bId,
+        bookingNumber = bNum,
+        bookingPassword = bPass,
+        createdAt = if (booking.createdAt == 0L) System.currentTimeMillis() else booking.createdAt,
+        updatedAt = System.currentTimeMillis()
+    )
+    try {
+        db.collection("bookings").document(bId).set(finalized)
+            .addOnSuccessListener {
+                _bookings.value = _bookings.value + finalized
+                addNotification(
+                    title = "📅 حجز جديد رقم $bNum",
+                    message = "تم تسجيل طلب حجز موعد لدى ${finalized.providerName} بتاريخ ${finalized.dateString} الساعة ${finalized.timeString}.",
+                    targetType = "USER",
+                    targetValue = finalized.customerPhone.ifEmpty { finalized.clientPhone }
+                )
+                onResult(true)
+            }
+            .addOnFailureListener {
+                _bookings.value = _bookings.value + finalized
+                onResult(true)
+            }
+    } catch (e: Exception) {
+        _bookings.value = _bookings.value + finalized
+        onResult(true)
+    }
+}

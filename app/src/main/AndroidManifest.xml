@@ -24,6 +24,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
 
+        <receiver
+            android:name=".util.BookingReminderReceiver"
+            android:exported="false" />
+
         <service
             android:name=".FCMService"
             android:exported="false">
