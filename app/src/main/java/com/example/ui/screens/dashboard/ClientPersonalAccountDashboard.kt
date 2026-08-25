@@ -331,95 +331,12 @@ fun ClientPersonalAccountDashboard(
         }
     }
 
-    // Direct Restore account Dialog
+    // Direct Restore account BottomSheet
     if (showRestoreDialog) {
-        var restorePhone by remember { mutableStateOf("") }
-        var restorePass by remember { mutableStateOf("") }
-        var isRestoring by remember { mutableStateOf(false) }
-
-        Dialog(onDismissRequest = { showRestoreDialog = false }) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, themeColors.accent),
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("🔓 استرجاع حساب سابق موحد", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    
-                    OutlinedTextField(
-                        value = restorePhone,
-                        onValueChange = { restorePhone = it },
-                        label = { Text("رقم هاتفك اليمني المكون من 9 أرقام") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                    OutlinedTextField(
-                        value = restorePass,
-                        onValueChange = { restorePass = it },
-                        label = { Text("كلمة المرور السرية للحساب") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = {
-                                val cleanPhone = restorePhone.trim().replace(" ", "")
-                                val cleanPass = restorePass.trim()
-                                if (cleanPhone.length == 9 && cleanPass.isNotEmpty()) {
-                                    isRestoring = true
-                                    viewModel.restoreGuestUser(
-                                        context = context,
-                                        phone = cleanPhone,
-                                        password = cleanPass,
-                                        onResult = { success, msg ->
-                                            isRestoring = false
-                                            if (success) {
-                                                showRestoreDialog = false
-                                            }
-                                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
-                                        }
-                                    )
-                                } else {
-                                    android.widget.Toast.makeText(context, "❌ يرجى تعبئة كافة الحقول بشكل صحيح!", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(if (isRestoring) "جاري الاسترجاع..." else "تأكيد واسترجاع", fontSize = 11.sp, color = Color.White)
-                        }
-                        TextButton(onClick = { showRestoreDialog = false }) {
-                            Text("إلغاء", color = Color.White, fontSize = 11.sp)
-                        }
-                    }
-
-                    Divider(color = Color.Gray.copy(alpha = 0.2f))
-
-                    TextButton(
-                        onClick = {
-                            val cleanPhone = restorePhone.trim().replace(" ", "")
-                            if (cleanPhone.length == 9) {
-                                viewModel.requestAdminPasswordReset(cleanPhone)
-                                android.widget.Toast.makeText(context, "📩 تم إرسال طلب إعادة تعيين كلمة المرور لإدارة التطبيق لرقمك ($cleanPhone)", android.widget.Toast.LENGTH_LONG).show()
-                                showRestoreDialog = false
-                            } else {
-                                android.widget.Toast.makeText(context, "⚠️ يرجى إدخال رقم هاتفك في الحقل أولاً لطلب إعادة التعيين من الإدارة", android.widget.Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("❓ نسيت كلمة المرور؟ اضغط لطلب إعادة تعيينها من الإدارة", color = themeColors.accent, fontSize = 11.sp)
-                    }
-                }
-            }
-        }
+        RestoreAccountBottomSheet(
+            onDismissRequest = { showRestoreDialog = false },
+            viewModel = viewModel,
+            themeColors = themeColors
+        )
     }
 }

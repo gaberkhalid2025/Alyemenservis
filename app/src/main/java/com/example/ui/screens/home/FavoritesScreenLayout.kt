@@ -49,6 +49,7 @@ fun FavoritesScreenLayout(
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
     val favoriteIds by viewModel.favoriteIds.collectAsState()
+    val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) } // 0: الكل, 1: فنيين وخدمات, 2: متاجر ومطاعم, 3: عقارات
 
@@ -111,77 +112,102 @@ fun FavoritesScreenLayout(
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Providers
-                if (selectedTab == 0 || selectedTab == 1) {
-                    if (favoriteProviders.isNotEmpty()) {
-                        item {
-                            Text("الفنيون ومقدمو الخدمات المميزون", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
+            if (isProvidersLoading && favoriteIds.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = themeColors.accent)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("جاري تحميل قائمتك المفضلة... ❤️", color = Color.LightGray, fontSize = 12.sp)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Providers
+                    if (selectedTab == 0 || selectedTab == 1) {
+                        if (favoriteProviders.isNotEmpty()) {
+                            item {
+                                Text("الفنيون ومقدمو الخدمات المميزون", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
+                            }
+                            items(favoriteProviders) { provider ->
+                                FavoriteProviderCard(
+                                    provider = provider,
+                                    themeColors = themeColors,
+                                    onClick = { onOpenProviderDetails(provider) },
+                                    onRemoveFavorite = { viewModel.toggleFavorite(provider.id) },
+                                    onCall = {
+                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
+                                        context.startActivity(intent)
+                                    }
+                                )
+                            }
                         }
-                        items(favoriteProviders) { provider ->
-                            FavoriteProviderCard(
-                                provider = provider,
-                                themeColors = themeColors,
-                                onClick = { onOpenProviderDetails(provider) },
-                                onRemoveFavorite = { viewModel.toggleFavorite(provider.id) },
-                                onCall = {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
-                                    context.startActivity(intent)
+                    }
+
+                    // Stores
+                    if (selectedTab == 0 || selectedTab == 2) {
+                        if (favoriteStores.isNotEmpty()) {
+                            item {
+                                Text("المتاجر والمطاعم المفضلة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF34D399))
+                            }
+                            items(favoriteStores) { store ->
+                                FavoriteStoreCard(
+                                    store = store,
+                                    themeColors = themeColors,
+                                    onClick = { onOpenStoreDetails(store) },
+                                    onRemoveFavorite = { viewModel.toggleFavorite(store.id) },
+                                    onCall = {
+                                        if (store.phone.isNotEmpty()) {
+                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
+                                            context.startActivity(intent)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Properties
+                    if (selectedTab == 0 || selectedTab == 3) {
+                        if (favoriteProperties.isNotEmpty()) {
+                            item {
+                                Text("العقارات والاستثمارات المحفوظة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA78BFA))
+                            }
+                            items(favoriteProperties) { property ->
+                                FavoritePropertyCard(
+                                    property = property,
+                                    themeColors = themeColors,
+                                    onClick = { onOpenPropertyDetails(property) },
+                                    onRemoveFavorite = { viewModel.toggleFavorite(property.id) },
+                                    onCall = {
+                                        if (property.phone.isNotEmpty()) {
+                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${property.phone}"))
+                                            context.startActivity(intent)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (favoriteProviders.isEmpty() && favoriteStores.isEmpty() && favoriteProperties.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 40.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
+                                    Text("قائمة المفضلة فارغة حالياً.", color = Color.LightGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("يمكنك الضغط على رمز القلب ❤️ في أي صفحة لإضافتها هنا والوصول إليها بسرعة.", color = Color.Gray, fontSize = 11.sp)
                                 }
-                            )
-                        }
-                    }
-                }
-
-                // Stores
-                if (selectedTab == 0 || selectedTab == 2) {
-                    if (favoriteStores.isNotEmpty()) {
-                        item {
-                            Text("المتاجر والمطاعم المفضلة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF34D399))
-                        }
-                        items(favoriteStores) { store ->
-                            FavoriteStoreCard(
-                                store = store,
-                                themeColors = themeColors,
-                                onClick = { onOpenStoreDetails(store) },
-                                onRemoveFavorite = { viewModel.toggleFavorite(store.id) }
-                            )
-                        }
-                    }
-                }
-
-                // Properties
-                if (selectedTab == 0 || selectedTab == 3) {
-                    if (favoriteProperties.isNotEmpty()) {
-                        item {
-                            Text("العقارات والاستثمارات المحفوظة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA78BFA))
-                        }
-                        items(favoriteProperties) { property ->
-                            FavoritePropertyCard(
-                                property = property,
-                                themeColors = themeColors,
-                                onClick = { onOpenPropertyDetails(property) },
-                                onRemoveFavorite = { viewModel.toggleFavorite(property.id) }
-                            )
-                        }
-                    }
-                }
-
-                if (favoriteProviders.isEmpty() && favoriteStores.isEmpty() && favoriteProperties.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 40.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
-                                Text("قائمة المفضلة فارغة حالياً.", color = Color.LightGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text("يمكنك الضغط على رمز القلب ❤️ في أي صفحة لإضافتها هنا والوصول إليها بسرعة.", color = Color.Gray, fontSize = 11.sp)
                             }
                         }
                     }
@@ -229,6 +255,8 @@ fun FavoriteProviderCard(
                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(3.dp))
                     Text(String.format("%.1f", provider.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("📍 ${provider.localNeighborhood.ifEmpty { provider.area }}", color = Color.Gray, fontSize = 10.sp)
                 }
             }
 
@@ -248,7 +276,8 @@ fun FavoriteStoreCard(
     store: StoreEntity,
     themeColors: VisualThemePalette,
     onClick: () -> Unit,
-    onRemoveFavorite: () -> Unit
+    onRemoveFavorite: () -> Unit,
+    onCall: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -276,6 +305,19 @@ fun FavoriteStoreCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(store.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
                 Text(store.description, color = Color.LightGray, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(String.format("%.1f", store.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("📍 ${store.localNeighborhood.ifEmpty { store.cityId }}", color = Color.Gray, fontSize = 10.sp)
+                }
+            }
+
+            if (store.phone.isNotEmpty()) {
+                IconButton(onClick = onCall) {
+                    Icon(Icons.Default.Phone, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
+                }
             }
 
             IconButton(onClick = onRemoveFavorite) {
@@ -290,7 +332,8 @@ fun FavoritePropertyCard(
     property: PropertyEntity,
     themeColors: VisualThemePalette,
     onClick: () -> Unit,
-    onRemoveFavorite: () -> Unit
+    onRemoveFavorite: () -> Unit,
+    onCall: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -318,6 +361,19 @@ fun FavoritePropertyCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(property.title, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
                 Text("${property.price.toInt()} ${property.currency} • ${property.propertyType}", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(String.format("%.1f", property.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("📍 ${property.localNeighborhood.ifEmpty { property.cityId }}", color = Color.Gray, fontSize = 10.sp)
+                }
+            }
+
+            if (property.phone.isNotEmpty()) {
+                IconButton(onClick = onCall) {
+                    Icon(Icons.Default.Phone, contentDescription = "اتصال", tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
+                }
             }
 
             IconButton(onClick = onRemoveFavorite) {

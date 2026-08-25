@@ -5,14 +5,14 @@ import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
-import com.example.utils.VisualThemePalette
-import com.example.utils.resolveThemePalette
+import com.example.ui.MapScreen
 
 /**
- * 🗺️ MockMapViewScreen (Legacy alias delegating directly to MapScreen)
+ * 🗺️ MapScreenLayout
+ * واجهة تخطيط الخريطة التفاعلية التي تدمج شاشة الخريطة ونظام الرادار والـ Leaflet المباشر
  */
 @Composable
-fun MockMapViewScreen(
+fun MapScreenLayout(
     viewModel: MainViewModel,
     onBackClick: () -> Unit = {},
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},

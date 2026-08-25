@@ -555,3 +555,34 @@ fun MainViewModel.createBooking(booking: BookingEntity, onResult: (Boolean) -> U
         onResult(true)
     }
 }
+
+fun MainViewModel.createBookingDirectly(
+    provider: ProviderEntity,
+    notes: String,
+    onSuccess: () -> Unit,
+    onError: (String) -> Unit
+) {
+    val custName = currentUserName.value.ifBlank { "عميل التطبيق" }
+    val custPhone = currentUserPhone.value.ifBlank { "770000000" }
+    val newBooking = BookingEntity(
+        id = java.util.UUID.randomUUID().toString(),
+        customerName = custName,
+        customerPhone = custPhone,
+        clientName = custName,
+        clientPhone = custPhone,
+        customerArea = currentUserResidence.value.ifBlank { provider.area },
+        serviceType = provider.profession,
+        providerId = provider.id,
+        providerName = provider.name,
+        providerPhone = provider.phone,
+        serviceDetails = notes,
+        dateString = "2026-08-25",
+        timeString = "12:00 م",
+        status = "PENDING",
+        bookingNumber = "MAP-${(10000..99999).random()}"
+    )
+    createBooking(newBooking) { success ->
+        if (success) onSuccess() else onError("تعذر إتمام الحجز")
+    }
+}
+

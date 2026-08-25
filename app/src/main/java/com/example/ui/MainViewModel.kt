@@ -88,10 +88,33 @@ class MainViewModel : ViewModel() {
     internal val _userLongitude = MutableStateFlow(44.1910)
     val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
 
+    internal val _isGpsTrackingActive = MutableStateFlow(false)
+    val isGpsTrackingActive: StateFlow<Boolean> = _isGpsTrackingActive.asStateFlow()
+
     fun updateUserLocation(lat: Double, lng: Double) {
         _userLatitude.value = lat
         _userLongitude.value = lng
     }
+
+    fun startLocationUpdates() {
+        _isGpsTrackingActive.value = true
+        appContext?.let { ctx ->
+            try {
+                val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
+                val loc = lm?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                    ?: lm?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                loc?.let {
+                    updateUserLocation(it.latitude, it.longitude)
+                }
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+
 
     internal val _isProvidersLoading = MutableStateFlow(true)
     val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
@@ -1048,8 +1071,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 5. Providers (Paginated / limited to 20 for Spark Plan efficiency)
-        db.collection("providers").limit(20).addSnapshotListener { snapshot, error ->
+        // 5. Providers (Full limit & safe parsing for complete Map & listing coverage)
+        db.collection("providers").limit(250).addSnapshotListener { snapshot, error ->
             _isProvidersLoading.value = false
             if (error != null) {
                 error.printStackTrace()
@@ -1058,10 +1081,44 @@ class MainViewModel : ViewModel() {
             if (snapshot != null) {
                 val allList = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(ProviderEntity::class.java)
+                        val parsed = doc.toObject(ProviderEntity::class.java)
+                        parsed?.copy(id = doc.id)
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        null
+                        try {
+                            ProviderEntity(
+                                id = doc.id,
+                                name = doc.getString("name") ?: "",
+                                phone = doc.getString("phone") ?: "",
+                                categoryId = doc.getString("categoryId") ?: "",
+                                area = doc.getString("area") ?: doc.getString("localArea") ?: "",
+                                isVip = doc.getBoolean("isVip") ?: doc.getBoolean("vip") ?: false,
+                                subscriptionStatus = doc.getString("subscriptionStatus") ?: "APPROVED",
+                                isAvailable = doc.getBoolean("isAvailable") ?: doc.getBoolean("available") ?: true,
+                                cityId = doc.getString("cityId") ?: "",
+                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
+                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
+                                points = (doc.getLong("points") ?: 0L).toInt(),
+                                isVerified = doc.getBoolean("isVerified") ?: doc.getBoolean("verified") ?: true,
+                                isRecommended = doc.getBoolean("isRecommended") ?: doc.getBoolean("recommended") ?: true,
+                                numReviews = (doc.getLong("numReviews") ?: 0L).toInt(),
+                                coverImage = doc.getString("coverImage") ?: "",
+                                profileImage = doc.getString("profileImage") ?: "",
+                                previewPrice = doc.getDouble("previewPrice") ?: 1500.0,
+                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
+                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
+                                customCategoryName = doc.getString("customCategoryName") ?: "",
+                                profession = doc.getString("profession") ?: "",
+                                specialization = doc.getString("specialization") ?: "",
+                                isBlocked = doc.getBoolean("isBlocked") ?: doc.getBoolean("blocked") ?: false,
+                                isChatDisabled = doc.getBoolean("isChatDisabled") ?: doc.getBoolean("chatDisabled") ?: false,
+                                isDeleted = doc.getBoolean("isDeleted") ?: doc.getBoolean("deleted") ?: false,
+                                providerType = doc.getString("providerType") ?: ""
+                            )
+                        } catch (ex: Exception) {
+                            ex.printStackTrace()
+                            null
+                        }
                     }
                 }.filter { !it.name.contains("ماهر") && it.id != "p_maher" }
                 
@@ -1074,8 +1131,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 6. Pending Providers (Paginated / limited to 20)
-        db.collection("pending_providers").limit(20).addSnapshotListener { snapshot, error ->
+        // 6. Pending Providers (Full limit & safe parsing)
+        db.collection("pending_providers").limit(200).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListener
@@ -1130,7 +1187,7 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 8. Notifications (Paginated / limited to 20)
+        // 8. Notifications (Paginated / limited to 20 with strict validation & deduplication)
         db.collection("notifications").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
@@ -1140,16 +1197,17 @@ class MainViewModel : ViewModel() {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
                         val obj = doc.toObject(NotificationEntity::class.java)
-                        if (obj != null && obj.id.isEmpty()) {
+                        val finalObj = if (obj != null && obj.id.isEmpty()) {
                             obj.copy(id = doc.id)
                         } else {
                             obj
                         }
+                        if (finalObj != null && finalObj.isValid()) finalObj else null
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
                     }
-                }.distinctBy { it.id }.sortedByDescending { it.timestamp }
+                }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }.sortedByDescending { it.timestamp }
                 _notifications.value = fetched
             }
         }
@@ -1309,8 +1367,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 18. Stores (Paginated / limited to 20)
-        db.collection("stores").limit(20).addSnapshotListener { snapshot, error ->
+        // 18. Stores (Full limit & safe parsing for Maps & directory coverage)
+        db.collection("stores").limit(250).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1340,15 +1398,46 @@ class MainViewModel : ViewModel() {
                         } else null
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        null
+                        try {
+                            com.example.data.StoreEntity(
+                                id = doc.id,
+                                sectionId = doc.getString("sectionId") ?: "stores",
+                                name = doc.getString("name") ?: "",
+                                description = doc.getString("description") ?: "",
+                                phone = doc.getString("phone") ?: "",
+                                categoryId = doc.getString("categoryId") ?: "",
+                                cityId = doc.getString("cityId") ?: "",
+                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
+                                coverImage = doc.getString("coverImage") ?: "",
+                                logoImage = doc.getString("logoImage") ?: "",
+                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
+                                numReviews = (doc.getLong("numReviews") ?: 0L).toInt(),
+                                isActive = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true,
+                                isPinned = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true,
+                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
+                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
+                                isDeleted = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true,
+                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: true,
+                                isVip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true,
+                                isVerified = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true,
+                                isRecommended = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true,
+                                isBlocked = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true,
+                                medicalLicenseNo = doc.getString("medicalLicenseNo") ?: "",
+                                commercialRegisterNo = doc.getString("commercialRegisterNo") ?: "",
+                                providerType = doc.getString("providerType") ?: ""
+                            )
+                        } catch (ex: Exception) {
+                            ex.printStackTrace()
+                            null
+                        }
                     }
                 }
                 _stores.value = fetched.filter { !it.isDeleted }
             }
         }
 
-        // 19. Products (Paginated / limited to 20)
-        db.collection("products").limit(20).addSnapshotListener { snapshot, error ->
+        // 19. Products (Full limit & safe parsing)
+        db.collection("products").limit(250).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1366,8 +1455,8 @@ class MainViewModel : ViewModel() {
             }
         }
 
-        // 20. Properties (Paginated / limited to 20)
-        db.collection("properties").limit(20).addSnapshotListener { snapshot, error ->
+        // 20. Properties (Full limit & safe parsing for Maps & real estate coverage)
+        db.collection("properties").limit(250).addSnapshotListener { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1395,7 +1484,36 @@ class MainViewModel : ViewModel() {
                         } else null
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        null
+                        try {
+                            com.example.data.PropertyEntity(
+                                id = doc.id,
+                                sectionId = doc.getString("sectionId") ?: "properties",
+                                title = doc.getString("title") ?: "",
+                                description = doc.getString("description") ?: "",
+                                price = doc.getDouble("price") ?: doc.getLong("price")?.toDouble() ?: 0.0,
+                                currency = doc.getString("currency") ?: "YER",
+                                type = doc.getString("type") ?: "rent",
+                                propertyType = doc.getString("propertyType") ?: "apartment",
+                                phone = doc.getString("phone") ?: "",
+                                cityId = doc.getString("cityId") ?: "",
+                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
+                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
+                                numReviews = (doc.getLong("numReviews") ?: 0L).toInt(),
+                                isActive = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true,
+                                isPinned = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true,
+                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
+                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
+                                isDeleted = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true,
+                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: true,
+                                isVip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true,
+                                isVerified = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true,
+                                isRecommended = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true,
+                                isBlocked = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
+                            )
+                        } catch (ex: Exception) {
+                            ex.printStackTrace()
+                            null
+                        }
                     }
                 }
                 _properties.value = fetched.filter { !it.isDeleted }
@@ -2346,7 +2464,7 @@ class MainViewModel : ViewModel() {
         return null
     }
 
-    private suspend fun uploadImageStringOrUri(
+    suspend fun uploadImageStringOrUri(
         context: android.content.Context,
         input: String,
         storagePath: String,
@@ -4951,12 +5069,18 @@ class MainViewModel : ViewModel() {
         updateBookingImpl(booking)
     }
 
-    // Targeted Notifications Management
+    // Targeted Notifications Management with Strict Validation & Deduplication
     fun addNotification(
         title: String,
         message: String,
-        targetType: String,
-        targetValue: String,
+        targetType: String = "ALL",
+        targetValue: String = "",
+        targetAudience: String = "ALL",
+        targetRoles: List<String> = emptyList(),
+        targetUserIds: List<String> = emptyList(),
+        senderId: String = "SYSTEM",
+        senderName: String = "النظام",
+        dedupKey: String = "",
         expiryTimestamp: Long = 0L,
         scheduledTime: Long = 0L,
         customerPhone: String = "",
@@ -4964,6 +5088,11 @@ class MainViewModel : ViewModel() {
         notificationType: String = "NORMAL",
         channel: String = "IN_APP"
     ) {
+        // 1. Strict Validation Check: Reject empty or dummy notifications
+        if (title.trim().isEmpty() || message.trim().isEmpty()) {
+            return
+        }
+
         val providerByPhone = _providers.value.find { it.phone.trim() == targetValue.trim() }
         val providerById = _providers.value.find { it.id == targetValue }
         val isNotifDisabled = (providerByPhone?.isNotificationsDisabled == true) || (providerById?.isNotificationsDisabled == true)
@@ -4972,12 +5101,26 @@ class MainViewModel : ViewModel() {
             return
         }
 
+        val finalDedupKey = if (dedupKey.isNotBlank()) dedupKey else "${notificationType}_${targetValue}_${title}_${System.currentTimeMillis() / (30 * 1000L)}"
+
+        // 2. Prevent duplicate notifications
+        val isDuplicate = _notifications.value.any { it.dedupKey == finalDedupKey || (it.title == title && it.targetValue == targetValue && Math.abs(it.timestamp - System.currentTimeMillis()) < 15000L) }
+        if (isDuplicate) {
+            return
+        }
+
         val newNotif = NotificationEntity(
-            id = "n_" + UUID.randomUUID().toString().take(6),
-            title = title,
-            message = message,
+            id = "n_" + UUID.randomUUID().toString().take(8),
+            title = title.trim(),
+            message = message.trim(),
             targetType = targetType,
             targetValue = targetValue,
+            targetAudience = targetAudience,
+            targetRoles = targetRoles,
+            targetUserIds = targetUserIds,
+            senderId = senderId,
+            senderName = senderName,
+            dedupKey = finalDedupKey,
             timestamp = System.currentTimeMillis(),
             expiryTimestamp = expiryTimestamp,
             scheduledTime = scheduledTime,
@@ -4986,8 +5129,16 @@ class MainViewModel : ViewModel() {
             notificationType = notificationType,
             channel = channel
         )
-        db.collection("notifications").document(newNotif.id).set(newNotif)
-        triggerNotification("🔔 تم إرسال الإشعار الموجه بنجاح!")
+
+        // Optimistic instant state update
+        _notifications.value = listOf(newNotif) + _notifications.value.filter { it.id != newNotif.id }
+
+        try {
+            db.collection("notifications").document(newNotif.id).set(newNotif)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        triggerNotification("🔔 تم إرسال الإشعار الموثوق بنجاح!")
     }
 
     private val _readNotificationIds = MutableStateFlow<Set<String>>(emptySet())

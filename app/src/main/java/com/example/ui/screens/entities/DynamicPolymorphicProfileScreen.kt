@@ -64,6 +64,11 @@ fun DynamicPolymorphicProfileScreen(
     val categories by viewModel.categories.collectAsState()
     val products by viewModel.products.collectAsState()
     val ratings by viewModel.ratings.collectAsState()
+    val bookings by viewModel.bookings.collectAsState()
+
+    // Current user authentication states
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
     // Determine Entity Type dynamically
     val entityType = remember(provider, store, property, job) {
@@ -116,6 +121,29 @@ fun DynamicPolymorphicProfileScreen(
     val isFav = remember(favoriteIds, entityId) { favoriteIds.contains(entityId) }
     val entityReviews = remember(ratings, entityId) {
         ratings.filter { it.targetId == entityId }
+    }
+
+    // Ownership logic: check if logged-in user is the provider/owner
+    val isOwner = remember(currentUserId, currentUserPhone, provider, store, property) {
+        val phoneClean = currentUserPhone.trim()
+        val uidClean = currentUserId.trim()
+        val provPhone = provider?.phone?.trim() ?: ""
+        val storePhone = store?.phone?.trim() ?: ""
+        val storeOwner = store?.ownerId?.trim() ?: ""
+        val propPhone = property?.phone?.trim() ?: ""
+        val propOwner = property?.ownerId?.trim() ?: ""
+
+        (uidClean.isNotEmpty() && (uidClean == storeOwner || uidClean == propOwner)) ||
+        (phoneClean.isNotEmpty() && (phoneClean == provPhone || phoneClean == storePhone || phoneClean == propPhone))
+    }
+
+    // Dynamic stats calculations
+    val bookingsCount = remember(bookings, entityId) {
+        bookings.count { it.providerId == entityId }
+    }
+    val completedRevenue = remember(bookings, entityId) {
+        bookings.filter { it.providerId == entityId && (it.status == "COMPLETED" || it.status == "APPROVED") }
+            .sumOf { it.totalAmount }
     }
 
     if (showRatingDialog) {
@@ -210,134 +238,20 @@ fun DynamicPolymorphicProfileScreen(
             )
         },
         bottomBar = {
-            // Polymorphic Action Bar at the bottom
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Chat Button
-                    Button(
-                        onClick = {
-                            val channelId = when {
-                                provider != null -> "chat_p_${provider.id}"
-                                store != null -> "chat_store_${store.id}"
-                                property != null -> "chat_prop_${property.id}"
-                                else -> "chat_general_$entityId"
-                            }
-                            onOpenChat(channelId)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).height(44.dp)
-                    ) {
-                        Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("محادثة 💬", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-
-                    // Dynamic Primary Action
-                    when (entityType) {
-                        ProfileEntityType.TECHNICIAN -> {
-                            Button(
-                                onClick = onRequestBooking,
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f).height(44.dp)
-                            ) {
-                                Icon(Icons.Default.Build, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("طلب حجز صيانة 🔧", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-                        }
-                        ProfileEntityType.STORE -> {
-                            Button(
-                                onClick = onOrderProduct,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f).height(44.dp)
-                            ) {
-                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("طلب شراء بضاعة 🛍️", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                        ProfileEntityType.RESTAURANT -> {
-                            Button(
-                                onClick = onOrderProduct,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f).height(44.dp)
-                            ) {
-                                Icon(Icons.Default.Menu, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("حجز طاولة / طلب 🍽️", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-                        }
-                        ProfileEntityType.MEDICAL -> {
-                            Button(
-                                onClick = onRequestBooking,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f).height(44.dp)
-                            ) {
-                                Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("حجز موعد طبي 🩺", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                        ProfileEntityType.REAL_ESTATE -> {
-                            Button(
-                                onClick = onRequestBooking,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f).height(44.dp)
-                            ) {
-                                Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("طلب معاينة العقار 🏡", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                        ProfileEntityType.JOB -> {
-                            Button(
-                                onClick = {
-                                    if (entityPhone.isNotBlank()) {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/967$entityPhone?text=${Uri.encode("مرحباً، أود التقديم على فرصة العمل: $entityName")}"))
-                                        context.startActivity(intent)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f).height(44.dp)
-                            ) {
-                                Icon(Icons.Default.AccountBox, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("تقديم السيرة الذاتية 📄", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-                        }
-                        ProfileEntityType.GENERAL -> {
-                            Button(
-                                onClick = onRequestBooking,
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f).height(44.dp)
-                            ) {
-                                Text("طلب الخدمة 🚀", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-                        }
-                    }
-                }
-            }
+            ProfileActions(
+                entityId = entityId,
+                entityName = entityName,
+                entityPhone = entityPhone,
+                entityType = entityType,
+                isOwner = isOwner,
+                themeColors = themeColors,
+                onOpenChat = onOpenChat,
+                onRequestBooking = onRequestBooking,
+                onOrderProduct = onOrderProduct,
+                onEditProfile = { viewModel.navigateTo("OWNER_PROFILE_VIEW") },
+                onEditProducts = { viewModel.navigateTo("PRODUCTS_MGMT_VIEW") },
+                onEditGallery = { viewModel.navigateTo("GALLERY_MGMT_VIEW") }
+            )
         },
         containerColor = themeColors.background
     ) { innerPadding ->
@@ -348,149 +262,46 @@ fun DynamicPolymorphicProfileScreen(
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 🌟 1. HERO BANNER & AVATAR
+            // 🌟 1. HERO BANNER, AVATAR & BUSINESS METRICS
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.25f))
-                ) {
-                    Column {
-                        // Cover & Hero image
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(themeColors.primary, themeColors.secondary)
-                                    )
-                                )
-                        ) {
-                            if (profileCover.isNotBlank()) {
-                                SmartAsyncImage(
-                                    model = profileCover,
-                                    contentDescription = entityName,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            // Type Tag
-                            Box(
-                                modifier = Modifier
-                                    .padding(12.dp)
-                                    .align(Alignment.TopEnd)
-                                    .background(entityType.badgeColor, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = entityType.labelAr,
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // Info Body
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = entityName,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = "📍 $entityAddress",
-                                        fontSize = 12.sp,
-                                        color = Color.LightGray
-                                    )
-                                }
-
-                                // Rating Badge
-                                Surface(
-                                    color = Color(0xFFFFA000).copy(alpha = 0.2f),
-                                    border = BorderStroke(1.dp, Color(0xFFFFA000)),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(String.format("%.1f", ratingValue), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text(" ($reviewsCount)", color = Color.LightGray, fontSize = 10.sp)
-                                    }
-                                }
-                            }
-
-                            Text(
-                                text = entityDescription,
-                                fontSize = 13.sp,
-                                color = Color.White.copy(alpha = 0.9f),
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
-                }
+                ProfileHeader(
+                    entityName = entityName,
+                    entityType = entityType,
+                    entityAddress = entityAddress,
+                    ratingValue = ratingValue,
+                    reviewsCount = reviewsCount,
+                    profileCover = profileCover,
+                    entityDescription = entityDescription,
+                    isVerified = provider?.isVerified ?: store?.isVerified ?: property?.isVerified ?: true,
+                    isVip = provider?.isVip ?: store?.isVip ?: property?.isVip ?: false,
+                    isOwner = isOwner,
+                    bookingsCount = bookingsCount,
+                    completedRevenue = completedRevenue,
+                    themeColors = themeColors
+                )
             }
 
             // 🌟 2. POLYMORPHIC STRUCTURED DATA (Tailored Fields per category)
             item {
-                when (entityType) {
-                    ProfileEntityType.TECHNICIAN -> TechnicianSpecificSpecsView(provider, themeColors)
-                    ProfileEntityType.STORE -> StoreSpecificSpecsView(store, products, themeColors)
-                    ProfileEntityType.RESTAURANT -> RestaurantSpecificSpecsView(store, products, themeColors)
-                    ProfileEntityType.MEDICAL -> MedicalSpecificSpecsView(provider, store, themeColors)
-                    ProfileEntityType.REAL_ESTATE -> RealEstateSpecificSpecsView(property, themeColors)
-                    ProfileEntityType.JOB -> JobSpecificSpecsView(job, themeColors)
-                    ProfileEntityType.GENERAL -> GeneralSpecificSpecsView(provider, store, themeColors)
-                }
+                ProfileSpecs(
+                    entityType = entityType,
+                    provider = provider,
+                    store = store,
+                    property = property,
+                    job = job,
+                    products = products,
+                    themeColors = themeColors
+                )
             }
 
             // 🌟 3. TABS (معرض الأعمال / المنتجات / التقييمات / تفاصيل إضافية)
             item {
-                val tabTitles = when (entityType) {
-                    ProfileEntityType.TECHNICIAN -> listOf("سابقة الأعمال 📸", "التقييمات والآراء ⭐", "شروط الضمان 🛡️")
-                    ProfileEntityType.STORE -> listOf("الكتالوج والبضائع 📦", "العروض والخصومات 🏷️", "تقييمات المتجر ⭐")
-                    ProfileEntityType.RESTAURANT -> listOf("منيو الأكلات 🍔", "العروض الخاصة 🎁", "آراء الذواقة ⭐")
-                    ProfileEntityType.MEDICAL -> listOf("العيادات والتخصصات 🩺", "أوقات الدوام والطوارئ ⏰", "آراء المراجعين ⭐")
-                    ProfileEntityType.REAL_ESTATE -> listOf("صور العقار والمخطط 📐", "المواصفات والخدمات 🏢", "معاينة وخريطة 🗺️")
-                    ProfileEntityType.JOB -> listOf("شروط ومؤهلات الوظيفة 📋", "المزايا والحوافز 💰", "عن جهة العمل 🏢")
-                    ProfileEntityType.GENERAL -> listOf("الخدمات 🛠️", "التقييمات ⭐", "معلومات التواصل 📞")
-                }
-
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = themeColors.surface,
-                    contentColor = themeColors.accent,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
-                ) {
-                    tabTitles.forEachIndexed { index, title ->
-                        Tab(
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index },
-                            text = {
-                                Text(
-                                    title,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selectedTab == index) themeColors.accent else Color.LightGray
-                                )
-                            }
-                        )
-                    }
-                }
+                ProfileTabs(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it },
+                    entityType = entityType,
+                    themeColors = themeColors
+                )
             }
 
             // 🌟 4. TAB CONTENTS
@@ -516,14 +327,14 @@ fun DynamicPolymorphicProfileScreen(
                                     }
                                 }
                             }
-                            ProfileEntityType.STORE, ProfileEntityType.RESTAURANT -> {
+                            ProfileEntityType.STORE, ProfileEntityType.RESTAURANT, ProfileEntityType.MEDICAL -> {
                                 val storeProducts = products.filter { it.storeId == (store?.id ?: "") }
                                 if (storeProducts.isEmpty()) {
                                     EmptyStateBox("لا توجد أصناف مدرجة في القائمة حالياً.", themeColors)
                                 } else {
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         storeProducts.forEach { prod ->
-                                            ProductItemCard(prod, themeColors)
+                                            ProfileProductCard(product = prod, themeColors = themeColors)
                                         }
                                     }
                                 }
@@ -578,40 +389,7 @@ fun DynamicPolymorphicProfileScreen(
                                 EmptyStateBox("لا توجد تقييمات مسجلة بعد. كن أول من يكتب تقييماً!", themeColors)
                             } else {
                                 entityReviews.forEach { review ->
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                                        shape = RoundedCornerShape(10.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text(review.userName.ifEmpty { "عميل معتمد" }, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
-                                                Row {
-                                                    val ratingCount = review.rating.toInt().coerceIn(1, 5)
-                                                    repeat(ratingCount) {
-                                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(14.dp))
-                                                    }
-                                                }
-                                            }
-                                            Text(review.comment, color = Color.LightGray, fontSize = 11.sp)
-                                            if (review.reply.isNotBlank()) {
-                                                Surface(
-                                                    color = Color.Black.copy(alpha = 0.3f),
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
-                                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                                                ) {
-                                                    Column(modifier = Modifier.padding(6.dp)) {
-                                                        Text("رد المنشأة / المزود 💬:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                                                        Text(review.reply, fontSize = 10.5.sp, color = Color.White)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                    ProfileReviewCard(review = review, themeColors = themeColors)
                                 }
                             }
                         }
@@ -632,218 +410,6 @@ fun DynamicPolymorphicProfileScreen(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-// ----------------------------------------------------
-// POLYMORPHIC SPECIFIC CARDS (الحقول المخصصة لكل فئة)
-// ----------------------------------------------------
-
-@Composable
-fun TechnicianSpecificSpecsView(provider: ProviderEntity?, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("🔧 بيانات المهنة والاعتماد الفني", fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA), fontSize = 13.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("سعر المعاينة:", "${provider?.previewPrice?.toInt() ?: 1500} ر.ي", Icons.Default.CheckCircle)
-                SpecBadge("الحالة:", if (provider?.isAvailable == true) "متاح للعمل الآن 🟢" else "مشغول 🔴", Icons.Default.Info)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("التوثيق:", if (provider?.isVerified == true) "موثق بالهوية ✅" else "قيد التدقيق", Icons.Default.Star)
-                SpecBadge("المدينة:", if (!provider?.cityId.isNullOrEmpty()) provider?.cityId!! else "صنعاء", Icons.Default.LocationOn)
-            }
-        }
-    }
-}
-
-@Composable
-fun StoreSpecificSpecsView(store: StoreEntity?, products: List<ProductEntity>, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("🛍️ تفاصيل المتجر وسياسة التوصيل", fontWeight = FontWeight.Bold, color = Color(0xFF34D399), fontSize = 13.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("أوقات الدوام:", store?.workingHours ?: "9:00 ص - 10:00 م", Icons.Default.AccountBox)
-                SpecBadge("عدد المنتجات:", "${products.count { it.storeId == store?.id }} صنف", Icons.Default.ShoppingCart)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("طرق الدفع:", "محافظ إلكترونية + نقد", Icons.Default.Star)
-                SpecBadge("السجل التجاري:", if (!store?.commercialRegisterNo.isNullOrEmpty()) store?.commercialRegisterNo!! else "معتمد بالمنصة", Icons.Default.CheckCircle)
-            }
-        }
-    }
-}
-
-@Composable
-fun RestaurantSpecificSpecsView(store: StoreEntity?, products: List<ProductEntity>, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("🍽️ خدمات المطعم والضيافة", fontWeight = FontWeight.Bold, color = Color(0xFFFBBF24), fontSize = 13.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("أوقات الوجبات:", "فطور - غداء - عشاء", Icons.Default.Favorite)
-                SpecBadge("خدمة التوصيل:", "سريع لجميع الأحياء 🛵", Icons.Default.Send)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("جلسات عائلية:", "متوفرة وقسم خاص 👨‍👩‍👧", Icons.Default.Home)
-                SpecBadge("حجز مسبق:", "متاح عبر التطبيق 📱", Icons.Default.DateRange)
-            }
-        }
-    }
-}
-
-@Composable
-fun MedicalSpecificSpecsView(provider: ProviderEntity?, store: StoreEntity?, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("🩺 بيانات الاعتماد الطبي والعيادات", fontWeight = FontWeight.Bold, color = Color(0xFFF87171), fontSize = 13.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("قسم الطوارئ:", "متاح 24 ساعة 🚨", Icons.Default.Warning)
-                SpecBadge("الترخيص الطبي:", store?.medicalLicenseNo?.ifEmpty { "مرخص رسمياً 📄" } ?: "مرخص رسمياً 📄", Icons.Default.CheckCircle)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("حجز الكشوفات:", "مسبق لتجنب الانتظار ⏱️", Icons.Default.DateRange)
-                SpecBadge("المختبر والأشعة:", "فحوصات متكاملة 🔬", Icons.Default.Star)
-            }
-        }
-    }
-}
-
-@Composable
-fun RealEstateSpecificSpecsView(property: PropertyEntity?, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("🏢 مواصفات العقار والاستثمار", fontWeight = FontWeight.Bold, color = Color(0xFFA78BFA), fontSize = 13.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("نوع العرض:", if (property?.type == "rent") "إيجار شهري/سنوي 🔑" else "للبيع والشراء 📜", Icons.Default.Home)
-                SpecBadge("السعر:", "${property?.price?.toInt() ?: 0} ${property?.currency ?: "YER"}", Icons.Default.Star)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("تصنيف العقار:", if (!property?.propertyType.isNullOrEmpty()) property?.propertyType!! else "شقة سكنية", Icons.Default.LocationOn)
-                SpecBadge("المعاينة:", "متاحة بالتنسيق المباشر 🚶‍♂️", Icons.Default.CheckCircle)
-            }
-        }
-    }
-}
-
-@Composable
-fun JobSpecificSpecsView(job: JobEntity?, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, Color(0xFF06B6D4).copy(alpha = 0.3f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("💼 تفاصيل فرصة العمل", fontWeight = FontWeight.Bold, color = Color(0xFF22D3EE), fontSize = 13.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("نوع الدوام:", if (!job?.jobType.isNullOrEmpty()) job?.jobType!! else "دوام كامل", Icons.Default.AccountBox)
-                SpecBadge("الراتب المتوقع:", if (!job?.salary.isNullOrEmpty()) job?.salary!! else "حسب الاتفاق", Icons.Default.Star)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("اسم الشركة:", if (!job?.companyName.isNullOrEmpty()) job?.companyName!! else "جهة معتمدة", Icons.Default.CheckCircle)
-                SpecBadge("المدينة:", if (!job?.cityId.isNullOrEmpty()) job?.cityId!! else "صنعاء", Icons.Default.LocationOn)
-            }
-        }
-    }
-}
-
-@Composable
-fun GeneralSpecificSpecsView(provider: ProviderEntity?, store: StoreEntity?, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("📋 معلومات النشاط", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 13.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("الخدمات:", "متنوعة ومعتمدة", Icons.Default.Build)
-                SpecBadge("الحالة:", "نشط على المنصة ✅", Icons.Default.CheckCircle)
-            }
-        }
-    }
-}
-
-@Composable
-fun SpecBadge(title: String, value: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(14.dp))
-        Spacer(modifier = Modifier.width(4.dp))
-        Column {
-            Text(title, fontSize = 9.sp, color = Color.Gray)
-            Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        }
-    }
-}
-
-@Composable
-fun ProductItemCard(product: ProductEntity, themeColors: VisualThemePalette) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            if (product.imageUrl.isNotEmpty()) {
-                SmartAsyncImage(
-                    model = product.imageUrl,
-                    contentDescription = product.name,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .background(Color.DarkGray, RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.LightGray)
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(product.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                Text(product.description, color = Color.LightGray, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${product.price.toInt()} ${product.currency}", fontWeight = FontWeight.Bold, color = themeColors.accent, fontSize = 12.sp)
             }
         }
     }

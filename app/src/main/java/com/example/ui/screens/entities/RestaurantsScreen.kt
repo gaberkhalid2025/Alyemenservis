@@ -8,24 +8,24 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.data.StoreEntity
-import com.example.rememberBase64Bitmap
 import com.example.ui.MainViewModel
+import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -37,12 +37,18 @@ fun RestaurantsScreen(
     onOrderMealClick: (StoreEntity) -> Unit
 ) {
     val stores by viewModel.stores.collectAsState()
+    val cities by viewModel.cities.collectAsState()
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
+    var selectedCityId by remember { mutableStateOf("الكل") }
+    var selectedMinRating by remember { mutableStateOf(0.0f) }
 
     val categories = listOf("الكل", "وجبات شعبية", "وجبات سريعة", "مشويات", "حلويات وعصائر", "كافيهات")
 
-    val restaurantStores = remember(stores, searchQuery, selectedCategory) {
+    val isLoading = remember(stores) { stores.isEmpty() }
+
+    val restaurantStores = remember(stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating) {
         stores.filter { store ->
             val isRestaurant = store.sectionId == "restaurants" ||
                     store.categoryId.contains("rest", ignoreCase = true) ||
@@ -58,9 +64,15 @@ fun RestaurantsScreen(
                     store.description.contains(searchQuery, ignoreCase = true) ||
                     store.localNeighborhood.contains(searchQuery, ignoreCase = true)
 
-            val matchesCat = selectedCategory == "الكل" || store.categoryId.contains(selectedCategory, ignoreCase = true)
+            val matchesCat = selectedCategory == "الكل" ||
+                    store.categoryId.contains(selectedCategory, ignoreCase = true) ||
+                    store.name.contains(selectedCategory, ignoreCase = true)
 
-            isRestaurant && matchesSearch && matchesCat
+            val matchesCity = selectedCityId == "الكل" || store.cityId == selectedCityId
+
+            val matchesRating = store.rating >= selectedMinRating
+
+            isRestaurant && matchesSearch && matchesCat && matchesCity && matchesRating
         }
     }
 
@@ -71,6 +83,7 @@ fun RestaurantsScreen(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Search Input
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -85,12 +98,62 @@ fun RestaurantsScreen(
             )
         )
 
+        // 🏙️ City Filter LazyRow
+        Text("🏙️ اختر المدينة:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(categories.size) { idx ->
-                val cat = categories[idx]
+            item {
+                FilterChip(
+                    selected = selectedCityId == "الكل",
+                    onClick = { selectedCityId = "الكل" },
+                    label = { Text("كل المدن 🇾🇪", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+            items(cities) { city ->
+                FilterChip(
+                    selected = selectedCityId == city.id,
+                    onClick = { selectedCityId = city.id },
+                    label = { Text("${city.icon} ${city.nameAr}", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+        }
+
+        // ⭐ Rating Filter LazyRow
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("⭐ التقييم الأدنى:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+            listOf(0.0f, 3.0f, 4.0f, 4.5f).forEach { stars ->
+                FilterChip(
+                    selected = selectedMinRating == stars,
+                    onClick = { selectedMinRating = stars },
+                    label = { Text(if (stars == 0.0f) "الكل" else "⭐ $stars+", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+        }
+
+        // 🏷️ Category Filter LazyRow
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(categories) { cat ->
                 val isSelected = selectedCategory == cat
                 Surface(
                     color = if (isSelected) themeColors.accent else themeColors.surface,
@@ -118,15 +181,44 @@ fun RestaurantsScreen(
             Text("${restaurantStores.size} مطعم", fontSize = 11.sp, color = Color.LightGray)
         }
 
-        if (restaurantStores.isEmpty()) {
+        if (isLoading) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = themeColors.accent)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("جاري تحميل قائمة المطاعم... 🍔", color = Color.LightGray, fontSize = 11.sp)
+                }
+            }
+        } else if (restaurantStores.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🍔", fontSize = 48.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("لا توجد مطاعم مطابقة للبحث", color = Color.Gray, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            searchQuery = ""
+                            selectedCategory = "الكل"
+                            selectedCityId = "الكل"
+                            selectedMinRating = 0.0f
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = themeColors.accent)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إعادة تعيين الفلاتر", color = Color.White, fontSize = 11.sp)
+                    }
                 }
             }
         } else {
@@ -134,7 +226,9 @@ fun RestaurantsScreen(
                 columns = GridCells.Fixed(2),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
                 items(restaurantStores, key = { it.id }) { rest ->
                     RestaurantCard(
@@ -159,12 +253,11 @@ fun RestaurantCard(
     onOrderMealClick: () -> Unit
 ) {
     val imageSource = restaurant.coverImage.ifBlank { restaurant.logoImage }
-    val bitmap = rememberBase64Bitmap(imageSource)
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.25f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
@@ -176,19 +269,11 @@ fun RestaurantCard(
                     .height(100.dp)
                     .background(Color.DarkGray)
             ) {
-                if (bitmap != null) {
-                    androidx.compose.foundation.Image(
-                        bitmap = bitmap,
-                        contentDescription = restaurant.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else if (imageSource.startsWith("http")) {
-                    AsyncImage(
+                if (imageSource.isNotBlank()) {
+                    SmartAsyncImage(
                         model = imageSource,
                         contentDescription = restaurant.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -207,7 +292,7 @@ fun RestaurantCard(
                     ) {
                         Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(2.dp))
-                        Text("${restaurant.rating}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(String.format("%.1f", restaurant.rating), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -228,6 +313,14 @@ fun RestaurantCard(
                 )
 
                 Text(
+                    text = "⏰ الدوام: " + restaurant.workingHours,
+                    fontSize = 9.5.sp,
+                    color = Color.LightGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
                     text = "📍 ${restaurant.localNeighborhood.ifBlank { "اليمن" }}",
                     fontSize = 10.sp,
                     color = Color.LightGray,
@@ -243,7 +336,9 @@ fun RestaurantCard(
                         onClick = onOrderMealClick,
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                        modifier = Modifier.weight(1f).height(30.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(30.dp)
                     ) {
                         Text("اطلب وجبتك 🍕", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                     }

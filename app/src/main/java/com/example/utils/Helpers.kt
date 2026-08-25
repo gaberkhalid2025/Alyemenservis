@@ -13,6 +13,8 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import com.example.data.AdminSettingsEntity
 import com.example.data.ProviderEntity
+import com.example.data.StoreEntity
+import com.example.data.PropertyEntity
 import java.io.ByteArrayOutputStream
 
 data class VisualThemePalette(
@@ -243,12 +245,25 @@ fun formatDistance(meters: Float): String {
 }
 
 fun getAreaCoords(areaName: String): Pair<Double, Double> {
+    val norm = areaName.lowercase().trim()
     return when {
-        areaName.contains("تعز") -> Pair(13.5794, 44.0135)
-        areaName.contains("عدن") -> Pair(12.7855, 45.0186)
-        areaName.contains("الحديدة") -> Pair(14.7979, 42.9530)
-        areaName.contains("حضرموت") || areaName.contains("المكلا") -> Pair(14.5424, 49.1242)
-        else -> Pair(15.3694, 44.1910)
+        norm.contains("تعز") || norm.contains("taiz") || norm.contains("ye_tai") -> Pair(13.5794, 44.0135)
+        norm.contains("عدن") || norm.contains("aden") || norm.contains("ye_ade") -> Pair(12.7855, 45.0186)
+        norm.contains("الحديدة") || norm.contains("hodeidah") || norm.contains("ye_hud") || norm.contains("hod") -> Pair(14.7979, 42.9530)
+        norm.contains("حضرموت") || norm.contains("المكلا") || norm.contains("mukalla") || norm.contains("ye_had") -> Pair(14.5424, 49.1242)
+        norm.contains("إب") || norm.contains("ibb") || norm.contains("ye_ibb") -> Pair(13.9667, 44.1833)
+        norm.contains("ذمار") || norm.contains("dhamar") || norm.contains("ye_dha") -> Pair(14.5428, 44.4051)
+        norm.contains("مأرب") || norm.contains("marib") || norm.contains("ye_mar") -> Pair(15.4542, 45.3262)
+        norm.contains("شبوة") || norm.contains("عتق") || norm.contains("shabwah") || norm.contains("ye_sha") -> Pair(14.5377, 46.8319)
+        norm.contains("صعدة") || norm.contains("saada") || norm.contains("ye_saa") -> Pair(16.9402, 43.7639)
+        norm.contains("لحج") || norm.contains("lahej") || norm.contains("ye_lah") -> Pair(13.0582, 44.8838)
+        norm.contains("أبين") || norm.contains("زنجبار") || norm.contains("abyan") || norm.contains("ye_aby") -> Pair(13.1287, 45.3807)
+        norm.contains("المهرة") || norm.contains("الغيضة") || norm.contains("mahra") || norm.contains("ye_mah") -> Pair(16.2079, 52.1760)
+        norm.contains("حجة") || norm.contains("hajja") || norm.contains("ye_haj") -> Pair(15.6917, 43.6028)
+        norm.contains("البيضاء") || norm.contains("bayda") || norm.contains("ye_bay") -> Pair(13.9852, 45.5727)
+        norm.contains("عمران") || norm.contains("amran") || norm.contains("ye_amr") -> Pair(15.6594, 43.9439)
+        norm.contains("سيئون") || norm.contains("sayun") -> Pair(15.9432, 48.7871)
+        else -> Pair(15.3694, 44.1910) // Sana'a default center
     }
 }
 
@@ -256,11 +271,48 @@ fun getProviderCoords(provider: ProviderEntity): Pair<Double, Double> {
     if (provider.latitude != 0.0 && provider.longitude != 0.0) {
         return Pair(provider.latitude, provider.longitude)
     }
-    val baseStr = if (provider.area.isNotEmpty()) provider.area else provider.cityId
+    val baseStr = when {
+        provider.localNeighborhood.isNotEmpty() -> provider.localNeighborhood
+        provider.area.isNotEmpty() -> provider.area
+        provider.cityId.isNotEmpty() -> provider.cityId
+        else -> "صنعاء"
+    }
     val base = getAreaCoords(baseStr)
-    val hash = provider.id.hashCode().toDouble()
-    val offsetLat = (hash % 100) / 1000.0
-    val offsetLng = ((hash / 100) % 100) / 1000.0
+    val hash = (provider.id.ifEmpty { provider.name }).hashCode()
+    val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
+    val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
+    return Pair(base.first + offsetLat, base.second + offsetLng)
+}
+
+fun getStoreCoords(store: StoreEntity): Pair<Double, Double> {
+    if (store.latitude != 0.0 && store.longitude != 0.0) {
+        return Pair(store.latitude, store.longitude)
+    }
+    val baseStr = when {
+        store.localNeighborhood.isNotEmpty() -> store.localNeighborhood
+        store.cityId.isNotEmpty() -> store.cityId
+        else -> "صنعاء"
+    }
+    val base = getAreaCoords(baseStr)
+    val hash = (store.id.ifEmpty { store.name }).hashCode()
+    val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
+    val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
+    return Pair(base.first + offsetLat, base.second + offsetLng)
+}
+
+fun getPropertyCoords(property: PropertyEntity): Pair<Double, Double> {
+    if (property.latitude != 0.0 && property.longitude != 0.0) {
+        return Pair(property.latitude, property.longitude)
+    }
+    val baseStr = when {
+        property.localNeighborhood.isNotEmpty() -> property.localNeighborhood
+        property.cityId.isNotEmpty() -> property.cityId
+        else -> "صنعاء"
+    }
+    val base = getAreaCoords(baseStr)
+    val hash = (property.id.ifEmpty { property.title }).hashCode()
+    val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
+    val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
     return Pair(base.first + offsetLat, base.second + offsetLng)
 }
 
@@ -268,9 +320,9 @@ fun getProviderCoords(providerId: String): Pair<Double, Double> {
     return when (providerId) {
         "p_amin" -> Pair(15.3694, 44.1910)
         else -> {
-            val hash = providerId.hashCode().toDouble()
-            val offsetLat = (hash % 100) / 1000.0
-            val offsetLng = ((hash / 100) % 100) / 1000.0
+            val hash = providerId.hashCode()
+            val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
+            val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
             Pair(15.3694 + offsetLat, 44.1910 + offsetLng)
         }
     }

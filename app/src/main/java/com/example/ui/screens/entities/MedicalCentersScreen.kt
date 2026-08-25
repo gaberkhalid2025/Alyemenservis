@@ -8,24 +8,25 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.data.ProviderEntity
-import com.example.rememberBase64Bitmap
 import com.example.ui.MainViewModel
+import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -37,13 +38,19 @@ fun MedicalCentersScreen(
     onBookAppointmentClick: (ProviderEntity) -> Unit
 ) {
     val providers by viewModel.providers.collectAsState()
+    val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
+    val cities by viewModel.cities.collectAsState()
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
+    var selectedCityId by remember { mutableStateOf("الكل") }
+    var selectedMinRating by remember { mutableStateOf(0.0f) }
 
     val categories = listOf("الكل", "مستشفيات", "عيادات تخصصية", "صيدليات", "مختبرات تحاليل", "مراكز أشعة")
 
-    val medicalProviders = remember(providers, searchQuery, selectedCategory) {
+    val medicalProviders = remember(providers, searchQuery, selectedCategory, selectedCityId, selectedMinRating) {
         providers.filter { provider ->
+            // Section categorization
             val isMedical = provider.categoryId == "medical" ||
                     provider.categoryId == "health" ||
                     provider.categoryId.contains("med", ignoreCase = true) ||
@@ -71,9 +78,14 @@ fun MedicalCentersScreen(
 
             val matchesCat = selectedCategory == "الكل" ||
                     provider.specialization.contains(selectedCategory, ignoreCase = true) ||
-                    provider.profession.contains(selectedCategory, ignoreCase = true)
+                    provider.profession.contains(selectedCategory, ignoreCase = true) ||
+                    provider.customCategoryName.contains(selectedCategory, ignoreCase = true)
 
-            isMedical && matchesSearch && matchesCat
+            val matchesCity = selectedCityId == "الكل" || provider.cityId == selectedCityId
+
+            val matchesRating = provider.rating >= selectedMinRating
+
+            isMedical && matchesSearch && matchesCat && matchesCity && matchesRating
         }
     }
 
@@ -84,6 +96,7 @@ fun MedicalCentersScreen(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Search Input
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -98,12 +111,62 @@ fun MedicalCentersScreen(
             )
         )
 
+        // 🏙️ City Filter LazyRow
+        Text("🏙️ اختر المدينة:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(categories.size) { idx ->
-                val cat = categories[idx]
+            item {
+                FilterChip(
+                    selected = selectedCityId == "الكل",
+                    onClick = { selectedCityId = "الكل" },
+                    label = { Text("كل المدن 🇾🇪", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+            items(cities) { city ->
+                FilterChip(
+                    selected = selectedCityId == city.id,
+                    onClick = { selectedCityId = city.id },
+                    label = { Text("${city.icon} ${city.nameAr}", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+        }
+
+        // ⭐ Rating Filter LazyRow
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("⭐ التقييم الأدنى:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+            listOf(0.0f, 3.0f, 4.0f, 4.5f).forEach { stars ->
+                FilterChip(
+                    selected = selectedMinRating == stars,
+                    onClick = { selectedMinRating = stars },
+                    label = { Text(if (stars == 0.0f) "الكل" else "⭐ $stars+", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+        }
+
+        // 🏷️ Sub-categories Filter LazyRow
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(categories) { cat ->
                 val isSelected = selectedCategory == cat
                 Surface(
                     color = if (isSelected) themeColors.accent else themeColors.surface,
@@ -131,15 +194,45 @@ fun MedicalCentersScreen(
             Text("${medicalProviders.size} مركز", fontSize = 11.sp, color = Color.LightGray)
         }
 
-        if (medicalProviders.isEmpty()) {
+        // ⏳ Loading / Error Handling / Content State
+        if (isProvidersLoading) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = themeColors.accent)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("جاري تحميل الكوادر والمراكز الطبية... 🏥", color = Color.LightGray, fontSize = 11.sp)
+                }
+            }
+        } else if (medicalProviders.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🏥", fontSize = 48.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("لا توجد مراكز طبية مطابقة للبحث", color = Color.Gray, fontSize = 12.sp)
+                    Text("لا توجد مراكز طبية مطابقة للتصفية الحالية", color = Color.Gray, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            searchQuery = ""
+                            selectedCategory = "الكل"
+                            selectedCityId = "الكل"
+                            selectedMinRating = 0.0f
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = themeColors.accent)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إعادة تعيين الفلاتر", color = Color.White, fontSize = 11.sp)
+                    }
                 }
             }
         } else {
@@ -147,7 +240,9 @@ fun MedicalCentersScreen(
                 columns = GridCells.Fixed(2),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
                 items(medicalProviders, key = { it.id }) { provider ->
                     MedicalCenterCard(
@@ -172,12 +267,11 @@ fun MedicalCenterCard(
     onBookAppointmentClick: () -> Unit
 ) {
     val imageSource = provider.coverImage.ifBlank { provider.profileImage }
-    val bitmap = rememberBase64Bitmap(imageSource)
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.25f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
@@ -189,19 +283,11 @@ fun MedicalCenterCard(
                     .height(100.dp)
                     .background(Color.DarkGray)
             ) {
-                if (bitmap != null) {
-                    androidx.compose.foundation.Image(
-                        bitmap = bitmap,
-                        contentDescription = provider.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else if (imageSource.startsWith("http")) {
-                    AsyncImage(
+                if (imageSource.isNotBlank()) {
+                    SmartAsyncImage(
                         model = imageSource,
                         contentDescription = provider.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -210,7 +296,7 @@ fun MedicalCenterCard(
                 }
 
                 Surface(
-                    color = Color.Black.copy(alpha = 0.7f),
+                    color = Color.Black.copy(alpha = 0.75f),
                     shape = RoundedCornerShape(bottomStart = 8.dp),
                     modifier = Modifier.align(Alignment.TopEnd)
                 ) {
@@ -220,7 +306,7 @@ fun MedicalCenterCard(
                     ) {
                         Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(2.dp))
-                        Text("${provider.rating}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(String.format("%.1f", provider.rating), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -248,6 +334,19 @@ fun MedicalCenterCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "⏱️ متاح للاستشارة",
+                        fontSize = 9.sp,
+                        color = if (provider.isAvailable) Color(0xFF10B981) else Color.LightGray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
                 Text(
                     text = "📍 ${provider.localNeighborhood.ifBlank { provider.area.ifBlank { "اليمن" } }}",
                     fontSize = 9.5.sp,
@@ -264,7 +363,9 @@ fun MedicalCenterCard(
                         onClick = onBookAppointmentClick,
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                        modifier = Modifier.weight(1f).height(30.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(30.dp)
                     ) {
                         Text("حجز موعد 🩺", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                     }

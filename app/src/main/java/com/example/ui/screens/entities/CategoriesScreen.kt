@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -21,13 +22,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.CategoryEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
-
-data class StaticCategoryItem(
-    val id: String,
-    val name: String,
-    val icon: String,
-    val countLabel: String
-)
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 
 @Composable
 fun CategoriesScreen(
@@ -35,114 +31,140 @@ fun CategoriesScreen(
     themeColors: VisualThemePalette,
     onCategoryClick: (String) -> Unit
 ) {
-    val categoriesFromVm by viewModel.categories.collectAsState()
+    var categories by remember { mutableStateOf<List<CategoryEntity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var retryCount by remember { mutableStateOf(0) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    val defaultCategories = listOf(
-        StaticCategoryItem("stores", "المحلات والأنشطة التجارية", "🏪", "أكثر من 500 محل"),
-        StaticCategoryItem("medical", "المراكز الطبية والعيادات", "🏥", "مستشفيات وصيدليات"),
-        StaticCategoryItem("restaurants", "المطاعم والكافيهات", "🍔", "أشهر الوجبات والمقاهي"),
-        StaticCategoryItem("properties", "العقارات والأراضي", "🏠", "بيوت، شقق، أراضي"),
-        StaticCategoryItem("plumbing", "سباكة وكهرباء", "🔧", "فنيون متعددو المهارات"),
-        StaticCategoryItem("car_maintenance", "صيانة السيارات", "🚗", "ورش وميكانيك"),
-        StaticCategoryItem("appliances", "صيانة الأجهزة الإلكترونية", "📱", "موبايل، تكييف، غسالات"),
-        StaticCategoryItem("cleaning", "خدمات التنظيف والتعقيم", "🧹", "منازل ومكاتب")
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(themeColors.background)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "🗂️ فئات دليل الخدمات اليمني المتاحة:",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.accent
-            )
-        }
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(defaultCategories, key = { it.id }) { cat ->
-                StaticCategoryCard(
-                    cat = cat,
-                    themeColors = themeColors,
-                    onClick = { onCategoryClick(cat.id) }
-                )
-            }
-
-            if (categoriesFromVm.isNotEmpty()) {
-                items(categoriesFromVm, key = { it.id }) { cat ->
-                    DynamicCategoryCard(
-                        category = cat,
-                        themeColors = themeColors,
-                        onClick = { onCategoryClick(cat.id) }
-                    )
+    DisposableEffect(retryCount) {
+        isLoading = true
+        errorMessage = null
+        val registration = viewModel.db.collection("categories")
+            .addSnapshotListener { snapshot, error ->
+                isLoading = false
+                if (error != null) {
+                    errorMessage = "فشل تحميل الفئات: ${error.localizedMessage ?: "خطأ غير معروف"}"
+                    return@addSnapshotListener
                 }
+                if (snapshot != null) {
+                    val fetched = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val obj = doc.toObject(CategoryEntity::class.java)
+                            if (obj != null) {
+                                if (obj.id.isEmpty()) obj.copy(id = doc.id) else obj
+                            } else {
+                                null
+                            }
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }.distinctBy { it.id }.sortedWith(
+                        compareByDescending<CategoryEntity> { it.isPinned }
+                            .thenBy { it.order }
+                    )
+                    categories = fetched
+                    errorMessage = null
+                }
+            }
+        onDispose {
+            registration.remove()
+        }
+    }
+
+    if (errorMessage != null) {
+        LaunchedEffect(errorMessage) {
+            val result = snackbarHostState.showSnackbar(
+                message = errorMessage ?: "حدث خطأ غير متوقع",
+                actionLabel = "إعادة المحاولة",
+                duration = SnackbarDuration.Indefinite
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                retryCount++
             }
         }
     }
-}
 
-@Composable
-fun StaticCategoryCard(
-    cat: StaticCategoryItem,
-    themeColors: VisualThemePalette,
-    onClick: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    ) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = themeColors.background,
+        modifier = Modifier.fillMaxSize()
+    ) { paddingValues ->
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(paddingValues)
                 .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(
-                color = themeColors.accent.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(20.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = cat.icon,
-                    fontSize = 28.sp,
-                    modifier = Modifier.padding(10.dp)
+                    text = "🗂️ فئات دليل الخدمات اليمني المتاحة:",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = themeColors.accent
                 )
             }
 
-            Text(
-                text = cat.name,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Text(
-                text = cat.countLabel,
-                fontSize = 10.sp,
-                color = Color.LightGray,
-                textAlign = TextAlign.Center
-            )
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = themeColors.primary,
+                            modifier = Modifier.testTag("categories_loading_indicator")
+                        )
+                        Text(
+                            text = "جاري تحميل الفئات...",
+                            color = themeColors.textSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            } else if (categories.isEmpty() && errorMessage == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "لا توجد فئات متاحة حالياً.",
+                        color = themeColors.textSecondary,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .testTag("categories_grid")
+                ) {
+                    items(categories, key = { it.id }) { cat ->
+                        DynamicCategoryCard(
+                            category = cat,
+                            themeColors = themeColors,
+                            onClick = { onCategoryClick(cat.id) }
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -156,10 +178,11 @@ fun DynamicCategoryCard(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
+            .testTag("category_card_${category.id}")
     ) {
         Column(
             modifier = Modifier
@@ -168,16 +191,22 @@ fun DynamicCategoryCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = category.icon.ifBlank { "✨" },
-                fontSize = 28.sp
-            )
+            Surface(
+                color = themeColors.accent.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Text(
+                    text = category.icon.ifBlank { "✨" },
+                    fontSize = 28.sp,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
 
             Text(
                 text = category.name,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = themeColors.textPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
