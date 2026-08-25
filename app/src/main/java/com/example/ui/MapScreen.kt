@@ -1097,44 +1097,115 @@ private fun LeafletRadarMapRenderer(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Concentric Pulsing Radar Canvas (4 Pulsing Rings, 2.0s continuous cycle)
+        // Concentric Pulsing Radar Canvas + Sweeping Scanner Beam & Blips
         val infiniteTransition = rememberInfiniteTransition(label = "RadarPulse")
         val pulseProgress by infiniteTransition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                animation = androidx.compose.animation.core.tween(durationMillis = 2000, easing = androidx.compose.animation.core.LinearEasing),
+                animation = androidx.compose.animation.core.tween(durationMillis = 2200, easing = androidx.compose.animation.core.LinearEasing),
                 repeatMode = androidx.compose.animation.core.RepeatMode.Restart
             ),
             label = "RadarProgress"
+        )
+        val sweepAngle by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = androidx.compose.animation.core.tween(durationMillis = 3500, easing = androidx.compose.animation.core.LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+            ),
+            label = "RadarSweep"
         )
 
         androidx.compose.foundation.Canvas(
             modifier = Modifier.fillMaxSize()
         ) {
             val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-            val maxRadius = kotlin.math.min(size.width, size.height) * 0.35f
+            val maxRadius = kotlin.math.min(size.width, size.height) * 0.42f
             val radarColor = try {
                 Color(android.graphics.Color.parseColor(circleColorHex))
             } catch (e: Exception) {
                 Color(0xFF10B981)
             }
 
+            // Radar Crosshairs Grid
+            drawLine(
+                color = radarColor.copy(alpha = 0.25f),
+                start = androidx.compose.ui.geometry.Offset(center.x - maxRadius, center.y),
+                end = androidx.compose.ui.geometry.Offset(center.x + maxRadius, center.y),
+                strokeWidth = 1.dp.toPx()
+            )
+            drawLine(
+                color = radarColor.copy(alpha = 0.25f),
+                start = androidx.compose.ui.geometry.Offset(center.x, center.y - maxRadius),
+                end = androidx.compose.ui.geometry.Offset(center.x, center.y + maxRadius),
+                strokeWidth = 1.dp.toPx()
+            )
+
+            // Static Target Distance Rings
+            drawCircle(
+                color = radarColor.copy(alpha = 0.15f),
+                radius = maxRadius * 0.33f,
+                center = center,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+            )
+            drawCircle(
+                color = radarColor.copy(alpha = 0.20f),
+                radius = maxRadius * 0.66f,
+                center = center,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+            )
+            drawCircle(
+                color = radarColor.copy(alpha = 0.35f),
+                radius = maxRadius,
+                center = center,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+            )
+
+            // Dynamic Pulsing Echo Rings
             for (i in 0..3) {
                 val delayOffset = i * 0.25f
                 val ringProgress = (pulseProgress + delayOffset) % 1.0f
                 val currentRadius = ringProgress * maxRadius
-                val alpha = (1.0f - ringProgress) * 0.40f
+                val alpha = (1.0f - ringProgress) * 0.35f
 
                 if (currentRadius > 0f) {
                     drawCircle(
                         color = radarColor.copy(alpha = alpha),
                         radius = currentRadius,
                         center = center,
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx())
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
                     )
                 }
             }
+
+            // Sweeping Scanner Beam Line
+            val rad = Math.toRadians(sweepAngle.toDouble())
+            val endX = center.x + (maxRadius * kotlin.math.cos(rad)).toFloat()
+            val endY = center.y + (maxRadius * kotlin.math.sin(rad)).toFloat()
+            drawLine(
+                brush = Brush.linearGradient(
+                    colors = listOf(radarColor.copy(alpha = 0.8f), radarColor.copy(alpha = 0.05f)),
+                    start = center,
+                    end = androidx.compose.ui.geometry.Offset(endX, endY)
+                ),
+                start = center,
+                end = androidx.compose.ui.geometry.Offset(endX, endY),
+                strokeWidth = 2.5.dp.toPx()
+            )
+
+            // User Center Point
+            drawCircle(
+                color = Color(0xFF38BDF8),
+                radius = 6.dp.toPx(),
+                center = center
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 2.5.dp.toPx(),
+                center = center
+            )
         }
     }
 }

@@ -44,20 +44,19 @@ fun UserNotificationsScreen(
     }
 
     val filteredNotifs = remember(allNotifications, userPhone, adminRole) {
+        val cleanPhone = userPhone.trim().replace(" ", "").replace("+", "")
         allNotifications.filter { notif ->
-            // Do not show private urgent requests to general visitors
-            if (notif.title.contains("طلب عاجل") || notif.title.contains("حجز عاجل")) {
-                if (userPhone.isBlank()) return@filter false
-                if (notif.targetType == "USER" || notif.targetType == "PROVIDER") {
-                    return@filter notif.targetValue.isEmpty() || notif.targetValue == userPhone
-                }
-                return@filter false
+            // Filter sensitive notifications (password recovery, private orders)
+            val isSensitive = notif.title.contains("كلمة مرور") || notif.message.contains("كلمة المرور") || notif.title.contains("استعادة") || notif.title.contains("طلب عاجل") || notif.title.contains("حجز عاجل")
+            if (isSensitive) {
+                val isAdmin = adminRole != "GUEST"
+                val isMyTarget = cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)
+                if (!isAdmin && !isMyTarget) return@filter false
             }
             
             when (notif.targetType) {
                 "ALL" -> true
-                "USER" -> notif.targetValue == userPhone
-                "PROVIDER" -> notif.targetValue == userPhone
+                "USER", "PROVIDER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
                 "SUPERVISOR" -> adminRole != "GUEST"
                 else -> true
             }
@@ -222,9 +221,13 @@ fun UserNotificationsScreen(
                                             text = notif.title,
                                             fontSize = 12.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isUnread) themeColors.accent else Color.White
+                                            color = if (isUnread) themeColors.accent else Color.White,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
                                         if (isUnread) {
+                                            Spacer(modifier = Modifier.width(6.dp))
                                             Surface(
                                                 shape = RoundedCornerShape(6.dp),
                                                 color = Color(0xFF10B981)

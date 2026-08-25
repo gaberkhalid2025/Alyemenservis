@@ -1,6 +1,8 @@
 package com.example.ui.screens.chat
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,8 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,306 +21,292 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.data.ChatChannelEntity
-import com.example.viewmodels.ChatViewModel
+import com.example.data.models.ChatChannel
+import com.example.utils.VisualThemePalette
 import java.text.SimpleDateFormat
 import java.util.*
 
-/**
- * 📋 ChatListScreen
- * شاشة عرض قائمة المحادثات النشطة مع البحث، التصفية حسب نوع المحادثة، وإحصائيات الرسائل غير المقروءة
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
-    currentUserId: String = "user_default",
-    userRole: String = "USER", // USER, PROVIDER, STORE, RESTAURANT, ADMIN
-    onChannelClick: (channelId: String, otherUserId: String, otherUserName: String, otherUserPhoto: String) -> Unit = { _, _, _, _ -> },
-    onBack: () -> Unit = {},
-    chatViewModel: ChatViewModel = viewModel(),
-    modifier: Modifier = Modifier
+    currentUserId: String,
+    currentUserName: String,
+    themeColors: VisualThemePalette,
+    chatListViewModel: ChatListViewModel = viewModel(),
+    onChannelClick: (ChatChannel) -> Unit,
+    onBackClick: () -> Unit
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("ALL") } // ALL, PROVIDER, STORE, RESTAURANT, ADMIN, UNREAD
+    val channels by chatListViewModel.channels.collectAsState()
+    val selectedFilter by chatListViewModel.selectedFilter.collectAsState()
+    val searchQuery by chatListViewModel.searchQuery.collectAsState()
+    val isLoading by chatListViewModel.isLoading.collectAsState()
 
-    val channels: List<ChatChannelEntity> by chatViewModel.activeChannels.collectAsState()
-    val unreadCount: Int by chatViewModel.unreadCount.collectAsState()
-    val isLoading: Boolean by chatViewModel.isLoading.collectAsState()
+    val filters = listOf(
+        Pair("ALL", "الكل"),
+        Pair("UNREAD", "غير مقروءة"),
+        Pair("SUPPORT", "الدعم الفني")
+    )
 
     LaunchedEffect(currentUserId) {
-        chatViewModel.loadChannelsForUser(currentUserId)
+        if (currentUserId.isNotBlank()) {
+            chatListViewModel.loadUserChannels(currentUserId)
+            chatListViewModel.setUserPresence(currentUserId, true)
+        }
     }
 
-    val filteredChannels = remember(channels, searchQuery, selectedFilter) {
+    val filteredChannels = remember(channels, selectedFilter, searchQuery, currentUserId) {
         channels.filter { channel ->
-            val matchesFilter = when (selectedFilter) {
-                "UNREAD" -> channel.unreadCount > 0
-                "PROVIDER" -> channel.channelType.equals("PROVIDER", ignoreCase = true)
-                "STORE" -> channel.channelType.equals("STORE", ignoreCase = true)
-                "RESTAURANT" -> channel.channelType.equals("RESTAURANT", ignoreCase = true)
-                "ADMIN" -> channel.channelType.equals("ADMIN", ignoreCase = true)
-                else -> true
-            }
-
-            val otherName = if (channel.providerId == currentUserId) channel.clientName else channel.providerName
+            val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
+            val otherName = channel.participantNames[otherUserId] ?: ""
             val matchesSearch = searchQuery.isBlank() ||
                     otherName.contains(searchQuery, ignoreCase = true) ||
                     channel.lastMessage.contains(searchQuery, ignoreCase = true)
 
-            matchesFilter && matchesSearch
+            val matchesFilter = when (selectedFilter) {
+                "UNREAD" -> (channel.unreadCount[currentUserId] ?: 0) > 0
+                "SUPPORT" -> channel.type.name == "SUPPORT"
+                else -> true
+            }
+
+            matchesSearch && matchesFilter
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "المحادثات والرسائل",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                        if (unreadCount > 0) {
-                            Text(
-                                text = "$unreadCount رسائل جديدة غير مقروءة",
-                                fontSize = 12.sp,
-                                color = Color(0xFF00668B)
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color(0xFFF8FAFC))
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D151F))
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF142030))
+                .border(1.dp, Color.White.copy(alpha = 0.08f))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // شريط البحث
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
+            IconButton(
+                onClick = onBackClick,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("بحث في المحادثات...", fontSize = 14.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF64748B)) },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "مسح")
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF00668B),
-                    unfocusedBorderColor = Color(0xFFCBD5E1)
-                )
-            )
-
-            // شريط الفلاتر
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .size(36.dp)
+                    .background(Color.White.copy(alpha = 0.08f), CircleShape)
             ) {
-                val filters = listOf(
-                    "ALL" to "الكل",
-                    "UNREAD" to "غير مقروءة 🔴",
-                    "PROVIDER" to "الفنيين 🔧",
-                    "STORE" to "المتاجر 🛍️",
-                    "RESTAURANT" to "المطاعم 🍽️",
-                    "ADMIN" to "الدعم الفني 🛡️"
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "المحادثات والرسائل",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
+                Text(
+                    text = "تواصل فوري وآمن 🔒",
+                    fontSize = 11.sp,
+                    color = Color(0xFF90CAF9)
+                )
+            }
+        }
 
-                items(filters) { (key, label) ->
-                    val isSelected = selectedFilter == key
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { selectedFilter = key },
-                        label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF00668B),
-                            selectedLabelColor = Color.White
-                        )
+        // Search Bar
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { chatListViewModel.setSearchQuery(it) },
+            placeholder = { Text("بحث في المحادثات...", fontSize = 12.sp, color = Color.Gray) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث", tint = Color.Gray) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = Color(0xFF1E88E5),
+                unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                focusedContainerColor = Color(0xFF142030),
+                unfocusedContainerColor = Color(0xFF142030)
+            ),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true
+        )
+
+        // Filter Pills
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(filters) { (key, title) ->
+                val isSelected = selectedFilter == key
+                Surface(
+                    color = if (isSelected) Color(0xFF1E88E5) else Color(0xFF142030),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF1E88E5) else Color.White.copy(alpha = 0.08f)),
+                    modifier = Modifier.clickable { chatListViewModel.setFilter(key) }
+                ) {
+                    Text(
+                        text = title,
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
+        Divider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp, modifier = Modifier.padding(vertical = 6.dp))
+
+        // Channels List
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color(0xFF1E88E5))
+            }
+        } else if (filteredChannels.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة." else "لا توجد محادثات نشطة حالياً. عند قبول عرض أو طلب خدمة ستظهر محادثتك هنا فوراً.",
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredChannels, key = { it.id }) { channel ->
+                    val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
+                    val otherName = channel.participantNames[otherUserId] ?: "مستخدم"
+                    val otherPhoto = channel.participantPhotos[otherUserId] ?: ""
+                    val unread = channel.unreadCount[currentUserId] ?: 0
+
+                    ChannelItemCard(
+                        channel = channel,
+                        otherName = otherName,
+                        otherPhoto = otherPhoto,
+                        unreadCount = unread,
+                        onClick = { onChannelClick(channel) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelItemCard(
+    channel: ChatChannel,
+    otherName: String,
+    otherPhoto: String,
+    unreadCount: Int,
+    onClick: () -> Unit
+) {
+    val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    val formattedTime = if (channel.lastMessageTime > 0) timeFormat.format(Date(channel.lastMessageTime)) else ""
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF142030)),
+        shape = RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // User Photo
+            if (otherPhoto.isNotBlank()) {
+                AsyncImage(
+                    model = otherPhoto,
+                    contentDescription = otherName,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color(0xFF1E88E5), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = otherName.take(1).ifBlank { "👤" },
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            // قائمة المحادثات
-            if (isLoading && channels.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (filteredChannels.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            tint = Color.LightGray,
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Text(
-                            text = "لا توجد محادثات مطابقة",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Gray
-                        )
-                        Text(
-                            text = "عند بدء حجز أو طلب خدمة ستظهر محادثتك هنا",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
+                    Text(
+                        text = otherName,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = formattedTime,
+                        fontSize = 10.5.sp,
+                        color = if (unreadCount > 0) Color(0xFF64B5F6) else Color.Gray
+                    )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(filteredChannels, key = { it.id }) { channel ->
-                        val isMeProvider = channel.providerId == currentUserId
-                        val otherId = if (isMeProvider) channel.clientId else channel.providerId
-                        val otherName = if (isMeProvider) channel.clientName.ifEmpty { "العميل" } else channel.providerName.ifEmpty { "مقدم الخدمة" }
-                        val otherPhoto = if (isMeProvider) channel.clientPhoto else channel.providerPhoto
+                    Text(
+                        text = channel.lastMessage.ifBlank { "بدء محادثة جديدة" },
+                        fontSize = 12.sp,
+                        color = if (unreadCount > 0) Color.White else Color.LightGray,
+                        fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
 
-                        val timeFormatted = remember(channel.lastMessageTime) {
-                            if (channel.lastMessageTime > 0) {
-                                SimpleDateFormat("hh:mm a", Locale("ar")).format(Date(channel.lastMessageTime))
-                            } else ""
-                        }
-
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onChannelClick(channel.id, otherId, otherName, otherPhoto)
-                                }
+                    if (unreadCount > 0) {
+                        Surface(
+                            color = Color(0xFF1E88E5),
+                            shape = CircleShape,
+                            modifier = Modifier.size(20.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // صورة الطرف الآخر
-                                Box {
-                                    if (otherPhoto.isNotBlank()) {
-                                        AsyncImage(
-                                            model = otherPhoto,
-                                            contentDescription = otherName,
-                                            modifier = Modifier
-                                                .size(50.dp)
-                                                .clip(CircleShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(50.dp)
-                                                .background(Color(0xFFE0F2FE), CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Person,
-                                                contentDescription = null,
-                                                tint = Color(0xFF00668B),
-                                                modifier = Modifier.size(28.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // تفاصيل الرسالة
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = otherName,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = Color(0xFF1E293B),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Text(
-                                            text = timeFormatted,
-                                            fontSize = 11.sp,
-                                            color = Color.Gray
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = channel.lastMessage.ifEmpty { "بدء محادثة جديدة" },
-                                            fontSize = 13.sp,
-                                            color = if (channel.unreadCount > 0) Color(0xFF1E293B) else Color(0xFF64748B),
-                                            fontWeight = if (channel.unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-
-                                        // شارة عدد غير المقروء
-                                        if (channel.unreadCount > 0) {
-                                            Badge(
-                                                containerColor = Color(0xFF00668B),
-                                                contentColor = Color.White,
-                                                modifier = Modifier.padding(start = 6.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${channel.unreadCount}",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = if (unreadCount > 99) "99+" else unreadCount.toString(),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             }
                         }
                     }

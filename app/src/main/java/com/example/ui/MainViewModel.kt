@@ -117,6 +117,9 @@ class MainViewModel : ViewModel() {
     internal val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
     val notifications: StateFlow<List<NotificationEntity>> = _notifications.asStateFlow()
 
+    internal val _offers = MutableStateFlow<List<com.example.data.models.Offer>>(emptyList())
+    val offers: StateFlow<List<com.example.data.models.Offer>> = _offers.asStateFlow()
+
     internal val _passwordRecoveryWaitingPhone = MutableStateFlow<String>("")
     val passwordRecoveryWaitingPhone: StateFlow<String> = _passwordRecoveryWaitingPhone.asStateFlow()
 
@@ -127,6 +130,8 @@ class MainViewModel : ViewModel() {
     var selectedProvider: com.example.data.ProviderEntity? = null
     var selectedStore: com.example.data.StoreEntity? = null
     var selectedProperty: com.example.data.PropertyEntity? = null
+    var selectedOfferId by androidx.compose.runtime.mutableStateOf("")
+    var selectedRequestId by androidx.compose.runtime.mutableStateOf("")
     var showQuickServiceDialog by androidx.compose.runtime.mutableStateOf(false)
 
     internal val _chatChannels = MutableStateFlow<List<ChatChannelEntity>>(emptyList())
@@ -174,9 +179,112 @@ class MainViewModel : ViewModel() {
             triggerNotification("❤️ تمت الإضافة إلى المفضلة!")
         }
         _favoriteIds.value = current
+        appContext?.let { ctx ->
+            try {
+                val sp = ctx.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                sp.edit().putStringSet("favorite_ids_set", current).apply()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        checkAndTriggerFavoriteOffersNotifications()
     }
 
     fun isFavorite(id: String): Boolean = _favoriteIds.value.contains(id)
+
+    fun checkAndTriggerFavoriteOffersNotifications() {
+        val ctx = appContext ?: return
+        val favIds = _favoriteIds.value
+        if (favIds.isEmpty()) return
+
+        val deduplicator = com.example.util.NotificationDeduplicator(ctx)
+        val currentStores = _stores.value
+        val currentProviders = _providers.value
+
+        currentStores.filter { favIds.contains(it.id) }.forEach { store ->
+            val offers = com.example.data.SpecialOfferEntity.parseList(store.specialOffersJson)
+            offers.forEach { offer ->
+                val notifId = "fav_offer_${store.id}_${offer.id}"
+                val notif = NotificationEntity(
+                    id = notifId,
+                    title = "🔥 عرض جديد من ${store.name}",
+                    message = "أضاف متجر ${store.name} المفضل لديك عرضاً جديداً: ${offer.title} بخصم %${offer.discountPercent} (السعر: ${offer.offerPrice.toInt()} ر.ي)! 🎁",
+                    targetType = "ALL",
+                    targetValue = store.id,
+                    timestamp = System.currentTimeMillis(),
+                    notificationType = "SPECIAL_OFFER",
+                    channel = "IN_APP",
+                    isRead = false
+                )
+                if (!deduplicator.isDuplicate(notif) && _notifications.value.none { it.id == notifId }) {
+                    deduplicator.markAsSent(notif)
+                    addNotificationEntityDirect(notif)
+                    triggerNotification("🔔 عرض جديد من ${store.name}: ${offer.title}")
+                }
+            }
+        }
+
+        currentProviders.filter { favIds.contains(it.id) }.forEach { provider ->
+            val offers = com.example.data.SpecialOfferEntity.parseList(provider.specialOffersJson)
+            offers.forEach { offer ->
+                val notifId = "fav_offer_${provider.id}_${offer.id}"
+                val notif = NotificationEntity(
+                    id = notifId,
+                    title = "🔥 عرض جديد من ${provider.name}",
+                    message = "أضاف مقدم الخدمة ${provider.name} المفضل لديك عرضاً جديداً: ${offer.title} بخصم %${offer.discountPercent} (السعر: ${offer.offerPrice.toInt()} ر.ي)! 🎁",
+                    targetType = "ALL",
+                    targetValue = provider.id,
+                    timestamp = System.currentTimeMillis(),
+                    notificationType = "SPECIAL_OFFER",
+                    channel = "IN_APP",
+                    isRead = false
+                )
+                if (!deduplicator.isDuplicate(notif) && _notifications.value.none { it.id == notifId }) {
+                    deduplicator.markAsSent(notif)
+                    addNotificationEntityDirect(notif)
+                    triggerNotification("🔔 عرض جديد من ${provider.name}: ${offer.title}")
+                }
+            }
+        }
+    }
+
+    fun notifyFavoriteOfferCreated(merchantId: String, merchantName: String, offer: com.example.data.SpecialOfferEntity) {
+        val ctx = appContext ?: return
+        val deduplicator = com.example.util.NotificationDeduplicator(ctx)
+        val notifId = "fav_offer_${merchantId}_${offer.id}"
+
+        val notif = NotificationEntity(
+            id = notifId,
+            title = "🔥 عرض جديد من ${merchantName}",
+            message = "تم نشر عرض جديد: ${offer.title} بخصم %${offer.discountPercent} (السعر: ${offer.offerPrice.toInt()} ر.ي)! 🎁",
+            targetType = "ALL",
+            targetValue = merchantId,
+            timestamp = System.currentTimeMillis(),
+            notificationType = "SPECIAL_OFFER",
+            channel = "IN_APP",
+            isRead = false
+        )
+        if (!deduplicator.isDuplicate(notif) && _notifications.value.none { it.id == notifId }) {
+            deduplicator.markAsSent(notif)
+            addNotificationEntityDirect(notif)
+            if (_favoriteIds.value.contains(merchantId)) {
+                triggerNotification("🔔 عرض جديد من ${merchantName}: ${offer.title}")
+            }
+        }
+    }
+
+    fun addNotificationEntityDirect(newNotif: NotificationEntity) {
+        val current = _notifications.value.toMutableList()
+        if (current.none { it.id == newNotif.id }) {
+            current.add(0, newNotif)
+            _notifications.value = current
+            try {
+                db.collection("notifications").document(newNotif.id).set(newNotif)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     private val _customProfileTabs = MutableStateFlow<List<com.example.data.CustomProfileTabEntity>>(emptyList())
     val customProfileTabs: StateFlow<List<com.example.data.CustomProfileTabEntity>> = _customProfileTabs.asStateFlow()
@@ -418,6 +526,16 @@ class MainViewModel : ViewModel() {
 
         val savedLang = LocaleManager.currentLang.value
         _currentLanguage.value = savedLang
+
+        try {
+            val savedFavs = sp.getStringSet("favorite_ids_set", emptySet()) ?: emptySet()
+            if (savedFavs.isNotEmpty()) {
+                _favoriteIds.value = savedFavs
+            }
+            checkAndTriggerFavoriteOffersNotifications()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // Automatic credential synchronization for service providers / technicians
         if (savedJoinPhone.isNotEmpty() && (savedId == "guest" || savedId.isEmpty())) {
@@ -1347,6 +1465,21 @@ class MainViewModel : ViewModel() {
                     }
                 }
                 _orders.value = fetched
+            }
+        }
+
+        // 22.1 Offers & Instant Pricing (Real-time synchronization)
+        db.collection("offers").limit(50).addSnapshotListener { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(com.example.data.models.Offer::class.java)
+                        obj?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                _offers.value = fetched
             }
         }
 
@@ -3222,6 +3355,87 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    // --- INSTANT PRICING & REAL-TIME OFFERS SYSTEM ---
+    fun updateProductPrice(productId: String, newPrice: Double) {
+        val existing = _products.value.find { it.id == productId }
+        if (existing != null) {
+            val updated = existing.copy(price = newPrice, oldPrice = if (existing.price != newPrice) existing.price else existing.oldPrice)
+            _products.value = _products.value.map { if (it.id == productId) updated else it }
+            db.collection("products").document(productId).update("price", newPrice, "oldPrice", updated.oldPrice)
+                .addOnSuccessListener {
+                    triggerNotification("⚡ تم تحديث السعر فورياً لجميع العملاء!")
+                }
+        } else {
+            db.collection("products").document(productId).update("price", newPrice)
+        }
+    }
+
+    fun saveOffer(offer: com.example.data.models.Offer) {
+        val targetId = if (offer.id.isEmpty()) db.collection("offers").document().id else offer.id
+        val finalOffer = offer.copy(id = targetId, updatedAt = System.currentTimeMillis())
+
+        val currentList = _offers.value.filter { it.id != targetId }.toMutableList()
+        currentList.add(finalOffer)
+        _offers.value = currentList
+
+        db.collection("offers").document(targetId).set(finalOffer)
+            .addOnSuccessListener {
+                triggerNotification("🎁 تم نشر العرض وتحديث الأسعار فورياً!")
+            }
+            .addOnFailureListener {
+                triggerNotification("⚠️ فشل حفظ العرض: ${it.localizedMessage}")
+            }
+    }
+
+    fun deleteOffer(offerId: String) {
+        _offers.value = _offers.value.filter { it.id != offerId }
+        db.collection("offers").document(offerId).delete()
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف العرض بنجاح!")
+            }
+    }
+
+    fun toggleOfferStatus(offerId: String, isActive: Boolean) {
+        _offers.value = _offers.value.map { if (it.id == offerId) it.copy(isActive = isActive) else it }
+        db.collection("offers").document(offerId).update(
+            "isActive", isActive,
+            "updatedAt", System.currentTimeMillis()
+        )
+    }
+
+    fun listenToOffersForEntity(
+        entityId: String,
+        onResult: (List<com.example.data.models.Offer>) -> Unit
+    ): com.google.firebase.firestore.ListenerRegistration {
+        return db.collection("offers")
+            .whereEqualTo("entityId", entityId)
+            .addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val fetched = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(com.example.data.models.Offer::class.java)?.copy(id = doc.id)
+                    }
+                    onResult(fetched)
+                }
+            }
+    }
+
+    fun listenToProductsForStore(
+        storeId: String,
+        onResult: (List<com.example.data.ProductEntity>) -> Unit
+    ): com.google.firebase.firestore.ListenerRegistration {
+        return db.collection("products")
+            .whereEqualTo("storeId", storeId)
+            .addSnapshotListener { snapshot, error ->
+                if (error == null && snapshot != null) {
+                    val fetched = snapshot.documents.mapNotNull { doc ->
+                        val p = doc.toObject(com.example.data.ProductEntity::class.java)
+                        if (p != null && !p.isDeleted) p.copy(id = doc.id) else null
+                    }
+                    onResult(fetched)
+                }
+            }
+    }
+
     // --- PROPERTIES MANAGEMENT ---
     fun saveProperty(property: com.example.data.PropertyEntity) {
         val cleanPhone = property.phone.trim().replace(" ", "").replace("+", "")
@@ -5041,10 +5255,12 @@ class MainViewModel : ViewModel() {
     // Advanced Instant Chat Engine
     fun openOrCreateChatChannel(
         targetId: String,
-        targetType: String, // "PROVIDER", "STORE", "PROPERTY", "RESTAURANT", "ADMIN", "SUPERVISOR", "CATEGORY"
+        targetType: String, // "PROVIDER", "STORE", "PROPERTY", "RESTAURANT", "ADMIN", "SUPERVISOR", "CATEGORY", "BOOKING"
         targetName: String,
         targetPhone: String = "",
         targetCategory: String = "",
+        relatedEntityId: String = "",
+        relatedEntityType: String = "",
         onCreated: (ChatChannelEntity) -> Unit
     ) {
         val currUser = _currentUserId.value
@@ -5058,7 +5274,11 @@ class MainViewModel : ViewModel() {
             else -> Triple(targetId, targetType, targetName)
         }
 
-        val chanId = "chat_${effectiveTargetType.lowercase()}_${effectiveTargetId}_u_${currUser.ifEmpty { currPhone.ifEmpty { "guest" } }}"
+        val chanId = if (relatedEntityId.isNotBlank()) {
+            "chat_${(relatedEntityType.ifEmpty { effectiveTargetType }).lowercase()}_${relatedEntityId}_u_${currUser.ifEmpty { currPhone.ifEmpty { "guest" } }}"
+        } else {
+            "chat_${effectiveTargetType.lowercase()}_${effectiveTargetId}_u_${currUser.ifEmpty { currPhone.ifEmpty { "guest" } }}"
+        }
 
         val newCh = ChatChannelEntity(
             id = chanId,
@@ -5067,11 +5287,13 @@ class MainViewModel : ViewModel() {
             targetName = effectiveTargetName,
             targetPhone = targetPhone,
             targetCategory = targetCategory,
+            relatedEntityId = relatedEntityId,
+            relatedEntityType = relatedEntityType.ifEmpty { effectiveTargetType },
             customerId = currUser,
             customerName = currName,
             customerPhone = currPhone,
             userName = effectiveTargetName,
-            lastMessage = "بدء محادثة فورية جديدة مع $effectiveTargetName",
+            lastMessage = if (relatedEntityId.isNotBlank()) "بدء محادثة فورية مخصصة للحجز ($relatedEntityId)" else "بدء محادثة فورية جديدة مع $effectiveTargetName",
             lastMessageTime = System.currentTimeMillis(),
             timestamp = System.currentTimeMillis(),
             messages = listOf(

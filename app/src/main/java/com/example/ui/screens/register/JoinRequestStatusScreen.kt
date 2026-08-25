@@ -145,16 +145,27 @@ fun JoinRequestStatusScreen(viewModel: MainViewModel, themeColors: VisualThemePa
     }
 
     if (matchingStore != null && matchingStore.isActive) {
-        val accType = if (matchingStore.sectionId.contains("restaurant") || matchingStore.name.contains("مطعم") || matchingStore.description.contains("أكل") || matchingStore.description.contains("وجبة")) "RESTAURANT" else if (matchingStore.sectionId.contains("medical") || matchingStore.name.contains("عيادة") || matchingStore.name.contains("طبي")) "MEDICAL" else "STORE"
-        UnifiedBusinessProfileDashboard(accountType = accType, providerId = matchingStore.id, viewModel = viewModel, themeColors = themeColors)
+        val isRest = matchingStore.sectionId.contains("restaurant") || matchingStore.name.contains("مطعم") || matchingStore.description.contains("أكل") || matchingStore.description.contains("وجبة")
+        val isMed = matchingStore.sectionId.contains("medical") || matchingStore.name.contains("عيادة") || matchingStore.name.contains("طبي") || matchingStore.name.contains("مستشفى")
+        val acc = UnifiedBusinessAccount.fromStore(matchingStore, if (isRest) "restaurants" else if (isMed) "medical" else "stores")
+        
+        if (isRest) {
+            RestaurantDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+        } else if (isMed) {
+            MedicalDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+        } else {
+            StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+        }
         return
     }
     if (matchingProperty != null && matchingProperty.isActive) {
-        UnifiedBusinessProfileDashboard(accountType = "REAL_ESTATE", providerId = matchingProperty.id, viewModel = viewModel, themeColors = themeColors)
+        val acc = UnifiedBusinessAccount.fromProperty(matchingProperty)
+        PropertyDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
         return
     }
     if (matchingApproved != null) {
-        UnifiedBusinessProfileDashboard(accountType = "TECHNICIAN", providerId = matchingApproved.id, viewModel = viewModel, themeColors = themeColors)
+        val acc = UnifiedBusinessAccount.fromProvider(matchingApproved)
+        TechnicianDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
         return
     }
 

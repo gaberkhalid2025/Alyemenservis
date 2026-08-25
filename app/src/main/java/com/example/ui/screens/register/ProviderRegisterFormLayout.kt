@@ -401,7 +401,7 @@ fun ProviderRegisterFormLayout(
 
         when {
             matchingApprovedTech != null -> {
-                com.example.ui.UnifiedBusinessDashboardScreen(
+                TechnicianDashboard(
                     account = com.example.data.UnifiedBusinessAccount.fromProvider(matchingApprovedTech),
                     viewModel = viewModel,
                     themeColors = themeColors,
@@ -409,15 +409,19 @@ fun ProviderRegisterFormLayout(
                 )
             }
             matchingStore != null -> {
-                com.example.ui.UnifiedBusinessDashboardScreen(
-                    account = com.example.data.UnifiedBusinessAccount.fromStore(matchingStore),
-                    viewModel = viewModel,
-                    themeColors = themeColors,
-                    onBackClick = { showRegistrationFormsAnyway = true }
-                )
+                val isRest = matchingStore.sectionId.contains("restaurant") || matchingStore.name.contains("مطعم") || matchingStore.description.contains("أكل") || matchingStore.description.contains("وجبة")
+                val isMed = matchingStore.sectionId.contains("medical") || matchingStore.name.contains("عيادة") || matchingStore.name.contains("طبي") || matchingStore.name.contains("مستشفى")
+                val acc = com.example.data.UnifiedBusinessAccount.fromStore(matchingStore, if (isRest) "restaurants" else if (isMed) "medical" else "stores")
+                if (isRest) {
+                    RestaurantDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { showRegistrationFormsAnyway = true })
+                } else if (isMed) {
+                    MedicalDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { showRegistrationFormsAnyway = true })
+                } else {
+                    StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { showRegistrationFormsAnyway = true })
+                }
             }
             matchingProperty != null -> {
-                com.example.ui.UnifiedBusinessDashboardScreen(
+                PropertyDashboard(
                     account = com.example.data.UnifiedBusinessAccount.fromProperty(matchingProperty),
                     viewModel = viewModel,
                     themeColors = themeColors,

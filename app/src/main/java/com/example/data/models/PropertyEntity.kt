@@ -43,4 +43,7 @@ data class PropertyEntity(
     val productAttachmentsJson: String = "",
     val isBlocked: Boolean = false,
     val blockReason: String = ""
-)
+) {
+    val address: String get() = localNeighborhood
+    val area: String get() = localNeighborhood
+}

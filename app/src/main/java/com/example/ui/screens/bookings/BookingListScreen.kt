@@ -1,0 +1,289 @@
+package com.example.ui.screens.bookings
+
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.BookingEntity
+import com.example.ui.dialogs.BookingCancellationDialog
+
+/**
+ * 📋 BookingListScreen
+ * شاشة "حجوزاتي" المستقلة بالكامل لإدارة وعرض الحجوزات العادية
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BookingListScreen(
+    bookings: List<BookingEntity>,
+    currentUserId: String = "",
+    isAdmin: Boolean = false,
+    onBackClick: () -> Unit,
+    onCreateNewBookingClick: () -> Unit,
+    onUpdateBooking: (BookingEntity) -> Unit,
+    onCancelBooking: (BookingEntity, String, String) -> Unit, // booking, reason, password
+    onDeleteBooking: (BookingEntity) -> Unit,
+    onOpenChatClick: (BookingEntity) -> Unit
+) {
+    val context = LocalContext.current
+
+    var selectedTabFilter by remember { mutableStateOf("ALL") } // ALL, ACTIVE, COMPLETED, CANCELLED
+    var searchQuery by remember { mutableStateOf("") }
+
+    var bookingToEdit by remember { mutableStateOf<BookingEntity?>(null) }
+    var bookingToCancel by remember { mutableStateOf<BookingEntity?>(null) }
+    var bookingToDelete by remember { mutableStateOf<BookingEntity?>(null) }
+
+    // Filter bookings
+    val filteredBookings = remember(bookings, selectedTabFilter, searchQuery) {
+        bookings.filter { bk ->
+            val matchesTab = when (selectedTabFilter) {
+                "ACTIVE" -> bk.status in listOf("PENDING", "APPROVED")
+                "COMPLETED" -> bk.status == "COMPLETED"
+                "CANCELLED" -> bk.status in listOf("CANCELLED", "REJECTED")
+                else -> true
+            }
+
+            val query = searchQuery.trim().lowercase()
+            val matchesQuery = query.isEmpty() ||
+                bk.bookingCode.lowercase().contains(query) ||
+                bk.bookingNumber.lowercase().contains(query) ||
+                bk.fullName.lowercase().contains(query) ||
+                bk.customerName.lowercase().contains(query) ||
+                bk.clientPhone.lowercase().contains(query) ||
+                bk.providerName.lowercase().contains(query)
+
+            matchesTab && matchesQuery
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "حجوزاتي",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onCreateNewBookingClick) {
+                        Icon(Icons.Default.AddCircle, contentDescription = "حجز جديد", tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("بحث برقم الحجز، الاسم، أو الهاتف...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = null)
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            // Filter Tabs
+            ScrollableTabRow(
+                selectedTabIndex = when (selectedTabFilter) {
+                    "ACTIVE" -> 1
+                    "COMPLETED" -> 2
+                    "CANCELLED" -> 3
+                    else -> 0
+                },
+                edgePadding = 16.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Tab(
+                    selected = selectedTabFilter == "ALL",
+                    onClick = { selectedTabFilter = "ALL" },
+                    text = { Text("الكل (${bookings.size})", fontWeight = FontWeight.Bold) }
+                )
+                Tab(
+                    selected = selectedTabFilter == "ACTIVE",
+                    onClick = { selectedTabFilter = "ACTIVE" },
+                    text = {
+                        Text(
+                            "الحالية (${bookings.count { it.status in listOf("PENDING", "APPROVED") }})",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTabFilter == "COMPLETED",
+                    onClick = { selectedTabFilter = "COMPLETED" },
+                    text = {
+                        Text(
+                            "المكتملة (${bookings.count { it.status == "COMPLETED" }})",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTabFilter == "CANCELLED",
+                    onClick = { selectedTabFilter = "CANCELLED" },
+                    text = {
+                        Text(
+                            "الملغاة (${bookings.count { it.status in listOf("CANCELLED", "REJECTED") }})",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Booking List Content
+            if (filteredBookings.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Text(
+                            text = "لا توجد حجوزات مسجلة في هذا التبويب",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onCreateNewBookingClick,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("إنشاء طلب حجز جديد")
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp, top = 8.dp)
+                ) {
+                    items(
+                        items = filteredBookings,
+                        key = { it.id.ifBlank { it.bookingCode } }
+                    ) { bk ->
+                        BookingCardItem(
+                            booking = bk,
+                            currentUserId = currentUserId,
+                            isAdmin = isAdmin,
+                            onEditClick = { bookingToEdit = it },
+                            onCancelClick = { bookingToCancel = it },
+                            onDeleteClick = { bookingToDelete = it },
+                            onOpenChatClick = { onOpenChatClick(it) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Edit Dialog
+    if (bookingToEdit != null) {
+        BookingEditDialog(
+            booking = bookingToEdit!!,
+            isAdmin = isAdmin,
+            onDismiss = { bookingToEdit = null },
+            onConfirmEdit = { updatedBooking, pass ->
+                onUpdateBooking(updatedBooking)
+                bookingToEdit = null
+                Toast.makeText(context, "تم تحديث بيانات الحجز بنجاح", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Cancellation Dialog
+    if (bookingToCancel != null) {
+        val bk = bookingToCancel!!
+        BookingCancellationDialog(
+            booking = bk,
+            onDismiss = { bookingToCancel = null },
+            onConfirmCancel = { pass, reason ->
+                onCancelBooking(bk, reason, pass)
+                bookingToCancel = null
+                Toast.makeText(context, "تم إرسال طلب إلغاء الحجز", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    if (bookingToDelete != null) {
+        val bk = bookingToDelete!!
+        AlertDialog(
+            onDismissRequest = { bookingToDelete = null },
+            title = { Text("تأكيد حذف الحجز النهائي", fontWeight = FontWeight.Bold) },
+            text = { Text("هل أنت تأكد من رغبتك في حذف الحجز رقم (${bk.bookingCode}) بشكل نهائي؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteBooking(bk)
+                        bookingToDelete = null
+                        Toast.makeText(context, "تم حذف الحجز بنجاح", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("حذف نهائي")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { bookingToDelete = null }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
+}

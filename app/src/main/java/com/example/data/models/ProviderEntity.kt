@@ -40,7 +40,9 @@ data class ProviderEntity(
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
     val providerType: String = ""
-)
+) {
+    val portfolioImages: List<String> get() = workPhotosBase64
+}
 
 @Keep
 data class PendingProviderEntity(

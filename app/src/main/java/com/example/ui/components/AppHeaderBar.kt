@@ -48,13 +48,27 @@ fun AppHeaderBar(
 
     val myProvider = providers.find { it.phone == currentUserPhone }
 
-    val myChannels = remember(chatChannels, currentUserId, currentUserPhone, myProvider) {
-        chatChannels.filter { ch ->
-            ch.id == "support_$currentUserId" ||
-            ch.id.contains(currentUserId) ||
-            (currentUserPhone.isNotEmpty() && ch.id.contains(currentUserPhone)) ||
-            (myProvider != null && (ch.id.contains("chat_p_${myProvider.id}_") || ch.id.contains("_u_${myProvider.id}"))) ||
-            currentUserId == "admin" || currentUserId.startsWith("super_")
+    val cleanUserId = currentUserId.trim()
+    val cleanUserPhone = currentUserPhone.trim().replace(" ", "").replace("+", "")
+    val isAdminUser = cleanUserId == "admin" || cleanUserId.startsWith("super_") || adminRoleState != "GUEST"
+
+    val myChannels = remember(chatChannels, cleanUserId, cleanUserPhone, myProvider, isAdminUser) {
+        if (isAdminUser) {
+            chatChannels
+        } else if (cleanUserId.isEmpty() && cleanUserPhone.isEmpty()) {
+            emptyList()
+        } else {
+            chatChannels.filter { ch ->
+                val isMySupport = (cleanUserId.isNotEmpty() && ch.id == "support_$cleanUserId") ||
+                                  (cleanUserPhone.isNotEmpty() && ch.id == "support_$cleanUserPhone")
+                val isMyUser = (cleanUserId.isNotEmpty() && ch.id.contains(cleanUserId)) ||
+                               (cleanUserPhone.isNotEmpty() && ch.id.contains(cleanUserPhone)) ||
+                               (cleanUserId.isNotEmpty() && ch.customerId == cleanUserId) ||
+                               (cleanUserPhone.isNotEmpty() && ch.customerPhone == cleanUserPhone)
+                val isMyProvider = myProvider != null && (ch.id.contains("chat_p_${myProvider.id}_") || ch.id.contains("_u_${myProvider.id}") || ch.targetId == myProvider.id)
+
+                isMySupport || isMyUser || isMyProvider
+            }
         }
     }
 
@@ -64,11 +78,19 @@ fun AppHeaderBar(
     
     // Calculate unread notifications count
     val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
+        val cleanPhone = userPhoneState.trim().replace(" ", "").replace("+", "")
         allNotifications.filter { notif ->
+            // Filter sensitive notifications (password recovery, private orders)
+            val isSensitive = notif.title.contains("كلمة مرور") || notif.message.contains("كلمة المرور") || notif.title.contains("استعادة") || notif.title.contains("طلب عاجل")
+            if (isSensitive) {
+                val isAdmin = adminRoleState != "GUEST"
+                val isMyTarget = cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)
+                if (!isAdmin && !isMyTarget) return@filter false
+            }
+
             when (notif.targetType) {
                 "ALL" -> true
-                "USER" -> notif.targetValue == userPhoneState
-                "PROVIDER" -> notif.targetValue == userPhoneState
+                "USER", "PROVIDER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
                 "SUPERVISOR" -> adminRoleState != "GUEST"
                 else -> true
             }

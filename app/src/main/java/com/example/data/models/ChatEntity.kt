@@ -113,6 +113,8 @@ data class ChatChannelEntity(
     val clientId: String = "",
     val clientName: String = "",
     val clientPhoto: String = "",
+    val relatedEntityId: String = "",
+    val relatedEntityType: String = "",
     val unreadCount: Int = 0,
     val messages: List<ChatMessageEntity> = emptyList()
 )

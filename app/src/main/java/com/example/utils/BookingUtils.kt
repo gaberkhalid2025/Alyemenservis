@@ -15,6 +15,10 @@ object BookingUtils {
         return "$prefix-$datePart-$randomPart"
     }
 
+    fun generateBookingCode(prefix: String = "BK"): String {
+        return generateBookingNumber(prefix)
+    }
+
     fun generateBookingPassword(length: Int = 4): String {
         val builder = StringBuilder()
         for (i in 0 until length) {
@@ -23,7 +27,10 @@ object BookingUtils {
         return builder.toString()
     }
 
-    fun isBookingWithin6Hours(dateString: String, timeString: String): Boolean {
+    /**
+     * Parse date and time strings to Unix timestamp (millis).
+     */
+    fun parseScheduledTimestamp(dateString: String, timeString: String): Long {
         return try {
             val cleanDate = dateString.trim().replace("/", "-")
             val cleanTime = timeString.trim().replace("م", "PM").replace("ص", "AM")
@@ -33,22 +40,40 @@ object BookingUtils {
                 SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US),
                 SimpleDateFormat("yyyy-MM-dd", Locale.US)
             )
-            var parsedDate: Date? = null
             for (fmt in formats) {
                 try {
-                    parsedDate = fmt.parse(combined) ?: fmt.parse(cleanDate)
-                    if (parsedDate != null) break
+                    val parsed = fmt.parse(combined) ?: fmt.parse(cleanDate)
+                    if (parsed != null) return parsed.time
                 } catch (e: Exception) {}
             }
-            if (parsedDate != null) {
-                val diffMs = parsedDate.time - System.currentTimeMillis()
-                val sixHoursMs = 6 * 60 * 60 * 1000L
-                diffMs in 0..sixHoursMs
-            } else {
-                false
-            }
+            0L
         } catch (e: Exception) {
-            false
+            0L
         }
+    }
+
+    /**
+     * Checks if a booking can be modified or cancelled.
+     * Rule: Allowed ONLY if there are MORE than 8 hours remaining before scheduledAt.
+     * Returns true if remaining time > 8 hours, false if 8 hours or less or already passed.
+     */
+    fun canModifyOrCancelBooking(scheduledAtTimestamp: Long, dateString: String = "", timeString: String = ""): Boolean {
+        val scheduledMs = if (scheduledAtTimestamp > 0) scheduledAtTimestamp else parseScheduledTimestamp(dateString, timeString)
+        if (scheduledMs <= 0) return true // If no valid date/time, allow by default
+        val now = System.currentTimeMillis()
+        val diffMs = scheduledMs - now
+        val eightHoursMs = 8 * 60 * 60 * 1000L
+        return diffMs > eightHoursMs
+    }
+
+    /**
+     * Backwards compatibility helper for 6 hours check.
+     */
+    fun isBookingWithin6Hours(dateString: String, timeString: String): Boolean {
+        val scheduledMs = parseScheduledTimestamp(dateString, timeString)
+        if (scheduledMs <= 0) return false
+        val diffMs = scheduledMs - System.currentTimeMillis()
+        val sixHoursMs = 6 * 60 * 60 * 1000L
+        return diffMs in 0..sixHoursMs
     }
 }

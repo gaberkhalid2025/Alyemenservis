@@ -27,8 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
+import com.example.data.models.ChannelType
+import com.example.data.models.ChatChannel
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
+import com.example.data.repositories.ChatRepository
 import com.example.ui.MainViewModel
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -49,11 +52,16 @@ fun OfferSelectionScreen(
     viewModel: MainViewModel,
     onNavigateBack: () -> Unit = {},
     onBookingConfirmed: (bookingId: String) -> Unit = {},
-    onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> }
+    onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> },
+    onNavigateToDirectChannel: (channel: ChatChannel) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val firestore = remember { FirebaseFirestore.getInstance() }
+    val chatRepository = remember { ChatRepository(firestore) }
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserName by viewModel.currentUserName.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
     var offer by remember { mutableStateOf<RequestOfferEntity?>(null) }
     var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
@@ -71,6 +79,7 @@ fun OfferSelectionScreen(
 
     var showConfirmationSuccessDialog by remember { mutableStateOf(false) }
     var createdBookingNumber by remember { mutableStateOf("") }
+    var newlyCreatedChannel by remember { mutableStateOf<ChatChannel?>(null) }
 
     LaunchedEffect(offerId) {
         if (offerId.isNotBlank()) {
@@ -291,7 +300,40 @@ fun OfferSelectionScreen(
                                     )
                                 )
 
-                                // 4. إشعار للفني بتأكيد الحجز
+                                // 4. إنشاء قناة المحادثة فوراً وربطها بالطلب العاجل
+                                scope.launch {
+                                    try {
+                                        val effectiveUserId = currentUserId.ifBlank { currentUserPhone.ifBlank { "client_${System.currentTimeMillis()}" } }
+                                        val effectiveUserName = currentUserName.ifBlank { "العميل" }
+                                        val targetTechId = curOffer.technicianId.ifBlank { curOffer.technicianPhone }
+                                        val createdChannel = chatRepository.getOrCreateChannel(
+                                            currentUserId = effectiveUserId,
+                                            currentUserName = effectiveUserName,
+                                            currentUserPhoto = "",
+                                            otherUserId = targetTechId,
+                                            otherUserName = curOffer.technicianName,
+                                            otherUserPhoto = curOffer.technicianAvatar,
+                                            type = ChannelType.PRIVATE,
+                                            relatedEntityId = curReq.id,
+                                            relatedEntityType = "URGENT_REQUEST"
+                                        )
+                                        newlyCreatedChannel = createdChannel
+                                        viewModel.openChatChannel(
+                                            com.example.data.ChatChannelEntity(
+                                                id = createdChannel.id,
+                                                targetId = targetTechId,
+                                                targetName = curOffer.technicianName,
+                                                targetPhone = curOffer.technicianPhone,
+                                                providerId = targetTechId,
+                                                providerName = curOffer.technicianName
+                                            )
+                                        )
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("OfferSelection", "Error creating chat channel: ${e.message}")
+                                    }
+                                }
+
+                                // 5. إشعار للفني بتأكيد الحجز
                                 val notifId = UUID.randomUUID().toString()
                                 val notif = NotificationEntity(
                                     id = notifId,
@@ -367,14 +409,32 @@ fun OfferSelectionScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        showConfirmationSuccessDialog = false
-                        onBookingConfirmed(createdBookingNumber)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                ) {
-                    Text("عرض تفاصيل الحجوزات")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            showConfirmationSuccessDialog = false
+                            onBookingConfirmed(createdBookingNumber)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                    ) {
+                        Text("الحجوزات")
+                    }
+
+                    Button(
+                        onClick = {
+                            showConfirmationSuccessDialog = false
+                            newlyCreatedChannel?.let { onNavigateToDirectChannel(it) } ?: run {
+                                val tPhone = offer?.technicianPhone ?: ""
+                                val tName = offer?.technicianName ?: ""
+                                onNavigateToChat(tPhone, tName)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5))
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("محادثة الفني الآن")
+                    }
                 }
             }
         )

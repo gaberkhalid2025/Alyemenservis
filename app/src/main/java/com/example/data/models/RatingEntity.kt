@@ -28,4 +28,7 @@ data class RatingEntity(
     val unhelpfulUserIds: List<String> = emptyList(),
     val isReported: Boolean = false,
     val reportReason: String = ""
-)
+) {
+    val providerId: String get() = targetId
+    val customerName: String get() = userName
+}

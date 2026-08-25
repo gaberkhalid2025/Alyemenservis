@@ -46,11 +46,16 @@ data class UnifiedBusinessAccount(
     val deletedBy: String? = null,
     val deleteReason: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    val isBookingEnabled: Boolean = true,
+    val isInstantOrdersEnabled: Boolean = true,
+    val isChatEnabled: Boolean = true,
     val rawProvider: ProviderEntity? = null,
     val rawStore: StoreEntity? = null,
     val rawProperty: PropertyEntity? = null,
     val rawJob: JobEntity? = null
 ) {
+    val city: String get() = cityId
+    val specialty: String get() = description
     companion object {
         fun fromProvider(p: ProviderEntity): UnifiedBusinessAccount {
             return UnifiedBusinessAccount(
@@ -67,7 +72,7 @@ data class UnifiedBusinessAccount(
                 logoImage = p.profileImage,
                 rating = p.rating,
                 numReviews = p.numReviews,
-                isVerified = p.isVerified,
+                isVerified = p.isVerified || p.subscriptionStatus == "APPROVED" || p.isAvailable,
                 isVip = p.isVip,
                 isRecommended = p.isRecommended,
                 password = p.password,
@@ -99,7 +104,7 @@ data class UnifiedBusinessAccount(
                 logoImage = s.logoImage,
                 rating = s.rating,
                 numReviews = s.numReviews,
-                isVerified = s.isVerified,
+                isVerified = s.isVerified || s.isActive,
                 isVip = s.isVip,
                 isRecommended = s.isRecommended,
                 workingHours = s.workingHours,
@@ -127,7 +132,7 @@ data class UnifiedBusinessAccount(
                 logoImage = "",
                 rating = p.rating,
                 numReviews = p.numReviews,
-                isVerified = p.isVerified,
+                isVerified = p.isVerified || p.isApproved || p.isActive,
                 isVip = p.isVip,
                 isRecommended = p.isRecommended,
                 password = p.password,

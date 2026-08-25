@@ -112,6 +112,7 @@ fun AppNavigator(
 
     val currentUserIdState by viewModel.currentUserId.collectAsState()
     val currentUserPhoneState by viewModel.currentUserPhone.collectAsState()
+    val currentUserNameState by viewModel.currentUserName.collectAsState()
     var showGuestRegisterDialogForAction by remember { mutableStateOf<String?>(null) } // null, "CHAT"
     var activeSectionIdForCreation by remember { mutableStateOf("") }
     var preselectedRegistrationType by remember { mutableStateOf("TECHNICIAN") }
@@ -149,9 +150,7 @@ fun AppNavigator(
     var showInfoDialog by remember { mutableStateOf(false) }
     var showAssistantDialog by remember { mutableStateOf(false) }
     var showRequestServiceModal by remember { mutableStateOf(false) }
-    var showChatDialog by remember { mutableStateOf(false) }
     var showNotificationsDialog by remember { mutableStateOf(false) }
-    var showAllConversationsDialog by remember { mutableStateOf(false) }
     var preSelectedChannelId by remember { mutableStateOf<String?>(null) }
     var chatReadTrigger by remember { mutableStateOf(0) }
 
@@ -183,7 +182,7 @@ fun AppNavigator(
     LaunchedEffect(activeChatChannel) {
         activeChatChannel?.let { channel ->
             preSelectedChannelId = channel.id
-            showAllConversationsDialog = true
+            viewModel.navigateTo("CHAT_DIRECT")
         }
     }
 
@@ -205,7 +204,7 @@ fun AppNavigator(
                         viewModel = viewModel,
                         themeColors = themeColors,
                         onNotificationsClick = { showNotificationsDialog = true },
-                        onChatsClick = { showAllConversationsDialog = true },
+                        onChatsClick = { viewModel.navigateTo("CHAT_LIST") },
                         chatReadTrigger = chatReadTrigger,
                         onMenuClick = {}
                     )
@@ -340,6 +339,46 @@ fun AppNavigator(
                                 )
                                 "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
+                                "OFFER_SELECTION" -> com.example.ui.screens.requests.OfferSelectionScreen(
+                                    offerId = viewModel.selectedOfferId,
+                                    viewModel = viewModel,
+                                    onNavigateBack = { viewModel.goBack() },
+                                    onBookingConfirmed = { viewModel.navigateTo("BOOKINGS_VIEW") },
+                                    onNavigateToChat = { phone, _ ->
+                                        preSelectedChannelId = phone
+                                        viewModel.navigateTo("CHAT_DIRECT")
+                                    },
+                                    onNavigateToDirectChannel = { channel ->
+                                        preSelectedChannelId = channel.id
+                                        viewModel.navigateTo("CHAT_DIRECT")
+                                    }
+                                )
+                                "URGENT_REQUEST_DETAILS" -> com.example.ui.screens.urgent.UrgentRequestDetailsScreen(
+                                    requestId = viewModel.selectedRequestId,
+                                    viewModel = viewModel,
+                                    onNavigateBack = { viewModel.goBack() },
+                                    onNavigateToOfferSelection = { offerId ->
+                                        viewModel.selectedOfferId = offerId
+                                        viewModel.navigateTo("OFFER_SELECTION")
+                                    },
+                                    onNavigateToChat = { phone, _ ->
+                                        preSelectedChannelId = phone
+                                        viewModel.navigateTo("CHAT_DIRECT")
+                                    }
+                                )
+                                "OFFERS_LIST" -> com.example.ui.screens.requests.OffersListScreen(
+                                    requestId = viewModel.selectedRequestId,
+                                    viewModel = viewModel,
+                                    onNavigateBack = { viewModel.goBack() },
+                                    onSelectOffer = { offerId ->
+                                        viewModel.selectedOfferId = offerId
+                                        viewModel.navigateTo("OFFER_SELECTION")
+                                    },
+                                    onNavigateToChat = { phone, _ ->
+                                        preSelectedChannelId = phone
+                                        viewModel.navigateTo("CHAT_DIRECT")
+                                    }
+                                )
                                 "BOOKINGS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
                                 "INSTANT_REQUESTS_VIEW" -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
                                 "ORDERS_VIEW" -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { showRequestServiceModal = true })
@@ -388,7 +427,7 @@ fun AppNavigator(
                                     },
                                     onChatClick = { store ->
                                         preSelectedChannelId = "chat_store_${store.id}"
-                                        showAllConversationsDialog = true
+                                        viewModel.navigateTo("CHAT_DIRECT")
                                     },
                                     onRequestServiceClick = { store ->
                                         viewModel.selectedStore = store
@@ -404,7 +443,7 @@ fun AppNavigator(
                                     },
                                     onChatClick = { medical ->
                                         preSelectedChannelId = "chat_p_${medical.id}"
-                                        showAllConversationsDialog = true
+                                        viewModel.navigateTo("CHAT_DIRECT")
                                     },
                                     onBookAppointmentClick = { medical ->
                                         viewModel.selectedProvider = medical
@@ -420,7 +459,7 @@ fun AppNavigator(
                                     },
                                     onChatClick = { rest ->
                                         preSelectedChannelId = "chat_store_${rest.id}"
-                                        showAllConversationsDialog = true
+                                        viewModel.navigateTo("CHAT_DIRECT")
                                     },
                                     onOrderMealClick = { rest ->
                                         viewModel.selectedStore = rest
@@ -436,7 +475,7 @@ fun AppNavigator(
                                     },
                                     onChatClick = { prop ->
                                         preSelectedChannelId = "chat_prop_${prop.id}"
-                                        showAllConversationsDialog = true
+                                        viewModel.navigateTo("CHAT_DIRECT")
                                     },
                                     onRequestInspectionClick = { prop ->
                                         viewModel.selectedProperty = prop
@@ -508,7 +547,7 @@ fun AppNavigator(
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
                                             preSelectedChannelId = channelId
-                                            showAllConversationsDialog = true
+                                            viewModel.navigateTo("CHAT_DIRECT")
                                         },
                                         onRequestBooking = {
                                             viewModel.navigateTo("CREATE_BOOKING")
@@ -523,7 +562,7 @@ fun AppNavigator(
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
                                             preSelectedChannelId = channelId
-                                            showAllConversationsDialog = true
+                                            viewModel.navigateTo("CHAT_DIRECT")
                                         },
                                         onOrderProduct = {
                                             showRequestServiceModal = true
@@ -538,7 +577,7 @@ fun AppNavigator(
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
                                             preSelectedChannelId = channelId
-                                            showAllConversationsDialog = true
+                                            viewModel.navigateTo("CHAT_DIRECT")
                                         },
                                         onRequestBooking = {
                                             showRequestServiceModal = true
@@ -555,7 +594,7 @@ fun AppNavigator(
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
                                             preSelectedChannelId = channelId
-                                            showAllConversationsDialog = true
+                                            viewModel.navigateTo("CHAT_DIRECT")
                                         },
                                         onRequestBooking = {
                                             viewModel.navigateTo("CREATE_BOOKING")
@@ -581,8 +620,51 @@ fun AppNavigator(
                                         },
                                         onOpenChat = { channelId ->
                                             preSelectedChannelId = channelId
-                                            showAllConversationsDialog = true
+                                            viewModel.navigateTo("CHAT_DIRECT")
                                         }
+                                    )
+                                }
+                                "CHAT_LIST" -> {
+                                    ChatListScreen(
+                                        currentUserId = currentUserIdState.ifBlank { currentUserPhoneState },
+                                        currentUserName = currentUserNameState.ifBlank { "مستخدم" },
+                                        themeColors = themeColors,
+                                        onChannelClick = { ch ->
+                                            preSelectedChannelId = ch.id
+                                            viewModel.navigateTo("CHAT_DIRECT")
+                                        },
+                                        onBackClick = { viewModel.goBack() }
+                                    )
+                                }
+                                "CHAT_DIRECT" -> {
+                                    val effUserId = currentUserIdState.ifBlank { currentUserPhoneState }
+                                    val effUserName = currentUserNameState.ifBlank { "مستخدم" }
+                                    val activeCh by viewModel.activeChatChannel.collectAsState()
+                                    val isChannelId = preSelectedChannelId?.startsWith("channel_") == true || preSelectedChannelId?.startsWith("chat_") == true
+
+                                    ChatScreen(
+                                        currentUserId = effUserId,
+                                        currentUserName = effUserName,
+                                        channelId = if (activeCh != null) activeCh!!.id else if (isChannelId) preSelectedChannelId else null,
+                                        targetUserId = if (activeCh == null && !isChannelId) preSelectedChannelId else null,
+                                        themeColors = themeColors,
+                                        onBackClick = {
+                                            viewModel.closeActiveChatChannel()
+                                            viewModel.goBack()
+                                        }
+                                    )
+                                }
+                                "CHAT_SUPPORT" -> {
+                                    val effUserId = currentUserIdState.ifBlank { currentUserPhoneState }
+                                    val effUserName = currentUserNameState.ifBlank { "مستخدم" }
+                                    ChatScreen(
+                                        currentUserId = effUserId,
+                                        currentUserName = effUserName,
+                                        targetUserId = "admin_support",
+                                        targetUserName = "الدعم الفني والإدارة",
+                                        relatedEntityType = "SUPPORT",
+                                        themeColors = themeColors,
+                                        onBackClick = { viewModel.goBack() }
                                     )
                                 }
                                 "CREATE_BOOKING", "BOOKING_CALENDAR" -> {
@@ -610,7 +692,7 @@ fun AppNavigator(
                                     onPreselectedRegistrationTypeChange = { preselectedRegistrationType = it },
                                     onChatOpen = { channelId ->
                                         preSelectedChannelId = channelId
-                                        showAllConversationsDialog = true
+                                        viewModel.navigateTo("CHAT_DIRECT")
                                     }
                                 )
                             }
@@ -657,7 +739,7 @@ fun AppNavigator(
             onRegisterCompleted = { name, phone, residence, password ->
                 viewModel.registerGuestUser(context, name, phone, residence, password)
                 showGuestRegisterDialogForAction = null
-                showChatDialog = true
+                viewModel.navigateTo("CHAT_LIST")
             }
         )
     }
@@ -686,8 +768,8 @@ fun AppNavigator(
             onDismiss = { showAssistantDialog = false },
             onChatOpen = { channelId ->
                 preSelectedChannelId = channelId
-                showAllConversationsDialog = true
                 showAssistantDialog = false
+                viewModel.navigateTo("CHAT_DIRECT")
             },
             onRequestQuickService = {
                 showAssistantDialog = false
@@ -700,26 +782,8 @@ fun AppNavigator(
         )
     }
 
-    if (showChatDialog) {
-        ChatPanelDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { showChatDialog = false })
-    }
-
     if (showNotificationsDialog) {
         UserNotificationsDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { showNotificationsDialog = false })
-    }
-
-    if (showAllConversationsDialog) {
-        AllConversationsDialogView(
-            viewModel = viewModel,
-            themeColors = themeColors,
-            initialSelectedChannelId = preSelectedChannelId,
-            onReadTrigger = { chatReadTrigger++ },
-            onDismiss = { 
-                showAllConversationsDialog = false
-                preSelectedChannelId = null
-                viewModel.closeActiveChatChannel()
-            }
-        )
     }
 
     if (showRestoreAccountDialog) {

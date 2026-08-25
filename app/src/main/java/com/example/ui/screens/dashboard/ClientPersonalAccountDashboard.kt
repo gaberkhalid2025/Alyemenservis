@@ -105,9 +105,9 @@ fun ClientPersonalAccountDashboard(
     currentUserResidence: String,
     currentUserId: String,
     bookings: List<com.example.data.BookingEntity>,
-    onShowRegistrationFormsAnyway: () -> Unit
+    onShowRegistrationFormsAnyway: () -> Unit,
+    onNavigateToSupportChat: () -> Unit = { viewModel.navigateTo("CHAT_SUPPORT") }
 ) {
-    var showDirectSupportChat by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -183,7 +183,7 @@ fun ClientPersonalAccountDashboard(
 
         // Live Chat with Support Button
         Button(
-            onClick = { showDirectSupportChat = true },
+            onClick = { onNavigateToSupportChat() },
             colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth().height(48.dp)
@@ -283,7 +283,7 @@ fun ClientPersonalAccountDashboard(
                             // Direct Chat with provider button
                             Button(
                                 onClick = {
-                                    showDirectSupportChat = true
+                                    onNavigateToSupportChat()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                                 shape = RoundedCornerShape(6.dp),
@@ -329,10 +329,6 @@ fun ClientPersonalAccountDashboard(
                 Text("🚪 تسجيل الخروج / تبديل الحساب", color = Color.Red, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
         }
-    }
-
-    if (showDirectSupportChat) {
-        ChatPanelDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { showDirectSupportChat = false })
     }
 
     // Direct Restore account Dialog

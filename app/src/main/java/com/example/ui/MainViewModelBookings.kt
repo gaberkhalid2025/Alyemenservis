@@ -172,6 +172,27 @@ fun MainViewModel.updateBookingStatusImpl(bookingId: String, newStatus: String, 
             val updated = b.copy(status = newStatus, rejectionReason = rejectionReason)
             db.collection("bookings").document(bookingId).set(updated)
             
+            // Automatically trigger getOrCreateChannel with relatedEntityId & relatedEntityType = "BOOKING" upon acceptance/approval
+            if (newStatus == "APPROVED" || newStatus == "ACCEPTED" || newStatus == "IN_PROGRESS") {
+                val otherId = b.providerId.ifEmpty { b.providerPhone.ifEmpty { "ADMIN" } }
+                val otherName = b.providerName.ifEmpty { "مقدم الخدمة" }
+                val otherPhone = b.providerPhone
+                openOrCreateChatChannel(
+                    targetId = otherId,
+                    targetType = "BOOKING",
+                    targetName = otherName,
+                    targetPhone = otherPhone,
+                    targetCategory = b.category,
+                    relatedEntityId = bookingId,
+                    relatedEntityType = "BOOKING"
+                ) { createdCh ->
+                    // Channel auto-provisioned upon booking approval with relatedChatChannelId stored
+                    if (createdCh != null && createdCh.id.isNotEmpty()) {
+                        db.collection("bookings").document(bookingId).update("relatedChatChannelId", createdCh.id)
+                    }
+                }
+            }
+            
             val arabicStatusMsg = when(newStatus) {
                 "APPROVED", "ACCEPTED", "IN_PROGRESS" -> "قبول وتأكيد حجزك بنجاح وسيتواصل معك الفني قريباً"
                 "PENDING", "UNDER_REVIEW" -> "وضع حجزك قيد المراجعة والتدقيق الإداري"
@@ -182,10 +203,10 @@ fun MainViewModel.updateBookingStatusImpl(bookingId: String, newStatus: String, 
 
             // Always send critical user notifications for booking transitions so they can track progress
             addNotification(
-                title = "📅 تحديث حالة الحجز (رقم ${b.id})",
+                title = "📅 تحديث حالة الحجز (رقم ${b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }})",
                 message = "عزيزي العميل، تم $arabicStatusMsg للخدمة المقدمة من ${b.providerName}.",
                 targetType = "USER",
-                targetValue = b.customerPhone
+                targetValue = b.customerPhone.ifBlank { b.clientPhone }
             )
         }
     }
@@ -200,9 +221,19 @@ fun MainViewModel.updateBookingStatusImpl(bookingId: String, newStatus: String, 
 }
 
 fun MainViewModel.deleteBookingImpl(bookingId: String) {
+    val b = _bookings.value.find { it.id == bookingId }
     _bookings.value = _bookings.value.filter { it.id != bookingId }
     db.collection("bookings").document(bookingId).delete()
     triggerNotification("🗑️ تم حذف الحجز من السجلات")
+
+    val bkCode = b?.bookingCode?.ifBlank { b.bookingNumber.ifBlank { bookingId } } ?: bookingId
+    val custName = b?.fullName?.ifBlank { b.clientName.ifBlank { b.customerName.ifBlank { "عميل" } } } ?: "عميل"
+    addNotification(
+        title = "🗑️ إشعار إداري: حذف حجز",
+        message = "نوع العملية: (حذف) | رقم الحجز: $bkCode | اسم العميل: $custName",
+        targetType = "ADMIN_ONLY",
+        targetValue = ""
+    )
 }
 
 fun MainViewModel.deleteAllBookingsImpl(customerPhone: String) {
@@ -223,7 +254,17 @@ fun MainViewModel.deleteAllBookingsImpl(customerPhone: String) {
 
 fun MainViewModel.updateBookingImpl(booking: BookingEntity) {
     db.collection("bookings").document(booking.id).set(booking)
+    _bookings.value = _bookings.value.map { if (it.id == booking.id) booking else it }
     triggerNotification("💾 تم تحديث بيانات الحجز بنجاح")
+
+    val bkCode = booking.bookingCode.ifBlank { booking.bookingNumber.ifBlank { booking.id } }
+    val custName = booking.fullName.ifBlank { booking.clientName.ifBlank { booking.customerName.ifBlank { "عميل" } } }
+    addNotification(
+        title = "✏️ إشعار إداري: تعديل حجز",
+        message = "نوع العملية: (تعديل) | رقم الحجز: $bkCode | اسم العميل: $custName",
+        targetType = "ADMIN_ONLY",
+        targetValue = ""
+    )
 }
 
 fun MainViewModel.cancelBookingByUserImpl(bookingId: String) {
@@ -237,15 +278,16 @@ fun MainViewModel.cancelBookingByUserImpl(bookingId: String) {
         db.collection("bookings").document(bookingId).update("status", "CANCELLED")
             .addOnSuccessListener {
                 triggerNotification("✅ تم إلغاء الحجز وإرسال إشعار للإدارة والفني")
-                val custName = b?.customerName?.ifBlank { "العميل" } ?: "العميل"
-                val custPhone = b?.customerPhone ?: ""
+                val bkCode = b?.bookingCode?.ifBlank { b?.bookingNumber?.ifBlank { bookingId } } ?: bookingId
+                val custName = b?.fullName?.ifBlank { b.clientName.ifBlank { b.customerName.ifBlank { "العميل" } } } ?: "العميل"
+                val custPhone = b?.customerPhone?.ifBlank { b.clientPhone } ?: ""
                 val provName = b?.providerName ?: ""
                 val srvName = b?.serviceType?.ifBlank { "خدمة" } ?: "خدمة"
                 
                 // 1. Notify Admin
                 addNotification(
-                    title = "🚨 إلغاء حجز من قبل العميل",
-                    message = "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName) لدى ($provName).",
+                    title = "❌ إشعار إداري: إلغاء حجز",
+                    message = "نوع العملية: (إلغاء) | رقم الحجز: $bkCode | اسم العميل: $custName ($custPhone) | الخدمة: $srvName لدى $provName",
                     targetType = "ADMIN_ONLY",
                     targetValue = ""
                 )
@@ -286,9 +328,14 @@ fun MainViewModel.attemptCancelBookingImpl(bookingId: String, input: String, rea
             }
         }
 
-        // Check 6-hour cancellation restriction rule
-        if (com.example.utils.BookingUtils.isBookingWithin6Hours(b.dateString, b.timeString)) {
-            onResult(false, "⚠️ لا يمكن إلغاء أو حذف الحجز إذا تبقى أقل من 6 ساعات على موعد الحجز المحدد حرصاً على وقت الفني. يرجى التواصل مع الإدارة أو الفني عبر المحادثة.")
+        // Check 8-hour cancellation restriction rule
+        val canCancel = com.example.utils.BookingUtils.canModifyOrCancelBooking(
+            scheduledAtTimestamp = b.scheduledAt,
+            dateString = b.dateString.ifBlank { b.date },
+            timeString = b.timeString.ifBlank { b.time }
+        )
+        if (!canCancel) {
+            onResult(false, "⚠️ لا يمكن إلغاء الحجز؛ التعديل والإلغاء مسموح فقط قبل 8 ساعات من الموعد المحدد حرصاً على وقت مقدم الخدمة.")
             return@addOnSuccessListener
         }
 
@@ -309,30 +356,33 @@ fun MainViewModel.attemptCancelBookingImpl(bookingId: String, input: String, rea
                 lockedUntil = 0L,
                 updatedAt = System.currentTimeMillis()
             )
+            val bkCode = b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }
+            val custName = b.fullName.ifBlank { b.clientName.ifBlank { b.customerName.ifBlank { "العميل" } } }
+
             db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
                 _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
                 
                 // Trigger in-app notifications
                 addNotification(
                     title = "❌ تم إلغاء حجزك بنجاح",
-                    message = "عزيزي العميل، تم إلغاء حجز الخدمة بنجاح بطلب منك. رقم الحجز: ${b.bookingNumber.ifEmpty { b.id }}",
+                    message = "عزيزي العميل، تم إلغاء حجز الخدمة بنجاح بطلب منك. رقم الحجز: $bkCode",
                     targetType = "USER",
-                    targetValue = b.customerPhone
+                    targetValue = b.customerPhone.ifBlank { b.clientPhone }
                 )
                 
                 if (b.providerId.isNotEmpty()) {
                     addNotification(
                         title = "❌ تم إلغاء حجز قائم لديك",
-                        message = "الفني العزيز ${b.providerName}، نود إبلاغك بأن العميل قد ألغى الحجز رقم ${b.bookingNumber.ifEmpty { b.id }} والمحدد في تاريخ ${b.dateString} ${b.timeString}.",
+                        message = "الفني العزيز ${b.providerName}، نود إبلاغك بأن العميل قد ألغى الحجز رقم $bkCode والمحدد في تاريخ ${b.dateString} ${b.timeString}.",
                         targetType = "PROVIDER",
                         targetValue = b.providerPhone.ifEmpty { b.customerPhone }
                     )
                 }
 
-                // Add Admin notification for monitoring
+                // Add Admin notification containing: booking code, customer name, and operation type (إلغاء)
                 addNotification(
-                    title = "🚨 إلغاء حجز بواسطة العميل",
-                    message = "قام العميل ${b.customerName} (${b.customerPhone}) بإلغاء الحجز رقم ${b.bookingNumber.ifEmpty { b.id }} الخاص بالفني ${b.providerName}. السبب: $reason",
+                    title = "❌ إشعار إداري: إلغاء حجز",
+                    message = "نوع العملية: (إلغاء) | رقم الحجز: $bkCode | اسم العميل: $custName | السبب: $reason",
                     targetType = "ADMIN_ONLY",
                     targetValue = ""
                 )

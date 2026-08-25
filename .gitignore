@@ -7,3 +7,4 @@ backup_altiqani_wam_14_8_10pm/
 *.jks
 local.properties
 .DS_Store
+.env

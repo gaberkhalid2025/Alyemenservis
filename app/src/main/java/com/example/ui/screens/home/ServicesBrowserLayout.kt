@@ -150,10 +150,12 @@ fun ServicesBrowserLayout(
     // --- STORES & REAL ESTATE COMPONENT STATES ---
     val parsedSections = remember(settingsState.dynamicSectionsData) {
         com.example.data.DynamicSection.parseDynamicSections(settingsState.dynamicSectionsData)
+            .filter { it.id != "services" && !it.name.contains("المهن والخدمات") }
     }
     val activeTabs = remember(parsedSections, settingsState.isStoresEnabled, settingsState.isPropertiesEnabled) {
         val list = mutableListOf("الرئيسية")
         parsedSections.filter { it.isEnabled }.forEach { sec ->
+            if (sec.id == "services" || sec.name.contains("المهن والخدمات")) return@forEach
             if ((sec.id == "stores" || sec.type == "store") && !settingsState.isStoresEnabled) return@forEach
             if ((sec.id == "properties" || sec.type == "property") && !settingsState.isPropertiesEnabled) return@forEach
             list.add(sec.name)
@@ -424,28 +426,10 @@ fun ServicesBrowserLayout(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (activeTabName != "الرئيسية") {
-                    Surface(
-                        onClick = { activeTabName = "الرئيسية" },
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.15f),
-                        modifier = Modifier.padding(end = 2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("🏠", fontSize = 12.sp)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("الرئيسية", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
                 activeTabs.forEach { tabName ->
                     val isSelected = activeTabName == tabName
                     val icon = when (tabName) {
-                        "الرئيسية" -> "🛠️"
+                        "الرئيسية" -> "🏠"
                         settingsState.storesTabName -> "🏪"
                         settingsState.propertiesTabName -> "🏠"
                         "المفضلة" -> "⭐"
@@ -543,19 +527,14 @@ fun ServicesBrowserLayout(
             }
         } else if (activeTabName == "المفضلة") {
             item {
-                val currentLangState by viewModel.currentLanguage.collectAsState()
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    val favTitle = if (currentLangState == "en") "⭐ Favorite Tabs & Stores" else "⭐ التبويبات والمحلات المفضلة"
-                    val favDesc = if (currentLangState == "en") "Your personal favorites will be saved here for quick access later." else "سيتم حفظ مفضلاتك الشخصية هنا للوصول السريع إليها لاحقاً."
-                    Text(favTitle, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Text(favDesc, fontSize = 11.sp, color = themeColors.textSecondary)
-                }
+                WishlistTabContent(
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onChatOpen = onChatOpen,
+                    onSelectStore = { selectedStoreForDetails = it },
+                    onSelectProperty = { selectedPropertyForDetails = it },
+                    onSwitchToHome = { activeTabName = "الرئيسية" }
+                )
             }
         } else {
             // "الرئيسية" / Standard flow
@@ -1450,5 +1429,300 @@ fun getPicture2CategoryDetail(cat: CategoryEntity): Picture2CategoryDetail {
                 vectorIcon = Icons.Default.List,
                 badge = null
             )
+    }
+}
+
+@Composable
+fun WishlistTabContent(
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
+    onChatOpen: (String) -> Unit,
+    onSelectStore: (StoreEntity) -> Unit,
+    onSelectProperty: (PropertyEntity) -> Unit,
+    onSwitchToHome: () -> Unit
+) {
+    val context = LocalContext.current
+    val favoriteIds by viewModel.favoriteIds.collectAsState()
+    val providers by viewModel.providers.collectAsState()
+    val stores by viewModel.stores.collectAsState()
+    val properties by viewModel.properties.collectAsState()
+
+    var wishlistFilterIndex by remember { mutableStateOf(0) }
+
+    val favProviders = remember(providers, favoriteIds) {
+        providers.filter { favoriteIds.contains(it.id) }
+    }
+    val favStores = remember(stores, favoriteIds) {
+        stores.filter { favoriteIds.contains(it.id) }
+    }
+    val favProperties = remember(properties, favoriteIds) {
+        properties.filter { favoriteIds.contains(it.id) }
+    }
+
+    val favOffers = remember(favStores, favProviders) {
+        val list = mutableListOf<Triple<String, String, SpecialOfferEntity>>()
+        favStores.forEach { store ->
+            SpecialOfferEntity.parseList(store.specialOffersJson).forEach { offer ->
+                list.add(Triple(store.name, store.phone, offer))
+            }
+        }
+        favProviders.forEach { provider ->
+            SpecialOfferEntity.parseList(provider.specialOffersJson).forEach { offer ->
+                list.add(Triple(provider.name, provider.phone, offer))
+            }
+        }
+        list
+    }
+
+    val totalCount = favProviders.size + favStores.size + favProperties.size + favOffers.size
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // --- WISHLIST HEADER BANNER ---
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Favorite, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(24.dp))
+                    }
+                    Column {
+                        Text(
+                            "❤️ قائمة المفضلة والعروض الحصرية",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            "إدارة المفضلة وتلقي إشعارات التخفيضات داخل التطبيق فورياً",
+                            fontSize = 10.5.sp,
+                            color = Color.LightGray
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFFEF4444)
+                ) {
+                    Text(
+                        "$totalCount عنصر",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        // --- FILTER CHIPS ROW ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf("الكل ($totalCount)", "المتاجر والمطاعم (${favStores.size}) 🛍️", "الفنيون والخدمات (${favProviders.size}) 🔧", "العروض والتخفيضات (${favOffers.size}) 🔥", "العقارات (${favProperties.size}) 🏠").forEachIndexed { idx, filterTitle ->
+                val isSel = wishlistFilterIndex == idx
+                Surface(
+                    onClick = { wishlistFilterIndex = idx },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isSel) themeColors.accent else Color.White.copy(alpha = 0.08f),
+                    border = BorderStroke(0.5.dp, if (isSel) themeColors.accent else Color.White.copy(alpha = 0.2f))
+                ) {
+                    Text(
+                        filterTitle,
+                        fontSize = 10.5.sp,
+                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSel) Color.Black else Color.White,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
+        if (favoriteIds.isEmpty() || totalCount == 0) {
+            // --- EMPTY WISHLIST STATE ---
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.FavoriteBorder,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Text(
+                        "قائمة المفضلة فارغة حالياً 💔",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        "تصفح المتاجر والمطاعم والخدمات واضغط على زر القلب ❤️ في أي صفحة للوصول إليها بسرعة من هنا، وسنرسل لك إشعارات داخل التطبيق فور إضافة عروض جديدة!",
+                        fontSize = 11.5.sp,
+                        color = Color.LightGray,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = onSwitchToHome,
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("تصفح المتاجر والخدمات الآن 🚀", color = Color.Black, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        } else {
+            // --- WISHLIST CONTENT SECTIONS ---
+
+            // 1. Special Offers Section
+            if ((wishlistFilterIndex == 0 || wishlistFilterIndex == 3) && favOffers.isNotEmpty()) {
+                Text("🔥 العروض والتخفيضات المتاحة للمفضلين لديك:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                favOffers.forEach { (merchantName, phone, offer) ->
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                        border = BorderStroke(1.dp, Color(0xFFFF9800).copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Surface(shape = RoundedCornerShape(6.dp), color = Color.Red) {
+                                        Text("%${offer.discountPercent} خصم 🔥", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
+                                    Text(merchantName, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+                                }
+                                Text("⌛ ${offer.expiryDate}", fontSize = 9.5.sp, color = Color(0xFFFF9800))
+                            }
+
+                            Text(offer.title, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            if (offer.description.isNotEmpty()) {
+                                Text(offer.description, fontSize = 10.5.sp, color = Color.LightGray)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("${offer.offerPrice.toInt()} ر.ي", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                    if (offer.originalPrice > offer.offerPrice) {
+                                        Text("${offer.originalPrice.toInt()} ر.ي", fontSize = 11.sp, color = Color.Gray, textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough)
+                                    }
+                                }
+
+                                if (phone.isNotEmpty()) {
+                                    Button(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                            context.startActivity(intent)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Text("📞 طلب العرض", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Favorite Stores & Restaurants Section
+            if ((wishlistFilterIndex == 0 || wishlistFilterIndex == 1) && favStores.isNotEmpty()) {
+                Text("🛍️ المتاجر والمطاعم المفضلة (${favStores.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF34D399))
+                favStores.forEach { store ->
+                    FavoriteStoreCard(
+                        store = store,
+                        themeColors = themeColors,
+                        onClick = { onSelectStore(store) },
+                        onRemoveFavorite = { viewModel.toggleFavorite(store.id) }
+                    )
+                }
+            }
+
+            // 3. Favorite Technicians & Service Providers
+            if ((wishlistFilterIndex == 0 || wishlistFilterIndex == 2) && favProviders.isNotEmpty()) {
+                Text("🔧 الفنيون والخدمات المفضلة (${favProviders.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
+                favProviders.forEach { provider ->
+                    FavoriteProviderCard(
+                        provider = provider,
+                        themeColors = themeColors,
+                        onClick = {
+                            viewModel.selectedProvider = provider
+                            viewModel.navigateTo("DYNAMIC_PROFILE")
+                        },
+                        onRemoveFavorite = { viewModel.toggleFavorite(provider.id) },
+                        onCall = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+            }
+
+            // 4. Favorite Real Estate & Properties
+            if ((wishlistFilterIndex == 0 || wishlistFilterIndex == 4) && favProperties.isNotEmpty()) {
+                Text("🏢 العقارات والاستثمارات المحفوظة (${favProperties.size}):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA78BFA))
+                favProperties.forEach { property ->
+                    FavoritePropertyCard(
+                        property = property,
+                        themeColors = themeColors,
+                        onClick = { onSelectProperty(property) },
+                        onRemoveFavorite = { viewModel.toggleFavorite(property.id) }
+                    )
+                }
+            }
+        }
     }
 }

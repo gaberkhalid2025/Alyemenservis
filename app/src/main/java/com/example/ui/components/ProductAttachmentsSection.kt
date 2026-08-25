@@ -8,7 +8,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -554,81 +557,179 @@ fun SpecialOffersSection(
     if (showAddDialog) {
         androidx.compose.ui.window.Dialog(onDismissRequest = { showAddDialog = false }) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF151C24)),
                 border = BorderStroke(1.dp, themeColors.accent),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(12.dp)
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
+                    modifier = Modifier
+                        .padding(14.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("🔥 إضافة عرض أو تخفيض جديد", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "🏷️ إضافة عرض أو تخفيض جديد",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColors.accent
+                        )
+                        IconButton(
+                            onClick = { showAddDialog = false },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.Clear, contentDescription = "إغلاق", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                        }
+                    }
 
+                    // Title with Preset Chips
+                    Text("اسم العرض أو عنوان التخفيض:", fontSize = 10.sp, color = Color.LightGray)
                     OutlinedTextField(
                         value = titleInput,
                         onValueChange = { titleInput = it },
-                        label = { Text("عنوان العرض (مثال: خصم الصيف 20%)") },
+                        placeholder = { Text("مثال: خصم الصيف 20%", fontSize = 11.sp, color = Color.Gray) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = themeColors.accent)
                     )
 
-                    OutlinedTextField(
-                        value = descInput,
-                        onValueChange = { descInput = it },
-                        label = { Text("تفاصيل العرض والشروط") },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = percentInput,
-                            onValueChange = { percentInput = it },
-                            label = { Text("نسبة الخصم %") },
-                            modifier = Modifier.weight(1f),
-                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                        )
-                        OutlinedTextField(
-                            value = expiryInput,
-                            onValueChange = { expiryInput = it },
-                            label = { Text("تاريخ الانتهاء") },
-                            modifier = Modifier.weight(1f),
-                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                        )
+                    // Quick Preset Title Chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("خصم خاص 🔥", "تخفيض الموسم 🏷️", "عرض محدود ⏳", "اشتري 1 واحصل على 1 🎁").forEach { preset ->
+                            Surface(
+                                onClick = { titleInput = preset },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (titleInput == preset) themeColors.accent else Color.White.copy(alpha = 0.08f),
+                                border = BorderStroke(0.5.dp, themeColors.accent.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    preset,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (titleInput == preset) Color.Black else Color.White,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                     }
 
+                    // Discount Percentage Selector Chips
+                    Text("حدد نسبة الخصم %:", fontSize = 10.sp, color = Color.LightGray)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("10", "20", "30", "50").forEach { pct ->
+                            val isSel = percentInput == pct
+                            Surface(
+                                onClick = {
+                                    percentInput = pct
+                                    val orig = originalPriceInput.toDoubleOrNull() ?: 10000.0
+                                    val dis = pct.toDoubleOrNull() ?: 10.0
+                                    offerPriceInput = (orig * (1 - dis / 100)).toInt().toString()
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSel) Color.Red else Color(0xFF222C36),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 6.dp)) {
+                                    Text("%$pct", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+                    }
+
+                    // Prices & Calculation Row
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = originalPriceInput,
-                            onValueChange = { originalPriceInput = it },
-                            label = { Text("السعر الأصلي") },
+                            onValueChange = {
+                                originalPriceInput = it
+                                val orig = it.toDoubleOrNull() ?: 0.0
+                                val dis = percentInput.toDoubleOrNull() ?: 0.0
+                                if (orig > 0) {
+                                    offerPriceInput = (orig * (1 - dis / 100)).toInt().toString()
+                                }
+                            },
+                            label = { Text("السعر الأصلي (ر.ي)", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f),
                             textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp),
                             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                         )
+
                         OutlinedTextField(
                             value = offerPriceInput,
                             onValueChange = { offerPriceInput = it },
-                            label = { Text("السعر بعد الخصم") },
+                            label = { Text("السعر بعد الخصم (ر.ي)", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f),
-                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            textStyle = androidx.compose.ui.text.TextStyle(color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = themeColors.accent, unfocusedTextColor = themeColors.accent)
                         )
                     }
 
-                    Row(
+                    // Details
+                    OutlinedTextField(
+                        value = descInput,
+                        onValueChange = { descInput = it },
+                        label = { Text("ملاحظات وشروط العرض (اختياري)", fontSize = 10.sp) },
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    // Expiry Presets
+                    Text("مدة العرض / تاريخ الانتهاء:", fontSize = 10.sp, color = Color.LightGray)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        TextButton(onClick = { showAddDialog = false }) {
-                            Text("إلغاء", color = Color.Gray)
+                        listOf("اليوم فقط ⏳", "3 أيام 📅", "أسبوع كامل 🗓️", "حتى نفاد الكمية 📦").forEach { expPreset ->
+                            Surface(
+                                onClick = { expiryInput = expPreset },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (expiryInput == expPreset) Color(0xFFFF9800) else Color.White.copy(alpha = 0.08f)
+                            ) {
+                                Text(
+                                    expPreset,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (expiryInput == expPreset) Color.Black else Color.White,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+
+                    // Action buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showAddDialog = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("إلغاء", color = Color.White, fontSize = 11.sp)
+                        }
+
                         Button(
                             onClick = {
                                 val newOffer = com.example.data.SpecialOfferEntity(
@@ -638,17 +739,18 @@ fun SpecialOffersSection(
                                     discountPercent = percentInput.toIntOrNull() ?: 10,
                                     originalPrice = originalPriceInput.toDoubleOrNull() ?: 0.0,
                                     offerPrice = offerPriceInput.toDoubleOrNull() ?: 0.0,
-                                    expiryDate = expiryInput.ifBlank { "2026-12-31" }
+                                    expiryDate = expiryInput.ifBlank { "حتى نفاد الكمية" }
                                 )
                                 val updated = offersList + newOffer
                                 offersList = updated
                                 onOffersChanged(com.example.data.SpecialOfferEntity.serializeList(updated))
                                 showAddDialog = false
-                                Toast.makeText(context, "✅ تم إضافة العرض بنجاح!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "✅ تم نشر العرض بنجاح في التطبيق!", Toast.LENGTH_SHORT).show()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.weight(1.5f)
                         ) {
-                            Text("حفظ العرض 💾", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text("حفظ ونشر العرض 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }

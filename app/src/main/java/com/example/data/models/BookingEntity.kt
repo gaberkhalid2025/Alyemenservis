@@ -18,6 +18,9 @@ data class BookingEntity(
     val pinCode: String = "",
     
     // New Fields requested for the enhanced booking system
+    val fullName: String = "",
+    val fullAddress: String = "",
+    val bookingCode: String = "",
     val bookingNumber: String = "",      // BK-YYMMDDHHMMSS-XXXX
     val bookingPassword: String = "",    // 4-digit code (e.g. "8372")
     val clientId: String = "",
@@ -30,10 +33,13 @@ data class BookingEntity(
     val serviceDetails: String = "",
     val date: String = "",
     val time: String = "",
+    val scheduledAt: Long = 0L,
     val advancePayment: Double = 0.0,
     val paymentStatus: String = "unpaid",
+    val paymentProofUrl: String = "",
     val totalAmount: Double = 0.0,
     val progress: Int = 0,
+    val relatedChatChannelId: String = "",
     
     val cancellationReason: String? = null,
     val cancelledAt: Long? = null,
