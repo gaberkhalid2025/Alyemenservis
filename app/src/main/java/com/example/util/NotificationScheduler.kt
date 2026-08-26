@@ -7,8 +7,12 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.annotation.Keep
-import org.json.JSONArray
-import org.json.JSONObject
+import com.example.data.local.ScheduledNotificationDatabase
+import com.example.data.local.ScheduledNotificationEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.UUID
 
@@ -19,24 +23,31 @@ data class ScheduledNotification(
     val message: String = "",
     val scheduledTime: Long = 0L,
     val isActive: Boolean = true,
-    val type: String = "REMINDER", // "REMINDER", "DAILY", "WEEKLY"
+    val type: String = "REMINDER",
     val bookingId: String = ""
 )
 
 /**
  * 📅 NotificationScheduler
- * مسؤول عن جدولة الإشعارات في أوقات محددة وتذكير المواعيد والإشعارات الدورية
+ * 
+ * جدولة الإشعارات والتنبيهات المباشرة والدورية.
+ * تم تحديثه ليعتمد بالكامل على **Room Database (`ScheduledNotificationDatabase`)** بدلاً من `SharedPreferences`
+ * لحفظ الجداول الزمنية للإنذارات وضمان عمل التذكيرات بنجاح حتى عند إعادة تشغيل الجهاز.
  */
 class NotificationScheduler(private val context: Context) {
 
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-    private val prefs = context.getSharedPreferences("scheduled_notifications_prefs", Context.MODE_PRIVATE)
+    private val db = ScheduledNotificationDatabase.getInstance(context)
+    private val dao = db.scheduledNotificationDao()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     companion object {
         private const val TAG = "NotificationScheduler"
-        private const val KEY_NOTIFICATIONS = "saved_scheduled_notifications"
     }
 
+    /**
+     * جدولة تذكير بموعد محدد
+     */
     fun scheduleReminder(bookingId: String, hoursBefore: Int, appointmentTimeMillis: Long = System.currentTimeMillis() + (hoursBefore + 1) * 3600 * 1000L): Boolean {
         try {
             val triggerTime = appointmentTimeMillis - (hoursBefore * 3600 * 1000L)
@@ -63,7 +74,7 @@ class NotificationScheduler(private val context: Context) {
             )
 
             setExactAlarm(notif)
-            saveNotification(notif)
+            saveToRoom(notif)
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling reminder", e)
@@ -71,6 +82,9 @@ class NotificationScheduler(private val context: Context) {
         }
     }
 
+    /**
+     * جدولة إشعار تذكيري يومي
+     */
     fun scheduleDailyNotification(title: String, message: String, hour: Int): Boolean {
         try {
             val calendar = Calendar.getInstance().apply {
@@ -93,7 +107,7 @@ class NotificationScheduler(private val context: Context) {
             )
 
             setRepeatingAlarm(notif, AlarmManager.INTERVAL_DAY)
-            saveNotification(notif)
+            saveToRoom(notif)
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling daily notification", e)
@@ -101,6 +115,9 @@ class NotificationScheduler(private val context: Context) {
         }
     }
 
+    /**
+     * جدولة إشعار أسبوعي
+     */
     fun scheduleWeeklyNotification(title: String, message: String, dayOfWeek: Int, hour: Int): Boolean {
         try {
             val calendar = Calendar.getInstance().apply {
@@ -124,7 +141,7 @@ class NotificationScheduler(private val context: Context) {
             )
 
             setRepeatingAlarm(notif, AlarmManager.INTERVAL_DAY * 7)
-            saveNotification(notif)
+            saveToRoom(notif)
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error scheduling weekly notification", e)
@@ -132,66 +149,37 @@ class NotificationScheduler(private val context: Context) {
         }
     }
 
+    /**
+     * إلغاء إشعار مجدول
+     */
     fun cancelScheduledNotification(notificationId: String): Boolean {
         try {
-            val list = getScheduledNotifications().toMutableList()
-            val index = list.indexOfFirst { it.id == notificationId }
-            if (index != -1) {
-                val notif = list[index]
-                cancelAlarm(notif)
-                list.removeAt(index)
-                saveAllNotifications(list)
-                return true
+            scope.launch {
+                dao.deleteById(notificationId)
             }
-            return false
+            val dummy = ScheduledNotification(id = notificationId)
+            cancelAlarm(dummy)
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "Error cancelling scheduled notification", e)
             return false
         }
     }
 
-    fun getScheduledNotifications(): List<ScheduledNotification> {
-        val jsonStr = prefs.getString(KEY_NOTIFICATIONS, null) ?: return emptyList()
-        val list = mutableListOf<ScheduledNotification>()
-        try {
-            val jsonArray = JSONArray(jsonStr)
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                list.add(
-                    ScheduledNotification(
-                        id = obj.optString("id"),
-                        title = obj.optString("title"),
-                        message = obj.optString("message"),
-                        scheduledTime = obj.optLong("scheduledTime"),
-                        isActive = obj.optBoolean("isActive", true),
-                        type = obj.optString("type", "REMINDER"),
-                        bookingId = obj.optString("bookingId")
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing scheduled notifications", e)
-        }
-        return list
-    }
-
-    fun rescheduleNotification(notificationId: String, newTime: Long): Boolean {
-        try {
-            val list = getScheduledNotifications().toMutableList()
-            val index = list.indexOfFirst { it.id == notificationId }
-            if (index != -1) {
-                val old = list[index]
-                cancelAlarm(old)
-                val updated = old.copy(scheduledTime = newTime)
-                setExactAlarm(updated)
-                list[index] = updated
-                saveAllNotifications(list)
-                return true
-            }
-            return false
-        } catch (e: Exception) {
-            Log.e(TAG, "Error rescheduling notification", e)
-            return false
+    /**
+     * جلب قائمة الإشعارات المجدولة من Room
+     */
+    suspend fun getScheduledNotificationsFromDb(): List<ScheduledNotification> {
+        return dao.getActiveNotificationsList().map {
+            ScheduledNotification(
+                id = it.id,
+                title = it.title,
+                message = it.message,
+                scheduledTime = it.scheduledTime,
+                isActive = it.isActive,
+                type = it.type,
+                bookingId = it.bookingId
+            )
         }
     }
 
@@ -235,25 +223,18 @@ class NotificationScheduler(private val context: Context) {
         return PendingIntent.getActivity(context, notif.id.hashCode(), intent, flags)
     }
 
-    private fun saveNotification(notif: ScheduledNotification) {
-        val current = getScheduledNotifications().filter { it.id != notif.id }.toMutableList()
-        current.add(notif)
-        saveAllNotifications(current)
-    }
-
-    private fun saveAllNotifications(list: List<ScheduledNotification>) {
-        val jsonArray = JSONArray()
-        for (item in list) {
-            val obj = JSONObject()
-            obj.put("id", item.id)
-            obj.put("title", item.title)
-            obj.put("message", item.message)
-            obj.put("scheduledTime", item.scheduledTime)
-            obj.put("isActive", item.isActive)
-            obj.put("type", item.type)
-            obj.put("bookingId", item.bookingId)
-            jsonArray.put(obj)
+    private fun saveToRoom(notif: ScheduledNotification) {
+        scope.launch {
+            val entity = ScheduledNotificationEntity(
+                id = notif.id,
+                title = notif.title,
+                message = notif.message,
+                scheduledTime = notif.scheduledTime,
+                isActive = notif.isActive,
+                type = notif.type,
+                bookingId = notif.bookingId
+            )
+            dao.insert(entity)
         }
-        prefs.edit().putString(KEY_NOTIFICATIONS, jsonArray.toString()).apply()
     }
 }

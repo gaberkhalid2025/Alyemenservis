@@ -4,7 +4,11 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 
+/**
+ * 🔄 SyncStatus - حالات المزامنة
+ */
 enum class SyncStatus {
     SYNCED,        // متزامن بالكامل
     SYNCING,       // جاري المزامنة
@@ -13,8 +17,11 @@ enum class SyncStatus {
     ERROR          // خطأ
 }
 
+/**
+ * ❌ SyncError - كائن خطأ المزامنة
+ */
 data class SyncError(
-    val id: String = java.util.UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(),
     val message: String,
     val timestamp: Long = System.currentTimeMillis(),
     val module: String = "GENERAL",
@@ -23,7 +30,9 @@ data class SyncError(
 
 /**
  * 📊 SyncStatusTracker
- * تتبع وإدارة حالة المزامنة وعرض الإحصائيات والأخطاء والتقدم في واجهة المستخدم.
+ * 
+ * تتبع وإدارة حالة المزامنة وعرض الإحصائيات والأخطاء والتقدم في واجهة المستخدم لحظياً.
+ * يوفر StateFlow لكافة تفاصيل التقدم ومؤشرات الخطأ وحالات المزامنة مع كليبرات مستقرة.
  */
 class SyncStatusTracker(private val context: Context) {
 
@@ -45,28 +54,55 @@ class SyncStatusTracker(private val context: Context) {
     private val _errors = MutableStateFlow<List<SyncError>>(emptyList())
     val errors: StateFlow<List<SyncError>> = _errors.asStateFlow()
 
+    /**
+     * الحصول على حالة المزامنة الحالية
+     */
     fun getSyncStatus(): SyncStatus = _syncStatus.value
 
+    /**
+     * الحصول على توقيت آخر مزامنة
+     */
     fun getLastSyncTime(): Long = _lastSyncTime.value
 
+    /**
+     * الحصول على عدد العناصر المتزامنة
+     */
     fun getSyncedItemsCount(): Int = _syncedItemsCount.value
 
+    /**
+     * الحصول على عدد العناصر المعلقة
+     */
     fun getPendingItemsCount(): Int = _pendingItemsCount.value
 
+    /**
+     * الحصول على نسبة تقدم المزامنة (من 0 إلى 1)
+     */
     fun getSyncProgress(): Float = _syncProgress.value
 
+    /**
+     * الحصول على قائمة أخطاء المزامنة
+     */
     fun getErrors(): List<SyncError> = _errors.value
 
+    /**
+     * تحديث حالة المزامنة
+     */
     fun updateStatus(status: SyncStatus) {
         _syncStatus.value = status
     }
 
+    /**
+     * تحديث التقدم وعدد العناصر
+     */
     fun updateProgress(progress: Float, syncedCount: Int, pendingCount: Int) {
         _syncProgress.value = progress.coerceIn(0f, 1f)
         _syncedItemsCount.value = syncedCount
         _pendingItemsCount.value = pendingCount
     }
 
+    /**
+     * تسجيل نجاح عملية مزامنة
+     */
     fun recordSuccessfulSync(syncedCount: Int) {
         _syncStatus.value = SyncStatus.SYNCED
         _lastSyncTime.value = System.currentTimeMillis()
@@ -75,12 +111,18 @@ class SyncStatusTracker(private val context: Context) {
         _syncProgress.value = 1f
     }
 
+    /**
+     * تسجيل خطأ في عملية المزامنة
+     */
     fun recordError(message: String, module: String = "SYNC", throwable: Throwable? = null) {
         _syncStatus.value = SyncStatus.ERROR
         val error = SyncError(message = message, module = module, exception = throwable)
         _errors.value = _errors.value + error
     }
 
+    /**
+     * مسح قائمة الأخطاء
+     */
     fun clearErrors() {
         _errors.value = emptyList()
         if (_syncStatus.value == SyncStatus.ERROR) {
@@ -88,12 +130,18 @@ class SyncStatusTracker(private val context: Context) {
         }
     }
 
+    /**
+     * إعادة محاولة المزامنة الفاشلة
+     */
     fun retryFailedSync(action: () -> Unit) {
         clearErrors()
         _syncStatus.value = SyncStatus.SYNCING
         action()
     }
 
+    /**
+     * بدء مزامنة يدوية
+     */
     fun manualSync(action: () -> Unit) {
         _syncStatus.value = SyncStatus.SYNCING
         _syncProgress.value = 0.1f

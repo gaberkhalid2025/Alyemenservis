@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
@@ -27,6 +29,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.AdminPermissionsRegistry
 
+/**
+ * 🔒 PermissionGuard - حارس الصلاحيات والتحكم في الوصول
+ * 
+ * الميزات:
+ * 1. التحقق من صلاحيات المشرفين والمديرين على مستوى التبويبات والعمليات الدقيقة.
+ * 2. المالك والمدير العام (OWNER / SUPER_ADMIN) يملكان كافة الصلاحيات تلقائياً.
+ * 3. واجهة متجاوبة وموحدة لرسالة عدم التصريح (UnauthorizedView).
+ */
 object PermissionGuard {
     const val PERMISSION_BOOKINGS = "MANAGE_BOOKINGS"
     const val PERMISSION_RESTAURANTS = "MANAGE_RESTAURANTS"
@@ -43,10 +53,16 @@ object PermissionGuard {
     const val PERMISSION_PROPERTIES = "MANAGE_PROPERTIES"
     const val PERMISSION_JOBS = "MANAGE_JOBS"
     const val PERMISSION_CUSTOM_TABS = "MANAGE_CUSTOM_TABS"
+    const val PERMISSION_FINANCE = "MANAGE_FINANCE"
+    const val PERMISSION_SECURITY = "MANAGE_SECURITY"
 
     /**
-     * Verifies if the role and assigned permission set has access to a specific permission key.
-     * Owner (Main Admin) has ALL 320 permissions automatically.
+     * فحص ما إذا كان الدور أو المشرف يملك صلاحية معينة
+     * 
+     * @param role الدور الإداري للمستخدم
+     * @param permission مفتاح الصلاحية المطلوب فحصها
+     * @param supervisorGrantedPermissions قائمة الصلاحيات الممنوحة للمشرف بشكل مخصص
+     * @return true إذا كان الوصول مسموحاً
      */
     fun hasPermission(
         role: AdminRole,
@@ -56,34 +72,42 @@ object PermissionGuard {
         if (role == AdminRole.GUEST) return false
         if (role == AdminRole.OWNER || role == AdminRole.SUPER_ADMIN) return true
         
-        // Admin has all standard permissions by default unless restricted
+        // المدير يملك كافة الصلاحيات القياسية ما لم تكن مقيدة
         if (role == AdminRole.ADMIN) {
             if (supervisorGrantedPermissions.isEmpty()) return true
             if (supervisorGrantedPermissions.contains(permission)) return true
         }
 
-        // Supervisor permissions check
+        // فحص صلاحيات المشرف المخصصة
         if (supervisorGrantedPermissions.contains(permission)) return true
         
-        // Category-level check (e.g. if supervisor has "MANAGE_BOOKINGS", they can access all booking permissions)
+        // فحص الصلاحية على مستوى التصنيف الرئيسي
         val permItem = AdminPermissionsRegistry.allPermissions.find { it.key == permission || it.id == permission }
         if (permItem != null) {
             val mainCatKey = permItem.category.tabKey
             if (supervisorGrantedPermissions.contains(mainCatKey)) return true
         }
 
-        // Fallback for legacy simple checks
+        // فحوصات التوافق مع الصلاحيات الأساسية
         return when (permission) {
-            "bookings", PERMISSION_BOOKINGS -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR
+            "bookings", PERMISSION_BOOKINGS -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR || role == AdminRole.OPERATIONS
             "restaurants", PERMISSION_RESTAURANTS -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR
+            "chat", PERMISSION_CHAT -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR || role == AdminRole.SUPPORT
+            "finance", PERMISSION_FINANCE -> role == AdminRole.ADMIN || role == AdminRole.AUDITOR
             else -> false
         }
     }
 
+    /**
+     * فحص الصلاحية باستخدام نص الدور
+     */
     fun hasPermission(role: String, permission: String, grantedPermissions: List<String> = emptyList()): Boolean {
         return hasPermission(RoleManager.fromRoleString(role), permission, grantedPermissions)
     }
 
+    /**
+     * واجهة المستخدم لرسالة الوصول غير المصرح به
+     */
     @Composable
     fun UnauthorizedView(
         customMessage: String = "🔒 ليس لديك صلاحية للوصول إلى هذه الميزة",

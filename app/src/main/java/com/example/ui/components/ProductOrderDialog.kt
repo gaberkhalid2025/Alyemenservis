@@ -2,11 +2,8 @@ package com.example.ui
 
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,31 +17,45 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.data.*
+import com.example.data.OrderEntity
+import com.example.data.ProductEntity
+import com.example.data.StoreEntity
+import com.example.ui.components.SnackbarManager
+import com.example.ui.components.SnackbarType
 import com.example.utils.VisualThemePalette
 
+/**
+ * 🛍️ StoreProductOrderDialog Component
+ * نافذة طلب واستفسار مباشر لشراء المنتج من التاجر بدون وسيط
+ *
+ * @param product المنتج المطلوب
+ * @param currentUserName اسم العميل الحالي
+ * @param currentUserPhone رقم هاتف العميل الحالي
+ * @param stores قائمة المتاجر المتاحة لإيجاد معلومات المتجر البائع
+ * @param themeColors الألوان المعتمدة للتصميم
+ * @param onPlaceOrder دالة إرسال الطلب
+ * @param onDismiss دالة إغلاق النافذة
+ */
 @Composable
 fun StoreProductOrderDialog(
     product: ProductEntity,
-    viewModel: MainViewModel,
+    currentUserName: String = "",
+    currentUserPhone: String = "",
+    stores: List<StoreEntity> = emptyList(),
     themeColors: VisualThemePalette,
+    onPlaceOrder: ((OrderEntity) -> Unit)? = null,
+    viewModel: Any? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val currentUserName by viewModel.currentUserName.collectAsState()
-    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
-    val stores by viewModel.stores.collectAsState()
 
     val targetStore = remember(stores, product.storeId) {
         stores.find { it.id == product.storeId }
@@ -55,7 +66,6 @@ fun StoreProductOrderDialog(
     var customerArea by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf(1) }
     var notes by remember { mutableStateOf("") }
-    var isSubmitted by remember { mutableStateOf(false) }
 
     val totalAmount = product.price * quantity
 
@@ -91,7 +101,7 @@ fun StoreProductOrderDialog(
                     }
                 }
 
-                // Trust Note Banner
+                // شعار الموثوقية
                 Surface(
                     color = Color(0xFF1E293B),
                     shape = RoundedCornerShape(10.dp),
@@ -119,7 +129,7 @@ fun StoreProductOrderDialog(
                     }
                 }
 
-                // Product Preview Card
+                // معاينة المنتج
                 Card(
                     colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                     shape = RoundedCornerShape(10.dp)
@@ -189,7 +199,7 @@ fun StoreProductOrderDialog(
                     )
                 )
 
-                // Quantity selector
+                // اختيار الكمية
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -227,7 +237,7 @@ fun StoreProductOrderDialog(
                     }
                 }
 
-                // Direct Contact Fast Buttons
+                // أزرار التواصل المباشر السريع
                 val storePhone = targetStore?.phone.orEmpty()
                 if (storePhone.isNotEmpty()) {
                     Text("📞 أو تواصل مباشرة مع المنشأة الآن:", fontSize = 10.5.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
@@ -285,11 +295,11 @@ fun StoreProductOrderDialog(
                                 paymentStatus = "COD_PENDING",
                                 status = "PENDING"
                             )
-                            viewModel.placeOrder(newOrder)
-                            Toast.makeText(context, "✅ تم إرسال الطلب وإشعار التاجر بنجاح!", Toast.LENGTH_SHORT).show()
+                            onPlaceOrder?.invoke(newOrder)
+                            SnackbarManager.showSnackbar("✅ تم إرسال الطلب وإشعار التاجر بنجاح!", SnackbarType.SUCCESS)
                             onDismiss()
                         } else {
-                            Toast.makeText(context, "يرجى كتابة الاسم ورقم الهاتف", Toast.LENGTH_SHORT).show()
+                            SnackbarManager.showSnackbar("يرجى كتابة الاسم ورقم الهاتف", SnackbarType.WARNING)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
@@ -304,3 +314,4 @@ fun StoreProductOrderDialog(
         }
     }
 }
+

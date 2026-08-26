@@ -1,4 +1,4 @@
-package com.example.data.models
+package com.example.data
 
 import androidx.annotation.Keep
 
@@ -16,6 +16,7 @@ data class InstantRequestEntity(
     val categoryId: String = "services",
     val categoryName: String = "",
     val serviceTitle: String = "",
+    val serviceDetails: String = "",
     val description: String = "",
     val images: List<String> = emptyList(),
     val status: String = "WAITING_FOR_OFFERS", // WAITING_FOR_OFFERS, REVIEWING_OFFERS, ACCEPTED, IN_PROGRESS, COMPLETED, EXPIRED, CANCELLED

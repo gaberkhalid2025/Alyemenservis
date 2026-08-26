@@ -2,9 +2,12 @@ package com.example.util
 
 import com.example.data.BookingEntity
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
+/**
+ * 🏷️ BookingStatus
+ * جميع الحالات المتاحة للطلب/الحجز مع المسمى العربي ولون العرض
+ */
 enum class BookingStatus(val label: String, val colorHex: String) {
     PENDING("قيد الانتظار", "#F59E0B"),
     UNDER_REVIEW("قيد المراجعة", "#FCD34D"),
@@ -19,7 +22,8 @@ enum class BookingStatus(val label: String, val colorHex: String) {
 
 /**
  * ⚙️ BookingStateMachine
- * محرك إدارة دورة حياة وحالات الحجز وضبط الانتقالات المسموحة وقواعد الأمان والإلغاء.
+ * 
+ * محرك حالات الحجز وضبط الانتقالات المسموحة وقواعد الأمان والإلغاء (مثل قاعدة الـ 8 ساعات).
  */
 object BookingStateMachine {
 
@@ -36,7 +40,7 @@ object BookingStateMachine {
     )
 
     /**
-     * 1. التحقق من إمكانية الانتقال من الحالة الحالية للحالة الجديدة
+     * التحقق من إمكانية الانتقال من الحالة الحالية إلى الحالة الجديدة
      */
     fun canTransition(currentStatus: String, newStatus: String): Boolean {
         val curr = currentStatus.uppercase(Locale.ROOT)
@@ -47,7 +51,7 @@ object BookingStateMachine {
     }
 
     /**
-     * 2. الحصول على قائمة الحالات المتاحة للانتقال إليها
+     * الحصول على قائمة الحالات المتاحة للانتقال إليها
      */
     fun getAvailableTransitions(currentStatus: String): List<String> {
         val curr = currentStatus.uppercase(Locale.ROOT)
@@ -55,7 +59,7 @@ object BookingStateMachine {
     }
 
     /**
-     * 3. الحصول على المسمى العربي للحالة
+     * الحصول على المسمى العربي للحالة
      */
     fun getStatusLabel(status: String): String {
         return try {
@@ -70,7 +74,7 @@ object BookingStateMachine {
     }
 
     /**
-     * 4. الحصول على كود اللون للحالة
+     * الحصول على كود اللون المخصص للحالة
      */
     fun getStatusColor(status: String): String {
         return try {
@@ -81,7 +85,7 @@ object BookingStateMachine {
     }
 
     /**
-     * 5. هل الحالة نهائية لا تقبل التعديل
+     * هل الحالة نهائية لا تقبل التعديل
      */
     fun isTerminalStatus(status: String): Boolean {
         val s = status.uppercase(Locale.ROOT)
@@ -89,7 +93,7 @@ object BookingStateMachine {
     }
 
     /**
-     * 6. التحقق من إمكانية الإلغاء (تطبيق قاعدة 8 ساعات وقفل المحاولات)
+     * التحقق من إمكانية الإلغاء (تطبيق قاعدة 8 ساعات وقفل المحاولات)
      */
     fun canCancel(booking: BookingEntity): Boolean {
         if (booking.isLocked) return false
@@ -98,29 +102,21 @@ object BookingStateMachine {
             return false
         }
 
-        // فحص قاعدة الـ 8 ساعات قبل موعد الحجز
         val appointmentTime = parseAppointmentTimestamp(booking.dateString.ifEmpty { booking.date }, booking.timeString.ifEmpty { booking.time })
         if (appointmentTime > 0) {
             val diffMs = appointmentTime - System.currentTimeMillis()
             val eightHoursMs = 8 * 60 * 60 * 1000L
             if (diffMs in 1..eightHoursMs) {
-                // متبقي أقل من 8 ساعات على الموعد
                 return false
             }
         }
         return true
     }
 
-    /**
-     * 7. الحصول على عدد محاولات الإلغاء
-     */
     fun getCancelAttempts(booking: BookingEntity): Int {
         return booking.cancellationAttempts
     }
 
-    /**
-     * 8. استخراج توقيت الموعد
-     */
     private fun parseAppointmentTimestamp(dateStr: String, timeStr: String): Long {
         if (dateStr.isBlank()) return 0L
         return try {

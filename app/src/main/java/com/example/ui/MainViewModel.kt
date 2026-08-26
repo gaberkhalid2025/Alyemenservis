@@ -315,11 +315,11 @@ class MainViewModel : ViewModel() {
     private val _orders = MutableStateFlow<List<com.example.data.OrderEntity>>(emptyList())
     val orders: StateFlow<List<com.example.data.OrderEntity>> = _orders.asStateFlow()
 
-    private val _instantRequests = MutableStateFlow<List<com.example.data.models.InstantRequestEntity>>(emptyList())
-    val instantRequests: StateFlow<List<com.example.data.models.InstantRequestEntity>> = _instantRequests.asStateFlow()
+    private val _instantRequests = MutableStateFlow<List<com.example.data.InstantRequestEntity>>(emptyList())
+    val instantRequests: StateFlow<List<com.example.data.InstantRequestEntity>> = _instantRequests.asStateFlow()
 
-    private val _requestOffers = MutableStateFlow<List<com.example.data.models.RequestOfferEntity>>(emptyList())
-    val requestOffers: StateFlow<List<com.example.data.models.RequestOfferEntity>> = _requestOffers.asStateFlow()
+    private val _requestOffers = MutableStateFlow<List<com.example.data.RequestOfferEntity>>(emptyList())
+    val requestOffers: StateFlow<List<com.example.data.RequestOfferEntity>> = _requestOffers.asStateFlow()
 
     private val _currentUserId = MutableStateFlow("guest")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
@@ -678,18 +678,22 @@ class MainViewModel : ViewModel() {
             apply()
         }
 
-        // Save profile WITH password field!
+        // Save profile WITH password hash & PENDING status!
+        val saltedHash = if (password.isNotBlank()) com.example.util.PasswordHasher.createSaltedHash(password) else ""
         val regUser = mapOf(
             "id" to userId,
             "name" to name,
             "phone" to phone,
             "residence" to residence,
-            "password" to password,
+            "passwordHash" to saltedHash,
+            "verificationStatus" to "PENDING",
+            "isApproved" to false,
+            "role" to "CLIENT",
             "androidId" to androidId,
             "timestamp" to System.currentTimeMillis()
         )
         db.collection("registered_users").document(userId).set(regUser)
-        triggerNotification("🎉 أهلاً بك في الدليل $name، تم تسجيل وحماية حسابك آمنياً بنجاح عبر Firebase Auth!")
+        triggerNotification("📨 تم تقديم طلب تسجيلك كعميل بنجاح! حسابك الآن (قيد الانتظار) وسيتم تفعيله بعد موافقة الإدارة.")
     }
 
     fun approveRegisteredUser(userId: String, userName: String = "") {
@@ -864,6 +868,7 @@ class MainViewModel : ViewModel() {
         try {
             setupRealtimeFirestoreListeners()
             loadCardSettings()
+            loadBookingSystemSettings()
             loadPendingTechnicians()
             loadUserPoints()
             seedFirestoreIfEmpty()
@@ -1620,7 +1625,7 @@ class MainViewModel : ViewModel() {
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(com.example.data.models.InstantRequestEntity::class.java)?.copy(id = doc.id)
+                        doc.toObject(com.example.data.InstantRequestEntity::class.java)?.copy(id = doc.id)
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
@@ -1642,7 +1647,7 @@ class MainViewModel : ViewModel() {
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(com.example.data.models.RequestOfferEntity::class.java)?.copy(id = doc.id)
+                        doc.toObject(com.example.data.RequestOfferEntity::class.java)?.copy(id = doc.id)
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
@@ -2810,6 +2815,40 @@ class MainViewModel : ViewModel() {
         )
         db.collection("banners").document(banner.id).set(banner)
         triggerNotification("🖼️ تم إضافة إعلان جديد: $title")
+    }
+
+    fun addBanner(title: String, url: String, redirect: String, type: String, size: String, duration: Int, displayTime: String = "طوال اليوم") {
+        addNewBanner(title, url, redirect, type, size, duration, displayTime)
+    }
+
+    fun addNewStore(name: String, phone: String, cityId: String, localNeighborhood: String, categoryId: String, coverImage: String = "", workingHours: String = "9:00 AM - 10:00 PM") {
+        val nextId = "store_" + UUID.randomUUID().toString().take(6)
+        val store = StoreEntity(
+            id = nextId,
+            name = name,
+            phone = phone,
+            cityId = cityId,
+            localNeighborhood = localNeighborhood,
+            categoryId = categoryId,
+            coverImage = coverImage,
+            workingHours = workingHours
+        )
+        db.collection("stores").document(nextId).set(store)
+        triggerNotification("🛍️ تم إضافة متجر/منشأة جديدة: $name")
+    }
+
+    fun toggleStoreBlocked(storeId: String, isBlocked: Boolean) {
+        db.collection("stores").document(storeId).update("isBlocked", isBlocked)
+            .addOnSuccessListener {
+                triggerNotification(if (isBlocked) "🚫 تم حظر المتجر" else "✅ تم إلغاء حظر المتجر")
+            }
+    }
+
+    fun togglePropertyBlocked(propertyId: String, isBlocked: Boolean) {
+        db.collection("properties").document(propertyId).update("isBlocked", isBlocked)
+            .addOnSuccessListener {
+                triggerNotification(if (isBlocked) "🚫 تم حظر العقار" else "✅ تم إلغاء حظر العقار")
+            }
     }
 
     fun deleteBanner(bannerId: String) {
@@ -6274,6 +6313,44 @@ class MainViewModel : ViewModel() {
     }
 
     // ============================================================
+    // ⚙️ إعدادات وصلاحيات الحجوزات ونظام الدفع
+    // ============================================================
+
+    data class BookingSystemSettings(
+        val showBookingButtonOnCards: Boolean = true,
+        val bookingRoutingMode: String = "ADMIN_AND_PROVIDER", // "ADMIN_ONLY", "ADMIN_AND_MODERATOR", "ADMIN_AND_PROVIDER"
+        val paymentSystemEnabled: Boolean = true,
+        val paymentSystemLinkedToBooking: Boolean = true,
+        val paymentSystemHidden: Boolean = false,
+        val adminBypass8HourRestriction: Boolean = true
+    )
+
+    private val _bookingSystemSettings = MutableStateFlow(BookingSystemSettings())
+    val bookingSystemSettings: StateFlow<BookingSystemSettings> = _bookingSystemSettings.asStateFlow()
+
+    fun updateBookingSystemSettings(settings: BookingSystemSettings) {
+        _bookingSystemSettings.value = settings
+        try {
+            db.collection("settings").document("booking_settings").set(settings)
+        } catch (e: Exception) {}
+    }
+
+    fun loadBookingSystemSettings() {
+        try {
+            db.collection("settings").document("booking_settings")
+                ?.addSnapshotListener { snapshot, error ->
+                    if (error != null) return@addSnapshotListener
+                    if (snapshot != null && snapshot.exists()) {
+                        val settings = snapshot.toObject(BookingSystemSettings::class.java)
+                        if (settings != null) {
+                            _bookingSystemSettings.value = settings
+                        }
+                    }
+                }
+        } catch (e: Exception) {}
+    }
+
+    // ============================================================
     // 👥 تحديد أطراف الدردشة - إضافة
     // ============================================================
 
@@ -7124,7 +7201,7 @@ class MainViewModel : ViewModel() {
             else -> 30 * 60 * 1000L // default 30 min
         }
 
-        val req = com.example.data.models.InstantRequestEntity(
+        val req = com.example.data.InstantRequestEntity(
             id = reqId,
             requestCode = requestCode,
             secretPin = secretPin,
@@ -7261,7 +7338,7 @@ class MainViewModel : ViewModel() {
         notes: String = ""
     ) {
         val offerId = java.util.UUID.randomUUID().toString()
-        val offer = com.example.data.models.RequestOfferEntity(
+        val offer = com.example.data.RequestOfferEntity(
             id = offerId,
             requestId = requestId,
             requestCode = requestCode,
@@ -7308,8 +7385,8 @@ class MainViewModel : ViewModel() {
     }
 
     fun acceptRequestOffer(
-        req: com.example.data.models.InstantRequestEntity,
-        offer: com.example.data.models.RequestOfferEntity
+        req: com.example.data.InstantRequestEntity,
+        offer: com.example.data.RequestOfferEntity
     ) {
         db.collection("request_offers").document(offer.id).update("status", "ACCEPTED")
         
@@ -7393,6 +7470,37 @@ class MainViewModel : ViewModel() {
             .addOnSuccessListener {
                 triggerNotification("🚫 تم إلغاء الطلب الفوري بنجاح.")
             }
+    }
+
+    fun approvePendingProvider(pending: PendingProviderEntity) {
+        db.collection("pending_providers").document(pending.id).delete()
+        val provider = ProviderEntity(
+            id = if (pending.id.isNotBlank()) pending.id else "p_" + pending.phone,
+            name = pending.name,
+            phone = pending.phone,
+            categoryId = pending.categoryId,
+            area = pending.area,
+            localNeighborhood = pending.localNeighborhood,
+            subscriptionStatus = "APPROVED",
+            isAvailable = true,
+            profession = pending.profession,
+            specialization = pending.specialization,
+            customCategoryName = pending.customCategoryName,
+            password = pending.password,
+            providerType = pending.providerType
+        )
+        db.collection("providers").document(provider.id).set(provider)
+        triggerNotification("✅ تم قبول وتعميم الفني: ${pending.name}")
+    }
+
+    fun rejectPendingProvider(pending: PendingProviderEntity, reason: String = "تم رفض الطلب") {
+        db.collection("pending_providers").document(pending.id).delete()
+        triggerNotification("❌ تم رفض طلب انضمام: ${pending.name}")
+    }
+
+    fun clearAllNotifications() {
+        _notifications.value = emptyList()
+        triggerNotification("🧹 تم مسح كافة الإشعارات")
     }
 }
 

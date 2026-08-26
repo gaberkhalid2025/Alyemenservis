@@ -71,6 +71,8 @@ fun BookingCalendarScreen(
     var selectedTimeSlot by remember { mutableStateOf<ScheduleManager.TimeSlot?>(null) }
     var recurrenceOption by remember { mutableStateOf("NONE") } // "NONE", "WEEKLY", "MONTHLY"
     var clientNotes by remember { mutableStateOf("") }
+    var clientNameInput by remember(currentUserName) { mutableStateOf(currentUserName) }
+    var clientPhoneInput by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
     var clientAddress by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
 
@@ -412,13 +414,34 @@ fun BookingCalendarScreen(
                 }
             }
 
-            // Client Input Fields
+            // Client Input Fields (Mandatory)
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
+                        value = clientNameInput,
+                        onValueChange = { clientNameInput = it },
+                        label = { Text("الاسم الثلاثي بالكامل *", fontSize = 11.sp) },
+                        placeholder = { Text("مثال: علي محمد أحمد") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = clientPhoneInput,
+                        onValueChange = { if (it.length <= 9) clientPhoneInput = it },
+                        label = { Text("رقم الهاتف اليمني (9 أرقام) *", fontSize = 11.sp) },
+                        placeholder = { Text("77XXXXXXX أو 73XXXXXXX") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
                         value = clientAddress,
                         onValueChange = { clientAddress = it },
-                        label = { Text("عنوانك وموقع الخدمة (المدينة، الحي، الشارع)", fontSize = 11.sp) },
+                        label = { Text("عنوان السكن وموقع الخدمة بالكامل *", fontSize = 11.sp) },
+                        placeholder = { Text("المدينة، الحي، والشارع") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     )
@@ -438,27 +461,51 @@ fun BookingCalendarScreen(
             item {
                 Button(
                     onClick = {
+                        val nameToUse = clientNameInput.trim()
+                        val phoneToUse = clientPhoneInput.trim()
+                        val addressToUse = clientAddress.trim()
+
+                        if (nameToUse.isBlank()) {
+                            Toast.makeText(context, "⚠️ الاسم الثلاثي بالكامل مطلوب لتأكيد الحجز", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (phoneToUse.length < 9) {
+                            Toast.makeText(context, "⚠️ يرجى إدخال رقم هاتف يمني صحيح مكون من 9 أرقام", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (addressToUse.isBlank()) {
+                            Toast.makeText(context, "⚠️ عنوان السكن وموقع الخدمة مطلوب", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         if (selectedTimeSlot == null) {
-                            Toast.makeText(context, "الرجاء اختيار وقت محدد للموعد", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "⚠️ الرجاء اختيار وقت محدد للموعد", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
                         if (isSelectedDayHoliday) {
-                            Toast.makeText(context, "لا يمكن الحجز في يوم عطلة", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "⚠️ لا يمكن الحجز في يوم عطلة", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
                         isSubmitting = true
+                        val generatedCode = com.example.utils.BookingUtils.generateBookingCode("BK")
+                        val generatedPass = com.example.utils.BookingUtils.generateBookingPassword(4)
+                        val scheduledTs = com.example.utils.BookingUtils.parseScheduledTimestamp(selectedDateString, selectedTimeSlot!!.timeString)
+
                         val newBooking = BookingEntity(
                             id = "book_${System.currentTimeMillis()}_${(1000..9999).random()}",
-                            bookingNumber = "YEM-${(10000..99999).random()}",
-                            bookingPassword = "${(1000..9999).random()}",
-                            clientId = currentUserPhone.ifEmpty { "client_${System.currentTimeMillis()}" },
-                            clientName = currentUserName.ifEmpty { "عميل معتمد" },
-                            clientPhone = currentUserPhone,
-                            customerName = currentUserName.ifEmpty { "عميل معتمد" },
-                            customerPhone = currentUserPhone,
-                            customerArea = clientAddress.ifBlank { provider.area },
-                            clientAddress = clientAddress.ifBlank { provider.area },
+                            bookingCode = generatedCode,
+                            bookingNumber = generatedCode,
+                            bookingPassword = generatedPass,
+                            pinCode = generatedPass,
+                            fullName = nameToUse,
+                            clientId = phoneToUse.ifEmpty { "client_${System.currentTimeMillis()}" },
+                            clientName = nameToUse,
+                            clientPhone = phoneToUse,
+                            customerName = nameToUse,
+                            customerPhone = phoneToUse,
+                            fullAddress = addressToUse,
+                            customerArea = addressToUse,
+                            clientAddress = addressToUse,
                             serviceType = provider.profession.ifEmpty { "خدمة صيانة ومعاينة" },
                             serviceDetails = clientNotes,
                             providerId = provider.id,
@@ -469,6 +516,7 @@ fun BookingCalendarScreen(
                             dateString = selectedDateString,
                             time = selectedTimeSlot!!.timeString,
                             timeString = selectedTimeSlot!!.timeString,
+                            scheduledAt = scheduledTs,
                             status = "PENDING",
                             isRecurring = recurrenceOption != "NONE",
                             recurrenceRule = recurrenceOption,

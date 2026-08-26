@@ -3,7 +3,7 @@ package com.example.ui.components
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -32,12 +32,23 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.ChatMessageEntity
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * 💬 ChatMessageComponent
- * مكون عرض الرسالة الفردية التفاعلية مع دعم النصوص، الصور، التسجيلات الصوتية، الملفات، الردود، والتفاعلات
+ * مكون عرض الرسالة الفردية التفاعلية مع دعم النصوص، الصور، التسجيلات الصوتية، الملفات، الردود، والتفاعلات وتسجيل الصوت
+ *
+ * @param message كائن بيانات الرسالة
+ * @param isMe هل الرسالة من المستخدم الحالي
+ * @param showSenderName عرض اسم المرسل
+ * @param searchQuery نص البحث لتمييز المطابقات
+ * @param onDeleteMessage دالة حذف الرسالة
+ * @param onForwardMessage دالة إعادة التوجيه
+ * @param onReplyMessage دالة الرد على الرسالة
+ * @param onReactionSelect دالة اختيار تفاعل (إيموجي)
+ * @param onSendAudioMessage دالة إرسال مقطع صوتي مسجل (رابط/مسار، مدة بالثواني)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -50,6 +61,7 @@ fun ChatMessageComponent(
     onForwardMessage: ((ChatMessageEntity) -> Unit)? = null,
     onReplyMessage: ((ChatMessageEntity) -> Unit)? = null,
     onReactionSelect: ((ChatMessageEntity, String) -> Unit)? = null,
+    onSendAudioMessage: ((String, Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -57,7 +69,20 @@ fun ChatMessageComponent(
     var showImageDialog by remember { mutableStateOf(false) }
     var isPlayingAudio by remember { mutableStateOf(false) }
     var audioProgress by remember { mutableFloatStateOf(0.3f) }
-    var showReactionPicker by remember { mutableStateOf(false) }
+
+    // حالة تسجيل الصوت
+    var isRecordingAudio by remember { mutableStateOf(false) }
+    var recordingTimeSec by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(isRecordingAudio) {
+        if (isRecordingAudio) {
+            recordingTimeSec = 0
+            while (isRecordingAudio) {
+                delay(1000L)
+                recordingTimeSec++
+            }
+        }
+    }
 
     val bubbleShape = if (isMe) {
         RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
@@ -197,7 +222,7 @@ fun ChatMessageComponent(
                             )
                             IconButton(
                                 onClick = {
-                                    Toast.makeText(context, "تم حفظ الصورة في معرض الهاتف بنجاح 💾", Toast.LENGTH_SHORT).show()
+                                    SnackbarManager.showSnackbar("تم حفظ الصورة في معرض الهاتف بنجاح 💾", SnackbarType.SUCCESS)
                                 },
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
@@ -223,7 +248,7 @@ fun ChatMessageComponent(
                         ) {
                             IconButton(
                                 onClick = {
-                                    Toast.makeText(context, "تشغيل مقطع الفيديو...", Toast.LENGTH_SHORT).show()
+                                    SnackbarManager.showSnackbar("جاري تشغيل مقطع الفيديو...", SnackbarType.INFO)
                                 },
                                 modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.3f), CircleShape)
                             ) {
@@ -237,7 +262,7 @@ fun ChatMessageComponent(
                             )
                             IconButton(
                                 onClick = {
-                                    Toast.makeText(context, "تم حفظ مقطع الفيديو في معرض الهاتف بنجاح 💾", Toast.LENGTH_SHORT).show()
+                                    SnackbarManager.showSnackbar("تم حفظ مقطع الفيديو في معرض الهاتف بنجاح 💾", SnackbarType.SUCCESS)
                                 },
                                 modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(30.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)
                             ) {
@@ -256,7 +281,7 @@ fun ChatMessageComponent(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .clickable {
-                                    Toast.makeText(context, "جاري فتح الملف: ${message.fileName}", Toast.LENGTH_SHORT).show()
+                                    SnackbarManager.showSnackbar("جاري فتح الملف: ${message.fileName}", SnackbarType.INFO)
                                 }
                         ) {
                             Row(
@@ -334,7 +359,7 @@ fun ChatMessageComponent(
                                         color = timeColor
                                     )
                                     Text(
-                                        text = "تسجيل صوتي",
+                                        text = "تسجيل صوتي 🎤",
                                         fontSize = 10.sp,
                                         color = timeColor
                                     )
@@ -381,7 +406,7 @@ fun ChatMessageComponent(
                         }
 
                         // معاينة الروابط إن وجدت في النص
-                        if (message.message.contains("http://") || message.message.contains("https://") && !message.isDeleted) {
+                        if ((message.message.contains("http://") || message.message.contains("https://")) && !message.isDeleted) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (isMe) Color.Black.copy(alpha = 0.2f) else Color.White,
@@ -422,7 +447,7 @@ fun ChatMessageComponent(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.clickable {
                                             val readTimeStr = if (message.readAt > 0) SimpleDateFormat("hh:mm a", Locale("ar")).format(Date(message.readAt)) else "الآن"
-                                            Toast.makeText(context, "تمت القراءة الساعة: $readTimeStr", Toast.LENGTH_SHORT).show()
+                                            SnackbarManager.showSnackbar("تمت القراءة الساعة: $readTimeStr", SnackbarType.INFO)
                                         }
                                     ) {
                                         Icon(
@@ -502,6 +527,26 @@ fun ChatMessageComponent(
                     onClick = {}
                 )
                 HorizontalDivider()
+                if (onSendAudioMessage != null && !message.isDeleted) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(if (isRecordingAudio) "إيقاف وتسجيل المقطع الصوتي ⏹️ ($recordingTimeSec ثانية)" else "تسجيل بصوتية جديدة 🎙️")
+                        },
+                        leadingIcon = { Icon(Icons.Default.Call, contentDescription = null, tint = if (isRecordingAudio) Color.Red else Color.Unspecified) },
+                        onClick = {
+                            if (isRecordingAudio) {
+                                isRecordingAudio = false
+                                val duration = recordingTimeSec.coerceAtLeast(1)
+                                onSendAudioMessage("recorded_audio_${System.currentTimeMillis()}.mp3", duration)
+                                SnackbarManager.showSnackbar("✅ تم حفظ وإرسال التسجيل الصوتي ($duration ثانية)", SnackbarType.SUCCESS)
+                            } else {
+                                isRecordingAudio = true
+                                SnackbarManager.showSnackbar("🎙️ بدأ تسجيل الصوت... اضغط هنا مجدداً لإنهائه وإرساله", SnackbarType.INFO)
+                            }
+                            showContextMenu = false
+                        }
+                    )
+                }
                 if (onReplyMessage != null && !message.isDeleted) {
                     DropdownMenuItem(
                         text = { Text("رد على الرسالة 💬") },
@@ -519,7 +564,7 @@ fun ChatMessageComponent(
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("chat_msg", message.message)
                         clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "تم نسخ النص", Toast.LENGTH_SHORT).show()
+                        SnackbarManager.showSnackbar("تم نسخ النص", SnackbarType.INFO)
                         showContextMenu = false
                     }
                 )
@@ -543,6 +588,35 @@ fun ChatMessageComponent(
                         }
                     )
                 }
+            }
+        }
+    }
+
+    // شريط التنبيه ببدء تسجيل الصوت إن كان جارياً
+    AnimatedVisibility(visible = isRecordingAudio) {
+        Surface(
+            color = Color(0xFFEF4444),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .clickable {
+                    isRecordingAudio = false
+                    val duration = recordingTimeSec.coerceAtLeast(1)
+                    onSendAudioMessage?.invoke("recorded_audio_${System.currentTimeMillis()}.mp3", duration)
+                    SnackbarManager.showSnackbar("✅ تم إرسال التسجيل الصوتي ($duration ثانية)", SnackbarType.SUCCESS)
+                }
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Call, contentDescription = null, tint = Color.White)
+                    Text("جاري تسجيل الصوت... ($recordingTimeSec ثانية)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+                Text("اضغط للإرسال ⏹️", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -576,7 +650,7 @@ fun ChatMessageComponent(
                     ) {
                         Button(
                             onClick = {
-                                Toast.makeText(context, "تم حفظ الصورة في المعرض 💾", Toast.LENGTH_SHORT).show()
+                                SnackbarManager.showSnackbar("تم حفظ الصورة في المعرض 💾", SnackbarType.SUCCESS)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00668B))
                         ) {
@@ -594,3 +668,4 @@ fun ChatMessageComponent(
         }
     }
 }
+

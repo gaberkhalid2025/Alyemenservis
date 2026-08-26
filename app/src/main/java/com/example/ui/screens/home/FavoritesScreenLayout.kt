@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -52,15 +53,44 @@ fun FavoritesScreenLayout(
     val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) } // 0: الكل, 1: فنيين وخدمات, 2: متاجر ومطاعم, 3: عقارات
+    var searchQuery by remember { mutableStateOf("") }
+    var sortOption by remember { mutableStateOf("DEFAULT") } // DEFAULT, RATING, NAME, CITY
 
-    val favoriteProviders = remember(providers, favoriteIds) {
-        providers.filter { favoriteIds.contains(it.id) || it.isVip }
+    val favoriteProviders = remember(providers, favoriteIds, searchQuery, sortOption) {
+        providers.filter { (favoriteIds.contains(it.id) || it.isVip) &&
+            (searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true) || it.profession.contains(searchQuery, ignoreCase = true) || it.area.contains(searchQuery, ignoreCase = true))
+        }.let { list ->
+            when (sortOption) {
+                "RATING" -> list.sortedByDescending { it.rating }
+                "NAME" -> list.sortedBy { it.name }
+                "CITY" -> list.sortedBy { it.area }
+                else -> list
+            }
+        }
     }
-    val favoriteStores = remember(stores, favoriteIds) {
-        stores.filter { favoriteIds.contains(it.id) }
+    val favoriteStores = remember(stores, favoriteIds, searchQuery, sortOption) {
+        stores.filter { favoriteIds.contains(it.id) &&
+            (searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true) || it.description.contains(searchQuery, ignoreCase = true) || it.cityId.contains(searchQuery, ignoreCase = true))
+        }.let { list ->
+            when (sortOption) {
+                "RATING" -> list.sortedByDescending { it.rating }
+                "NAME" -> list.sortedBy { it.name }
+                "CITY" -> list.sortedBy { it.cityId }
+                else -> list
+            }
+        }
     }
-    val favoriteProperties = remember(properties, favoriteIds) {
-        properties.filter { favoriteIds.contains(it.id) }
+    val favoriteProperties = remember(properties, favoriteIds, searchQuery, sortOption) {
+        properties.filter { favoriteIds.contains(it.id) &&
+            (searchQuery.isBlank() || it.title.contains(searchQuery, ignoreCase = true) || it.propertyType.contains(searchQuery, ignoreCase = true) || it.cityId.contains(searchQuery, ignoreCase = true))
+        }.let { list ->
+            when (sortOption) {
+                "RATING" -> list.sortedByDescending { it.rating }
+                "NAME" -> list.sortedBy { it.title }
+                "CITY" -> list.sortedBy { it.cityId }
+                else -> list
+            }
+        }
     }
 
     Scaffold(
@@ -89,6 +119,73 @@ fun FavoritesScreenLayout(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Search & Sort Bar inside Favorites
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("ابحث في المفضلة...", fontSize = 11.sp, color = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                        focusedContainerColor = themeColors.surface,
+                        unfocusedContainerColor = themeColors.surface
+                    )
+                )
+
+                // Sort Dropdown Button
+                Box {
+                    var showSortMenu by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { showSortMenu = true },
+                        modifier = Modifier
+                            .background(themeColors.surface, RoundedCornerShape(10.dp))
+                            .border(1.dp, themeColors.accent.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(Icons.Default.List, contentDescription = "ترتيب", tint = themeColors.accent)
+                    }
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                        modifier = Modifier.background(themeColors.surface)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("الافتراضي", fontSize = 11.sp, color = Color.White) },
+                            onClick = { sortOption = "DEFAULT"; showSortMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("⭐ الأعلى تقييماً", fontSize = 11.sp, color = Color.White) },
+                            onClick = { sortOption = "RATING"; showSortMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("🔤 الأبجدي", fontSize = 11.sp, color = Color.White) },
+                            onClick = { sortOption = "NAME"; showSortMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("📍 حسب المدينة", fontSize = 11.sp, color = Color.White) },
+                            onClick = { sortOption = "CITY"; showSortMenu = false }
+                        )
+                    }
+                }
+            }
+
             // Filter Tabs
             TabRow(
                 selectedTabIndex = selectedTab,

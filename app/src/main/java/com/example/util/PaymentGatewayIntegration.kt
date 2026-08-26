@@ -2,6 +2,9 @@ package com.example.util
 
 import android.content.Context
 import androidx.annotation.Keep
+import com.example.data.PaymentEntity
+import com.example.data.repositories.PaymentRepository
+import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 @Keep
@@ -10,7 +13,7 @@ data class Payment(
     val userId: String = "",
     val amount: Double = 0.0,
     val method: String = "JEEB", // "JEEB", "ALKARIMI", "JAWALY", "YEMENCASH", "BANK"
-    val currency: String = "YER", // "YER", "USD", "SAR"
+    val currency: String = "YER",
     val walletNumber: String = "",
     val accountName: String = "",
     val transferId: String = "",
@@ -30,7 +33,7 @@ data class PaymentResult(
 data class PaymentVerification(
     val transactionId: String = "",
     val isValid: Boolean = true,
-    val status: String = "VERIFIED", // "VERIFIED", "PENDING", "REJECTED"
+    val status: String = "VERIFIED",
     val amount: Double = 0.0,
     val verifiedAt: Long = System.currentTimeMillis()
 )
@@ -49,7 +52,7 @@ data class PaymentMethod(
     val id: String,
     val nameAr: String,
     val nameEn: String,
-    val type: String, // "JEEB", "ALKARIMI", "JAWALY", "YEMENCASH", "BANK"
+    val type: String,
     val iconUrl: String = "",
     val description: String = "",
     val minAmount: Double = 500.0,
@@ -58,66 +61,51 @@ data class PaymentMethod(
 )
 
 /**
- * 💳 PaymentGatewayIntegration
- * تكامل الدفع الإلكتروني مع المحافظ الجوالية اليمنية (جيب، الكريمي حاسب، جوالي، يمن كاش، والحوالات البنكية)
+ * 💳 PaymentGatewayIntegration - تكامل بوابات الدفع الإلكتروني
+ * 
+ * الميزات:
+ * 1. دعم المحافظ اليمنية (جيب، الكريمي حاسب، جوالي، يمن كاش، الحوالات).
+ * 2. الاتصال بـ Firestore عبر `PaymentRepository` لحفظ السجل وتأكيد / إلغاء المعاملات.
+ * 3. إتاحة التدفق اللحظي Flow لسجل العمليات.
  */
 class PaymentGatewayIntegration(private val context: Context? = null) {
 
-    private val activeTransactions = mutableMapOf<String, Payment>()
+    private val repository = PaymentRepository()
 
     /**
-     * معالجة وتنفيذ عملية الدفع
+     * معالجة وتنفيذ عملية الدفع في Firestore
      */
-    fun processPayment(payment: Payment): Result<PaymentResult> {
+    suspend fun processPayment(payment: Payment): Result<PaymentResult> {
         return try {
             if (!validatePaymentMethod(payment.method)) {
                 return Result.failure(IllegalArgumentException("طريقة الدفع غير مدعومة: ${payment.method}"))
             }
 
-            if (payment.amount <= 0) {
-                return Result.failure(IllegalArgumentException("المبلغ يجب أن يكون أكبر من الصفر"))
-            }
-
-            val transactionId = if (payment.id.isNotBlank()) payment.id else "TXN-${UUID.randomUUID().toString().take(8).uppercase()}"
-            activeTransactions[transactionId] = payment.copy(id = transactionId)
-
-            val result = PaymentResult(
-                success = true,
-                transactionId = transactionId,
-                message = "تمت معالجة الدفع عبر محفظة ${getPaymentMethodName(payment.method)} بنجاح",
-                timestamp = System.currentTimeMillis()
+            val entity = PaymentEntity(
+                id = payment.id.ifBlank { "PAY_${UUID.randomUUID().toString().take(8)}" },
+                userId = payment.userId,
+                amount = payment.amount,
+                method = payment.method,
+                currency = payment.currency,
+                walletNumber = payment.walletNumber,
+                accountHolderName = payment.accountName,
+                transferId = payment.transferId,
+                transferPhoto = payment.transferPhoto,
+                createdAt = payment.timestamp
             )
-            Result.success(result)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 
-    /**
-     * التحقق من صحة عملية الدفع ورقم الحوالة
-     */
-    fun verifyPayment(transactionId: String): Result<PaymentVerification> {
-        return try {
-            val payment = activeTransactions[transactionId]
-            if (payment != null) {
-                val verification = PaymentVerification(
-                    transactionId = transactionId,
-                    isValid = true,
-                    status = "VERIFIED",
-                    amount = payment.amount,
-                    verifiedAt = System.currentTimeMillis()
-                )
-                Result.success(verification)
-            } else {
+            val result = repository.processPayment(entity)
+            if (result.isSuccess) {
                 Result.success(
-                    PaymentVerification(
-                        transactionId = transactionId,
-                        isValid = true,
-                        status = "VERIFIED",
-                        amount = 0.0,
-                        verifiedAt = System.currentTimeMillis()
+                    PaymentResult(
+                        success = true,
+                        transactionId = entity.id,
+                        message = "تمت معالجة الدفع عبر محفظة ${getPaymentMethodName(payment.method)} بنجاح",
+                        timestamp = System.currentTimeMillis()
                     )
                 )
+            } else {
+                Result.failure(result.exceptionOrNull() ?: Exception("فشلت عملية معالجة الدفع"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -125,79 +113,44 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
     }
 
     /**
-     * تأكيد استلام المبلغ وإصدار إيصال السداد
+     * جلب تدفق معاملات الدفع الخاصة بالمستخدم
      */
-    fun confirmPayment(transactionId: String): Result<PaymentConfirmation> {
-        return try {
-            val code = "CONF-${(100000..999999).random()}"
-            val confirmation = PaymentConfirmation(
-                transactionId = transactionId,
-                isConfirmed = true,
-                confirmedBy = "SYSTEM_PAYMENT_GATEWAY",
-                confirmationCode = code,
-                confirmedAt = System.currentTimeMillis()
+    fun getTransactionHistoryFlow(userId: String): Flow<List<PaymentEntity>> {
+        return repository.getTransactionHistoryFlow(userId)
+    }
+
+    /**
+     * تأكيد عملية الدفع
+     */
+    suspend fun confirmPayment(transactionId: String, note: String = ""): Result<PaymentConfirmation> {
+        val result = repository.confirmPayment(transactionId, note)
+        return if (result.isSuccess) {
+            Result.success(
+                PaymentConfirmation(
+                    transactionId = transactionId,
+                    isConfirmed = true,
+                    confirmedBy = "SYSTEM_GATEWAY",
+                    confirmationCode = "CONF-${(100000..999999).random()}",
+                    confirmedAt = System.currentTimeMillis()
+                )
             )
-            Result.success(confirmation)
-        } catch (e: Exception) {
-            Result.failure(e)
+        } else {
+            Result.failure(result.exceptionOrNull() ?: Exception("فشل تأكيد عملية الدفع"))
         }
     }
 
     /**
      * إلغاء عملية الدفع
      */
-    fun cancelPayment(transactionId: String, reason: String): Result<Boolean> {
-        return try {
-            activeTransactions.remove(transactionId)
-            Result.success(true)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    suspend fun cancelPayment(transactionId: String, reason: String = ""): Result<Boolean> {
+        return repository.cancelPayment(transactionId, reason)
     }
 
-    /**
-     * استرداد المبلغ
-     */
-    fun refundPayment(transactionId: String, amount: Double): Result<Boolean> {
-        return try {
-            if (amount <= 0) return Result.failure(IllegalArgumentException("مبلغ الاسترداد غير صالح"))
-            Result.success(true)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * الحصول على سجل المعاملات لمستخدم معين
-     */
-    fun getTransactionHistory(userId: String): List<Transaction> {
-        return activeTransactions.values
-            .filter { it.userId == userId || userId.isBlank() }
-            .map { p ->
-                Transaction(
-                    id = p.id,
-                    walletId = "wallet_${p.userId}",
-                    type = "PAYMENT",
-                    amount = p.amount,
-                    balanceAfter = 0.0,
-                    note = "دفع عبر ${getPaymentMethodName(p.method)} - إشعار: ${p.transferId}",
-                    timestamp = p.timestamp,
-                    status = "COMPLETED"
-                )
-            }
-    }
-
-    /**
-     * التحقق من نوع وسيلة الدفع
-     */
     fun validatePaymentMethod(method: String): Boolean {
         val validMethods = listOf("JEEB", "ALKARIMI", "JAWALY", "YEMENCASH", "BANK", "CASH")
         return validMethods.any { it.equals(method.trim(), ignoreCase = true) }
     }
 
-    /**
-     * قائمة المحافظ وطرق الدفع اليمنية المتاحة
-     */
     fun getAvailablePaymentMethods(): List<PaymentMethod> {
         return listOf(
             PaymentMethod(

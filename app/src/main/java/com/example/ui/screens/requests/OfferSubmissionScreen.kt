@@ -1,7 +1,5 @@
 package com.example.ui.screens.requests
 
-import android.widget.Toast
-import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,42 +12,42 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.NotificationEntity
-import com.example.data.models.InstantRequestEntity
-import com.example.data.models.RequestOfferEntity
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.RequestOfferEntity
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.ui.components.AppSnackbarHost
+import com.example.ui.components.SnackbarType
+import com.example.ui.components.showCustomSnackbar
 import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
  * 💼 OfferSubmissionScreen
  * شاشة تقديم عرض سعر وموعد وصول من قبل مقدم الخدمة / الفني
+ * مرتبطة مع RequestsViewModel ومزودة بـ AppSnackbar
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OfferSubmissionScreen(
     requestId: String,
     viewModel: MainViewModel,
+    requestsViewModel: RequestsViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onOfferSubmitted: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
-    val isProvider = viewModel.isProviderUser
+    val currentUserName by viewModel.currentUserName.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
-    var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
-    var isLoadingRequest by remember { mutableStateOf(true) }
+    val currentRequest by requestsViewModel.currentRequest.collectAsState()
 
     var priceText by remember { mutableStateOf("") }
     var estimatedArrivalTime by remember { mutableStateOf("خلال 30 دقيقة") }
@@ -61,20 +59,11 @@ fun OfferSubmissionScreen(
     val durationOptions = listOf("نصف ساعة", "ساعة واحدة", "ساعتان", "نصف يوم", "يوم كامل")
 
     LaunchedEffect(requestId) {
-        if (requestId.isNotBlank()) {
-            firestore.collection("instant_requests").document(requestId)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    request = snapshot.toObject(InstantRequestEntity::class.java)
-                    isLoadingRequest = false
-                }
-                .addOnFailureListener {
-                    isLoadingRequest = false
-                }
-        }
+        requestsViewModel.listenToRequestDetails(requestId)
     }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("تقديم عرض سعر", fontWeight = FontWeight.Bold) },
@@ -87,17 +76,10 @@ fun OfferSubmissionScreen(
             )
         }
     ) { paddingValues ->
-        if (isLoadingRequest) {
+        val req = currentRequest
+        if (req == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
-            }
-            return@Scaffold
-        }
-
-        val currentReq = request
-        if (currentReq == null) {
-            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("الطلب غير موجود أو تم إغلاقه.")
             }
             return@Scaffold
         }
@@ -122,18 +104,18 @@ fun OfferSubmissionScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(currentReq.requestCode, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
-                        Text(currentReq.urgencyTime, fontSize = 12.sp, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        Text(req.requestCode, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
+                        Text(req.urgencyTime, fontSize = 12.sp, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }
 
-                    Text(currentReq.serviceTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text(currentReq.description, style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
+                    Text(req.serviceTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(req.description, style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
 
                     HorizontalDivider()
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("المدينة: ${currentReq.userCity}", fontSize = 12.sp)
-                        Text("الحي: ${currentReq.userNeighborhood}", fontSize = 12.sp)
+                        Text("المدينة: ${req.userCity}", fontSize = 12.sp)
+                        Text("الحي: ${req.userNeighborhood}", fontSize = 12.sp)
                     }
                 }
             }
@@ -197,59 +179,51 @@ fun OfferSubmissionScreen(
                 onClick = {
                     val price = priceText.toDoubleOrNull()
                     if (price == null || price <= 0.0) {
-                        Toast.makeText(context, "يرجى إدخال السعر المقترح", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            snackbarHostState.showCustomSnackbar(
+                                message = "يرجى إدخال السعر المقترح أكبر من صفر",
+                                type = SnackbarType.WARNING
+                            )
+                        }
                         return@Button
                     }
 
                     isSubmitting = true
-                    scope.launch {
-                        val offerId = UUID.randomUUID().toString()
-                        val newOffer = RequestOfferEntity(
-                            id = offerId,
-                            requestId = currentReq.id,
-                            requestCode = currentReq.requestCode,
-                            technicianId = currentUserId,
-                            technicianName = "فني معتمد",
-                            technicianPhone = currentUserId,
-                            technicianAvatar = "",
-                            technicianRating = 4.9f,
-                            price = price,
-                            estimatedArrivalTime = estimatedArrivalTime,
-                            estimatedDuration = estimatedDuration,
-                            notes = notesText,
-                            status = "PENDING",
-                            createdAt = System.currentTimeMillis()
-                        )
+                    val offerId = UUID.randomUUID().toString()
+                    val newOffer = RequestOfferEntity(
+                        id = offerId,
+                        requestId = req.id,
+                        requestCode = req.requestCode,
+                        technicianId = currentUserId.ifBlank { "tech_${System.currentTimeMillis()}" },
+                        technicianName = currentUserName.ifBlank { "فني معتمد" },
+                        technicianPhone = currentUserPhone.ifBlank { currentUserId },
+                        technicianAvatar = "",
+                        technicianRating = 4.9f,
+                        price = price,
+                        estimatedArrivalTime = estimatedArrivalTime,
+                        estimatedDuration = estimatedDuration,
+                        notes = notesText,
+                        status = "PENDING",
+                        createdAt = System.currentTimeMillis()
+                    )
 
-                        firestore.collection("instant_offers").document(offerId).set(newOffer)
-                            .addOnSuccessListener {
-                                // تحديث عداد العروض في الطلب
-                                firestore.collection("instant_requests").document(currentReq.id)
-                                    .update("offersCount", FieldValue.increment(1))
-
-                                // إرسال إشعار للعميل
-                                val notifId = UUID.randomUUID().toString()
-                                val notif = NotificationEntity(
-                                    id = notifId,
-                                    title = "وصلك عرض جديد لطلب ${currentReq.requestCode}",
-                                    message = "قدم لك فني عرضاً بسعر ${newOffer.price} ر.ي ووقت وصول ${newOffer.estimatedArrivalTime}",
-                                    customerPhone = currentReq.userPhone,
-                                    targetType = "USER",
-                                    targetValue = currentReq.userPhone,
-                                    notificationType = "NEW_OFFER",
-                                    timestamp = System.currentTimeMillis()
+                    requestsViewModel.submitOffer(
+                        offer = newOffer,
+                        userPhone = req.userPhone,
+                        onSuccess = {
+                            isSubmitting = false
+                            onOfferSubmitted()
+                        },
+                        onError = { errMsg ->
+                            isSubmitting = false
+                            scope.launch {
+                                snackbarHostState.showCustomSnackbar(
+                                    message = errMsg,
+                                    type = SnackbarType.ERROR
                                 )
-                                firestore.collection("notifications").document(notifId).set(notif)
-
-                                isSubmitting = false
-                                Toast.makeText(context, "تم تقديم عرضك بنجاح!", Toast.LENGTH_SHORT).show()
-                                onOfferSubmitted()
                             }
-                            .addOnFailureListener { e ->
-                                isSubmitting = false
-                                Toast.makeText(context, "فشل إرسال العرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                            }
-                    }
+                        }
+                    )
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_offer_btn"),
                 shape = RoundedCornerShape(12.dp),

@@ -1,7 +1,6 @@
 package com.example.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,32 +13,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import com.example.data.*
+import com.example.data.ProductEntity
+import com.example.ui.components.SnackbarManager
+import com.example.ui.components.SnackbarType
 import com.example.utils.VisualThemePalette
-import androidx.compose.ui.graphics.ImageBitmap
-import com.example.rememberBase64Bitmap
 
 /**
- * 📦 Product Item Card Component with Inline Price Editing for Owner/Admin
+ * 📦 ProductListItemCard Component
+ * بطاقة عرض المنتج مع إمكانية تعديل السعر السريع للمالك/الآدمن ودعم التكيف مع الأقسام المختلفة
+ *
+ * @param product كائن بيانات المنتج المراد عرضه
+ * @param isOwnerOrAdmin تحديد ما إذا كان المستخدم يملك صلاحية التعديل
+ * @param themeColors ألوان النمط البصري المعتمد
+ * @param isMedical التكيف مع القسم الطبي (حجز موعد)
+ * @param isRestaurant التكيف مع قسم المطاعم (طلب وجبة)
+ * @param onSaveProduct دالة الاستدعاء عند تعديل وحفظ سعر المنتج
+ * @param onOrderClick دالة الاستدعاء عند الضغط على زر الشراء/الطلب
  */
 @Composable
 fun ProductListItemCard(
     product: ProductEntity,
     isOwnerOrAdmin: Boolean,
     themeColors: VisualThemePalette,
-    viewModel: MainViewModel,
     isMedical: Boolean = false,
     isRestaurant: Boolean = false,
+    onSaveProduct: ((ProductEntity) -> Unit)? = null,
+    viewModel: Any? = null,
     onOrderClick: () -> Unit
 ) {
-    val context = LocalContext.current
     var editingPrice by remember(product.price) { mutableStateOf(product.price.toString()) }
     var isPriceEditing by remember { mutableStateOf(false) }
 
@@ -53,7 +59,7 @@ fun ProductListItemCard(
             modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Product Image Thumbnail
+            // صورة المنتج
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -96,7 +102,7 @@ fun ProductListItemCard(
                             Text("🔥 خصم", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
-                    if (product.isOffer || product.price > 0 && product.price <= 2000) {
+                    if (product.isOffer || (product.price > 0 && product.price <= 2000)) {
                         Box(
                             modifier = Modifier
                                 .background(Color(0xFFFFD700), RoundedCornerShape(4.dp))
@@ -117,7 +123,7 @@ fun ProductListItemCard(
                     )
                 }
 
-                // Price display or Inline Price Editor
+                // عرض السعر أو محرر السعر المباشر
                 if (isOwnerOrAdmin && isPriceEditing) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -138,9 +144,9 @@ fun ProductListItemCard(
                         Button(
                             onClick = {
                                 val pVal = editingPrice.toDoubleOrNull() ?: product.price
-                                viewModel.saveProduct(product.copy(price = pVal))
+                                onSaveProduct?.invoke(product.copy(price = pVal))
                                 isPriceEditing = false
-                                android.widget.Toast.makeText(context, "✅ تم تحديث سعر السلعة!", android.widget.Toast.LENGTH_SHORT).show()
+                                SnackbarManager.showSnackbar("✅ تم تحديث سعر السلعة!", SnackbarType.SUCCESS)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
@@ -176,7 +182,7 @@ fun ProductListItemCard(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            // Order Action Button
+            // زر طلب أو شراء
             Button(
                 onClick = onOrderClick,
                 colors = ButtonDefaults.buttonColors(containerColor = if (isMedical) Color(0xFF0284C7) else themeColors.accent),
@@ -193,3 +199,4 @@ fun ProductListItemCard(
         }
     }
 }
+

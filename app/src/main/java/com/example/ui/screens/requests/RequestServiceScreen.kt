@@ -1,7 +1,5 @@
 package com.example.ui.screens.requests
 
-import android.widget.Toast
-import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -22,10 +19,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.NotificationEntity
-import com.example.data.models.InstantRequestEntity
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.InstantRequestEntity
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.ui.components.AppSnackbarHost
+import com.example.ui.components.SnackbarType
+import com.example.ui.components.showCustomSnackbar
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.random.Random
@@ -33,22 +32,25 @@ import kotlin.random.Random
 /**
  * 📝 RequestServiceScreen
  * شاشة إنشاء طلب خدمة فوري بخطوات بسيطة وكود فريد وحماية برمز PIN
+ * مرتبطة مع RequestsViewModel و AppSnackbar لإشعارات مخصصة وتصميم متناسق
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RequestServiceScreen(
     viewModel: MainViewModel,
+    requestsViewModel: RequestsViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToMyRequests: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserName by viewModel.currentUserName.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
-    var customerPhone by remember { mutableStateOf("") }
-    var customerName by remember { mutableStateOf("") }
+    var customerPhone by remember { mutableStateOf(currentUserPhone) }
+    var customerName by remember { mutableStateOf(currentUserName) }
     var selectedDepartment by remember { mutableStateOf("خدمات وفنيين") }
     var selectedCategory by remember { mutableStateOf("سباكة") }
     var serviceTitle by remember { mutableStateOf("") }
@@ -80,6 +82,7 @@ fun RequestServiceScreen(
     }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("اطلب خدمتك الآن", fontWeight = FontWeight.Bold) },
@@ -281,55 +284,65 @@ fun RequestServiceScreen(
             Button(
                 onClick = {
                     if (customerPhone.isBlank() || serviceTitle.isBlank() || serviceDetails.isBlank() || selectedArea.isBlank()) {
-                        Toast.makeText(context, "يرجى تعبئة كافة الحقول الإجبارية (*)", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            snackbarHostState.showCustomSnackbar(
+                                message = "يرجى تعبئة كافة الحقول الإجبارية (*)",
+                                type = SnackbarType.WARNING
+                            )
+                        }
                         return@Button
                     }
                     if (pinCode.length < 4) {
-                        Toast.makeText(context, "يرجى إدخال رمز PIN مكون من 4 أرقام", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            snackbarHostState.showCustomSnackbar(
+                                message = "يرجى إدخال رمز PIN مكون من 4 أرقام",
+                                type = SnackbarType.WARNING
+                            )
+                        }
                         return@Button
                     }
 
                     isSubmitting = true
-                    scope.launch {
-                        try {
-                            val uniqueCode = "REQ-${Random.nextInt(100000, 999999)}"
-                            val reqId = UUID.randomUUID().toString()
-                            val now = System.currentTimeMillis()
-                            val request = InstantRequestEntity(
-                                id = reqId,
-                                requestCode = uniqueCode,
-                                secretPin = pinCode,
-                                cancellationPassword = pinCode,
-                                userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
-                                userName = customerName.ifBlank { "عميل" },
-                                userPhone = customerPhone,
-                                userCity = selectedCity,
-                                userNeighborhood = selectedArea,
-                                categoryId = selectedDepartment,
-                                categoryName = selectedCategory,
-                                serviceTitle = serviceTitle,
-                                description = serviceDetails,
-                                status = "WAITING_FOR_OFFERS",
-                                urgencyTime = urgencyTime,
-                                createdAt = now,
-                                expiresAt = now + 24 * 60 * 60 * 1000L
-                            )
+                    val uniqueCode = "REQ-${Random.nextInt(100000, 999999)}"
+                    val reqId = UUID.randomUUID().toString()
+                    val now = System.currentTimeMillis()
+                    val request = InstantRequestEntity(
+                        id = reqId,
+                        requestCode = uniqueCode,
+                        secretPin = pinCode,
+                        cancellationPassword = pinCode,
+                        userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
+                        userName = customerName.ifBlank { "عميل" },
+                        userPhone = customerPhone,
+                        userCity = selectedCity,
+                        userNeighborhood = selectedArea,
+                        categoryId = selectedDepartment,
+                        categoryName = selectedCategory,
+                        serviceTitle = serviceTitle,
+                        description = serviceDetails,
+                        status = "WAITING_FOR_OFFERS",
+                        urgencyTime = urgencyTime,
+                        createdAt = now,
+                        expiresAt = now + 24 * 60 * 60 * 1000L
+                    )
 
-                            firestore.collection("instant_requests").document(reqId).set(request)
-                                .addOnSuccessListener {
-                                    isSubmitting = false
-                                    createdRequestCode = uniqueCode
-                                    showSuccessDialog = true
-                                }
-                                .addOnFailureListener { e ->
-                                    isSubmitting = false
-                                    Toast.makeText(context, "فشل إرسال الطلب: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                }
-                        } catch (e: Exception) {
+                    requestsViewModel.createRequest(
+                        request = request,
+                        onSuccess = {
                             isSubmitting = false
-                            Toast.makeText(context, "حدث خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                            createdRequestCode = uniqueCode
+                            showSuccessDialog = true
+                        },
+                        onError = { errMsg ->
+                            isSubmitting = false
+                            scope.launch {
+                                snackbarHostState.showCustomSnackbar(
+                                    message = "فشل إرسال الطلب: $errMsg",
+                                    type = SnackbarType.ERROR
+                                )
+                            }
                         }
-                    }
+                    )
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_request_btn"),
                 shape = RoundedCornerShape(12.dp),

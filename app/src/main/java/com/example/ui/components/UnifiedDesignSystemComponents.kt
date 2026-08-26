@@ -1,10 +1,6 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -18,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -27,16 +22,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.utils.VisualThemePalette
 
 /**
- * 🎨 12 Unified Dashboard & Design System Components
- * (ProfileHeaderCard, StatsMetricCard, ActionButtonBar, DataTableRow,
- *  FilterChipGroup, EmptyStateView, LoadingSkeleton, ConfirmationDialog,
- *  InputFormField, RatingDisplay, NotificationBadge, TabNavigator)
+ * 🎨 Unified Design System Components
+ * مجموعة مكونات واجهة المستخدم الموحدة للنظام
  */
 
-// 1. ProfileHeaderCard
+/**
+ * 1. ProfileHeaderCard
+ * بطاقة الترويسة الشخصية لعرض الاسم، الرتبة/الشارة، الصورة، والتفاصيل
+ */
 @Composable
 fun ProfileHeaderCard(
     title: String,
@@ -113,7 +108,10 @@ fun ProfileHeaderCard(
     }
 }
 
-// 2. StatsMetricCard
+/**
+ * 2. StatsMetricCard
+ * بطاقة عرض الإحصائيات والأرقام المباشرة
+ */
 @Composable
 fun StatsMetricCard(
     title: String,
@@ -157,7 +155,10 @@ fun StatsMetricCard(
     }
 }
 
-// 3. ActionButtonBar
+/**
+ * 3. ActionButtonBar
+ * شريط الأزرار التفاعلية السريعة
+ */
 @Composable
 fun ActionButtonBar(
     actions: List<Pair<String, () -> Unit>>,
@@ -188,7 +189,10 @@ fun ActionButtonBar(
     }
 }
 
-// 4. DataTableRow
+/**
+ * 4. DataTableRow
+ * صف عرض البيانات بشكل مفتاح وقيمة متوازية
+ */
 @Composable
 fun DataTableRow(
     label: String,
@@ -214,7 +218,10 @@ fun DataTableRow(
     }
 }
 
-// 5. FilterChipGroup
+/**
+ * 5. FilterChipGroup
+ * شريط الشرائح لفلترة البيانات
+ */
 @Composable
 fun FilterChipGroup(
     items: List<Pair<String, String>>,
@@ -251,7 +258,10 @@ fun FilterChipGroup(
     }
 }
 
-// 6. EmptyStateView
+/**
+ * 6. EmptyStateView
+ * واجهة حالة الفراغ/عدم وجود نتائج
+ */
 @Composable
 fun EmptyStateView(
     emoji: String = "📭",
@@ -286,7 +296,10 @@ fun EmptyStateView(
     }
 }
 
-// 7. LoadingSkeleton
+/**
+ * 7. LoadingSkeleton
+ * مؤشر تحميل هيكلي للمحتوى
+ */
 @Composable
 fun LoadingSkeleton(
     modifier: Modifier = Modifier,
@@ -313,7 +326,10 @@ fun LoadingSkeleton(
     }
 }
 
-// 8. ConfirmationDialog
+/**
+ * 8. ConfirmationDialog
+ * نافذة تأكيد الإجراءات الهامة بالحذف أو الإرسال
+ */
 @Composable
 fun ConfirmationDialog(
     isOpen: Boolean,
@@ -353,7 +369,10 @@ fun ConfirmationDialog(
     )
 }
 
-// 9. InputFormField
+/**
+ * 9. InputFormField
+ * حقل إدخال موحد للشاشات والأنماط
+ */
 @Composable
 fun InputFormField(
     value: String,
@@ -387,7 +406,10 @@ fun InputFormField(
     }
 }
 
-// 10. RatingDisplay
+/**
+ * 9. RatingDisplay
+ * مكون عرض التقييم بالنجوم وعدد التقييمات
+ */
 @Composable
 fun RatingDisplay(
     rating: Double,
@@ -407,73 +429,3 @@ fun RatingDisplay(
     }
 }
 
-// 11. NotificationBadge
-@Composable
-fun NotificationBadge(
-    count: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier.testTag("notification_badge_btn")
-    ) {
-        Box(contentAlignment = Alignment.TopEnd) {
-            Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = Color.White)
-            if (count > 0) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFEF4444),
-                    modifier = Modifier.size(16.dp).offset(x = 4.dp, y = (-4).dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (count > 99) "99+" else "$count",
-                            color = Color.White,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// 12. TabNavigator
-@Composable
-fun TabNavigator(
-    tabs: List<Pair<String, String>>,
-    selectedTab: String,
-    onTabSelected: (String) -> Unit,
-    accentColor: Color = Color(0xFF00E5FF),
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color(0xFF0F172A), RoundedCornerShape(12.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        tabs.forEach { (key, title) ->
-            val isSelected = key == selectedTab
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) accentColor else Color.Transparent)
-                    .clickable { onTabSelected(key) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isSelected) Color(0xFF0F172A) else Color.White
-                )
-            }
-        }
-    }
-}

@@ -1,19 +1,21 @@
 package com.example.util
 
-import com.example.utils.*
-
 import com.google.firebase.firestore.FirebaseFirestore
 
 /**
- * 🗂️ Problem 14 Solution: Hierarchical Content & Category Moderation Engine
- * Hierarchical categories & subcategories, tag keywords, admin approval workflow for new providers,
- * notification triggers for admins, and automatic stale content listing reminders.
+ * 🗂️ HierarchicalContentManager - إدارة التصنيفات الشجرية والفرعية ومراجعة واعتماد المحتوى
+ * 
+ * الميزات:
+ * 1. هيكل شجري متكامل للأقسام الرئيسية والفرعية والكلمات الدلالية الشائعة في اليمن.
+ * 2. تدفق إرسال طلبات إضافة المزودين الجدد للمراجعة والاعتماد من قبل الإدارة (Moderation Workflow).
+ * 3. إطلاق الإشعارات الإدارية للمشرفين عند تقديم محتوى جديد.
+ * 4. فحص المحتوى القديم أو غير المحدث (Stale Content Checker) لأكثر من 90 يوماً لتحديث البيانات.
  */
 object HierarchicalContentManager {
 
     private val db = FirebaseFirestore.getInstance()
 
-    // 1. Category & Subcategory Hierarchy Model
+    // 1. نماذج التصنيفات الشجرية
     data class Subcategory(
         val id: String,
         val nameAr: String,
@@ -30,7 +32,7 @@ object HierarchicalContentManager {
         val tagsKeywords: List<String> = emptyList()
     )
 
-    // Pre-configured Hierarchical Catalog for Yemen Services
+    // دليل التصنيفات الافتراضي لخدمات اليمن
     val DefaultYemenCategories = listOf(
         HierarchicalCategory(
             id = "CAT_TECH",
@@ -73,7 +75,13 @@ object HierarchicalContentManager {
         )
     )
 
-    // 2. Admin Content Moderation Workflow (Submitting Provider for Admin Approval)
+    /**
+     * تقديم مزود خدمة جديد للمراجعة والاعتماد من قبل الإدارة
+     * 
+     * @param providerPayload بيانات مزود الخدمة
+     * @param onSuccess الإجراء المتبع عند نجاح الإرسال
+     * @param onError الإجراء المتبع عند حدوث خطأ
+     */
     fun submitNewProviderForReview(
         providerPayload: HashMap<String, Any?>,
         onSuccess: () -> Unit,
@@ -88,16 +96,17 @@ object HierarchicalContentManager {
             .document(pendingId)
             .set(providerPayload)
             .addOnSuccessListener {
-                // Notify Admin Panel
                 notifyAdminNewContentSubmitted(pendingId, providerPayload["name"] as? String ?: "مزود جديد")
                 onSuccess()
             }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل تقديم الطلب للمراجعة") }
     }
 
-    // 3. Admin Notification Trigger
+    /**
+     * إرسال إشعار للإدارة بوصول طلب تسجيل جديد
+     */
     private fun notifyAdminNewContentSubmitted(entityId: String, entityTitle: String) {
-        val notifId = EntityIdGenerator.generate(EntityIdGenerator.Prefix.PROVIDER)
+        val notifId = EntityIdGenerator.generate(EntityIdGenerator.Prefix.NOTIFICATION)
         val notif = hashMapOf<String, Any?>(
             "id" to notifId,
             "title" to "طلب إضافة جديد قيد المراجعة 📑",
@@ -110,7 +119,9 @@ object HierarchicalContentManager {
         db.collection("admin_notifications").document(notifId).set(notif)
     }
 
-    // 4. Stale Content Checker (Finds listings unchanged for > 90 days)
+    /**
+     * فحص الإعلانات والخدمات التي لم يتم تحديثها منذ أكثر من 90 يوماً
+     */
     fun checkStaleListings(
         onResult: (staleCount: Int) -> Unit
     ) {

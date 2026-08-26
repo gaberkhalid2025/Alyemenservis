@@ -213,6 +213,12 @@ class ChatViewModel(
         }
     }
 
+    fun deleteChannel(channelId: String) {
+        viewModelScope.launch {
+            repository.deleteChannel(channelId)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         messagesJob?.cancel()

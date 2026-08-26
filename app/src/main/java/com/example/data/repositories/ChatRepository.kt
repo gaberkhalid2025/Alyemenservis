@@ -30,8 +30,10 @@ class ChatRepository(
         otherUserName: String,
         otherUserPhoto: String,
         type: ChannelType = ChannelType.PRIVATE,
+        channelCategory: String = "",
         relatedEntityId: String? = null,
-        relatedEntityType: String? = null
+        relatedEntityType: String? = null,
+        relatedEntityCode: String? = null
     ): ChatChannel {
         val sortedParticipants = listOf(currentUserId.trim(), otherUserId.trim()).sorted()
         val customChannelId = if (type == ChannelType.PRIVATE) {
@@ -48,7 +50,7 @@ class ChatRepository(
         if (snapshot.exists()) {
             val existing = snapshot.toObject(ChatChannel::class.java)
             if (existing != null) {
-                // Ensure names and photos are updated
+                // Ensure names, photos, category, and entity code are updated and restore if deleted for current user
                 val updatedNames = existing.participantNames.toMutableMap().apply {
                     put(currentUserId, currentUserName)
                     if (otherUserName.isNotBlank()) put(otherUserId, otherUserName)
@@ -57,16 +59,24 @@ class ChatRepository(
                     put(currentUserId, currentUserPhoto)
                     if (otherUserPhoto.isNotBlank()) put(otherUserId, otherUserPhoto)
                 }
+                val updatedDeleted = existing.deletedForUsers.filter { it != currentUserId }
+
                 docRef.update(
                     mapOf(
                         "participantNames" to updatedNames,
-                        "participantPhotos" to updatedPhotos
+                        "participantPhotos" to updatedPhotos,
+                        "channelCategory" to channelCategory.ifBlank { existing.channelCategory },
+                        "relatedEntityCode" to (relatedEntityCode ?: existing.relatedEntityCode),
+                        "deletedForUsers" to updatedDeleted
                     )
                 )
                 return existing.copy(
                     id = customChannelId,
                     participantNames = updatedNames,
-                    participantPhotos = updatedPhotos
+                    participantPhotos = updatedPhotos,
+                    channelCategory = channelCategory.ifBlank { existing.channelCategory },
+                    relatedEntityCode = relatedEntityCode ?: existing.relatedEntityCode,
+                    deletedForUsers = updatedDeleted
                 )
             }
         }
@@ -84,8 +94,10 @@ class ChatRepository(
                 otherUserId to otherUserPhoto
             ),
             type = type,
+            channelCategory = channelCategory,
             relatedEntityId = relatedEntityId,
             relatedEntityType = relatedEntityType,
+            relatedEntityCode = relatedEntityCode,
             lastMessage = "محادثة جديدة",
             lastMessageTime = System.currentTimeMillis(),
             lastMessageSenderId = currentUserId,
@@ -139,6 +151,8 @@ class ChatRepository(
 
                 val list = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(ChatChannel::class.java)?.copy(id = doc.id)
+                }?.filter { ch ->
+                    !ch.deletedForUsers.contains(cleanUserId)
                 }?.sortedByDescending { it.lastMessageTime } ?: emptyList()
 
                 trySend(list)
@@ -189,6 +203,9 @@ class ChatRepository(
         messageText: String,
         mediaType: MediaType = MediaType.TEXT,
         mediaUrl: String = "",
+        audioDurationSec: Int = 0,
+        fileName: String = "",
+        fileSize: Long = 0L,
         replyToId: String? = null,
         replyToText: String? = null
     ): Boolean {
@@ -212,6 +229,9 @@ class ChatRepository(
                 message = messageText,
                 mediaType = mediaType,
                 mediaUrl = mediaUrl,
+                audioDurationSec = audioDurationSec,
+                fileName = fileName,
+                fileSize = fileSize,
                 replyToId = replyToId,
                 replyToText = replyToText,
                 status = MessageStatus.SENT,
@@ -234,8 +254,8 @@ class ChatRepository(
             val displayLastMessage = when (mediaType) {
                 MediaType.IMAGE -> "📷 صورة"
                 MediaType.VIDEO -> "🎥 فيديو"
-                MediaType.AUDIO -> "🎤 تسجيل صوتي"
-                MediaType.FILE -> "📎 ملف مرفق"
+                MediaType.AUDIO -> "🎤 تسجيل صوتي ($audioDurationSec ثانية)"
+                MediaType.FILE -> "📎 ${fileName.ifBlank { "ملف مرفق" }}"
                 MediaType.TEXT -> messageText
             }
 
@@ -245,6 +265,7 @@ class ChatRepository(
                     "lastMessageTime" to now,
                     "lastMessageSenderId" to senderId,
                     "unreadCount" to updatedUnread,
+                    "deletedForUsers" to emptyList<String>(), // Restore for all participants on new message
                     "updatedAt" to now
                 )
             ).await()
@@ -326,6 +347,46 @@ class ChatRepository(
             }
         } catch (e: Exception) {
             Log.e("ChatRepository", "Error deleting message: ${e.message}")
+        }
+    }
+
+    /**
+     * Delete a single chat channel for current user (hides from list).
+     */
+    suspend fun deleteChannelForUser(channelId: String, currentUserId: String) {
+        if (channelId.isBlank() || currentUserId.isBlank()) return
+        try {
+            channelsCollection.document(channelId).update("deletedForUsers", FieldValue.arrayUnion(currentUserId)).await()
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "Error deleting channel for user: ${e.message}")
+        }
+    }
+
+    /**
+     * Delete a single chat channel for everyone.
+     */
+    suspend fun deleteChannel(channelId: String) {
+        if (channelId.isBlank()) return
+        try {
+            channelsCollection.document(channelId).delete().await()
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "Error deleting channel: ${e.message}")
+        }
+    }
+
+    /**
+     * Delete all chat channels provided.
+     */
+    suspend fun deleteAllChannels(channelsList: List<ChatChannel>) {
+        if (channelsList.isEmpty()) return
+        try {
+            val batch = firestore.batch()
+            channelsList.forEach { ch ->
+                batch.delete(channelsCollection.document(ch.id))
+            }
+            batch.commit().await()
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "Error deleting all channels: ${e.message}")
         }
     }
 

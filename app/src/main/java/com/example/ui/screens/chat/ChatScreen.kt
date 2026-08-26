@@ -40,6 +40,7 @@ fun ChatScreen(
     relatedEntityType: String? = null,
     themeColors: VisualThemePalette,
     chatViewModel: ChatViewModel = viewModel(),
+    showUserIdInsteadOfNameInChat: Boolean = false,
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -99,9 +100,44 @@ fun ChatScreen(
         activeChannel?.participantPhotos?.get(otherUserId) ?: targetUserPhoto ?: ""
     }
 
+    val displayNameToShow = remember(otherUserId, otherUserName, showUserIdInsteadOfNameInChat) {
+        if (showUserIdInsteadOfNameInChat) {
+            "معرف المستخدم: ID_$otherUserId"
+        } else {
+            otherUserName
+        }
+    }
+
+    var showConfirmDeleteChannel by remember { mutableStateOf(false) }
+
     val filteredMessages = remember(messages, searchQuery) {
         if (searchQuery.isBlank()) messages
         else messages.filter { it.message.contains(searchQuery, ignoreCase = true) }
+    }
+
+    if (showConfirmDeleteChannel && activeChannel != null) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDeleteChannel = false },
+            title = { Text("حذف المحادثة بالكامل 🗑️", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة وكافة رسائلها نهائياً؟ لا يمكن التراجع عن هذا الإجراء.", fontSize = 14.sp) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        chatViewModel.deleteChannel(activeChannel.id)
+                        showConfirmDeleteChannel = false
+                        onBackClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("نعم، احذف المحادثة", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDeleteChannel = false }) {
+                    Text("إلغاء", color = Color.Gray)
+                }
+            }
+        )
     }
 
     Column(
@@ -111,10 +147,12 @@ fun ChatScreen(
     ) {
         // Header
         ChatHeaderBar(
-            name = otherUserName,
-            photoUrl = otherUserPhoto,
+            name = displayNameToShow,
+            photoUrl = if (showUserIdInsteadOfNameInChat) "" else otherUserPhoto,
             presence = presence,
             isTyping = isTypingOther,
+            relatedEntityType = activeChannel?.relatedEntityType ?: relatedEntityType,
+            relatedEntityCode = activeChannel?.relatedEntityCode ?: relatedEntityId,
             onBackClick = onBackClick,
             onSearchToggle = {
                 isSearchOpen = !isSearchOpen
@@ -123,8 +161,14 @@ fun ChatScreen(
             onBlockClick = {
                 if (otherUserId.isNotBlank()) {
                     chatViewModel.toggleBlock(otherUserId, true)
-                    Toast.makeText(context, "تم حظر المستخدم", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "تم حظر المستخدم 🚫", Toast.LENGTH_SHORT).show()
                 }
+            },
+            onDeleteChannelClick = {
+                showConfirmDeleteChannel = true
+            },
+            onCloseClick = {
+                onBackClick()
             }
         )
 

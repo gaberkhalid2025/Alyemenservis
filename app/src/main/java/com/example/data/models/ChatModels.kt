@@ -25,14 +25,17 @@ data class ChatChannel(
     val participantNames: Map<String, String> = emptyMap(),
     val participantPhotos: Map<String, String> = emptyMap(),
     val type: ChannelType = ChannelType.PRIVATE,
+    val channelCategory: String = "", // TECHNICIAN, STORE, RESTAURANT, SUPPORT, OTHER
     val relatedEntityId: String? = null,
     val relatedEntityType: String? = null, // BOOKING, URGENT_REQUEST, SUPPORT
+    val relatedEntityCode: String? = null,
     val lastMessage: String = "",
     val lastMessageTime: Long = 0L,
     val lastMessageSenderId: String = "",
     val unreadCount: Map<String, Int> = emptyMap(),
     val isBlocked: Map<String, Boolean> = emptyMap(),
     val isTyping: Map<String, Boolean> = emptyMap(),
+    val deletedForUsers: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) : Serializable
@@ -46,6 +49,9 @@ data class ChatMessage(
     val message: String = "",
     val mediaType: MediaType = MediaType.TEXT,
     val mediaUrl: String = "",
+    val audioDurationSec: Int = 0,
+    val fileName: String = "",
+    val fileSize: Long = 0L,
     val replyToId: String? = null,
     val replyToText: String? = null,
     val status: MessageStatus = MessageStatus.SENT,

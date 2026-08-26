@@ -11,6 +11,8 @@ data class UserEntity(
     val city: String = "صنعاء",
     val neighborhood: String = "",
     val role: String = "CLIENT", // CLIENT, PROVIDER, STORE, RESTAURANT, ADMIN
+    val verificationStatus: String = "PENDING", // PENDING, UNDER_REVIEW, VERIFIED, REJECTED, SUSPENDED
+    val passwordHash: String = "",
     val isBlocked: Boolean = false,
     val totalBookings: Int = 0,
     val rating: Float = 5.0f,

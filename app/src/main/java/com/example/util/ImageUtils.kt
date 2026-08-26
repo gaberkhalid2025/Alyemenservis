@@ -1,34 +1,37 @@
 package com.example.util
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
-import java.io.ByteArrayOutputStream
 
+/**
+ * 🖼️ ImageUtils - أدوات مساعدة لمعالجة وتحويل الصور
+ * يفوض العمليات إلى المحرك المركزي [ImageOptimizer] لضمان أعلى أداء وتوفير البيانات
+ */
 object ImageUtils {
+
+    /**
+     * تحويل مسار الصورة (Uri) إلى سلسلة Base64 مضغوطة
+     * 
+     * @param context سياق التطبيق
+     * @param uri مسار الصورة
+     * @param maxWidth أقصى عرض
+     * @param quality جودة الضغط (1-100)
+     * @return النص المشفر بتنسيق Base64
+     */
     fun uriToBase64(context: Context, uri: Uri, maxWidth: Int = 800, quality: Int = 75): String {
-        return try {
-            val inputStream = context.contentResolver.openInputStream(uri) ?: return ""
-            val bitmap = BitmapFactory.decodeStream(inputStream) ?: return ""
-            val scaledBitmap = if (bitmap.width > maxWidth) {
-                val ratio = bitmap.height.toFloat() / bitmap.width.toFloat()
-                val targetHeight = (maxWidth * ratio).toInt()
-                Bitmap.createScaledBitmap(bitmap, maxWidth, targetHeight, true)
-            } else {
-                bitmap
-            }
-            val outputStream = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-            val bytes = outputStream.toByteArray()
-            Base64.encodeToString(bytes, Base64.NO_WRAP)
-        } catch (e: Exception) {
-            ""
-        }
+        return ImageOptimizer.uriToOptimizedBase64(context, uri, maxWidth, maxWidth, quality)
     }
 
-    fun uriToCompressedBase64(context: Context, uri: Uri, maxWidth: Int = 800, maxHeight: Int = 800, quality: Int = 75): String {
-        return uriToBase64(context, uri, maxWidth, quality)
+    /**
+     * تحويل مسار الصورة (Uri) إلى سلسلة Base64 مع تحديد أقصى طول وعرض
+     */
+    fun uriToCompressedBase64(
+        context: Context,
+        uri: Uri,
+        maxWidth: Int = 800,
+        maxHeight: Int = 800,
+        quality: Int = 75
+    ): String {
+        return ImageOptimizer.uriToOptimizedBase64(context, uri, maxWidth, maxHeight, quality)
     }
 }

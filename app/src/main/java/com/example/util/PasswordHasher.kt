@@ -1,15 +1,19 @@
 package com.example.util
 
-import com.example.utils.*
-
 import android.util.Base64
+import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
 /**
- * Secure PBKDF2 with HmacSHA256 and unique random salts for hashing admin/owner/user passwords.
- * Prevents plain-text password storage and protects against reverse engineering dictionary attacks.
+ * 🔑 PasswordHasher - نظام التجزئة الآمن لكلمات المرور (PBKDF2-HMAC-SHA256)
+ * 
+ * الميزات:
+ * 1. استخدام خوارزمية PBKDF2 المعتمدة مع HMAC-SHA256 و 12,000 دورة تكرار.
+ * 2. توليد تمليح عشوائي مشفر (Cryptographically Secure Salt) بطول 16 بايت لكل كلمة مرور.
+ * 3. حماية ضد هجمات التوقيت (Timing Attacks) باستخدام المقارنة ذات الوقت الثابت (Constant-time).
+ * 4. التوافق العكسي مع كلمات المرور المحفوظة بصيغة SHA-256 أو التنسيق المشفر.
  */
 object PasswordHasher {
 
@@ -18,19 +22,23 @@ object PasswordHasher {
     private const val KEY_LENGTH = 256
     private const val SALT_SIZE = 16
 
+    private val secureRandom by lazy { SecureRandom() }
+
     /**
-     * Generates a unique 16-byte random salt.
+     * توليد تمليح عشوائي فريد بطول 16 بايت
+     * @return مصفوفة بايتات التمليح
      */
     fun generateSalt(): ByteArray {
-        val random = SecureRandom()
         val salt = ByteArray(SALT_SIZE)
-        random.nextBytes(salt)
+        secureRandom.nextBytes(salt)
         return salt
     }
 
     /**
-     * Hashes a password string using PBKDF2 and the provided salt.
-     * Returns a Base64-encoded hash string.
+     * تجزئة كلمة المرور باستخدام PBKDF2 والتمليح المعطى
+     * @param password كلمة المرور النصية
+     * @param salt مصفوفة التمليح
+     * @return الهاش المشفر بتنسيق Base64
      */
     fun hashPassword(password: String, salt: ByteArray): String {
         val spec = PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH)
@@ -40,7 +48,9 @@ object PasswordHasher {
     }
 
     /**
-     * Helper to format salt and hash into a single stored string format: "salt:hash"
+     * إنشاء هاش مدمج بالتمليح بصيغة "saltBase64:hashBase64" للتخزين الآمن
+     * @param password كلمة المرور
+     * @return السلسلة المركبة الجاهزة للحفظ
      */
     fun createSaltedHash(password: String): String {
         val salt = generateSalt()
@@ -49,9 +59,14 @@ object PasswordHasher {
         return "$saltBase64:$hashBase64"
     }
 
-    private fun sha256(input: String): String {
+    /**
+     * تجزئة سريعة باستخدام SHA-256 للتوافق
+     * @param input النص المراد تجزئته
+     * @return تمثيل Hex للهاش
+     */
+    fun sha256(input: String): String {
         return try {
-            val md = java.security.MessageDigest.getInstance("SHA-256")
+            val md = MessageDigest.getInstance("SHA-256")
             val bytes = md.digest(input.toByteArray(Charsets.UTF_8))
             bytes.joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
@@ -60,14 +75,26 @@ object PasswordHasher {
     }
 
     /**
-     * Verifies if an input password matches the stored "salt:hash" string, raw text, or sha256.
+     * التحقق من صحة كلمة المرور مقارنة بالهاش المخزن
+     * يستخدم المقارنة بالوقت الثابت لمنع هجمات التوقيت (Timing Attacks)
+     * 
+     * @param inputPassword كلمة المرور المدخلة
+     * @param storedSaltedHash الهاش المخزن (إما salt:hash أو SHA-256 أو نص قديم)
+     * @return true إذا كانت كلمة المرور مطابقة
      */
     fun verifyPassword(inputPassword: String, storedSaltedHash: String): Boolean {
         if (inputPassword.isBlank() || storedSaltedHash.isBlank()) return false
         val trimmedInput = inputPassword.trim()
         val trimmedStored = storedSaltedHash.trim()
-        if (trimmedInput == trimmedStored) return true
-        if (sha256(trimmedInput).equals(trimmedStored, ignoreCase = true)) return true
+
+        // 1. فحص المطابقة المباشرة إذا كانت القيمة مخزنة كنص صريح (Legacy)
+        if (constantTimeEquals(trimmedInput, trimmedStored)) return true
+
+        // 2. فحص SHA-256
+        val computedSha256 = sha256(trimmedInput)
+        if (constantTimeEquals(computedSha256.lowercase(), trimmedStored.lowercase())) return true
+
+        // 3. فحص صيغة PBKDF2 (salt:hash)
         return try {
             if (trimmedStored.contains(":")) {
                 val parts = trimmedStored.split(":")
@@ -75,12 +102,21 @@ object PasswordHasher {
                     val salt = Base64.decode(parts[0], Base64.NO_WRAP)
                     val expectedHash = parts[1]
                     val computedHash = hashPassword(trimmedInput, salt)
-                    return computedHash == expectedHash
+                    return constantTimeEquals(computedHash, expectedHash)
                 }
             }
             false
         } catch (e: Exception) {
             false
         }
+    }
+
+    /**
+     * مقارنة نصين في وقت ثابت لمنع هجمات التوقيت
+     */
+    private fun constantTimeEquals(a: String, b: String): Boolean {
+        val aBytes = a.toByteArray(Charsets.UTF_8)
+        val bBytes = b.toByteArray(Charsets.UTF_8)
+        return MessageDigest.isEqual(aBytes, bBytes)
     }
 }

@@ -73,8 +73,7 @@ fun AppHeaderBar(
     }
 
     val headerContext = LocalContext.current
-    val headerSp = remember(headerContext) { headerContext.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
-    var headerReadIds by remember { mutableStateOf(headerSp.getStringSet("read_notif_ids", emptySet()) ?: emptySet()) }
+    val readNotificationIdsState by viewModel.readNotificationIds.collectAsState()
     
     // Calculate unread notifications count
     val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
@@ -96,20 +95,16 @@ fun AppHeaderBar(
             }
         }
     }
-    val unreadNotifCount = remember(filteredNotifs, headerReadIds) {
-        filteredNotifs.count { it.id !in headerReadIds }
+    val unreadNotifCount = remember(filteredNotifs, readNotificationIdsState) {
+        filteredNotifs.count { it.id !in readNotificationIdsState }
     }
 
     // Calculate unread chats count
-    val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
+    val unreadChatsCount = remember(myChannels, currentUserId, myProvider) {
         myChannels.count { ch ->
-            val lastMsg = ch.messages.lastOrNull()
-            if (lastMsg == null) {
-                false
-            } else {
-                val isMe = lastMsg.senderId == currentUserId || (myProvider != null && lastMsg.senderId == myProvider.id)
-                val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
-                !isMe && lastMsg.timestamp > readTime
+            ch.messages.any { msg ->
+                val isMe = msg.senderId == currentUserId || (myProvider != null && msg.senderId == myProvider.id)
+                !isMe && msg.readAt == 0L
             }
         }
     }
@@ -180,7 +175,7 @@ fun AppHeaderBar(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
                         .background(themeColors.accent)
-                        .clickable { viewModel.navigateTo("ORDERS_VIEW") }
+                        .clickable { viewModel.navigateTo("BOOKINGS_VIEW") }
                         .padding(horizontal = 6.dp, vertical = 2.5.dp)
                 ) {
                     Row(
@@ -283,25 +278,22 @@ fun AppHeaderBar(
                 emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
                 vectorIcon = Icons.Default.Notifications,
                 label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = unreadNotifCount > 0,
+                isSelected = currentScreen == "NOTIFICATIONS",
                 badgeCount = unreadNotifCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
                 onClick = {
-                    val allIds = filteredNotifs.map { it.id }.toSet()
-                    headerSp.edit().putStringSet("read_notif_ids", allIds).apply()
-                    headerReadIds = allIds
+                    viewModel.markAllNotificationsAsRead(headerContext)
                     onNotificationsClick()
                 }
             )
 
             // 5. المحادثات
-            val hasUnreadChats = unreadChatsCount > 0
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topChatsIcon.ifEmpty { "✉️" },
                 vectorIcon = Icons.Default.Email,
                 label = if (isEn) "Chats" else "المحادثات",
-                isSelected = hasUnreadChats,
+                isSelected = currentScreen == "CHAT_LIST",
                 badgeCount = unreadChatsCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,

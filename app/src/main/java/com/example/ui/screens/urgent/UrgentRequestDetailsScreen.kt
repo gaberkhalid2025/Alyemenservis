@@ -2,7 +2,6 @@ package com.example.ui.screens.urgent
 
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -28,22 +27,24 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.models.InstantRequestEntity
-import com.example.data.models.RequestOfferEntity
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
 import com.example.ui.components.UrgentTimerComponent
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.viewmodels.UrgentUiState
+import com.example.viewmodels.UrgentViewModel
 import kotlinx.coroutines.launch
 
 /**
  * 🚨 UrgentRequestDetailsScreen
- * عرض تفاصيل الطلب العاجل ومؤقت الـ 30 دقيقة وقائمة العروض السريعة
+ * عرض تفاصيل الطلب العاجل ومؤقت الـ 30 دقيقة وقائمة العروض السريعة.
+ * تعتمد على UrgentViewModel وتدعم Snackbar ومؤشرات التحميل الفعالة.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentRequestDetailsScreen(
     requestId: String,
     viewModel: MainViewModel,
+    urgentViewModel: UrgentViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToOfferSelection: (offerId: String) -> Unit = {},
     onNavigateToUrgentOfferSubmission: (requestId: String) -> Unit = {},
@@ -51,40 +52,26 @@ fun UrgentRequestDetailsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
     val isProvider = viewModel.isProviderUser
 
-    var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
-    var offers by remember { mutableStateOf<List<RequestOfferEntity>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val request by urgentViewModel.selectedRequest.collectAsState()
+    val offers by urgentViewModel.offersForRequest.collectAsState()
+    val uiState by urgentViewModel.uiState.collectAsState()
 
     var showCancelDialog by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
-    var isCancelling by remember { mutableStateOf(false) }
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
-            firestore.collection("instant_requests").document(requestId)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null && snapshot.exists()) {
-                        request = snapshot.toObject(InstantRequestEntity::class.java)
-                    }
-                    isLoading = false
-                }
-
-            firestore.collection("instant_offers")
-                .whereEqualTo("requestId", requestId)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null) {
-                        offers = snapshot.documents.mapNotNull { it.toObject(RequestOfferEntity::class.java) }
-                    }
-                }
+            urgentViewModel.observeRequestDetails(requestId)
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -116,7 +103,7 @@ fun UrgentRequestDetailsScreen(
             )
         }
     ) { paddingValues ->
-        if (isLoading) {
+        if (uiState is UrgentUiState.Loading && request == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xFFD32F2F))
             }
@@ -230,7 +217,7 @@ fun UrgentRequestDetailsScreen(
                         }
                     }
                 } else {
-                    items(offers) { offer ->
+                    items(offers, key = { it.id }) { offer ->
                         Card(
                             modifier = Modifier.fillMaxWidth().testTag("urgent_offer_card_${offer.id}"),
                             shape = RoundedCornerShape(14.dp),
@@ -289,7 +276,20 @@ fun UrgentRequestDetailsScreen(
                                     }
 
                                     Button(
-                                        onClick = { onNavigateToOfferSelection(offer.id) },
+                                        onClick = {
+                                            urgentViewModel.acceptOffer(
+                                                requestId = currentRequest.id,
+                                                offerId = offer.id,
+                                                offer = offer,
+                                                onSuccess = {
+                                                    scope.launch { snackbarHostState.showSnackbar("تم قبول العرض بنجاح!") }
+                                                    onNavigateToOfferSelection(offer.id)
+                                                },
+                                                onError = { err ->
+                                                    scope.launch { snackbarHostState.showSnackbar(err) }
+                                                }
+                                            )
+                                        },
                                         modifier = Modifier.weight(1.2f).height(38.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                                     ) {
@@ -305,6 +305,7 @@ fun UrgentRequestDetailsScreen(
     }
 
     if (showCancelDialog) {
+        val expectedPin = request?.secretPin ?: request?.cancellationPassword ?: ""
         AlertDialog(
             onDismissRequest = { showCancelDialog = false },
             title = { Text("إلغاء الطلب العاجل") },
@@ -325,21 +326,18 @@ fun UrgentRequestDetailsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val expectedPin = request?.secretPin ?: request?.cancellationPassword ?: ""
-                        if (enteredPin != expectedPin) {
-                            Toast.makeText(context, "رمز PIN غير صحيح!", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isCancelling = true
-                        scope.launch {
-                            firestore.collection("instant_requests").document(requestId)
-                                .update("status", "CANCELLED")
-                                .addOnSuccessListener {
-                                    isCancelling = false
-                                    showCancelDialog = false
-                                    Toast.makeText(context, "تم إلغاء الطلب العاجل", Toast.LENGTH_SHORT).show()
-                                }
-                        }
+                        urgentViewModel.cancelUrgentRequest(
+                            requestId = requestId,
+                            enteredPin = enteredPin,
+                            expectedPin = expectedPin,
+                            onSuccess = {
+                                showCancelDialog = false
+                                scope.launch { snackbarHostState.showSnackbar("تم إلغاء الطلب العاجل بنجاح") }
+                            },
+                            onError = { err ->
+                                scope.launch { snackbarHostState.showSnackbar(err) }
+                            }
+                        )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                 ) {

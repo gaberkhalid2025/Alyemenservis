@@ -1,31 +1,38 @@
 package com.example.util
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import com.example.data.AdminSettingsEntity
+import com.example.data.local.SyncDataDatabase
+import com.example.data.local.SyncDataEntity
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
  * 🔄 SyncManager
- * المركز الرئيسي لإدارة المزامنة الشاملة وحفظ واسترجاع إعدادات الأدمن، الثيمات،
- * واستمارات التسجيل وحقولها من وإلى Firebase Firestore مع التخزين المحلي الدائم.
+ * 
+ * المركز الرئيسي لإدارة المزامنة الشاملة والجزئية وحفظ واسترجاع إعدادات الأدمن، الثيمات،
+ * واستمارات التسجيل وحقولها من وإلى Firebase Firestore.
+ * 
+ * يعتمد على **Room Database (`SyncDataDatabase`)** لتخزين حالات وبصمات المزامنة.
  */
 class SyncManager(private val context: Context) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
-    private val prefs: SharedPreferences = context.getSharedPreferences("app_sync_manager_prefs", Context.MODE_PRIVATE)
+    private val syncDb by lazy { SyncDataDatabase.getInstance(context) }
+    private val dao by lazy { syncDb.syncDataDao() }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val _lastSyncTimestamp = MutableStateFlow(prefs.getLong(KEY_LAST_SYNC_TS, 0L))
+    private val _lastSyncTimestamp = MutableStateFlow(0L)
     val lastSyncTimestamp: StateFlow<Long> = _lastSyncTimestamp.asStateFlow()
 
     private val _isSyncing = MutableStateFlow(false)
@@ -36,7 +43,6 @@ class SyncManager(private val context: Context) {
     companion object {
         private const val TAG = "SyncManager"
         private const val KEY_LAST_SYNC_TS = "key_last_sync_timestamp"
-        private const val KEY_LOCAL_SETTINGS_CACHE = "key_local_admin_settings_cache"
         private const val COLLECTION_ADMIN_SETTINGS = "admin_settings"
         private const val DOC_MAIN_CONFIG = "main_config"
         private const val DOC_FORMS_CONFIG = "forms_config"
@@ -45,12 +51,23 @@ class SyncManager(private val context: Context) {
     }
 
     init {
+        loadLastSyncTimestamp()
         startAutoSync()
     }
 
-    /**
-     * بدء المزامنة التلقائية كل 5 دقائق
-     */
+    private fun loadLastSyncTimestamp() {
+        scope.launch {
+            try {
+                val entity = dao.get(KEY_LAST_SYNC_TS)
+                if (entity != null) {
+                    _lastSyncTimestamp.value = entity.timestamp
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading sync timestamp from Room: ${e.message}")
+            }
+        }
+    }
+
     fun startAutoSync() {
         autoSyncJob?.cancel()
         autoSyncJob = scope.launch {
@@ -68,9 +85,6 @@ class SyncManager(private val context: Context) {
         autoSyncJob = null
     }
 
-    /**
-     * 1. مزامنة جميع الإعدادات (الأدمن، الثيم، الاستمارات، الحقول)
-     */
     suspend fun syncAllSettings(): Boolean = withContext(Dispatchers.IO) {
         _isSyncing.value = true
         try {
@@ -81,9 +95,9 @@ class SyncManager(private val context: Context) {
             val success = adminSync && themeSync && formSync
             if (success) {
                 val now = System.currentTimeMillis()
-                prefs.edit().putLong(KEY_LAST_SYNC_TS, now).apply()
+                dao.insert(SyncDataEntity(KEY_LAST_SYNC_TS, now.toString(), now))
                 _lastSyncTimestamp.value = now
-                Log.d(TAG, "All settings synchronized successfully to Firestore.")
+                Log.d(TAG, "All settings synchronized successfully to Firestore & Room.")
             }
             _isSyncing.value = false
             success
@@ -94,9 +108,24 @@ class SyncManager(private val context: Context) {
         }
     }
 
-    /**
-     * 2. مزامنة إعدادات الأدمن
-     */
+    suspend fun syncPartialData(key: String, payloadMap: Map<String, Any?>): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val jsonObj = JSONObject(payloadMap)
+            val now = System.currentTimeMillis()
+            dao.insert(SyncDataEntity(key, jsonObj.toString(), now))
+
+            firestore.collection("sync_partial")
+                .document(key)
+                .set(payloadMap, SetOptions.merge())
+                .await()
+
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed partial sync for key $key: ${e.message}")
+            false
+        }
+    }
+
     suspend fun syncAdminSettings(settings: AdminSettingsEntity? = null): Boolean = withContext(Dispatchers.IO) {
         try {
             syncAdminSettingsInternal(settings)
@@ -153,9 +182,6 @@ class SyncManager(private val context: Context) {
             }
     }
 
-    /**
-     * 3. مزامنة الألوان والثيمات
-     */
     suspend fun syncThemeSettings(themeId: String? = null, primaryHex: String? = null, secondaryHex: String? = null): Boolean = withContext(Dispatchers.IO) {
         try {
             syncThemeSettingsInternal(themeId, primaryHex, secondaryHex)
@@ -184,9 +210,6 @@ class SyncManager(private val context: Context) {
             }
     }
 
-    /**
-     * 4. مزامنة استمارات التسجيل لجميع الأقسام
-     */
     suspend fun syncFormSettings(formsData: Map<String, Any>? = null): Boolean = withContext(Dispatchers.IO) {
         try {
             syncFormSettingsInternal(formsData)
@@ -216,32 +239,6 @@ class SyncManager(private val context: Context) {
             }
     }
 
-    /**
-     * 5 & 6. مزامنة حقول استمارة معينة وترتيبها وإلزاميتها
-     */
-    suspend fun syncFormFields(section: String, fieldsDefinition: String): Boolean = withContext(Dispatchers.IO) {
-        suspendCancellableCoroutine { continuation ->
-            val payload = mapOf(
-                "${section.lowercase(Locale.ROOT)}_fields" to fieldsDefinition,
-                "lastUpdatedSection" to section,
-                "updatedAt" to System.currentTimeMillis()
-            )
-
-            firestore.collection(COLLECTION_ADMIN_SETTINGS)
-                .document(DOC_FORMS_CONFIG)
-                .set(payload, SetOptions.merge())
-                .addOnSuccessListener {
-                    if (continuation.isActive) continuation.resume(true) {}
-                }
-                .addOnFailureListener {
-                    if (continuation.isActive) continuation.resume(false) {}
-                }
-        }
-    }
-
-    /**
-     * 8. استرجاع جميع الإعدادات من Firebase Firestore
-     */
     suspend fun restoreAllSettings(): Map<String, Any?>? = withContext(Dispatchers.IO) {
         suspendCancellableCoroutine { continuation ->
             firestore.collection(COLLECTION_ADMIN_SETTINGS)
@@ -261,27 +258,18 @@ class SyncManager(private val context: Context) {
         }
     }
 
-    /**
-     * الحصول على وقت آخر مزامنة بصيغة نصية منسقة
-     */
     fun getLastSyncTime(): String {
-        val ts = prefs.getLong(KEY_LAST_SYNC_TS, 0L)
+        val ts = _lastSyncTimestamp.value
         if (ts == 0L) return "لم تتم المزامنة بعد"
         val sdf = SimpleDateFormat("yyyy/MM/dd - hh:mm a", Locale("ar"))
         return sdf.format(Date(ts))
     }
 
-    /**
-     * التحقق من الحاجة للمزامنة
-     */
     fun isSyncRequired(): Boolean {
-        val lastTs = prefs.getLong(KEY_LAST_SYNC_TS, 0L)
+        val lastTs = _lastSyncTimestamp.value
         return (System.currentTimeMillis() - lastTs) >= SYNC_INTERVAL_MS
     }
 
-    /**
-     * مزامنة فورية
-     */
     fun forceSync(onComplete: (Boolean) -> Unit = {}) {
         scope.launch {
             val res = syncAllSettings()
@@ -291,11 +279,10 @@ class SyncManager(private val context: Context) {
         }
     }
 
-    /**
-     * مسح التخزين المؤقت المحلي
-     */
     fun clearLocalCache() {
-        prefs.edit().remove(KEY_LOCAL_SETTINGS_CACHE).remove(KEY_LAST_SYNC_TS).apply()
-        _lastSyncTimestamp.value = 0L
+        scope.launch {
+            dao.clearAll()
+            _lastSyncTimestamp.value = 0L
+        }
     }
 }

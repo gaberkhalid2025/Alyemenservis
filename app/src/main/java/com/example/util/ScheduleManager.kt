@@ -3,28 +3,28 @@ package com.example.util
 import com.example.data.BookingEntity
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 /**
  * 📅 ScheduleManager
- * إدارة الجداول الزمنية، أوقات الدوام، فترات الراحة، وتوليد المواعيد المتاحة
- * مع دعم الحجوزات المتكررة (أسبوعي / شهري) لمنع التداخل والتعارض
+ * 
+ * المساعد المخصص لإدارة أوقات الدوام، فترات الاستراحة، وحساب الفترات الزمنية المتاحة 
+ * للحجوزات والمواعيد الدورية، واستبعاد العطلات الرسمية وأوقات الراحة.
  */
 object ScheduleManager {
 
     data class TimeSlot(
-        val timeString: String,      // e.g. "09:00 ص", "04:00 م"
-        val hour24: Int,             // e.g. 9, 16
-        val isAvailable: Boolean,    // true if not booked and not during break
-        val reasonIfNotAvailable: String? = null // e.g. "محجوز مسبقاً", "فترة استراحة وصلاة"
+        val timeString: String,
+        val hour24: Int,
+        val isAvailable: Boolean,
+        val reasonIfNotAvailable: String? = null
     )
 
     data class ProviderWorkingHours(
-        val startHour: Int = 8,      // 08:00 AM
-        val endHour: Int = 20,       // 08:00 PM
-        val breakStartHour: Int = 13,// 01:00 PM (صلاة وغداء)
-        val breakEndHour: Int = 14,  // 02:00 PM
+        val startHour: Int = 8,
+        val endHour: Int = 20,
+        val breakStartHour: Int = 13,
+        val breakEndHour: Int = 14,
         val slotDurationHours: Int = 1
     )
 
@@ -91,7 +91,7 @@ object ScheduleManager {
      */
     fun calculateRecurringDates(
         startDateString: String,
-        recurrenceRule: String, // "WEEKLY", "MONTHLY"
+        recurrenceRule: String,
         occurrences: Int = 4
     ): List<String> {
         if (recurrenceRule == "NONE" || recurrenceRule.isBlank()) {

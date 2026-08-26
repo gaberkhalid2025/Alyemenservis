@@ -2,9 +2,13 @@ package com.example.util
 
 import android.content.Context
 import androidx.annotation.Keep
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Locale
-import kotlin.math.min
 
 @Keep
 data class AiResponse(
@@ -35,10 +39,20 @@ data class TroubleshootingGuide(
 )
 
 /**
- * 🇾🇪 محرك المساعد الذكي اليمني المتقدم
- * يفهم المصطلحات واللهجات اليمنية، الاستفسارات الطويلة، استعلامات الحجوزات، إرشادات الصيانة (DIY)، وإنشاء الطلبات الفورية
+ * 🇾🇪 AiAssistantEngine - محرك المساعد الذكي اليمني المتقدم
+ * 
+ * الميزات:
+ * 1. دمج كامل مع Google Gemini API (نموذج gemini-3.5-flash) لتوليد ردود ذكية مخصصة.
+ * 2. استخدام تقنية RAG (Retrieval-Augmented Generation) لربط الردود بقاعدة بيانات الفنيين والخدمات والمحلات في اليمن.
+ * 3. حفظ سجل المحادثات في Firebase Firestore collection ("assistant_chat_history").
+ * 4. دعم وضع العمل بدون إنترنت (Offline DIY Engine) بفهم اللهجة والمصطلحات المحلية اليمنية.
+ * 5. توجيه ذكي للمستخدمين (Referral Actions) لحجز الفنيين أو تصفح الخريطة وطلب الخدمات السريعة.
  */
 class AiAssistantEngine(private val context: Context) {
+
+    private val geminiApi = GeminiApi()
+    private val firestore by lazy { FirebaseFirestore.getInstance() }
+    private val auth by lazy { FirebaseAuth.getInstance() }
 
     private val guidesList = mutableListOf<TroubleshootingGuide>()
     private val faqList = mutableListOf<Pair<List<String>, String>>()
@@ -49,302 +63,341 @@ class AiAssistantEngine(private val context: Context) {
         loadBuiltInYemeniGuides()
     }
 
+    /**
+     * استعلام المساعد الذكي باستخدام Gemini API و RAG مع حفظ سجل المحادثة (Suspend Function)
+     * 
+     * @param prompt استفسار المستخدم
+     * @return الرد الذكي المولد
+     */
+    suspend fun queryAssistant(prompt: String): String = withContext(Dispatchers.IO) {
+        if (prompt.isBlank()) return@withContext "يرجى كتابة استفسارك أو مشكلتك لمساعدتك."
+
+        // 1. جلب سياق البيانات ذات الصلة من Firebase / Local (RAG)
+        val ragContext = getRelevantRagContext(prompt)
+
+        // 2. إرسال الطلب إلى Gemini API
+        val response = if (geminiApi.isApiKeyConfigured()) {
+            val geminiResult = geminiApi.generateContent(prompt, ragContext)
+            if (geminiResult.isNotBlank() && !geminiResult.contains("تعذر الحصول على استجابة")) {
+                geminiResult
+            } else {
+                generateLocalFallbackAnswer(prompt)
+            }
+        } else {
+            generateLocalFallbackAnswer(prompt)
+        }
+
+        // 3. تخزين سجل المحادثة في Firestore
+        saveChatHistory(prompt, response)
+
+        return@withContext response
+    }
+
+    /**
+     * استعلام المساعد الذكي عبر Callback وإرجاع كائن AiResponse منظم لواجهات ولوحات التحكم
+     */
+    fun queryAssistant(prompt: String, onResult: (AiResponse) -> Unit) {
+        val result = processQuery(prompt)
+        onResult(result)
+    }
+
+    /**
+     * جلب سياق معرفي من قاعدة البيانات لاستخدامه في RAG
+     */
+    private suspend fun getRelevantRagContext(prompt: String): String {
+        val contextBuilder = StringBuilder()
+        contextBuilder.append("تطبيق: دليل خدمات اليمن (منصة لحجز الفنيين وصيانة المنازل والمحلات التجارية والطاقة الشمسية والسباكة والكهرباء في اليمن).\n")
+
+        // البحث في الإرشادات المحلية ذات الصلة
+        val matchedGuide = findBestGuide(prompt)
+        if (matchedGuide != null) {
+            contextBuilder.append("إرشادات صيانة سريعة متوفرة:\n")
+            contextBuilder.append("- العنوان: ${matchedGuide.title}\n")
+            contextBuilder.append("- خطوات الإصلاح الذاتي: ${matchedGuide.diySteps.joinToString("، ")}\n")
+            contextBuilder.append("- نصيحة وقائية: ${matchedGuide.preventiveTips}\n")
+            contextBuilder.append("- التصنيف المقترح: ${matchedGuide.suggestedCategory}\n")
+        }
+
+        // جلب أفضل المزودين والمحلات ذات الصلة من Firestore
+        try {
+            val keywords = extractKeywords(prompt)
+            if (keywords.isNotEmpty()) {
+                val primaryKeyword = keywords.first()
+                val providersSnap = firestore.collection("providers")
+                    .whereArrayContains("specialties", primaryKeyword)
+                    .limit(3)
+                    .get()
+                    .await()
+
+                if (!providersSnap.isEmpty) {
+                    contextBuilder.append("\nأبرز الفنيين المتاحين في هذا المجال:\n")
+                    for (doc in providersSnap.documents) {
+                        val name = doc.getString("name") ?: ""
+                        val city = doc.getString("city") ?: "صنعاء"
+                        val phone = doc.getString("phone") ?: ""
+                        contextBuilder.append("- الفني: $name (المدينة: $city، رقم التواصل: $phone)\n")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // تجاهل خطأ جلب RAG في حال انقطاع الشبكة
+        }
+
+        return contextBuilder.toString()
+    }
+
+    /**
+     * حفظ سجل المحادثة في Firestore
+     */
+    private fun saveChatHistory(userPrompt: String, botResponse: String) {
+        try {
+            val currentUserId = auth.currentUser?.uid ?: "GUEST_${System.currentTimeMillis()}"
+            val historyDoc = hashMapOf<String, Any?>(
+                "id" to EntityIdGenerator.generate(EntityIdGenerator.Prefix.CHAT),
+                "userId" to currentUserId,
+                "userMessage" to userPrompt,
+                "botResponse" to botResponse,
+                "timestamp" to System.currentTimeMillis()
+            )
+            firestore.collection("assistant_chat_history")
+                .document(historyDoc["id"] as String)
+                .set(historyDoc)
+                .addOnFailureListener { /* صامت */ }
+        } catch (e: Exception) {
+            // صامت
+        }
+    }
+
+    /**
+     * توليد رد احتياطي محلي في حال غياب الإنترنت أو مفتاح API
+     */
+    private fun generateLocalFallbackAnswer(prompt: String): String {
+        val localResponse = processQuery(prompt)
+        val sb = StringBuilder()
+        if (localResponse.title.isNotBlank()) {
+            sb.append("🔧 **${localResponse.title}**\n\n")
+        }
+        sb.append(localResponse.message)
+        if (localResponse.diySteps.isNotEmpty()) {
+            sb.append("\n\n🛠️ **خطوات الفحص والإصلاح المقترحة:**\n")
+            localResponse.diySteps.forEachIndexed { idx, step ->
+                sb.append("${idx + 1}. $step\n")
+            }
+        }
+        if (!localResponse.preventiveTips.isNullOrBlank()) {
+            sb.append("\n💡 **نصيحة وقائية:** ${localResponse.preventiveTips}")
+        }
+        if (!localResponse.estimatedCost.isNullOrBlank()) {
+            sb.append("\n💰 **التقدير التقريبي:** ${localResponse.estimatedCost}")
+        }
+        return sb.toString()
+    }
+
+    /**
+     * معالجة الاستعلام وتقديم كائن استجابة منظم للاستخدام في الواجهات ولوحات التحكم
+     * 
+     * @param query نص الاستعلام
+     * @return كائن AiResponse منظم
+     */
+    fun processQuery(query: String): AiResponse {
+        val cleanQuery = query.trim().lowercase(Locale.ROOT)
+        if (cleanQuery.isEmpty()) {
+            return AiResponse(
+                title = "مرحباً بك!",
+                message = "كيف يمكنني مساعدتك اليوم في خدمات الصيانة والفنيين في اليمن؟",
+                chipLabel = "المساعد الذكي"
+            )
+        }
+
+        queryCache[cleanQuery]?.let { return it }
+
+        // البحث عن أفضل دليل صيانة
+        val matchedGuide = findBestGuide(cleanQuery)
+        if (matchedGuide != null) {
+            val response = AiResponse(
+                title = matchedGuide.title,
+                message = "إليك إرشادات المعاينة والحل السريع لمشكلة (${matchedGuide.title}):",
+                diySteps = matchedGuide.diySteps,
+                preventiveTips = matchedGuide.preventiveTips.ifBlank { null },
+                chipLabel = matchedGuide.chipLabel,
+                suggestedCategory = matchedGuide.suggestedCategory,
+                referralAction = matchedGuide.referralAction,
+                estimatedCost = matchedGuide.estimatedCost.ifBlank { null },
+                isOfflineMode = true
+            )
+            queryCache[cleanQuery] = response
+            return response
+        }
+
+        // البحث في الأسئلة الشائعة
+        for ((keywords, answer) in faqList) {
+            if (keywords.any { cleanQuery.contains(it) }) {
+                val response = AiResponse(
+                    title = "إجابة المساعد الذكي",
+                    message = answer,
+                    chipLabel = "معلومات عامة",
+                    referralAction = "EXPLORE_MAP"
+                )
+                queryCache[cleanQuery] = response
+                return response
+            }
+        }
+
+        // رد عام افتراضي
+        val defaultResp = AiResponse(
+            title = "طلب خدمة صيانة متخصصة",
+            message = "تم تحليل استفسارك. للحصول على أفضل خدمة ننصحك بطلب فني متخصص أو تصفح الخريطة التفاعلية لاختيار أقرب المحلات والمراكز المعتمدة.",
+            chipLabel = "خدمات الصيانة",
+            suggestedCategory = "صيانة عامة",
+            referralAction = "REQUEST_TECHNICIAN",
+            diySteps = listOf(
+                "تأكد من فصل التيار الكهربائي أو إغلاق محبس المياه الرئيسي عند أي عطل طارئ.",
+                "حدد موقعك بدقة في التطبيق ليصلك أقرب فني مرخص.",
+                "يمكنك التفاوض على السعر ومراجعة تقييمات العملاء السابقين قبل بدء العمل."
+            )
+        )
+        queryCache[cleanQuery] = defaultResp
+        return defaultResp
+    }
+
+    private fun findBestGuide(query: String): TroubleshootingGuide? {
+        var bestGuide: TroubleshootingGuide? = null
+        var maxScore = 0
+
+        for (guide in guidesList) {
+            var score = 0
+            for (kw in guide.keywords) {
+                if (query.contains(kw)) {
+                    score += kw.length
+                }
+            }
+            if (score > maxScore) {
+                maxScore = score
+                bestGuide = guide
+            }
+        }
+
+        return if (maxScore >= 3) bestGuide else null
+    }
+
+    private fun extractKeywords(text: String): List<String> {
+        val stopWords = setOf("في", "من", "على", "إلى", "عن", "مع", "هذا", "هذه", "هل", "كيف", "أريد", "عندي", "مشكلة")
+        return text.split(Regex("[\\s,،.?!]+"))
+            .map { it.trim() }
+            .filter { it.length > 2 && it !in stopWords }
+    }
+
     private fun loadOfflineData() {
         try {
             val jsonString = context.assets.open("ai_assistant_data.json").bufferedReader().use { it.readText() }
             val root = JSONObject(jsonString)
-
             if (root.has("troubleshooting_guides")) {
                 val guidesArray = root.getJSONArray("troubleshooting_guides")
                 for (i in 0 until guidesArray.length()) {
                     val obj = guidesArray.getJSONObject(i)
-                    val keywordsArr = obj.getJSONArray("keywords")
-                    val kwList = mutableListOf<String>()
-                    for (k in 0 until keywordsArr.length()) kwList.add(keywordsArr.getString(k))
-
-                    val stepsArr = obj.getJSONArray("diy_steps")
-                    val stepsList = mutableListOf<String>()
-                    for (s in 0 until stepsArr.length()) stepsList.add(stepsArr.getString(s))
+                    val kws = mutableListOf<String>()
+                    val kwArray = obj.optJSONArray("keywords")
+                    if (kwArray != null) {
+                        for (k in 0 until kwArray.length()) kws.add(kwArray.getString(k))
+                    }
+                    val steps = mutableListOf<String>()
+                    val stArray = obj.optJSONArray("diy_steps")
+                    if (stArray != null) {
+                        for (s in 0 until stArray.length()) steps.add(stArray.getString(s))
+                    }
 
                     guidesList.add(
                         TroubleshootingGuide(
-                            id = obj.getString("id"),
+                            id = obj.optString("id", "g_$i"),
                             category = obj.optString("category", ""),
-                            keywords = kwList,
-                            title = obj.getString("title"),
-                            diySteps = stepsList,
+                            keywords = kws,
+                            title = obj.optString("title", ""),
+                            diySteps = steps,
                             preventiveTips = obj.optString("preventive_tips", ""),
                             referralAction = obj.optString("referral_action", "REQUEST_TECHNICIAN"),
                             suggestedCategory = obj.optString("suggested_category", ""),
-                            chipLabel = obj.optString("chip_label", "طلب فني متخصص"),
+                            chipLabel = obj.optString("chip_label", "صيانة"),
                             estimatedCost = obj.optString("estimated_cost", "")
                         )
                     )
                 }
             }
-
-            if (root.has("faq")) {
-                val faqArr = root.getJSONArray("faq")
-                for (i in 0 until faqArr.length()) {
-                    val obj = faqArr.getJSONObject(i)
-                    val keywordsArr = obj.getJSONArray("keywords")
-                    val kwList = mutableListOf<String>()
-                    for (k in 0 until keywordsArr.length()) kwList.add(keywordsArr.getString(k))
-                    val answer = obj.getString("answer")
-                    faqList.add(Pair(kwList, answer))
-                }
-            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            // صامت
         }
     }
 
     private fun loadBuiltInYemeniGuides() {
-        // قاموس إضافي شامل للمصطلحات اليمنية والمواقف اليومية
         guidesList.add(
             TroubleshootingGuide(
-                id = "plumbing_water_motor",
+                id = "solar_inverter_fault",
+                category = "طاقة شمسية",
+                keywords = listOf("إنفرتر", "انفرتر", "طاقة شمسية", "بطارية", "شاحن شمسي", "لوح شمسي", "كهرباء مقطوعة"),
+                title = "فحص منظومة الطاقة الشمسية والإنفرتر",
+                diySteps = listOf(
+                    "تأكد من نظافة الألواح الشمسية من الغبار لضمان كفاءة الشحن.",
+                    "افحص قاطع البطارية وقاطع الألواح وتأكد من عدم فصل الفيوزات.",
+                    "راقب رمز الخطأ الظاهر على شاشة الإنفرتر (مثل 04 لجهد البطارية المنخفض أو 07 للحمل الزائد).",
+                    "أعد تشغيل قاطع الإنفرتر بعد إطفاء الأحمال الثقيلة."
+                ),
+                preventiveTips = "قم بقياس مستوى سائل البطاريات كل شهر وتنظيف أقطاب البطارية من الكبرتة.",
+                referralAction = "REQUEST_TECHNICIAN",
+                suggestedCategory = "طاقة شمسية",
+                chipLabel = "طاقة شمسية ☀️",
+                estimatedCost = "2,000 - 5,000 ريال يمني"
+            )
+        )
+
+        guidesList.add(
+            TroubleshootingGuide(
+                id = "plumbing_leak",
                 category = "سباكة",
-                keywords = listOf("دينمو", "ماطور", "ماطور ماء", "بزبوز", "حنفية", "خزان يقطر", "تسريب ماء", "سباك", "أشتي سباك", "مواسير", "عوامة الخزان"),
-                title = "🔧 تشخيص أعطال السباكة وماطور الماء",
+                keywords = listOf("سباكة", "تسريب", "ماسورة", "حنفية", "خزان", "دينمو", "تهريب مياه", "سيفون"),
+                title = "معالجة تسريب المياه وفحص السباكة",
                 diySteps = listOf(
-                    "افحص قاطع الكهرباء الخاص بالدينمو وتأكد من وصول التيار.",
-                    "تأكد من عدم وجود هواء في ماسورة السحب (قم بتنفيس الدينمو من برغي الهواء).",
-                    "إذا كان البزبوز أو الحنفية تقطر، افحص الجلبة المطاطية (الواشر) واستبدلها.",
-                    "أغلق المحبس الرئيسي فوراً في حال وجود تسريب قوي لتجنب إهدار المياه."
+                    "أغلق المحبس الرئيسي المغذي للشقة أو العمارة فوراً لمنع هدر المياه.",
+                    "حدد مصدر التسريب (كوع ماسورة، محبس زاوية، أو خلاط).",
+                    "استخدم شريط التفلون الأبيض (Teflon Tape) لإحكام ربط السن إذا كان التسريب خفيفاً.",
+                    "تأكد من عمل عوامة الخزان الأرضي أو العلوي بشكل سليم لمنع الفوضى."
                 ),
-                referralAction = "CREATE_SERVICE_ORDER",
+                preventiveTips = "افحص ضغط مضخة المياه وتأكد من جودة المحابس الإيطالية المقاومة للصدأ.",
+                referralAction = "REQUEST_TECHNICIAN",
                 suggestedCategory = "سباكة",
-                chipLabel = "🛠️ إنشاء طلب سباك معتمد الآن",
-                estimatedCost = "3,000 - 6,000 ريال يمني"
+                chipLabel = "سباكة وخزانات 🚰",
+                estimatedCost = "1,500 - 4,000 ريال يمني"
             )
         )
 
         guidesList.add(
             TroubleshootingGuide(
-                id = "ac_cooling_issue",
+                id = "ac_cooling",
                 category = "تكييف وتبريد",
-                keywords = listOf("مكيف", "تبريد", "ما يبردش", "حار", "كمبروسر", "غاز الفريون", "مكيف صحراوي", "مكيف سبليت", "ينقط ماء"),
-                title = "❄️ تشخيص مشاكل التكييف والتبريد",
+                keywords = listOf("مكيف", "تبريد", "فريون", "سبلت", "كمبروسر", "مروحة مكيف", "ما يبرد"),
+                title = "فحص كفاءة المكيف والتبريد",
                 diySteps = listOf(
-                    "تأكد من ضبط الريموت على وضع التبريد (Cool ❄️) بدرجة حرارة بين 22-24.",
-                    "قم بفك فلاتر الهواء الأمامية وغسلها جيداً من الغبار والأتربة وجففها.",
-                    "افحص خرطوم تصريف الماء وتأكد من عدم انسداده بالأوساخ.",
-                    "إذا كان الهواء يخرج حاراً والكمبروسر لا يعمل، قد يحتاج المكيف لفحص الفريون أو الكابستر."
+                    "نظف فلاتر الهواء الداخلية بالماء الفاتر وجففها جيداً.",
+                    "تأكد من ضبط الريموت على وضع التبريد (Cool ❄️) ودرجة حرارة 22-24 مئوية.",
+                    "افحص الوحدة الخارجية وتأكد من دوران المروحة وعدم وجود عوائق أمامها."
                 ),
-                referralAction = "CREATE_SERVICE_ORDER",
+                preventiveTips = "قم بإجراء صيانة دورية وغسيل للرادياتير مع بداية فصل الصيف لتفادي احتراق الكمبروسر.",
+                referralAction = "REQUEST_TECHNICIAN",
                 suggestedCategory = "تكييف وتبريد",
-                chipLabel = "❄️ طلب فني تكييف للمعاينة",
-                estimatedCost = "5,000 - 12,000 ريال يمني"
+                chipLabel = "تكييف وتبريد ❄️",
+                estimatedCost = "3,000 - 8,000 ريال يمني"
             )
         )
 
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "electricity_solar",
-                category = "كهرباء وطاقة شمسية",
-                keywords = listOf("كهرباء", "طاقة شمسية", "الواح", "انفرتر", "انفيرتر", "بطارية", "القاطع نزل", "التماس", "كنداكتر", "كهربائي", "مافيش كهرباء", "شورت"),
-                title = "⚡ تشخيص منظومة الطاقة الشمسية والكهرباء",
-                diySteps = listOf(
-                    "افحص شاشة الانفرتر وشاهد كود الخطأ (Fault Code) الظاهر.",
-                    "تأكد من مستوى فولتية البطاريات وعدم وجود أسلاك مفكوكة أو متأكسدة.",
-                    "في حال نزول القاطع الرئيسي، افصل الأجهزة الثقيلة ثم ارفع القاطع بالتدريج لمعرفة الجهاز المسبب للالتماس.",
-                    "تحذير: لا تلمس الأسلاك المكشوفة وتأكد من ارتداء حذاء عازل للأمان."
-                ),
-                referralAction = "CREATE_SERVICE_ORDER",
-                suggestedCategory = "كهرباء",
-                chipLabel = "⚡ طلب فني طاقة وكهرباء",
-                estimatedCost = "4,000 - 8,000 ريال يمني"
+        faqList.add(
+            Pair(
+                listOf("أسعار", "تكلفة", "كم يكلف", "سعر الفني"),
+                "تعتمد تكلفة الخدمات في دليل خدمات اليمن على نوع الصيانة والقطع المطلوبة. يمكنك مراجعة الأسعار التقديرية لكل فني والتفاوض المباشر عبر المحادثة المدمجة."
             )
         )
-
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "car_puncture_battery",
-                category = "ميكانيك وبنشر سيارات",
-                keywords = listOf("سيارة", "بنشر", "تاير", "كفر", "بطارية سيارة", "ما تدقش سلف", "عطلان في الطريق", "ميكانيكي", "سطحة", "سحب سيارة", "طرمبة بنزين"),
-                title = "🚗 خدمات طوارئ السيارات والبنشر",
-                diySteps = listOf(
-                    "أوقف السيارة في مكان آمن واشعل إشارات الطوارئ (الرباعي).",
-                    "إذا كانت البطارية ضعيفة، استخدم كابل اشتراك مع سيارة أخرى أو اطلب فحص السلف.",
-                    "في حال البنشر، تأكد من ثبات الهاندبريك ووضع حجر خلف الإطار قبل رفع الجك."
-                ),
-                referralAction = "CREATE_SERVICE_ORDER",
-                suggestedCategory = "سيارات",
-                chipLabel = "🚗 طلب فني طوارئ سيارات فوراً",
-                estimatedCost = "3,000 - 10,000 ريال يمني"
+        faqList.add(
+            Pair(
+                listOf("ضمان", "كفالة", "هل يوجد ضمان"),
+                "جميع الفنيين والمراكز المعتمدة يقدمون ضماناً على أعمال الصيانة والقطع الأصلية، ويمكنك التحقق من شارة الاعتماد الذهبية في ملف الفني."
             )
         )
-
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "real_estate_rental",
-                category = "عقارات",
-                keywords = listOf("شقة", "ايجار", "عقار", "بيت", "عمارة", "دكان", "مكتب", "أشتي استأجر", "عقارات", "سمسار"),
-                title = "🏠 البحث عن العقارات والشقق المتاحة",
-                diySteps = listOf(
-                    "حدد المنطقة المرغوبة (حدة، الأصبحي، المطار، الستين، خور مكسر...).",
-                    "يمكنك تصفح قسم العقارات مباشرة لمشاهدة الصور، الأسعار، والمواصفات.",
-                    "تواصل مباشرة مع المالك أو المكتب عبر المحادثة أو زر الاتصال لمعاينة الموقع."
-                ),
-                referralAction = "EXPLORE_MAP",
-                suggestedCategory = "عقارات",
-                chipLabel = "🏢 تصفح العقارات على الخريطة",
-                estimatedCost = ""
-            )
-        )
-
-        guidesList.add(
-            TroubleshootingGuide(
-                id = "medical_clinic",
-                category = "مراكز طبية وصيدليات",
-                keywords = listOf("دكتور", "طبيب", "صيدلية", "مستشفى", "باطنية", "أسنان", "عيادة", "فحص", "مختبر", "علاج", "دواء"),
-                title = "🏥 المراكز الطبية والعيادات المتخصصة",
-                diySteps = listOf(
-                    "في حالات الطوارئ القصوى يرجى التوجه لأقرب طوارئ مستشفى.",
-                    "يمكنك تصفح العيادات والمراكز المعتمدة ومطابقة التأمين الصحي وساعات العمل.",
-                    "استخدم خريطة الخدمات للوصول إلى أقرب صيدلية مناوبة بالقرب منك."
-                ),
-                referralAction = "EXPLORE_MAP",
-                suggestedCategory = "مراكز طبية",
-                chipLabel = "🏥 عرض العيادات والصيدليات القريبة",
-                estimatedCost = ""
-            )
-        )
-    }
-
-    /**
-     * معالجة الاستعلام وفهم السياق ولهجات اليمن مع دعم الكاشينج
-     */
-    fun queryAssistant(
-        prompt: String,
-        currentCity: String = "صنعاء",
-        isOnlineAvailable: Boolean = false,
-        onResult: (AiResponse) -> Unit
-    ) {
-        val queryLower = prompt.trim().lowercase(Locale.getDefault())
-
-        if (queryLower.isBlank()) {
-            onResult(
-                AiResponse(
-                    title = "مساعد دليل خدمات اليمن الذكي 🇾🇪",
-                    message = "حياك الله! أنا مساعدك الشخصي للبحث عن الفنيين، المحلات، العقارات، حل الأعطال، والاستعلام عن طلباتك.",
-                    chipLabel = "🛠️ طلب خدمة جديدة",
-                    referralAction = "CREATE_SERVICE_ORDER"
-                )
-            )
-            return
-        }
-
-        // Check in-memory cache
-        if (queryCache.containsKey(queryLower)) {
-            onResult(queryCache[queryLower]!!)
-            return
-        }
-
-        // الاستعلام عن الحجوزات والطلبات السابقة
-        if (queryLower.contains("حجز") || queryLower.contains("طلباتي") || queryLower.contains("حالة الطلب") || queryLower.contains("حجوزاتي") || queryLower.contains("وين وصل طلبي")) {
-            val resp = AiResponse(
-                title = "📋 الاستعلام عن حالة الحجوزات والطلبات",
-                message = "يمكنك متابعة حالة جميع حجوزاتك وطلباتك المباشرة ومعرفة هل تم قبولها أو وصول الفني إليك من خلال شاشة الحجوزات.",
-                chipLabel = "📋 فتح سجل حجوزاتي الآن",
-                referralAction = "CHECK_BOOKINGS",
-                deepLinkRoute = "bookings_screen",
-                isOfflineMode = true
-            )
-            queryCache[queryLower] = resp
-            onResult(resp)
-            return
-        }
-
-        // المطابقة الذكية مع أدلة الصيانة والمصطلحات
-        var bestGuideMatch: TroubleshootingGuide? = null
-        var maxScore = 0
-
-        for (guide in guidesList) {
-            var matchCount = 0
-            for (kw in guide.keywords) {
-                val kwLower = kw.lowercase(Locale.getDefault())
-                if (queryLower.contains(kwLower)) {
-                    matchCount += 3
-                } else if (levenshteinDistance(queryLower, kwLower) <= 2) {
-                    matchCount += 1
-                }
-            }
-            if (matchCount > maxScore) {
-                maxScore = matchCount
-                bestGuideMatch = guide
-            }
-        }
-
-        if (bestGuideMatch != null && maxScore >= 2) {
-            val costText = if (bestGuideMatch.estimatedCost.isNotBlank()) " | التكلفة التقديرية: ${bestGuideMatch.estimatedCost}" else ""
-            val resp = AiResponse(
-                title = bestGuideMatch.title,
-                message = "إليك خطوات فحص وصيانة سريعة ومجربة (DIY)$costText:",
-                diySteps = bestGuideMatch.diySteps,
-                preventiveTips = bestGuideMatch.preventiveTips.ifEmpty { null },
-                chipLabel = bestGuideMatch.chipLabel,
-                suggestedCategory = bestGuideMatch.suggestedCategory,
-                referralAction = bestGuideMatch.referralAction,
-                deepLinkRoute = "urgent_request/${bestGuideMatch.suggestedCategory}",
-                isOfflineMode = true,
-                estimatedCost = bestGuideMatch.estimatedCost
-            )
-            queryCache[queryLower] = resp
-            onResult(resp)
-            return
-        }
-
-        // فحص الأسئلة الشائعة
-        for ((kwList, answer) in faqList) {
-            if (kwList.any { queryLower.contains(it.lowercase(Locale.getDefault())) }) {
-                val resp = AiResponse(
-                    title = "معلومات الخدمة المعتمدة",
-                    message = answer,
-                    chipLabel = "🛠️ إنشاء طلب صيانة مباشر",
-                    referralAction = "CREATE_SERVICE_ORDER",
-                    deepLinkRoute = "urgent_request_create",
-                    isOfflineMode = true
-                )
-                queryCache[queryLower] = resp
-                onResult(resp)
-                return
-            }
-        }
-
-        // الرد الافتراضي الذكي
-        val defaultResp = AiResponse(
-            title = "المساعد الذكي 🇾🇪",
-            message = "فهمت استفسارك بخصوص: \"$prompt\" في مدينة $currentCity. يمكنك طلب فني معتمد أو البحث عبر الخريطة التفاعلية لاكتشاف أقرب مزودي الخدمات فوراً.",
-            chipLabel = "🛠️ إنشاء طلب لهذه المشكلة الآن",
-            referralAction = "CREATE_SERVICE_ORDER",
-            deepLinkRoute = "urgent_request_create",
-            isOfflineMode = true
-        )
-        queryCache[queryLower] = defaultResp
-        onResult(defaultResp)
-    }
-
-    private fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int {
-        val lhsLength = lhs.length
-        val rhsLength = rhs.length
-        var cost = IntArray(lhsLength + 1) { it }
-        var newCost = IntArray(lhsLength + 1) { 0 }
-
-        for (i in 1..rhsLength) {
-            newCost[0] = i
-            for (j in 1..lhsLength) {
-                val match = if (lhs[j - 1] == rhs[i - 1]) 0 else 1
-                val costReplace = cost[j - 1] + match
-                val costInsert = cost[j] + 1
-                val costDelete = newCost[j - 1] + 1
-                newCost[j] = min(min(costInsert, costDelete), costReplace)
-            }
-            val swap = cost
-            cost = newCost
-            newCost = swap
-        }
-        return cost[lhsLength]
     }
 }

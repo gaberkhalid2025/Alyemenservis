@@ -337,7 +337,7 @@ fun AppNavigator(
                                     sectionId = activeSectionIdForCreation,
                                     onRegTypeChange = { preselectedRegistrationType = it }
                                 )
-                                "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
+                                "JOIN_REQUEST_STATUS", "STATUS_VIEW" -> com.example.ui.screens.status.StatusScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                                 "OFFER_SELECTION" -> com.example.ui.screens.requests.OfferSelectionScreen(
                                     offerId = viewModel.selectedOfferId,
@@ -380,8 +380,8 @@ fun AppNavigator(
                                     }
                                 )
                                 "BOOKINGS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
-                                "INSTANT_REQUESTS_VIEW" -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
-                                "ORDERS_VIEW" -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { showRequestServiceModal = true })
+                                "INSTANT_REQUESTS_VIEW" -> com.example.ui.screens.urgent.UrgentRequestsListScreen(viewModel = viewModel, themeColors = themeColors, onNavigateBack = { viewModel.goBack() })
+                                "ORDERS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
                                 "MAP_VIEW" -> com.example.ui.MapScreen(
                                     viewModel = viewModel,
                                     onBackClick = { viewModel.navigateTo("HOME") },
@@ -646,6 +646,7 @@ fun AppNavigator(
                                         currentUserId = effUserId,
                                         currentUserName = effUserName,
                                         channelId = if (activeCh != null) activeCh!!.id else if (isChannelId) preSelectedChannelId else null,
+                                        showUserIdInsteadOfNameInChat = settingsState.showUserIdInsteadOfNameInChat,
                                         targetUserId = if (activeCh == null && !isChannelId) preSelectedChannelId else null,
                                         themeColors = themeColors,
                                         onBackClick = {
@@ -661,6 +662,7 @@ fun AppNavigator(
                                         currentUserId = effUserId,
                                         currentUserName = effUserName,
                                         targetUserId = "admin_support",
+                                        showUserIdInsteadOfNameInChat = settingsState.showUserIdInsteadOfNameInChat,
                                         targetUserName = "الدعم الفني والإدارة",
                                         relatedEntityType = "SUPPORT",
                                         themeColors = themeColors,
@@ -701,7 +703,8 @@ fun AppNavigator(
                                 "REGISTER_FORM", "JOIN_REQUEST_STATUS", "LOGIN", 
                                 "PROVIDER_REGISTRATION", "STORE_CREATION", "PROPERTY_CREATION", 
                                 "JOB_CREATION", "CREATE_BOOKING", "REGISTER",
-                                "MAP", "MAP_VIEW", "ADMIN_PANEL", "ADMIN_LOGIN", "OWNER_PANEL"
+                                "MAP", "MAP_VIEW", "ADMIN_PANEL", "ADMIN_LOGIN", "OWNER_PANEL",
+                                "CHAT_DIRECT", "CHAT_SUPPORT", "CHAT_LIST"
                             ) || showGuestRegisterDialogForAction != null || 
                               showAssistantDialog || showRequestServiceModal
 
@@ -1316,8 +1319,7 @@ fun AppHeaderBar(
     }
 
     val headerContext = LocalContext.current
-    val headerSp = remember(headerContext) { headerContext.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
-    var headerReadIds by remember { mutableStateOf(headerSp.getStringSet("read_notif_ids", emptySet()) ?: emptySet()) }
+    val readNotificationIdsState by viewModel.readNotificationIds.collectAsState()
     
     // Calculate unread notifications count
     val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
@@ -1332,20 +1334,16 @@ fun AppHeaderBar(
             }
         }
     }
-    val unreadNotifCount = remember(filteredNotifs, headerReadIds) {
-        filteredNotifs.count { it.id !in headerReadIds }
+    val unreadNotifCount = remember(filteredNotifs, readNotificationIdsState) {
+        filteredNotifs.count { it.id !in readNotificationIdsState }
     }
 
     // Calculate unread chats count
-    val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
+    val unreadChatsCount = remember(myChannels, currentUserId, myProvider) {
         myChannels.count { ch ->
-            val lastMsg = ch.messages.lastOrNull()
-            if (lastMsg == null) {
-                false
-            } else {
-                val isMe = lastMsg.senderId == currentUserId || (myProvider != null && lastMsg.senderId == myProvider.id)
-                val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
-                !isMe && lastMsg.timestamp > readTime
+            ch.messages.any { msg ->
+                val isMe = msg.senderId == currentUserId || (myProvider != null && msg.senderId == myProvider.id)
+                !isMe && msg.readAt == 0L
             }
         }
     }
@@ -1416,7 +1414,7 @@ fun AppHeaderBar(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
                         .background(themeColors.accent)
-                        .clickable { viewModel.navigateTo("ORDERS_VIEW") }
+                        .clickable { viewModel.navigateTo("BOOKINGS_VIEW") }
                         .padding(horizontal = 6.dp, vertical = 2.5.dp)
                 ) {
                     Row(
@@ -1517,25 +1515,22 @@ fun AppHeaderBar(
                 emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
                 vectorIcon = Icons.Default.Notifications,
                 label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = unreadNotifCount > 0,
+                isSelected = currentScreen == "NOTIFICATIONS",
                 badgeCount = unreadNotifCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
                 onClick = {
-                    val allIds = filteredNotifs.map { it.id }.toSet()
-                    headerSp.edit().putStringSet("read_notif_ids", allIds).apply()
-                    headerReadIds = allIds
+                    viewModel.markAllNotificationsAsRead(headerContext)
                     onNotificationsClick()
                 }
             )
 
             // 5. المحادثات
-            val hasUnreadChats = unreadChatsCount > 0
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topChatsIcon.ifEmpty { "✉️" },
                 vectorIcon = androidx.compose.material.icons.Icons.Default.Email,
                 label = if (isEn) "Chats" else "المحادثات",
-                isSelected = hasUnreadChats,
+                isSelected = currentScreen == "CHAT_LIST",
                 badgeCount = unreadChatsCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
@@ -4620,6 +4615,5 @@ fun isMoreThan8HoursBefore(dateStr: String, timeStr: String): Boolean {
 }
 
 /* UserSubmitPaymentProofDialog has been moved to com.example.ui.dialogs.UserSubmitPaymentProofDialog */
-/* OrdersScreenLayout has been moved to com.example.ui.screens.bookings.OrdersScreenLayout */
 /* StoreOwnerDashboardLayout has been moved to com.example.ui.screens.dashboard.StoreOwnerDashboardLayout */
 /* PropertyOwnerDashboardLayout has been moved to com.example.ui.screens.dashboard.PropertyOwnerDashboardLayout */

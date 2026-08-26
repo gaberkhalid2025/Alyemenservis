@@ -5,7 +5,12 @@ import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 
+/**
+ * ⚔️ Conflict
+ * يمثل تعارضاً بين النسخة المحلية والنسخة السحابية لبيانات محددة
+ */
 data class Conflict(
     val entityId: String,
     val entityType: String, // "ADMIN_SETTINGS", "PROVIDER", "BOOKING", "FORM_CONFIG"
@@ -16,14 +21,22 @@ data class Conflict(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+/**
+ * 🛠️ Resolution
+ * استراتيجية حل التعارض
+ */
 enum class Resolution {
     USE_CLOUD,
     USE_LOCAL,
     MERGE
 }
 
+/**
+ * 📜 ConflictAuditEntry
+ * سجل أثر حل التعارضات للأغراض الأمنية والرقابية
+ */
 data class ConflictAuditEntry(
-    val id: String = java.util.UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(),
     val entityId: String,
     val entityType: String,
     val resolution: Resolution,
@@ -33,7 +46,9 @@ data class ConflictAuditEntry(
 
 /**
  * ⚖️ ConflictResolver
- * كشف وإدارة وحل التعارضات الناتجة عن التعديل المتزامن محلياً وسحابياً
+ * 
+ * كشف وإدارة وحل التعارضات الناتجة عن التعديل المتزامن محلياً وسحابياً،
+ * وتطبيق قواعد استخدام السحابة أو التخزين المحلي أو الدمج الذكي للحقول.
  */
 class ConflictResolver(private val context: Context) {
 
@@ -48,7 +63,7 @@ class ConflictResolver(private val context: Context) {
     }
 
     /**
-     * كشف التعارضات بين النسخة المحلية والسحابية بناء على الإصدار أو التوقيت
+     * كشف التعارضات بين النسخة المحلية والسحابية بناءً على الاختلافات والإصدارات
      */
     fun detectConflicts(
         entityId: String,
@@ -80,7 +95,7 @@ class ConflictResolver(private val context: Context) {
     fun getPendingConflicts(): List<Conflict> = _pendingConflicts.value
 
     /**
-     * حل تعارض معين وتطبيق القرار
+     * حل تعارض محدد باستخدام استراتيجية معينة
      */
     fun resolveConflict(
         conflict: Conflict,
@@ -93,10 +108,8 @@ class ConflictResolver(private val context: Context) {
             Resolution.MERGE -> mergeChanges(conflict)
         }
 
-        // إزالة التعارض من القائمة المعلقة
         _pendingConflicts.value = _pendingConflicts.value.filterNot { it.entityId == conflict.entityId }
 
-        // تسجيل في سجل التدقيق
         _auditLogs.value = _auditLogs.value + ConflictAuditEntry(
             entityId = conflict.entityId,
             entityType = conflict.entityType,
@@ -110,12 +123,11 @@ class ConflictResolver(private val context: Context) {
     }
 
     /**
-     * دمج التغييرات المحلية والسحابية (دمج الحقول المحدثة)
+     * الدمج الذكي للحقول
      */
     fun mergeChanges(conflict: Conflict): Map<String, Any?> {
         val merged = HashMap<String, Any?>()
         merged.putAll(conflict.cloudData)
-        // دمج الحقول المحلية غير الفارغة أو الأحدث
         conflict.localData.forEach { (key, localVal) ->
             if (localVal != null) {
                 if (localVal is String && localVal.isNotBlank()) {
@@ -130,7 +142,7 @@ class ConflictResolver(private val context: Context) {
     }
 
     /**
-     * حل جميع التعارضات باستخدام السحابة
+     * حل كافة التعارضات عبر النسخة السحابية
      */
     fun resolveAllWithCloud(onResolved: (List<Pair<Conflict, Map<String, Any?>>>) -> Unit) {
         val list = _pendingConflicts.value.map { c ->
@@ -140,7 +152,7 @@ class ConflictResolver(private val context: Context) {
     }
 
     /**
-     * حل جميع التعارضات باستخدام المحلي
+     * حل كافة التعارضات عبر النسخة المحلية
      */
     fun resolveAllWithLocal(onResolved: (List<Pair<Conflict, Map<String, Any?>>>) -> Unit) {
         val list = _pendingConflicts.value.map { c ->

@@ -1,7 +1,5 @@
 package com.example.viewmodels
 
-import com.example.utils.*
-
 import android.Manifest
 import android.app.Application
 import android.content.Context
@@ -9,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Looper
+import androidx.annotation.Keep
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +26,27 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+@Keep
+data class MapCluster(
+    val id: String,
+    val centerLatitude: Double,
+    val centerLongitude: Double,
+    val title: String,
+    val itemCount: Int,
+    val items: List<ProviderEntity>
+)
+
+@Keep
+data class HeatmapPoint(
+    val latitude: Double,
+    val longitude: Double,
+    val intensity: Float = 1.0f
+)
+
+/**
+ * 🗺️ MapViewModel
+ * إدارة الخريطة التفاعلية، تحديد الموقع الحي GPS، تجميع النقاط (Clustering)، الخريطة الحرارية (Heatmap)، وتوجيه الملاحة.
+ */
 class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     private val mapRepo = MapRepository(application)
@@ -61,6 +81,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _properties = MutableStateFlow<List<PropertyEntity>>(emptyList())
     val properties: StateFlow<List<PropertyEntity>> = _properties.asStateFlow()
+
+    // Clusters & Heatmap
+    private val _clusters = MutableStateFlow<List<MapCluster>>(emptyList())
+    val clusters: StateFlow<List<MapCluster>> = _clusters.asStateFlow()
+
+    private val _heatmapPoints = MutableStateFlow<List<HeatmapPoint>>(emptyList())
+    val heatmapPoints: StateFlow<List<HeatmapPoint>> = _heatmapPoints.asStateFlow()
 
     // Notification toast event when new items arrive in real-time
     private val _newServiceBanner = MutableStateFlow<String?>(null)
@@ -188,6 +215,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 _newServiceBanner.value = "🆕 $message"
             }.collect { list ->
                 _providers.value = list
+                computeClustersAndHeatmap(list)
             }
         }
 
@@ -205,6 +233,43 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             }.collect { list ->
                 _properties.value = list
             }
+        }
+    }
+
+    /**
+     * حساب التجميع والتوزيع الحراري
+     */
+    private fun computeClustersAndHeatmap(providers: List<ProviderEntity>) {
+        val validProviders = providers.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+        
+        // Heatmap points
+        _heatmapPoints.value = validProviders.map {
+            HeatmapPoint(
+                latitude = it.latitude,
+                longitude = it.longitude,
+                intensity = (it.rating.coerceAtLeast(1.0f) / 5.0f)
+            )
+        }
+
+        // Simple grid-based clustering (~0.05 deg ~ 5km)
+        val clusterMap = mutableMapOf<String, MutableList<ProviderEntity>>()
+        validProviders.forEach { p ->
+            val gridKey = "${(p.latitude * 20).toInt()}_${(p.longitude * 20).toInt()}"
+            val group = clusterMap.getOrPut(gridKey) { mutableListOf() }
+            group.add(p)
+        }
+
+        _clusters.value = clusterMap.map { (key, group) ->
+            val avgLat = group.map { it.latitude }.average()
+            val avgLng = group.map { it.longitude }.average()
+            MapCluster(
+                id = key,
+                centerLatitude = avgLat,
+                centerLongitude = avgLng,
+                title = "${group.first().area} (${group.size})",
+                itemCount = group.size,
+                items = group
+            )
         }
     }
 
