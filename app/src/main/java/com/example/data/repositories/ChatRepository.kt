@@ -139,52 +139,12 @@ class ChatRepository(
 
                 val list = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(ChatChannel::class.java)?.copy(id = doc.id)
-                }?.filter { channel ->
-                    !channel.deletedForUsers.contains(cleanUserId)
                 }?.sortedByDescending { it.lastMessageTime } ?: emptyList()
 
                 trySend(list)
             }
 
         awaitClose { listener.remove() }
-    }
-
-    /**
-     * Delete a single channel (for current user or for everyone).
-     */
-    suspend fun deleteChannel(channelId: String, currentUserId: String, forEveryone: Boolean = false) {
-        if (channelId.isBlank()) return
-        try {
-            val docRef = channelsCollection.document(channelId)
-            if (forEveryone) {
-                docRef.delete().await()
-            } else {
-                docRef.update("deletedForUsers", FieldValue.arrayUnion(currentUserId)).await()
-            }
-        } catch (e: Exception) {
-            Log.e("ChatRepository", "Error deleting channel $channelId: ${e.message}")
-        }
-    }
-
-    /**
-     * Delete all channels for the current user.
-     */
-    suspend fun deleteAllChannels(currentUserId: String, forEveryone: Boolean = false) {
-        if (currentUserId.isBlank()) return
-        try {
-            val snapshot = channelsCollection.whereArrayContains("participants", currentUserId).get().await()
-            val batch = firestore.batch()
-            for (doc in snapshot.documents) {
-                if (forEveryone) {
-                    batch.delete(doc.reference)
-                } else {
-                    batch.update(doc.reference, "deletedForUsers", FieldValue.arrayUnion(currentUserId))
-                }
-            }
-            batch.commit().await()
-        } catch (e: Exception) {
-            Log.e("ChatRepository", "Error deleting all channels: ${e.message}")
-        }
     }
 
     /**
@@ -229,7 +189,6 @@ class ChatRepository(
         messageText: String,
         mediaType: MediaType = MediaType.TEXT,
         mediaUrl: String = "",
-        mediaDurationSeconds: Int = 0,
         replyToId: String? = null,
         replyToText: String? = null
     ): Boolean {
@@ -253,7 +212,6 @@ class ChatRepository(
                 message = messageText,
                 mediaType = mediaType,
                 mediaUrl = mediaUrl,
-                mediaDurationSeconds = mediaDurationSeconds,
                 replyToId = replyToId,
                 replyToText = replyToText,
                 status = MessageStatus.SENT,
@@ -276,7 +234,7 @@ class ChatRepository(
             val displayLastMessage = when (mediaType) {
                 MediaType.IMAGE -> "📷 صورة"
                 MediaType.VIDEO -> "🎥 فيديو"
-                MediaType.AUDIO -> "🎤 تسجيل صوتي (${mediaDurationSeconds}ث)"
+                MediaType.AUDIO -> "🎤 تسجيل صوتي"
                 MediaType.FILE -> "📎 ملف مرفق"
                 MediaType.TEXT -> messageText
             }
@@ -287,7 +245,6 @@ class ChatRepository(
                     "lastMessageTime" to now,
                     "lastMessageSenderId" to senderId,
                     "unreadCount" to updatedUnread,
-                    "deletedForUsers" to emptyList<String>(), // un-hide when new message arrives
                     "updatedAt" to now
                 )
             ).await()

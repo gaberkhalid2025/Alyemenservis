@@ -3,32 +3,27 @@ package com.example.ui.screens.chat
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.models.ChatChannel
 import com.example.data.models.ChatMessage
-import com.example.data.models.MediaType
 import com.example.ui.screens.chat.components.ChatBubbleItem
 import com.example.ui.screens.chat.components.ChatHeaderBar
 import com.example.ui.screens.chat.components.ChatInputBar
-import com.example.util.VoiceNoteManager
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -49,13 +44,6 @@ fun ChatScreen(
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
-    val voiceNoteManager = remember { VoiceNoteManager(context) }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            voiceNoteManager.release()
-        }
-    }
 
     val currentChannel by chatViewModel.currentChannel.collectAsState()
     val messages by chatViewModel.messages.collectAsState()
@@ -66,7 +54,6 @@ fun ChatScreen(
 
     var isSearchOpen by remember { mutableStateOf(false) }
     var selectedMessageForAction by remember { mutableStateOf<ChatMessage?>(null) }
-    var showDeleteChatDialog by remember { mutableStateOf(false) }
 
     // Initialize Chat
     LaunchedEffect(channel, channelId, targetUserId) {
@@ -78,9 +65,7 @@ fun ChatScreen(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 fallbackTargetUserId = targetUserId,
-                fallbackUserName = targetUserName,
-                relatedEntityId = relatedEntityId,
-                relatedEntityType = relatedEntityType
+                fallbackUserName = targetUserName
             )
         } else if (!targetUserId.isNullOrBlank()) {
             chatViewModel.startDirectChat(
@@ -114,53 +99,9 @@ fun ChatScreen(
         activeChannel?.participantPhotos?.get(otherUserId) ?: targetUserPhoto ?: ""
     }
 
-    val entityId = activeChannel?.relatedEntityId ?: relatedEntityId
-    val entityType = activeChannel?.relatedEntityType ?: relatedEntityType
-
     val filteredMessages = remember(messages, searchQuery) {
         if (searchQuery.isBlank()) messages
         else messages.filter { it.message.contains(searchQuery, ignoreCase = true) }
-    }
-
-    // Dialog for deleting the entire chat
-    if (showDeleteChatDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteChatDialog = false },
-            title = { Text("حذف المحادثة بالكامل", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
-            text = { Text("هل تريد حذف هذه المحادثة من قائمتك فقط أم حذفها لكلا الطرفين؟", fontSize = 13.sp) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        chatViewModel.deleteChannel(currentUserId, forEveryone = true) {
-                            showDeleteChatDialog = false
-                            onBackClick()
-                        }
-                    }
-                ) {
-                    Text("حذف للطرفين", color = Color(0xFFEF5350), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(
-                        onClick = {
-                            chatViewModel.deleteChannel(currentUserId, forEveryone = false) {
-                                showDeleteChatDialog = false
-                                onBackClick()
-                            }
-                        }
-                    ) {
-                        Text("حذف لدي فقط", color = Color(0xFF1E88E5))
-                    }
-                    TextButton(onClick = { showDeleteChatDialog = false }) {
-                        Text("إلغاء", color = Color.Gray)
-                    }
-                }
-            },
-            containerColor = Color(0xFF142030),
-            textContentColor = Color.LightGray,
-            titleContentColor = Color.White
-        )
     }
 
     Column(
@@ -184,49 +125,8 @@ fun ChatScreen(
                     chatViewModel.toggleBlock(otherUserId, true)
                     Toast.makeText(context, "تم حظر المستخدم", Toast.LENGTH_SHORT).show()
                 }
-            },
-            onDeleteChatClick = {
-                showDeleteChatDialog = true
             }
         )
-
-        // Related Context Bar (Booking / Urgent Request)
-        if (!entityId.isNullOrBlank()) {
-            val contextTitle = when (entityType?.uppercase()) {
-                "BOOKING" -> "📅 محادثة بخصوص الحجز رقم #${entityId.takeLast(6)}"
-                "URGENT_REQUEST" -> "🚨 محادثة بخصوص الطلب العاجل رقم #${entityId.takeLast(6)}"
-                "SUPPORT" -> "🛡️ تذكرة الدعم الفني رقم #${entityId.takeLast(6)}"
-                else -> "📋 بخصوص المعاملة رقم #${entityId.takeLast(6)}"
-            }
-
-            Surface(
-                color = Color(0xFF19324D),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFF1E88E5).copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = Color(0xFF64B5F6),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = contextTitle,
-                        fontSize = 12.sp,
-                        color = Color(0xFFE3F2FD),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
 
         // In-chat search bar
         AnimatedVisibility(visible = isSearchOpen) {
@@ -285,7 +185,6 @@ fun ChatScreen(
                         ChatBubbleItem(
                             message = msg,
                             isMe = isMe,
-                            voiceNoteManager = voiceNoteManager,
                             onReplyClick = { chatViewModel.setReplyingTo(msg) },
                             onLongClick = { selectedMessageForAction = msg }
                         )
@@ -298,22 +197,13 @@ fun ChatScreen(
         ChatInputBar(
             replyingTo = replyingTo,
             onCancelReply = { chatViewModel.setReplyingTo(null) },
-            onSendMessage = { text, mediaType, mediaUrl, durationSec ->
+            onSendMessage = { text, mediaType, mediaUrl ->
                 chatViewModel.sendMessage(
                     senderId = currentUserId,
                     senderName = currentUserName,
                     text = text,
                     mediaType = mediaType,
-                    mediaUrl = mediaUrl,
-                    mediaDurationSeconds = durationSec
-                )
-            },
-            onSendVoiceFile = { audioFile, durationSec ->
-                chatViewModel.sendVoiceNote(
-                    senderId = currentUserId,
-                    senderName = currentUserName,
-                    audioFile = audioFile,
-                    durationSeconds = durationSec
+                    mediaUrl = mediaUrl
                 )
             },
             onTyping = { text ->
@@ -329,49 +219,28 @@ fun ChatScreen(
 
         AlertDialog(
             onDismissRequest = { selectedMessageForAction = null },
-            title = { Text("خيارات الرسالة", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+            title = { Text("خيارات الرسالة", fontSize = 14.sp, color = Color.White) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = {
-                            chatViewModel.setReplyingTo(targetMsg)
+                    TextButton(onClick = {
+                        chatViewModel.setReplyingTo(targetMsg)
+                        selectedMessageForAction = null
+                    }) {
+                        Text("↩️ الرد على الرسالة", color = Color.White, fontSize = 13.sp)
+                    }
+                    if (isMe) {
+                        TextButton(onClick = {
+                            chatViewModel.deleteMessage(targetMsg.id, true, currentUserId)
                             selectedMessageForAction = null
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Send, contentDescription = null, tint = Color(0xFF64B5F6))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("الرد على هذه الرسالة", color = Color.White, fontSize = 13.sp)
+                        }) {
+                            Text("🗑️ حذف لدى الجميع", color = Color(0xFFE53935), fontSize = 13.sp)
                         }
                     }
-                    if (isMe && !targetMsg.isDeleted) {
-                        TextButton(
-                            onClick = {
-                                chatViewModel.deleteMessage(targetMsg.id, true, currentUserId)
-                                selectedMessageForAction = null
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("حذف لدى الطرفين (الجميع)", color = Color(0xFFEF5350), fontSize = 13.sp)
-                            }
-                        }
-                    }
-                    TextButton(
-                        onClick = {
-                            chatViewModel.deleteMessage(targetMsg.id, false, currentUserId)
-                            selectedMessageForAction = null
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Delete, contentDescription = null, tint = Color.LightGray)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("حذف لدي فقط", color = Color.LightGray, fontSize = 13.sp)
-                        }
+                    TextButton(onClick = {
+                        chatViewModel.deleteMessage(targetMsg.id, false, currentUserId)
+                        selectedMessageForAction = null
+                    }) {
+                        Text("🗑️ حذف لدي فقط", color = Color.LightGray, fontSize = 13.sp)
                     }
                 }
             },

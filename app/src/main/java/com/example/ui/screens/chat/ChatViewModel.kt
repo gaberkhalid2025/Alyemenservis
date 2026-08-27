@@ -1,7 +1,5 @@
 package com.example.ui.screens.chat
 
-import android.net.Uri
-import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.*
@@ -10,7 +8,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.io.File
 
 class ChatViewModel(
     private val repository: ChatRepository = ChatRepository()
@@ -39,7 +36,6 @@ class ChatViewModel(
 
     private var messagesJob: Job? = null
     private var presenceJob: Job? = null
-    private var channelJob: Job? = null
     private var typingJob: Job? = null
 
     /**
@@ -64,9 +60,7 @@ class ChatViewModel(
         currentUserId: String,
         currentUserName: String = "",
         fallbackTargetUserId: String? = null,
-        fallbackUserName: String? = null,
-        relatedEntityId: String? = null,
-        relatedEntityType: String? = null
+        fallbackUserName: String? = null
     ) {
         viewModelScope.launch {
             val channel = repository.getChannelById(channelId)
@@ -81,9 +75,7 @@ class ChatViewModel(
                         currentUserPhoto = "",
                         otherUserId = targetId,
                         otherUserName = fallbackUserName ?: "مستخدم",
-                        otherUserPhoto = "",
-                        relatedEntityId = relatedEntityId,
-                        relatedEntityType = relatedEntityType
+                        otherUserPhoto = ""
                     )
                 }
             }
@@ -91,7 +83,7 @@ class ChatViewModel(
     }
 
     /**
-     * Initialize or find channel between two users with context.
+     * Initialize or find channel between two users.
      */
     fun startDirectChat(
         currentUserId: String,
@@ -142,8 +134,7 @@ class ChatViewModel(
         senderName: String,
         text: String,
         mediaType: MediaType = MediaType.TEXT,
-        mediaUrl: String = "",
-        mediaDurationSeconds: Int = 0
+        mediaUrl: String = ""
     ) {
         val channel = _currentChannel.value ?: return
         if (text.isBlank() && mediaUrl.isBlank()) return
@@ -159,7 +150,6 @@ class ChatViewModel(
                 messageText = text.trim(),
                 mediaType = mediaType,
                 mediaUrl = mediaUrl,
-                mediaDurationSeconds = mediaDurationSeconds,
                 replyToId = replyTo?.id,
                 replyToText = replyTo?.message
             )
@@ -167,52 +157,6 @@ class ChatViewModel(
             if (success) {
                 _replyingToMessage.value = null
                 sendTypingStatus(senderId, false)
-            }
-        }
-    }
-
-    /**
-     * Send recorded audio voice note.
-     */
-    fun sendVoiceNote(
-        senderId: String,
-        senderName: String,
-        audioFile: File,
-        durationSeconds: Int
-    ) {
-        val channel = _currentChannel.value ?: return
-        if (!audioFile.exists() || audioFile.length() == 0L) return
-
-        _isSending.value = true
-        viewModelScope.launch {
-            try {
-                // Read bytes & format as data URI or local path
-                val bytes = audioFile.readBytes()
-                val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                val dataUri = "data:audio/mp4;base64,$base64"
-
-                repository.sendMessage(
-                    channelId = channel.id,
-                    senderId = senderId,
-                    senderName = senderName,
-                    messageText = "تسجيل صوتي",
-                    mediaType = MediaType.AUDIO,
-                    mediaUrl = dataUri,
-                    mediaDurationSeconds = durationSeconds
-                )
-            } catch (e: Exception) {
-                // Fallback to absolute path
-                repository.sendMessage(
-                    channelId = channel.id,
-                    senderId = senderId,
-                    senderName = senderName,
-                    messageText = "تسجيل صوتي",
-                    mediaType = MediaType.AUDIO,
-                    mediaUrl = audioFile.absolutePath,
-                    mediaDurationSeconds = durationSeconds
-                )
-            } finally {
-                _isSending.value = false
             }
         }
     }
@@ -231,7 +175,7 @@ class ChatViewModel(
         typingJob = viewModelScope.launch {
             repository.setTyping(channel.id, senderId, text.isNotBlank())
             if (text.isNotBlank()) {
-                delay(2500)
+                delay(3000)
                 repository.setTyping(channel.id, senderId, false)
             }
         }
@@ -257,14 +201,6 @@ class ChatViewModel(
         }
     }
 
-    fun deleteChannel(currentUserId: String, forEveryone: Boolean, onDeleted: () -> Unit) {
-        val channel = _currentChannel.value ?: return
-        viewModelScope.launch {
-            repository.deleteChannel(channel.id, currentUserId, forEveryone)
-            onDeleted()
-        }
-    }
-
     fun toggleBlock(otherUserId: String, block: Boolean) {
         val channel = _currentChannel.value ?: return
         viewModelScope.launch {
@@ -281,7 +217,6 @@ class ChatViewModel(
         super.onCleared()
         messagesJob?.cancel()
         presenceJob?.cancel()
-        channelJob?.cancel()
         typingJob?.cancel()
     }
 }

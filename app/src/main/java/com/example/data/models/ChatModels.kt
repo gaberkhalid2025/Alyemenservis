@@ -19,27 +19,20 @@ enum class MessageStatus {
 }
 
 @Keep
-enum class ChatFilterCategory {
-    ALL, UNREAD, TECHNICIANS, STORES, RESTAURANTS, SUPPORT
-}
-
-@Keep
 data class ChatChannel(
     val id: String = "",
     val participants: List<String> = emptyList(),
     val participantNames: Map<String, String> = emptyMap(),
     val participantPhotos: Map<String, String> = emptyMap(),
-    val participantRoles: Map<String, String> = emptyMap(),
     val type: ChannelType = ChannelType.PRIVATE,
     val relatedEntityId: String? = null,
-    val relatedEntityType: String? = null, // BOOKING, URGENT_REQUEST, SUPPORT, STORE, RESTAURANT, TECHNICIAN
+    val relatedEntityType: String? = null, // BOOKING, URGENT_REQUEST, SUPPORT
     val lastMessage: String = "",
     val lastMessageTime: Long = 0L,
     val lastMessageSenderId: String = "",
     val unreadCount: Map<String, Int> = emptyMap(),
     val isBlocked: Map<String, Boolean> = emptyMap(),
     val isTyping: Map<String, Boolean> = emptyMap(),
-    val deletedForUsers: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) : Serializable
@@ -53,7 +46,6 @@ data class ChatMessage(
     val message: String = "",
     val mediaType: MediaType = MediaType.TEXT,
     val mediaUrl: String = "",
-    val mediaDurationSeconds: Int = 0,
     val replyToId: String? = null,
     val replyToText: String? = null,
     val status: MessageStatus = MessageStatus.SENT,
@@ -68,4 +60,3 @@ data class UserPresence(
     val isOnline: Boolean = false,
     val lastSeen: Long = System.currentTimeMillis()
 ) : Serializable
-

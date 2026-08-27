@@ -5,9 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -34,8 +33,7 @@ fun ChatHeaderBar(
     isTyping: Boolean,
     onBackClick: () -> Unit,
     onSearchToggle: () -> Unit,
-    onBlockClick: () -> Unit,
-    onDeleteChatClick: () -> Unit = {}
+    onBlockClick: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -48,7 +46,7 @@ fun ChatHeaderBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBackClick) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+            Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
         }
 
         Box(modifier = Modifier.size(42.dp)) {
@@ -132,20 +130,12 @@ fun ChatHeaderBar(
                 modifier = Modifier.background(Color(0xFF1E293B))
             ) {
                 DropdownMenuItem(
-                    text = { Text("حذف هذه المحادثة", color = Color(0xFFEF5350), fontSize = 13.sp) },
-                    onClick = {
-                        showMenu = false
-                        onDeleteChatClick()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350)) }
-                )
-                DropdownMenuItem(
-                    text = { Text("حظر المستخدم", color = Color.LightGray, fontSize = 13.sp) },
+                    text = { Text("حظر المستخدم", color = Color(0xFFE53935), fontSize = 13.sp) },
                     onClick = {
                         showMenu = false
                         onBlockClick()
                     },
-                    leadingIcon = { Icon(Icons.Default.Clear, contentDescription = null, tint = Color.LightGray) }
+                    leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFE53935)) }
                 )
             }
         }
