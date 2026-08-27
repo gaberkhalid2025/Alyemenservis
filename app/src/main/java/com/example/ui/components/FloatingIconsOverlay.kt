@@ -11,7 +11,6 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,9 +18,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -31,10 +27,9 @@ import com.example.utils.VisualThemePalette
 import kotlin.math.roundToInt
 
 /**
- * 🌟 High-Craft Floating Action Buttons (FABs) with 10/10 UX
- * - Drag bounds constraints coerced to prevent elements from going off-screen
- * - Status retention via rememberSaveable
- * - Fully localized accessibility semantics
+ * 🌟 High-Craft Floating Action Buttons (FABs)
+ * 1. "اطلب خدمتك الآن": Compact, vivid red gradient, instant 3-step wizard.
+ * 2. "المساعد الذكي": Draggable Floating Action Button (FAB قابلة للسحب), royal indigo-blue gradient.
  */
 @Composable
 fun BoxScope.FloatingIconsOverlay(
@@ -44,7 +39,7 @@ fun BoxScope.FloatingIconsOverlay(
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن"
+    // 1. Primary Action FAB: "اطلب خدمتك الآن" (يظهر فقط للعملاء المسجلين، وليس للزوار أو مقدمي الخدمات)
     if (isClientUser && !settings.footerMessage.contains("hide_urgent_fab")) {
         Box(
             modifier = Modifier
@@ -59,11 +54,7 @@ fun BoxScope.FloatingIconsOverlay(
                 )
                 .clickable { onRequestServiceClick() }
                 .border(1.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp)
-                .testTag("urgent_service_fab")
-                .semantics {
-                    contentDescription = "طلب خدمة عاجلة فورية"
-                },
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
@@ -72,7 +63,7 @@ fun BoxScope.FloatingIconsOverlay(
             ) {
                 Icon(
                     imageVector = Icons.Default.Send,
-                    contentDescription = null,
+                    contentDescription = "اطلب خدمتك الآن",
                     tint = Color.White,
                     modifier = Modifier.size(13.dp)
                 )
@@ -86,10 +77,10 @@ fun BoxScope.FloatingIconsOverlay(
         }
     }
 
-    // 2. Draggable Smart Assistant FAB (قائمة للسحب بحرية مع تحديد الحدود لمنع الضياع)
+    // 2. Draggable Smart Assistant FAB (قائم للسحب بحرية على الشاشة)
     if (!settings.assistantHidden) {
-        var offsetX by rememberSaveable { mutableFloatStateOf(0f) }
-        var offsetY by rememberSaveable { mutableFloatStateOf(0f) }
+        var offsetX by remember { mutableFloatStateOf(0f) }
+        var offsetY by remember { mutableFloatStateOf(0f) }
 
         Box(
             modifier = Modifier
@@ -106,18 +97,13 @@ fun BoxScope.FloatingIconsOverlay(
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
-                        // Constrain dragging to stay inside typical screen sizes safely
-                        offsetX = (offsetX + dragAmount.x).coerceIn(-320f, 10f)
-                        offsetY = (offsetY + dragAmount.y).coerceIn(-720f, 10f)
+                        offsetX += dragAmount.x
+                        offsetY += dragAmount.y
                     }
                 }
                 .clickable { onAssistantClick() }
                 .border(1.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp)
-                .testTag("smart_assistant_fab")
-                .semantics {
-                    contentDescription = "المساعد الذكي القابل للسحب"
-                },
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(

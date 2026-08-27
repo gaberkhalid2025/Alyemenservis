@@ -2,7 +2,6 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.secrets)
-  alias(libs.plugins.google.devtools.ksp)
   id("com.google.gms.google-services")
 }
 
@@ -22,32 +21,22 @@ android {
 
   signingConfigs {
     create("releaseConfig") {
-      val customKeystore = file(System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() } ?: "${rootDir}/my-release-key.jks")
+      val customKeystore = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-release-key.jks")
       val releaseKeystore = file("${rootDir}/release.keystore")
       val debugKeystore = file("${rootDir}/debug.keystore")
 
-      fun envOr(key: String, fallback: String): String {
-        return System.getenv(key)?.takeIf { it.isNotBlank() } ?: fallback
-      }
-
       if (customKeystore.exists()) {
         storeFile = customKeystore
-        storePassword = envOr("RELEASE_KEYSTORE_PASSWORD", envOr("STORE_PASSWORD", "Maher@@--@@736462##"))
-        keyAlias = envOr("RELEASE_KEY_ALIAS", envOr("KEY_ALIAS", "Maher"))
-        keyPassword = envOr("RELEASE_KEY_PASSWORD", envOr("KEY_PASSWORD", "Maher@@--@@736462##"))
+        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "Maher@@--@@736462##"
+        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "Maher"
+        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "Maher@@--@@736462##"
       } else if (releaseKeystore.exists()) {
         storeFile = releaseKeystore
-        storePassword = envOr("RELEASE_KEYSTORE_PASSWORD", envOr("STORE_PASSWORD", "Maher@@--@@736462##"))
-        keyAlias = envOr("RELEASE_KEY_ALIAS", envOr("KEY_ALIAS", "Maher"))
-        keyPassword = envOr("RELEASE_KEY_PASSWORD", envOr("KEY_PASSWORD", "Maher@@--@@736462##"))
+        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "Maher@@--@@736462##"
+        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "Maher"
+        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "Maher@@--@@736462##"
       } else if (debugKeystore.exists()) {
         storeFile = debugKeystore
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
-      } else {
-        // Fallback to debug keystore path if created dynamically
-        storeFile = file("${rootDir}/debug.keystore")
         storePassword = "android"
         keyAlias = "androiddebugkey"
         keyPassword = "android"
@@ -92,31 +81,43 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
+// Configure the Secrets Gradle Plugin to use .env and .env.example files
+// to match the convention used in Web projects.
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
 }
 
+// Some unused dependencies are commented out below instead of being removed.
+// This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation("androidx.fragment:fragment-ktx:1.8.6")
   implementation(platform(libs.firebase.bom))
+  // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
+  // implementation(libs.androidx.camera.camera2)
+  // implementation(libs.androidx.camera.core)
+  // implementation(libs.androidx.camera.lifecycle)
+  // implementation(libs.androidx.camera.view)
   implementation(libs.androidx.compose.material.icons.core)
+  // implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.work.runtime.ktx)
+  // implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
-  implementation(libs.androidx.room.ktx)
-  implementation(libs.androidx.room.runtime)
-  ksp(libs.androidx.room.compiler)
+  // implementation(libs.androidx.navigation.compose)
+  // implementation(libs.androidx.room.ktx)
+  // implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
+  // implementation(libs.firebase.ai)
   implementation(libs.firebase.auth)
   implementation(libs.firebase.appcheck)
   implementation(libs.firebase.appcheck.playintegrity)

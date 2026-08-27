@@ -1,5 +1,6 @@
 package com.example.ui.screens.admin
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,107 +14,94 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.MainViewModel
-import com.example.ui.screens.admin.components.AdminEntityCard
-import com.example.utils.VisualThemePalette
-import kotlinx.coroutines.launch
+import com.example.viewmodels.AdminViewModel
 
-/**
- * 📢 Admin Panel: Banners Management (إدارة البنرات الإعلانية)
- */
+data class BannerItem(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val actionUrl: String,
+    val isActive: Boolean = true
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminBannersPanel(
     onBack: () -> Unit = {},
-    viewModel: MainViewModel = viewModel(),
-    themeColors: VisualThemePalette,
+    adminViewModel: AdminViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val banners by viewModel.banners.collectAsState()
-
+    val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
+    var subtitle by remember { mutableStateOf("") }
+    var actionUrl by remember { mutableStateOf("") }
+
+    var bannersList by remember {
+        mutableStateOf(
+            listOf(
+                BannerItem("BAN-1", "خصومات خاصة على صيانة منظومات الطاقة الشمسية ☀️", "خدمة سريعة وضمان معتمد", "service://solar"),
+                BannerItem("BAN-2", "انضم الآن كفني أو متجر معتمد في كل خدمات اليمن 🇾🇪", "سجل الآن وابدأ باستقبال الطلبات", "service://join"),
+                BannerItem("BAN-3", "عروض المتاجر وقطع الغيار الأصلية 🛍️", "توصيل سريع لكافة المحافظات", "service://stores")
+            )
+        )
+    }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("📢 إدارة البنرات الإعلانية", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White) },
+                title = { Text("إدارة الإعلانات والبنرات", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
                     }
                 },
                 actions = {
                     IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "إضافة بنر", tint = themeColors.accent)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
-            )
-        },
-        containerColor = Color(0xFF0F172A)
-    ) { paddingValues ->
-        if (banners.isEmpty()) {
-            Box(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("📢 لا توجد بنرات إعلانية حالياً", color = Color.Gray, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { showAddDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                    ) {
-                        Text("إضافة بنر جديد", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Add, contentDescription = "إضافة بنر", tint = Color(0xFF00668B))
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(banners, key = { it.id }) { banner ->
-                    AdminEntityCard(
-                        title = banner.title.ifBlank { "بنر إعلاني" },
-                        subtitle = "🎯 القسم: ${banner.redirectCategory} • 🔗 ${banner.url.take(25)}...",
-                        details = "مدة العرض: ${banner.duration} ثواني • التوقيت: ${banner.displayTime}",
-                        statusText = "نشط",
-                        statusColor = Color(0xFF10B981),
-                        themeColors = themeColors,
-                        actions = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("الترتيب: #${banner.order}", fontSize = 11.sp, color = Color.Gray)
-                                IconButton(
-                                    onClick = {
-                                        viewModel.deleteBanner(banner.id)
-                                        scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف البنر الإعلاني") }
-                                    },
-                                    modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
-                                }
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = modifier.fillMaxSize().padding(paddingValues).background(Color(0xFFF8FAFC)),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(bannersList, key = { it.id }) { banner ->
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(banner.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(banner.subtitle, fontSize = 12.sp, color = Color.Gray)
                             }
+                            Switch(
+                                checked = banner.isActive,
+                                onCheckedChange = { active ->
+                                    bannersList = bannersList.map { if (it.id == banner.id) it.copy(isActive = active) else it }
+                                    Toast.makeText(context, if (active) "تم تفعيل البنر" else "تم إيقاف البنر", Toast.LENGTH_SHORT).show()
+                                }
+                            )
                         }
-                    )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("الرابط: ${banner.actionUrl}", fontSize = 11.sp, color = Color(0xFF00668B))
+                    }
                 }
             }
         }
@@ -122,54 +110,25 @@ fun AdminBannersPanel(
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            containerColor = Color(0xFF1E293B),
-            title = { Text("📢 إضافة بنر إعلاني جديد", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            title = { Text("إضافة بنر إعلاني جديد") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("عنوان البنر / النبذة", color = Color.Gray) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it },
-                        label = { Text("رابط الصورة أو التوجيه", color = Color.Gray) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("عنوان البنر") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = subtitle, onValueChange = { subtitle = it }, label = { Text("الوصف الفرعي") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = actionUrl, onValueChange = { actionUrl = it }, label = { Text("رابط التوجيه") }, modifier = Modifier.fillMaxWidth())
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        if (title.isNotBlank()) {
-                            viewModel.addBanner(
-                                title = title,
-                                url = url,
-                                redirect = "home",
-                                type = "BANNER",
-                                size = "MEDIUM",
-                                duration = 5,
-                                displayTime = "ALL"
-                            )
-                            showAddDialog = false
-                            title = ""; url = ""
-                            scope.launch { snackbarHostState.showSnackbar("✅ تم حفظ البنر الإعلاني بنجاح") }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                ) {
-                    Text("حفظ البنر", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
+                Button(onClick = {
+                    if (title.isNotBlank()) {
+                        bannersList = listOf(BannerItem("BAN-${System.currentTimeMillis() % 1000}", title, subtitle, actionUrl)) + bannersList
+                        showAddDialog = false
+                        title = ""; subtitle = ""; actionUrl = ""
+                        Toast.makeText(context, "تمت إضافة البنر بنجاح", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("إضافة") }
             },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("إلغاء", color = Color.Gray)
-                }
-            }
+            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("إلغاء") } }
         )
     }
 }

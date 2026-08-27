@@ -1,8 +1,10 @@
 package com.example.ui.screens.chat
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,9 +13,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,10 +30,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.data.models.ChatChannel
+import com.example.data.models.ChatFilterCategory
 import com.example.utils.VisualThemePalette
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
     currentUserId: String,
@@ -42,18 +45,22 @@ fun ChatListScreen(
     onChannelClick: (ChatChannel) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val channels by chatListViewModel.channels.collectAsState()
+    val filteredChannels by chatListViewModel.filteredChannels.collectAsState()
     val selectedFilter by chatListViewModel.selectedFilter.collectAsState()
     val searchQuery by chatListViewModel.searchQuery.collectAsState()
     val isLoading by chatListViewModel.isLoading.collectAsState()
 
-    val filters = listOf(
-        Pair("ALL", "الكل"),
-        Pair("UNREAD", "غير مقروءة 🔴"),
-        Pair("TECHNICIANS", "🛠️ فنيين"),
-        Pair("STORES", "🏪 متاجر"),
-        Pair("RESTAURANTS", "🍽️ مطاعم"),
-        Pair("SUPPORT", "🛡️ الدعم الفني")
+    var showMenu by remember { mutableStateOf(false) }
+    var channelToDelete by remember { mutableStateOf<ChatChannel?>(null) }
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
+
+    val filterTabs = listOf(
+        Pair(ChatFilterCategory.ALL, "الكل"),
+        Pair(ChatFilterCategory.UNREAD, "غير مقروءة"),
+        Pair(ChatFilterCategory.TECHNICIANS, "فنيين"),
+        Pair(ChatFilterCategory.STORES, "متاجر"),
+        Pair(ChatFilterCategory.RESTAURANTS, "مطاعم"),
+        Pair(ChatFilterCategory.SUPPORT, "دعم فني")
     )
 
     LaunchedEffect(currentUserId) {
@@ -63,93 +70,70 @@ fun ChatListScreen(
         }
     }
 
-    val filteredChannels = remember(channels, selectedFilter, searchQuery, currentUserId) {
-        channels.filter { channel ->
-            val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
-            val otherName = channel.participantNames[otherUserId] ?: ""
-            val matchesSearch = searchQuery.isBlank() ||
-                    otherName.contains(searchQuery, ignoreCase = true) ||
-                    channel.lastMessage.contains(searchQuery, ignoreCase = true) ||
-                    (channel.relatedEntityCode?.contains(searchQuery, ignoreCase = true) == true)
+    // Dialog for deleting single channel
+    channelToDelete?.let { channel ->
+        val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
+        val otherName = channel.participantNames[otherUserId] ?: "المحادثة"
 
-            val cat = channel.channelCategory.uppercase()
-            val relType = (channel.relatedEntityType ?: "").uppercase()
-            val chType = channel.type.name.uppercase()
-
-            val matchesFilter = when (selectedFilter) {
-                "UNREAD" -> (channel.unreadCount[currentUserId] ?: 0) > 0
-                "TECHNICIANS" -> cat == "TECHNICIAN" || relType == "TECHNICIAN" || relType == "PROVIDER"
-                "STORES" -> cat == "STORE" || relType == "STORE"
-                "RESTAURANTS" -> cat == "RESTAURANT" || relType == "RESTAURANT"
-                "SUPPORT" -> chType == "SUPPORT" || relType == "SUPPORT"
-                else -> true
-            }
-
-            matchesSearch && matchesFilter
-        }
-    }
-
-    var showDeleteAllConfirm by remember { mutableStateOf(false) }
-    var channelToDelete by remember { mutableStateOf<ChatChannel?>(null) }
-
-    if (showDeleteAllConfirm) {
         AlertDialog(
-            onDismissRequest = { showDeleteAllConfirm = false },
-            title = { Text("حذف كافة المحادثات 🗑️", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
-            text = { Text("هل أنت متأكد من رغبتك في حذف جميع المحادثات نهائياً؟ لا يمكن استرجاع الرسائل المحذوفة.", fontSize = 14.sp) },
+            onDismissRequest = { channelToDelete = null },
+            title = { Text("حذف المحادثة مع $otherName", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = { Text("هل تريد حذف هذه المحادثة من قائمتك أم حذفها للجميع؟", fontSize = 13.sp) },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
-                        chatListViewModel.deleteAllChannels(channels)
-                        showDeleteAllConfirm = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                        chatListViewModel.deleteChannel(channel.id, currentUserId, forEveryone = true)
+                        channelToDelete = null
+                    }
                 ) {
-                    Text("حذف الجميع", color = Color.White)
+                    Text("حذف للطرفين", color = Color(0xFFEF5350), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteAllConfirm = false }) {
-                    Text("إلغاء", color = Color.Gray)
+                Row {
+                    TextButton(
+                        onClick = {
+                            chatListViewModel.deleteChannel(channel.id, currentUserId, forEveryone = false)
+                            channelToDelete = null
+                        }
+                    ) {
+                        Text("حذف لدي فقط", color = Color(0xFF1E88E5))
+                    }
+                    TextButton(onClick = { channelToDelete = null }) {
+                        Text("إلغاء", color = Color.Gray)
+                    }
                 }
-            }
+            },
+            containerColor = Color(0xFF142030),
+            textContentColor = Color.LightGray,
+            titleContentColor = Color.White
         )
     }
 
-    if (channelToDelete != null) {
+    // Dialog for deleting all channels
+    if (showDeleteAllDialog) {
         AlertDialog(
-            onDismissRequest = { channelToDelete = null },
-            title = { Text("حذف المحادثة 🗑️", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
-            text = { Text("اختر خيار الحذف المناسب لهذه المحادثة:", fontSize = 14.sp) },
+            onDismissRequest = { showDeleteAllDialog = false },
+            title = { Text("حذف جميع المحادثات", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = { Text("هل أنت متأكد من رغبتك في مسح كافة المحادثات والرسائل؟", fontSize = 13.sp) },
             confirmButton = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(
-                        onClick = {
-                            channelToDelete?.let { chatListViewModel.deleteChannelForUser(it.id, currentUserId) }
-                            channelToDelete = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("🗑️ حذف لدي فقط", color = Color.White, fontSize = 13.sp)
+                TextButton(
+                    onClick = {
+                        chatListViewModel.deleteAllChannels(currentUserId, forEveryone = false)
+                        showDeleteAllDialog = false
                     }
-                    Button(
-                        onClick = {
-                            channelToDelete?.let { chatListViewModel.deleteChannelForEveryone(it.id) }
-                            channelToDelete = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("🗑️ حذف للجميع نهائياً", color = Color.White, fontSize = 13.sp)
-                    }
+                ) {
+                    Text("مسح الكل لدي", color = Color(0xFFEF5350), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { channelToDelete = null }) {
+                TextButton(onClick = { showDeleteAllDialog = false }) {
                     Text("إلغاء", color = Color.Gray)
                 }
-            }
+            },
+            containerColor = Color(0xFF142030),
+            textContentColor = Color.LightGray,
+            titleContentColor = Color.White
         )
     }
 
@@ -158,7 +142,7 @@ fun ChatListScreen(
             .fillMaxSize()
             .background(Color(0xFF0D151F))
     ) {
-        // Header
+        // Top App Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -173,7 +157,7 @@ fun ChatListScreen(
                     .size(36.dp)
                     .background(Color.White.copy(alpha = 0.08f), CircleShape)
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -189,17 +173,30 @@ fun ChatListScreen(
                     color = Color(0xFF90CAF9)
                 )
             }
-            if (channels.isNotEmpty()) {
+
+            // Options menu (Delete all chats)
+            Box {
                 IconButton(
-                    onClick = { showDeleteAllConfirm = true },
+                    onClick = { showMenu = true },
                     modifier = Modifier
                         .size(36.dp)
-                        .background(Color(0xFFEF5350).copy(alpha = 0.15f), CircleShape)
+                        .background(Color.White.copy(alpha = 0.08f), CircleShape)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "حذف جميع المحادثات",
-                        tint = Color(0xFFEF5350)
+                    Icon(Icons.Default.MoreVert, contentDescription = "خيارات", tint = Color.White)
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(Color(0xFF142030))
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("حذف جميع المحادثات", color = Color(0xFFEF5350), fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350)) },
+                        onClick = {
+                            showMenu = false
+                            showDeleteAllDialog = true
+                        }
                     )
                 }
             }
@@ -209,8 +206,15 @@ fun ChatListScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { chatListViewModel.setSearchQuery(it) },
-            placeholder = { Text("بحث في المحادثات...", fontSize = 12.sp, color = Color.Gray) },
+            placeholder = { Text("بحث في الأسماء، الرسائل، أو أرقام الطلبات...", fontSize = 12.sp, color = Color.Gray) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث", tint = Color.Gray) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { chatListViewModel.setSearchQuery("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                    }
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -226,20 +230,20 @@ fun ChatListScreen(
             singleLine = true
         )
 
-        // Filter Pills
+        // Filter Tabs
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(filters) { (key, title) ->
-                val isSelected = selectedFilter == key
+            items(filterTabs) { (filterCat, title) ->
+                val isSelected = selectedFilter == filterCat
                 Surface(
                     color = if (isSelected) Color(0xFF1E88E5) else Color(0xFF142030),
                     shape = RoundedCornerShape(16.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF1E88E5) else Color.White.copy(alpha = 0.08f)),
-                    modifier = Modifier.clickable { chatListViewModel.setFilter(key) }
+                    modifier = Modifier.clickable { chatListViewModel.setFilter(filterCat) }
                 ) {
                     Text(
                         text = title,
@@ -261,12 +265,16 @@ fun ChatListScreen(
             }
         } else if (filteredChannels.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    text = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة." else "لا توجد محادثات نشطة حالياً. عند قبول عرض أو طلب خدمة ستظهر محادثتك هنا فوراً.",
-                    color = Color.Gray,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Email, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة." else "لا توجد محادثات في هذا القسم حالياً.",
+                        color = Color.Gray,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         } else {
             LazyColumn(
@@ -286,7 +294,7 @@ fun ChatListScreen(
                         otherPhoto = otherPhoto,
                         unreadCount = unread,
                         onClick = { onChannelClick(channel) },
-                        onDeleteClick = { channelToDelete = channel }
+                        onLongClick = { channelToDelete = channel }
                     )
                 }
             }
@@ -294,6 +302,7 @@ fun ChatListScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChannelItemCard(
     channel: ChatChannel,
@@ -301,7 +310,7 @@ private fun ChannelItemCard(
     otherPhoto: String,
     unreadCount: Int,
     onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onLongClick: () -> Unit
 ) {
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     val formattedTime = if (channel.lastMessageTime > 0) timeFormat.format(Date(channel.lastMessageTime)) else ""
@@ -312,7 +321,10 @@ private fun ChannelItemCard(
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Row(
             modifier = Modifier
@@ -369,7 +381,22 @@ private fun ChannelItemCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                // Entity context badge if available (e.g. Booking #XXX)
+                if (!channel.relatedEntityId.isNullOrBlank()) {
+                    val badgeLabel = when (channel.relatedEntityType?.uppercase()) {
+                        "BOOKING" -> "حجز #${channel.relatedEntityId.takeLast(6)}"
+                        "URGENT_REQUEST" -> "طلب عاجل #${channel.relatedEntityId.takeLast(6)}"
+                        else -> "طلب #${channel.relatedEntityId.takeLast(6)}"
+                    }
+                    Text(
+                        text = badgeLabel,
+                        fontSize = 10.sp,
+                        color = Color(0xFF4FC3F7),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -403,19 +430,6 @@ private fun ChannelItemCard(
                         }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = onDeleteClick,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "حذف المحادثة",
-                    tint = Color(0xFFEF5350).copy(alpha = 0.8f),
-                    modifier = Modifier.size(18.dp)
-                )
             }
         }
     }

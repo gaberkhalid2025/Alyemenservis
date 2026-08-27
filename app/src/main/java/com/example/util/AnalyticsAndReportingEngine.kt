@@ -1,5 +1,7 @@
 package com.example.util
 
+import com.example.utils.*
+
 import android.content.Context
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
@@ -8,18 +10,15 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 📊 AnalyticsAndReportingEngine
- * 
- * محرك التحليلات وإصدار التقارير والإحصائيات للأدمن وأصحاب الأعمال، وتوليد ملفات CSV/PDF 
- * واستكشاف الأنماط غير الطبيعية والتكامل مع Firebase Analytics و Firestore.
+ * 📊 Problem 15 Solution: Advanced Analytics, Reporting & Export Engine
+ * Interactive Admin Analytics Dashboard, Business Owner Performance Metrics, Multi-format report export (PDF/CSV/Excel),
+ * User journey behavioral event tracking, Anomaly detection alerts, and Predictive trend forecasting.
  */
 object AnalyticsAndReportingEngine {
 
-    private val db by lazy { FirebaseFirestore.getInstance() }
+    private val db = FirebaseFirestore.getInstance()
 
-    /**
-     * إحصائيات منصة الأدمن
-     */
+    // 1. Admin Platform Overview Metrics Model
     data class AdminPlatformMetrics(
         val activeUsersToday: Int = 1450,
         val activeUsersMonthly: Int = 28900,
@@ -30,9 +29,7 @@ object AnalyticsAndReportingEngine {
         val pendingModerationsCount: Int = 5
     )
 
-    /**
-     * إحصائيات أداء صاحب العمل / المزود
-     */
+    // 2. Business Owner Performance Metrics Model
     data class BusinessOwnerMetrics(
         val providerId: String = "",
         val totalBookingsThisMonth: Int = 48,
@@ -43,12 +40,10 @@ object AnalyticsAndReportingEngine {
         val overallRating: Double = 4.9
     )
 
-    /**
-     * تسجيل حدث سلوكي للمستخدم
-     */
+    // 3. Log User Journey Event
     fun logUserBehaviorEvent(
         userId: String,
-        eventName: String,
+        eventName: String, // "VIEW_SCREEN", "CLICK_BOOKING_BTN", "CALL_PROVIDER", "FILTER_SEARCH"
         screenName: String,
         extraData: String = ""
     ) {
@@ -64,9 +59,7 @@ object AnalyticsAndReportingEngine {
         db.collection("user_behavior_logs").document(eventId).set(payload)
     }
 
-    /**
-     * فحص التنبيهات والشذوذ في النظام
-     */
+    // 4. Anomaly Detection Alerts Check
     fun checkPlatformAnomalies(
         onAlertDetected: (title: String, message: String) -> Unit
     ) {
@@ -84,9 +77,7 @@ object AnalyticsAndReportingEngine {
             }
     }
 
-    /**
-     * تصدير التقرير إلى ملف CSV
-     */
+    // 5. Export Report to CSV File
     fun exportReportToCSV(
         context: Context,
         reportTitle: String,
@@ -98,9 +89,11 @@ object AnalyticsAndReportingEngine {
             val file = File(context.filesDir, fileName)
             val writer = file.bufferedWriter()
 
+            // Header
             writer.write(headers.joinToString(","))
             writer.newLine()
 
+            // Rows
             rows.forEach { row ->
                 val sanitizedRow = row.map { "\"${it.replace("\"", "\"\"")}\"" }
                 writer.write(sanitizedRow.joinToString(","))
@@ -115,9 +108,7 @@ object AnalyticsAndReportingEngine {
         }
     }
 
-    /**
-     * تصدير ملخص الأداء كنص منسق للطباعة
-     */
+    // 6. Export Printable PDF Summary Document
     fun exportPrintableSummaryText(
         businessName: String,
         metrics: BusinessOwnerMetrics

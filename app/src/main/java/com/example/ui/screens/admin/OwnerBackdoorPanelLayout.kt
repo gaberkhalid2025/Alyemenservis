@@ -129,7 +129,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     var isDataSaverEnabled by remember { mutableStateOf(false) }
     var appImageQuality by remember { mutableStateOf(90f) }
     var bypassVisitorRegistration by remember { mutableStateOf(settingsState.bypassVisitorRegistration) }
-    var showUserIdInsteadOfNameInChat by remember { mutableStateOf(settingsState.showUserIdInsteadOfNameInChat) }
     var isUserPasswordRequired by remember { mutableStateOf(settingsState.isUserPasswordRequired) }
     var disableChatFirewall by remember { mutableStateOf(settingsState.disableChatFirewall) }
     var disableBookingFirewall by remember { mutableStateOf(settingsState.disableBookingFirewall) }
@@ -548,15 +547,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
         ) {
             Text("إلغاء شرط تسجيل الزائرين للحجز والمحادثة", color = Color.White, fontSize = 13.sp)
             Switch(checked = bypassVisitorRegistration, onCheckedChange = { bypassVisitorRegistration = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("إخفاء الاسم والرقم في الدردشة وعرض معرف الـ ID", color = Color.White, fontSize = 13.sp)
-            Switch(checked = showUserIdInsteadOfNameInChat, onCheckedChange = { showUserIdInsteadOfNameInChat = it })
         }
 
         Row(
@@ -1241,7 +1231,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     maxSearchRadiusKm = maxSearchRadiusKm.toInt(),
                     isSpeechSearchEnabled = isSpeechSearchEnabled,
                     bypassVisitorRegistration = bypassVisitorRegistration,
-                    showUserIdInsteadOfNameInChat = showUserIdInsteadOfNameInChat,
                     isUserPasswordRequired = isUserPasswordRequired,
                     disableChatFirewall = disableChatFirewall,
                     disableBookingFirewall = disableBookingFirewall,

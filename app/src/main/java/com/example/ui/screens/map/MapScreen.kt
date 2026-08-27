@@ -72,18 +72,13 @@ fun MapScreen(
     val userLatState by viewModel.userLatitude.collectAsState()
     val userLngState by viewModel.userLongitude.collectAsState()
 
-    // Connection Monitor
-    val connectionManager = remember { com.example.utils.ConnectionManager(context) }
-    val isOnlineState by connectionManager.isOnline.collectAsState()
-
     // Persistent State
     var isRadarMode by rememberSaveable { mutableStateOf(false) }
     var isHeatmapActive by rememberSaveable { mutableStateOf(false) }
     var selectedCategory by rememberSaveable { mutableStateOf("ALL") }
     var selectedCity by rememberSaveable { mutableStateOf("صنعاء") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var maxRangeKm by rememberSaveable { mutableFloatStateOf(100.0f) }
-    var minRating by rememberSaveable { mutableFloatStateOf(0.0f) }
+    var maxRangeKm by rememberSaveable { mutableFloatStateOf(25.0f) }
 
     // Dynamic technician offsets with safe cleanup
     val dynamicOffsets = remember { mutableStateMapOf<String, Pair<Double, Double>>() }
@@ -113,237 +108,41 @@ fun MapScreen(
         }
     }
 
-    // Base data with fallbacks to high-quality Yemeni mock data if empty
-    val safeProviders = remember(providers, userLatState, userLngState, selectedCity) {
-        if (providers.isNotEmpty()) {
-            providers
-        } else {
-            listOf(
-                ProviderEntity(
-                    id = "mock_p_1",
-                    name = "م. محمد الحرازي (كهربائي تمديدات)",
-                    phone = "777123456",
-                    categoryId = "kahraba",
-                    profession = "كهربائي",
-                    specialization = "تمديدات وصيانة منزلية",
-                    area = "$selectedCity - الشارع الرئيسي",
-                    cityId = selectedCity,
-                    localNeighborhood = "الشارع الرئيسي",
-                    rating = 4.9f,
-                    numReviews = 24,
-                    isAvailable = true,
-                    latitude = userLatState + 0.003,
-                    longitude = userLngState + 0.002,
-                    isVip = true,
-                    isVerified = true
-                ),
-                ProviderEntity(
-                    id = "mock_p_2",
-                    name = "المهندس علي السباك (صيانة صحية)",
-                    phone = "771987654",
-                    categoryId = "spaka",
-                    profession = "سباك",
-                    specialization = "تركيب وصيانة شبكات المياه والترميم",
-                    area = "$selectedCity - الحي التجاري",
-                    cityId = selectedCity,
-                    localNeighborhood = "الحي التجاري",
-                    rating = 4.7f,
-                    numReviews = 18,
-                    isAvailable = true,
-                    latitude = userLatState - 0.005,
-                    longitude = userLngState - 0.006,
-                    isVip = false,
-                    isVerified = true
-                ),
-                ProviderEntity(
-                    id = "mock_p_3",
-                    name = "ياسر لتبريد وتكييف الهواء",
-                    phone = "775443322",
-                    categoryId = "ac",
-                    profession = "فني تكييف",
-                    specialization = "صيانة مكيفات مركزي وسبليت",
-                    area = "$selectedCity - شارع الجزائر",
-                    cityId = selectedCity,
-                    localNeighborhood = "شارع الجزائر",
-                    rating = 4.8f,
-                    numReviews = 15,
-                    isAvailable = true,
-                    latitude = userLatState + 0.006,
-                    longitude = userLngState + 0.007,
-                    isVip = true,
-                    isVerified = true
-                )
-            )
+    // Filtered lists
+    val filteredProviders = remember(providers, selectedCategory, selectedCity, searchQuery) {
+        providers.filter { p ->
+            val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROVIDERS"
+            val matchesCity = selectedCity.isEmpty() || p.area.contains(selectedCity) || p.cityId.contains(selectedCity) || p.localNeighborhood.contains(selectedCity)
+            val matchesQuery = searchQuery.isEmpty() || p.name.contains(searchQuery, ignoreCase = true) ||
+                    p.profession.contains(searchQuery, ignoreCase = true) || p.customCategoryName.contains(searchQuery, ignoreCase = true)
+            matchesCat && matchesCity && matchesQuery
         }
     }
 
-    val safeStores = remember(stores, userLatState, userLngState, selectedCity) {
-        if (stores.isNotEmpty()) {
-            stores
-        } else {
-            listOf(
-                StoreEntity(
-                    id = "mock_s_1",
-                    sectionId = "stores",
-                    name = "سوبرماركت الأمانة والوفاء",
-                    description = "أفضل المواد الغذائية والاستهلاكية بأسعار منافسة خدمة توصيل سريعة",
-                    phone = "770112233",
-                    categoryId = "supermarket",
-                    cityId = selectedCity,
-                    localNeighborhood = "شارع الخمسين",
-                    rating = 4.5f,
-                    numReviews = 42,
-                    isActive = true,
-                    latitude = userLatState - 0.004,
-                    longitude = userLngState + 0.009,
-                    isVerified = true,
-                    workingHours = "7:00 AM - 12:00 PM"
-                ),
-                StoreEntity(
-                    id = "mock_s_2",
-                    sectionId = "medical",
-                    categoryId = "pharmacy",
-                    name = "صيدلية اليمن السعيد الكبرى",
-                    description = "توفير كافة الأدوية والمستلزمات الطبية على مدار 24 ساعة",
-                    phone = "773445566",
-                    cityId = selectedCity,
-                    localNeighborhood = "شارع الزبيري",
-                    rating = 4.9f,
-                    numReviews = 31,
-                    isActive = true,
-                    latitude = userLatState + 0.001,
-                    longitude = userLngState - 0.003,
-                    isVerified = true,
-                    workingHours = "24/7 مفتوح دائماً"
-                ),
-                StoreEntity(
-                    id = "mock_s_3",
-                    sectionId = "restaurant",
-                    categoryId = "restaurant",
-                    name = "مطعم الشيباني الفاخر والحديث",
-                    description = "أشهى المأكولات اليمنية والشعبية والسفري واللحم المندي والسلته والمقلقل",
-                    phone = "775667788",
-                    cityId = selectedCity,
-                    localNeighborhood = "حدة المدينة",
-                    rating = 4.8f,
-                    numReviews = 112,
-                    isActive = true,
-                    latitude = userLatState - 0.002,
-                    longitude = userLngState + 0.012,
-                    isVerified = true,
-                    workingHours = "6:00 AM - 11:30 PM"
-                )
-            )
-        }
-    }
-
-    val safeProperties = remember(properties, userLatState, userLngState, selectedCity) {
-        if (properties.isNotEmpty()) {
-            properties
-        } else {
-            listOf(
-                PropertyEntity(
-                    id = "mock_pr_1",
-                    sectionId = "properties",
-                    title = "شقة سكنية عائلية مفروشة للإيجار",
-                    description = "شقة راقية تتكون من 4 غرف وصالة واسعة وحمامين ومطبخ جاهز، قريبة من الخدمات والمدارس والمواصلات.",
-                    price = 120000.0,
-                    currency = "YER",
-                    type = "rent",
-                    propertyType = "apartment",
-                    phone = "774998877",
-                    cityId = selectedCity,
-                    localNeighborhood = "بيت بوس",
-                    rating = 4.7f,
-                    numReviews = 5,
-                    isActive = true,
-                    latitude = userLatState - 0.008,
-                    longitude = userLngState + 0.005
-                ),
-                PropertyEntity(
-                    id = "mock_pr_2",
-                    sectionId = "properties",
-                    title = "بيت مستقل للبيع دورين حجر ديوان",
-                    description = "منزل حجر صمم بأعلى المواصفات، دورين جاهزين للسكن مباشرة، يقع على شارعين واسعين وقريب من السوق الرئيسي.",
-                    price = 45000000.0,
-                    currency = "YER",
-                    type = "sale",
-                    propertyType = "house",
-                    phone = "770889900",
-                    cityId = selectedCity,
-                    localNeighborhood = "شارع تعز",
-                    rating = 5.0f,
-                    numReviews = 3,
-                    isActive = true,
-                    latitude = userLatState + 0.009,
-                    longitude = userLngState - 0.002
-                )
-            )
-        }
-    }
-
-    // Filtered lists optimized with derivedStateOf
-    val filteredProviders by remember {
-        derivedStateOf {
-            safeProviders.filter { p ->
-                val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROVIDERS"
-                val matchesCity = selectedCity.isEmpty() || p.area.contains(selectedCity) || p.cityId.contains(selectedCity) || p.localNeighborhood.contains(selectedCity)
-                val matchesQuery = searchQuery.isEmpty() || p.name.contains(searchQuery, ignoreCase = true) ||
-                        p.profession.contains(searchQuery, ignoreCase = true) || p.customCategoryName.contains(searchQuery, ignoreCase = true)
-                
-                // Distance Range check
-                val distanceM = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, p.latitude, p.longitude)
-                val matchesDistance = maxRangeKm >= 100.0f || (distanceM <= maxRangeKm * 1000)
-
-                // Rating check
-                val matchesRating = p.rating >= minRating
-
-                matchesCat && matchesCity && matchesQuery && matchesDistance && matchesRating
+    val filteredStores = remember(stores, selectedCategory, selectedCity, searchQuery) {
+        stores.filter { s ->
+            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
+            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
+            
+            val matchesCat = when (selectedCategory) {
+                "ALL" -> true
+                "STORES" -> !isMedical && !isRestaurant
+                "RESTAURANTS" -> isRestaurant
+                "MEDICAL" -> isMedical
+                else -> false
             }
+            val matchesCity = selectedCity.isEmpty() || s.cityId.contains(selectedCity) || s.localNeighborhood.contains(selectedCity)
+            val matchesQuery = searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.description.contains(searchQuery, ignoreCase = true)
+            matchesCat && matchesCity && matchesQuery
         }
     }
 
-    val filteredStores by remember {
-        derivedStateOf {
-            safeStores.filter { s ->
-                val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
-                val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
-                
-                val matchesCat = when (selectedCategory) {
-                    "ALL" -> true
-                    "STORES" -> !isMedical && !isRestaurant
-                    "RESTAURANTS" -> isRestaurant
-                    "MEDICAL" -> isMedical
-                    else -> false
-                }
-                val matchesCity = selectedCity.isEmpty() || s.cityId.contains(selectedCity) || s.localNeighborhood.contains(selectedCity)
-                val matchesQuery = searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.description.contains(searchQuery, ignoreCase = true)
-                
-                // Distance Range check
-                val distanceM = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, s.latitude, s.longitude)
-                val matchesDistance = maxRangeKm >= 100.0f || (distanceM <= maxRangeKm * 1000)
-
-                // Rating check
-                val matchesRating = s.rating >= minRating
-
-                matchesCat && matchesCity && matchesQuery && matchesDistance && matchesRating
-            }
-        }
-    }
-
-    val filteredProperties by remember {
-        derivedStateOf {
-            safeProperties.filter { pr ->
-                val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROPERTIES"
-                val matchesCity = selectedCity.isEmpty() || pr.cityId.contains(selectedCity) || pr.localNeighborhood.contains(selectedCity)
-                val matchesQuery = searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true) || pr.description.contains(searchQuery, ignoreCase = true)
-                
-                // Distance Range check
-                val distanceM = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, pr.latitude, pr.longitude)
-                val matchesDistance = maxRangeKm >= 100.0f || (distanceM <= maxRangeKm * 1000)
-
-                matchesCat && matchesCity && matchesQuery && matchesDistance
-            }
+    val filteredProperties = remember(properties, selectedCategory, selectedCity, searchQuery) {
+        properties.filter { pr ->
+            val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROPERTIES"
+            val matchesCity = selectedCity.isEmpty() || pr.cityId.contains(selectedCity) || pr.localNeighborhood.contains(selectedCity)
+            val matchesQuery = searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true) || pr.description.contains(searchQuery, ignoreCase = true)
+            matchesCat && matchesCity && matchesQuery
         }
     }
 
@@ -498,44 +297,24 @@ fun MapScreen(
                             )
                         }
 
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Entity Count Badge
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF00E5FF).copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.4f))
                         ) {
-                            // Connection Status Badge
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isOnlineState) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isOnlineState) Color(0xFF10B981).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.4f))
-                            ) {
-                                Text(
-                                    text = if (isOnlineState) "🟢 متصل" else "📡 محلي",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isOnlineState) Color(0xFF10B981) else Color(0xFFF59E0B),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Entity Count Badge
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFF00E5FF).copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.4f))
-                            ) {
-                                Text(
-                                    text = "${radarPoints.size} خدمة",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF00E5FF),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
+                            Text(
+                                text = "${radarPoints.size} خدمة متوفرة",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00E5FF),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }
 
-                // Filter Bar with Advanced Multi-Filtering
+                // Filter Bar
                 MapFilterBar(
                     selectedCategory = selectedCategory,
                     onCategorySelected = { selectedCategory = it },
@@ -547,10 +326,6 @@ fun MapScreen(
                     },
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
-                    maxDistanceKm = maxRangeKm,
-                    onMaxDistanceChange = { maxRangeKm = it },
-                    minRating = minRating,
-                    onMinRatingChange = { minRating = it },
                     themeColors = themeColors
                 )
             }

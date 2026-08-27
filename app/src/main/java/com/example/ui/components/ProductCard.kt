@@ -1,6 +1,7 @@
 package com.example.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,87 +14,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.ProductEntity
-import com.example.ui.components.SnackbarManager
-import com.example.ui.components.SnackbarType
+import coil.compose.AsyncImage
+import com.example.data.*
 import com.example.utils.VisualThemePalette
+import androidx.compose.ui.graphics.ImageBitmap
+import com.example.rememberBase64Bitmap
 
 /**
- * 📦 ProductListItemCard Component (10/10 UX & Safety)
- * Shows a service catalog item/product with support for:
- * 1. Safe inline price adjustment with dynamic validation and confirmation dialogs
- * 2. Adaptable layouts for restaurants, medical, and commercial entities
- * 3. Shimmer-backed loading indicators
+ * 📦 Product Item Card Component with Inline Price Editing for Owner/Admin
  */
 @Composable
 fun ProductListItemCard(
     product: ProductEntity,
     isOwnerOrAdmin: Boolean,
     themeColors: VisualThemePalette,
+    viewModel: MainViewModel,
     isMedical: Boolean = false,
     isRestaurant: Boolean = false,
-    onSaveProduct: ((ProductEntity) -> Unit)? = null,
-    viewModel: Any? = null,
     onOrderClick: () -> Unit
 ) {
+    val context = LocalContext.current
     var editingPrice by remember(product.price) { mutableStateOf(product.price.toString()) }
     var isPriceEditing by remember { mutableStateOf(false) }
-    
-    // Safety confirmation dialog state
-    var showConfirmDialog by remember { mutableStateOf(false) }
-    var targetNewPrice by remember { mutableDoubleStateOf(0.0) }
-
-    if (showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
-            title = { Text("تأكيد تعديل السعر ⚠️", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White) },
-            text = {
-                Text(
-                    text = "هل أنت متأكد من تغيير سعر السلعة \"${product.name}\" من (${product.price} ريال) إلى ($targetNewPrice ريال)؟",
-                    fontSize = 13.sp,
-                    color = Color.LightGray
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onSaveProduct?.invoke(product.copy(price = targetNewPrice))
-                        isPriceEditing = false
-                        showConfirmDialog = false
-                        SnackbarManager.showSnackbar("✅ تم تحديث السعر بنجاح إلى $targetNewPrice ريال", SnackbarType.SUCCESS)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
-                ) {
-                    Text("نعم، تأكيد التعديل", color = Color.White, fontSize = 12.sp)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) {
-                    Text("إلغاء", color = Color.Gray, fontSize = 12.sp)
-                }
-            },
-            containerColor = Color(0xFF1E293B),
-            shape = RoundedCornerShape(14.dp)
-        )
-    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.35f)),
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
-        modifier = Modifier.fillMaxWidth().testTag("product_item_card_${product.id}")
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // صورة المنتج مع Shimmer
+            // Product Image Thumbnail
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -136,7 +96,7 @@ fun ProductListItemCard(
                             Text("🔥 خصم", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
-                    if (product.isOffer || (product.price > 0 && product.price <= 2000)) {
+                    if (product.isOffer || product.price > 0 && product.price <= 2000) {
                         Box(
                             modifier = Modifier
                                 .background(Color(0xFFFFD700), RoundedCornerShape(4.dp))
@@ -157,7 +117,7 @@ fun ProductListItemCard(
                     )
                 }
 
-                // عرض السعر أو محرر السعر المباشر
+                // Price display or Inline Price Editor
                 if (isOwnerOrAdmin && isPriceEditing) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -167,7 +127,7 @@ fun ProductListItemCard(
                         OutlinedTextField(
                             value = editingPrice,
                             onValueChange = { editingPrice = it },
-                            modifier = Modifier.width(90.dp).height(38.dp).testTag("edit_price_input"),
+                            modifier = Modifier.width(90.dp).height(38.dp),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -178,16 +138,13 @@ fun ProductListItemCard(
                         Button(
                             onClick = {
                                 val pVal = editingPrice.toDoubleOrNull() ?: product.price
-                                if (pVal != product.price) {
-                                    targetNewPrice = pVal
-                                    showConfirmDialog = true
-                                } else {
-                                    isPriceEditing = false
-                                }
+                                viewModel.saveProduct(product.copy(price = pVal))
+                                isPriceEditing = false
+                                android.widget.Toast.makeText(context, "✅ تم تحديث سعر السلعة!", android.widget.Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                            modifier = Modifier.height(34.dp).testTag("save_price_button")
+                            modifier = Modifier.height(34.dp)
                         ) {
                             Text("💾 حفظ", fontSize = 9.sp, color = Color.White)
                         }
@@ -211,7 +168,6 @@ fun ProductListItemCard(
                                 modifier = Modifier
                                     .clickable { isPriceEditing = true }
                                     .padding(horizontal = 2.dp)
-                                    .testTag("edit_price_trigger")
                             )
                         }
                     }
@@ -220,13 +176,12 @@ fun ProductListItemCard(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            // زر طلب أو شراء
+            // Order Action Button
             Button(
                 onClick = onOrderClick,
                 colors = ButtonDefaults.buttonColors(containerColor = if (isMedical) Color(0xFF0284C7) else themeColors.accent),
                 shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                modifier = Modifier.testTag("order_button")
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 val btnText = when {
                     isMedical -> "📅 حجز موعد"

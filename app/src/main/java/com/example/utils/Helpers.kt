@@ -27,8 +27,7 @@ data class VisualThemePalette(
     val textSecondary: Color,
     val accent: Color,
     val gradientBrush: Brush,
-    val scheme: ColorScheme,
-    val border: Color = Color(0xFF374151)
+    val scheme: ColorScheme
 )
 
 data class PresetPalette(

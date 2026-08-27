@@ -19,16 +19,20 @@ enum class MessageStatus {
 }
 
 @Keep
+enum class ChatFilterCategory {
+    ALL, UNREAD, TECHNICIANS, STORES, RESTAURANTS, SUPPORT
+}
+
+@Keep
 data class ChatChannel(
     val id: String = "",
     val participants: List<String> = emptyList(),
     val participantNames: Map<String, String> = emptyMap(),
     val participantPhotos: Map<String, String> = emptyMap(),
+    val participantRoles: Map<String, String> = emptyMap(),
     val type: ChannelType = ChannelType.PRIVATE,
-    val channelCategory: String = "", // TECHNICIAN, STORE, RESTAURANT, SUPPORT, OTHER
     val relatedEntityId: String? = null,
-    val relatedEntityType: String? = null, // BOOKING, URGENT_REQUEST, SUPPORT
-    val relatedEntityCode: String? = null,
+    val relatedEntityType: String? = null, // BOOKING, URGENT_REQUEST, SUPPORT, STORE, RESTAURANT, TECHNICIAN
     val lastMessage: String = "",
     val lastMessageTime: Long = 0L,
     val lastMessageSenderId: String = "",
@@ -49,9 +53,7 @@ data class ChatMessage(
     val message: String = "",
     val mediaType: MediaType = MediaType.TEXT,
     val mediaUrl: String = "",
-    val audioDurationSec: Int = 0,
-    val fileName: String = "",
-    val fileSize: Long = 0L,
+    val mediaDurationSeconds: Int = 0,
     val replyToId: String? = null,
     val replyToText: String? = null,
     val status: MessageStatus = MessageStatus.SENT,
@@ -66,3 +68,4 @@ data class UserPresence(
     val isOnline: Boolean = false,
     val lastSeen: Long = System.currentTimeMillis()
 ) : Serializable
+

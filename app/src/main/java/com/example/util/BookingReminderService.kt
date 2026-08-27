@@ -17,11 +17,15 @@ import java.util.Calendar
 import java.util.Locale
 
 /**
- * ⏰ BookingReminderReceiver
- * مستقبل إنذارات AlarmManager لعرض تنبيه الموعد القادم للمستخدم
+ * ⏰ BookingReminderService & Receiver
+ * نظام التنبيهات المسبقة للحجوزات والمواعيد:
+ * - تنبيه قبل 24 ساعة من الموعد.
+ * - تنبيه قبل ساعة واحدة من الموعد.
+ * - يعمل محلياً بالكامل عبر AlarmManager بدون أي تكاليف على Firebase.
  */
 class BookingReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val bookingId = intent.getStringExtra("booking_id") ?: ""
         val title = intent.getStringExtra("title") ?: "تذكير بموعد الخدمة ⏰"
         val message = intent.getStringExtra("message") ?: "لديك موعد خدمة مجدول قريباً."
         val notificationId = intent.getIntExtra("notif_id", 1001)
@@ -30,20 +34,11 @@ class BookingReminderReceiver : BroadcastReceiver() {
     }
 }
 
-/**
- * ⏰ BookingReminderService
- * 
- * الخدمة المحلية المسؤولة عن جدولة وتأكيد التنبيهات المسبقة للحجوزات (24 ساعة وساعة واحدة).
- * تعمل محلياً بالكامل عبر `AlarmManager` دون أي استهلاك لحصص Firebase.
- */
 object BookingReminderService {
 
     private const val CHANNEL_ID = "booking_reminder_channel"
     private const val CHANNEL_NAME = "تنبيهات المواعيد والحجوزات"
 
-    /**
-     * إنشاء قناة الإشعارات على نظام Android O+
-     */
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -118,9 +113,6 @@ object BookingReminderService {
         }
     }
 
-    /**
-     * إظهار الإشعار المحلي في شريط التنبيهات
-     */
     fun showNotification(context: Context, notifId: Int, title: String, message: String) {
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

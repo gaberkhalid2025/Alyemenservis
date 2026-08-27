@@ -1,4 +1,4 @@
-package com.example.data
+package com.example.data.models
 
 import androidx.annotation.Keep
 

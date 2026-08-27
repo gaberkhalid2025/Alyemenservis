@@ -9,9 +9,7 @@ import org.json.JSONObject
 
 /**
  * 🛡️ NotificationDeduplicator
- * 
- * فحص وتصفية الإشعارات المتكررة لمنع إرسال نفس التنبيه للمستخدم أكثر من مرة خلال فترة زمنية محددة.
- * يتضمن آليات الفرز والتنظيف الآلي للإشعارات القديمة وإدارة بصمات التنبيه الفريدة.
+ * منع تكرار الإشعارات وحذف الإشعارات القديمة وإدارة المعرفات الفريدة
  */
 class NotificationDeduplicator(private val context: Context) {
 
@@ -23,18 +21,12 @@ class NotificationDeduplicator(private val context: Context) {
         private const val KEY_RECORD_TIMESTAMPS = "notification_timestamps"
     }
 
-    /**
-     * توليد معرّف فريد للإشعار يعتمد على النوع، الهدف والتوقيت
-     */
     fun generateUniqueId(notification: NotificationEntity): String {
         val target = if (notification.targetValue.isNotBlank()) notification.targetValue else notification.customerPhone
         val timeBucket = notification.timestamp / (60 * 1000L)
         return "${notification.notificationType}_${target}_${timeBucket}"
     }
 
-    /**
-     * فحص هل الإشعار مكرر
-     */
     fun isDuplicate(notification: NotificationEntity): Boolean {
         val uniqueId = if (notification.id.isNotBlank()) notification.id else generateUniqueId(notification)
         val sentSet = getSentNotifications().toSet()
@@ -45,9 +37,6 @@ class NotificationDeduplicator(private val context: Context) {
         return isDup
     }
 
-    /**
-     * تعليم الإشعار كمرسل
-     */
     fun markAsSent(notification: NotificationEntity) {
         val uniqueId = if (notification.id.isNotBlank()) notification.id else generateUniqueId(notification)
         val list = getSentNotifications().toMutableList()
@@ -61,9 +50,6 @@ class NotificationDeduplicator(private val context: Context) {
         }
     }
 
-    /**
-     * تصفية القائمة واستبعاد الإشعارات المكررة
-     */
     fun removeDuplicates(notifications: List<NotificationEntity>): List<NotificationEntity> {
         val seen = mutableSetOf<String>()
         val result = mutableListOf<NotificationEntity>()
@@ -76,9 +62,6 @@ class NotificationDeduplicator(private val context: Context) {
         return result
     }
 
-    /**
-     * مسح الإشعارات القديمة أقدم من عدد أيام معين
-     */
     fun cleanOldNotifications(daysToKeep: Int = 30) {
         try {
             val cutoff = System.currentTimeMillis() - (daysToKeep * 24 * 60 * 60 * 1000L)
@@ -99,9 +82,6 @@ class NotificationDeduplicator(private val context: Context) {
         }
     }
 
-    /**
-     * جلب المعرفات التي تم إرسالها
-     */
     fun getSentNotifications(): List<String> {
         val jsonStr = prefs.getString(KEY_SENT_IDS, null) ?: return emptyList()
         val list = mutableListOf<String>()

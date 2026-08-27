@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import kotlin.math.*
 
 /**
@@ -54,37 +53,27 @@ fun RadarRenderer(
 
     var zoomScale by remember { mutableFloatStateOf(1.0f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
-    var canvasWidth by remember { mutableFloatStateOf(0f) }
-    var canvasHeight by remember { mutableFloatStateOf(0f) }
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .onSizeChanged { size ->
-                canvasWidth = size.width.toFloat()
-                canvasHeight = size.height.toFloat()
-            }
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     zoomScale = (zoomScale * zoom).coerceIn(0.5f, 4.0f)
                     panOffset += pan
                 }
             }
-            .pointerInput(items, canvasWidth, canvasHeight, zoomScale, panOffset) {
+            .pointerInput(items) {
                 detectTapGestures { tapOffset ->
-                    if (canvasWidth <= 0 || canvasHeight <= 0) return@detectTapGestures
-                    val defaultCenterX = canvasWidth / 2f
-                    val defaultCenterY = canvasHeight / 2f
-
-                    // Find closest item within threshold
+                    // Find closest item within 40px
                     val clicked = items.minByOrNull { item ->
-                        val screenX = defaultCenterX + item.x * zoomScale + panOffset.x
-                        val screenY = defaultCenterY + item.y * zoomScale + panOffset.y
+                        val screenX = item.x * zoomScale + panOffset.x
+                        val screenY = item.y * zoomScale + panOffset.y
                         sqrt((tapOffset.x - screenX).pow(2) + (tapOffset.y - screenY).pow(2))
                     }
                     if (clicked != null) {
-                        val screenX = defaultCenterX + clicked.x * zoomScale + panOffset.x
-                        val screenY = defaultCenterY + clicked.y * zoomScale + panOffset.y
+                        val screenX = clicked.x * zoomScale + panOffset.x
+                        val screenY = clicked.y * zoomScale + panOffset.y
                         val dist = sqrt((tapOffset.x - screenX).pow(2) + (tapOffset.y - screenY).pow(2))
                         if (dist < 50f) {
                             onItemSelected(clicked)
@@ -161,8 +150,8 @@ fun RadarRenderer(
         if (isHeatmapActive) {
             val weightedPoints = items.map { item ->
                 HeatmapRenderer.WeightedPoint(
-                    x = centerX + item.x * zoomScale,
-                    y = centerY + item.y * zoomScale,
+                    x = item.x * zoomScale + panOffset.x,
+                    y = item.y * zoomScale + panOffset.y,
                     weight = 1.2f
                 )
             }
@@ -176,8 +165,8 @@ fun RadarRenderer(
         // 7. Cluster & Draw Items
         val screenItems = items.map { item ->
             item.copy(
-                x = centerX + item.x * zoomScale,
-                y = centerY + item.y * zoomScale
+                x = item.x * zoomScale + panOffset.x,
+                y = item.y * zoomScale + panOffset.y
             )
         }
         val clusters = MarkerRenderer.clusterPoints(screenItems, thresholdPx = 45f * zoomScale)

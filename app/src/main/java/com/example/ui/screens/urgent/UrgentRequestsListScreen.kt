@@ -18,42 +18,54 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.models.InstantRequestEntity
 import com.example.ui.MainViewModel
-import com.example.ui.screens.urgent.components.UrgentCard
-import com.example.utils.VisualThemePalette
-import com.example.viewmodels.UrgentUiState
-import com.example.viewmodels.UrgentViewModel
+import com.example.ui.components.UrgentTimerComponent
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 
 /**
  * ⚡ UrgentRequestsListScreen
- * عرض قائمة الطلبات العاجلة مع مؤقت الـ 30 دقيقة وفلترة الوقت الحرج وتلوين البطاقات.
- * تعتمد على UrgentViewModel وتدعم Snackbar للرسائل وحالات التحميل الكاملة.
+ * عرض قائمة الطلبات العاجلة مع مؤقت الـ 30 دقيقة وفلترة الوقت الحرج وتلوين البطاقات
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentRequestsListScreen(
     viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
-    themeColors: VisualThemePalette,
     onNavigateBack: () -> Unit = {},
     onNavigateToDetails: (requestId: String) -> Unit = {},
     onNavigateToNewUrgentRequest: () -> Unit = {},
     onNavigateToSubmitUrgentOffer: (requestId: String) -> Unit = {}
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-
+    val firestore = remember { FirebaseFirestore.getInstance() }
     val currentUserId by viewModel.currentUserId.collectAsState()
     val isProvider = viewModel.isProviderUser
 
-    val requestsList by urgentViewModel.urgentRequests.collectAsState()
-    val uiState by urgentViewModel.uiState.collectAsState()
+    var requestsList by remember { mutableStateOf<List<InstantRequestEntity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
 
     var onlyUnder10MinFilter by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(currentUserId, isProvider) {
-        urgentViewModel.observeUrgentRequests(currentUserId, isProvider)
+        isLoading = true
+        var query: Query = firestore.collection("instant_requests")
+
+        if (!isProvider && currentUserId.isNotBlank() && currentUserId != "guest") {
+            query = query.whereEqualTo("userId", currentUserId)
+        }
+
+        query.orderBy("createdAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(InstantRequestEntity::class.java) }
+                    // تصفية الطلبات العاجلة (30 دقيقة أو كود URG)
+                    requestsList = list.filter {
+                        it.urgencyTime.contains("30") || it.requestCode.startsWith("URG") || it.serviceTitle.contains("عاجل")
+                    }
+                }
+                isLoading = false
+            }
     }
 
     val now = System.currentTimeMillis()
@@ -69,7 +81,6 @@ fun UrgentRequestsListScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -140,57 +151,112 @@ fun UrgentRequestsListScreen(
                 )
             }
 
-            when (uiState) {
-                is UrgentUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFFD32F2F))
-                    }
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFFD32F2F))
                 }
-                is UrgentUiState.Error -> {
-                    val errMsg = (uiState as UrgentUiState.Error).message
-                    Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color(0xFFE57373))
-                            Text(errMsg, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+            } else if (filteredList.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color(0xFFE57373))
+                        Text("لا توجد طلبات عاجلة نشطة حالياً", fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                        if (!isProvider) {
                             Button(
-                                onClick = { urgentViewModel.observeUrgentRequests(currentUserId, isProvider) },
+                                onClick = onNavigateToNewUrgentRequest,
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                             ) {
-                                Text("إعادة المحاولة")
+                                Text("إنشاء طلب استجابة سريعة")
                             }
                         }
                     }
                 }
-                else -> {
-                    if (filteredList.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color(0xFFE57373))
-                                Text("لا توجد طلبات عاجلة نشطة حالياً", fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
-                                if (!isProvider) {
-                                    Button(
-                                        onClick = onNavigateToNewUrgentRequest,
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
-                                    ) {
-                                        Text("إنشاء طلب استجابة سريعة")
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
+                ) {
+                    items(filteredList) { req ->
+                        val remainingMinutes = (((req.expiresAt - System.currentTimeMillis()) / 1000) / 60).coerceAtLeast(0)
+                        val isCritical = remainingMinutes < 5
+                        val isUrgent = remainingMinutes < 10
+
+                        val cardBgColor = when {
+                            req.status != "WAITING_FOR_OFFERS" -> MaterialTheme.colorScheme.surface
+                            isCritical -> Color(0xFFFFEBEE)
+                            isUrgent -> Color(0xFFFFF8E1)
+                            else -> MaterialTheme.colorScheme.surface
+                        }
+
+                        val cardBorderColor = when {
+                            req.status != "WAITING_FOR_OFFERS" -> MaterialTheme.colorScheme.outlineVariant
+                            isCritical -> Color(0xFFE53935)
+                            isUrgent -> Color(0xFFFFA000)
+                            else -> Color(0xFFEF9A9A)
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNavigateToDetails(req.id) }
+                                .testTag("urgent_card_${req.id}"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = cardBgColor),
+                            border = BorderStroke(1.5.dp, cardBorderColor)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(req.requestCode, fontWeight = FontWeight.Black, fontSize = 15.sp, color = Color(0xFFD32F2F))
+                                    UrgentTimerComponent(
+                                        expiresAt = req.expiresAt,
+                                        totalDurationMillis = 30 * 60 * 1000L,
+                                        isCompact = true
+                                    )
+                                }
+
+                                Text(req.serviceTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text(req.description, style = MaterialTheme.typography.bodySmall, maxLines = 2, color = Color(0xFF424242))
+
+                                HorizontalDivider()
+
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFFD32F2F))
+                                        Text("${req.userCity} - ${req.userNeighborhood}", fontSize = 12.sp)
+                                    }
+                                    if (!isProvider) {
+                                        Text("${req.offersCount} عروض مستلمة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                                     }
                                 }
-                            }
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
-                        ) {
-                            items(filteredList, key = { it.id }) { req ->
-                                UrgentCard(
-                                    request = req,
-                                    isProvider = isProvider,
-                                    themeColors = themeColors,
-                                    onNavigateToDetails = onNavigateToDetails,
-                                    onNavigateToSubmitOffer = onNavigateToSubmitUrgentOffer
-                                )
+
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = { onNavigateToDetails(req.id) },
+                                        modifier = Modifier.weight(1f).height(36.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 4.dp)
+                                    ) {
+                                        Text("عرض التفاصيل", fontSize = 12.sp)
+                                    }
+
+                                    if (isProvider && req.status == "WAITING_FOR_OFFERS") {
+                                        Button(
+                                            onClick = { onNavigateToSubmitUrgentOffer(req.id) },
+                                            modifier = Modifier.weight(1f).height(36.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                                            contentPadding = PaddingValues(horizontal = 4.dp)
+                                        ) {
+                                            Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("عرض فوري", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

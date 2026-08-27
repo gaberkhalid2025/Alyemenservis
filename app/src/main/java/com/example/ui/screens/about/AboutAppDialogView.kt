@@ -2,115 +2,164 @@
 
 package com.example.ui.screens.about
 
+
+
+
 import android.content.Intent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathEffect
+import okhttp3.MediaType.Companion.toMediaType
+
+import com.example.*
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import com.example.data.*
+import com.example.utils.*
 import com.example.ui.MainViewModel
-import com.example.utils.VisualThemePalette
+import com.example.ui.components.*
+import com.example.ui.dialogs.*
+import com.example.ui.screens.home.*
+import com.example.ui.screens.map.*
+import com.example.ui.screens.bookings.*
+import com.example.ui.screens.admin.*
+import com.example.ui.screens.assistant.*
+import com.example.ui.screens.register.*
+import com.example.ui.screens.status.*
+import com.example.ui.screens.about.*
+import com.example.ui.screens.chat.*
+import com.example.ui.screens.notifications.*
+import com.example.ui.screens.dashboard.*
+import com.example.ui.*
+import com.example.ui.utils.*
+import java.util.UUID
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-/**
- * ℹ️ AboutAppDialogView
- * نافذة سفلية منبثقة (ModalBottomSheet) تعرض تفاصيل التطبيق، النسخة، وروابط التواصل
- * متوافقة 100% مع نظام التصميم الموحد والألوان الديناميكية.
- */
+
+// ------ About App Info Dialog overlay ------
 @Composable
-fun AboutAppDialogView(
-    viewModel: MainViewModel,
-    themeColors: VisualThemePalette,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
+fun AboutAppDialogView(viewModel: MainViewModel, themeColors: VisualThemePalette, onDismiss: () -> Unit) {
+    Dialog(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = themeColors.background,
-        contentColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = {
-            BottomSheetDefaults.DragHandle(color = themeColors.accent.copy(alpha = 0.6f))
-        }
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.9f)
+        Surface(
+            color = themeColors.background,
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Header Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(themeColors.primary)
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = themeColors.accent,
-                        modifier = Modifier.size(22.dp)
-                    )
+                // Top header bar for the full-screen about page
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(themeColors.primary)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(
                         text = "معلومات عن التطبيق",
                         color = Color.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "إغلاق",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
-
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .background(Color.White.copy(alpha = 0.15f), CircleShape)
-                        .size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "إغلاق",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
+                
+                Box(modifier = Modifier.weight(1f)) {
+                    AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                 }
-            }
-
-            Box(modifier = Modifier.weight(1f)) {
-                AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
             }
         }
     }
 }
 
-/**
- * محتوى شاشة نبذة عن التطبيق
- */
+
+
+// ------ Unused screen layouts defined as secondary ------
 @Composable
 fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePalette) {
     val settingsState by viewModel.settings.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
     val context = LocalContext.current
+    val isOnline = com.example.NetworkUtils.isNetworkAvailable(context)
 
     Column(
         modifier = Modifier
@@ -120,12 +169,14 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        Spacer(modifier = Modifier.height(10.dp))
+
         if (adminRole != "GUEST") {
             var isEditingAboutPanel by remember { mutableStateOf(false) }
             Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                 shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.5.dp, themeColors.accent),
+                border = BorderStroke(1.5.dp, Color(0xFFFFD700)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -134,12 +185,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "👑 تنسيق وترتيب عناصر شاشة (عن التطبيق)",
-                            color = themeColors.accent,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        Text("👑 تنسيق وترتيب عناصر شاشة (عن التطبيق)", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         IconButton(onClick = { isEditingAboutPanel = !isEditingAboutPanel }, modifier = Modifier.size(28.dp)) {
                             Text(if (isEditingAboutPanel) "🔽" else "⚙️", fontSize = 14.sp)
                         }
@@ -147,11 +193,11 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
 
                     if (isEditingAboutPanel) {
                         Divider(color = Color.White.copy(alpha = 0.15f))
-
-                        Text("1. ترتيب ظهور العناصر:", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        
+                        Text("1. ترتيب ظهور العناصر (اضغط على الأسهم للتقديم أو التأخير):", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         val keyLabels = mapOf(
                             "COVER" to "🖼️ غلاف التطبيق",
-                            "LOGO" to "🔴 شعار التطبيق",
+                            "LOGO" to "🔴 شعار WAM",
                             "TITLE" to "🏷️ اسم التطبيق",
                             "ANNOUNCEMENT" to "📢 إعلان المنصة",
                             "ABOUT_CARD" to "ℹ️ كارت نبذة عن التطبيق",
@@ -168,7 +214,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(themeColors.background, RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF0F172A), RoundedCornerShape(8.dp))
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
@@ -196,7 +242,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(themeColors.surface)
+                                                .background(Color(0xFF334155))
                                                 .clickable {
                                                     val newList = currentList.toMutableList()
                                                     val tmp = newList[index]
@@ -214,7 +260,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("2. النص المخصص في كارت حول التطبيق:", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("2. النص المخصص في كارت حول التطبيق:", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         var customTextTemp by remember(settingsState.aboutCustomInfo) { mutableStateOf(settingsState.aboutCustomInfo) }
                         OutlinedTextField(
                             value = customTextTemp,
@@ -228,8 +274,8 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                 viewModel.saveCustomSettingsState(settingsState.copy(aboutCustomInfo = customTextTemp))
                                 viewModel.triggerNotification("💾 تم تحديث وحفظ نص شاشة عن التطبيق!")
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                            modifier = Modifier.fillMaxWidth().height(38.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
                         ) {
                             Text("💾 حفظ النص المخصص", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
@@ -247,6 +293,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
         orderKeys.forEach { key ->
             when (key) {
                 "COVER" -> {
+                    // Cover container (Dynamic)
                     val coverType = settingsState.aboutCoverType
                     val coverContent = settingsState.aboutCoverContent
                     val coverBase64 = settingsState.aboutCoverBase64
@@ -276,7 +323,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                     )
                                 }
                             } else if (coverContent.isNotEmpty()) {
-                                AsyncImage(
+                                coil.compose.AsyncImage(
                                     model = coverContent,
                                     contentDescription = "صورة الغلاف",
                                     modifier = Modifier
@@ -290,32 +337,36 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                     }
                 }
                 "LOGO" -> {
+                    // Beautiful red WAM circle logo with border and subtle elevation shadow
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(110.dp)
                             .shadow(6.dp, CircleShape)
-                            .background(themeColors.primary, CircleShape)
+                            .background(Color(0xFFD91A1A), CircleShape)
                             .border(3.dp, themeColors.accent, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "🇾🇪",
-                            fontSize = 44.sp
+                            text = "WAM",
+                            color = Color(0xFFFFD700),
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 32.sp
                         )
                     }
                 }
                 "TITLE" -> {
                     Text(
-                        text = settingsState.appName.ifBlank { "دليل خدمات اليمن" },
+                        text = settingsState.appName,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 22.sp,
+                        fontSize = 24.sp,
                         color = Color.White,
                         textAlign = TextAlign.Center
                     )
                 }
                 "ANNOUNCEMENT" -> {
+                    // 📢 Platform Announcement Card
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
                         modifier = Modifier.fillMaxWidth()
@@ -345,7 +396,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                             }
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = settingsState.bannerContent.ifEmpty { "منصة شاملة تربط مقدمي الخدمات بالعملاء في جميع محافظات اليمن" },
+                                text = settingsState.bannerContent.ifEmpty { "منصة لكل الخدمات" },
                                 fontSize = 12.sp,
                                 color = Color.White.copy(alpha = 0.9f),
                                 textAlign = TextAlign.Center,
@@ -356,8 +407,9 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                     }
                 }
                 "ABOUT_CARD" -> {
+                    // ℹ️ About Platform Card
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
                         modifier = Modifier.fillMaxWidth()
@@ -379,7 +431,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "حول تطبيق دليل ${settingsState.appName.ifBlank { "خدمات اليمن" }}",
+                                    text = "حول تطبيق دليل ${settingsState.appName}",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = themeColors.accent
@@ -393,7 +445,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                 lineHeight = 20.sp,
                                 modifier = Modifier.fillMaxWidth()
                             )
-
+                            
                             Divider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp)
 
                             Row(
@@ -407,7 +459,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                     color = Color.LightGray
                                 )
                                 Text(
-                                    text = settingsState.appVersion.ifBlank { "v2.5.0" },
+                                    text = settingsState.appVersion,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -424,7 +476,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                     color = Color.LightGray
                                 )
                                 Text(
-                                    text = settingsState.encryptionType.ifBlank { "End-to-End Encrypted" },
+                                    text = settingsState.encryptionType,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = themeColors.accent
@@ -434,14 +486,15 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                     }
                 }
                 "DOWNLOAD_BTN" -> {
+                    // 📥 💾 Download / Update Button
                     Button(
                         onClick = {
                             try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(settingsState.appDownloadUrl.ifBlank { "https://example.com/download" }))
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(settingsState.appDownloadUrl.ifBlank { "https://example.com/download_app" }))
                                 context.startActivity(intent)
                             } catch (e: Exception) {}
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
@@ -453,7 +506,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "📥 تحميل وتحديث التطبيق المباشر",
+                            text = "📥 💾 تحميل وتحديث التطبيق المباشر",
                             color = Color.Black,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 13.sp
@@ -479,10 +532,10 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            // Whatsapp Support Button
                             Button(
                                 onClick = {
-                                    val phone = settingsState.supportWhatsapp.ifBlank { "967770000000" }
-                                    val url = "https://wa.me/$phone"
+                                    val url = "https://wa.me/${settingsState.supportWhatsapp}"
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                     try { context.startActivity(intent) } catch(e: Exception) {}
                                 },
@@ -495,14 +548,14 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                 Text("💬 واتساب الدعم", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             }
 
+                            // Call Support Button
                             Button(
                                 onClick = {
-                                    val phone = settingsState.supportPhone.ifBlank { "770000000" }
-                                    val uri = Uri.parse("tel:$phone")
+                                    val uri = Uri.parse("tel:${settingsState.supportPhone}")
                                     val intent = Intent(Intent.ACTION_DIAL, uri)
                                     try { context.startActivity(intent) } catch(e: Exception) {}
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E3A8A)),
                                 shape = RoundedCornerShape(24.dp),
                                 modifier = Modifier.weight(1f).height(46.dp)
                             ) {
@@ -544,11 +597,12 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                 text = "🌐 حساباتنا الرسمية والروابط الخارجية:",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = themeColors.accent,
+                                color = Color(0xFFFFD700),
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth()
                             )
 
+                            // Render socials in chunks of 2 for grid layout
                             socialsList.chunked(2).forEach { rowItems ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -568,6 +622,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                                             Text(social.first, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
+                                    // Add spacer to align if single item in last row
                                     if (rowItems.size < 2) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
@@ -579,6 +634,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
             }
         }
 
+        // Email Support Button
         if (settingsState.supportEmail.isNotBlank()) {
             Button(
                 onClick = {
@@ -589,7 +645,7 @@ fun AboutAppScreenContent(viewModel: MainViewModel, themeColors: VisualThemePale
                     }
                     try { context.startActivity(intent) } catch(e: Exception) {}
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4B5563)),
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier.fillMaxWidth(0.8f).height(40.dp)
             ) {

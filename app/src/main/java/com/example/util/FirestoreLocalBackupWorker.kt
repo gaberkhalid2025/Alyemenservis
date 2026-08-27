@@ -1,9 +1,10 @@
 package com.example.util
 
+import com.example.utils.*
+
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -17,10 +18,8 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
- * 💾 FirestoreLocalBackupWorker
- * 
- * عامل خلفي (WorkManager Worker) ينفذ عملية نسخ احتياطي يومية مشفرة برمز AES-256
- * لبيانات ومجموعات Firestore المحلية، مع حفظ الملفات المشفرة في مسار حماية داخل التخزين الداخلي.
+ * WorkManager worker that performs daily local encrypted backups (AES-256)
+ * of offline Firestore persistent documents.
  */
 class FirestoreLocalBackupWorker(
     private val context: Context,
@@ -92,16 +91,13 @@ class FirestoreLocalBackupWorker(
         private const val TAG = "FirestoreBackupWorker"
         private const val WORK_NAME = "DailyFirestoreLocalEncryptedBackup"
 
-        /**
-         * جدولة وظيفة النسخ الاحتياطي الدوري كل 24 ساعة
-         */
         fun schedulePeriodicBackup(context: Context) {
             val backupRequest = PeriodicWorkRequestBuilder<FirestoreLocalBackupWorker>(24, TimeUnit.HOURS)
                 .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
                 backupRequest
             )
             Log.d(TAG, "Scheduled daily 24-hour encrypted local backup worker.")

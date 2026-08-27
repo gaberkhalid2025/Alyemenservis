@@ -1,15 +1,27 @@
 package com.example.util
 
+import com.example.utils.*
+
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * 🔑 EntityIdGenerator - استراتيجية توليد المعرفات الفريدة المنظمة في كامل التطبيق
+ * 🔑 EntityIdGenerator - System-wide Prefix-Based Unique Identifier Strategy
  * 
- * الميزات:
- * 1. استبدال معرفات UUID العشوائية بمعرفات منظمة ومفروزة زمنياً وسهلة القراءة والفهرسة.
- * 2. الصيغة: <PREFIX>_<TIMESTAMP_MILLIS>_<6_CHAR_HEX_RANDOM>
- * 3. ضمان تصاعد زمني وتسلسل فريد حتى في حالات التزامن العالي (High Concurrency).
+ * Replaces random UUIDs with structured, timestamp-ordered, human-readable IDs:
+ * Format: <PREFIX>_<TIMESTAMP_MILLIS>_<6_CHAR_HEX_RANDOM>
+ * Examples:
+ * - User: USR_1722345678000_A9B8C7
+ * - Provider: PRV_1722345678000_D1E2F3
+ * - Store: STR_1722345678000_1A2B3C
+ * - Property: PROP_1722345678000_4D5E6F
+ * - Job: JOB_1722345678000_7G8H9I
+ * - Booking: BKG_1722345678000_9J8H7G
+ * - Payment: PAY_1722345678000_6F5E4D
+ * - Chat: CHT_1722345678000_3C2B1A
+ * - Product: PRD_1722345678000_F3E2D1
+ * - Review: REV_1722345678000_C7B8A9
+ * - Offer: OFFER_1722345678000_0A1B2C
  */
 object EntityIdGenerator {
 
@@ -28,20 +40,11 @@ object EntityIdGenerator {
         REVIEW("REV"),
         OFFER("OFFER"),
         CATEGORY("CAT"),
-        CITY("CITY"),
-        NOTIFICATION("NTF"),
-        COUPON("CPN"),
-        REPORT("REP"),
-        SUPERVISOR("SUP"),
-        BANNER("BNR"),
-        WALLET("WLT")
+        CITY("CITY")
     }
 
     /**
-     * توليد معرف فريد مسبوق برمز الكيان مع ضمان التسلسل الزمني
-     * 
-     * @param prefix نوع الكيان المطلوب توليد معرف له
-     * @return المعرف النصي الفريد
+     * Generates a unique prefixed ID with timestamp sequence guarantee
      */
     fun generate(prefix: Prefix): String {
         var now = System.currentTimeMillis()
@@ -68,26 +71,16 @@ object EntityIdGenerator {
     fun generateOfferId(): String = generate(Prefix.OFFER)
     fun generateCategoryId(): String = generate(Prefix.CATEGORY)
     fun generateCityId(): String = generate(Prefix.CITY)
-    fun generateNotificationId(): String = generate(Prefix.NOTIFICATION)
-    fun generateCouponId(): String = generate(Prefix.COUPON)
-    fun generateReportId(): String = generate(Prefix.REPORT)
-    fun generateSupervisorId(): String = generate(Prefix.SUPERVISOR)
-    fun generateBannerId(): String = generate(Prefix.BANNER)
-    fun generateWalletId(): String = generate(Prefix.WALLET)
 
     /**
-     * استخراج بادئة نوع الكيان من المعرف النصي
-     * @param id المعرف النصي
-     * @return البادئة النصية (مثل "USR" أو "PRV")
+     * Extracts entity type prefix from a given ID
      */
     fun getPrefix(id: String): String {
         return id.substringBefore("_", "")
     }
 
     /**
-     * التحقق من صحة ومطابقة المعرف لصيغة المعرفات المنظمة للنظام
-     * @param id المعرف المطلوب فحصه
-     * @return true إذا كان المعرف صالحاً
+     * Validates if an ID adheres to the prefixed format
      */
     fun isValidPrefixedId(id: String): Boolean {
         if (id.isBlank() || !id.contains("_")) return false

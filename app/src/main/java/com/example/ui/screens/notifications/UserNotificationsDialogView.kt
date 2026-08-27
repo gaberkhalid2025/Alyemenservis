@@ -203,32 +203,23 @@ fun UserNotificationsBottomSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "رجوع إلى الشاشة الرئيسية",
-                                tint = Color.White
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("🔔", fontSize = 18.sp)
+                            Text(
+                                "مركز الإشعارات الذكية",
+                                fontSize = 16.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
                             )
                         }
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("🔔", fontSize = 18.sp)
-                                Text(
-                                    "مركز الإشعارات الذكية",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White
-                                )
-                            }
-                            if (unreadCount > 0) {
-                                Text(
-                                    "$unreadCount إشعار غير مقروء",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF10B981),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                        if (unreadCount > 0) {
+                            Text(
+                                "$unreadCount إشعار غير مقروء",
+                                fontSize = 11.sp,
+                                color = Color(0xFF10B981),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 

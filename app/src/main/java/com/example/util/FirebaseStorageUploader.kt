@@ -11,14 +11,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.InputStream
 import java.util.UUID
 
 /**
- * 🚀 FirebaseStorageUploader
- * 
- * المساعد الرئيسي لرفع الصور والوسائط إلى Firebase Storage مع الضغط الأوتوماتيكي وصياغة WebP،
- * والتحقق من الحصص اليومية وحجم الصورة قبل الرفع وتوليد روابط التحميل المباشرة.
+ * 🚀 Firebase Storage Uploader & Ultra-Optimizer
+ * Handles image compression (WebP / JPEG, 800px max, <150KB for profile, <300KB for items),
+ * quota safety checks, and direct upload to Firebase Storage with download URL generation.
  */
 object FirebaseStorageUploader {
 
@@ -26,6 +26,11 @@ object FirebaseStorageUploader {
         FirebaseStorage.getInstance()
     }
 
+    /**
+     * Compress bitmap or Uri into WebP/JPEG byte array strictly respecting dimension and byte size limits.
+     * @param maxDimension Maximum width or height (default 800px)
+     * @param maxSizeBytes Maximum file size in bytes (150KB for profile, 300KB for product/store/prop)
+     */
     suspend fun compressImageToBytes(
         context: Context,
         imageUri: Uri,
@@ -44,6 +49,7 @@ object FirebaseStorageUploader {
             val origHeight = boundsOptions.outHeight
             if (origWidth <= 0 || origHeight <= 0) return@withContext null
 
+            // Calculate sample size
             var sampleSize = 1
             while (origWidth / sampleSize > maxDimension * 1.5 || origHeight / sampleSize > maxDimension * 1.5) {
                 sampleSize *= 2
@@ -56,6 +62,7 @@ object FirebaseStorageUploader {
 
             if (decodedBitmap == null) return@withContext null
 
+            // Exact scale if larger than maxDimension
             val finalBitmap = if (decodedBitmap.width > maxDimension || decodedBitmap.height > maxDimension) {
                 val ratio = Math.min(
                     maxDimension.toFloat() / decodedBitmap.width,
@@ -68,6 +75,7 @@ object FirebaseStorageUploader {
                 decodedBitmap
             }
 
+            // Compress to WebP (or JPEG fallback)
             var quality = 80
             var outputBytes: ByteArray
             do {
@@ -82,6 +90,7 @@ object FirebaseStorageUploader {
                 quality -= 15
             } while (outputBytes.size > maxSizeBytes && quality >= 30)
 
+            // If still too large, try JPEG with high compression
             if (outputBytes.size > maxSizeBytes) {
                 val bos = ByteArrayOutputStream()
                 finalBitmap.compress(Bitmap.CompressFormat.JPEG, 55, bos)
@@ -95,6 +104,9 @@ object FirebaseStorageUploader {
         }
     }
 
+    /**
+     * Compress an in-memory Bitmap directly to WebP bytes.
+     */
     suspend fun compressBitmapToBytes(
         bitmap: Bitmap,
         maxDimension: Int = 800,
@@ -129,6 +141,9 @@ object FirebaseStorageUploader {
         outputBytes
     }
 
+    /**
+     * Uploads bytes to a specific storage path in Firebase Storage and returns the public download URL.
+     */
     suspend fun uploadBytesToStorage(
         bytes: ByteArray,
         storagePath: String,
@@ -136,6 +151,7 @@ object FirebaseStorageUploader {
         userType: String = "USER"
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
+            // Check quota guard first
             val (canUpload, reason) = FirebaseStorageQuotaGuard.canUpload(userType, bytes.size.toLong())
             if (!canUpload) {
                 return@withContext Result.failure(Exception(reason))
@@ -147,7 +163,7 @@ object FirebaseStorageUploader {
                 .setCustomMetadata("uploadedAt", System.currentTimeMillis().toString())
                 .build()
 
-            storageRef.putBytes(bytes, metadata).await()
+            val uploadTask = storageRef.putBytes(bytes, metadata).await()
             val downloadUrl = storageRef.downloadUrl.await().toString()
             Result.success(downloadUrl)
         } catch (e: Exception) {
@@ -156,6 +172,9 @@ object FirebaseStorageUploader {
         }
     }
 
+    /**
+     * Uploads an image Uri directly with automatic compression and quota check.
+     */
     suspend fun uploadImageUri(
         context: Context,
         uri: Uri,
@@ -169,6 +188,9 @@ object FirebaseStorageUploader {
         return uploadBytesToStorage(bytes, storagePath, "image/webp", userType)
     }
 
+    /**
+     * Uploads a Bitmap directly with automatic compression and quota check.
+     */
     suspend fun uploadBitmap(
         bitmap: Bitmap,
         storagePath: String,
@@ -180,6 +202,7 @@ object FirebaseStorageUploader {
         return uploadBytesToStorage(bytes, storagePath, "image/webp", userType)
     }
 
+    // Helper functions for standard app entity paths
     fun getProviderProfilePath(providerId: String): String =
         "providers/$providerId/profile.webp"
 

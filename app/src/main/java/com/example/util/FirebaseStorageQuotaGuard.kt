@@ -1,8 +1,11 @@
 package com.example.util
 
+import com.example.utils.*
+
 /**
- * 📊 StorageUsageReport
- * تقرير استخدام المساحة وتحديد مستويات التحذير والحظر الطارئ عند اقتراب السعة المجانية 5GB.
+ * 📊 Firebase Storage Quota Guard & Admin Upload Management
+ * Keeps storage usage strictly below Spark Free Tier (5GB limit).
+ * Tracks 75% warning, 85% urgent alert, and 95% emergency upload shutdown.
  */
 data class StorageUsageReport(
     val totalUsedBytes: Long = 0L,
@@ -24,10 +27,6 @@ data class StorageUsageReport(
     val isCritical95: Boolean get() = usagePercentage >= 95f
 }
 
-/**
- * 🔒 AdminUploadPermissions
- * صلاحيات وضوابط الرفع المعتمدة من قبل الأدمن.
- */
 data class AdminUploadPermissions(
     val isGlobalUploadEnabled: Boolean = true,
     val isAdminUploadEnabled: Boolean = true,
@@ -42,27 +41,15 @@ data class AdminUploadPermissions(
     val maxFilesPerUser: Int = 20
 )
 
-/**
- * 🛡️ FirebaseStorageQuotaGuard
- * 
- * فحص وإدارة حصص الرفع والأمان في Firebase Storage لضمان عدم تجاوز السعة المسموحة
- * وحماية التطبيق من السعة الزائدة أو ملفات الأحجام غير المسموحة.
- */
 object FirebaseStorageQuotaGuard {
 
     private var currentPermissions = AdminUploadPermissions()
     private var currentUsageReport = StorageUsageReport()
 
-    /**
-     * تحديث تقرير الاستخدام الحقيقي
-     */
     fun updateUsage(report: StorageUsageReport) {
         currentUsageReport = report
     }
 
-    /**
-     * تحديث صلاحيات الرفع
-     */
     fun updatePermissions(permissions: AdminUploadPermissions) {
         currentPermissions = permissions
     }
@@ -71,7 +58,7 @@ object FirebaseStorageQuotaGuard {
     fun getCurrentPermissions(): AdminUploadPermissions = currentPermissions
 
     /**
-     * فحص هل يسمح للمستخدم أو الفئة المحددة برفع ملف بهذه السعة
+     * Checks whether upload is allowed for a specific user category
      */
     fun canUpload(userType: String, fileSizeBytes: Long): Pair<Boolean, String> {
         if (!currentPermissions.isGlobalUploadEnabled) {

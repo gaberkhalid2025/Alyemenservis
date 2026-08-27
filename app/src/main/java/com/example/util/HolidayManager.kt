@@ -2,17 +2,17 @@ package com.example.util
 
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 /**
  * 🏖️ HolidayManager
- * 
- * إدارة وتحديد العطلات الرسمية اليمنية والإجازات الأسبوعية (يوم الجمعة) 
- * والإجازات الخاصة بمزودي الخدمات لمنع توفر مواعيد فيها.
+ * إدارة العطلات الرسمية اليمنية والإجازات الأسبوعية والخاصة بمزودي الخدمة
+ * لمنع الحجز في الأيام غير المتاحة وتنبيه المستخدم مسبقاً
  */
 object HolidayManager {
 
-    private val customProviderHolidays = mutableMapOf<String, MutableSet<String>>()
+    private val customProviderHolidays = mutableMapOf<String, MutableSet<String>>() // providerId -> Set of "yyyy-MM-dd"
 
     // Official Fixed & Common Yemeni Holidays
     private val fixedHolidays = mapOf(
@@ -33,7 +33,7 @@ object HolidayManager {
             val date = sdf.parse(dateString) ?: return Pair(false, null)
             val cal = Calendar.getInstance().apply { time = date }
 
-            // 1. فحص يوم الجمعة
+            // 1. فحص يوم الجمعة (Friday)
             if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) {
                 return Pair(true, "يوم الجمعة (عطلة أسبوعية) 🕌")
             }

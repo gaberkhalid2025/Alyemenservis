@@ -1,29 +1,24 @@
 package com.example.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.data.ProductEntity
+import com.example.data.*
 import com.example.utils.VisualThemePalette
 
 /**
- * 📊 ProductGrid Component
- * مكون شبكة/قائمة المنتجات يعرض المنتجات بشكل سلس ومستقل عن MainViewModel
- *
- * @param products قائمة المنتجات
- * @param isOwnerOrAdmin صلاحية المالك/الآدمن للتعديل
- * @param themeColors الألوان المعتمدة للتصميم
- * @param onSaveProduct دالة اختيارية عند تحديث المنتج
- * @param onProductOrderClick دالة الاستدعاء عند اختيار شراء المنتج
+ * 📊 Product Grid Component
  */
 @Composable
 fun ProductGrid(
     products: List<ProductEntity>,
     isOwnerOrAdmin: Boolean,
     themeColors: VisualThemePalette,
-    onSaveProduct: ((ProductEntity) -> Unit)? = null,
-    viewModel: Any? = null,
+    viewModel: MainViewModel,
     onProductOrderClick: (ProductEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -36,10 +31,9 @@ fun ProductGrid(
                 product = product,
                 isOwnerOrAdmin = isOwnerOrAdmin,
                 themeColors = themeColors,
-                onSaveProduct = onSaveProduct,
+                viewModel = viewModel,
                 onOrderClick = { onProductOrderClick(product) }
             )
         }
     }
 }
-

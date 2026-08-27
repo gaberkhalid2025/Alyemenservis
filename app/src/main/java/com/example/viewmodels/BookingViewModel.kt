@@ -13,10 +13,12 @@ import com.example.util.OfflineQueueManager
 import com.example.util.OfflineRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 @Keep
@@ -36,15 +38,9 @@ data class BookingNote(
     val createdAt: Long = System.currentTimeMillis()
 )
 
-@Keep
-data class TimeSlot(
-    val time: String,
-    val isAvailable: Boolean = true
-)
-
 /**
  * 📅 BookingViewModel
- * إدارة كاملة لمنطق نظام الحجوزات الذكي، التقويم وحساب الفترات المتاحة والعطلات، الحماية والصلاحيات.
+ * إدارة كاملة لمنطق نظام الحجوزات الذكي، الحماية، الصلاحيات، التحديثات المباشرة، والإلغاء الآمن.
  */
 class BookingViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -69,16 +65,6 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     private val _successMessage = MutableStateFlow<String?>(null)
     val successMessage: StateFlow<String?> = _successMessage.asStateFlow()
 
-    // Unified UI State using sealed interface
-    sealed interface BookingUiState {
-        object Loading : BookingUiState
-        data class Success(val bookings: List<BookingEntity>) : BookingUiState
-        data class Error(val message: String) : BookingUiState
-    }
-
-    private val _uiState = MutableStateFlow<BookingUiState>(BookingUiState.Loading)
-    val uiState: StateFlow<BookingUiState> = _uiState.asStateFlow()
-
     companion object {
         private const val TAG = "BookingViewModel"
     }
@@ -93,25 +79,21 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     fun loadAllBookings() {
         viewModelScope.launch {
             _isLoading.value = true
-            _uiState.value = BookingUiState.Loading
             try {
                 firestore.collection("bookings")
                     .addSnapshotListener { snapshot, error ->
                         _isLoading.value = false
                         if (error != null) {
                             Log.w(TAG, "Bookings listen failed: ${error.message}")
-                            _uiState.value = BookingUiState.Error(error.message ?: "فشل تحميل البيانات")
                             return@addSnapshotListener
                         }
                         if (snapshot != null) {
                             val list = snapshot.documents.mapNotNull { it.toObject(BookingEntity::class.java) }
                             _bookings.value = list
-                            _uiState.value = BookingUiState.Success(list)
                         }
                     }
             } catch (e: Exception) {
                 _isLoading.value = false
-                _uiState.value = BookingUiState.Error(e.message ?: "خطأ أثناء جلب البيانات")
                 Log.e(TAG, "Error loading bookings: ${e.message}")
             }
         }
@@ -392,73 +374,19 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
-    /**
-     * 16. حساب الفترات الزمنية المتاحة لليوم المحدد
-     */
-    fun getAvailableSlots(dateString: String, providerId: String): List<String> {
-        val allSlots = listOf(
-            "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
-            "12:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-            "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
-        )
-        if (isHoliday(dateString)) return emptyList()
-
-        val bookedSlots = _bookings.value
-            .filter { it.providerId == providerId && it.dateString == dateString && it.status != "CANCELLED" && it.status != "REJECTED" }
-            .map { it.timeString.ifEmpty { it.time } }
-
-        return allSlots.filterNot { bookedSlots.contains(it) }
-    }
+    // ==========================================
+    // دالات القسم الثالث التكميلية (16 - 30)
+    // ==========================================
 
     /**
-     * 17. التحقق من العطل الرسمية
-     */
-    fun isHoliday(dateString: String): Boolean {
-        // الجمعة عطلة أسبوعية
-        try {
-            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-            val date = sdf.parse(dateString) ?: return false
-            val cal = java.util.Calendar.getInstance()
-            cal.time = date
-            val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK)
-            if (dayOfWeek == java.util.Calendar.FRIDAY) return true
-        } catch (e: Exception) {
-            // fallback
-        }
-        return false
-    }
-
-    /**
-     * 18. قائمة الفترات الزمنية مع حالة التوفر
-     */
-    fun getTimeSlotsWithAvailability(dateString: String, providerId: String): List<TimeSlot> {
-        val allSlots = listOf(
-            "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM",
-            "12:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-            "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
-        )
-        val holiday = isHoliday(dateString)
-        val bookedSlots = _bookings.value
-            .filter { it.providerId == providerId && it.dateString == dateString && it.status != "CANCELLED" && it.status != "REJECTED" }
-            .map { it.timeString.ifEmpty { it.time } }
-
-        return allSlots.map { slot ->
-            TimeSlot(
-                time = slot,
-                isAvailable = !holiday && !bookedSlots.contains(slot)
-            )
-        }
-    }
-
-    /**
-     * 19. عدد الحجوزات حسب الحالة
+     * 16. عدد الحجوزات حسب الحالة
      */
     fun getBookingCountByStatus(status: String): Int {
         return _bookings.value.count { it.status.equals(status, ignoreCase = true) }
     }
 
     /**
-     * 20. عدد حجوزات اليوم
+     * 17. عدد حجوزات اليوم
      */
     fun getBookingCountForToday(): Int {
         val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
@@ -466,7 +394,7 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 21. عدد حجوزات الأسبوع
+     * 18. عدد حجوزات الأسبوع
      */
     fun getBookingCountForWeek(): Int {
         val oneWeekAgo = System.currentTimeMillis() - 1000L * 60 * 60 * 24 * 7
@@ -474,7 +402,7 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 22. عدد حجوزات الشهر
+     * 19. عدد حجوزات الشهر
      */
     fun getBookingCountForMonth(): Int {
         val oneMonthAgo = System.currentTimeMillis() - 1000L * 60 * 60 * 24 * 30
@@ -482,7 +410,7 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 23. الحجوزات القادمة لمستخدم معين
+     * 20. الحجوزات القادمة لمستخدم معين
      */
     fun getUpcomingBookings(userId: String): List<BookingEntity> {
         val clean = userId.trim()
@@ -493,7 +421,7 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 24. الحجوزات السابقة والمنتهية
+     * 21. الحجوزات السابقة والمنتهية
      */
     fun getPastBookings(userId: String): List<BookingEntity> {
         val clean = userId.trim()
@@ -504,28 +432,28 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 25. الحجوزات حسب التاريخ
+     * 22. الحجوزات حسب التاريخ
      */
     fun getBookingsByDate(date: String): List<BookingEntity> {
         return _bookings.value.filter { it.dateString == date }
     }
 
     /**
-     * 26. الحجوزات حسب مقدم الخدمة
+     * 23. الحجوزات حسب مقدم الخدمة
      */
     fun getBookingsByProvider(providerId: String): List<BookingEntity> {
         return _bookings.value.filter { it.providerId == providerId }
     }
 
     /**
-     * 27. الحجوزات حسب العميل
+     * 24. الحجوزات حسب العميل
      */
     fun getBookingsByCustomer(customerId: String): List<BookingEntity> {
         return _bookings.value.filter { it.clientId == customerId || it.customerPhone == customerId }
     }
 
     /**
-     * 28. البحث في الحجوزات
+     * 25. البحث في الحجوزات
      */
     fun searchBookings(query: String): List<BookingEntity> {
         if (query.isBlank()) return _bookings.value
@@ -540,7 +468,7 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 29. تصدير الحجوزات
+     * 26. تصدير الحجوزات
      */
     fun exportBookings(format: String = "CSV"): String {
         return buildString {
@@ -552,7 +480,7 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 30. الخط الزمني للحجز
+     * 27. الخط الزمني للحجز
      */
     fun getBookingTimeline(bookingId: String): List<BookingTimeline> {
         val b = _bookings.value.find { it.id == bookingId }
@@ -576,7 +504,23 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 31. إضافة ملاحظة للحجز
+     * 28. رسائل واستفسارات الحجز
+     */
+    fun getBookingMessages(bookingId: String): List<ChatMessageEntity> {
+        val b = _bookings.value.find { it.id == bookingId } ?: return emptyList()
+        return listOf(
+            ChatMessageEntity(
+                id = "msg_init",
+                senderId = b.clientId,
+                senderName = b.customerName,
+                message = "مرحباً، حجزت خدمة ${b.serviceType} بتاريخ ${b.dateString}",
+                timestamp = b.createdAt
+            )
+        )
+    }
+
+    /**
+     * 29. إضافة ملاحظة للحجز
      */
     fun addBookingNote(bookingId: String, note: String) {
         if (note.isBlank()) return
@@ -592,7 +536,7 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * 32. ملاحظات الحجز
+     * 30. ملاحظات الحجز
      */
     fun getBookingNotes(bookingId: String): List<BookingNote> {
         return _bookingNotes.value[bookingId] ?: emptyList()

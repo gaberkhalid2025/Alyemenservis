@@ -18,8 +18,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,12 +25,6 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
-/**
- * 🌟 Premium AppHeaderBar with 10/10 Performance & Accessibility
- * - Full derivedStateOf integration to completely eliminate redundant recompositions
- * - Premium TalkBack support with explicit semantic descriptions
- * - Dynamic 3D Nav Icons with high contrast colors and adaptive notification badges
- */
 @Composable
 fun AppHeaderBar(
     viewModel: MainViewModel,
@@ -54,85 +46,76 @@ fun AppHeaderBar(
     val currentLang by viewModel.currentLanguage.collectAsState()
     val isEn = currentLang == "en"
 
-    // derivedStateOf optimizations to avoid re-running business logic on every recomposition
-    val myProvider by remember(providers, currentUserPhone) {
-        derivedStateOf { providers.find { it.phone == currentUserPhone } }
-    }
+    val myProvider = providers.find { it.phone == currentUserPhone }
 
-    val cleanUserId = remember(currentUserId) { currentUserId.trim() }
-    val cleanUserPhone = remember(currentUserPhone) { currentUserPhone.trim().replace(" ", "").replace("+", "") }
-    val isAdminUser by remember(cleanUserId, adminRoleState) {
-        derivedStateOf { cleanUserId == "admin" || cleanUserId.startsWith("super_") || adminRoleState != "GUEST" }
-    }
+    val cleanUserId = currentUserId.trim()
+    val cleanUserPhone = currentUserPhone.trim().replace(" ", "").replace("+", "")
+    val isAdminUser = cleanUserId == "admin" || cleanUserId.startsWith("super_") || adminRoleState != "GUEST"
 
-    val myChannels by remember(chatChannels, cleanUserId, cleanUserPhone, myProvider, isAdminUser) {
-        derivedStateOf {
-            if (isAdminUser) {
-                chatChannels
-            } else if (cleanUserId.isEmpty() && cleanUserPhone.isEmpty()) {
-                emptyList()
-            } else {
-                chatChannels.filter { ch ->
-                    val isMySupport = (cleanUserId.isNotEmpty() && ch.id == "support_$cleanUserId") ||
-                                      (cleanUserPhone.isNotEmpty() && ch.id == "support_$cleanUserPhone")
-                    val isMyUser = (cleanUserId.isNotEmpty() && ch.id.contains(cleanUserId)) ||
-                                   (cleanUserPhone.isNotEmpty() && ch.id.contains(cleanUserPhone)) ||
-                                   (cleanUserId.isNotEmpty() && ch.customerId == cleanUserId) ||
-                                   (cleanUserPhone.isNotEmpty() && ch.customerPhone == cleanUserPhone)
-                    val isMyProvider = myProvider != null && (ch.id.contains("chat_p_${myProvider!!.id}_") || ch.id.contains("_u_${myProvider!!.id}") || ch.targetId == myProvider!!.id)
+    val myChannels = remember(chatChannels, cleanUserId, cleanUserPhone, myProvider, isAdminUser) {
+        if (isAdminUser) {
+            chatChannels
+        } else if (cleanUserId.isEmpty() && cleanUserPhone.isEmpty()) {
+            emptyList()
+        } else {
+            chatChannels.filter { ch ->
+                val isMySupport = (cleanUserId.isNotEmpty() && ch.id == "support_$cleanUserId") ||
+                                  (cleanUserPhone.isNotEmpty() && ch.id == "support_$cleanUserPhone")
+                val isMyUser = (cleanUserId.isNotEmpty() && ch.id.contains(cleanUserId)) ||
+                               (cleanUserPhone.isNotEmpty() && ch.id.contains(cleanUserPhone)) ||
+                               (cleanUserId.isNotEmpty() && ch.customerId == cleanUserId) ||
+                               (cleanUserPhone.isNotEmpty() && ch.customerPhone == cleanUserPhone)
+                val isMyProvider = myProvider != null && (ch.id.contains("chat_p_${myProvider.id}_") || ch.id.contains("_u_${myProvider.id}") || ch.targetId == myProvider.id)
 
-                    isMySupport || isMyUser || isMyProvider
-                }
+                isMySupport || isMyUser || isMyProvider
             }
         }
     }
 
     val headerContext = LocalContext.current
-    val readNotificationIdsState by viewModel.readNotificationIds.collectAsState()
+    val headerSp = remember(headerContext) { headerContext.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
+    var headerReadIds by remember { mutableStateOf(headerSp.getStringSet("read_notif_ids", emptySet()) ?: emptySet()) }
     
-    // Calculate filtered notifications via derivedStateOf
-    val filteredNotifs by remember(allNotifications, userPhoneState, adminRoleState) {
-        derivedStateOf {
-            val cleanPhone = userPhoneState.trim().replace(" ", "").replace("+", "")
-            allNotifications.filter { notif ->
-                val isSensitive = notif.title.contains("كلمة مرور") || notif.message.contains("كلمة المرور") || notif.title.contains("استعادة") || notif.title.contains("طلب عاجل")
-                if (isSensitive) {
-                    val isAdmin = adminRoleState != "GUEST"
-                    val isMyTarget = cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)
-                    if (!isAdmin && !isMyTarget) return@filter false
-                }
+    // Calculate unread notifications count
+    val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
+        val cleanPhone = userPhoneState.trim().replace(" ", "").replace("+", "")
+        allNotifications.filter { notif ->
+            // Filter sensitive notifications (password recovery, private orders)
+            val isSensitive = notif.title.contains("كلمة مرور") || notif.message.contains("كلمة المرور") || notif.title.contains("استعادة") || notif.title.contains("طلب عاجل")
+            if (isSensitive) {
+                val isAdmin = adminRoleState != "GUEST"
+                val isMyTarget = cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)
+                if (!isAdmin && !isMyTarget) return@filter false
+            }
 
-                when (notif.targetType) {
-                    "ALL" -> true
-                    "USER", "PROVIDER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
-                    "SUPERVISOR" -> adminRoleState != "GUEST"
-                    else -> true
-                }
+            when (notif.targetType) {
+                "ALL" -> true
+                "USER", "PROVIDER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
+                "SUPERVISOR" -> adminRoleState != "GUEST"
+                else -> true
             }
         }
     }
-
-    val unreadNotifCount by remember(filteredNotifs, readNotificationIdsState) {
-        derivedStateOf { filteredNotifs.count { it.id !in readNotificationIdsState } }
+    val unreadNotifCount = remember(filteredNotifs, headerReadIds) {
+        filteredNotifs.count { it.id !in headerReadIds }
     }
 
-    // Calculate unread chats count via derivedStateOf
-    val unreadChatsCount by remember(myChannels, currentUserId, myProvider) {
-        derivedStateOf {
-            val provider = myProvider
-            myChannels.count { ch ->
-                ch.messages.any { msg ->
-                    val isMe = msg.senderId == currentUserId || (provider != null && msg.senderId == provider.id)
-                    !isMe && msg.readAt == 0L
-                }
+    // Calculate unread chats count
+    val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
+        myChannels.count { ch ->
+            val lastMsg = ch.messages.lastOrNull()
+            if (lastMsg == null) {
+                false
+            } else {
+                val isMe = lastMsg.senderId == currentUserId || (myProvider != null && lastMsg.senderId == myProvider.id)
+                val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
+                !isMe && lastMsg.timestamp > readTime
             }
         }
     }
 
     val screenBackStack by viewModel.screenBackStack.collectAsState()
-    val showBackButton by remember(screenBackStack, currentScreen) {
-        derivedStateOf { screenBackStack.size > 1 || currentScreen != "USER_BROWSE" }
-    }
+    val showBackButton = screenBackStack.size > 1 || currentScreen != "USER_BROWSE"
 
     Column(
         modifier = Modifier
@@ -141,7 +124,7 @@ fun AppHeaderBar(
             .statusBarsPadding()
             .testTag("app_header_bar")
     ) {
-        // Row 1: Unified TopBar Header with Back Button
+        // Row 1: Unified TopBar Header with Back Button (Controlled by Admin hideTopHeaderBar)
         if (!settingsState.hideTopHeaderBar) {
             Row(
                 modifier = Modifier
@@ -155,13 +138,10 @@ fun AppHeaderBar(
                         modifier = Modifier
                             .background(Color.White.copy(alpha = 0.2f), CircleShape)
                             .size(24.dp)
-                            .semantics {
-                                contentDescription = if (isEn) "Go Back" else "زر الرجوع للشاشة السابقة"
-                            }
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
+                            contentDescription = if (isEn) "Back" else "رجوع",
                             tint = Color.White,
                             modifier = Modifier.size(13.dp)
                         )
@@ -169,21 +149,18 @@ fun AppHeaderBar(
                     Spacer(modifier = Modifier.width(6.dp))
                 }
 
-                val titleText by remember(currentScreen, settingsState, isEn) {
-                    derivedStateOf {
-                        val defaultTitle = if (isEn) "Yemen Services Directory" else "دليل خدمات اليمن"
-                        val customTitle = settingsState.customAppName.ifEmpty { settingsState.appName.ifEmpty { defaultTitle } }
-                        when (currentScreen) {
-                            "REGISTER_FORM" -> if (isEn) "Join & Register" else "الانضمام والتسجيل"
-                            "JOIN_REQUEST_STATUS" -> if (isEn) "Request Status" else "حالة طلب الانضمام"
-                            "ADMIN_PANEL" -> if (isEn) "Admin Panel" else "لوحة التحكم والإدارة"
-                            "OWNER_PANEL" -> if (isEn) "Owner Backdoor" else "البوابة الخلفية"
-                            "ABOUT_APP" -> if (isEn) "About App" else "عن التطبيق"
-                            "BOOKINGS_VIEW" -> if (isEn) "Bookings & Orders" else "الحجوزات والطلبات"
-                            "MAP_VIEW" -> if (isEn) "Services Map" else "خريطة الخدمات"
-                            else -> customTitle
-                        }
-                    }
+                val defaultTitle = if (isEn) "Yemen Services Directory" else "دليل خدمات اليمن"
+                val customTitle = settingsState.customAppName.ifEmpty { settingsState.appName.ifEmpty { defaultTitle } }
+
+                val titleText = when (currentScreen) {
+                    "REGISTER_FORM" -> if (isEn) "Join & Register" else "الانضمام والتسجيل"
+                    "JOIN_REQUEST_STATUS" -> if (isEn) "Request Status" else "حالة طلب الانضمام"
+                    "ADMIN_PANEL" -> if (isEn) "Admin Panel" else "لوحة التحكم والإدارة"
+                    "OWNER_PANEL" -> if (isEn) "Owner Backdoor" else "البوابة الخلفية"
+                    "ABOUT_APP" -> if (isEn) "About App" else "عن التطبيق"
+                    "BOOKINGS_VIEW" -> if (isEn) "Bookings & Orders" else "الحجوزات والطلبات"
+                    "MAP_VIEW" -> if (isEn) "Services Map" else "خريطة الخدمات"
+                    else -> customTitle
                 }
 
                 Text(
@@ -193,25 +170,18 @@ fun AppHeaderBar(
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .semantics {
-                            contentDescription = if (isEn) "App Title: $titleText" else "عنوان التطبيق: $titleText"
-                        }
+                    modifier = Modifier.weight(1f, fill = false)
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // [ طلباتي ] Icon Button in Header
+                // [ طلباتي ] Icon Button in Header (Reduced 30%)
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
                         .background(themeColors.accent)
-                        .clickable { viewModel.navigateTo("BOOKINGS_VIEW") }
+                        .clickable { viewModel.navigateTo("ORDERS_VIEW") }
                         .padding(horizontal = 6.dp, vertical = 2.5.dp)
-                        .semantics {
-                            contentDescription = if (isEn) "View My Bookings" else "عرض طلباتي وحجوزاتي"
-                        }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -236,9 +206,6 @@ fun AppHeaderBar(
                     modifier = Modifier
                         .background(Color.White.copy(alpha = 0.2f), CircleShape)
                         .size(24.dp)
-                        .semantics {
-                            contentDescription = if (isEn) "Refresh Data" else "تحديث البيانات المباشر"
-                        }
                 ) {
                     if (isRefreshingHeader) {
                         CircularProgressIndicator(
@@ -249,7 +216,7 @@ fun AppHeaderBar(
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
+                            contentDescription = if (isEn) "Refresh" else "تحديث البيانات",
                             tint = Color.White,
                             modifier = Modifier.size(12.dp)
                         )
@@ -258,7 +225,7 @@ fun AppHeaderBar(
             }
         }
 
-        // Row 2: Navigation Items
+        // Row 2: Navigation Items (5 luxury 3D golden icons - Preserved in order & iconography)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -270,11 +237,8 @@ fun AppHeaderBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            val isBrowse by remember(currentScreen) {
-                derivedStateOf { currentScreen == "USER_BROWSE" || currentScreen == "MAIN_DASHBOARD" }
-            }
-
             // 1. الرئيسية
+            val isBrowse = currentScreen == "USER_BROWSE" || currentScreen == "MAIN_DASHBOARD"
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topHomeIcon.ifEmpty { "🏠" },
                 vectorIcon = Icons.Default.Home,
@@ -290,9 +254,7 @@ fun AppHeaderBar(
 
             // 2. الخرائط
             if (settingsState.isMapFeatureEnabled) {
-                val isMap by remember(currentScreen) {
-                    derivedStateOf { currentScreen == "MAP_VIEW" }
-                }
+                val isMap = currentScreen == "MAP_VIEW"
                 Luxury3DNavIcon(
                     emojiIcon = settingsState.topMapsIcon.ifEmpty { "🗺️" },
                     vectorIcon = Icons.Default.Place,
@@ -305,9 +267,7 @@ fun AppHeaderBar(
             }
 
             // 3. الانضمام
-            val isJoin by remember(currentScreen) {
-                derivedStateOf { currentScreen == "REGISTER_FORM" || currentScreen == "JOIN_REQUEST_STATUS" }
-            }
+            val isJoin = currentScreen == "REGISTER_FORM" || currentScreen == "JOIN_REQUEST_STATUS"
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topJoinIcon.ifEmpty { "👤" },
                 vectorIcon = Icons.Default.Person,
@@ -323,22 +283,25 @@ fun AppHeaderBar(
                 emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
                 vectorIcon = Icons.Default.Notifications,
                 label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = currentScreen == "NOTIFICATIONS",
+                isSelected = unreadNotifCount > 0,
                 badgeCount = unreadNotifCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
                 onClick = {
-                    viewModel.markAllNotificationsAsRead(headerContext)
+                    val allIds = filteredNotifs.map { it.id }.toSet()
+                    headerSp.edit().putStringSet("read_notif_ids", allIds).apply()
+                    headerReadIds = allIds
                     onNotificationsClick()
                 }
             )
 
             // 5. المحادثات
+            val hasUnreadChats = unreadChatsCount > 0
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topChatsIcon.ifEmpty { "✉️" },
                 vectorIcon = Icons.Default.Email,
                 label = if (isEn) "Chats" else "المحادثات",
-                isSelected = currentScreen == "CHAT_LIST",
+                isSelected = hasUnreadChats,
                 badgeCount = unreadChatsCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,

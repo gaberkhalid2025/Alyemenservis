@@ -1,24 +1,18 @@
 package com.example.util
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.example.data.local.OfflineRequestDatabase
-import com.example.data.local.OfflineRequestEntity
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-/**
- * 📦 OfflineRequest
- * نموذج طلب الأوفلاين للتعامل في الطبقة العليا.
- */
 data class OfflineRequest(
     val id: String = UUID.randomUUID().toString(),
     val type: String, // "BOOKING", "REQUEST", "MESSAGE", "OFFER", "ADMIN_UPDATE"
@@ -31,15 +25,11 @@ data class OfflineRequest(
 
 /**
  * 📦 OfflineQueueManager
- * 
  * إدارة وتخزين الطلبات في وضع الأوفلاين وإعادة جدولتها ومعالجتها تلقائياً عند استعادة الاتصال بالإنترنت.
- * تم تحديثه ليعتمد بالكامل على **Room Database (`OfflineRequestDatabase`)** بدلاً من `SharedPreferences`
- * لتحسين الأداء واستيعاب كميات كبرى من العمليات المعلقة وسرعة الاستعلام والفرز.
  */
 class OfflineQueueManager(private val context: Context) {
 
-    private val db = OfflineRequestDatabase.getInstance(context)
-    private val dao = db.offlineRequestDao()
+    private val prefs: SharedPreferences = context.getSharedPreferences("app_offline_queue_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val _pendingRequests = MutableStateFlow<List<OfflineRequest>>(emptyList())
@@ -50,105 +40,119 @@ class OfflineQueueManager(private val context: Context) {
 
     companion object {
         private const val TAG = "OfflineQueueManager"
+        private const val KEY_QUEUE = "key_offline_requests_queue_json"
         private const val MAX_RETRIES = 5
     }
 
     init {
-        observeAndLoadQueue()
+        loadQueueFromStorage()
     }
 
-    private fun observeAndLoadQueue() {
-        scope.launch {
-            try {
-                dao.getPendingRequests().collect { entities ->
-                    val domainList = entities.map { entityToDomain(it) }
-                    _pendingRequests.value = domainList
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error observing offline queue from Room: ${e.message}")
-            }
-        }
-    }
-
-    private fun domainToEntity(req: OfflineRequest): OfflineRequestEntity {
-        val jsonObj = JSONObject()
-        req.data.forEach { (k, v) ->
-            jsonObj.put(k, v ?: JSONObject.NULL)
-        }
-        return OfflineRequestEntity(
-            id = req.id,
-            type = req.type,
-            data = jsonObj.toString(),
-            timestamp = req.timestamp,
-            priority = req.priority,
-            retryCount = req.retryCount,
-            status = req.status
-        )
-    }
-
-    private fun entityToDomain(entity: OfflineRequestEntity): OfflineRequest {
-        val dataMap = mutableMapOf<String, Any?>()
+    private fun loadQueueFromStorage() {
+        val jsonStr = prefs.getString(KEY_QUEUE, null) ?: return
         try {
-            val jsonObj = JSONObject(entity.data)
-            val keys = jsonObj.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                if (!jsonObj.isNull(key)) {
-                    dataMap[key] = jsonObj.get(key)
+            val arr = JSONArray(jsonStr)
+            val list = mutableListOf<OfflineRequest>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val id = obj.optString("id", UUID.randomUUID().toString())
+                val type = obj.optString("type", "BOOKING")
+                val timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                val priority = obj.optInt("priority", 3)
+                val retryCount = obj.optInt("retryCount", 0)
+                val status = obj.optString("status", "PENDING")
+
+                val dataObj = obj.optJSONObject("data")
+                val dataMap = mutableMapOf<String, Any?>()
+                if (dataObj != null) {
+                    val keys = dataObj.keys()
+                    while (keys.hasNext()) {
+                        val k = keys.next()
+                        dataMap[k] = dataObj.opt(k)
+                    }
                 }
+
+                list.add(
+                    OfflineRequest(
+                        id = id,
+                        type = type,
+                        data = dataMap,
+                        timestamp = timestamp,
+                        priority = priority,
+                        retryCount = retryCount,
+                        status = status
+                    )
+                )
             }
+            _pendingRequests.value = list
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing json data for entity ${entity.id}: ${e.message}")
+            Log.e(TAG, "Failed parsing saved offline queue: ${e.message}")
         }
-        return OfflineRequest(
-            id = entity.id,
-            type = entity.type,
-            data = dataMap,
-            timestamp = entity.timestamp,
-            priority = entity.priority,
-            retryCount = entity.retryCount,
-            status = entity.status
-        )
+    }
+
+    private fun saveQueueToStorage() {
+        try {
+            val arr = JSONArray()
+            _pendingRequests.value.forEach { req ->
+                val obj = JSONObject()
+                obj.put("id", req.id)
+                obj.put("type", req.type)
+                obj.put("timestamp", req.timestamp)
+                obj.put("priority", req.priority)
+                obj.put("retryCount", req.retryCount)
+                obj.put("status", req.status)
+
+                val dataObj = JSONObject()
+                req.data.forEach { (k, v) ->
+                    dataObj.put(k, v ?: JSONObject.NULL)
+                }
+                obj.put("data", dataObj)
+                arr.put(obj)
+            }
+            prefs.edit().putString(KEY_QUEUE, arr.toString()).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed saving queue: ${e.message}")
+        }
     }
 
     /**
-     * 1. إضافة طلب إلى قائمة الانتظار الحافظة في Room
+     * 1. إضافة طلب إلى قائمة الانتظار
      */
     fun addToQueue(request: OfflineRequest) {
-        scope.launch {
-            try {
-                val entity = domainToEntity(request)
-                dao.insert(entity)
-                Log.d(TAG, "Request inserted into Room database: ${request.id} (Type: ${request.type})")
+        val updated = (_pendingRequests.value + request).sortedBy { it.priority }
+        _pendingRequests.value = updated
+        saveQueueToStorage()
+        Log.d(TAG, "Request added to offline queue: ${request.id} (Type: ${request.type})")
 
-                if (isOnline()) {
-                    processQueue()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed inserting request to Room: ${e.message}")
-            }
+        if (isOnline()) {
+            processQueue()
         }
     }
 
     /**
-     * 2. الحصول على الطلبات المعلقة محلياً
+     * 2. الحصول على الطلبات المعلقة
      */
     fun getPendingRequests(): List<OfflineRequest> {
         return _pendingRequests.value.filter { it.status == "PENDING" || it.status == "FAILED" }
     }
 
     /**
-     * 3. معالجة قائمة الانتظار وإرسال الطلبات للسيرفر عبر Firestore
+     * 3. معالجة قائمة الانتظار وإرسال الطلبات للسيرفر
      */
     fun processQueue(onItemProcessed: ((OfflineRequest, Boolean) -> Unit)? = null) {
         if (!isOnline() || _isProcessing.value) return
 
         scope.launch {
             _isProcessing.value = true
-            val currentList = dao.getPendingOrFailedRequestsList().map { entityToDomain(it) }
+            val currentList = _pendingRequests.value.filter { it.status == "PENDING" || it.status == "FAILED" }
+
+            val remainingList = mutableListOf<OfflineRequest>()
 
             for (req in currentList) {
-                if (!isOnline()) break
+                if (!isOnline()) {
+                    remainingList.add(req)
+                    continue
+                }
 
                 var success = false
                 try {
@@ -158,27 +162,27 @@ class OfflineQueueManager(private val context: Context) {
                 }
 
                 if (success) {
-                    dao.updateStatus(req.id, "COMPLETED")
-                    dao.deleteById(req.id)
                     onItemProcessed?.invoke(req, true)
                 } else {
                     val nextRetry = req.retryCount + 1
                     if (nextRetry < MAX_RETRIES) {
-                        dao.updateStatus(req.id, "FAILED", nextRetry)
+                        remainingList.add(req.copy(retryCount = nextRetry, status = "FAILED"))
                     } else {
                         Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
-                        dao.deleteById(req.id)
                     }
                     onItemProcessed?.invoke(req, false)
                 }
             }
+
+            _pendingRequests.value = remainingList
+            saveQueueToStorage()
             _isProcessing.value = false
         }
     }
 
     private suspend fun executeRequest(req: OfflineRequest): Boolean = withContext(Dispatchers.IO) {
         try {
-            val firestore = FirebaseFirestore.getInstance()
+            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
             val collection = when (req.type) {
                 "BOOKING" -> "bookings"
                 "REQUEST" -> "instant_requests"
@@ -194,7 +198,7 @@ class OfflineQueueManager(private val context: Context) {
 
             var finished = false
             var isOk = false
-            firestore.collection(collection).document(targetDoc).set(req.data, SetOptions.merge())
+            db.collection(collection).document(targetDoc).set(req.data, com.google.firebase.firestore.SetOptions.merge())
                 .addOnSuccessListener {
                     isOk = true
                     finished = true
@@ -216,47 +220,42 @@ class OfflineQueueManager(private val context: Context) {
     }
 
     /**
-     * 4. إلغاء طلب من القائمة في Room
+     * 4. إلغاء طلب من القائمة
      */
     fun cancelRequest(requestId: String) {
-        scope.launch {
-            dao.deleteById(requestId)
-        }
+        _pendingRequests.value = _pendingRequests.value.filterNot { it.id == requestId }
+        saveQueueToStorage()
     }
 
     /**
      * 5. إعادة محاولة الطلبات الفاشلة
      */
     fun retryFailedRequests() {
-        scope.launch {
-            val list = dao.getPendingOrFailedRequestsList()
-            list.forEach { entity ->
-                if (entity.status == "FAILED") {
-                    dao.updateStatus(entity.id, "PENDING", 0)
-                }
-            }
-            if (isOnline()) {
-                processQueue()
-            }
+        val updated = _pendingRequests.value.map {
+            if (it.status == "FAILED") it.copy(status = "PENDING", retryCount = 0) else it
+        }
+        _pendingRequests.value = updated
+        saveQueueToStorage()
+        if (isOnline()) {
+            processQueue()
         }
     }
 
     /**
-     * 6. مسح كامل طابور العمليات المعلقة
+     * 6. مسح قائمة الانتظار
      */
     fun clearQueue() {
-        scope.launch {
-            dao.clearAll()
-        }
+        _pendingRequests.value = emptyList()
+        prefs.edit().remove(KEY_QUEUE).apply()
     }
 
     /**
-     * 7. حجم قائمة الانتظار الحالية
+     * 7. حجم قائمة الانتظار
      */
     fun getQueueSize(): Int = _pendingRequests.value.size
 
     /**
-     * 8. التحقق من الاتصال بالإنترنت
+     * 8. التحقق من توفر الإنترنت
      */
     fun isOnline(): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false

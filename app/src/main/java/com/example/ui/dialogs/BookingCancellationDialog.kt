@@ -41,7 +41,7 @@ fun BookingCancellationDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var attemptsLeft by remember { mutableIntStateOf((3 - booking.cancellationAttempts).coerceAtLeast(0)) }
 
-    val canCancelByRule = remember(booking) { userRole == "ADMIN" || userRole == "SUPERVISOR" || BookingStateMachine.canCancel(booking) }
+    val canCancelByRule = remember(booking) { BookingStateMachine.canCancel(booking) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(

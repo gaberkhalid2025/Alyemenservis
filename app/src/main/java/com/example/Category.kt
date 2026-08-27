@@ -1,11 +1,8 @@
 package com.example
 
+import com.example.utils.*
+
 import androidx.annotation.Keep
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 
 @Keep
 data class Category(
@@ -22,28 +19,6 @@ data class Category(
                 icon = map["icon"] as? String ?: "",
                 order = (map["order"] as? Number)?.toInt() ?: 0
             )
-        }
-
-        /**
-         * جلب الأقسام من Firebase في الوقت الفعلي عبر Flow
-         */
-        fun observeCategoriesRealtime(): Flow<List<Category>> = callbackFlow {
-            val firestore = FirebaseFirestore.getInstance()
-            val registration: ListenerRegistration = firestore.collection("categories")
-                .orderBy("order")
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        trySend(defaultCategories)
-                        return@addSnapshotListener
-                    }
-                    if (snapshot != null && !snapshot.isEmpty) {
-                        val list = snapshot.documents.mapNotNull { it.toObject(Category::class.java) }
-                        trySend(list)
-                    } else {
-                        trySend(defaultCategories)
-                    }
-                }
-            awaitClose { registration.remove() }
         }
     }
 

@@ -4014,10 +4014,10 @@ fun PropertyCreateEditDialog(
 
 
 // --------------------------------------------------------
-// 9. LEGACY ADMIN STORES & PROPERTIES MANAGEMENT PANEL (MOVED TO AdminStoresPropertiesPanel.kt)
+// 9. ADMIN STORES & PROPERTIES MANAGEMENT PANEL
 // --------------------------------------------------------
 @Composable
-fun LegacyAdminStoresPropertiesPanel(
+fun AdminStoresPropertiesPanel(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {

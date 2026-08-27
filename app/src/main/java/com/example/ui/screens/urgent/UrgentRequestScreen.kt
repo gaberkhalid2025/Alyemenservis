@@ -1,5 +1,6 @@
 package com.example.ui.screens.urgent
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -21,30 +22,29 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.models.InstantRequestEntity
 import com.example.ui.MainViewModel
-import com.example.viewmodels.UrgentUiState
-import com.example.viewmodels.UrgentViewModel
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import java.util.UUID
+import kotlin.random.Random
 
 /**
  * 🚨 UrgentRequestScreen
- * شاشة طلب خدمة عاجلة خلال 30 دقيقة مع مؤقت فوري وتنبيهات أولوية قصوى.
- * تستخدم النمط المعماري MVVM مع UrgentViewModel وعرض الملاحظات عبر Snackbar.
+ * شاشة طلب خدمة عاجلة خلال 30 دقيقة مع مؤقت فوري وتنبيهات أولوية قصوى
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentRequestScreen(
     viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToUrgentList: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val firestore = remember { FirebaseFirestore.getInstance() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
-    val uiState by urgentViewModel.uiState.collectAsState()
 
     var customerPhone by remember { mutableStateOf("") }
     var customerName by remember { mutableStateOf("") }
@@ -57,6 +57,7 @@ fun UrgentRequestScreen(
     var pinCode by remember { mutableStateOf("") }
     var isPinVisible by remember { mutableStateOf(false) }
 
+    var isSubmitting by remember { mutableStateOf(false) }
     var createdRequestCode by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var expandedCategoryDropdown by remember { mutableStateOf(false) }
@@ -75,19 +76,7 @@ fun UrgentRequestScreen(
         selectedCategory = subCategories.firstOrNull() ?: ""
     }
 
-    LaunchedEffect(uiState) {
-        when (val state = uiState) {
-            is UrgentUiState.Error -> {
-                scope.launch {
-                    snackbarHostState.showSnackbar(state.message)
-                }
-            }
-            else -> {}
-        }
-    }
-
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -261,44 +250,65 @@ fun UrgentRequestScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // زر إرسال الطلب العاجل
-            val isLoading = uiState is UrgentUiState.Loading
             Button(
                 onClick = {
                     if (customerPhone.isBlank() || serviceTitle.isBlank() || serviceDetails.isBlank() || selectedArea.isBlank()) {
-                        scope.launch { snackbarHostState.showSnackbar("يرجى تعبئة كافة الحقول الإجبارية (*)") }
+                        Toast.makeText(context, "يرجى تعبئة كافة الحقول الإجبارية (*)", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     if (pinCode.length < 4) {
-                        scope.launch { snackbarHostState.showSnackbar("يرجى كتابة رمز PIN مكون من 4 أرقام") }
+                        Toast.makeText(context, "يرجى كتابة رمز PIN مكون من 4 أرقام", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
-                    urgentViewModel.createUrgentRequest(
-                        customerName = customerName,
-                        customerPhone = customerPhone,
-                        selectedCity = selectedCity,
-                        selectedArea = selectedArea,
-                        selectedDepartment = selectedDepartment,
-                        selectedCategory = selectedCategory,
-                        serviceTitle = serviceTitle,
-                        serviceDetails = serviceDetails,
-                        pinCode = pinCode,
-                        currentUserId = currentUserId,
-                        onSuccess = { code ->
-                            createdRequestCode = code
-                            showSuccessDialog = true
-                        },
-                        onError = { err ->
-                            scope.launch { snackbarHostState.showSnackbar(err) }
+                    isSubmitting = true
+                    scope.launch {
+                        try {
+                            val uniqueCode = "URG-${Random.nextInt(100000, 999999)}"
+                            val reqId = UUID.randomUUID().toString()
+                            val now = System.currentTimeMillis()
+                            val urgentReq = InstantRequestEntity(
+                                id = reqId,
+                                requestCode = uniqueCode,
+                                secretPin = pinCode,
+                                cancellationPassword = pinCode,
+                                userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
+                                userName = customerName.ifBlank { "عميل" },
+                                userPhone = customerPhone,
+                                userCity = selectedCity,
+                                userNeighborhood = selectedArea,
+                                categoryId = selectedDepartment,
+                                categoryName = selectedCategory,
+                                serviceTitle = "🚨 عاجل: $serviceTitle",
+                                description = serviceDetails,
+                                status = "WAITING_FOR_OFFERS",
+                                urgencyTime = "فوراً (خلال 30 دقيقة)",
+                                createdAt = now,
+                                expiresAt = now + 30 * 60 * 1000L // 30 دقيقة بالضبط
+                            )
+
+                            firestore.collection("instant_requests").document(reqId).set(urgentReq)
+                                .addOnSuccessListener {
+                                    isSubmitting = false
+                                    createdRequestCode = uniqueCode
+                                    showSuccessDialog = true
+                                }
+                                .addOnFailureListener { e ->
+                                    isSubmitting = false
+                                    Toast.makeText(context, "فشل الإرسال: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                }
+                        } catch (e: Exception) {
+                            isSubmitting = false
+                            Toast.makeText(context, "خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                         }
-                    )
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_urgent_request_btn"),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                enabled = !isLoading
+                enabled = !isSubmitting
             ) {
-                if (isLoading) {
+                if (isSubmitting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
                     Icon(Icons.Default.Warning, contentDescription = null)
