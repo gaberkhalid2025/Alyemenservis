@@ -1,6 +1,5 @@
 package com.example.ui.screens.owner
 
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,30 +15,46 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.CouponEntity
 import com.example.data.UnifiedBusinessAccount
 import com.example.ui.MainViewModel
+import com.example.ui.components.AppSnackbarHost
+import com.example.ui.components.SnackbarType
+import com.example.ui.components.showCustomSnackbar
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 import java.util.UUID
 
+/**
+ * 🎁 OffersManagementScreen
+ * شاشة إدارة العروض وكوبونات الخصم مع تكامل OwnerViewModel ونظام AppSnackbar
+ */
 @Composable
 fun OffersManagementScreen(
     account: UnifiedBusinessAccount,
     viewModel: MainViewModel,
+    ownerViewModel: OwnerViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
-    val context = LocalContext.current
-    val couponsList by viewModel.coupons.collectAsState()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val couponsList by ownerViewModel.coupons.collectAsState()
 
     var showAddOfferDialog by remember { mutableStateOf(false) }
     var offerToEdit by remember { mutableStateOf<CouponEntity?>(null) }
 
+    LaunchedEffect(account.id) {
+        ownerViewModel.listenToCoupons(account.id)
+    }
+
     Scaffold(
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
@@ -92,7 +107,8 @@ fun OffersManagementScreen(
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 72.dp)
                 ) {
                     items(couponsList, key = { it.id }) { offer ->
                         OfferItemCard(
@@ -103,8 +119,25 @@ fun OffersManagementScreen(
                                 showAddOfferDialog = true
                             },
                             onDelete = {
-                                viewModel.deleteCoupon(offer.id)
-                                Toast.makeText(context, "تم حذف الكوبون بنجاح", Toast.LENGTH_SHORT).show()
+                                ownerViewModel.deleteCoupon(
+                                    couponId = offer.id,
+                                    onSuccess = {
+                                        scope.launch {
+                                            snackbarHostState.showCustomSnackbar(
+                                                message = "تم حذف الكوبون بنجاح",
+                                                type = SnackbarType.SUCCESS
+                                            )
+                                        }
+                                    },
+                                    onError = { err ->
+                                        scope.launch {
+                                            snackbarHostState.showCustomSnackbar(
+                                                message = err,
+                                                type = SnackbarType.ERROR
+                                            )
+                                        }
+                                    }
+                                )
                             }
                         )
                     }
@@ -119,9 +152,26 @@ fun OffersManagementScreen(
             offer = offerToEdit,
             onDismiss = { showAddOfferDialog = false },
             onSave = { newCoupon ->
-                viewModel.saveCoupon(newCoupon)
-                showAddOfferDialog = false
-                Toast.makeText(context, "تم نشر كوبون الخصم بنجاح!", Toast.LENGTH_SHORT).show()
+                ownerViewModel.saveCoupon(
+                    coupon = newCoupon,
+                    onSuccess = {
+                        showAddOfferDialog = false
+                        scope.launch {
+                            snackbarHostState.showCustomSnackbar(
+                                message = "تم نشر كوبون الخصم بنجاح!",
+                                type = SnackbarType.SUCCESS
+                            )
+                        }
+                    },
+                    onError = { err ->
+                        scope.launch {
+                            snackbarHostState.showCustomSnackbar(
+                                message = err,
+                                type = SnackbarType.ERROR
+                            )
+                        }
+                    }
+                )
             }
         )
     }

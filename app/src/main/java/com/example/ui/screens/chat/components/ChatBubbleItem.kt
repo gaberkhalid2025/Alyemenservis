@@ -105,6 +105,39 @@ fun ChatBubbleItem(
                         Spacer(modifier = Modifier.height(6.dp))
                     }
                 }
+                MediaType.VIDEO -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.Black.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (message.mediaUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = message.mediaUrl,
+                                contentDescription = "فيديو مرفق",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "تشغيل الفيديو",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
                 MediaType.AUDIO -> {
                     Row(
                         modifier = Modifier
@@ -120,8 +153,29 @@ fun ChatBubbleItem(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
                 MediaType.FILE -> {
-                    Text("📎 ${message.message.ifBlank { "ملف مرفق" }}", color = Color(0xFF90CAF9), fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    val fileName = message.message.ifBlank { "ملف مرفق" }
+                    val fileIcon = when {
+                        fileName.endsWith(".pdf", ignoreCase = true) -> "📄 [PDF]"
+                        fileName.endsWith(".doc", ignoreCase = true) || fileName.endsWith(".docx", ignoreCase = true) -> "📝 [DOC]"
+                        fileName.endsWith(".xls", ignoreCase = true) || fileName.endsWith(".xlsx", ignoreCase = true) -> "📊 [XLS]"
+                        fileName.endsWith(".zip", ignoreCase = true) || fileName.endsWith(".rar", ignoreCase = true) -> "📦 [ZIP]"
+                        else -> "📎 [FILE]"
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(fileIcon, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(fileName, color = Color(0xFF90CAF9), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                            Text("انقر للفتح أو التنزيل", color = Color.LightGray, fontSize = 10.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
                 else -> {}
             }

@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.models.ChatChannel
 import com.example.data.models.ChatMessage
+import com.example.ui.components.AppSnackbarHost
+import com.example.ui.components.SnackbarType
+import com.example.ui.components.showCustomSnackbar
 import com.example.ui.screens.chat.components.ChatBubbleItem
 import com.example.ui.screens.chat.components.ChatHeaderBar
 import com.example.ui.screens.chat.components.ChatInputBar
@@ -40,6 +43,7 @@ fun ChatScreen(
     relatedEntityType: String? = null,
     themeColors: VisualThemePalette,
     chatViewModel: ChatViewModel = viewModel(),
+    showUserIdInsteadOfNameInChat: Boolean = false,
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -99,20 +103,62 @@ fun ChatScreen(
         activeChannel?.participantPhotos?.get(otherUserId) ?: targetUserPhoto ?: ""
     }
 
+    val displayNameToShow = remember(otherUserId, otherUserName, showUserIdInsteadOfNameInChat) {
+        if (showUserIdInsteadOfNameInChat) {
+            "معرف المستخدم: ID_$otherUserId"
+        } else {
+            otherUserName
+        }
+    }
+
+    var showConfirmDeleteChannel by remember { mutableStateOf(false) }
+
     val filteredMessages = remember(messages, searchQuery) {
         if (searchQuery.isBlank()) messages
         else messages.filter { it.message.contains(searchQuery, ignoreCase = true) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0D151F))
-    ) {
+    if (showConfirmDeleteChannel && activeChannel != null) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDeleteChannel = false },
+            title = { Text("حذف المحادثة بالكامل 🗑️", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة وكافة رسائلها نهائياً؟ لا يمكن التراجع عن هذا الإجراء.", fontSize = 14.sp) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        chatViewModel.deleteChannel(activeChannel.id)
+                        showConfirmDeleteChannel = false
+                        onBackClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("نعم، احذف المحادثة", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDeleteChannel = false }) {
+                    Text("إلغاء", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    Scaffold(
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
+        containerColor = Color(0xFF0D151F)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(Color(0xFF0D151F))
+        ) {
         // Header
         ChatHeaderBar(
-            name = otherUserName,
-            photoUrl = otherUserPhoto,
+            name = displayNameToShow,
+            photoUrl = if (showUserIdInsteadOfNameInChat) "" else otherUserPhoto,
             presence = presence,
             isTyping = isTypingOther,
             onBackClick = onBackClick,
@@ -123,8 +169,14 @@ fun ChatScreen(
             onBlockClick = {
                 if (otherUserId.isNotBlank()) {
                     chatViewModel.toggleBlock(otherUserId, true)
-                    Toast.makeText(context, "تم حظر المستخدم", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "تم حظر المستخدم 🚫", Toast.LENGTH_SHORT).show()
                 }
+            },
+            onDeleteChannelClick = {
+                showConfirmDeleteChannel = true
+            },
+            onCloseClick = {
+                onBackClick()
             }
         )
 
@@ -210,6 +262,7 @@ fun ChatScreen(
                 chatViewModel.onUserTyping(currentUserId, text)
             }
         )
+    }
     }
 
     // Message options action sheet

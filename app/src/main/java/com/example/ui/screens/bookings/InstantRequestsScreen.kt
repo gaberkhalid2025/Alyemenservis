@@ -29,8 +29,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.data.models.InstantRequestEntity
-import com.example.data.models.RequestOfferEntity
+import com.example.data.InstantRequestEntity
+import com.example.data.RequestOfferEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.delay

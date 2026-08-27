@@ -1,6 +1,7 @@
 package com.example.viewmodels
 
 import android.app.Application
+import androidx.annotation.Keep
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.util.Conflict
@@ -16,9 +17,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+@Keep
+data class SyncDetails(
+    val lastSyncTimestamp: Long = System.currentTimeMillis(),
+    val totalSyncedItems: Int = 0,
+    val pendingUploads: Int = 0,
+    val syncPhase: String = "IDLE", // IDLE, DOWNLOADING, UPLOADING, RESOLVING, COMPLETED, FAILED
+    val isAutoSyncEnabled: Boolean = true
+)
+
 /**
  * 🔄 SyncViewModel
- * إدارة واجهات وتفاعل عمليات المزامنة المركزية وحل التعارضات وإدارة طابور الأوفلاين.
+ * إدارة واجهات وتفاعل عمليات المزامنة المركزية وحل التعارضات وإدارة طابور الأوفلاين وتفاصيل التقدم.
  */
 class SyncViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -32,18 +42,28 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
     val pendingConflicts: StateFlow<List<Conflict>> = conflictResolver.pendingConflicts
     val errors: StateFlow<List<SyncError>> = statusTracker.errors
 
+    private val _syncDetails = MutableStateFlow(SyncDetails())
+    val syncDetails: StateFlow<SyncDetails> = _syncDetails.asStateFlow()
+
     private val _lastSyncFormatted = MutableStateFlow(syncManager.getLastSyncTime())
     val lastSyncFormatted: StateFlow<String> = _lastSyncFormatted.asStateFlow()
 
     fun triggerManualSync(onComplete: ((Boolean) -> Unit)? = null) {
         statusTracker.manualSync {
             viewModelScope.launch {
+                _syncDetails.value = _syncDetails.value.copy(syncPhase = "DOWNLOADING")
                 val success = syncManager.syncAllSettings()
                 if (success) {
                     statusTracker.recordSuccessfulSync(10)
                     _lastSyncFormatted.value = syncManager.getLastSyncTime()
+                    _syncDetails.value = _syncDetails.value.copy(
+                        lastSyncTimestamp = System.currentTimeMillis(),
+                        totalSyncedItems = _syncDetails.value.totalSyncedItems + 10,
+                        syncPhase = "COMPLETED"
+                    )
                 } else {
                     statusTracker.recordError("فشلت عملية المزامنة مع السحابة")
+                    _syncDetails.value = _syncDetails.value.copy(syncPhase = "FAILED")
                 }
                 onComplete?.invoke(success)
             }

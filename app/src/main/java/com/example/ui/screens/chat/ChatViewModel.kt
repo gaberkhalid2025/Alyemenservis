@@ -9,9 +9,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+sealed class ChatUiState {
+    object Idle : ChatUiState()
+    object Loading : ChatUiState()
+    data class Success(val message: String? = null) : ChatUiState()
+    data class Error(val errorMessage: String) : ChatUiState()
+}
+
 class ChatViewModel(
     private val repository: ChatRepository = ChatRepository()
 ) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<ChatUiState>(ChatUiState.Idle)
+    val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private val _currentChannel = MutableStateFlow<ChatChannel?>(null)
     val currentChannel: StateFlow<ChatChannel?> = _currentChannel.asStateFlow()
@@ -210,6 +220,12 @@ class ChatViewModel(
                     put(otherUserId, block)
                 } ?: mapOf(otherUserId to block)
             )
+        }
+    }
+
+    fun deleteChannel(channelId: String) {
+        viewModelScope.launch {
+            repository.deleteChannel(channelId)
         }
     }
 

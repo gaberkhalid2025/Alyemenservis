@@ -3,8 +3,8 @@ package com.example.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.NotificationEntity
-import com.example.data.models.InstantRequestEntity
-import com.example.data.models.RequestOfferEntity
+import com.example.data.InstantRequestEntity
+import com.example.data.RequestOfferEntity
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration

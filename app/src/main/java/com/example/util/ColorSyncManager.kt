@@ -4,8 +4,16 @@ import android.content.Context
 import com.example.data.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
 
+/**
+ * 🎨 ColorSyncManager - مدير مزامنة سمات وألوان الواجهات محلياً وسحابياً
+ * 
+ * الميزات:
+ * 1. حفظ واسترجاع سمات ألوان التطبيق (ColorSchemeEntity) محلياً عبر SharedPreferences.
+ * 2. حفظ واسترجاع تفضيلات الألوان الشخصية للمستخدم (UserColorsEntity).
+ * 3. تسجيل سجلات مزامنة الألوان (SyncLogEntity) مع الحفاظ على أحدث 50 سجلاً.
+ * 4. تسلسل وإلغاء تسلسل آمن بتنسيق JSON لجميع فئات الألوان.
+ */
 object ColorSyncManager {
 
     private const val PREFS_NAME = "yemen_service_prefs"
@@ -13,38 +21,51 @@ object ColorSyncManager {
     private const val KEY_PERSONAL_COLORS = "personal_colors_json"
     private const val KEY_SYNC_LOGS = "color_sync_logs_json"
 
+    /**
+     * حفظ نظام الألوان المخصص محلياً
+     */
     fun saveLocalColorScheme(context: Context, scheme: ColorSchemeEntity) {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sp.edit().putString(KEY_COLOR_SCHEME, serializeColorScheme(scheme)).apply()
     }
 
+    /**
+     * استرجاع نظام الألوان المحفوظ محلياً
+     */
     fun getLocalColorScheme(context: Context): ColorSchemeEntity {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonStr = sp.getString(KEY_COLOR_SCHEME, null) ?: return ColorSchemeEntity()
         return try {
             deserializeColorScheme(jsonStr)
         } catch (e: Exception) {
-            e.printStackTrace()
             ColorSchemeEntity()
         }
     }
 
+    /**
+     * حفظ تفضيلات الألوان الخاصة بالمستخدم
+     */
     fun saveLocalPersonalColors(context: Context, personal: UserColorsEntity) {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sp.edit().putString(KEY_PERSONAL_COLORS, serializePersonalColors(personal)).apply()
     }
 
+    /**
+     * استرجاع تفضيلات الألوان الخاصة بالمستخدم
+     */
     fun getLocalPersonalColors(context: Context): UserColorsEntity {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonStr = sp.getString(KEY_PERSONAL_COLORS, null) ?: return UserColorsEntity()
         return try {
             deserializePersonalColors(jsonStr)
         } catch (e: Exception) {
-            e.printStackTrace()
             UserColorsEntity()
         }
     }
 
+    /**
+     * الحصول على سجلات عمليات المزامنة
+     */
     fun getSyncLogs(context: Context): List<SyncLogEntity> {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonStr = sp.getString(KEY_SYNC_LOGS, null) ?: return emptyList()
@@ -74,15 +95,17 @@ object ColorSyncManager {
             }
             list
         } catch (e: Exception) {
-            e.printStackTrace()
             emptyList()
         }
     }
 
+    /**
+     * حفظ سجل مزامنة جديد في الذاكرة المحلية
+     */
     fun saveSyncLog(context: Context, log: SyncLogEntity) {
         val currentLogs = getSyncLogs(context).toMutableList()
-        currentLogs.add(0, log) // Insert at beginning (most recent)
-        if (currentLogs.size > 50) { // Cap at 50 logs to conserve space
+        currentLogs.add(0, log)
+        if (currentLogs.size > 50) {
             currentLogs.removeAt(currentLogs.size - 1)
         }
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -103,10 +126,13 @@ object ColorSyncManager {
             }
             sp.edit().putString(KEY_SYNC_LOGS, arr.toString()).apply()
         } catch (e: Exception) {
-            e.printStackTrace()
+            // صامت
         }
     }
 
+    /**
+     * تحويل كائن ColorSchemeEntity إلى نص JSON
+     */
     fun serializeColorScheme(scheme: ColorSchemeEntity): String {
         val root = JSONObject()
         root.put("version", scheme.version)
@@ -173,10 +199,13 @@ object ColorSyncManager {
         return root.toString()
     }
 
+    /**
+     * تحويل نص JSON إلى كائن ColorSchemeEntity
+     */
     fun deserializeColorScheme(jsonStr: String): ColorSchemeEntity {
         val root = JSONObject(jsonStr)
         val version = root.optInt("version", 1)
-        val lastUpdated = root.optString("lastUpdated", "2024-01-15T10:30:00Z")
+        val lastUpdated = root.optString("lastUpdated", "2026-01-01T00:00:00Z")
 
         val colorsObj = root.optJSONObject("colors") ?: return ColorSchemeEntity(version, lastUpdated)
 
@@ -255,6 +284,9 @@ object ColorSyncManager {
         )
     }
 
+    /**
+     * تحويل تفضيلات الألوان الشخصية إلى JSON
+     */
     fun serializePersonalColors(personal: UserColorsEntity): String {
         val root = JSONObject()
         root.put("colorsLastSynced", personal.colorsLastSynced)
@@ -275,9 +307,12 @@ object ColorSyncManager {
         return root.toString()
     }
 
+    /**
+     * استرجاع تفضيلات الألوان الشخصية من JSON
+     */
     fun deserializePersonalColors(jsonStr: String): UserColorsEntity {
         val root = JSONObject(jsonStr)
-        val lastSynced = root.optString("colorsLastSynced", "2024-01-15T10:30:00Z")
+        val lastSynced = root.optString("colorsLastSynced", "2026-01-01T00:00:00Z")
 
         val pcObj = root.optJSONObject("personalColors") ?: return UserColorsEntity(colorsLastSynced = lastSynced)
         val favorite = pcObj.optString("favorite", "#FF5722")

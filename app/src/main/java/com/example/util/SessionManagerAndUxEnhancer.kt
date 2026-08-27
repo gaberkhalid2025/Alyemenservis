@@ -1,17 +1,33 @@
 package com.example.util
 
-import com.example.utils.*
-
 import android.content.Context
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,9 +38,12 @@ import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 
 /**
- * ⏱️ Session Management & UX Enhancement Engine
- * Solves Problem 10: Manages inactivity timeout auto-lock with warnings, auto-renewal,
- * smooth re-login, operation progress modals, and clean logout memory purging.
+ * ⏱️ SessionManagerAndUxEnhancer - إدارة جلسات المستخدم وتحسين تجربة الاستخدام (UX)
+ * 
+ * المكونات:
+ * 1. SessionTimeoutWarningModal: تنبيه انتهاء الجلسة عند الخمول مع إمكانية التمديد الفوري.
+ * 2. OperationProgressModal: نافذة تقدم العمليات الثقيلة والرفع.
+ * 3. CleanLogoutManager: تسجيل الخروج النظيف وتفريغ الذاكرة والرموز المؤقتة.
  */
 
 // ==========================================
@@ -40,7 +59,7 @@ fun SessionTimeoutWarningModal(
 ) {
     if (isVisible) {
         AlertDialog(
-            onDismissRequest = { /* Modal force choice */ },
+            onDismissRequest = { /* إجبار المستخدم على الاختيار */ },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -56,7 +75,7 @@ fun SessionTimeoutWarningModal(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "نظراً لعدم وجود نشاط مؤخراً، ستنتهي جلسة تسجليك الحالية آلياً لحماية خصوصيتك خلال:",
+                        text = "نظراً لعدم وجود نشاط مؤخراً، ستنتهي جلسة تسجيلك الحالية آلياً لحماية خصوصيتك خلال:",
                         fontSize = 11.sp,
                         color = Color.LightGray
                     )
@@ -94,8 +113,8 @@ fun SessionTimeoutWarningModal(
 @Composable
 fun OperationProgressModal(
     isVisible: Boolean,
-    title: String, // e.g. "جاري رفع الصور والمرفقات..."
-    progress: Float, // 0.0f to 1.0f
+    title: String,
+    progress: Float,
     themeColors: VisualThemePalette
 ) {
     if (isVisible) {
@@ -154,13 +173,20 @@ fun OperationProgressModal(
 // ==========================================
 object CleanLogoutManager {
 
+    /**
+     * تنفيذ تسجيل خروج آمن وشامل وتفريغ بيانات الجلسة من الذاكرة
+     * @param context سياق التطبيق
+     * @param onComplete الإجراء المتبع بعد اكتمال التنظيف
+     */
     fun executeCleanLogout(context: Context, onComplete: () -> Unit) {
         try {
-            // 1. Clear SharedPreferences session tokens
             val prefs = context.getSharedPreferences("YS_Local_App_Cache_v2026", Context.MODE_PRIVATE)
-            prefs.edit().remove("USER_TOKEN").remove("ADMIN_LOGGED").remove("KEY_OFFLINE_QUEUE").apply()
+            prefs.edit()
+                .remove("USER_TOKEN")
+                .remove("ADMIN_LOGGED")
+                .remove("KEY_OFFLINE_QUEUE")
+                .apply()
 
-            // 2. Invoke callback to reset ViewModel state and navigate to login
             onComplete()
         } catch (e: Exception) {
             onComplete()

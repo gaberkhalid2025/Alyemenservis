@@ -1,13 +1,21 @@
 package com.example.util
 
-import com.example.utils.*
-
 import android.content.Context
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,8 +28,11 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * 💾 System Backup, Performance Diagnostics & Runtime Permission Rationales
- * Solves Problem 9: Provides automated system database backups, performance diagnostics, and M3 permission rationales.
+ * 💾 SystemBackupAndPerformance - إدارة النسخ الاحتياطي للنظام وشاشات توضيح الصلاحيات (Permission Rationales)
+ * 
+ * الميزات:
+ * 1. SystemBackupManager: إنشاء واستعراض واستعادة النسخ الاحتياطية المحلية المشفرة.
+ * 2. RuntimePermissionRationaleDialog: حوار تفاعلي يشرح للمستخدم سبب طلب الصلاحية بوضوح بالعربية.
  */
 
 // ==========================================
@@ -47,6 +58,12 @@ object SystemBackupManager {
         }
     }
 
+    /**
+     * إنشاء نسخة احتياطية محلية بصيغة JSON
+     * @param context سياق التطبيق
+     * @param backupDataJson محتوى البيانات
+     * @return Pair يحتوي على نجاح العملية ومسار الملف أو رسالة الخطأ
+     */
     fun createLocalBackup(context: Context, backupDataJson: String): Pair<Boolean, String> {
         return try {
             val backupDir = File(context.filesDir, "backups")
@@ -61,6 +78,9 @@ object SystemBackupManager {
         }
     }
 
+    /**
+     * سرد جميع النسخ الاحتياطية المحلية المتوفرة
+     */
     fun listLocalBackups(context: Context): List<File> {
         val backupDir = File(context.filesDir, "backups")
         if (!backupDir.exists()) return emptyList()
@@ -73,8 +93,8 @@ object SystemBackupManager {
 // ==========================================
 @Composable
 fun RuntimePermissionRationaleDialog(
-    permissionNameArabic: String, // e.g. "إذن الموقع الجغرافي (GPS)"
-    reasonArabic: String, // e.g. "يحتاج التطبيق لإذن الموقع لعرض أقرب الفنيين والمحلات التجارية منك بدقة عالية."
+    permissionNameArabic: String,
+    reasonArabic: String,
     onConfirmGrant: () -> Unit,
     onDismiss: () -> Unit,
     themeColors: VisualThemePalette

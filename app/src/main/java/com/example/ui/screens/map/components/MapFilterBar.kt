@@ -121,6 +121,16 @@ fun MapFilterBar(
                     onDismissRequest = { isCityMenuExpanded = false },
                     modifier = Modifier.background(Color(0xFF1E293B))
                 ) {
+                    DropdownMenuItem(
+                        text = { Text("الكل (جميع المدن)", color = Color(0xFF00E5FF), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
+                        onClick = {
+                            onCitySelected("الكل")
+                            isCityMenuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
+                        }
+                    )
                     OfflineMapManager.MAJOR_YEMENI_CITIES.forEach { city ->
                         DropdownMenuItem(
                             text = { Text(city.nameAr, color = Color.White, fontSize = 13.sp) },

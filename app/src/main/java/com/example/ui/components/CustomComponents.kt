@@ -141,16 +141,18 @@ fun Luxury3DNavIcon(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-2).dp)
-                        .size(13.dp)
-                        .background(Color.Red, CircleShape),
+                        .offset(x = 5.dp, y = (-3).dp)
+                        .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                        .background(Color(0xFFEF4444), CircleShape)
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (badgeCount > 99) "99+" else badgeCount.toString(),
                         color = Color.White,
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
                     )
                 }
             }

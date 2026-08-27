@@ -9,6 +9,7 @@ import com.example.data.AdminSettingsEntity
 import com.example.data.ProviderEntity
 import com.example.util.SyncManager
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,49 +62,49 @@ data class StorageUsage(
 
 @Keep
 data class BookingStats(
-    val total: Int = 5120,
-    val pending: Int = 42,
-    val inProgress: Int = 88,
-    val completed: Int = 4850,
-    val cancelled: Int = 140,
-    val today: Int = 34,
-    val thisWeek: Int = 245,
-    val thisMonth: Int = 1120
+    val total: Int = 0,
+    val pending: Int = 0,
+    val inProgress: Int = 0,
+    val completed: Int = 0,
+    val cancelled: Int = 0,
+    val today: Int = 0,
+    val thisWeek: Int = 0,
+    val thisMonth: Int = 0
 )
 
 @Keep
 data class RevenueStats(
-    val totalRevenue: Double = 5420000.0,
-    val platformCommission: Double = 542000.0,
-    val providerPayouts: Double = 4878000.0,
+    val totalRevenue: Double = 0.0,
+    val platformCommission: Double = 0.0,
+    val providerPayouts: Double = 0.0,
     val currency: String = "YER",
-    val todayRevenue: Double = 125000.0,
-    val monthRevenue: Double = 1840000.0
+    val todayRevenue: Double = 0.0,
+    val monthRevenue: Double = 0.0
 )
 
 @Keep
 data class ProviderStats(
-    val totalVerified: Int = 340,
-    val pendingApproval: Int = 12,
-    val topRated: Int = 95,
-    val suspended: Int = 3
+    val totalVerified: Int = 0,
+    val pendingApproval: Int = 0,
+    val topRated: Int = 0,
+    val suspended: Int = 0
 )
 
 @Keep
 data class CategoryStats(
-    val maintenanceCount: Int = 145,
-    val storeCount: Int = 88,
-    val restaurantCount: Int = 64,
-    val medicalCount: Int = 43
+    val maintenanceCount: Int = 0,
+    val storeCount: Int = 0,
+    val restaurantCount: Int = 0,
+    val medicalCount: Int = 0
 )
 
 @Keep
 data class CityStats(
-    val sanaaCount: Int = 420,
-    val adenCount: Int = 240,
-    val taizCount: Int = 160,
-    val ibbCount: Int = 100,
-    val mukallaCount: Int = 80
+    val sanaaCount: Int = 0,
+    val adenCount: Int = 0,
+    val taizCount: Int = 0,
+    val ibbCount: Int = 0,
+    val mukallaCount: Int = 0
 )
 
 @Keep
@@ -136,7 +137,7 @@ data class SystemLog(
 
 /**
  * 👑 AdminViewModel
- * إدارة كاملة لمنطق ولوحة تحكم الإدارة العليا (الأدمن) متضمنة الإعدادات، طلبات الانضمام، الحظر، والإحصائيات والمزامنة.
+ * إدارة كاملة لمنطق ولوحة تحكم الإدارة العليا (الأدمن) مع التحديثات اللحظية عبر Firestore SnapshotListeners وحساب الإيرادات الحقيقية.
  */
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -151,6 +152,21 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _systemStats = MutableStateFlow(SystemStats())
     val systemStats: StateFlow<SystemStats> = _systemStats.asStateFlow()
+
+    private val _bookingStats = MutableStateFlow(BookingStats())
+    val bookingStats: StateFlow<BookingStats> = _bookingStats.asStateFlow()
+
+    private val _revenueStats = MutableStateFlow(RevenueStats())
+    val revenueStats: StateFlow<RevenueStats> = _revenueStats.asStateFlow()
+
+    private val _providerStats = MutableStateFlow(ProviderStats())
+    val providerStats: StateFlow<ProviderStats> = _providerStats.asStateFlow()
+
+    private val _cityStats = MutableStateFlow(CityStats())
+    val cityStats: StateFlow<CityStats> = _cityStats.asStateFlow()
+
+    private val _categoryStats = MutableStateFlow(CategoryStats())
+    val categoryStats: StateFlow<CategoryStats> = _categoryStats.asStateFlow()
 
     private val _auditLogs = MutableStateFlow<List<AuditLog>>(emptyList())
     val auditLogs: StateFlow<List<AuditLog>> = _auditLogs.asStateFlow()
@@ -167,44 +183,192 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    private var settingsListener: ListenerRegistration? = null
+    private var pendingListener: ListenerRegistration? = null
+    private var providersListener: ListenerRegistration? = null
+    private var bookingsListener: ListenerRegistration? = null
+
     companion object {
         private const val TAG = "AdminViewModel"
     }
 
     init {
         loadAdminSettings()
-        loadPendingRequests()
-        loadSystemStats()
+        startRealtimeListeners()
         loadAuditLogs()
         loadNotifications()
     }
 
     /**
-     * 1. تحميل إعدادات الأدمن من السحابة والمحلي
+     * 1. تحميل إعدادات الأدمن من السحابة والمحلي بالاستماع اللحظي
      */
     fun loadAdminSettings() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                firestore.collection("admin_settings").document("main_config")
-                    .get()
-                    .addOnSuccessListener { doc ->
-                        if (doc.exists()) {
-                            val settings = doc.toObject(AdminSettingsEntity::class.java)
-                            if (settings != null) {
-                                _adminSettings.value = settings
-                            }
-                        }
-                        _isLoading.value = false
+        settingsListener?.remove()
+        settingsListener = firestore.collection("admin_settings").document("main_config")
+            .addSnapshotListener { doc, error ->
+                if (doc != null && doc.exists()) {
+                    val settings = doc.toObject(AdminSettingsEntity::class.java)
+                    if (settings != null) {
+                        _adminSettings.value = settings
                     }
-                    .addOnFailureListener {
-                        _isLoading.value = false
-                    }
-            } catch (e: Exception) {
-                _isLoading.value = false
-                Log.e(TAG, "Failed loading admin settings: ${e.message}")
+                }
             }
-        }
+    }
+
+    /**
+     * تشغيل الاستماع اللحظي للإحصائيات والطلبات والحجوزات ومقدمي الخدمات
+     */
+    private fun startRealtimeListeners() {
+        // الاستماع للطلبات المعلقة
+        pendingListener?.remove()
+        pendingListener = firestore.collection("provider_requests")
+            .whereEqualTo("status", "PENDING")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { it.toObject(PendingRequest::class.java) }
+                    _pendingRequests.value = list
+                    updateStatsAggregations()
+                }
+            }
+
+        // الاستماع لمقدمي الخدمات
+        providersListener?.remove()
+        providersListener = firestore.collection("providers")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    val providers = snapshot.documents.mapNotNull { it.toObject(ProviderEntity::class.java) }
+                    val verified = providers.count { it.isVerified }
+                    val topRated = providers.count { it.rating >= 4.5f }
+                    val suspended = providers.count { it.subscriptionStatus == "BLOCKED" || it.subscriptionStatus == "SUSPENDED" }
+
+                    _providerStats.value = ProviderStats(
+                        totalVerified = if (verified > 0) verified else providers.size,
+                        pendingApproval = _pendingRequests.value.size,
+                        topRated = topRated,
+                        suspended = suspended
+                    )
+
+                    var sanaa = 0
+                    var aden = 0
+                    var taiz = 0
+                    var ibb = 0
+                    var mukalla = 0
+
+                    providers.forEach { p ->
+                        val areaText = "${p.area} ${p.cityId} ${p.localNeighborhood}"
+                        when {
+                            areaText.contains("صنعاء") -> sanaa++
+                            areaText.contains("عدن") -> aden++
+                            areaText.contains("تعز") -> taiz++
+                            areaText.contains("إب") -> ibb++
+                            areaText.contains("المكلا") || areaText.contains("حضرموت") -> mukalla++
+                        }
+                    }
+
+                    _cityStats.value = CityStats(
+                        sanaaCount = sanaa,
+                        adenCount = aden,
+                        taizCount = taiz,
+                        ibbCount = ibb,
+                        mukallaCount = mukalla
+                    )
+
+                    updateStatsAggregations()
+                }
+            }
+
+        // الاستماع للحجوزات لحساب الإيرادات والإحصائيات
+        bookingsListener?.remove()
+        bookingsListener = firestore.collection("bookings")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    val docs = snapshot.documents
+                    val total = docs.size
+                    var pending = 0
+                    var inProgress = 0
+                    var completed = 0
+                    var cancelled = 0
+                    var today = 0
+                    var thisWeek = 0
+                    var thisMonth = 0
+
+                    var totalRev = 0.0
+                    var todayRev = 0.0
+                    var monthRev = 0.0
+
+                    val now = System.currentTimeMillis()
+                    val oneDayAgo = now - 24L * 3600 * 1000
+                    val oneWeekAgo = now - 7L * 24 * 3600 * 1000
+                    val oneMonthAgo = now - 30L * 24 * 3600 * 1000
+
+                    val todayDateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+
+                    docs.forEach { doc ->
+                        val status = doc.getString("status") ?: "PENDING"
+                        val price = doc.getDouble("totalAmount") ?: (doc.getLong("totalAmount")?.toDouble() ?: 0.0)
+                        val createdAt = doc.getLong("createdAt") ?: now
+                        val dateStr = doc.getString("dateString") ?: ""
+
+                        when (status.uppercase()) {
+                            "PENDING" -> pending++
+                            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> inProgress++
+                            "COMPLETED", "PAID" -> {
+                                completed++
+                                totalRev += price
+                                if (createdAt >= oneMonthAgo) monthRev += price
+                                if (createdAt >= oneDayAgo || dateStr == todayDateStr) todayRev += price
+                            }
+                            "CANCELLED", "REJECTED" -> cancelled++
+                        }
+
+                        if (createdAt >= oneDayAgo || dateStr == todayDateStr) today++
+                        if (createdAt >= oneWeekAgo) thisWeek++
+                        if (createdAt >= oneMonthAgo) thisMonth++
+                    }
+
+                    _bookingStats.value = BookingStats(
+                        total = total,
+                        pending = pending,
+                        inProgress = inProgress,
+                        completed = completed,
+                        cancelled = cancelled,
+                        today = today,
+                        thisWeek = thisWeek,
+                        thisMonth = thisMonth
+                    )
+
+                    val commissionRate = 0.10 // 10%
+                    val comm = totalRev * commissionRate
+                    val payouts = totalRev - comm
+
+                    _revenueStats.value = RevenueStats(
+                        totalRevenue = totalRev,
+                        platformCommission = comm,
+                        providerPayouts = payouts,
+                        currency = "YER",
+                        todayRevenue = todayRev,
+                        monthRevenue = monthRev
+                    )
+
+                    updateStatsAggregations()
+                }
+            }
+    }
+
+    private fun updateStatsAggregations() {
+        val provCount = _providerStats.value.totalVerified.coerceAtLeast(1)
+        val activeB = _bookingStats.value.inProgress
+        val compB = _bookingStats.value.completed
+        val pendA = _pendingRequests.value.size
+
+        _systemStats.value = SystemStats(
+            totalProviders = provCount,
+            activeBookings = activeB,
+            completedOrders = compB,
+            pendingApprovals = pendA,
+            totalUsers = provCount + compB + activeB + 10,
+            systemHealth = "EXCELLENT"
+        )
     }
 
     /**
@@ -358,27 +522,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun getSystemStats(): SystemStats = _systemStats.value
 
     fun loadSystemStats() {
-        viewModelScope.launch {
-            try {
-                firestore.collection("providers").get().addOnSuccessListener { pSnap ->
-                    val provCount = pSnap.size()
-                    firestore.collection("bookings").get().addOnSuccessListener { bSnap ->
-                        val activeB = bSnap.documents.count { it.getString("status") == "IN_PROGRESS" || it.getString("status") == "PENDING" }
-                        val compB = bSnap.documents.count { it.getString("status") == "COMPLETED" || it.getString("status") == "PAID" }
-                        _systemStats.value = SystemStats(
-                            totalProviders = provCount,
-                            activeBookings = activeB,
-                            completedOrders = compB,
-                            pendingApprovals = _pendingRequests.value.size,
-                            totalUsers = provCount + activeB + 10,
-                            systemHealth = "EXCELLENT"
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed fetching stats: ${e.message}")
-            }
-        }
+        updateStatsAggregations()
     }
 
     /**
@@ -386,7 +530,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun exportReport(type: String): String {
         recordAuditLog("EXPORT_REPORT", "تصدير تقرير من نوع $type")
-        return "تقرير شامل للـ $type - التاريخ: ${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())}\nإجمالي الفنيين: ${_systemStats.value.totalProviders}\nالحجوزات النشطة: ${_systemStats.value.activeBookings}\nالطلبات المنجزة: ${_systemStats.value.completedOrders}"
+        return "تقرير شامل للـ $type - التاريخ: ${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())}\nإجمالي الفنيين: ${_systemStats.value.totalProviders}\nالحجوزات النشطة: ${_systemStats.value.activeBookings}\nالطلبات المنجزة: ${_systemStats.value.completedOrders}\nإجمالي الإيرادات: ${_revenueStats.value.totalRevenue} ${_revenueStats.value.currency}"
     }
 
     /**
@@ -478,10 +622,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ==========================================
-    // دالات القسم الثالث التكميلية (16 - 33)
-    // ==========================================
-
     /**
      * 16. الحصول على صحة النظام
      */
@@ -510,35 +650,27 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * 21. إحصائيات الحجوزات
      */
-    fun getBookingStats(): BookingStats = BookingStats(
-        total = _systemStats.value.activeBookings + _systemStats.value.completedOrders + 200,
-        pending = _pendingRequests.value.size + 15,
-        inProgress = _systemStats.value.activeBookings,
-        completed = _systemStats.value.completedOrders
-    )
+    fun getBookingStats(): BookingStats = _bookingStats.value
 
     /**
      * 22. إحصائيات الإيرادات
      */
-    fun getRevenueStats(): RevenueStats = RevenueStats()
+    fun getRevenueStats(): RevenueStats = _revenueStats.value
 
     /**
      * 23. إحصائيات مقدمي الخدمة
      */
-    fun getProviderStats(): ProviderStats = ProviderStats(
-        totalVerified = _systemStats.value.totalProviders.coerceAtLeast(340),
-        pendingApproval = _pendingRequests.value.size
-    )
+    fun getProviderStats(): ProviderStats = _providerStats.value
 
     /**
      * 24. إحصائيات الأقسام
      */
-    fun getCategoryStats(): CategoryStats = CategoryStats()
+    fun getCategoryStats(): CategoryStats = _categoryStats.value
 
     /**
      * 25. إحصائيات المدن
      */
-    fun getCityStats(): CityStats = CityStats()
+    fun getCityStats(): CityStats = _cityStats.value
 
     /**
      * 26. إرسال إشعار أدمن لمستخدم معين أو جماعي
@@ -609,5 +741,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearSystemLogs() {
         _systemLogs.value = emptyList()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        settingsListener?.remove()
+        pendingListener?.remove()
+        providersListener?.remove()
+        bookingsListener?.remove()
     }
 }

@@ -141,7 +141,7 @@ fun UserNotificationsBottomSheet(
 
     val unreadCount by remember {
         derivedStateOf {
-            validAndFilteredNotifs.count { !readIds.contains(it.id) }
+            validAndFilteredNotifs.count { !it.isRead && !readIds.contains(it.id) }
         }
     }
 

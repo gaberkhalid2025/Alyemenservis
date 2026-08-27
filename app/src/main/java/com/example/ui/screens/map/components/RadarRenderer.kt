@@ -65,15 +65,17 @@ fun RadarRenderer(
             }
             .pointerInput(items) {
                 detectTapGestures { tapOffset ->
-                    // Find closest item within 40px
+                    val centerX = size.width / 2f + panOffset.x
+                    val centerY = size.height / 2f + panOffset.y
+                    // Find closest item within 50px
                     val clicked = items.minByOrNull { item ->
-                        val screenX = item.x * zoomScale + panOffset.x
-                        val screenY = item.y * zoomScale + panOffset.y
+                        val screenX = centerX + item.x * zoomScale
+                        val screenY = centerY + item.y * zoomScale
                         sqrt((tapOffset.x - screenX).pow(2) + (tapOffset.y - screenY).pow(2))
                     }
                     if (clicked != null) {
-                        val screenX = clicked.x * zoomScale + panOffset.x
-                        val screenY = clicked.y * zoomScale + panOffset.y
+                        val screenX = centerX + clicked.x * zoomScale
+                        val screenY = centerY + clicked.y * zoomScale
                         val dist = sqrt((tapOffset.x - screenX).pow(2) + (tapOffset.y - screenY).pow(2))
                         if (dist < 50f) {
                             onItemSelected(clicked)
@@ -150,8 +152,8 @@ fun RadarRenderer(
         if (isHeatmapActive) {
             val weightedPoints = items.map { item ->
                 HeatmapRenderer.WeightedPoint(
-                    x = item.x * zoomScale + panOffset.x,
-                    y = item.y * zoomScale + panOffset.y,
+                    x = centerX + item.x * zoomScale,
+                    y = centerY + item.y * zoomScale,
                     weight = 1.2f
                 )
             }
@@ -165,8 +167,8 @@ fun RadarRenderer(
         // 7. Cluster & Draw Items
         val screenItems = items.map { item ->
             item.copy(
-                x = item.x * zoomScale + panOffset.x,
-                y = item.y * zoomScale + panOffset.y
+                x = centerX + item.x * zoomScale,
+                y = centerY + item.y * zoomScale
             )
         }
         val clusters = MarkerRenderer.clusterPoints(screenItems, thresholdPx = 45f * zoomScale)
