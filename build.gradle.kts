@@ -7,7 +7,6 @@ plugins {
 }
 
 tasks.register<Copy>("copyApk") {
-    notCompatibleWithConfigurationCache("Copies apk after build")
     from("app/build/outputs/apk/debug") {
         include("app-debug.apk")
     }
@@ -36,3 +35,4 @@ tasks.register<Copy>("copyApk") {
         }
     }
 }
+

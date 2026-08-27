@@ -330,6 +330,34 @@ class ChatRepository(
     }
 
     /**
+     * Delete a single chat channel.
+     */
+    suspend fun deleteChannel(channelId: String) {
+        if (channelId.isBlank()) return
+        try {
+            channelsCollection.document(channelId).delete().await()
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "Error deleting channel: ${e.message}")
+        }
+    }
+
+    /**
+     * Delete all chat channels provided.
+     */
+    suspend fun deleteAllChannels(channelsList: List<ChatChannel>) {
+        if (channelsList.isEmpty()) return
+        try {
+            val batch = firestore.batch()
+            channelsList.forEach { ch ->
+                batch.delete(channelsCollection.document(ch.id))
+            }
+            batch.commit().await()
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "Error deleting all channels: ${e.message}")
+        }
+    }
+
+    /**
      * Set user online presence.
      */
     suspend fun setUserPresence(userId: String, isOnline: Boolean) {

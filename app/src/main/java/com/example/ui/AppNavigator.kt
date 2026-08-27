@@ -337,7 +337,7 @@ fun AppNavigator(
                                     sectionId = activeSectionIdForCreation,
                                     onRegTypeChange = { preselectedRegistrationType = it }
                                 )
-                                "JOIN_REQUEST_STATUS" -> JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
+                                "JOIN_REQUEST_STATUS", "STATUS_VIEW" -> com.example.ui.screens.status.StatusScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                                 "OFFER_SELECTION" -> com.example.ui.screens.requests.OfferSelectionScreen(
                                     offerId = viewModel.selectedOfferId,

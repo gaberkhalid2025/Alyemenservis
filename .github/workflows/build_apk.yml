@@ -22,7 +22,7 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Ensure Gradle Wrapper
+    - name: Ensure Gradle Wrapper 9.3.1
       run: |
         gradle wrapper --gradle-version 9.3.1
         chmod +x gradlew
@@ -72,24 +72,21 @@ jobs:
         elif [ -f debug.keystore.base64 ]; then
           echo "Decoding debug.keystore.base64..."
           base64 -d debug.keystore.base64 > debug.keystore
-        else
-          echo "Creating default release keystore with Maher credentials..."
-          keytool -genkeypair -v -keystore my-release-key.jks -storepass "Maher@@--@@736462##" -alias "Maher" -keypass "Maher@@--@@736462##" -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Maher,O=AlyemenServices,C=YE"
+        fi
+        if [ ! -f debug.keystore ] && [ ! -f my-release-key.jks ]; then
+          echo "Generating fallback keystore..."
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         fi
 
     - name: Build Release APK
       env:
-        RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'Maher' }}
-        RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD || 'Maher@@--@@736462##' }}
-        RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD || 'Maher@@--@@736462##' }}
-      run: |
-        ./gradlew :app:assembleRelease --stacktrace --no-daemon
-        ./gradlew copyApk || true
+        RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+      run: ./gradlew :app:assembleRelease --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: app-apk
-        path: |
-          app/build/outputs/apk/release/*.apk
-          app-release.apk
+        path: app/build/outputs/apk/release/*.apk

@@ -7141,92 +7141,2587 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text("${w.ownerName} (${w.ownerType})", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-xœì}kwG–à÷ıé:>Òº`h`†î-¤ÂÖ6z¬ªŒ·?qRU)”¦TY›YeĞ¸9g 	0íY·íé3în³nŒ%dƒ|öôï(}å?aãŞˆÈŒ|GdfI<}L«ª2oFFÜ¸ï‡¦©†q±W.½¸õÕ¦6ØÜ¾²½¢V·—ëÛ7«ƒ'ÛËÇµ·?¹P±.t{fÁê—Jû´y«Ó«›ÿbh'´£§»OkZmË&Çàÿ+§Ís½÷l}iä¿e˜‘;¥/¤sÙ$ó¸9x@?lÀ¿Û7é´æô¶Şi—`ê7ámûæöÊöµí›Ú‹[×ÿNş[L÷ N¾ùĞ€Y’ïN¹*'­vË{™Ş‚±hà9½Ù4:=õ÷¹¤|ÇÉ~¯guÊ™VÎêŒµÍæy2÷O2İÃ1ÚF³g´>ÔÛm£wÊ²	¼™áõ.6–ºÆD§Û‡Å.×f¦ëRxÕE«ßé¹Œæ7eõ¼é6¶¯iÎ­áAx4x:¸KğÎàùbsp7û3ë]ŞÆÅqSo[ç Ûì¾‘	â¥}™nC,wÈƒ)Âóz¿İs*sø‘¢}¹IÎ†n’³?&ğòèÅS§Œ<vôÀÈHÖ§wzä@Íè­–Ù×gÑÛ}Ã)/X¶ù/ğì6ùéh¥EÎìÇ†İ3›øÅAò…úQÉx((9Ü| ;¿¥í×>lÖùòY)HüN¶õæù(™Dt†MXä¯–»2ıªä+âş%üí¥ÿújÿ~‚=XvÚtzÚ;ZµÙ3­ºØì‹1QïêMÃ./Z-sŞ4`g'ÙŸ•Ü²2`äHôÍZâiwÈy³İÔ/~h¶zå„Óä‰ªmës„7u “„OœùI£wÁ0:ñøIª¶Ís…ÿ]#ÿövM{)LÒY%
-àÕ+È³/Qúy*°pFPÉïëäXmäÃò`‹0ğeòÅ·Î}hHœ[†ßªğU£eö!£h8=÷¹©Óo·Sï»€7LõçÛeGé<†ŞVm6'Né‹F{«êO7œ¦mvá)ß;Ñq×£Tıf‡±,~ç¼ŞvÒ9(›µétÛúÒ´İ[BŠ wOš9tÎ|¦›õ‹¡›A„‘b(„zOïõ½ÓÉ~l¤ßRGµÅä:y±#E¼È&FDĞ´ÇM^H“(={şÍ¿kDöû	I!U„ªM#bà Y†#s‰æ\ÜÔœ×Ê]}	xc©Ó©-v{Kå‘¸%K`ª0Æt»•Lh]l‚K]\j’2˜äôíy² •¦Õ]*ëíî‚N.­O“RÓùr¥Kñ­<g¼^„MÍ‡U'­‹‘ûóØ¸qûø9Hbİ2r.Ãé¯ÿï=û\v«¡Æ4ÛD{™¶È°É÷üpMœüûû
-Ñ»‰JtoûÓè3¢?¶ğIDv^ß¾2XCu<l…‚§ÂËü+‘z»ÿ ¥[
-35ƒp•Œènµû‹²+nÅŠmÛÖÉ%&W¦ì_àPÎ[vMo.hŸ0î ıâW©ÛŸ~ù(ä@Jêˆs°c`%øG½g[çò¤æ@èû*Äæ1ÁFèv…¿Ò„éDôSš
-FVõdõD—¤„@«È`•8u˜¨‘G¯‰Åé:Q£ ı'j¨Ú>&²I×¶>6	®ƒğV¶£ãâ9ÿ-‹İ¢ô‘aÌ•)ĞJ"¾GÈ4˜-¾ÚT7^•ôöotÛ\4)X$şWÁîJHöM Ş+ÚöeòİÁ#ò„Ï¿Ïğ„tòêKQÓf¦ş0à%@™IkÎl:š‰5d>À‰n‚éø*a<=Ã±úc{ÍĞä'cÚó¯¿Í ÍÑçtÂÙr?"ó¼íÍñ«o²,ƒÕwc>4Gòúd×¶/¸_|§InpÏÖÉŸ7p]·÷	|J ö5èjF.jÄµ3„¨¡t1[ŠçôwU	:Ñ\4›YØÌğ†‘ŒÊÑ¹ÎÙV¿Ó*§3ÿƒó„ÎÂÅcl"¼Ôô®ÁÖ5ßD8Ÿöi¤GŠ±`ÃÈº]0˜%mĞ×‰È¾:ø	ûç(%¡¿ï(‚=†º³,ƒ{-+Ú‰²"ºæB7á@7û¶mtšKÚ‰ZéƒúxiDpÖ:yôà©##Rï88õê¬Î©ÃÇj£'ãá„ÜCQG/×ÇÛÌ@³ß9Ô³Ë[•ù•|(Ç„<$b#
-/n}ùl7PÉßÔà‡| AèëÏÈß{¡ DdÚ"rÍƒí›ùáŠ7\2Gd@Fç-¿1äÃ³gd¤î¹ Åq…lo)(˜;è*@RÎÜ#R4Z æ•Y£µGÅ_)*‚ ¥íkƒÇĞòâÖ­¿•è^—@Ş¾‚†Û·¾ş¡”Ÿ0©âa éöˆŒáÅyH_ÊÔ/:PĞó÷ó¨¼G„¡¯aTİqÑŒ<aÌ§ü« ¥‚+:ƒG0ã'^°7S]ôWÌù“m½sŞ5§‹?k—‚oå–Èı¨~Ü©ıí‘o¶ğUˆÜVö­<İ|âÅÛ1	æ«;šÉ´}yûÊàiéŸ´Ò‡÷Çg«VO»W~ÇÃœÜ«IèË>87è¥%²BÚïxÔæwÔe´Œóˆ¨›÷‰0¶ÓõÙ!Î˜9×6Öa;# ı‹Ëà—"¶º}Cízqë?o€[é>™]º¤H¥B>Y¥»ãµcy±ô•Âµ¼²\SV/Å7<õŸì×“íËÂ!à«†İ
-¤æ}—›hÆ+GP‰ 42zì9IN3Ï/„—Ä²s&Ğİ¯£g0»Î·Ï0»7
-8‘rB÷‡¥E°øœğ#â×Âì·¸gTƒ¯â“r>'"".Les>#*r3Tá§œO÷CÂENØcÌ¸€ÏmNy×‡KÁÅ	H¹ˆA:Wò¢RD˜"Ç%á§JÏª÷l`tÙÕàØÈFö¼EïšQàCÃ‘ü¡Ş/E?ÔDéSS3CÎa7v>±£r²İ‰WG¤#eÂ3É´y`7’<Ö[`0Ş^Öÿås¢ƒ„‚;5U°0dQë_9ÉåcÓ¸@$Z£Má¹smcFŒCC²j¶M¢—pØÚGu3zwò8$j¨Æuû<(BAÏ×èácG{SÎL²*?¸º:tj »s=|ıŒhöàbÊşŞAó†õ»-½g´Áˆ²+W0¶’	z‡™>Éw˜Ëìé¯À9õİø±_şrôÈî»lÏ5::90°Ïoå–sò¾ä½S{*¹s#Õïâô®~/NùO{ÇØÇQß<Ö‰.(>¥ÒèŸÿèòÎupß‘ú”ºï†wDÕ®Vº|‚ìUÖ÷0{g†ügÏŒ+½fX1u´2;d×ÊÕİáYp‘çêşé*ƒ½tj3xS²ÌU44KèÔÊ¦1l²uM>aŞyè¦\Ùæb’ö`¸µRi„T,C0û`;i· *C­ÖÁEwgğı^CS²üiWóA‹˜Û8ìjúd²DğÀ´°»0ÕõÁíí«^ÑoªğÄ•käJ¢ªkä‡ÁŸk—ÜOÀ=…?	À»ş²6^T:]¢Mpnj4L |ïıú§^L´\ß^9è_»G^­nJ×ÒíwÙ6@Â½tÍ7)]S<ë<Û¼î÷Èww‚C°"ÁiÌİ\‡\M@ú¿m_{3“-Œ*d[ÒååZ²¯_·dKiY™ÒWÓ°b¶fLØUWJcÓ“3§k%Nb$dDşÌìôX­^Ÿ˜z/ğ€˜àyåœªNœgY©
-”‡äx‡4ñD9±l/o6fìÅŠìD¬ˆÆ´BD¼åÁÏÈÄ‰‹~B…Š€*B­ a10S4zQ‘è…D¡AïƒC•şT¤¤¡ç©òƒÜ”á¹2[;õÁÔ¸ï1“ú9²MzÑJgMy#q¦Ğäƒlw-é Ë)Ë6=£@Zµ…ßÀ±…4ƒ«DùXÊzúwäãíù_V²åPOi	5kDÑ†îEWë¿BÔüçŸ?Êøáh–˜ÕàÆà'íù_?ËĞwÁ¦ËX/«dY Î:ÛÜPmjB‘0ÌŒk Q•=ÅÃÄˆ‚‘FÿÉ8Ñd‡ÅQ²C‹g™a†yÄNúªò¥ˆP
-KÁ]úRnRşâ;Ï8Ó2Z™éåí¾cØ­aæÅ©ü™¾.£“ÂT’Áİ˜Iñ¨ç¡ML°µVæ,ë<aå­’3^ÜújÅ5XSÊÍLÛ÷Å7tšü‚yê˜( Œb²†BúSöb¡¡+¼7Ú7y"_’E£·`µĞ‡ºˆ¥~¨GÃÅ„˜;Õ³¶(jâı‘ú y¯‡âÈÊÅÿLÌÎBô
-_«WĞö’eåñß =üsbõ‡4!yÒ)î`Ç)qØEÇÔÅÊÁİı¬Èüı(.÷ğä„Ê¸ê-ùó*HBÔªÍ,X=+×Â¥ûË2ÔğqIï3mğ„ìÃ&	×Yšä8$û3¼v»kR´ÔFÂàşëÑÑÌêµhÊëF¹#+:%xÎÓŸŒV2£H|¶ºL)á3ºI şôEÊî9š+J½^·”)?vü“†Q‡kƒ§ô¬±3Eúèzúy£|èğÈ¥J%èº-Lüá#Ñ))ûÿñÿ0¡™SB?VÔãÈ»D,Á\ç‡¼
->3Y/¸¯µûŠ†ˆd!4Ğ¥Yú¯ó‰oPÙO0‰Ø|øze\!6P´üîwZÔµ©qøYuÉ†œn­2¥‹•]n0Šv»ÁPÊ^>º#vİ]˜†cµD‚EXÒlg†´™¡ê­E³ƒwK.Yí„hEåß`$˜OÒ†ŞN×€î6²ÙX_ÉÆKQ¸ÉiÜ1ù˜?üèùg€DS…ôVnoD^‚m|d4{C9e³:xÊ¢Ã)† Pkgƒü±ai7Bç^ã…—ò¸K¸ùªœB°¢¿§tØÁOÁ`á»èÕJÏ*ÒùÎÕ—¼2§B“çÙy…Å¦İJ§°y¢úI(ÄYCw„R”¹ßp7PİõPj³æú:¡ƒ#`5u0Äü¼ŸYtøİJf, êNy’J FØ¡óß‚5íêøß2‹šÏË-†riåYÜı‘İ @¯cşŠÿ“ï#PCšmVïÏ5ô9¤…ã5†ÀåKcMOcÁ<$Íë±J%x/5Ä;Õä×¼ş‚?’ë.ÃWÍıİ¡e¬0Ş¢	³ë_¬¢hCˆÍ N~‡¥kOş‘Î‰Lÿ2¤– å"Dì
-íªä2rï2Ğ®Î=‰is“{B³éZ…¤¤Ú¾³Ø¹Ué Ë˜i2TƒºLV[¹t/nıŸOiòöëğ’?—sÏA|º$Jq&[µv$™cg2R¶4©Uz“‰C¤1eÆé€xş.l!†¹”eR``(Yêòº±òˆ<QòøQµ
-Ã‹ÃB¾Šˆ—€W›Õ\Ï(=Cû<”èDÄìHÜ¾ëIøFÃz5ë´jª;±î‚Õ1xÉ[Bv¯Â{×…mÍQXµğÈ
-2ÍãAú˜Šnz²kCQ‚ˆ
-´,kmÕKü·§gÙŠq›F)§ı+ª†»cúMâèÎåNjÖ”Ÿ„ìækªzdE‹‚êGQºå@¸|İñÔÄTujl¢zúìlmfz¶Q4š%x(Ü$¿IÈPI¸*#&QÎ”êâê’ìöÃ]Å„5–°p›h•|´Á5ÜuªL†*2C¿õÏL7 ¸bûE¯Xhn¡	rt/~¤Ü†¦:XÆDºğ¶™D,Ó²P[Tı¾æM—öZÍOûGíğèhD²`ú¼Ezœ‡1&(ğ5±Ğ¢m;gØSVÏO@œ¹É,ë„†> Sÿ¹cxÄWËïëÑ.É× x‚Ø¤h‰¤å™ñS#ÒÍĞë(¯zcz¶ú^íìÿü`ºQİ#\y×Ÿ–1&ßg{„g;=<t4XFù”isºchu"éçŒ Şì E[e) ,è®æ~\÷Ü	‚Áä8™ÒA '7ñø`³X(§ƒôåöà	!‡ic]áçBÉŞwŸR3â*m¢A§'l÷YôÈŞ:F”İ<„eW#gÅ¬Õ-N°zF0ã²FøÅ*ôöÂ²8óy·u‡as9H˜÷PÊ®–±$éºïIØöhuëÕ bµ±f'¿=[ı`|¢±GÆò±?‹,”Ã1ñ˜N¡,²9V>€ààûñ"YX,jğtç	Øß ¡²æ
-bwİ*Xl®Çñ´‚»GF+Ê­o_G¾–õ ÎE ‚dkb]iäÇt“lñ²^kHb¯QÑŒLı2ä¨jåj­ş‹ƒ‡HL*Šñş¶Ş¨M­×‰©÷öt gğù×ÿÉœ~[Ô!ìÑækØŠa€
-++à4>…B¦wDCzBı•™×VTF1G‘ÈéDJço¡=X~“XENù3g§b¾Çùnâ¡Ã¼IzÜdf!a•ŞI«~Ğ˜>;>QŸ©6ÆŞß;gyxİ*Q”ï³ğ»‡(ÒzÇø8ä—Q`ÿŞŸù‘Hk«ƒowüxA¡^§20K&¦O`ãW ù¹·´\í÷¬_L:˜‚eÙËÇ‚|¼Vèıu7ôÙzFÒÁ¶=dy9¥âêÌÄÙÉêQï'kS{Rq.JñÇÏ|A8+Ta¢‘½´R*dk1ÊmN«œÍMÙß§2¯¢;‚¯!EØb±Çô©¹V	ø}C¨a¯£~1H´¤ÌöÊ0eº¨ ÛCuoòÍiCŸo=m¿6İ5:õm@³¤®'+¿ÌòìôéZıìLmvr¢^Ÿ˜R–‘ıTã…ª;Ø ˜¥	bfãboCy`”ÅÊ‡Õ„‹_å!Î;’®pè…²óKˆ\¼2³ÕpÚÔNÖ4¨AéOµG5hÄŠŒáaË`'woqKÆcZ¯˜ÀgËÁÎŠÁtq®¡¸Šu<¤×„Ã¶¯7‹	z
-7‹Çšu›&/ŒõÉ+-Îö¢‰îwG›[Òl2e¨r@˜òb¿­7 ˜1=ÿÏİòÏ´·Ø¯~EèübÅ¸¨/vÛF¥¥÷ôÊ"°o§RÈÌYã¹Ï^ªèí¶ğueQï’G˜½Êyc	¸sô1B«m£Iöá‘âİâÂºûw!Ş+ì `£%®Æ‰˜eŠ‡b‰s[ ÓBù&f½OHò[ºş±1küï>Á>
-*‘^B2,;wtê$ÃpE1‡<;`R'p±a¹'¢ı U‚…ÕşOéu²:svlzªAkfZú§ŸQÕæ¹;WAæ\#dc•üçZ˜7©]‹Ñ¤C`ág2ø=¢d‚ÉŸv`Ş:
-­£¨A8fºĞİşo”%pyúÆK¥xñ¸Ş}-ƒ¯(X~†Îáú¯	|ÅDYõÂ¼r•»Å (¿mÉ-›ƒ[/˜˜\¤8”~Ûáö‰3”
-‰,"YY)9ùHj(Œ¶	ÄšpAb˜Ø&¬rz¾\ÄÚú¤öâÖgĞgªôek‘o*øš|³.’oşü#|“1#>4®*ª
-s7“IÃ}¾¢lö’M›”Š¸äzÍ˜JXi¶Ín¹˜ò)bÁ`c¸#Ô^h›[ÓEı5šçA¨K·¹ps—Ç}•´<ì¸ö6 @)N‚‹Jşâ¢ÊÀ¨Äê!É„õòÈ¡°©Âæ‰»)A*å66şÔ«C~ÕÂÁW0z];ı§„zé¹.ZÆ25\H¾ÄCy=`Ô/˜½æ‚dk£yuè›)w
-­Î½‹ê:2¦ÜwsğgZuè‰Ü\1¾¬'È1!N°±Ğ_œ‹’ãd‹¥Ys÷ÎQ‘çÜp?iÅ
-‹!.¶,ZuuğbÏSfS=`¥y³Ô:7=s³ ï13Ùë|ÔdS&”¼OÌ(@sQ¡‚¨¨9ÿå˜´g¿*}¥³¥@D,tú£r¦Â+hºjÉõâÖ—ß‰²6Ciz˜+ñ;&Z@‰Š7£wŒvÙÅTÄı{_¼Á³«Zuâlµ^Ÿ¨7ªS³3Õ©ÚiUÛ¾CÕqˆv«C÷Ù]{“ñÉ‰)ò
-¿÷gWau<vïEÎLOŒÕÎUOŸ®çx3–Ù4ÆÀ.¿k/’Û†/2kµG°=ïŞûLV'¦5Hÿ©œ¯íùØóøØ¿^Õ\#¼äò„ù¥ïrİé)Óø~÷éÑóÃòÓ&”O!€Ó§Vˆ_Ègæ‚Õ˜Á}}û:UUôCåXuqIÚ@èÀz;FJ¯9èE”»5Ğ±ı$ Z–e×$yk¡Ó«èİ.”Hß_0ÚMkÑ˜4G?G¿š·,¢¿ˆßĞ#İ d˜hÉÛ¢ÈN¿ÛµìŞ$<ï¾¨-êf[üâÃ½ç‰ÉC†L’3ß3:z§iTq–tÁlAšî¢u
-ß…¾çµï›­Ñò|ßŞ(½X“ÌW |XÔ/Öİn.Ìê-³ïüf¿5z×0šô§Z,
-‹9¯·şØ¨œù.İ6,¡›Š¨MÈ¦Yf•ÂÑÖ°³ò²æÚ‰§‚àø¢˜ÂÈÅ‡©ùÿbLuÿ~í¡¡ÍLÏ|0£MOš˜¬6ˆ| µÿÕĞÆ'ª§§ß«GÜå¤µ¡áxËÔÛÖ9²¶Ö5°›W›Ã¦Îu¼É+É~e÷_WÀó	\+:HªmÂ÷Æ¶Ÿ&ü1FØı¨dÆ'?vúívI{f¯Mõ¡V3†şDƒÌ´XÓ„
-…´¶[("Eh:´ïYiÇ”»
-'Š ,¢õ&Aã{ÛŸB@Ò:&İ¾°ÛúåY×AÉ‚Wßş„ì-Š‘ìŸ–
-ßî÷ÚäØ·`r§L£Py‡ğ½¾Áœbt“Òb}ÉM»¬Î¸]°ı$€IéÍÙX ;ŒÂÇ#²V?ÀBÒúÈ
-)nç_9ÒŸ 0Ù€‘Ç€éÒßĞZ­LóV³ïĞßÇÂˆ»Oëw’¯ˆŞâTáß?uÂ	æM{‘2‹Ès‘$XÉSb)Øûa§³iê2 ¶IÎmrTÌù“m½sl{	¶$ÌG˜ü}yû”Z@$ÜÖP j@cÂ9h%íR<KH!bñ¸˜ˆÇ¥èŠ“1¨–“U‡_.™	e—i`/ĞŸèàE$jQ&‘€D0ƒˆhùTV’òFnĞĞk$Â´ó[‘¥vğØ¡“¼‘ ß?PÑÆ±|–Ö$Âş9Ë^â§Í¯x™³`] ±kÆè%-Î›ÉÍ-‘;c,œ’È|lÓpIê´hè¡‰½°è—~ìBûõqÕX|Â4c¸|úº%KÏ¿¦}ß®ƒtÙL?Ó›¬f"=İW ŸÔàV–ˆXA€ãÒm”åBAo_åÏ¦Ï
-«å·Ù®Œh„U_÷¼4Ââ!5«Øbî²‚ñÀ©Ã‚go]£Å\‡Pl9ÉJI&m7)|Ë‡3eDÈxœe/15%Û¶E¶å3kø14"`('ıŒ Rg4×ª ù”¥ÀBgÅÓ— –¬hµ‘]*JÉ–K?áGşÊÓs	tÓO5mÍ WN µA´„ê_¡Àpú^ÏáCëø¶«ÛDôÇVpnµÓK¡gÍ°«äŸÆáˆFYF¦c)s`b™etiMu£lˆ”Gˆ¿éÖÕ$\’Çl›OÊxÑ_>§^Rğñ¡½¤÷‘ö?u“ÈQËn°;ôÅè«‘ó*J™3(æ !QAynKUÖÚú:*\¾*ô€dÄñõU½
-Ş§	r3ìÜ¦¾O·Á€QÒĞ«cav(-íõµàeJ÷‹[_ÿ¸O{şõ·#oÜ†r€¬ÏÈkÑô@> {ãNÇRïF•d²•q£ˆRˆÀbixĞ?ù9!èÄifël2
-¸-½§§…ëöy”gÔë4KDZËù¹±‰ŠÂ#¯f|•ÖàK&…áª&*ÁÈµİèİŞæ¾õJî.özÜ¢{¬ ŞÛ·†µ¹1Áe¡g&hu˜ÕáŠÂ¦á­ífW–Í(©ÙŒšßy‡Ù+ŞB`ğW<vºé¼uˆ ˆ{§ˆù Áº¾.æë2zSV55ĞuGºx´½Ş´­v»Ìµ
-ú5‰rZà3‚ÒN‚_Ä”D™¤7!³X™,ä±“AœTP§CÇÌ®œ§İñêÍ@:ÜÕG#şçÎW685(™AóR
-‚ÉKšû1ªR:`ºz¬·P.yw¿b$Z
-"¾Šcé
-Î{ô4¬_~Cz)(À®Ú/14H‹„Tœ¡Íh‚]êRqÉ„é…p¼XÉÔË×³‚eCã¸¡e*ò˜Õ1.0½6ü6JP˜Ö%è`ÊPºÕ1jUAé T’‡àÏ'A® £#Ş8•z{Jv×0dLå@ó¡Š<°¤A¡L
-#W/NH²Cc³‹ônnR¼ÃqHÅwü	FrYÉÇÌ^´…œ|/ZÇá²óxÕFêç3X“Kc,ÖğˆU;Êü]ëdUëDÁBjª 	d£Š9œb @É_ÅµÒ/X=ë»­¾Ëî‰‚7­£€9–Moªô,Z††ºÔ t÷Œÿ;kü÷•ã¹|X‚óÙàî~öÜw-WÅM)ÒªLÏ»ªQ™Q	uÛ?:µÑÒ3²¥nÒ7Î~œqë(yUİ:F”İº;ˆòÉÃ½”ßÀ,îœÜ¾œı>_Î`«_Üúr>ÿqüû„ôÁ_ıÛ›çÕÉ¸©\šPİXW
-QŞÜM´t>Õh¯¬&én*œS‘#iåfOïí¥ä^¢P¦º‘Ó¬s¨ê.’ºÂM×›XpuÍM§âŸi Üª[`êY¾i›ùzÙË¨(UŒ¹Œ¦•& `,“|¤oAµ>Ÿ©lŞâpjÜNFe“LpLÏÚ&˜Ú"4@5°]*‹D:Ó]5O¤.Då›è?§ˆÒV ]¹Ü0rF8ESOÜ3ÓÅ™*GBI1dÈë/½¡.`/Ø3Ò…GáFº¹Š6iØçŒØXVü5"˜Õ±ú6”4ğ¹LÓÌBA`{¶!ÛPbt·Xş²†Ñø÷Xİ¢c¡‰“õ¼ÂÛŒp» E$3Pç‹ß1Iì…è\Ëoâ"Ÿëqö¾A§óˆá@^ü
-äløÊ“‹ËÁlb|IÜd=4 À ãn_‡&q¾;n…'qx†„`kV
-ş³Ñø?À•núËßA$l$xÒB!|Éâ³»In’Š¨ÁaxvjĞD#lV+)ê' VŒÉ‰'ªşÜW1è²òˆ¦«ŞÆ\Ÿjl›7x™@†X+ßÈj¿"Ç³Fd!İ¨™\¢>Ï¤p%[3.vu¨kšXş½ŒakIU>±ä8hè„¦ö‚›àÏ»ò_;æz£OY6¥ş	•¾Ü éû öÑeµBû¶Ë¾%½áÖõ¦OËÍpäÓAÙÖñò†uQBûJãÌYëJÉ²ªaUxP»V ªQ»÷iår
-]…%ÖªuQ”FËJÖšVĞN½éõ(Ÿ(µ6,Ï¹UzûÓcc&š"äÒ#İcÇv[¬T’ø8"Ø²Üâ=DhêMé˜Z°Ü‚™‹ú9ãvŸ Ï‡ûœ
-÷*?¬ã¶Õ·.H V¼xÜpš¶ÙÅ2'4VøRr{&¢“°Œ9$¥´"¼`‹¼à¤Ñé§¯™pdùŸé¯)¤¤b§aDÑŞ íò‰à¹^PRğ¢8{œÁÉVWz¢g,ÊÛœÙ¹oâ>Û=ÍŞ7<2JLV± ©Ö†â#U 8¡	ÓO\Gg¤o–ã,5‡RNZü/±?I7Çˆ…°;6aÃª32ze2ÃğLÆ‹‚€î²¨>ìKEdù"ı	ö)õà‡^+cİYÉÎJ…³ÜÂTş÷eFI!C)*#KUâDÛÔpwQÂ	cg¶1³]ÆÎÕ/;äÖ1±Ç°?Æê%¾R&A+&½ü¤e':J¨ Éœ¿œIÖJ$Ağ1Tl!rÈÀ±ó*<?ïHq%IR‹„ìS<Z°‚jU3±jÈ=hwHkçİÃvnáéP‰Âoi[Ãf‚äÃöûÚÜ}UŠ‡°m.ÏÉU‰ÁŠè#ñ²AóíLİc…)Ò0Ìz"ñ'mèåDhó{ƒ­õCØô…²‰´FWjJxÑ_$[1ğ‡E·şúY¸¤ #'ù;œ½•W¶³¥YÒç=Zl&¶~dğİ5ŒSdµ˜6Ñb½,V"F÷@'½˜,'eĞ¯'¶‰Kï–!"iâq &:İ¾RåÅ0êQKl­İòqb¡Ç¡¨Kf)Ú2Ö€F&ƒï)ÑÃ6“´Ê},óz/Ğˆ1Xú@ZRã«ôüf—ë5‚"š€3^ä’¤Ú°t,¯|Ş@BsáÅŞ>Í #ê£zH&EÍí1u“–¿N°…>ãtmê½ÆûgëïOÏ6F*@‚œ©%¡
-Şt]À“Ôw@D!¯1[ûµ±FmœL#aÙ’…ûtv¡*ı¿¢NdÅIT]JÌÛÈ¯a½_)úªªÛ#)¥§¿ˆM‰®p™¹j¦4K“•ÅŞuuIj 5ZZGhIäH¨•ØÂ(¤TvŠQ*ıÀ‡«RŠ§AĞ'ï¹cËí´Ç"õ¯gÓ'EER€K”IÖÕ:P@-ÚTykÀ‰tÃ9VĞ§Ì”N;†FGw#Ÿ®c9åu^ù{šÑ t®‰Ş'*ìµWEñôµÊêÈiŸ‘èóäè¢•ä«¿±Ãe+ãÎŞ+¡d®h´u…FDíüÓéQ™Ğ‡`–Ó×Û„~Ú¼`¿Şi‘?mÂ4Ûè¶MÃq‰…@1iwA%ü/
-Ò† :ğËƒUåÀƒ!€as¤>‰Ô{¶uŞ( ÷îKíw“5†ğİ‚óK!¬¨«Û=²z<%ˆÚÍ"Jóò×#Z‰WÿkÿBoâOÈ…D¹À[/•XD¯b¶@ŒZİp^Üúƒ´6±MÏOò{ŒZ¯ö¶0å€^vhM‰"¿$çu¶qÈùipà¤‹‰JlÄ­d¤\Ä½—GGS«‡";c¿›=şÈÅä£±“IÒİNëÿ²”pLØ² .”ÕNÉ7+´ƒFœ•E¶ñû´óÆÒ:ww	³ës²5¥t!n	Î¹µâdYmZVª¤C¶ÒˆÔTë°J+ŞWuè/õ¼¹şÜ\Û8y.íqâÁèÕšCbñ7àgİÒS§ÀvNğïï®EŞÖjâH<uÁ‘5ÔØ6ö
-qy.,á$ò]S„ÀOš·Üãö$´…O.®&åNî€_‹¼ûWí’ø‹"q§@Qœ6*‹m+Ÿ†šo:èÂ–Kİö’Ö³¬hi>ƒ5Ï;gZÙŠq»ºõv­l`+çõW°S`_‚®¿ñş}DÑ#ZDE¾ÆFØÈ¯_ŸÌÓô)&Ô™¥†%h(Ñ‚a”r¸}Q¨Ëó)Q‚0=ÙZYÔ §ô4Ê2}‹ê^­¥¾(ƒì¾	4WéÛPWÍĞĞ{¿¦÷bNÏ²4Xj2n-€G„[·,$WBì§û-ªá©0ŒeÑ…[ sˆ&]1­’äÁ5ƒÑ0:»›Âè7{ôšĞæ¶¯»¹xaé§é¢²×±(tDôj[Íó!j’NgÏÛ†³ ’)I½àã?¬£ŸëØräwë<¢y©V=|tt,­Öñ0O¥k­A5Z#Z¨ıÍÆàÙ`“gè'ÖÑ[ŞÜ¾åÚV–Z“¿‰ì;âu(³ûfí†£Â,•ß"K¨AÙB1¾ğˆæ£É¯!w›H·˜ƒa¨»}ÙªÃUdbšÑ˜9ÄÏÍEÅ&ØĞ»F¸­Å°„ûØÇ´	XĞùB…£UğØ@€Ê4Öı^Ã€‹kğf7!peök¬š©}ëUqÂø)¿dó°<z‰}0Üñò#`pK’ııœgLí‚²j;ê‰9;×A,‡7æ—íC³kp„…è?*iÌŞ‚¶€¿5kÎ!Ùhi]İq.Xv‹Ğ3£yŞÑt‡·P6h†fdåÈla(<ñ…Ô‰_œ“–îkI¦}/n}½¦B0Àiëö©!¿¬0jÁê†=&Ÿ¦­Ü[1ÎïRhd`,‰`³@¯¸8Ä¼Ô—1~û
-_ŒûØv|“ú¯¤y®K÷6¸J\´MrdŠ=›YÁDp´?ñšš3Ï½ğ&]ù
-ïÃAP4^f…A&´|Ê$,cdİÊ ãUdçf‹oğ?ï“‡?9™ÊäŠ"ŒË_-,ò91¨6Î°#«b8İ¬l6Ã­_¡áô›4pbÕÛ†d£ÕE¯y‹‡¹œĞø\ÎDüœd';o,ÍYºİšîÒè™Úoüß”ù¥®!ü+ü©	xµxÁo^‚HJOÀ!4Ïœ_ª‚1dÚ¾@è:ßrGSqb‰
-²0°ê¬ÊÅiÓéMÏÿ3­+ı«‡%ÌÎıÏÎğBPmDà½Õ*—xçk'Å>Ça²XÉ$,^R"H(Ià@Y?Ûdz¶$LBIêW“:kt-;qª6½BöÅİ|Í¤·w/’„:ctÀi•´åôŠ³Ê[[ˆLsô
-Ixõ~×°	)µa:ŞU²ëjöRÖ/„Ö >š(ØYd· 3ı€÷›MÃñ¤p9äqœxİ1àÿÃ4dŸoé¯À&cQJcSïâÈÖàØ8ò·¾¼£QÛ“×¨86øŞ_§ıjÓ€¼…kË½Œõ¹.k_ƒÚÖ ò¿Œ+?==õ^jX9Œ7¤LĞyì‹BŠO²0¢AEBøîÉ`\yƒ»oi,¬BÿxÅSè02Ø¬dŒœ™•kOİávŞSD¸6xFËVÑ*ôÏ@ßÙ´»ÌE¶ƒ§pà^ºuMĞØüØ›Ã\p”öN3OdK	MËlæô7è%ì
-!,“‰-QíTÆúN/Ø¥®l€dÆ³j¢;ƒğ‰ÜÛ³iET·xÂÌ‚Õ)à&îUÛĞó? Ä=¡Üº™ã=
- t›¸gŒƒ8óÀ1Bé8ø3Ï^÷ÈİÉği¦Q%ÂûcñˆÓƒtø¾“ó0öÿªPŒ™_Ñ5	±hb™æ½õ¸.xÏl…: ;í_ğT1TY.\Ú¯ƒêœú $D;G\‰ú¬ÜZ—¡©rğ´"£wë	ä©`ıÄL3½ëÏˆmXGŠ¬ÁZ”ÙKä'ªM	\>”½ïËí•c‹“fÙ#ÊÉ³lÍJß¾¼·MòÛÒH–]BYHÙlÌ¼±¼eÒ,ñáºˆ~¶·uò[Ç„Å,»ÇåLåÇü–/‡[’o€Ÿfoå·dñ,û‡2|&>Î4pÕİßÛ&ùm•&Ë6¡*”‰“A1ub¹Á}÷²w¶TÑ¨ºy/nıñMpRûM’Ôc]öº¤ìw­®wQ`§Ş¼~VnĞZ	 KÔMËÄjÉ†&^Ï³¸J9ñ‰OIîô Û ´Ñ³Y.ÍÔ¦Æ'¦Ş#«TªÎÌÌNŸÁÚ+¥‰©³äÃ{³µz>MOÎœ®Ñº,^–„x2ö ¡Ü±“Zçfh:u£-Ef²¾ É™‚{ÌöùÂ‚Ñ);=ç‹ûşdr‚AâÔácµÑ“éÒŞš¹÷Óx÷ô;Åö?üĞÉ£O‘x¸·+~ FO;z  ºOÜyÏÉµ”SJ™Ê$,fîI Y>Ô½>.¡ñˆB£!‘<zˆ™#Ç„œÒÈDãCóÒOA»³h	Ïè!}>X6¡Yå=}ÇN­bS…`†¦LIZ¬yŸÔ!ÆP: (Ğ>|´¤„LbÓ®¤{c]>rR‚PN@ª”¨ÇG‚Ÿ¨”Àà'7§(%ZJîFÉšòœº§å®Ç;oŠ3j¦(º$qä×éÕàY]ø$Íİ—p²ÕXV“QnşÊñÔŞyÇo~Ì•ê%;ÔÜ’•ŠıEE—gÀî­ÜxÓçÛZh3Cc@Ñ¨KğV†íZÊĞ<×dÀÂ¢ÉsBŒ êoÈY°Ÿ'Ë8#ô[å91c<()HrWÅT‹äY{Â9Œ8¯fêÍRÁEá¹’e€J:¾ògnŞÔM¢®anOq[¥ıónˆ>Ş†oƒz„p¤kÛŸ¾%‘ÊıÆw”}qëË¿k¬­,dsA>üğó{‹bI	Nø7¡Ã¬›G±gJõ¡aîù‹ĞĞfª¿¬M5´úoëÚ¤6>Q==ı^=âJÈŠVmµöC¼”ö¡Ş†(¡L'Ï‘"—Ğ‹È
- Óbò£Ü|§ĞÅ«NLUârÁXú$Ä[R]zşÍ¿CµğŸÈæ^¦¡–x<İ¬J,“¶JSJW()¤Õ¯o‚q“çÿ¦Æ&°¢™9&O'Ô(6öªØÀ…È;"05tQe3¼„²aEeyA-°Ô&¥`…&[ñ °®üãš€M¾ØOÏì=æ‡½l™U0Émæx±º“‡$Ïb™HQftÓ.—>2Œ¹-‡âNü™îšöâÖW›¥bGaèíßèD¤1K¬¶6õ„D3,g¿™kàµ|+°N€şù÷rĞ?Ò/èí¥ğ© pæùPÒ|Û²œ%&/ƒ—|ğ˜LŠÏ}ùHXSwj›èÕÀßàûÊr·é	¾†EaûË,øŞöÊ~7#ğÊöÍı,gº?<“|Ë&§­3†eš¡Bc=ğ·ÉC±Š9LãƒúøşzuôÙä´‡fÒš3Ûøª4‰PC
-ä;ĞÅ|qëúßÉërp{ÍÀ¬'cÚó¯¿•»İÑçtr€põ¡’÷mo_}#[" ·¥-Ëƒ®Ûf˜®X<ıe(õœŞ•)gT^<d´X¢ú@Ì&|!Û©Ñõd`ÆX‘/òÄ0VµçÂ$ëe§ø6øØÙ¢€‚ı[éF®`$BIMèãº}ø¼"ÊGœé[	byBÑ^¹¯Â¶JÏ]Ø‘¥+¾;¼Ê‡8uı¢ûÂW¶›‚%ncXD?–(¡‹C¢CáNXO¥„#Æ…îF	GÔ¶@Iˆ=jš†º(ôÛÚl	³º(Ó0‚ûÈ°¤y®b+„ÇRP_>¡¥R–i=|Ô×¸«\#Œ0k6¯gä¿ï½y¦·’'×¼4ŒIªÎ®£ç7ùA¶´nßàÒË78I¶!Í2ò°U÷,Şå^Uã9Ÿ8‹01,¶·Ö
-´<‡3F^‡(YÊO³"É;Jôó´L…ñûŸ¡õú~V ê>ÔbÙå/Ô÷–º¨üÉéÆû”œşqJWİÄòVXëáH`s†`±íßËçñÚÌt}¢A!~uÇñ2Ñı‚Ş'šnFäà~8Ñx|¶úaõ4ıÆçÇÁº‹¯§ÜÈËÃ¤ÔwÅvïä;èÚƒ€·ËåŞ##V;°Ø¯1'p_t†B<1·ÜâÒTrüRê”Ãˆ(¹Y#¾¹}%Ä·Àvé}ÏÍ˜ªı"aä‰±ÛÁÅ0¢Ùd©6›„aÄF5Î„ádCê¤<ÁÒk>\!{U~Ø¤¶Xåv£0öĞÇ?r¡Ï¸á4m+˜å@ ”L¨CäÏ'X–•üTÙ¯¹Q‘+ÔŠy´½º ïíá8²áPb$Œ¼&#6c4âI£wÁ0:ÉĞ\÷f‚¨s†]“Ğ@º"ü3·ÙrDÚ¯ú>£°Vñ:ov”Ÿx=˜­1Lı‚Ùk.¤æMZË=ãÎÓ1‰´*qÂaXVI+tÎı¤N9NˆŸúÁ#ÂæÛX bKB PâcÔC;öIÁÇÄÍ+£…”/³f?QâšX‰u·ÏÃÀÎƒéÍ;ùDÓé¶õ¥i»•KÙ	É(·bÒòæ`C?(eç²êO{ò†/o$³óuíõ6Ãªı.­£‘fµNÏì¥Ç›<ôYŒOû5´	ùõq­”PÒˆöá'ß+jîê– İÓŞ¢4CÚùÉœ?ÙÖ;ç“T¾4ÖÅ;2« -O[È¨‡x6·°¹3å 1‡M´»,ù^“K?ëÇÀã¨.`™œedbG-ØÅÒJÏšèô¦í©~»]ÌMë¦P€4y Ae°¤'Gx¦WvcãõVËwxËtj	|M&?˜' øˆØ_bg£©f‘Åedƒ´ÆPo <>)>¾`WzàuÎj0í˜–±!ÌÒÍ0²$u?K^˜«h jwgbqÜXw^o"	Œˆé¦W5.²Wxç· 0ıå”e7.F5¢ò1¿ˆ{ŞzË½4Cûÿ¬²Å†CHÈ3îb¤‘1bT8ï³¢£å·?¡ïR±.°6Ø—‚Ãwl„½›4|%˜½:‰‹ ,î’ö;Ş âÊöJğ
-Lµ»”ßÁ,ÈÄ›h{à‹W;§‘¢I¦r#a£”½ÿ"g:n¢€U¸#˜ş~`>.Õ5]ß@·Â_—vüØJ§•RS#ŠT“‡zE—¥ëÅNîĞ5ß…'„kQDùmHâa	Ï¿ù÷ÀîfH‚‘sÑ…‡[wá¡Ü1;k´†²ä4\ãù7ÿñr,wc¶:U?U›İÁÅv){Í½˜ˆï‰Xx¿—>aÂINû‚ÌKÊnõ.VAÛTnãí»1ÕFY-me°B"7fºQ¨B[)UãĞkXd+Ó¦NY½4í9jKİÛ”7”åA£ĞÕÁú~LŸYğü7k3ƒß¼v<}±<ò•5nõçÚ†Ï¼QM4G œ_i£òÖ‡®aCW0¦ñxÊZº³Ùt<otdOw1pÇ»ÍıJòn^v#¤HŞï³¦y
-Gúİ=z£ÀIÒïÑqCÉ]dgÒ¯îX½ •Èèû€¯Éªò´—Ì†³Nø¤ëıÔ\ ğ•3ãÄ2[q¢¥+Y#ÎÁŠv»Èq—‚h¶¡ıå°|
-ş&4,é²«37m€­E—y5`şËŠØƒ[o±’üÄHZ	cä0¯ˆ,fwm)¬İ4}
-/şxûªæ{{lMävgÅe@'5¤#cµé·?a;W¡¤*ÊÀÁ°WPâÆ¯-"Dl
-÷ú½@—*…Yf ³5p:¬VYƒxZî€¾º÷Í~ÿæ?%W»Áy÷„"²dYÖOq} 
-yÌS/e]äYîÈEËØ+û{\›ß'¿ ¬»(©R‡†ôÔ²ÃüCEÀŒ†GÖ¼K—ö†El`jÄ}ô9c¹låxÈ=‰SÅuDÿXÜò2?ÍDÓzvŸ¼pfa"ÿ·İ™ÛwøÅ­?û_Ï>OÈK‰§òÃ=Bæ7eÉ#–²ôjIIÜv·üG‡*Ú¬ñ‘ÑìE‰6ş2Ñ#¶¬èñ×Ï4ZÔ3Ì3°ä`BñÅK¾‚ıÁ=Êx9‰ç–¶wNa+ G°P&Jñ/AP·À	j¡õmq
-Ÿ^FÆ‰êÛ¾8tÊÎ9ã‰ÔqÎœ½R|&T3©’İËÇ-“ÄnqËw[Î÷;­hn	¿‹[†`KrK–ˆ¬ƒ'bÓòMtXºuÕĞùğZğIT.×È	¿~\C]–µ~•×˜R»}=hÇ"'æ_µ ×²z¨Ş"ı
-nqHr Viòk4íwß³ ß;D'{ÂÕWOAÚS˜²î
-ÛW±-Ò(Î3óï5ŠÂJp½s«úEÉågİIÚ‹¡›3KŞÉI8({8İ“è6GI!”KA
-¸†¥;¿u[‚ëöà)­6X"\'ANˆ#Ï;©aûå/G¨kØyÁ¿8ÌÑÿJ	ñ¼rw‡äòÃáŠÁİZ½?·h²@ÍyòyÆ¶¬yQ– ¨,Û¢<©“rLì:ÕHY´Â:}{píÜ­”ƒ¡v‡ç£º;PkƒüQ€ãÀÁè2²õE”:úÅÖÍB9İHx‰í›ß/Û1¼ÆÌR5Š À+ÈŒ°nùë†WÔ|¬Œ«ÛxsÕg½Fd¥`LD‘ñ·á¹zöÁLÕH7¼ˆTtM ô¶ß`ÇôÃgÜÂâÊ|7& & „‚xè¹~Ès®’ï/{1Ÿ[Xâõšâ	+&]„0—y7¯qnI]¡NÅt$Z„¤à€·¶¬Ï y¹‘}ş~ğ™¬…Ú®î(*¬$Ëi^Aº~xíBrg E<ËrW4O^Á”Ğ{ÔÛF÷1­2»}MFàÔµ½•Œü6-/DzÅØÅ»	(ÈêŞ:0t‹Æ•‚:Ÿó‘©Ú­T¹B¾TN-	éí*ø	ùµâ¸øJ0ó±QBFÆsT+âj^0eBŞ	!ÂFl‡ÅØ,åûTxÚRû.,N»W	ÕÂåïwK†Sş¢áX\a.´@8Ÿ¯.¸<±Æ5í(Æª\
-[KCäı½Ø2û’+=ÈG‹ª÷
-ã,xüúÖ:<¶?±…T:FáÈWêXş•Kİˆ¨o¦PÚŒ_ç«mc˜ÕcŠ!ÃTå‘£î|F´5Ôua³‚*ËÁH•%jäSäŸ“nJ#‹æLÍIÒhĞª»OEy‘®¡ÏG¨ø—­öëîøå*/MÌš¦Á©ä©VÛˆx‹¤:hìuaø”˜Äçc‘2y|¡8€n±G	Iø™Ú^×W©Kx#á1Á÷U×•¢†+Ù¢)AñòG§õ	!`@â÷4²ÑßşHÔ‚Á­ğ€šÑy	-n²‹à8)¨vq¾%S,:ƒ;,ú„{q‹ŞDKºüOĞu&ÕyÁGB­M±Ç¼á›Ò›GŒvÔùWmb<S%Ey+ÓÀØm÷/9Æ²äE½ ¼ì8È˜GºGœ\¥Q[ÏD>nñ¤ä€¸{h¨½ôh8³`A}˜Ğƒ”ƒü¡ñì)‘”ñÛäQ„(¹ÛÛ74Œ2Ê|öJırOó±‡{é¸—ZùF©Şú;Ûs½¦gu¹-!ee%c™u>Tš‹óò{„ğAxtœ—G´ßı.‘ExWªÊùi]‹ÿú™hæ§M‹#EİMEV#^À¸mA¡4IÛèõíÎ§ÛP°‹U^ÇoâúõñŒ³PšDËjÎódŞ¶´æ€ÂÀ”pC˜‘Ş)TÈÅ}Œ¾_Ll©É"âÜ*z2õó‚ëéÑÙJ%ÂŠiİŞöb‡y5XÜÆïƒç}©Œİïƒ¥úr,k¶ÄzÓ§TE£·`ÁãK‹h°§ø§Ä­úVš™«ÕëSï)‚póxŒUñæÖÇP;¨Êa(°EİìÕ¯æ™FÓZ„ ZPùnCõİ6²ÎÀ+JH{°©1ç´Ùz±‹"¤)eÁéqCóëKôõ ë5ÌEc’ğqÓ‘áàPëÉYŠ9?2÷­âzÙ™f«Ú+p¦=—¥fµDAC	9‡ü-2©ëKq©Xhz£>jxU_Ò|Ê¯8hµÆ´—©ÀUø«ËçFn»Á#PËrºSï7›†ƒŒøË¿0×„-ÁŠH5z$ÆRB¼ìÆ[4pãÚ`« ljÁ8Ã;xÑÊ*
-‚Ø%ú¾§t³İ·!½/ˆ›—·—ƒvKï­Á
-mö*‹dÑõsÆ%•7(^h‹	ó“³]Ë•Â
-OdwO)tôRj4UŠİdrønX9¦Á‘ Bó‘QŒæŞûƒ^Î}O÷Í¶‹Ù~«l–ü÷‰şEÿıÇınÂÒÑÊamÖh™6dør	U=#/g[”JØìÙ cTáÄ¾äÚÜ’XáˆÿÄ¹ZÕ²Ï†ÀEİ?È,O™Ğ
-­c9— sk·–:úb ƒFZÑy…ˆëe6Û}Z°oºoå Hc–e· ·Ïù‚H~ôs9¨ÂOşÍ÷A¯,š“K´h”3šQØV“ü&>”¿{0üÆ2ÔÊi+ÎsX’»ºMÙ{ÚpŸğJnÛ<ïü"ázQøğ°XLvÂvİ>Çª¦Tà»Ac±ßƒ°Üÿéùr©>S›851VÑ.ÁæóÏû´êøäÄÔ>mªV­Õû´éÆûµÙÈ‡Md±g<­;ù‰ğ$˜–mu[Ö…NíbW‡@¦äû1¹tD|ï¤ûÈ“4ô¸{¡ÌBíà±C'£Â@âBKÇ—ÈEÌl°ªqğ™cà|…GŒÔ›„’µË|éGFrv<R^L¼Äpg÷ÕÃ¹CkA”ÆwPŞGƒhŒ^†ÃEFñ&ÌÕõü²ˆ— ùÃêØÚ/¸1õfÔ5@"“£JDƒ”Ğ:İN­½}K"«D-m8Ëá	Š¦ á&Lq(¶tÁ	¯0 |EkXZ²ßc/Kõ±¨õsÊÛ‘&2Sà!'´²ƒR‚Ì”&íÍê-Ób2³ãu0.G=Î}ŞÈ>Ÿèœ<5™ˆæÅ¦õÊ,©ğ?ıâ‹/ò·«JĞhq9‚´IOãLó5ÂW Ø9Tñdl&˜Š0ÿ  ÿÿì]ÿoÇÿ¿b³¢Ñ]B!¶D\c;`)Ø§»3¨
-ZÎk|íùö´{ÆFÔR0X 'iÕP©RT…ª*Á	ÔM«”şĞ¿Ãş5Bç½™ÙÙİ¹[ƒ¬ù¸Û™yïÍ›÷>ï½¤Ä#´óƒÛà¿N•y@G?6"Í3=—b:?KtºyHŞ5sUƒ9Zw'çdÇõoĞº_˜.^Zò"9®B¸“ióYÌ	—ÎÉİIyÏZ<3ÿŒ¯VLşz°•‡?Lñ·4È¸¶Ó­tQKÍƒˆÈã7‰„©€ÒŞ/*ÃË„‡9™•7!%Å6ì÷¿,¦¤a_0Sšõ„p¾ÓñàÔ…”Ûi5[Îë¤kàQón ´?-ÊäCÓÚ:¢ãFDœ	îYmKôÇß±i¨¿U~%ˆ2g$«‰·¡";77å|°0o’lÎYƒÆÒPÀ4»Ãæ$ò5–ï+¼ÄÎ¥RÉmÓµíŠ“°cPß¬Q•Ğ¾íùéáıñkÀX­É?¾¬…usÌò3l	.¸µüÅs£…Š¯\RanR€²p–êR­‹y˜´)É«6T9c’×Y¹ãyş¬Ó\Ÿù^7¤W\„¹»ª"â™©(AŸ”¡ßµl¨†_PMsÚé¹×<ÿ–˜K†r:‘ÏX=Làt/põƒäƒ+MdQQ§ÕÌ¯42+Øëùâı+Ê¯±¶¯ÜlV¨3ŠZeÔOgj?ƒ XÍÑ«Ê¦
-,ô•$³nô"´ãã“z€®÷›_ŞûĞª:-¿dcŞGÂ}v„)TMï¼pPçM+À|	€HÍÂSo?qJfµ€ù%~ÔÁ^•i•dúbÍ}*KÚáÔxİÄlÀWM€Ş`x’‚iAÃÕVŠK:+‚TÁĞ¬5t	“*³ ³A5ÃÔäXCÔt‘ÛPşŒÄKç2×Y‰OAŠ¨/p%º„;–'°zÚc,çª·ÖPê570³´$aƒ´æŒ§à]@Û4Zò)Oº(8…Ğ!tp[•ÉàFĞ6iïŸ;ğ¿%zoö¿à&úàùÈˆØZÚ [¤jâ)Z•2Võ%LÚ„°.ÒØ€¡3¬Jâ€ºz³&zëÚPUúàEŒ¤„skPhÿôÀ:†·àÖº«ÀÂ*y
-æ„ò»LìéîŠÂVËŠ5e‹ie·ä@ÛÅ§± ½^¿ƒ1\ÃÜßN¡ßĞE
-–]~Kä–CIP¼ÜÑòÒÛ åÔFQİFkè²û £Õ[ûß¦ºSY¿ŒïÄÛx3¹KHe†•Z 
-æß k¶É˜ïÂŸGÖ¶æ7 ]ÿ@ŞeK—;q™$­Ö.ÎÍÊeNˆU¿	i"ÓØİ¼9¶½©Vµ°ƒKî-YĞ‘ìcÏaT5Ænö‰İÓ-=r­2#© ÊÔOÖ—+Ì´Nl6 è0V.&¼Ô+]Y:ÿ|¼bÍ.µ`I¬úZDi@†§ÀEºô®è&DOJÈHŸ" P euçº^ˆRô$Àù“ˆ3áw8îÄák¬ùš×¸yòiÍW h’}}Ğ.º¬´n\ŸHbOF=DMhÃôT{¤QzEbôØ?ÏSVªŒ/—åTLR£olï§?ÿ3—F6Ğ¤à|ÄÒø“}(ï†'yÓÆúEï)‡×G
-}A™$ÏÅ—y)k1ÛÎ
-UJwqwvì×8Q~ÁÇEp‹JoãÜ#ë•lÜOFûtÿ	‚UK¼ñò·–!‘G®^DóaÓ(³(/8«z²ãWÈ%Ì‚z›üt;–…:jƒ%5øLÿ·4a	„Ñíïîï•'lp­®u4ÜéY6³´N°}€*Ón=@ıS'Á	ËZœ™k,Ôàc}±Z]¨5àãBu¶6Õ˜[˜¯gÕ‚6§¤ßÖA¯ñìÂ‚F^°İ"”sÂ.W˜Z”üvö±Q+çl¿¹fMÂªğşf»Õ-¥e~ÕlCğ.k§©U&ÔÍËV'›cŒ,¸ayR–SÌP-æ:´6+=ïUZÁ gAsë_¢Óô*ñ¶ˆ¾å]wséO¼rëôK”@³Nš1­ŒöºÃEÇaŒ^<ĞItÿk¯Õix-ˆ$W ƒ+TÌ…DÇšy€ É0³ |™mhÃzôœ ÈA]Ë„ÆL²­Gîä¨P "óš`{LÔÈÖÁXª¾4hDØ’X;`•†“æ[ÿúOæÙÑmòü3¢?pÿ/zO›Ä[úÉªµ•q8;i?”v¾Ğ3YœääIëQuÖÚo‰æ0Ayj&ÁXá^*<ÿbËÍĞÒ„TÖÓg2ÄÌ	ã:£°ÍdA„ÛèAdI:‰H-·ÒÒ³§(ÜùPzÊÿ‹£åköûbµT–u–·ß U·i»$C× k”ÙÚô=ƒ˜áK2êûvX5ä+ë7áÓYØŸõŸíF'põ”4•Ãœ¹¨àÊ°‹æ»¸LtÄ¼,´€²¼%+RYşî±
-·h²x$¦•ÕP“r°„¯¿Síùƒ¯şgÑt»<o·€RI˜2^!§[¦yÿgŸÛ÷¹q5£æ6ÉÉÓ¿ÌÆÂ?â>4„¡Ìnô|§	D$€QàWíÂQÍŠ•ˆnîù7™?°ñš{Íİ Oãß’]šœ‘¿ebeë`›~)O^¾¼Súdè½ñOoŸÚ,Ç$´¿êôš+€À	ûAøM	ß”'’ƒİ™>ö¥SÕŠÇ&ï¯€A¥‹fàà“áOSVƒw! 2*ğ|¼ÿİş­Üà1pÌÀGR+Ì"7‘xcàÎJ ô÷¡5œFÓòââ3äÅ*ÁÚÕ ÁgİeÏwÉŠÙe¶•æ%İ˜òŞŸ—Ğ˜`„6ÔDli5‘ÊJî„5»Ñt±zG,­KÇ]ueİóY	‚ì+Ã#£§ŞK$ZÁiº1…Yí¦W¼V3/9ÌÌ\mvºq¥:U¯_Z¨ÍØ’?×¬dºRä¤ìÚ¡†?™Š	uE‘õû–HFYôRâÑÚâw8pRğªÜ‰È%ÅOU“\c§Tñ%Ö_g§­¼ì·€¶Ã3ªaAe„ùfÀ4E9ÛD¡jâi‹	cc7O_Í÷±rÏ]¨‰ùÆy×úX¼¸œ2YÀ„Œ3]D5_#Å3H)@Ÿ»*Y¼iK«rœş4Zx]€ÛìPÉ¸€Ü{ì°÷/”¥{Ù%‚L%g†ÍÈ0@İ4]±/-6¾ù¥—+Çaª#ÎUM+Ú–#ÏµÇ“:š;İ:NÀ©l7a˜‰“ï™XôkJ÷¦mŸ÷¢¼¬Ê2ù‚Š yN$dĞ¨–Aß)‡Ô—F4gk²†~ƒ+—ÎO5êSÕj¡¤£îA‡€RÇvØd„úFTŠ|1X­Œçâñş¬¦7ÊÛ¡²¶d.®i5fBŒ»œônáü~½Hhn¾Ş˜šo\™&+T(åHëL|$‡L'DM}qOâBG‹›ØŞfÅí–\M%¾œB²¿I_–[ş*]¥¢Ÿe?Óñ!`ÁxAßMxâº”‘¿@!Zmujn&{çæ»º<êIKç—0n…6©m©ÉYÉşt9E0d>šmæM9Ì©ãÑ‰VéšÛ[ğ§±NQ§{ RwÜvq©<²×èI6A¶£ŸÁ¯çÄfSNÓ"Ñø¸áŠÁ¥‘dÊs ¯°óe¢-6ˆBFûïhŒœJ|Es )H	…;JÓO$íëãÙùsóW>^˜?W®+d7Êñëº{R_E,,Ğ—ŞÇ_‹k}…¼Væ¯YV¥tSºÎL¥ÎµEãk}Ãu@€>e¡Š
-KÙƒTsŸ“úù…Z#wRRj)Ì-–h=×æ$…*G¤.ÑËó_vX	ı3·è%j |‹6²k¶*‚OËt5
-ğC¥°ËÌ¯D´è_N{«]/ åöØòZÇâ{7­%Eí€d°(‚N
-{ù«&Kğ»‘5É¿¤_{TI©†¿–èÏe ]-vZlaL<a9%ßkQ'jòô‡c|y@4˜m"ç¢ÚÜàÉÑ	ç?/g3—#›Šh2H. OÉèÃ¬p¨¨óÑ³§G>+ÇQÂ§8JX¤ÖéürôÃ#ÆõèÇTfq8ÑiØò´ÀDxâ9ëöÖ]·sÂ0¢ŠY‘Q;˜%MäÅÑ¢2I2· «1aç–6µœ"„N’; éY¼ÿ’â¯ÖB‚ê)
-“lzÆÂEàˆdÒ¢lÉ"eÿ¿ˆG.Ñ"njM¤ê/öOŸ=Tşgkxr¨:;~z¸l
-WdÛ£´rwÆz+üœj¾Ày’ßìOĞWõÍ^‘|ó$¢=ü¯ÜvÛ[Ïßº–dñS5iº`Ä@5˜KµÚ¡NcK–îjIu³D$ºWäUÏÊ®Ñ¡h%H¯a˜ĞÉÑ¯^‚Ó%ùMÆ¾PÔ£YÖ7¦…dœ-
-<)à	jù:~¹#{JHËšË€D¥‡p0´JUêïâ'
- *ERÇb‘ Æ1U$s¼á_iHQãW"Ö\|ªŞkPVÂšÎ+N/pºİEaØXšú{D«~ ×¿[pTÂİù‹,Ò}˜
-øåG@¶¢[ Œ§tf™‚BcôZîÒz)¹ûüfzˆˆø"‹>‡½Òëuƒ‰“'×Êª{r|ìÒè\1N£Ìª¾»ÜÚ(ÙCvü›wÉ#vys˜ùÌñ›üˆÔq{•E¿Uq;€•.‰³WÎ`è§z…?ı~(Ñ?•©itQ]œ›½tÂŠ¤ëøA4Eˆ¿Ëì‡É§JĞsü˜]¯CakÚs–$D\V–ÕŸ`dÕ+¹ù»Ğè¨‹½‘÷gFÇÆú{#‘k&bOƒœWíéÁÃøDç>ÆûÀJ+|‡EÈ¨`5ÅÓ•@E0x}v~¦±Æâ6™…7ÁNår…°{;¯S¸ºk=4ücW®zKpÄeS:ˆ±ùÈI’ú…ú+ @¸áà àÖavjÂctªG„¨ÿÅû›Çş  ÿÿ ¹ø—M
+                                                    Text("ğŸ“± Ø±Ù‚Ù… Ø§Ù„ØªÙˆØ§ØµÙ„: ${w.ownerPhone}", fontSize = 10.sp, color = Color.LightGray)
+                                                    Text("ğŸ’° Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø­Ø§Ù„ÙŠ: ${w.balance} Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ ğŸ‡¾ğŸ‡ª", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                                }
+                                                Button(
+                                                    onClick = {
+                                                        selectedWalletForTx = w
+                                                        txTypeInput = "DEPOSIT"
+                                                        txAmountInput = "1000"
+                                                        txNoteInput = "Ø´Ø­Ù† Ø±ØµÙŠØ¯ Ø¨ÙˆØ§Ø³Ø·Ø© Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©"
+                                                        showWalletTxDialog = true
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text("Ø¥ÙŠØ¯Ø§Ø¹ / Ø³Ø­Ø¨ ğŸ’¸", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Wallets List & Actions
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("ğŸ“± Ø§Ù„Ù…Ø­Ø§ÙØ¸ Ø§Ù„Ø¬ÙˆØ§Ù„ÙŠØ© Ø§Ù„Ù…ØªØ§Ø­Ø© Ù„Ù„Ø¹Ù…Ù„Ø§Ø¡", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                        Button(
+                            onClick = {
+                                editingWalletObj = null
+                                walletNumberInput = ""
+                                walletAccountNameInput = ""
+                                walletAccountNameArInput = ""
+                                walletDescriptionInput = ""
+                                walletInstructionsInput = ""
+                                walletIsDefaultInput = false
+                                walletDisplayOrderInput = "0"
+                                walletMinTransferInput = "0"
+                                walletMaxTransferInput = "100000"
+                                walletStatusInput = "active"
+                                showAddWalletDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("â• Ø¥Ø¶Ø§ÙØ© Ù…Ø­ÙØ¸Ø©", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+
+                if (paymentWallets.isEmpty()) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                Text("âš ï¸ Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ÙŠ Ù…Ø­Ø§ÙØ¸ Ø¬ÙˆØ§Ù„ÙŠØ© Ù…Ø¶Ø§ÙØ© Ø­Ø§Ù„ÙŠØ§Ù‹. ÙŠØ±Ø¬Ù‰ Ø¥Ø¶Ø§ÙØ© Ù…Ø­ÙØ¸Ø© Ø¯ÙØ¹ Ù„Ø§Ø³ØªÙ‚Ø¨Ø§Ù„ Ø£Ù…ÙˆØ§Ù„ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡.", fontSize = 11.sp, color = Color.Gray)
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            paymentWallets.forEach { wallet ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                    border = BorderStroke(1.dp, if (wallet.isDefault) themeColors.accent else themeColors.accent.copy(alpha = 0.15f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val providerName = when (wallet.provider) {
+                                                "jeeb" -> "Ù…Ø­ÙØ¸Ø© Ø¬ÙŠØ¨ ğŸ“±"
+                                                "alKarimi" -> "Ø§Ù„ÙƒØ±ÙŠÙ…ÙŠ Ø§Ù… ÙÙ„ÙˆØ³ ğŸ¦"
+                                                "jawaly" -> "Ù…Ø­ÙØ¸Ø© Ø¬ÙˆØ§Ù„ÙŠ ğŸ“²"
+                                                "yemenMobile" -> "ÙŠÙ…Ù† Ù…ÙˆØ¨Ø§ÙŠÙ„ ÙƒØ§Ø´ ğŸ‡¾ğŸ‡ª"
+                                                "mtc" -> "Ù…Ø­ÙØ¸Ø© MTC âš¡"
+                                                "sabafon" -> "Ø³Ø¨Ø£ ÙƒØ§Ø´ ğŸ“"
+                                                "youssef" -> "Ù…Ø­ÙØ¸Ø© ÙŠÙˆØ³Ù ğŸ‘¤"
+                                                else -> "Ù…Ø­ÙØ¸Ø© ØªØ­ÙˆÙŠÙ„ Ø£Ø®Ø±Ù‰ ğŸŒ"
+                                            }
+                                            Text(providerName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                            
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                if (wallet.isDefault) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(themeColors.accent.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text("Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠØ© â­", color = themeColors.accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(
+                                                            if (wallet.currency == "USD") Color(0xFF3B82F6).copy(alpha = 0.2f) else if (wallet.currency == "SAR") Color(0xFFF59E0B).copy(alpha = 0.2f) else Color(0xFF10B981).copy(alpha = 0.2f),
+                                                            RoundedCornerShape(4.dp)
+                                                        )
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        when (wallet.currency) {
+                                                            "USD" -> "ğŸ’µ Ø¯ÙˆÙ„Ø§Ø± USD"
+                                                            "SAR" -> "ğŸ‡¸ğŸ‡¦ Ø±ÙŠØ§Ù„ Ø³Ø¹ÙˆØ¯ÙŠ"
+                                                            else -> "ğŸ‡¾ğŸ‡ª Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ"
+                                                        },
+                                                        color = Color.White,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(
+                                                            if (wallet.status == "active") Color(0xFF10B981).copy(alpha = 0.2f) else Color.Red.copy(alpha = 0.2f),
+                                                            RoundedCornerShape(4.dp)
+                                                        )
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        if (wallet.status == "active") "Ù†Ø´Ø·Ø© ğŸŸ¢" else "Ù…ÙˆÙ‚ÙØ© ğŸš«",
+                                                        color = if (wallet.status == "active") Color(0xFF10B981) else Color.Red,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Text("Ø±Ù‚Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø© / Ø§Ù„Ø­Ø³Ø§Ø¨: ${wallet.walletNumber}", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text("Ø§Ø³Ù… ØµØ§Ø­Ø¨ Ø§Ù„Ø­Ø³Ø§Ø¨: ${wallet.accountNameAr.ifBlank { wallet.accountName }}", fontSize = 11.sp, color = Color.LightGray)
+                                        Text(
+                                            "Ø§Ù„Ù†ÙˆØ¹: ${when(wallet.walletType){ "DEPOSIT" -> "ğŸ“¥ Ø¥ÙŠØ¯Ø§Ø¹ ÙÙ‚Ø·"; "WITHDRAWAL" -> "ğŸ“¤ Ø³Ø­Ø¨ ÙÙ‚Ø·"; else -> "ğŸ”„ Ø¥ÙŠØ¯Ø§Ø¹ ÙˆØ³Ø­Ø¨" }} | Ø§Ù„Ø±Ø¤ÙŠØ© Ù„Ù„Ù…Ø³ØªØ®Ø¯Ù…: ${if (wallet.isVisibleToUsers) "ğŸ‘ï¸ Ø¸Ø§Ù‡Ø±Ø©" else "ğŸ™ˆ Ù…Ø®ÙÙŠØ©"}",
+                                            fontSize = 10.sp,
+                                            color = themeColors.accent
+                                        )
+                                        if (wallet.description.isNotEmpty()) {
+                                            Text("Ø§Ù„ÙˆØµÙ: ${wallet.description}", fontSize = 10.sp, color = Color.Gray)
+                                        }
+
+                                        HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(vertical = 4.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Button(
+                                                    onClick = {
+                                                        editingWalletObj = wallet
+                                                        walletProviderInput = wallet.provider
+                                                        walletNumberInput = wallet.walletNumber
+                                                        walletAccountNameInput = wallet.accountName
+                                                        walletAccountNameArInput = wallet.accountNameAr
+                                                        walletDescriptionInput = wallet.description
+                                                        walletInstructionsInput = wallet.instructions
+                                                        walletTypeInput = wallet.walletType
+                                                        walletCurrencyInput = wallet.currency
+                                                        walletIsVisibleInput = wallet.isVisibleToUsers
+                                                        walletIsDefaultInput = wallet.isDefault
+                                                        walletDisplayOrderInput = wallet.displayOrder.toString()
+                                                        walletMinTransferInput = wallet.minTransferAmount.toString()
+                                                        walletMaxTransferInput = wallet.maxTransferAmount.toString()
+                                                        walletStatusInput = wallet.status
+                                                        showAddWalletDialog = true
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Blue.copy(alpha = 0.6f)),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text("ØªØ¹Ø¯ÙŠÙ„ âœï¸", color = Color.White, fontSize = 9.sp)
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.togglePaymentWalletVisibility(wallet.id, wallet.isVisibleToUsers)
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = if (wallet.isVisibleToUsers) Color.DarkGray else Color(0xFF059669)),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text(if (wallet.isVisibleToUsers) "Ø¥Ø®ÙØ§Ø¡ ğŸ™ˆ" else "Ø¥Ø¸Ù‡Ø§Ø± ğŸ‘ï¸", color = Color.White, fontSize = 9.sp)
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        val updated = wallet.copy(isDefault = true)
+                                                        viewModel.updatePaymentWallet(updated)
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                                    enabled = !wallet.isDefault
+                                                ) {
+                                                    Text("Ø§ÙØªØ±Ø§Ø¶ÙŠØ© â­", color = Color.White, fontSize = 9.sp)
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        val updated = wallet.copy(status = if (wallet.status == "active") "suspended" else "active")
+                                                        viewModel.updatePaymentWallet(updated)
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text(if (wallet.status == "active") "ØªØ¹Ø·ÙŠÙ„ â›”" else "ØªÙ†Ø´ÙŠØ· ğŸŸ¢", color = Color.White, fontSize = 9.sp)
+                                                }
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    viewModel.deletePaymentWallet(wallet.id)
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Text("ğŸ—‘ï¸", fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Transactions Verification List
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("ğŸ’¸ Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø§Øª ÙˆØ¥Ø«Ø¨Ø§ØªØ§Øª Ø¯ÙØ¹ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ Ø§Ù„ÙˆØ§Ø±Ø¯Ø©", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("Ù…Ø±Ø§Ù‚Ø¨Ø© ÙˆØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¯ÙØ¹ Ø§Ù„ÙŠØ¯ÙˆÙŠ Ø¨Ø¹Ø¯ ÙØ­Øµ Ø§Ù„Ø­Ø³Ø§Ø¨ ÙˆÙ…Ø·Ø§Ø¨Ù‚Ø© Ø±Ù‚Ù… Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ù…Ø±ÙÙ‚ Ø¨Ø§Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„Ù…ØµØ±ÙÙŠØ© Ù„Ø¯ÙŠÙ‡Ù…:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+
+                if (paymentsList.isEmpty()) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                Text("âš ï¸ Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ÙŠ Ù…Ø¹Ø§Ù…Ù„Ø§Øª Ø¯ÙØ¹ Ù…Ø³Ø¬Ù„Ø© Ø¨Ø§Ù„Ù…Ù†ØµØ© Ø­ØªÙ‰ Ø§Ù„Ø¢Ù†.", fontSize = 11.sp, color = Color.Gray)
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            paymentsList.forEach { payment ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        when (payment.status) {
+                                            "COMPLETED" -> Color(0xFF10B981).copy(alpha = 0.5f)
+                                            "PROCESSING" -> Color(0xFF3B82F6).copy(alpha = 0.5f)
+                                            "FAILED" -> Color.Red.copy(alpha = 0.5f)
+                                            else -> Color.Gray.copy(alpha = 0.3f)
+                                        }
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Ø§Ù„Ù…Ø¨Ù„Øº: ${payment.amount} Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ ğŸ‡¾ğŸ‡ª", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        when (payment.status) {
+                                                            "COMPLETED" -> Color(0xFF10B981).copy(alpha = 0.2f)
+                                                            "PROCESSING" -> Color(0xFF3B82F6).copy(alpha = 0.2f)
+                                                            "FAILED" -> Color.Red.copy(alpha = 0.2f)
+                                                            "REFUNDED" -> Color.Magenta.copy(alpha = 0.2f)
+                                                            else -> Color.Gray.copy(alpha = 0.2f)
+                                                        },
+                                                        RoundedCornerShape(4.dp)
+                                                    )
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                val statusText = when (payment.status) {
+                                                    "COMPLETED" -> "Ù…ÙƒØªÙ…Ù„ ÙˆÙ…Ø¤ÙƒØ¯ âœ…"
+                                                    "PROCESSING" -> "Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø§Ù„ØªØ­Ù‚Ù‚ â³"
+                                                    "FAILED" -> "Ù…Ø±ÙÙˆØ¶ âŒ"
+                                                    "REFUNDED" -> "ØªÙ… Ø§Ù„Ø§Ø³ØªØ±Ø¯Ø§Ø¯ ğŸ”„"
+                                                    else -> "Ø·Ù„Ø¨ Ù…Ø¹Ù„Ù‚ â³"
+                                                }
+                                                Text(
+                                                    statusText,
+                                                    color = when (payment.status) {
+                                                        "COMPLETED" -> Color(0xFF10B981)
+                                                        "PROCESSING" -> Color(0xFF3B82F6)
+                                                        "FAILED" -> Color.Red
+                                                        "REFUNDED" -> Color.Magenta
+                                                        else -> Color.Gray
+                                                    },
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+
+                                        Text("ğŸ‘¤ Ø§Ù„Ø¹Ù…ÙŠÙ„ (Ù…Ø¹Ø±Ù): ${payment.userId}", fontSize = 11.sp, color = Color.LightGray)
+                                        Text("ğŸ› ï¸ ÙÙ†ÙŠ Ø§Ù„Ø®Ø¯Ù…Ø© (Ù…Ø¹Ø±Ù): ${payment.providerId}", fontSize = 11.sp, color = Color.LightGray)
+                                        if (payment.bookingId.isNotEmpty()) {
+                                            Text("ğŸ“… Ø±Ù‚Ù… Ø·Ù„Ø¨ Ø§Ù„Ø­Ø¬Ø²: ${payment.bookingId}", fontSize = 11.sp, color = themeColors.accent)
+                                        }
+
+                                        Divider(color = Color.White.copy(alpha = 0.05f))
+
+                                        Text("Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹: ${if (payment.method == "mobileWallet") "Ù…Ø­ÙØ¸Ø© Ø¬ÙˆØ§Ù„" else payment.method}", fontSize = 11.sp, color = Color.White)
+                                        if (payment.walletProvider.isNotEmpty()) {
+                                            Text("Ù…Ø²ÙˆØ¯ Ø§Ù„Ù…Ø­ÙØ¸Ø©: ${payment.walletProvider} | Ø±Ù‚Ù…: ${payment.walletNumber}", fontSize = 11.sp, color = Color.LightGray)
+                                            Text("Ø§Ø³Ù… Ø§Ù„Ù…Ø­ÙˆÙ„: ${payment.walletAccountName}", fontSize = 11.sp, color = Color.LightGray)
+                                        }
+                                        if (payment.transferId.isNotEmpty()) {
+                                            Text("Ø±Ù‚Ù… Ø§Ù„Ø­ÙˆØ§Ù„Ø©/Ø§Ù„Ø¥Ø­Ø§Ù„Ø©: ${payment.transferId}", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        if (payment.transferPhoto.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("ğŸ“¸ ØµÙˆØ±Ø© Ø¥Ø«Ø¨Ø§Øª Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ù…Ø±ÙÙ‚Ø©:", fontSize = 10.sp, color = Color.LightGray)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(100.dp)
+                                                    .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(6.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (payment.transferPhoto.startsWith("http")) {
+                                                    Text("ğŸ”— Ø±Ø§Ø¨Ø· Ø§Ù„ØµÙˆØ±Ø©: ${payment.transferPhoto.take(35)}...", fontSize = 10.sp, color = themeColors.accent)
+                                                } else {
+                                                    Text("ğŸ–¼ï¸ ØµÙˆØ±Ø© Ù…Ø´ÙØ±Ø© Base64 Ø¬Ø§Ù‡Ø²Ø© Ù„Ù„ØªØ­Ù‚Ù‚", fontSize = 11.sp, color = Color.White)
+                                                }
+                                            }
+                                        }
+
+                                        if (payment.verificationNote.isNotEmpty()) {
+                                            Text("ğŸ“ Ù…Ù„Ø§Ø­Ø¸Ø© Ø§Ù„ØªØ­Ù‚Ù‚: ${payment.verificationNote}", fontSize = 10.sp, color = Color.LightGray)
+                                        }
+
+                                        if (payment.status == "PROCESSING" || payment.status == "PENDING") {
+                                            Divider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(vertical = 4.dp))
+                                            
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        verifyingPaymentObj = payment
+                                                        adminVerifyPaymentNote = "ØªÙ… Ø§Ù„ØªØ­Ù‚Ù‚ ÙˆÙ…Ø·Ø§Ø¨Ù‚Ø© Ø§Ù„Ø­ÙˆØ§Ù„Ø© Ø¨Ù†Ø¬Ø§Ø­"
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Text("Ù‚Ø¨ÙˆÙ„ ÙˆØªØ£ÙƒÙŠØ¯ âœ…", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        rejectingPaymentObj = payment
+                                                        adminRejectPaymentNote = "Ø±Ù‚Ù… Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± ØµØ­ÙŠØ­ Ø£Ùˆ Ø§Ù„Ø­ÙˆØ§Ù„Ø© ØºÙŠØ± ÙˆØ§Ø±Ø¯Ø© Ø¨Ø§Ù„Ø­Ø³Ø§Ø¨"
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Text("Ø±ÙØ¶ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø© âŒ", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        } else if (payment.status == "COMPLETED") {
+                                            Divider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(vertical = 4.dp))
+                                            Button(
+                                                onClick = {
+                                                    refundingPaymentObj = payment
+                                                    refundReasonInput = "ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø®Ø¯Ù…Ø© Ø£Ùˆ Ø¨Ø·Ù„Ø¨ Ù…Ù† Ø§Ù„ÙÙ†ÙŠ ÙˆØ§Ù„Ø¹Ù…ÙŠÙ„"
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text("ğŸ”„ Ø¨Ø¯Ø¡ Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ø§Ù„Ù…Ø¨Ù„Øº (Refund)", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "DELETED") {
+
+                item {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("ğŸ—‘ï¸ Ø¥Ø¯Ø§Ø±Ø© ÙˆÙ…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„ÙÙ†ÙŠÙŠÙ† Ø§Ù„Ù…Ø­Ø°ÙˆÙÙŠÙ†", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("Ø§Ø³ØªØ¹Ø±Ø§Ø¶ ÙˆØ§Ø³ØªØ¹Ø§Ø¯Ø© Ù…Ù‚Ø¯Ù…ÙŠ Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ø°ÙŠÙ† ØªÙ… Ø­Ø°ÙÙ‡Ù… Ù…Ù†Ø·Ù‚ÙŠØ§Ù‹ Ù…Ù† Ø§Ù„Ø¯Ù„ÙŠÙ„:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (deletedList.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("ğŸ‰ Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø£ÙŠ ÙÙ†ÙŠ Ù…Ø­Ø°ÙˆÙ Ù…Ù†Ø·Ù‚ÙŠØ§Ù‹ Ø­Ø§Ù„ÙŠØ§Ù‹.", fontSize = 12.sp, color = Color.Gray)
+                        }
+                    }
+                } else {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                deletedList.forEach { provider ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("ğŸ‘¤ Ø§Ù„ÙÙ†ÙŠ: ${provider.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            Text("ğŸ“ Ù‡Ø§ØªÙ: ${provider.phone} | Ø§Ù„Ù…Ù‡Ù†Ø©: ${provider.profession}", fontSize = 11.sp, color = Color.LightGray)
+                                            Text("ğŸ“ Ø§Ù„Ù…Ù†Ø·Ù‚Ø©: ${provider.area}", fontSize = 10.sp, color = themeColors.textSecondary)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                viewModel.restoreProvider(provider.id)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            modifier = Modifier.padding(start = 8.dp)
+                                        ) {
+                                            Text("Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø­Ø³Ø§Ø¨ Ø§Ù„ÙÙ†ÙŠ ğŸŸ¢", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Divider(color = Color.White.copy(alpha = 0.05f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "FINANCIAL_REPORTS") {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("ğŸ“ˆ ØªÙ‚Ø§Ø±ÙŠØ± Ø§Ù„Ø£Ø±Ø¨Ø§Ø­ Ø§Ù„Ù…ØªÙ‚Ø¯Ù…Ø©", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª Ø§Ù„Ù…Ù†ÙØ°Ø©: ${bookings.size}", fontSize = 12.sp, color = Color.White)
+                            Text("Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø£Ø±Ø¨Ø§Ø­ Ø§Ù„Ù…ØªÙˆÙ‚Ø¹Ø© Ù…Ù† Ø§Ù„Ø¹Ù…ÙˆÙ„Ø§Øª: ${bookings.size * 500} Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ", fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                            Button(onClick = { viewModel.triggerNotification("ğŸ“Š ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± Ø§Ù„Ù…Ø§Ù„ÙŠØ© Ø¨Ù†Ø¬Ø§Ø­") }) {
+                                Text("ØªØµØ¯ÙŠØ± ØªÙ‚Ø±ÙŠØ± Ø§Ù„Ø£Ø±Ø¨Ø§Ø­ (PDF)", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "STORAGE_QUOTA") {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("ğŸ—„ï¸ Ù…Ø±Ø§Ù‚Ø¨Ø© Ø³Ø¹Ø© ØªØ®Ø²ÙŠÙ† Ø§Ù„Ù…Ø±ÙÙ‚Ø§Øª (Firebase Storage)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("Ø§Ù„Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…Ø© Ø­Ø§Ù„ÙŠØ§Ù‹: 142 Ù…ÙŠØ¬Ø§Ø¨Ø§ÙŠØª Ù…Ù† Ø£ØµÙ„ 5 Ø¬ÙŠØ¬Ø§Ø¨Ø§ÙŠØª", fontSize = 12.sp, color = Color.White)
+                            Text("Ø­Ø§Ù„Ø© Ø§Ù„Ø®Ø§Ø¯Ù…: Ù…Ø³ØªÙ‚Ø± ÙˆØ®Ø§Ù„ÙŠ Ù…Ù† Ø§Ù„ØªØ¬Ø§ÙˆØ²Ø§Øª", fontSize = 12.sp, color = Color(0xFF10B981))
+                            Button(onClick = { viewModel.triggerNotification("ğŸ§¹ ØªÙ… ØªÙ†Ø¸ÙŠÙ Ø°Ø§ÙƒØ±Ø© Ø§Ù„ØªØ®Ø²ÙŠÙ† Ø§Ù„Ù…Ø¤Ù‚Øª Ù„Ù„ØµÙˆØ± Ø¨Ù†Ø¬Ø§Ø­") }) {
+                                Text("ØªÙ†Ø¸ÙŠÙ Ø§Ù„Ù…Ù„ÙØ§Øª Ø§Ù„Ù…Ø¤Ù‚ØªØ© ğŸ§¹", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "SECURITY_AUDIT") {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("ğŸ›¡ï¸ Ø³Ø¬Ù„ Ø§Ù„ØªØ¯Ù‚ÙŠÙ‚ Ø§Ù„Ø£Ù…Ù†ÙŠ ÙˆØ­Ø±Ø§Ø³ Ø§Ù„ÙˆØ³Ø§Ø¦Ø·", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("Ø¢Ø®Ø± Ø¹Ù…Ù„ÙŠØ© ÙØ­Øµ Ø£Ù…Ù†ÙŠ: ØªÙ…Øª Ø¨Ù†Ø¬Ø§Ø­ (Ù„Ø§ ØªÙˆØ¬Ø¯ ØªÙ‡Ø¯ÙŠØ¯Ø§Øª)", fontSize = 12.sp, color = Color(0xFF10B981))
+                            Text("Ø­Ø§Ù„Ø© ØªØ´ÙÙŠØ± Ù‚ÙˆØ§Ø¹Ø¯ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª: Ù…ÙØ¹Ù„ (AES-256)", fontSize = 12.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "SYSTEM_SETTINGS") {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("âš™ï¸ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ø¹Ø§Ù…Ø© ÙˆØªÙØ¶ÙŠÙ„Ø§Øª Ø§Ù„ØªØ·Ø¨ÙŠÙ‚", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("Ø¥ØµØ¯Ø§Ø± Ø§Ù„ØªØ·Ø¨ÙŠÙ‚: 2.6.0 (Ù…Ø­Ø¯Ø« Ù„Ø¹Ø§Ù… 2026)", fontSize = 12.sp, color = Color.White)
+                            Text("Ø§Ù„Ù„ØºØ© Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠØ©: Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© (Ù…ÙØ¹Ù„)", fontSize = 12.sp, color = Color.LightGray)
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "AUTO_DISPATCH") {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("ğŸ§­ Ø®ÙˆØ§Ø±Ø²Ù…ÙŠØ§Øª Ø§Ù„ØªÙˆØ¬ÙŠÙ‡ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ ÙˆØ§Ù„Ø°ÙƒØ§Ø¡", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("ÙˆØ¶Ø¹ Ø§Ù„ØªÙˆØ¬ÙŠÙ‡ Ø§Ù„Ø­Ø§Ù„ÙŠ: Ø§Ù„ØªÙˆØ¬ÙŠÙ‡ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ Ù„Ø£Ù‚Ø±Ø¨ ÙÙ†ÙŠ (Auto-Nearest)", fontSize = 12.sp, color = Color(0xFF3B82F6))
+                            Button(onClick = { viewModel.triggerNotification("ğŸ§­ ØªÙ… ØªØ­Ø¯ÙŠØ« Ø®ÙˆØ§Ø±Ø²Ù…ÙŠØ© Ø§Ù„ØªÙˆØ¬ÙŠÙ‡ Ø¨Ù†Ø¬Ø§Ø­") }) {
+                                Text("ØªØ·Ø¨ÙŠÙ‚ Ø®ÙˆØ§Ø±Ø²Ù…ÙŠØ© Ø§Ù„ØªÙˆØ¬ÙŠÙ‡ Ø§Ù„Ø°ÙƒÙŠ", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "API_MANAGEMENT") {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("ğŸ”Œ Ø¥Ø¯Ø§Ø±Ø© Ù…ÙØ§ØªÙŠØ­ Ø§Ù„Ø±Ø¨Ø· ÙˆØ§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ø³Ø­Ø§Ø¨ÙŠØ© (API)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("Ø­Ø§Ù„Ø© Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª Firebase Firestore: Ù…ØªØµÙ„ ÙˆÙ…Ù†ØªØ¸Ù…", fontSize = 12.sp, color = Color(0xFF10B981))
+                            Text("Ø­Ø§Ù„Ø© Ø±Ø¨Ø· Ø®Ø±ÙŠØ·Ø© Leaflet / OpenStreetMap: Ù…ÙØ¹Ù„", fontSize = 12.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+
+            if (activeSubTab == "ROLES_PERMISSIONS") {
+                item {
+                    Text("ğŸ›¡ï¸ Ù…ØµÙÙˆÙØ© Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª ÙˆØ§Ù„Ø£Ø¯ÙˆØ§Ø± (538 ØµÙ„Ø§Ø­ÙŠØ© ÙƒØ§Ù…Ù„Ø©)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("Ø¥Ø¯Ø§Ø±Ø© ÙˆØªØ¹ÙŠÙŠÙ† Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ù€ 538 Ø§Ù„Ù…ÙˆØ²Ø¹Ø© Ø¹Ù„Ù‰ 18 Ù‚Ø·Ø§Ø¹Ø§Ù‹ Ù„Ø¬Ù…ÙŠØ¹ Ø§Ù„Ù…Ø´Ø±ÙÙŠÙ† ÙˆØ§Ù„Ø¥Ø¯Ø§Ø±ÙŠÙŠÙ† ÙˆÙ…Ø²Ø§Ù…Ù†ØªÙ‡Ø§ Ù…Ø¹ Firestore Ø³Ø­Ø§Ø¨ÙŠØ§Ù‹:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                item {
+                    var adminCustomPermissions by remember { mutableStateOf<List<String>>(com.example.data.models.AdminPermissionsRegistry.allPermissions.map { it.key }) }
+                    AdminPermissionsSelectorView(
+                        themeColors = themeColors,
+                        selectedPermissions = adminCustomPermissions,
+                        onPermissionsChanged = { adminCustomPermissions = it },
+                        onSaveRequested = {
+                            val count = adminCustomPermissions.size
+                            viewModel.saveCustomPermissionsMatrixToFirestore(adminCustomPermissions)
+                        }
+                    )
+                }
+            }
+
+            if (activeSubTab == "MAP_CONTROLS") {
+                item {
+                    Text("ğŸ—ºï¸ Ø§Ù„ØªØ­ÙƒÙ… Ø¨Ø´Ø§Ø´Ø© Ø§Ù„Ø®Ø±Ø§Ø¦Ø· ÙˆØ§Ù„Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ø¬ØºØ±Ø§ÙÙŠØ©", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("Ø¥Ø¯Ø§Ø±Ø© Ø¸Ù‡ÙˆØ± Ø§Ù„Ø®Ø±Ø§Ø¦Ø· ÙˆØ§Ù„Ù…Ù†Ø´Ø¢Øª ÙˆØªØ­Ø¯ÙŠØ¯ Ù…Ø²ÙˆØ¯ÙŠ Ø§Ù„Ø®Ø±Ø§Ø¦Ø· ÙˆÙ†Ø·Ø§Ù‚Ø§Øª Ø§Ù„ØªØºØ·ÙŠØ©:", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("ğŸ“ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ù…Ø²ÙˆØ¯ ÙˆÙ†Ø¸Ø§Ù… Ø§Ù„Ø®Ø±Ø§Ø¦Ø·:", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val mapProviders = listOf("Leaflet / OSM ğŸŒ", "Google Maps ğŸ—ºï¸", "Mapbox ğŸ›°ï¸")
+                                mapProviders.forEach { prov ->
+                                    val isSel = prov.startsWith("Leaflet")
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (isSel) themeColors.accent else Color.Black.copy(alpha = 0.3f))
+                                            .clickable { viewModel.triggerNotification("ØªÙ… ØªØ¹ÙŠÙŠÙ† Ù…Ø²ÙˆØ¯ Ø§Ù„Ø®Ø±ÙŠØ·Ø©: $prov") }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(prov, fontSize = 9.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø®Ø±ÙŠØ·Ø© Ù„Ù„Ø¬Ù…ÙŠØ¹ (Ø§Ù„Ø²ÙˆØ§Ø± ÙˆØ§Ù„Ø¹Ù…Ù„Ø§Ø¡)", fontSize = 12.sp, color = Color.White)
+                                Switch(
+                                    checked = true,
+                                    onCheckedChange = { viewModel.triggerNotification("ØªÙ… ØªØ­Ø¯ÙŠØ« Ø±Ø¤ÙŠØ© Ø§Ù„Ø®Ø±ÙŠØ·Ø©") },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Ø¹Ø±Ø¶ Ù…ÙˆØ§Ù‚Ø¹ Ø§Ù„Ù…Ø­Ù„Ø§Øª ÙˆØ§Ù„Ù…Ø±Ø§ÙƒØ² Ø§Ù„Ø·Ø¨ÙŠØ© ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹", fontSize = 12.sp, color = Color.White)
+                                Switch(
+                                    checked = true,
+                                    onCheckedChange = { viewModel.triggerNotification("ØªÙ… ØªØ­Ø¯ÙŠØ« Ø¹Ù„Ø§Ù…Ø§Øª Ø§Ù„Ù…Ù†Ø´Ø¢Øª Ø¹Ù„Ù‰ Ø§Ù„Ø®Ø±ÙŠØ·Ø©") },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                                )
+                            }
+
+                            Button(
+                                onClick = { viewModel.triggerNotification("ğŸ—ºï¸ ØªÙ… Ø­ÙØ¸ ÙˆØªØ­Ø¯ÙŠØ« Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø®Ø±Ø§Ø¦Ø· Ø¨Ù†Ø¬Ø§Ø­") },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Ø­ÙØ¸ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø®Ø±Ø§Ø¦Ø· ğŸ’¾", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AdminMapPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "AI_ASSISTANT_PANEL") {
+                item {
+                    AdminAssistantPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "ADMIN_PAYMENT_PANEL") {
+                item {
+                    AdminPaymentPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "VOICE_CALLS_PANEL") {
+                item {
+                    AdminVoiceCallPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "ROLES_PERMISSIONS") {
+                item {
+                    AdminRolesPermissionsPanel(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
+
+            if (activeSubTab == "MAINTENANCE_MODE") {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("ğŸš§ ØªØ­ÙƒÙ… ÙˆØ¶Ø¹ Ø§Ù„ØµÙŠØ§Ù†Ø© ÙˆØ§Ù„Ø·ÙˆØ§Ø±Ø¦", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                            Text("Ø­Ø§Ù„Ø© ÙˆØ¶Ø¹ Ø§Ù„ØµÙŠØ§Ù†Ø© Ø§Ù„Ø¹Ø§Ù…Ø©: Ù…Ø¹Ø·Ù„ (Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ ÙŠØ¹Ù…Ù„ Ø¨ÙƒØ§Ù…Ù„ Ø·Ø§Ù‚ØªÙ‡ Ù„Ù„Ø¹Ù…Ù„Ø§Ø¡)", fontSize = 12.sp, color = Color(0xFF10B981))
+                            Button(
+                                onClick = {
+                                    val st = settingsState
+                                    viewModel.updateBackdoorSettings(
+                                        st.appName, st.welcomeMessage, st.footerMessage, st.activeThemeId,
+                                        st.supportPhone, st.supportEmail, st.supportWhatsapp,
+                                        !st.isMaintenanceActive, st.hidePromoFooter, st.assistantHidden, st.assistantSize,
+                                        st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
+                                        false, 90
+                                    )
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f))
+                            ) {
+                                Text("ØªØ¨Ø¯ÙŠÙ„ Ø­Ø§Ù„Ø© Ø§Ù„ØµÙŠØ§Ù†Ø© ÙˆØ§Ù„Ø·ÙˆØ§Ø±Ø¦ ğŸ›‘", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ------------------ POPUP CONFIRMATION CONTEXT DIALOGS ------------------
+
+    // Rejection dialog for pending provider request
+    rejectingProviderRequest?.let { req ->
+        AlertDialog(
+            onDismissRequest = { rejectingProviderRequest = null },
+            title = { Text("ğŸ“ ØªÙˆØ¶ÙŠØ­ Ø³Ø¨Ø¨ Ø±ÙØ¶ Ø§Ù„Ø·Ù„Ø¨", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("ÙŠØ±Ø¬Ù‰ ÙƒØªØ§Ø¨Ø© Ø³Ø¨Ø¨ Ø±ÙØ¶ Ø·Ù„Ø¨ Ø§Ù†Ø¶Ù…Ø§Ù… Ø§Ù„ÙÙ†ÙŠ ${req.name}:", fontSize = 11.sp, color = Color.LightGray)
+                    OutlinedTextField(
+                        value = providerRejectionReasonText,
+                        onValueChange = { providerRejectionReasonText = it },
+                        placeholder = { Text("Ù…Ø«Ø§Ù„: Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª Ø§Ù„Ù…Ø±ÙÙ‚Ø© ØºÙŠØ± ÙˆØ§Ø¶Ø­Ø©") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.rejectTechnician(req.id, providerRejectionReasonText.ifBlank { "Ù„Ù… ÙŠØ³ØªÙˆÙÙ Ø§Ù„Ø´Ø±ÙˆØ· Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©" })
+                        rejectingProviderRequest = null
+                        providerRejectionReasonText = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø±ÙØ¶", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { rejectingProviderRequest = null }) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.LightGray)
+                }
+            },
+            containerColor = Color(0xFF1E293B)
+        )
+    }
+
+    // 1. Delete category confirmation
+    showDeleteCategoryConfirmId?.let { catId ->
+        val catName = categories.find { it.id == catId }?.name ?: ""
+        AlertDialog(
+            onDismissRequest = { showDeleteCategoryConfirmId = null },
+            containerColor = Color(0xFF1E293B),
+            title = { Text("âš ï¸ Ù‡Ù„ ØªØ±ØºØ¨ ÙÙŠ Ø­Ø°Ù Ø§Ù„Ù‚Ø³Ù…ØŸ", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text("Ø£Ù†Øª Ø¹Ù„Ù‰ ÙˆØ´Ùƒ Ø­Ø°Ù Ù‚Ø³Ù… Ø§Ù„ØµÙŠØ§Ù†Ø© ($catName) Ù†Ù‡Ø§Ø¦ÙŠØ§Ù‹. Ø³ÙŠØªÙ… Ø¥Ø²Ø§Ù„ØªÙ‡Ø§ Ù…Ù† Ø´Ø±ÙŠØ· Ø§Ù„Ø§Ù†ØªÙ‚Ø§Ù„Ø§Øª ÙˆÙ…Ù‚Ø¯Ù…ÙŠ Ø§Ù„Ø®Ø¯Ù…Ø§Øª.", color = themeColors.textSecondary) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCategory(catId)
+                        showDeleteCategoryConfirmId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Ù†Ø¹Ù…ØŒ Ø§Ø­Ø°Ù Ø§Ù„Ù‚Ø³Ù…")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteCategoryConfirmId = null }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) {
+                    Text("Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡")
+                }
+            }
+        )
+    }
+
+    // 2. Edit category Dialog
+    showEditCategoryObj?.let { cat ->
+        var editIsMain by remember(cat.id) { mutableStateOf(cat.isMainCategory || cat.parentId.isEmpty()) }
+        var editParentId by remember(cat.id) { mutableStateOf(cat.parentId) }
+
+        Dialog(onDismissRequest = { showEditCategoryObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                modifier = Modifier.padding(16.dp).fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("âœï¸ ØªØ¹Ø¯ÙŠÙ„ ÙˆØªØ®ØµÙŠØµ Ù‡ÙŠÙƒÙ„ÙŠØ© Ø§Ù„Ù‚Ø³Ù…", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    
+                    OutlinedTextField(
+                        value = editCatName,
+                        onValueChange = { editCatName = it },
+                        label = { Text("Ø§Ø³Ù… Ø§Ù„Ù‚Ø³Ù…") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCatIcon,
+                        onValueChange = { editCatIcon = it },
+                        label = { Text("Ø£ÙŠÙ‚ÙˆÙ†Ø© Ø¥ÙŠÙ…ÙˆØ¬ÙŠ Ù…Ù…ÙŠØ²Ø© (Ù…Ø«Ø§Ù„: ğŸš°, âš¡)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Text("Ù†ÙˆØ¹ ÙˆÙ‡ÙŠÙƒÙ„ÙŠØ© Ø§Ù„Ù‚Ø³Ù…:", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { editIsMain = true; editParentId = "" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (editIsMain) themeColors.accent else Color.DarkGray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ù‚Ø³Ù… Ø±Ø¦ÙŠØ³ÙŠ ğŸŸ¢", fontSize = 10.sp, color = if (editIsMain) Color.Black else Color.White)
+                        }
+                        Button(
+                            onClick = { editIsMain = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (!editIsMain) themeColors.accent else Color.DarkGray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ù‚Ø³Ù… ÙØ±Ø¹ÙŠ ğŸŸ¡", fontSize = 10.sp, color = if (!editIsMain) Color.Black else Color.White)
+                        }
+                    }
+
+                    if (!editIsMain) {
+                        val mainCategories = categories.filter { (it.isMainCategory || it.parentId.isEmpty()) && it.id != cat.id }
+                        Text("Ø­Ø¯Ø¯ Ø§Ù„Ù‚Ø³Ù… Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ Ø§Ù„ØªØ§Ø¨Ø¹ Ù„Ù‡:", fontSize = 10.sp, color = Color.White)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            mainCategories.forEach { parent ->
+                                val isSelected = editParentId == parent.id
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { editParentId = parent.id },
+                                    label = { Text("${parent.icon} ${parent.name}", fontSize = 10.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = themeColors.accent,
+                                        selectedLabelColor = Color.Black
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                if (editCatName.trim().isNotEmpty()) {
+                                    viewModel.editCategory(
+                                        categoryId = cat.id,
+                                        newName = editCatName.trim(),
+                                        newIcon = editCatIcon.trim(),
+                                        parentId = if (!editIsMain) editParentId else "",
+                                        isMainCategory = editIsMain
+                                    )
+                                    showEditCategoryObj = null
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø­ÙØ¸ Ø§Ù„Ù‡ÙŠÙƒÙ„ÙŠØ©", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { showEditCategoryObj = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2a. Edit City Dialog
+    showEditCityObj?.let { city ->
+        var editArName by remember(city.id) { mutableStateOf(city.nameAr) }
+        var editEnName by remember(city.id) { mutableStateOf(city.nameEn) }
+        var editIcon by remember(city.id) { mutableStateOf(city.icon.ifEmpty { "ğŸ“" }) }
+        var editPhotoUrl by remember(city.id) { mutableStateOf(city.photoUrl) }
+        var editOrder by remember(city.id) { mutableStateOf(city.sortOrder.toString()) }
+
+        Dialog(onDismissRequest = { showEditCityObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                modifier = Modifier.padding(16.dp).fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("âœï¸ ØªØ¹Ø¯ÙŠÙ„ ÙˆØªØ®ØµÙŠØµ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ø§ÙØ¸Ø©/Ø§Ù„Ù…Ø¯ÙŠÙ†Ø©", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+                    OutlinedTextField(
+                        value = editArName,
+                        onValueChange = { editArName = it },
+                        label = { Text("Ø§Ù„Ø§Ø³Ù… Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editEnName,
+                        onValueChange = { editEnName = it },
+                        label = { Text("Ø§Ù„Ø§Ø³Ù… Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¥Ù†Ø¬Ù„ÙŠØ²ÙŠØ©") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editIcon,
+                        onValueChange = { editIcon = it },
+                        label = { Text("Ø£ÙŠÙ‚ÙˆÙ†Ø©/Ø¥ÙŠÙ…ÙˆØ¬ÙŠ Ø±Ù…Ø²ÙŠØ© (Ù…Ø«Ø§Ù„: ğŸ°, ğŸ–ï¸, ğŸ“)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editPhotoUrl,
+                        onValueChange = { editPhotoUrl = it },
+                        label = { Text("Ø±Ø§Ø¨Ø· ØµÙˆØ±Ø© Ø±Ù…Ø²ÙŠØ© Ù„Ù„Ù…Ø­Ø§ÙØ¸Ø© (URL)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editOrder,
+                        onValueChange = { editOrder = it },
+                        label = { Text("Ø±Ù‚Ù… Ø§Ù„ØªØ±ØªÙŠØ¨ (Ø§Ù„ØªØ±ØªÙŠØ¨ ÙÙŠ Ø§Ù„Ù‚Ø§Ø¦Ù…Ø©)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                if (editArName.trim().isNotEmpty()) {
+                                    viewModel.updateCity(
+                                        city.copy(
+                                            nameAr = editArName.trim(),
+                                            nameEn = editEnName.trim(),
+                                            icon = editIcon.trim().ifEmpty { "ğŸ“" },
+                                            photoUrl = editPhotoUrl.trim(),
+                                            sortOrder = editOrder.toIntOrNull() ?: 0
+                                        )
+                                    )
+                                    showEditCityObj = null
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø­ÙØ¸ Ø§Ù„ØªØºÙŠÙŠØ±Ø§Øª", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { showEditCityObj = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2b. Merge category Dialog
+    showMergeCategoryObj?.let { sourceCat ->
+        Dialog(onDismissRequest = { showMergeCategoryObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                modifier = Modifier.padding(16.dp).fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("ğŸ”„ Ø¯Ù…Ø¬ ÙˆØªØ­ÙˆÙŠÙ„ ÙÙ†ÙŠÙŠÙ† ÙˆÙ…ØªØ§Ø¬Ø± Ù‚Ø³Ù… Ø§Ù„ØµÙŠØ§Ù†Ø©", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        "Ø£Ù†Øª Ø¹Ù„Ù‰ ÙˆØ´Ùƒ Ø¯Ù…Ø¬ Ù‚Ø³Ù… (${sourceCat.icon} ${sourceCat.name}). Ø³ÙŠØªÙ… Ù†Ù‚Ù„ Ø¬Ù…ÙŠØ¹ Ø§Ù„ÙÙ†ÙŠÙŠÙ† ÙˆØ§Ù„Ù…ØªØ§Ø¬Ø± Ø§Ù„Ù…Ø³Ø¬Ù„ÙŠÙ† ÙÙŠ Ù‡Ø°Ø§ Ø§Ù„Ù‚Ø³Ù… Ø¥Ù„Ù‰ Ø§Ù„Ù‚Ø³Ù… Ø§Ù„Ø°ÙŠ ØªØ­Ø¯Ø¯Ù‡ Ø¨Ø§Ù„Ø£Ø³ÙÙ„ØŒ Ø«Ù… Ø³ÙŠØªÙ… Ø­Ø°Ù Ù‡Ø°Ø§ Ø§Ù„Ù‚Ø³Ù… Ù†Ù‡Ø§Ø¦ÙŠØ§Ù‹.",
+                        fontSize = 11.sp,
+                        color = Color.LightGray
+                    )
+
+                    val otherCategories = categories.filter { it.id != sourceCat.id }
+
+                    if (otherCategories.isEmpty()) {
+                        Text("âš ï¸ Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£Ù‚Ø³Ø§Ù… Ø£Ø®Ø±Ù‰ Ù…ØªØ§Ø­Ø© Ù„Ù„Ø¯Ù…Ø¬ Ù…Ø¹Ù‡Ø§!", color = Color.Red, fontSize = 12.sp)
+                    } else {
+                        var expanded by remember { mutableStateOf(false) }
+                        val selectedTarget = categories.find { it.id == selectedTargetCategoryIdForMerge }
+
+                        Text("Ø§Ø®ØªØ± Ø§Ù„Ù‚Ø³Ù… Ø§Ù„Ù…Ø³ØªÙ‡Ø¯Ù Ù„Ù„Ø¯Ù…Ø¬ ÙˆØ§Ù„ØªØ­ÙˆÙŠÙ„ Ø¥Ù„ÙŠÙ‡:", fontSize = 12.sp, color = themeColors.textSecondary)
+
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                    .clickable { expanded = true }
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedTarget?.let { "${it.icon} ${it.name}" } ?: "Ø§Ø®ØªØ± Ù‚Ø³Ù… Ø¢Ø®Ø±...",
+                                    color = Color.White,
+                                    fontSize = 13.sp
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Ø¹Ø±Ø¶",
+                                    tint = Color.White
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                                modifier = Modifier.background(Color(0xFF1E293B))
+                            ) {
+                                otherCategories.forEach { targetCat ->
+                                    DropdownMenuItem(
+                                        text = { Text("${targetCat.icon} ${targetCat.name}", color = Color.White) },
+                                        onClick = {
+                                            selectedTargetCategoryIdForMerge = targetCat.id
+                                            expanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    if (selectedTargetCategoryIdForMerge.isNotEmpty()) {
+                                        viewModel.mergeCategories(sourceCat.id, selectedTargetCategoryIdForMerge)
+                                        showMergeCategoryObj = null
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("ØªØ£ÙƒÙŠØ¯ Ø¯Ù…Ø¬ Ø§Ù„Ù‚Ø³Ù…", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                            Button(
+                                onClick = { showMergeCategoryObj = null },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Delete reservation confirmation Dialog
+    showDeleteBookingConfirmId?.let { bId ->
+        AlertDialog(
+            onDismissRequest = { showDeleteBookingConfirmId = null },
+            containerColor = Color(0xFF1E293B),
+            title = { Text("âš ï¸ Ù‡Ù„ ØªÙ‚ØµØ¯ Ø­Ø°Ù Ø§Ù„Ø­Ø¬Ø² Ù†Ù‡Ø§Ø¦ÙŠØ§Ù‹ØŸ", color = Color.White) },
+            text = { Text("Ø­Ø°Ù Ù‡Ø°Ø§ Ø§Ù„Ø­Ø¬Ø² Ø³ÙŠØ²ÙŠÙ„Ù‡ Ù…Ù† Ø¬Ø¯ÙˆÙ„ Ø­Ø¬ÙˆØ²Ø§Øª Ø§Ù„Ø¯Ø¹Ù… ÙˆØ§Ù„Ù…ØªØ§Ø¨Ø¹Ø© Ù…Ø¨Ø§Ø´Ø±Ø©.", color = themeColors.textSecondary) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteBooking(bId)
+                        showDeleteBookingConfirmId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Ù†Ø¹Ù…ØŒ Ø§Ù…Ø³Ø­ ØªÙ…Ø§Ù…Ø§Ù‹", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteBookingConfirmId = null }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) {
+                    Text("ØªØ±Ø§Ø¬Ø¹")
+                }
+            }
+        )
+    }
+
+    // Booking Rejection Reason Dialog
+    showRejectionReasonDialogId?.let { bId ->
+        AlertDialog(
+            onDismissRequest = { showRejectionReasonDialogId = null },
+            containerColor = Color(0xFF1E293B),
+            title = { Text("âŒ Ø±ÙØ¶ Ø·Ù„Ø¨ Ø§Ù„Ø­Ø¬Ø²", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ø§Ù„Ø±Ø¬Ø§Ø¡ ØªÙˆØ¶ÙŠØ­ Ø³Ø¨Ø¨ Ø±ÙØ¶ Ø·Ù„Ø¨ Ø§Ù„Ø­Ø¬Ø² Ù„ÙŠØªÙ… Ø¥Ø±Ø³Ø§Ù„Ù‡ Ù„Ù„Ø¹Ù…ÙŠÙ„ Ù…Ø¨Ø§Ø´Ø±Ø© ÙÙŠ Ø§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª:", color = Color.White, fontSize = 11.sp)
+                    OutlinedTextField(
+                        value = bookingRejectionReasonInput,
+                        onValueChange = { bookingRejectionReasonInput = it },
+                        label = { Text("Ø³Ø¨Ø¨ Ø§Ù„Ø±ÙØ¶ (Ù…Ø«Ø§Ù„: Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ø£Ø¹Ù…Ø§Ù„ Ù…Ù…ØªÙ„Ø¦ØŒ Ø§Ù„Ù…ÙˆÙ‚Ø¹ Ø®Ø§Ø±Ø¬ Ø§Ù„ØªØºØ·ÙŠØ©)", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (bookingRejectionReasonInput.trim().isEmpty()) {
+                            Toast.makeText(context, "Ø§Ù„Ø±Ø¬Ø§Ø¡ ÙƒØªØ§Ø¨Ø© Ø³Ø¨Ø¨ Ø§Ù„Ø±ÙØ¶ Ù„ØªÙ†Ø¨ÙŠÙ‡ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¨Ù‡", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.updateBookingStatus(bId, "REJECTED", bookingRejectionReasonInput)
+                            showRejectionReasonDialogId = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø±ÙØ¶ ÙˆØ¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø³Ø¨Ø¨", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showRejectionReasonDialogId = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White, fontSize = 11.sp)
+                }
+            }
+        )
+    }
+
+    // 4. Delete targeted notifications confirmation Dialog
+    showDeleteNotifConfirmId?.let { nId ->
+        AlertDialog(
+            onDismissRequest = { showDeleteNotifConfirmId = null },
+            containerColor = Color(0xFF1E293B),
+            title = { Text("âš ï¸ ØªØ£ÙƒÙŠØ¯ Ø­Ø°Ù Ø§Ù„Ø¥Ø´Ø¹Ø§Ø± Ø§Ù„Ù…ÙˆØ¬Ù‡", color = Color.White) },
+            text = { Text("Ù‡Ø°Ø§ Ø§Ù„Ø¥Ø´Ø¹Ø§Ø± Ø³ÙŠÙˆØ¶Ø¹ ÙƒÙ…Ù†Ø´ÙˆØ± ØªØ§Ù„Ù ÙˆØ³ÙŠØªÙ… Ù…Ø­ÙˆÙ‡ Ù…Ù† Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù‡ÙˆØ§ØªÙ Ø§Ù„Ù…Ø­Ù„ÙŠØ© ÙˆØ§Ù„Ù…Ø®Ø²Ù†.", color = themeColors.textSecondary) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteNotification(nId)
+                        showDeleteNotifConfirmId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Ù†Ø¹Ù…ØŒ Ø§Ø­Ø°Ù Ø§Ù„Ø°ÙƒØ±Ù‰")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteNotifConfirmId = null }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) {
+                    Text("ØªØ±Ø§Ø¬Ø¹")
+                }
+            }
+        )
+    }
+
+    // 5. Active Chat Channel logs visualizer dialog and direct replies
+    showActiveChatChannelObj?.let { ch ->
+        Dialog(onDismissRequest = { showActiveChatChannelObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                border = BorderStroke(1.dp, themeColors.accent)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val partnerName = if (ch.isProvider) "Ù…Ù‚Ø¯Ù… Ø§Ù„Ø®Ø¯Ù…Ø©: ${ch.userName}" else "Ù…Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø¯Ù„ÙŠÙ„: ${ch.userName}"
+                    Text("ğŸ’¬ Ù…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„Ø´Ø§Øª: $partnerName", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    
+                    // Messages records logger
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(ch.messages, key = { it.id }) { msg ->
+                                val alignment = if (msg.senderId == "admin") Alignment.End else Alignment.Start
+                                val bubbleBg = if (msg.senderId == "admin") themeColors.primary else Color.Gray.copy(alpha = 0.3f)
+                                Column(horizontalAlignment = alignment, modifier = Modifier.fillMaxWidth()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(bubbleBg)
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(msg.message, fontSize = 11.sp, color = Color.White)
+                                    }
+                                    Text(msg.senderName, fontSize = 9.sp, color = themeColors.textSecondary)
+                                }
+                            }
+                        }
+                    }
+
+                    // Reply tool
+                    OutlinedTextField(
+                        value = adminChatReplyInput,
+                        onValueChange = { adminChatReplyInput = it },
+                        label = { Text("Ø§ÙƒØªØ¨ Ø±Ø¯ Ø§Ù„Ù…Ø´Ø±Ù Ø§Ù„ØµØ±ÙŠØ­ ÙˆØ§Ù„ÙƒØ§Ù…Ù„ Ù‡Ù†Ø§...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                if (adminChatReplyInput.trim().isNotEmpty()) {
+                                    viewModel.replyToChatChannel(ch.id, "admin", adminChatReplyInput.trim(), "Ù…Ø´Ø±Ù Ø§Ù„Ø¯Ø¹Ù…")
+                                    // Update visual logs dynamically
+                                    val currentChannels = viewModel.chatChannels.value
+                                    val updatedCh = currentChannels.find { it.id == ch.id }
+                                    if (updatedCh != null) {
+                                        showActiveChatChannelObj = updatedCh
+                                    }
+                                    adminChatReplyInput = ""
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Green),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ù…ÙˆØ«Ù‚", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.toggleBlockChatChannel(ch.id)
+                                // Refresh visual logs
+                                val currentChannels = viewModel.chatChannels.value
+                                val updatedCh = currentChannels.find { it.id == ch.id }
+                                if (updatedCh != null) {
+                                    showActiveChatChannelObj = updatedCh
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (ch.isBlocked) "Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø­Ø¸Ø±" else "Ø­Ø¸Ø± Ø§Ù„Ø·Ø±ÙÙŠÙ†", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 6. Delete communication log dialog
+    showDeleteChatConfirmId?.let { chId ->
+        AlertDialog(
+            onDismissRequest = { showDeleteChatConfirmId = null },
+            containerColor = Color(0xFF1E293B),
+            title = { Text("âš ï¸ Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ù…Ø³Ø­ Ù…Ù„ÙØ§Øª Ø§Ù„Ø³Ø¬Ù„ ØµØ±Ø§Ø­Ø©ØŸ", color = Color.White) },
+            text = { Text("Ø³ÙŠØªÙ… Ø§Ù‚ØªØ·Ø§Ø¹ ÙˆØ­Ø°Ù Ù‚Ù†ÙˆØ§Øª Ø§Ù„Ø´Ø§Øª Ù…Ù† Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¯Ø§ØªØ§ ÙÙˆØ±Ø§Ù‹ Ø¯ÙˆÙ† Ø£ÙŠ Ø¥Ù…ÙƒØ§Ù†ÙŠØ© Ø§Ø³ØªØ±Ø¬Ø§Ø¹.", color = themeColors.textSecondary) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteChatChannel(chId)
+                        showDeleteChatConfirmId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Ø­Ø°Ù Ø°ÙŠÙ„ Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø© ÙƒØ§Ù…Ù„Ø©")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteChatConfirmId = null }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) {
+                    Text("Ø¥Ù„ØºØ§Ø¡")
+                }
+            }
+        )
+    }
+
+    // 7. Wipe confirming AlertDialog with hidden obscured password checks as requested
+    if (showWipeConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showWipeConfirmDialog = false },
+            containerColor = Color(0xFF0F172A),
+            title = { Text("ğŸš¨ ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ù‡ÙˆÙŠØ© Ø§Ù„Ø£Ù…Ù†ÙŠØ© Ù„Ù„Ù…ØµÙÙŠ", color = Color.Red, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Ù‡Ø°Ù‡ Ø§Ù„Ø¹Ù…Ù„ÙŠØ© ÙØ§Ø¦Ù‚Ø© Ø§Ù„Ø®Ø·ÙˆØ±Ø© ÙˆØ°Ø§Øª ØªØµÙÙŠØ© ÙƒÙ„ÙŠØ© ÙÙˆØ±ÙŠØ© Ù„Ù„Ù…Ø±ÙƒØ² Ø§Ù„ÙÙ†ÙŠ Ø¨Ø§Ù„Ù…Ù†ØµØ© ÙˆØ§Ù„Ø¯Ù„ÙŠÙ„ Ø§Ù„ÙŠÙ…Ù†ÙŠ. Ø§Ù„Ø±Ø¬Ø§Ø¡ ÙƒØªØ§Ø¨Ø© Ø§Ù„Ø±Ù…Ø² Ø§Ù„Ø³Ø±ÙŠ Ù„Ù„Ø£Ø¯Ù…Ù† Ù„Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ù…Ø³Ø­ Ø§Ù„Ù…Ø®ØµØµ:",
+                        color = themeColors.textSecondary,
+                        fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = wipeInputPassword,
+                        onValueChange = { wipeInputPassword = it },
+                        label = { Text("ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ø£Ø¯Ù…Ù†") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (viewModel.verifyAdminOrOwnerPassword(wipeInputPassword)) {
+                            val selectedCols = mutableListOf<String>()
+                            if (wipeProvidersChecked) selectedCols.add("providers")
+                            if (wipeBookingsChecked) selectedCols.add("bookings")
+                            if (wipeChatsChecked) selectedCols.add("chat_channels")
+                            if (wipeNotifsChecked) selectedCols.add("notifications")
+                            if (wipeReportsChecked) selectedCols.add("reports")
+                            if (wipeCategoriesChecked) selectedCols.add("categories")
+                            if (wipePendingChecked) selectedCols.add("pending_providers")
+                            if (wipeBannersChecked) selectedCols.add("banners")
+                            if (wipeSupervisorsChecked) selectedCols.add("supervisors")
+                            if (wipeCitiesChecked) selectedCols.add("cities")
+                            if (wipeThemesChecked) selectedCols.add("color_themes")
+
+                            val success = viewModel.wipeSelectedDatabaseData(wipeInputPassword, selectedCols)
+                            if (success) {
+                                showWipeConfirmDialog = false
+                                wipeInputPassword = ""
+                                Toast.makeText(context, "ğŸ’¥ ØªÙ… ØªØµÙÙŠØ© Ø§Ù„ÙØ¦Ø§Øª Ø§Ù„Ù…Ø­Ø¯Ø¯Ø© ÙˆØ¥Ø¹Ø§Ø¯ØªÙ‡Ø§ Ù„Ù„ØµÙØ± Ø¨Ù†Ø¬Ø§Ø­!", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "âŒ ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ø£Ø¯Ù…Ù† ØºÙŠØ± ØµØ­ÙŠØ­Ø©! ØªÙ… Ù…Ù†Ø¹ Ø§Ù„ØªØ·Ù‡ÙŠØ±.", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("ØªØ£ÙƒÙŠØ¯ Ù…Ø³Ø­ ÙˆØªØ·Ù‡ÙŠØ± Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ø¹Ø¸ÙŠÙ…", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showWipeConfirmDialog = false
+                        wipeInputPassword = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("Ø¥Ù„ØºØ§Ø¡ Ø¹Ù…Ù„ÙŠØ© Ø§Ù„ØªØ·Ù‡ÙŠØ±")
+                }
+            }
+        )
+    }
+
+    // 8. Editing Booking Dialog Control
+    editingBookingObj?.let { booking ->
+        var editCustName by rememberSaveable(booking.id) { mutableStateOf(booking.customerName) }
+        var editCustPhone by rememberSaveable(booking.id) { mutableStateOf(booking.customerPhone) }
+        var editCustArea by rememberSaveable(booking.id) { mutableStateOf(booking.customerArea) }
+        var editCustService by rememberSaveable(booking.id) { mutableStateOf(booking.serviceType) }
+        var editCustDate by rememberSaveable(booking.id) { mutableStateOf(booking.dateString) }
+        var editCustTime by rememberSaveable(booking.id) { mutableStateOf(booking.timeString) }
+        var editCustStatus by rememberSaveable(booking.id) { mutableStateOf(booking.status) }
+        var editCustPassword by rememberSaveable(booking.id) { 
+            mutableStateOf(booking.bookingPassword.ifEmpty { booking.pinCode.ifEmpty { "1234" } }) 
+        }
+
+        Dialog(onDismissRequest = { editingBookingObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                border = BorderStroke(1.dp, themeColors.accent),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("âœï¸ ØªØ¹Ø¯ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ø³ØªÙ…Ø§Ø±Ø© Ø§Ù„Ø­Ø¬Ø²", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    
+                    OutlinedTextField(
+                        value = editCustName,
+                        onValueChange = { editCustName = it },
+                        label = { Text("Ø§Ù„Ø§Ø³Ù…") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCustPhone,
+                        onValueChange = { editCustPhone = it },
+                        label = { Text("Ø§Ù„Ù‡Ø§ØªÙ") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCustArea,
+                        onValueChange = { editCustArea = it },
+                        label = { Text("Ù…ÙƒØ§Ù† Ø§Ù„Ø¥Ù‚Ø§Ù…Ø© ÙˆØ§Ù„Ø­ÙŠ") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCustService,
+                        onValueChange = { editCustService = it },
+                        label = { Text("Ù†ÙˆØ¹ Ø§Ù„Ø®Ø¯Ù…Ø© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCustDate,
+                        onValueChange = { editCustDate = it },
+                        label = { Text("Ø§Ù„ØªØ§Ø±ÙŠØ®") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCustTime,
+                        onValueChange = { editCustTime = it },
+                        label = { Text("Ø§Ù„ÙˆÙ‚Øª Ø£Ùˆ Ø§Ù„Ø³Ø§Ø¹Ø©") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editCustPassword,
+                        onValueChange = { editCustPassword = it },
+                        label = { Text("ğŸ”‘ Ø±Ù…Ø² Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø³Ø±ÙŠ (ØªØºÙŠÙŠØ±/Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ†)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Text("Ø­Ø¯Ø¯ Ø­Ø§Ù„Ø© Ø§Ù„Ø­Ø¬Ø²:", color = themeColors.textSecondary, fontSize = 11.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val statuses = listOf("PENDING", "APPROVED", "IN_PROGRESS", "COMPLETED", "REJECTED")
+                        statuses.forEach { st ->
+                            val isSel = editCustStatus == st
+                            val color = when(st) {
+                                "PENDING" -> Color(0xFFF59E0B)
+                                "APPROVED" -> Color.Green
+                                "IN_PROGRESS" -> Color(0xFF3B82F6)
+                                "COMPLETED" -> Color(0xFF10B981)
+                                else -> Color.Red
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSel) color else Color.Black.copy(alpha = 0.3f))
+                                    .border(1.dp, if (isSel) Color.White else color.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                    .clickable { editCustStatus = st }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = when(st) {
+                                        "PENDING" -> "ØªØ¹Ù„ÙŠÙ‚"
+                                        "APPROVED" -> "Ù‚Ø¨ÙˆÙ„"
+                                        "IN_PROGRESS" -> "Ø¹Ù…Ù„"
+                                        "COMPLETED" -> "ØªÙ…"
+                                        else -> "Ø±ÙØ¶"
+                                    },
+                                    color = if (isSel) Color.White else color,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (editCustName.trim().isNotEmpty() && editCustPhone.trim().isNotEmpty()) {
+                                    val updatedB = booking.copy(
+                                        customerName = editCustName.trim(),
+                                        customerPhone = editCustPhone.trim(),
+                                        customerArea = editCustArea.trim(),
+                                        serviceType = editCustService.trim(),
+                                        dateString = editCustDate.trim(),
+                                        timeString = editCustTime.trim(),
+                                        status = editCustStatus,
+                                        bookingPassword = editCustPassword.trim(),
+                                        pinCode = editCustPassword.trim()
+                                    )
+                                    viewModel.updateBooking(updatedB)
+                                    editingBookingObj = null
+                                } else {
+                                    viewModel.triggerNotification("âš ï¸ ÙŠØ¬Ø¨ Ù…Ù„Ø¡ Ø§Ù„Ø§Ø³Ù… ÙˆØ§Ù„Ù‡Ø§ØªÙ Ø¨Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ø¯Ù†Ù‰!")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ğŸ’¾ Ø­ÙØ¸ ÙˆÙ†Ø´Ø±", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { editingBookingObj = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø£Ù…Ø±", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ------------------ PAYMENT SYSTEM DIALOGS ------------------
+
+    // 1. Add/Edit Wallet Dialog
+    if (showAddWalletDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddWalletDialog = false },
+            title = {
+                Text(
+                    text = if (editingWalletObj == null) "â• Ø¥Ø¶Ø§ÙØ© Ù…Ø­ÙØ¸Ø© Ø§Ø³ØªÙ‚Ø¨Ø§Ù„ Ø£Ù…ÙˆØ§Ù„ Ø¬Ø¯ÙŠØ¯Ø©" else "âœï¸ ØªØ¹Ø¯ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­ÙØ¸Ø©",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            },
+            text = {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        Text("Ù…Ø²ÙˆØ¯ Ø§Ù„Ù…Ø­ÙØ¸Ø© Ø§Ù„Ù…ØµØ±ÙÙŠØ© / Ø§Ù„Ø¬ÙˆØ§Ù„Ø©:", fontSize = 11.sp, color = Color.LightGray)
+                        val providersList = listOf(
+                            Pair("jeeb", "Ù…Ø­ÙØ¸Ø© Ø¬ÙŠØ¨ ğŸ“±"),
+                            Pair("alKarimi", "Ø§Ù„ÙƒØ±ÙŠÙ…ÙŠ Ø§Ù… ÙÙ„ÙˆØ³ / Ø­Ø³Ø§Ø¨ ğŸ¦"),
+                            Pair("jawaly", "Ù…Ø­ÙØ¸Ø© Ø¬ÙˆØ§Ù„ÙŠ ğŸ“²"),
+                            Pair("floosi", "ÙˆÙ† ÙƒØ§Ø´ / ÙÙ„ÙˆØ³ÙŠ ğŸ’³"),
+                            Pair("cashExchange", "Ø­ÙˆØ§Ù„Ø© ØµØ±Ø§ÙØ© Ù†Ù‚Ø¯ÙŠØ© (Ø§Ù„Ù†Ø¬Ù…/Ø§Ù„Ø¹Ù…Ù‚ÙŠ/Ø§Ù„Ù…Ù…ÙŠØ²) ğŸ’¸"),
+                            Pair("foreignCurrency", "Ù…Ø­ÙØ¸Ø© Ø¹Ù…Ù„Ø§Øª Ø£Ø¬Ù†Ø¨ÙŠØ© (USD/SAR) ğŸŒ"),
+                            Pair("yemenMobile", "ÙŠÙ…Ù† Ù…ÙˆØ¨Ø§ÙŠÙ„ ÙƒØ§Ø´ ğŸ‡¾ğŸ‡ª"),
+                            Pair("mtc", "Ù…Ø­ÙØ¸Ø© MTC âš¡"),
+                            Pair("sabafon", "Ø³Ø¨Ø£ ÙƒØ§Ø´ ğŸ“"),
+                            Pair("other", "ØªØ­ÙˆÙŠÙ„Ø§Øª Ù…ØµØ±ÙÙŠØ© Ø£Ø®Ø±Ù‰ ğŸŒ")
+                        )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                items(providersList) { prov ->
+                                    val isSelected = walletProviderInput == prov.first
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                if (isSelected) themeColors.accent else Color.DarkGray,
+                                                RoundedCornerShape(6.dp)
+                                            )
+                                            .clickable { walletProviderInput = prov.first }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(prov.second, color = if (isSelected) Color.Black else Color.White, fontSize = 9.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Text("Ø¹Ù…Ù„Ø© Ø§Ù„Ù…Ø­ÙØ¸Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ©:", fontSize = 11.sp, color = Color.LightGray)
+                        val currenciesList = listOf(
+                            Pair("YER", "ğŸ‡¾ğŸ‡ª Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ YER"),
+                            Pair("USD", "ğŸ’µ Ø¯ÙˆÙ„Ø§Ø± Ø£Ù…Ø±ÙŠÙƒÙŠ USD"),
+                            Pair("SAR", "ğŸ‡¸ğŸ‡¦ Ø±ÙŠØ§Ù„ Ø³Ø¹ÙˆØ¯ÙŠ SAR")
+                        )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            currenciesList.forEach { cur ->
+                                val isSelected = walletCurrencyInput == cur.first
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(if (isSelected) themeColors.accent else Color.DarkGray, RoundedCornerShape(6.dp))
+                                        .clickable { walletCurrencyInput = cur.first }
+                                        .padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(cur.second, color = if (isSelected) Color.Black else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Text("ØºØ±Ø¶/Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø©:", fontSize = 11.sp, color = Color.LightGray)
+                        val typesList = listOf(
+                            Pair("BOTH", "ğŸ”„ Ø¥ÙŠØ¯Ø§Ø¹ ÙˆØ³Ø­Ø¨ Ù…Ø¹Ø§Ù‹"),
+                            Pair("DEPOSIT", "ğŸ“¥ Ø¥ÙŠØ¯Ø§Ø¹ ÙÙ‚Ø· (Ø§Ø³ØªÙ‚Ø¨Ø§Ù„)"),
+                            Pair("WITHDRAWAL", "ğŸ“¤ Ø³Ø­Ø¨ ÙÙ‚Ø· (ØªØ­ÙˆÙŠÙ„ Ù„Ù„Ø¹Ù…ÙŠÙ„)")
+                        )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            typesList.forEach { typeItem ->
+                                val isSelected = walletTypeInput == typeItem.first
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(if (isSelected) themeColors.accent else Color.DarkGray, RoundedCornerShape(6.dp))
+                                        .clickable { walletTypeInput = typeItem.first }
+                                        .padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(typeItem.second, color = if (isSelected) Color.Black else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = walletNumberInput,
+                            onValueChange = { walletNumberInput = it },
+                            label = { Text("Ø±Ù‚Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø© / Ø±Ù‚Ù… Ø§Ù„Ø­Ø³Ø§Ø¨", fontSize = 11.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = walletAccountNameArInput,
+                            onValueChange = { walletAccountNameArInput = it },
+                            label = { Text("Ø§Ø³Ù… ØµØ§Ø­Ø¨ Ø§Ù„Ø­Ø³Ø§Ø¨ (Ø¨Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©)", fontSize = 11.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = walletDescriptionInput,
+                            onValueChange = { walletDescriptionInput = it },
+                            label = { Text("ÙˆØµÙ Ù‚ØµÙŠØ± / ØªØ¹Ù„ÙŠÙ…Ø§Øª Ø³Ø±ÙŠØ¹Ø© Ù„Ù„Ø¹Ù…ÙŠÙ„", fontSize = 11.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ø­ÙØ¸Ø© ÙÙŠ Ø®ÙŠØ§Ø±Ø§Øª Ø§Ù„Ø¯ÙØ¹ Ù„Ù„Ø¹Ù…ÙŠÙ„", fontSize = 12.sp, color = Color.White)
+                            Switch(
+                                checked = walletIsVisibleInput,
+                                onCheckedChange = { walletIsVisibleInput = it },
+                                colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                            )
+                        }
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("ØªØ¹ÙŠÙŠÙ† ÙƒØ§ÙØªØ±Ø§Ø¶ÙŠØ© Ø¨Ø§Ù„Ø¯Ù„ÙŠÙ„", fontSize = 12.sp, color = Color.White)
+                            Switch(
+                                checked = walletIsDefaultInput,
+                                onCheckedChange = { walletIsDefaultInput = it },
+                                colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = walletDisplayOrderInput,
+                            onValueChange = { walletDisplayOrderInput = it },
+                            label = { Text("Ø§Ù„ØªØ±ØªÙŠØ¨ ÙÙŠ Ø§Ù„Ø¹Ø±Ø¶ Ù„Ù„Ø¹Ù…ÙŠÙ„", fontSize = 11.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val wallet = PaymentWalletEntity(
+                            id = editingWalletObj?.id ?: "",
+                            provider = walletProviderInput,
+                            walletNumber = walletNumberInput,
+                            accountName = walletAccountNameInput.ifBlank { walletAccountNameArInput },
+                            accountNameAr = walletAccountNameArInput,
+                            description = walletDescriptionInput,
+                            walletType = walletTypeInput,
+                            currency = walletCurrencyInput,
+                            isVisibleToUsers = walletIsVisibleInput,
+                            isDefault = walletIsDefaultInput,
+                            displayOrder = walletDisplayOrderInput.toIntOrNull() ?: 0,
+                            status = walletStatusInput
+                        )
+                        if (editingWalletObj == null) {
+                            viewModel.addPaymentWallet(wallet)
+                        } else {
+                            viewModel.updatePaymentWallet(wallet)
+                        }
+                        showAddWalletDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("Ø­ÙØ¸ Ø§Ù„Ù…Ø­ÙØ¸Ø© ğŸ’¾", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddWalletDialog = false }) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White)
+                }
+            }
+        )
+    }
+
+    // 1b. Internal Wallet Transaction Dialog
+    if (showWalletTxDialog && selectedWalletForTx != null) {
+        val wallet = selectedWalletForTx!!
+        AlertDialog(
+            onDismissRequest = { showWalletTxDialog = false },
+            title = {
+                Text("ğŸ’¸ Ù…Ø¹Ø§Ù…Ù„Ø© Ù…Ø­ÙØ¸Ø© Ø¯Ø§Ø®Ù„ÙŠØ© (${wallet.ownerName})", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ù†ÙˆØ¹ Ø§Ù„Ø­Ø³Ø§Ø¨: ${wallet.ownerType} | Ø§Ù„Ø±Ù‚Ù…: ${wallet.ownerPhone}", fontSize = 11.sp, color = Color.LightGray)
+                    Text("Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø­Ø§Ù„ÙŠ: ${wallet.balance} Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ ğŸ‡¾ğŸ‡ª", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+                    Divider(color = Color.White.copy(alpha = 0.1f))
+
+                    Text("Ø§Ø®ØªØ± Ù†ÙˆØ¹ Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø§Ù„Ù…Ø§Ù„ÙŠØ©:", fontSize = 11.sp, color = Color.White)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(
+                            onClick = { txTypeInput = "DEPOSIT" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (txTypeInput == "DEPOSIT") Color(0xFF10B981) else Color.DarkGray)
+                        ) {
+                            Text("Ø¥ÙŠØ¯Ø§Ø¹ â•", fontSize = 10.sp)
+                        }
+                        Button(
+                            onClick = { txTypeInput = "WITHDRAWAL" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (txTypeInput == "WITHDRAWAL") Color.Red else Color.DarkGray)
+                        ) {
+                            Text("Ø³Ø­Ø¨ â–", fontSize = 10.sp)
+                        }
+                        Button(
+                            onClick = { txTypeInput = "TRANSFER" },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (txTypeInput == "TRANSFER") themeColors.accent else Color.DarkGray)
+                        ) {
+                            Text("ØªØ­ÙˆÙŠÙ„ ğŸ”„", fontSize = 10.sp, color = if (txTypeInput == "TRANSFER") Color.Black else Color.White)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = txAmountInput,
+                        onValueChange = { txAmountInput = it },
+                        label = { Text("Ø§Ù„Ù…Ø¨Ù„Øº Ø¨Ø§Ù„Ø±ÙŠØ§Ù„ Ø§Ù„ÙŠÙ…Ù†ÙŠ", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = txNoteInput,
+                        onValueChange = { txNoteInput = it },
+                        label = { Text("Ù…Ù„Ø§Ø­Ø¸Ø§Øª/Ø³Ø¨Ø¨ Ø§Ù„Ø¹Ù…Ù„ÙŠØ©", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amt = txAmountInput.toDoubleOrNull() ?: 0.0
+                        if (amt > 0) {
+                            viewModel.performWalletTransaction(
+                                walletId = wallet.id,
+                                ownerName = wallet.ownerName,
+                                ownerPhone = wallet.ownerPhone,
+                                ownerType = wallet.ownerType,
+                                type = txTypeInput,
+                                amount = amt,
+                                note = txNoteInput
+                            )
+                            showWalletTxDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("ØªÙ†ÙÙŠØ° Ø§Ù„Ø¹Ù…Ù„ÙŠØ© âš¡", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWalletTxDialog = false }) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    // 2. Verify Payment Dialog
+    verifyingPaymentObj?.let { payment ->
+        AlertDialog(
+            onDismissRequest = { verifyingPaymentObj = null },
+            title = { Text("âœ… ØªØ£ÙƒÙŠØ¯ ÙˆØ§Ø¹ØªÙ…Ø§Ø¯ Ø§Ù„Ø¯ÙØ¹ Ø§Ù„ÙˆØ§Ø±Ø¯", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ø£Ù†Øª Ø¹Ù„Ù‰ ÙˆØ´Ùƒ Ø§Ø¹ØªÙ…Ø§Ø¯ ÙˆØªØ£ÙƒÙŠØ¯ Ø¯ÙØ¹Ø© Ø¨Ù‚ÙŠÙ…Ø© ${payment.amount} Ø±ÙŠØ§Ù„ ÙŠÙ…Ù†ÙŠ ÙˆØ§Ù„Ù…Ø­ÙˆÙ„Ø© Ø¹Ø¨Ø± ${payment.walletProvider}.", fontSize = 11.sp, color = Color.LightGray)
+                    Text("Ø³ÙŠØ¹Ù…Ù„ Ù‡Ø°Ø§ Ø§Ù„ØªÙØ¹ÙŠÙ„ Ø¹Ù„Ù‰ ØªÙØ¹ÙŠÙ„/Ø§Ø¹ØªÙ…Ø§Ø¯ Ø·Ù„Ø¨ Ø§Ù„Ø­Ø¬Ø² Ø§Ù„Ù…Ø±ØªØ¨Ø· ÙˆØªÙ†Ø´ÙŠØ· Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹.", fontSize = 11.sp, color = themeColors.accent)
+                    
+                    OutlinedTextField(
+                        value = adminVerifyPaymentNote,
+                        onValueChange = { adminVerifyPaymentNote = it },
+                        label = { Text("Ù…Ù„Ø§Ø­Ø¸Ø© ÙˆØªÙˆØ¶ÙŠØ­ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.verifyPayment(payment.id, true, adminVerifyPaymentNote, "Ù…Ø¯ÙŠØ± Ø§Ù„Ø¯Ù„ÙŠÙ„ ğŸ›¡ï¸")
+                        verifyingPaymentObj = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                ) {
+                    Text("Ø§Ø¹ØªÙ…Ø§Ø¯ ÙˆØªØ£ÙƒÙŠØ¯ âœ…", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { verifyingPaymentObj = null }) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White)
+                }
+            }
+        )
+    }
+
+    // 3. Reject Payment Dialog
+    rejectingPaymentObj?.let { payment ->
+        AlertDialog(
+            onDismissRequest = { rejectingPaymentObj = null },
+            title = { Text("âŒ Ø±ÙØ¶ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø© ÙˆØ¥Ø«Ø¨Ø§Øª Ø§Ù„Ø¯ÙØ¹", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("ÙŠØ±Ø¬Ù‰ ØªÙˆØ¶ÙŠØ­ Ø³Ø¨Ø¨ Ø±ÙØ¶ Ø¥Ø«Ø¨Ø§Øª Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ù„Ù„Ø¹Ù…ÙŠÙ„:", fontSize = 11.sp, color = Color.LightGray)
+                    
+                    OutlinedTextField(
+                        value = adminRejectPaymentNote,
+                        onValueChange = { adminRejectPaymentNote = it },
+                        label = { Text("Ø³Ø¨Ø¨ Ø§Ù„Ø±ÙØ¶ Ø§Ù„Ù…Ø§Ù„ÙŠ", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.verifyPayment(payment.id, false, adminRejectPaymentNote, "Ù…Ø¯ÙŠØ± Ø§Ù„Ø¯Ù„ÙŠÙ„ ğŸ›¡ï¸")
+                        rejectingPaymentObj = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø±ÙØ¶ âŒ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { rejectingPaymentObj = null }) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White)
+                }
+            }
+        )
+    }
+
+    // 4. Refund Payment Dialog
+    refundingPaymentObj?.let { payment ->
+        AlertDialog(
+            onDismissRequest = { refundingPaymentObj = null },
+            title = { Text("ğŸ”„ Ø¥Ø±Ø¬Ø§Ø¹ ÙˆØ§Ø³ØªØ±Ø¯Ø§Ø¯ Ø§Ù„Ù…Ø¨Ù„Øº", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("ØªÙ†Ø¨ÙŠÙ‡: Ø³ÙŠØªÙ… ØªØ³Ø¬ÙŠÙ„ Ù‡Ø°Ù‡ Ø§Ù„Ø¹Ù…Ù„ÙŠØ© ÙƒÙ€ 'ØªÙ… Ø§Ù„Ø§Ø³ØªØ±Ø¯Ø§Ø¯' ÙˆØ¥Ù„ØºØ§Ø¡ ÙØ§Ø¹Ù„ÙŠØªÙ‡Ø§ Ø§Ù„Ù…Ø§Ù„ÙŠØ© ÙÙŠ Ø¥Ø­ØµØ§Ø¦ÙŠØ§Øª Ø§Ù„Ø¯Ù„ÙŠÙ„.", fontSize = 11.sp, color = Color.LightGray)
+                    Text("ÙŠØ±Ø¬Ù‰ ÙƒØªØ§Ø¨Ø© Ø³Ø¨Ø¨ Ø§Ù„Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ù„Ù„ØªØ³Ø¬ÙŠÙ„ ÙˆØ§Ù„Ù…ØªØ§Ø¨Ø¹Ø©:", fontSize = 11.sp, color = Color.LightGray)
+                    
+                    OutlinedTextField(
+                        value = refundReasonInput,
+                        onValueChange = { refundReasonInput = it },
+                        label = { Text("Ø³Ø¨Ø¨ Ø¥Ø±Ø¬Ø§Ø¹ Ø§Ù„Ù…Ø¨Ù„Øº", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.refundPayment(payment.id, refundReasonInput.ifBlank { "Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ø¨Ù†Ø§Ø¡ Ø¹Ù„Ù‰ Ø·Ù„Ø¨ Ø§Ù„Ø£Ø·Ø±Ø§Ù" })
+                        refundingPaymentObj = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                ) {
+                    Text("ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø§Ø³ØªØ±Ø¯Ø§Ø¯ ğŸ”„", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { refundingPaymentObj = null }) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White)
+                }
+            }
+        )
+    }
+
+    /*
+    // 5. User Submit Transfer Proof Dialog
+    payingBookingObj?.let { booking ->
+        Dialog(onDismissRequest = { payingBookingObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item {
+                        Text("ğŸ’³ Ø³Ø¯Ø§Ø¯ Ø±Ø³ÙˆÙ… Ø§Ù„Ø­Ø¬Ø² ÙˆØ§Ù„Ø®Ø¯Ù…Ø© Ø¨Ø§Ù„Ù…Ù†ØµØ©", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                        Text("ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± Ø£Ø­Ø¯ Ø§Ù„Ø­Ø³Ø§Ø¨Ø§Øª / Ø§Ù„Ù…Ø­Ø§ÙØ¸ Ø§Ù„ØªØ§Ù„ÙŠØ© ÙˆØ§Ù„ØªØ­ÙˆÙŠÙ„ Ø¥Ù„ÙŠÙ‡Ø§ Ø¨Ù‚ÙŠÙ…Ø© ØªÙƒÙ„ÙØ© Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø© ÙˆØ§Ù„ØµÙŠØ§Ù†Ø©:", fontSize = 11.sp, color = Color.LightGray)
+                    }
+
+                    if (paymentWallets.isEmpty()) {
+                        item {
+                            Text("âš ï¸ Ø¹Ø°Ø±Ø§Ù‹ØŒ Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ø­Ø§ÙØ¸ Ø¯ÙØ¹ Ù…ÙØ¹Ù„Ø© Ø­Ø§Ù„ÙŠØ§Ù‹ Ø¨Ø§Ù„Ù…Ù†ØµØ© Ù„Ù„ØªØ³Ø¯ÙŠØ¯. ÙŠØ±Ø¬Ù‰ Ù…Ø±Ø§Ø¬Ø¹Ø© Ø§Ù„Ù…Ø´Ø±ÙÙŠÙ†.", fontSize = 11.sp, color = Color.Red)
+                        }
+                    } else {
+                        item {
+                            Text("Ø§Ù„Ù…Ø­Ø§ÙØ¸ ÙˆØ§Ù„Ø­Ø³Ø§Ø¨Ø§Øª Ø§Ù„Ù…ØªØ§Ø­Ø© Ù„Ù„ØªØ­ÙˆÙŠÙ„:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                items(paymentWallets.filter { it.status == "active" }) { wallet ->
+                                    val isSel = selectedUserWalletObj?.id == wallet.id
+                                    val name = when (wallet.provider) {
+                                        "jeeb" -> "Ø¬ÙŠØ¨ ğŸ“±"
+                                        "alKarimi" -> "Ø§Ù„ÙƒØ±ÙŠÙ…ÙŠ ğŸ¦"
+                                        "jawaly" -> "Ø¬ÙˆØ§Ù„ÙŠ ğŸ“²"
+                                        "yemenMobile" -> "ÙŠÙ…Ù† ÙƒØ§Ø´ ğŸ‡¾ğŸ‡ª"
+                                        else -> wallet.accountNameAr.take(8)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                if (isSel) themeColors.accent else Color.DarkGray,
+                                                RoundedCornerShape(6.dp)
+                                            )
+                                            .clickable { selectedUserWalletObj = wallet }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(name, color = if (isSel) Color.Black else Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        selectedUserWalletObj?.let { wallet ->
+                            item {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
+                                    border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("Ø±Ù‚Ù… Ø§Ù„Ø­Ø³Ø§Ø¨/Ø§Ù„Ù…Ø­ÙØ¸Ø© Ù„Ù„ØªØ­ÙˆÙŠÙ„: ${wallet.walletNumber}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                                        Text("Ø§Ø³Ù… ØµØ§Ø­Ø¨ Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø³ØªÙ„Ù…: ${wallet.accountNameAr}", fontSize = 11.sp, color = Color.White)
+                                        if (wallet.description.isNotEmpty()) {
+                                            Text("ØªØ¹Ù„ÙŠÙ…Ø§Øª: ${wallet.description}", fontSize = 10.sp, color = Color.LightGray)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Divider(color = Color.White.copy(alpha = 0.05f))
+                            Text("ÙŠØ±Ø¬Ù‰ ØªØ¹Ø¨Ø¦Ø© Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ø¨Ø¹Ø¯ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø§Ù„ÙŠ:", fontSize = 11.sp, color = Color.LightGray)
+                        }
+
+                        item {
+                            OutlinedTextField(
+                                value = userTransferIdInput,
+                                onValueChange = { userTransferIdInput = it },
+                                label = { Text("Ø±Ù‚Ù… Ø§Ù„Ø­ÙˆØ§Ù„Ø© Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠ / Ø±Ù‚Ù… Ø§Ù„Ø¹Ù…Ù„ÙŠØ© (Ø§Ù„Ù€ ID)", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            )
+                        }
+
+                        item {
+                            OutlinedTextField(
+                                value = userTransferAccountNameInput,
+                                onValueChange = { userTransferAccountNameInput = it },
+                                label = { Text("Ø§Ø³Ù… Ø§Ù„Ù…Ø±Ø³Ù„ Ø§Ù„ÙƒØ§Ù…Ù„ (ØµØ§Ø­Ø¨ Ø§Ù„Ù…Ø­ÙØ¸Ø© Ø§Ù„Ù…Ø­ÙˆÙÙ„Ø©)", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            )
+                        }
+
+                        item {
+                            OutlinedTextField(
+                                value = userTransferPhotoInput,
+                                onValueChange = { userTransferPhotoInput = it },
+                                label = { Text("Ø±Ø§Ø¨Ø· ØµÙˆØ±Ø© Ø§Ù„Ø¥Ø«Ø¨Ø§Øª Ø£Ùˆ Ù„Ù‚Ø·Ø© Ø§Ù„Ø´Ø§Ø´Ø© (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            )
+                        }
+
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(top = 10.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (userTransferIdInput.isBlank() || userTransferAccountNameInput.isBlank()) {
+                                            viewModel.triggerNotification("âŒ ÙŠØ±Ø¬Ù‰ Ù…Ù„Ø¡ Ø±Ù‚Ù… Ø§Ù„Ø­ÙˆØ§Ù„Ø© ÙˆØ§Ø³Ù… Ù…Ø±Ø³Ù„ Ø§Ù„Ø­ÙˆØ§Ù„Ø© ÙƒØ§Ù…Ù„Ø§Ù‹")
+                                            return@Button
+                                        }
+                                        val wallet = selectedUserWalletObj ?: return@Button
+                                        
+                                        val docRef = viewModel.db.collection("payments").document()
+                                        val payment = PaymentEntity(
+                                            id = docRef.id,
+                                            userId = booking.customerPhone,
+                                            providerId = booking.providerId,
+                                            bookingId = booking.id,
+                                            type = "service",
+                                            method = "mobileWallet",
+                                            status = "PROCESSING",
+                                            amount = 1000.0,
+                                            advanceAmount = 0.0,
+                                            remainingAmount = 1000.0,
+                                            commission = 0.0,
+                                            providerShare = 1000.0,
+                                            currency = "YER",
+                                            isLinkedToBooking = true,
+                                            bookingDate = System.currentTimeMillis(),
+                                            bookingServiceType = booking.serviceType,
+                                            createdAt = System.currentTimeMillis(),
+                                            transferId = userTransferIdInput,
+                                            transferPhoto = userTransferPhotoInput,
+                                            walletProvider = wallet.provider,
+                                            walletNumber = wallet.walletNumber,
+                                            walletAccountName = userTransferAccountNameInput,
+                                            updatedAt = System.currentTimeMillis()
+                                        )
+                                        viewModel.db.collection("payments").document(docRef.id).set(payment).addOnSuccessListener {
+                                            viewModel.triggerNotification("âœ… ØªÙ… Ø¥Ø±Ø³Ø§Ù„ Ø¥Ø«Ø¨Ø§Øª Ø§Ù„Ø³Ø¯Ø§Ø¯ Ø¨Ù†Ø¬Ø§Ø­! Ø¨Ø§Ù†ØªØ¸Ø§Ø± ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©.")
+                                        }.addOnFailureListener {
+                                            viewModel.triggerNotification("âŒ ÙØ´Ù„ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¥Ø«Ø¨Ø§Øª: ${it.message}")
+                                        }
+                                        
+                                        payingBookingObj = null
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¥Ø«Ø¨Ø§Øª ğŸ“¤", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+
+                                Button(
+                                    onClick = { payingBookingObj = null },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    */
+
+    // 8.5 Redirect Booking Dialog Control
+    redirectingBookingObj?.let { booking ->
+        val providersList by viewModel.providers.collectAsState()
+        
+        // Find the nearest provider dynamically
+        val nearestProvider = remember(booking, providersList) {
+            val userCoords = getAreaCoords(booking.customerArea)
+            providersList.minByOrNull { tech ->
+                val techCoords = getProviderCoords(tech)
+                val dist = getDistance(userCoords.first, userCoords.second, techCoords.first, techCoords.second)
+                dist
+            }
+        }
+
+        var selectedTargetType by remember { mutableStateOf("SPECIFIC") } // SPECIFIC, ADMIN, NEAREST, OTHER
+        var selectedOtherProviderId by remember { mutableStateOf("") }
+        var dropdownExpanded by remember { mutableStateOf(false) }
+
+        Dialog(onDismissRequest = { redirectingBookingObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                border = BorderStroke(1.5.dp, themeColors.accent),
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("ğŸ”„ ØªÙˆØ¬ÙŠÙ‡ Ø§Ù„Ø­Ø¬Ø² Ø¥Ù„Ù‰ Ù…Ø³Ø¤ÙˆÙ„ Ø¬Ø¯ÙŠØ¯", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    
+                    Text("Ø§Ù„Ø¹Ù…ÙŠÙ„: ${booking.customerName} - Ø§Ù„Ø­ÙŠ: ${booking.customerArea}", fontSize = 11.sp, color = themeColors.textSecondary)
+                    Text("Ø§Ù„ÙÙ†ÙŠ Ø§Ù„Ø­Ø§Ù„ÙŠ: ${booking.providerName}", fontSize = 11.sp, color = themeColors.accent)
+                    
+                    Divider(color = Color.Gray.copy(alpha = 0.3f))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // 1. To Admin
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { selectedTargetType = "ADMIN" }
+                        ) {
+                            RadioButton(selected = (selectedTargetType == "ADMIN"), onClick = { selectedTargetType = "ADMIN" })
+                            Text("Ø§Ù„Ù…Ø¯ÙŠØ± (Ø§Ù„Ø£Ø¯Ù…Ù†) ğŸ‘‘", fontSize = 12.sp, color = Color.White)
+                        }
+
+                        // 2. To Current Provider
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { selectedTargetType = "SPECIFIC" }
+                        ) {
+                            RadioButton(selected = (selectedTargetType == "SPECIFIC"), onClick = { selectedTargetType = "SPECIFIC" })
+                            Text("Ø§Ù„ÙÙ†ÙŠ Ø§Ù„Ù…Ø°ÙƒÙˆØ±: ${booking.providerName} ğŸ‘·", fontSize = 12.sp, color = Color.White)
+                        }
+
+                        // 3. To Nearest Provider
+                        nearestProvider?.let { np ->
+                            val userCoords = getAreaCoords(booking.customerArea)
+                            val techCoords = getProviderCoords(np)
+                            val distance = getDistance(userCoords.first, userCoords.second, techCoords.first, techCoords.second)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable { selectedTargetType = "NEAREST" }
+                            ) {
+                                RadioButton(selected = (selectedTargetType == "NEAREST"), onClick = { selectedTargetType = "NEAREST" })
+                                Text("Ø§Ù„ÙÙ†ÙŠ Ø§Ù„Ø£Ù‚Ø±Ø¨ Ù„Ù„Ù…Ø³ØªØ®Ø¯Ù…: ${np.name} (ÙŠØ¨Ø¹Ø¯ ${String.format("%.1f", distance)} ÙƒÙ…) ğŸ“", fontSize = 12.sp, color = Color.White)
+                            }
+                        }
+
+                        // 4. To another technician
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { selectedTargetType = "OTHER" }
+                        ) {
+                            RadioButton(selected = (selectedTargetType == "OTHER"), onClick = { selectedTargetType = "OTHER" })
+                            Text("ØªÙˆØ¬ÙŠÙ‡ Ù„ÙÙ†ÙŠ Ø¢Ø®Ø± Ù…Ù† Ø§Ù„Ø¯Ù„ÙŠÙ„ ğŸ”", fontSize = 12.sp, color = Color.White)
+                        }
+                    }
+
+                    if (selectedTargetType == "OTHER") {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            val selectedProvName = providersList.find { it.id == selectedOtherProviderId }?.name ?: "Ø§Ø®ØªØ± Ø§Ù„ÙÙ†ÙŠ Ø§Ù„Ø¢Ø®Ø±..."
+                            Button(
+                                onClick = { dropdownExpanded = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(selectedProvName, color = Color.White, fontSize = 11.sp)
+                            }
+
+                            DropdownMenu(
+                                expanded = dropdownExpanded,
+                                onDismissRequest = { dropdownExpanded = false },
+                                modifier = Modifier.background(Color(0xFF1E293B)).fillMaxWidth(0.8f)
+                            ) {
+                                providersList.forEach { prov ->
+                                    DropdownMenuItem(
+                                        text = { Text(prov.name + " (${prov.customCategoryName.ifBlank { "ÙÙ†ÙŠ" }})", color = Color.White, fontSize = 11.sp) },
+                                        onClick = {
+                                            selectedOtherProviderId = prov.id
+                                            dropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val targetProvider = when (selectedTargetType) {
+                                    "ADMIN" -> Pair("admin", "Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø¯Ù„ÙŠÙ„")
+                                    "SPECIFIC" -> Pair(booking.providerId, booking.providerName)
+                                    "NEAREST" -> Pair(nearestProvider?.id ?: "admin", nearestProvider?.name ?: "Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø¯Ù„ÙŠÙ„")
+                                    "OTHER" -> {
+                                        val op = providersList.find { it.id == selectedOtherProviderId }
+                                        Pair(op?.id ?: "admin", op?.name ?: "Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø¯Ù„ÙŠÙ„")
+                                    }
+                                    else -> Pair(booking.providerId, booking.providerName)
+                                }
+
+                                val updatedB = booking.copy(
+                                    providerId = targetProvider.first,
+                                    providerName = targetProvider.second
+                                )
+                                viewModel.updateBooking(updatedB)
+
+                                // Send notifications to user about stages
+                                viewModel.addNotification(
+                                    title = "ğŸ”„ ØªÙ… ØªØ¹Ø¯ÙŠÙ„ ÙˆØªÙˆØ¬ÙŠÙ‡ Ø­Ø¬Ø²Ùƒ",
+                                    message = "Ø¹Ø²ÙŠØ²ÙŠ Ø§Ù„Ø¹Ù…ÙŠÙ„ØŒ ØªÙ… ØªÙˆØ¬ÙŠÙ‡ Ø­Ø¬Ø²Ùƒ Ø±Ù‚Ù… ${booking.id} Ø¨Ù†Ø¬Ø§Ø­ ÙˆÙ…Ø³Ø¤ÙˆÙ„ÙŠØ© ØªÙ†ÙÙŠØ° Ø§Ù„Ø®Ø¯Ù…Ø© Ø§Ù†ØªÙ‚Ù„Øª Ø¥Ù„Ù‰: ${targetProvider.second}.",
+                                    targetType = "USER",
+                                    targetValue = booking.customerPhone
+                                )
+
+                                // Send notifications to the target provider as well
+                                if (targetProvider.first != "admin") {
+                                    val targetPhone = providersList.find { it.id == targetProvider.first }?.phone ?: ""
+                                    viewModel.addNotification(
+                                        title = "ğŸ“… ØªÙ… ØªÙˆØ¬ÙŠÙ‡ Ø­Ø¬Ø² Ø¬Ø¯ÙŠØ¯ Ù„Ùƒ",
+                                        message = "ØªÙ… ØªÙˆØ¬ÙŠÙ‡ Ø­Ø¬Ø² Ø¬Ø¯ÙŠØ¯ Ù„Ùƒ Ù…Ù† Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©.\nØ§Ù„Ø¹Ù…ÙŠÙ„: ${booking.customerName}\nØ§Ù„Ù‡Ø§ØªÙ: ${booking.customerPhone}\nØ§Ù„Ù…Ù†Ø·Ù‚Ø©: ${booking.customerArea}\nØ§Ù„Ø®Ø¯Ù…Ø©: ${booking.serviceType}\nÙŠØ±Ø¬Ù‰ Ø§Ù„ØªÙˆØ§ØµÙ„ Ù…Ø¹Ù‡ Ù…Ø¨Ø§Ø´Ø±Ø© Ù„Ù„ØªÙ†Ø³ÙŠÙ‚.",
+                                        targetType = "PROVIDER",
+                                        targetValue = targetPhone,
+                                        customerPhone = booking.customerPhone,
+                                        customerName = booking.customerName
+                                    )
+                                }
+
+                                redirectingBookingObj = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ØªÙˆØ¬ÙŠÙ‡ ğŸ”„", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { redirectingBookingObj = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 9. Editing Supervisor Dialog Control
+    editingSupervisorObj?.let { supervisor ->
+        var editSupName by rememberSaveable(supervisor.id) { mutableStateOf(supervisor.name) }
+        var editSupRole by rememberSaveable(supervisor.id) { mutableStateOf(supervisor.role) }
+        var editSupPasscode by rememberSaveable(supervisor.id) { mutableStateOf(supervisor.passcode) }
+        var editSupPermissions by remember(supervisor.id) { mutableStateOf(supervisor.permissions) }
+
+        Dialog(onDismissRequest = { editingSupervisorObj = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                border = BorderStroke(1.dp, themeColors.accent),
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("âœï¸ ØªØ¹Ø¯ÙŠÙ„ ØµÙ„Ø§Ø­ÙŠØ§Øª ÙˆØ¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø´Ø±Ù", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+                    OutlinedTextField(
+                        value = editSupName,
+                        onValueChange = { editSupName = it },
+                        label = { Text("Ø§Ø³Ù… Ø§Ù„Ù…Ø´Ø±Ù Ø§Ù„Ø«Ù„Ø§Ø«ÙŠ") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = editSupPasscode,
+                        onValueChange = { editSupPasscode = it },
+                        label = { Text("Ø±Ù…Ø² Ø§Ù„Ù…Ø±ÙˆØ± ÙˆØ§Ù„Ø¯Ø®ÙˆÙ„ (Passcode)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Text("Ø§Ø®ØªØ± Ø§Ù„Ø£Ø¯ÙˆØ§Ø± ÙˆØ§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ø£Ù…Ù†ÙŠØ© Ù„Ù„Ù…Ø´Ø±Ù (ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ø®ØªÙŠØ§Ø± ØµÙ„Ø§Ø­ÙŠØ© ÙˆØ§Ø­Ø¯Ø© Ø£Ùˆ Ø£ÙƒØ«Ø±):", color = themeColors.textSecondary, fontSize = 11.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val roles = listOf("ADMIN", "AUDITOR", "SUPPORT", "OPERATIONS")
+                        roles.forEach { rl ->
+                            val isSel = editSupRole.split(",").contains(rl)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSel) themeColors.accent else Color.Black.copy(alpha = 0.3f))
+                                    .clickable {
+                                        val currentSelected = editSupRole.split(",").filter { it.isNotEmpty() }.toMutableList()
+                                        if (currentSelected.contains(rl)) {
+                                            currentSelected.remove(rl)
+                                        } else {
+                                            currentSelected.add(rl)
+                                        }
+                                        if (currentSelected.isEmpty()) {
+                                            currentSelected.add("SUPPORT")
+                                        }
+                                        editSupRole = currentSelected.joinToString(",")
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = when (rl) {
+                                        "ADMIN" -> "Ù…Ø¯ÙŠØ± ğŸ‘‘"
+                                        "AUDITOR" -> "Ù…Ø¯Ù‚Ù‚ ğŸ”"
+                                        "OPERATIONS" -> "Ù…ÙŠØ¯Ø§Ù†ÙŠ ğŸš—"
+                                        else -> "Ø¯Ø¹Ù… ğŸ“"
+                                    },
+                                    color = if (isSel) Color.Black else Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    // Granular Permissions Editor
+                    AdminPermissionsSelectorView(
+                        themeColors = themeColors,
+                        selectedPermissions = editSupPermissions,
+                        onPermissionsChanged = { editSupPermissions = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (editSupName.trim().isNotEmpty() && editSupPasscode.trim().isNotEmpty()) {
+                                    viewModel.editSupervisor(
+                                        id = supervisor.id,
+                                        name = editSupName.trim(),
+                                        role = editSupRole,
+                                        passcode = editSupPasscode.trim(),
+                                        permissions = editSupPermissions
+                                    )
+                                    editingSupervisorObj = null
+                                } else {
+                                    viewModel.triggerNotification("âš ï¸ ÙŠØ±Ø¬Ù‰ ÙƒØªØ§Ø¨Ø© Ø§Ù„Ø§Ø³Ù… ÙˆØ§Ù„Ø±Ù…Ø² Ø¨Ø§Ù„ÙƒØ§Ù…Ù„")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ğŸ’¾ Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„ ÙˆØ§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { editingSupervisorObj = null },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    selectedRecoveryNotif?.let { notif ->
+        var phoneExtract = ""
+        var nameExtract = "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…"
+        try {
+            val phoneRegex = Regex("(?:Ù‡Ø§ØªÙ:|Ø§Ù„Ø±Ù‚Ù…:|Ø§Ù„Ù‡Ø§ØªÙ:)?\\s*([0-9]{9,10})")
+            val match = phoneRegex.find(notif.message)
+            if (match != null) {
+                phoneExtract = match.groupValues[1]
+            }
+            if (notif.message.contains("Ø§Ù„Ù…ØªØ¬Ø±")) {
+                val split = notif.message.split("Ø§Ù„Ù…ØªØ¬Ø±")
+                if (split.size > 1) {
+                    nameExtract = split[1].substringBefore("(").trim()
+                }
+            } else if (notif.message.contains("Ø§Ù„Ø­Ø³Ø§Ø¨:")) {
+                val split = notif.message.split("Ø§Ù„Ø­Ø³Ø§Ø¨:")
+                if (split.size > 1) {
+                    nameExtract = split[1].substringBefore("(").trim()
+                }
+            }
+        } catch (e: Exception) {}
+
+        var newPasswordInput by remember { mutableStateOf("123456") }
+        var notifyActionChoice by remember { mutableStateOf("DIRECT_PASSWORD") }
+
+        AlertDialog(
+            onDismissRequest = { selectedRecoveryNotif = null },
+            containerColor = Color(0xFF0F172A),
+            title = { Text("ğŸ”“ Ø¥Ø¯Ø§Ø±Ø© Ø§Ø³ØªØ¹Ø§Ø¯Ø© ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ù„Ù„Ø­Ø³Ø§Ø¨", color = themeColors.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨: ${notif.message}", fontSize = 11.sp, color = Color.White)
+                    
+                    OutlinedTextField(
+                        value = phoneExtract,
+                        onValueChange = { phoneExtract = it },
+                        label = { Text("Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ Ø§Ù„Ù…Ø³ØªÙ‡Ø¯Ù") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    OutlinedTextField(
+                        value = newPasswordInput,
+                        onValueChange = { newPasswordInput = it },
+                        label = { Text("ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø© (Ø£Ùˆ Ø§Ù„Ø­Ø§Ù„ÙŠØ©)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Text("Ø§Ø®ØªØ± Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„Ø¥Ø¯Ø§Ø±ÙŠ Ù„Ù„Ø±Ø¯ ÙˆØ§Ù„Ø§Ø´Ø¹Ø§Ø±:", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { notifyActionChoice = "DIRECT_PASSWORD" }) {
+                        RadioButton(selected = notifyActionChoice == "DIRECT_PASSWORD", onClick = { notifyActionChoice = "DIRECT_PASSWORD" })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙˆØ¥Ø±Ø³Ø§Ù„Ù‡Ø§ Ø¨Ø¥Ø´Ø¹Ø§Ø± Ù…Ø¨Ø§Ø´Ø± Ù„Ù„Ù…Ø³ØªØ®Ø¯Ù…", fontSize = 10.sp, color = Color.White)
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { notifyActionChoice = "VERIFICATION_WHATSAPP" }) {
+                        RadioButton(selected = notifyActionChoice == "VERIFICATION_WHATSAPP", onClick = { notifyActionChoice = "VERIFICATION_WHATSAPP" })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Ø·Ù„Ø¨ Ø§Ù„ØªØ­Ù‚Ù‚ Ø¹Ø¨Ø± Ø§Ù„ÙˆØ§ØªØ³ / Ø§Ù„ØªÙ„ÙŠØ¬Ø±Ø§Ù… Ø£Ùˆ Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø© Ø§Ù„ÙÙˆØ±ÙŠØ©", fontSize = 10.sp, color = Color.White)
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { notifyActionChoice = "INSTANT_CHAT" }) {
+                        RadioButton(selected = notifyActionChoice == "INSTANT_CHAT", onClick = { notifyActionChoice = "INSTANT_CHAT" })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("ÙØªØ­ Ù…Ø­Ø§Ø¯Ø«Ø© ÙÙˆØ±ÙŠØ© Ù…Ø¨Ø§Ø´Ø±Ø© Ù…Ø¹ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ù„Ø¥Ø«Ø¨Ø§Øª Ø§Ù„Ù‡ÙˆÙŠØ©", fontSize = 10.sp, color = Color.White)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (phoneExtract.isNotEmpty() && newPasswordInput.isNotEmpty()) {
+                            viewModel.adminResetAccountPassword(
+                                phone = phoneExtract,
+                                newPassword = newPasswordInput.trim(),
+                                notifyAction = notifyActionChoice,
+                                customerName = nameExtract
+                            )
+                            if (notifyActionChoice == "INSTANT_CHAT") {
+                                viewModel.getOrCreateChatChannel(
+                                    providerId = "admin",
+                                    providerName = "Ø§Ù„Ø¥Ø¯Ø§Ø±Ø© ÙˆØ§Ù„Ø¯Ø¹Ù…",
+                                    customerId = phoneExtract,
+                                    customerName = nameExtract
+                                )
+                                Toast.makeText(context, "ğŸ’¬ ØªÙ… ÙØªØ­ Ù…Ø­Ø§Ø¯Ø«Ø© Ø§Ù„Ø¯Ø¹Ù… ÙˆØ¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ø¨Ù†Ø¬Ø§Ø­!", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "âœ… ØªÙ… Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙˆØ¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¥Ø´Ø¹Ø§Ø± Ø¨Ù†Ø¬Ø§Ø­!", Toast.LENGTH_LONG).show()
+                            }
+                            selectedRecoveryNotif = null
+                        } else {
+                            Toast.makeText(context, "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø§Ù„ØªØ£ÙƒØ¯ Ù…Ù† Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ ÙˆÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("ØªÙ†ÙÙŠØ° Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ ÙˆØ¥Ø±Ø³Ø§Ù„ ğŸš€", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { selectedRecoveryNotif = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("Ø¥Ù„ØºØ§Ø¡", color = Color.White, fontSize = 11.sp)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun PasswordEntityCard(
+    name: String,
+    phone: String,
+    category: String,
+    password: String?,
+    onResetPassword: (String) -> Unit,
+    context: android.content.Context
+) {
+    var editPass by remember { mutableStateOf(password ?: "") }
+    var showPass by remember { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Ø§Ù„Ù‚Ø³Ù…: $category", fontSize = 10.sp, color = Color(0xFF3B82F6))
+            }
+            Text("Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ: $phone", fontSize = 11.sp, color = Color.LightGray)
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("ğŸ”‘ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø­Ø§Ù„ÙŠØ©: ${if (showPass) (password ?: "ØºÙŠØ± Ù…ØªÙˆÙØ±Ø©") else "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showPass = !showPass }) {
+                    Text(if (showPass) "Ø¥Ø®ÙØ§Ø¡" else "Ø¥Ø¸Ù‡Ø§Ø±", fontSize = 10.sp, color = Color.Yellow)
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = editPass,
+                    onValueChange = { editPass = it },
+                    label = { Text("ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø¬Ø¯ÙŠØ¯Ø©", fontSize = 9.sp) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                )
+                Button(
+                    onClick = {
+                        if (editPass.isNotBlank()) {
+                            onResetPassword(editPass)
+                        } else {
+                            Toast.makeText(context, "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    modifier = Modifier.height(36.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("ØªØ­Ø¯ÙŠØ« ğŸ”’", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(
+                    onClick = {
+                        val whatsappText = "Ù…Ø±Ø­Ø¨Ø§Ù‹ ÙŠØ§ ØºØ§Ù„ÙŠØŒ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø®Ø§ØµØ© Ø¨Ø­Ø³Ø§Ø¨Ùƒ ÙÙŠ Ø¯Ù„ÙŠÙ„ Ø®Ø¯Ù…Ø§Øª Ø§Ù„ÙŠÙ…Ù† Ù‡ÙŠ: ${password ?: "ØºÙŠØ± Ù…ØªÙˆÙØ±Ø©"}"
+                        val whatsappUrl = "https://wa.me/967${phone.trim().removePrefix("0").removePrefix("+967")}?text=${android.net.Uri.encode(whatsappText)}"
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(whatsappUrl))
+                            context.startActivity(intent)
+                        } catch(e: Exception) {
+                            Toast.makeText(context, "ÙØ´Ù„ ÙØªØ­ ÙˆØ§ØªØ³Ø§Ø¨", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                    modifier = Modifier.height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
+                ) {
+                    Text("ğŸŸ¢ ÙˆØ§ØªØ³Ø§Ø¨", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = {
+                        val smsText = "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø®Ø§ØµØ© Ø¨Ø­Ø³Ø§Ø¨Ùƒ ÙÙŠ Ø¯Ù„ÙŠÙ„ Ø®Ø¯Ù…Ø§Øª Ø§Ù„ÙŠÙ…Ù† Ù‡ÙŠ: ${password ?: "ØºÙŠØ± Ù…ØªÙˆÙØ±Ø©"}"
+                        try {
+                            val intent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:$phone")).apply {
+                                putExtra("sms_body", smsText)
+                            }
+                            context.startActivity(intent)
+                        } catch(e: Exception) {
+                            Toast.makeText(context, "ÙØ´Ù„ ÙØªØ­ SMS", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                    modifier = Modifier.height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp)
+                ) {
+                    Text("ğŸ’¬ Ø±Ø³Ø§Ù„Ø© SMS", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}

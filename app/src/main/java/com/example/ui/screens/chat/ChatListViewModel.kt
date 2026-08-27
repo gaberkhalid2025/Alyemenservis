@@ -51,6 +51,18 @@ class ChatListViewModel(
         }
     }
 
+    fun deleteChannel(channelId: String) {
+        viewModelScope.launch {
+            repository.deleteChannel(channelId)
+        }
+    }
+
+    fun deleteAllChannels(channelsList: List<ChatChannel>) {
+        viewModelScope.launch {
+            repository.deleteAllChannels(channelsList)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         channelsJob?.cancel()

@@ -1,11 +1,10 @@
 package com.example.ui.screens.admin
 
-import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,121 +14,123 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.viewmodels.AdminViewModel
+import com.example.ui.MainViewModel
+import com.example.ui.screens.admin.components.AdminEntityCard
+import com.example.ui.screens.admin.components.AdminFilterChips
+import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 
-data class JobOfferItem(
-    val id: String,
-    val title: String,
-    val company: String,
-    val location: String,
-    val salaryRange: String,
-    val applicantsCount: Int = 0,
-    val isActive: Boolean = true
-)
-
+/**
+ * 💼 Admin Panel: Jobs Management (إدارة التوظيف وإعلانات الوظائف)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminJobsPanel(
     onBack: () -> Unit = {},
-    adminViewModel: AdminViewModel = viewModel(),
+    viewModel: MainViewModel = viewModel(),
+    themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    var showAddDialog by remember { mutableStateOf(false) }
-    var title by remember { mutableStateOf("") }
-    var company by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("صنعاء") }
-    var salary by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val jobs by viewModel.jobs.collectAsState()
 
-    var jobsList by remember {
-        mutableStateOf(
-            listOf(
-                JobOfferItem("JOB-1", "فني تمديدات كهربائية وطاقة", "شركة السعيد للطاقة", "صنعاء - حدة", "150,000 - 250,000 ر.ي", 12),
-                JobOfferItem("JOB-2", "صيدلي / مسوق أدوية", "مجموعة الشفاء الدوائية", "عدن - المنصورة", "200,000 - 300,000 ر.ي", 8),
-                JobOfferItem("JOB-3", "معلم تبريد وتكييف مركزي", "ورشة الخليج الهندسية", "تعز - شارع جمال", "180,000 - 280,000 ر.ي", 5)
-            )
-        )
-    }
+    var selectedFilter by remember { mutableStateOf("الكل") }
+    val filters = listOf("الكل", "مميز VIP", "نشط")
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("إدارة الوظائف وفرص العمل", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "إضافة وظيفة", tint = Color(0xFF00668B))
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = modifier.fillMaxSize().padding(paddingValues).background(Color(0xFFF8FAFC)),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(jobsList, key = { it.id }) { job ->
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column {
-                                Text(job.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                Text("${job.company} • ${job.location}", fontSize = 12.sp, color = Color.Gray)
-                            }
-                            Switch(
-                                checked = job.isActive,
-                                onCheckedChange = { active ->
-                                    jobsList = jobsList.map { if (it.id == job.id) it.copy(isActive = active) else it }
-                                    Toast.makeText(context, if (active) "تم تفعيل الوظيفة" else "تم تعطيل الوظيفة", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("الراتب المتوقع: ${job.salaryRange} | المتقدمين: ${job.applicantsCount}", fontSize = 12.sp, color = Color(0xFF00668B))
-                    }
-                }
+    val filteredJobs = remember(jobs, selectedFilter) {
+        jobs.filter { job ->
+            when (selectedFilter) {
+                "مميز VIP" -> job.isVip
+                "نشط" -> !job.isDeleted
+                else -> true
             }
         }
     }
 
-    if (showAddDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("نشر فرصة عمل جديدة") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("المسمى الوظيفي") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = company, onValueChange = { company = it }, label = { Text("الجهة / الشركة") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("الموقع والمدينة") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = salary, onValueChange = { salary = it }, label = { Text("الراتب التقديري") }, modifier = Modifier.fillMaxWidth())
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    if (title.isNotBlank() && company.isNotBlank()) {
-                        jobsList = listOf(JobOfferItem("JOB-${System.currentTimeMillis() % 1000}", title, company, location, salary.ifEmpty { "حسب الاتفاق" })) + jobsList
-                        showAddDialog = false
-                        title = ""; company = ""; salary = ""
-                        Toast.makeText(context, "تم نشر الوظيفة بنجاح", Toast.LENGTH_SHORT).show()
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("💼 إدارة فرص العمل والوظائف", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
                     }
-                }) { Text("نشر") }
-            },
-            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("إلغاء") } }
-        )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
+            )
+        },
+        containerColor = Color(0xFF0F172A)
+    ) { paddingValues ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            AdminFilterChips(
+                categories = filters,
+                selectedCategory = selectedFilter,
+                onSelectCategory = { selectedFilter = it },
+                themeColors = themeColors
+            )
+
+            if (filteredJobs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("لا توجد إعلانات وظائف حالياً", color = Color.Gray, fontSize = 13.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filteredJobs, key = { it.id }) { job ->
+                        AdminEntityCard(
+                            title = job.title.ifBlank { "فرصة عمل" },
+                            subtitle = "🏢 ${job.companyName} • 📍 ${job.cityId} • 💰 ${job.salary}",
+                            details = "📝 ${job.description.take(60)}...",
+                            statusText = if (job.isVip) "VIP ⭐" else "عادي",
+                            statusColor = if (job.isVip) Color(0xFFF59E0B) else Color(0xFF10B981),
+                            isVip = job.isVip,
+                            themeColors = themeColors,
+                            actions = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.setJobVip(job.id, !job.isVip)
+                                            scope.launch { snackbarHostState.showSnackbar(if (job.isVip) "تم إلغاء شارة VIP" else "تمت إضافة شارة VIP") }
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (job.isVip) Color(0xFFF59E0B) else themeColors.accent),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(if (job.isVip) "إلغاء VIP" else "ترقية VIP", fontSize = 10.5.sp, color = if (job.isVip) Color(0xFFF59E0B) else themeColors.accent)
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.deleteJobPermanently(job.id)
+                                            scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف الإعلان الوظيفي") }
+                                        },
+                                        modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }

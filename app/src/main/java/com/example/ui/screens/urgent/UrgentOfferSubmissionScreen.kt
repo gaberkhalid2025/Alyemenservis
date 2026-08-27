@@ -1,6 +1,5 @@
 package com.example.ui.screens.urgent
 
-import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -14,68 +13,55 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.NotificationEntity
-import com.example.data.models.InstantRequestEntity
-import com.example.data.models.RequestOfferEntity
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
 import com.example.ui.components.UrgentTimerComponent
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.viewmodels.UrgentUiState
+import com.example.viewmodels.UrgentViewModel
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 /**
  * ⚡ UrgentOfferSubmissionScreen
- * تقديم عرض استجابة سريعة للطلبات العاجلة مع مؤقت وخيارات وصول فورية
+ * تقديم عرض استجابة سريعة للطلبات العاجلة مع مؤقت وخيارات وصول فورية.
+ * تعتمد على UrgentViewModel وتدعم Snackbar ورسائل الأخطاء المنظمة.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentOfferSubmissionScreen(
     requestId: String,
     viewModel: MainViewModel,
+    urgentViewModel: UrgentViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onOfferSubmitted: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
-    val isProvider = viewModel.isProviderUser
-
-    var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
-    var isLoadingRequest by remember { mutableStateOf(true) }
+    val request by urgentViewModel.selectedRequest.collectAsState()
+    val uiState by urgentViewModel.uiState.collectAsState()
 
     var priceText by remember { mutableStateOf("") }
     var estimatedArrival by remember { mutableStateOf("الوصول خلال 15 دقيقة") }
     var estimatedDuration by remember { mutableStateOf("نصف ساعة") }
     var notesText by remember { mutableStateOf("") }
-    var isSubmitting by remember { mutableStateOf(false) }
 
     val fastArrivalOptions = listOf("الوصول خلال 15 دقيقة", "الوصول خلال 20 دقيقة", "الوصول خلال 30 دقيقة")
     val durationOptions = listOf("نصف ساعة", "ساعة واحدة", "ساعتان")
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
-            firestore.collection("instant_requests").document(requestId)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    request = snapshot.toObject(InstantRequestEntity::class.java)
-                    isLoadingRequest = false
-                }
-                .addOnFailureListener {
-                    isLoadingRequest = false
-                }
+            urgentViewModel.observeRequestDetails(requestId)
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -93,7 +79,7 @@ fun UrgentOfferSubmissionScreen(
             )
         }
     ) { paddingValues ->
-        if (isLoadingRequest) {
+        if (uiState is UrgentUiState.Loading && request == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xFFD32F2F))
             }
@@ -198,62 +184,30 @@ fun UrgentOfferSubmissionScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // زر إرسال العرض العاجل
+            val isSubmitting = uiState is UrgentUiState.Loading
             Button(
                 onClick = {
                     val price = priceText.toDoubleOrNull()
                     if (price == null || price <= 0.0) {
-                        Toast.makeText(context, "يرجى تحديد السعر", Toast.LENGTH_SHORT).show()
+                        scope.launch { snackbarHostState.showSnackbar("يرجى تحديد السعر") }
                         return@Button
                     }
 
-                    isSubmitting = true
-                    scope.launch {
-                        val offerId = UUID.randomUUID().toString()
-                        val newOffer = RequestOfferEntity(
-                            id = offerId,
-                            requestId = currentReq.id,
-                            requestCode = currentReq.requestCode,
-                            technicianId = currentUserId,
-                            technicianName = "فني طوارئ معتمد",
-                            technicianPhone = currentUserId,
-                            technicianAvatar = "",
-                            technicianRating = 5.0f,
-                            price = price,
-                            estimatedArrivalTime = estimatedArrival,
-                            estimatedDuration = estimatedDuration,
-                            notes = "🚨 استجابة طوارئ: $notesText",
-                            status = "PENDING",
-                            createdAt = System.currentTimeMillis()
-                        )
-
-                        firestore.collection("instant_offers").document(offerId).set(newOffer)
-                            .addOnSuccessListener {
-                                firestore.collection("instant_requests").document(currentReq.id)
-                                    .update("offersCount", FieldValue.increment(1))
-
-                                // إشعار طارئ للعميل
-                                val notifId = UUID.randomUUID().toString()
-                                val notif = NotificationEntity(
-                                    id = notifId,
-                                    title = "🚨 عرض طارئ لطلبك ${currentReq.requestCode}",
-                                    message = "وصلك عرض فوري من ${newOffer.technicianName} بسعر ${newOffer.price} ر.ي ووصول ${newOffer.estimatedArrivalTime}",
-                                    customerPhone = currentReq.userPhone,
-                                    targetType = "USER",
-                                    targetValue = currentReq.userPhone,
-                                    notificationType = "URGENT_OFFER",
-                                    timestamp = System.currentTimeMillis()
-                                )
-                                firestore.collection("notifications").document(notifId).set(notif)
-
-                                isSubmitting = false
-                                Toast.makeText(context, "تم إرسال عرضك الفوري بنجاح!", Toast.LENGTH_SHORT).show()
-                                onOfferSubmitted()
-                            }
-                            .addOnFailureListener { e ->
-                                isSubmitting = false
-                                Toast.makeText(context, "فشل الإرسال: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                            }
-                    }
+                    urgentViewModel.submitUrgentOffer(
+                        currentReq = currentReq,
+                        price = price,
+                        estimatedArrival = estimatedArrival,
+                        estimatedDuration = estimatedDuration,
+                        notesText = notesText,
+                        currentUserId = currentUserId,
+                        onSuccess = {
+                            scope.launch { snackbarHostState.showSnackbar("تم إرسال عرضك الفوري بنجاح!") }
+                            onOfferSubmitted()
+                        },
+                        onError = { err ->
+                            scope.launch { snackbarHostState.showSnackbar(err) }
+                        }
+                    )
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_urgent_offer_btn"),
                 shape = RoundedCornerShape(12.dp),

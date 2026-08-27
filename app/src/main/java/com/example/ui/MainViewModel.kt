@@ -2812,6 +2812,40 @@ class MainViewModel : ViewModel() {
         triggerNotification("🖼️ تم إضافة إعلان جديد: $title")
     }
 
+    fun addBanner(title: String, url: String, redirect: String, type: String, size: String, duration: Int, displayTime: String = "طوال اليوم") {
+        addNewBanner(title, url, redirect, type, size, duration, displayTime)
+    }
+
+    fun addNewStore(name: String, phone: String, cityId: String, localNeighborhood: String, categoryId: String, coverImage: String = "", workingHours: String = "9:00 AM - 10:00 PM") {
+        val nextId = "store_" + UUID.randomUUID().toString().take(6)
+        val store = StoreEntity(
+            id = nextId,
+            name = name,
+            phone = phone,
+            cityId = cityId,
+            localNeighborhood = localNeighborhood,
+            categoryId = categoryId,
+            coverImage = coverImage,
+            workingHours = workingHours
+        )
+        db.collection("stores").document(nextId).set(store)
+        triggerNotification("🛍️ تم إضافة متجر/منشأة جديدة: $name")
+    }
+
+    fun toggleStoreBlocked(storeId: String, isBlocked: Boolean) {
+        db.collection("stores").document(storeId).update("isBlocked", isBlocked)
+            .addOnSuccessListener {
+                triggerNotification(if (isBlocked) "🚫 تم حظر المتجر" else "✅ تم إلغاء حظر المتجر")
+            }
+    }
+
+    fun togglePropertyBlocked(propertyId: String, isBlocked: Boolean) {
+        db.collection("properties").document(propertyId).update("isBlocked", isBlocked)
+            .addOnSuccessListener {
+                triggerNotification(if (isBlocked) "🚫 تم حظر العقار" else "✅ تم إلغاء حظر العقار")
+            }
+    }
+
     fun deleteBanner(bannerId: String) {
         db.collection("banners").document(bannerId).delete()
         triggerNotification("🗑️ تم حذف الإعلان")
@@ -7393,6 +7427,37 @@ class MainViewModel : ViewModel() {
             .addOnSuccessListener {
                 triggerNotification("🚫 تم إلغاء الطلب الفوري بنجاح.")
             }
+    }
+
+    fun approvePendingProvider(pending: PendingProviderEntity) {
+        db.collection("pending_providers").document(pending.id).delete()
+        val provider = ProviderEntity(
+            id = if (pending.id.isNotBlank()) pending.id else "p_" + pending.phone,
+            name = pending.name,
+            phone = pending.phone,
+            categoryId = pending.categoryId,
+            area = pending.area,
+            localNeighborhood = pending.localNeighborhood,
+            subscriptionStatus = "APPROVED",
+            isAvailable = true,
+            profession = pending.profession,
+            specialization = pending.specialization,
+            customCategoryName = pending.customCategoryName,
+            password = pending.password,
+            providerType = pending.providerType
+        )
+        db.collection("providers").document(provider.id).set(provider)
+        triggerNotification("✅ تم قبول وتعميم الفني: ${pending.name}")
+    }
+
+    fun rejectPendingProvider(pending: PendingProviderEntity, reason: String = "تم رفض الطلب") {
+        db.collection("pending_providers").document(pending.id).delete()
+        triggerNotification("❌ تم رفض طلب انضمام: ${pending.name}")
+    }
+
+    fun clearAllNotifications() {
+        _notifications.value = emptyList()
+        triggerNotification("🧹 تم مسح كافة الإشعارات")
     }
 }
 
