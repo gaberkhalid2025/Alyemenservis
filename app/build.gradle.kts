@@ -22,20 +22,24 @@ android {
 
   signingConfigs {
     create("releaseConfig") {
-      val customKeystore = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-release-key.jks")
+      val customKeystore = file(System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() } ?: "${rootDir}/my-release-key.jks")
       val releaseKeystore = file("${rootDir}/release.keystore")
       val debugKeystore = file("${rootDir}/debug.keystore")
 
+      fun envOr(key: String, fallback: String): String {
+        return System.getenv(key)?.takeIf { it.isNotBlank() } ?: fallback
+      }
+
       if (customKeystore.exists()) {
         storeFile = customKeystore
-        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "Maher@@--@@736462##"
-        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "Maher"
-        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "Maher@@--@@736462##"
+        storePassword = envOr("RELEASE_KEYSTORE_PASSWORD", envOr("STORE_PASSWORD", "Maher@@--@@736462##"))
+        keyAlias = envOr("RELEASE_KEY_ALIAS", envOr("KEY_ALIAS", "Maher"))
+        keyPassword = envOr("RELEASE_KEY_PASSWORD", envOr("KEY_PASSWORD", "Maher@@--@@736462##"))
       } else if (releaseKeystore.exists()) {
         storeFile = releaseKeystore
-        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "Maher@@--@@736462##"
-        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "Maher"
-        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "Maher@@--@@736462##"
+        storePassword = envOr("RELEASE_KEYSTORE_PASSWORD", envOr("STORE_PASSWORD", "Maher@@--@@736462##"))
+        keyAlias = envOr("RELEASE_KEY_ALIAS", envOr("KEY_ALIAS", "Maher"))
+        keyPassword = envOr("RELEASE_KEY_PASSWORD", envOr("KEY_PASSWORD", "Maher@@--@@736462##"))
       } else if (debugKeystore.exists()) {
         storeFile = debugKeystore
         storePassword = "android"
