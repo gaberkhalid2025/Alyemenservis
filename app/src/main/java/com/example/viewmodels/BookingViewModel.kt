@@ -69,6 +69,16 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     private val _successMessage = MutableStateFlow<String?>(null)
     val successMessage: StateFlow<String?> = _successMessage.asStateFlow()
 
+    // Unified UI State using sealed interface
+    sealed interface BookingUiState {
+        object Loading : BookingUiState
+        data class Success(val bookings: List<BookingEntity>) : BookingUiState
+        data class Error(val message: String) : BookingUiState
+    }
+
+    private val _uiState = MutableStateFlow<BookingUiState>(BookingUiState.Loading)
+    val uiState: StateFlow<BookingUiState> = _uiState.asStateFlow()
+
     companion object {
         private const val TAG = "BookingViewModel"
     }
@@ -83,21 +93,25 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     fun loadAllBookings() {
         viewModelScope.launch {
             _isLoading.value = true
+            _uiState.value = BookingUiState.Loading
             try {
                 firestore.collection("bookings")
                     .addSnapshotListener { snapshot, error ->
                         _isLoading.value = false
                         if (error != null) {
                             Log.w(TAG, "Bookings listen failed: ${error.message}")
+                            _uiState.value = BookingUiState.Error(error.message ?: "فشل تحميل البيانات")
                             return@addSnapshotListener
                         }
                         if (snapshot != null) {
                             val list = snapshot.documents.mapNotNull { it.toObject(BookingEntity::class.java) }
                             _bookings.value = list
+                            _uiState.value = BookingUiState.Success(list)
                         }
                     }
             } catch (e: Exception) {
                 _isLoading.value = false
+                _uiState.value = BookingUiState.Error(e.message ?: "خطأ أثناء جلب البيانات")
                 Log.e(TAG, "Error loading bookings: ${e.message}")
             }
         }

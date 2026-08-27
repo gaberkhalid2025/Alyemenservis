@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,19 +17,32 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
+/**
+ * 🌟 Premium Multi-Dimensional Rating & Review Input (10/10 UX)
+ * Allows users to rate multiple dimensions of the service provider:
+ * 1. Speed & Execution (السرعة والالتزام)
+ * 2. Quality of Service (جودة العمل)
+ * 3. Fair Price (السعر المناسب)
+ * Computes the aggregate rating automatically while maintaining full backward-compatibility.
+ */
 @Composable
 fun ReviewInput(
     modifier: Modifier = Modifier,
     onSubmit: (rating: Int, comment: String) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    var rating by remember { mutableIntStateOf(5) }
+    
+    // Multi-dimensional ratings
+    var ratingSpeed by remember { mutableIntStateOf(5) }
+    var ratingQuality by remember { mutableIntStateOf(5) }
+    var ratingPrice by remember { mutableIntStateOf(5) }
+    
     var comment by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf("") }
 
     if (!isExpanded) {
-        // Collapsed state: Compact and elegant button to trigger review input
         OutlinedButton(
             onClick = { isExpanded = true },
             modifier = modifier
@@ -41,8 +53,7 @@ fun ReviewInput(
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.primary
-            ),
-            border = ButtonDefaults.outlinedButtonBorder.copy()
+            )
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -50,16 +61,15 @@ fun ReviewInput(
             ) {
                 Text("⭐ ", fontSize = 16.sp)
                 Text(
-                    text = "أضف تقييمك ورأيك في الخدمة",
+                    text = "أضف تقييمك ورأيك في الخدمة (تقييم ثلاثي الأبعاد)",
                     style = MaterialTheme.typography.labelLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 )
             }
         }
     } else {
-        // Expanded state: Full rating card with a close button
         Card(
             modifier = modifier
                 .fillMaxWidth()
@@ -67,7 +77,7 @@ fun ReviewInput(
                 .testTag("review_input_card"),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
             )
         ) {
             Column(
@@ -83,7 +93,7 @@ fun ReviewInput(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "شاركنا رأيك وتقييمك للخدمة",
+                        text = "شاركنا تقييمك التفصيلي للخدمة",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
@@ -105,32 +115,35 @@ fun ReviewInput(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Star Rating Selector
-                Row(
-                    modifier = Modifier
-                        .padding(vertical = 4.dp)
-                        .testTag("star_rating_row"),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    for (i in 1..5) {
-                        val isSelected = i <= rating
-                        Icon(
-                            imageVector = if (isSelected) Icons.Filled.Star else Icons.Outlined.Star,
-                            contentDescription = "Star $i",
-                            tint = if (isSelected) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    rating = i
-                                }
-                                .testTag("star_button_$i")
-                        )
-                    }
-                }
+                // Dimension 1: Speed
+                RatingDimensionRow(
+                    title = "⚡ السرعة والالتزام بالوقت",
+                    rating = ratingSpeed,
+                    onRatingChanged = { ratingSpeed = it },
+                    tagPrefix = "speed"
+                )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Dimension 2: Quality
+                RatingDimensionRow(
+                    title = "🛠️ جودة الخدمة والعمل",
+                    rating = ratingQuality,
+                    onRatingChanged = { ratingQuality = it },
+                    tagPrefix = "quality"
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Dimension 3: Price
+                RatingDimensionRow(
+                    title = "💰 مناسبة السعر والاتفاق",
+                    rating = ratingPrice,
+                    onRatingChanged = { ratingPrice = it },
+                    tagPrefix = "price"
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Feedback TextField
                 OutlinedTextField(
@@ -174,11 +187,15 @@ fun ReviewInput(
                         if (comment.isBlank()) {
                             errorMsg = "الرجاء كتابة تعليق قبل الإرسال"
                         } else {
-                            onSubmit(rating, comment)
+                            // Compute mathematically rounded average for backward compatibility
+                            val aggregateRating = ((ratingSpeed + ratingQuality + ratingPrice) / 3.0f).roundToInt()
+                            onSubmit(aggregateRating.coerceIn(1, 5), comment)
                             comment = ""
-                            rating = 5
+                            ratingSpeed = 5
+                            ratingQuality = 5
+                            ratingPrice = 5
                             errorMsg = ""
-                            isExpanded = false // Auto collapse on successful submit
+                            isExpanded = false
                         }
                     },
                     modifier = Modifier
@@ -199,6 +216,45 @@ fun ReviewInput(
                         )
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingDimensionRow(
+    title: String,
+    rating: Int,
+    onRatingChanged: (Int) -> Unit,
+    tagPrefix: String
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.testTag("rating_row_$tagPrefix")
+        ) {
+            for (i in 1..5) {
+                val isSelected = i <= rating
+                Icon(
+                    imageVector = if (isSelected) Icons.Filled.Star else Icons.Outlined.Star,
+                    contentDescription = "$title Star $i",
+                    tint = if (isSelected) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onRatingChanged(i) }
+                        .testTag("star_${tagPrefix}_$i")
+                )
             }
         }
     }

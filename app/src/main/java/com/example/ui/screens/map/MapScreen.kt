@@ -72,13 +72,18 @@ fun MapScreen(
     val userLatState by viewModel.userLatitude.collectAsState()
     val userLngState by viewModel.userLongitude.collectAsState()
 
+    // Connection Monitor
+    val connectionManager = remember { com.example.utils.ConnectionManager(context) }
+    val isOnlineState by connectionManager.isOnline.collectAsState()
+
     // Persistent State
     var isRadarMode by rememberSaveable { mutableStateOf(false) }
     var isHeatmapActive by rememberSaveable { mutableStateOf(false) }
     var selectedCategory by rememberSaveable { mutableStateOf("ALL") }
     var selectedCity by rememberSaveable { mutableStateOf("صنعاء") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var maxRangeKm by rememberSaveable { mutableFloatStateOf(25.0f) }
+    var maxRangeKm by rememberSaveable { mutableFloatStateOf(100.0f) }
+    var minRating by rememberSaveable { mutableFloatStateOf(0.0f) }
 
     // Dynamic technician offsets with safe cleanup
     val dynamicOffsets = remember { mutableStateMapOf<String, Pair<Double, Double>>() }
@@ -277,41 +282,68 @@ fun MapScreen(
         }
     }
 
-    // Filtered lists
-    val filteredProviders = remember(safeProviders, selectedCategory, selectedCity, searchQuery) {
-        safeProviders.filter { p ->
-            val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROVIDERS"
-            val matchesCity = selectedCity.isEmpty() || p.area.contains(selectedCity) || p.cityId.contains(selectedCity) || p.localNeighborhood.contains(selectedCity)
-            val matchesQuery = searchQuery.isEmpty() || p.name.contains(searchQuery, ignoreCase = true) ||
-                    p.profession.contains(searchQuery, ignoreCase = true) || p.customCategoryName.contains(searchQuery, ignoreCase = true)
-            matchesCat && matchesCity && matchesQuery
-        }
-    }
+    // Filtered lists optimized with derivedStateOf
+    val filteredProviders by remember {
+        derivedStateOf {
+            safeProviders.filter { p ->
+                val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROVIDERS"
+                val matchesCity = selectedCity.isEmpty() || p.area.contains(selectedCity) || p.cityId.contains(selectedCity) || p.localNeighborhood.contains(selectedCity)
+                val matchesQuery = searchQuery.isEmpty() || p.name.contains(searchQuery, ignoreCase = true) ||
+                        p.profession.contains(searchQuery, ignoreCase = true) || p.customCategoryName.contains(searchQuery, ignoreCase = true)
+                
+                // Distance Range check
+                val distanceM = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, p.latitude, p.longitude)
+                val matchesDistance = maxRangeKm >= 100.0f || (distanceM <= maxRangeKm * 1000)
 
-    val filteredStores = remember(safeStores, selectedCategory, selectedCity, searchQuery) {
-        safeStores.filter { s ->
-            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
-            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
-            
-            val matchesCat = when (selectedCategory) {
-                "ALL" -> true
-                "STORES" -> !isMedical && !isRestaurant
-                "RESTAURANTS" -> isRestaurant
-                "MEDICAL" -> isMedical
-                else -> false
+                // Rating check
+                val matchesRating = p.rating >= minRating
+
+                matchesCat && matchesCity && matchesQuery && matchesDistance && matchesRating
             }
-            val matchesCity = selectedCity.isEmpty() || s.cityId.contains(selectedCity) || s.localNeighborhood.contains(selectedCity)
-            val matchesQuery = searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.description.contains(searchQuery, ignoreCase = true)
-            matchesCat && matchesCity && matchesQuery
         }
     }
 
-    val filteredProperties = remember(safeProperties, selectedCategory, selectedCity, searchQuery) {
-        safeProperties.filter { pr ->
-            val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROPERTIES"
-            val matchesCity = selectedCity.isEmpty() || pr.cityId.contains(selectedCity) || pr.localNeighborhood.contains(selectedCity)
-            val matchesQuery = searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true) || pr.description.contains(searchQuery, ignoreCase = true)
-            matchesCat && matchesCity && matchesQuery
+    val filteredStores by remember {
+        derivedStateOf {
+            safeStores.filter { s ->
+                val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
+                val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
+                
+                val matchesCat = when (selectedCategory) {
+                    "ALL" -> true
+                    "STORES" -> !isMedical && !isRestaurant
+                    "RESTAURANTS" -> isRestaurant
+                    "MEDICAL" -> isMedical
+                    else -> false
+                }
+                val matchesCity = selectedCity.isEmpty() || s.cityId.contains(selectedCity) || s.localNeighborhood.contains(selectedCity)
+                val matchesQuery = searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.description.contains(searchQuery, ignoreCase = true)
+                
+                // Distance Range check
+                val distanceM = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, s.latitude, s.longitude)
+                val matchesDistance = maxRangeKm >= 100.0f || (distanceM <= maxRangeKm * 1000)
+
+                // Rating check
+                val matchesRating = s.rating >= minRating
+
+                matchesCat && matchesCity && matchesQuery && matchesDistance && matchesRating
+            }
+        }
+    }
+
+    val filteredProperties by remember {
+        derivedStateOf {
+            safeProperties.filter { pr ->
+                val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROPERTIES"
+                val matchesCity = selectedCity.isEmpty() || pr.cityId.contains(selectedCity) || pr.localNeighborhood.contains(selectedCity)
+                val matchesQuery = searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true) || pr.description.contains(searchQuery, ignoreCase = true)
+                
+                // Distance Range check
+                val distanceM = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, pr.latitude, pr.longitude)
+                val matchesDistance = maxRangeKm >= 100.0f || (distanceM <= maxRangeKm * 1000)
+
+                matchesCat && matchesCity && matchesQuery && matchesDistance
+            }
         }
     }
 
@@ -466,24 +498,44 @@ fun MapScreen(
                             )
                         }
 
-                        // Entity Count Badge
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF00E5FF).copy(alpha = 0.15f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.4f))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "${radarPoints.size} خدمة متوفرة",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00E5FF),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                            // Connection Status Badge
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isOnlineState) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isOnlineState) Color(0xFF10B981).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = if (isOnlineState) "🟢 متصل" else "📡 محلي",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isOnlineState) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            // Entity Count Badge
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF00E5FF).copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "${radarPoints.size} خدمة",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF00E5FF),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
 
-                // Filter Bar
+                // Filter Bar with Advanced Multi-Filtering
                 MapFilterBar(
                     selectedCategory = selectedCategory,
                     onCategorySelected = { selectedCategory = it },
@@ -495,6 +547,10 @@ fun MapScreen(
                     },
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
+                    maxDistanceKm = maxRangeKm,
+                    onMaxDistanceChange = { maxRangeKm = it },
+                    minRating = minRating,
+                    onMinRatingChange = { minRating = it },
                     themeColors = themeColors
                 )
             }

@@ -15,6 +15,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -26,12 +27,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
@@ -47,7 +54,8 @@ import com.example.utils.getPropertyCoords
  * - WebChromeClient for JavaScript console & error monitoring in Logcat
  * - Offline tile caching via OfflineMapManager
  * - Approximate fallback coordinates for zero-coordinate entities
- * - Smooth CircularProgressIndicator during map initialization
+ * - Smooth custom Shimmer Skeleton loader during map initialization
+ * - Lifecycle-aware onResume/onPause handling to save CPU and RAM resources
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -202,6 +210,28 @@ fun RealLeafletMapView(
         webViewRef?.evaluateJavascript("if (window.updateMapMarkers) { window.updateMapMarkers([$markersJson]); }", null)
     }
 
+    // Lifecycle-aware WebView observer to pause timers & rendering when screen backgrounded
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, webViewRef) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    webViewRef?.onResume()
+                    webViewRef?.resumeTimers()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    webViewRef?.onPause()
+                    webViewRef?.pauseTimers()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val htmlContent = """
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
@@ -261,26 +291,41 @@ fun RealLeafletMapView(
                     var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                             Math.sin(dLon/2) * Math.sin(dLon/2);
-                    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+                    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    return R * c;
                 }
 
-                function computeEtaText(distKm) {
+                function formatDistance(distKm) {
                     if (distKm < 1.0) {
-                        var mins = Math.max(1, Math.round(distKm / 5.0 * 60));
-                        return '⏱️ ~ ' + mins + ' دقيقة سيراً (' + Math.round(distKm * 1000) + ' م)';
+                        return Math.round(distKm * 1000) + " م";
                     } else {
-                        var mins = Math.max(1, Math.round(distKm / 35.0 * 60));
-                        return '🚘 ~ ' + mins + ' دقيقة بالسيارة (' + distKm.toFixed(1) + ' كم)';
+                        return distKm.toFixed(1) + " كم";
                     }
                 }
 
-                try {
-                    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([userLat, userLng], 14);
+                function getEta(distKm) {
+                    if (distKm < 1.0) {
+                        return Math.max(1, Math.round((distKm / 5.0) * 60)) + " دقيقة سيراً 🏃";
+                    } else {
+                        return Math.max(1, Math.round((distKm / 35.0) * 60)) + " دقيقة بالسيارة 🚗";
+                    }
+                }
 
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                        maxZoom: 19,
-                        subdomains: 'abcd'
+                function initMap() {
+                    map = L.map('map', {
+                        zoomControl: false,
+                        attributionControl: false
+                    }).setView([userLat, userLng], 14);
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19
                     }).addTo(map);
+
+                    clusterGroup = L.markerClusterGroup({
+                        maxClusterRadius: 40,
+                        showCoverageOnHover: false
+                    });
+                    map.addLayer(clusterGroup);
 
                     var userIcon = L.divIcon({
                         className: 'user-marker-container',
@@ -288,95 +333,86 @@ fun RealLeafletMapView(
                         iconSize: [32, 32],
                         iconAnchor: [16, 16]
                     });
-                    L.marker([userLat, userLng], {icon: userIcon, zIndexOffset: 1000}).addTo(map)
-                        .bindPopup("<div class='popup-card'><b style='color:#00E5FF;'>📍 موقعك الحالي المباشر</b><br/><span style='font-size:11px;color:#94A3B8;'>نقطة ارتكاز البحث وحساب المسافات</span></div>");
-
-                    clusterGroup = (typeof L.markerClusterGroup === 'function') ? L.markerClusterGroup({
-                        chunkedLoading: true,
-                        maxClusterRadius: 40,
-                        spiderfyOnMaxZoom: true,
-                        showCoverageOnHover: false
-                    }) : L.layerGroup();
-
-                    window.updateMapMarkers = function(rawMarkers) {
-                        clusterGroup.clearLayers();
-                        var bounds = [ [userLat, userLng] ];
-
-                        rawMarkers.forEach(function(item) {
-                            if (!item.lat || !item.lng) return;
-                            var distNum = calculateDistKm(userLat, userLng, item.lat, item.lng);
-                            var etaString = computeEtaText(distNum);
-
-                            var customIcon = L.divIcon({
-                                className: 'custom-pin-wrapper',
-                                html: '<div class="custom-pin" style="border-color:' + item.badgeColor + '; box-shadow: 0 0 12px ' + item.badgeColor + '66;">' + item.emoji + '</div>',
-                                iconSize: [44, 44],
-                                iconAnchor: [22, 22]
-                            });
-
-                            var m = L.marker([item.lat, item.lng], {icon: customIcon});
-                            bounds.push([item.lat, item.lng]);
-
-                            var approxBadge = item.isApprox ? '<div class="popup-approx-badge">📍 موقع تقريبي</div>' : '';
-                            var callBtnHtml = item.phone ? '<a href="tel:' + item.phone + '" class="btn-call">📞 اتصال</a>' : '';
-                            var navBtnHtml = '<button onclick="AndroidBridge.openNavigation(' + item.lat + ',' + item.lng + ',\'' + item.name + '\')" class="btn-nav">🗺️ اتجاهات</button>';
-
-                            var popupHtml = "<div class='popup-card'>" +
-                                "<div class='popup-cat-badge' style='color:" + item.badgeColor + "; border: 1px solid " + item.badgeColor + "44;'>" + item.serviceCategory + "</div>" +
-                                approxBadge +
-                                "<div class='popup-title'>" + item.name + "</div>" +
-                                "<div class='popup-spec'>" + item.spec + "</div>" +
-                                "<div class='popup-meta'>" +
-                                    "<div class='popup-meta-row'><span>⭐ تقييم: " + item.rating + "</span><span>" + item.status + "</span></div>" +
-                                    "<div class='popup-eta'>" + etaString + "</div>" +
-                                "</div>" +
-                                "<div class='popup-buttons'>" +
-                                    "<button onclick=\"AndroidBridge.onMarkerClicked('" + item.type + "', '" + item.id + "')\" class='btn-details'>عرض التفاصيل والطلب 🔍</button>" +
-                                    "<div class='popup-buttons-row'>" +
-                                        callBtnHtml +
-                                        navBtnHtml +
-                                    "</div>" +
-                                "</div>" +
-                                "</div>";
-
-                            m.bindPopup(popupHtml);
-                            clusterGroup.addLayer(m);
-                        });
-
-                        map.addLayer(clusterGroup);
-                    };
+                    L.marker([userLat, userLng], { icon: userIcon }).addTo(map);
 
                     window.updateMapMarkers([$markersJson]);
 
                     if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
                         window.AndroidBridge.onMapReady();
                     }
-                } catch(e) {
-                    console.error("Leaflet init error:", e);
-                    if (window.AndroidBridge && window.AndroidBridge.onMapLoadFailed) {
-                        window.AndroidBridge.onMapLoadFailed();
-                    }
                 }
+
+                window.updateMapMarkers = function(rawMarkers) {
+                    if (!map || !clusterGroup) return;
+                    clusterGroup.clearLayers();
+
+                    rawMarkers.forEach(function(item) {
+                        var dist = calculateDistKm(userLat, userLng, item.lat, item.lng);
+                        var distStr = formatDistance(dist);
+                        var etaStr = getEta(dist);
+
+                        var pinIcon = L.divIcon({
+                            className: 'custom-pin-container',
+                            html: '<div class="custom-pin" style="border-color: ' + item.badgeColor + ';">' + item.emoji + '</div>',
+                            iconSize: [44, 44],
+                            iconAnchor: [22, 22]
+                        });
+
+                        var popupHtml = '<div class="popup-card">' +
+                            '<div class="popup-cat-badge" style="color: ' + item.badgeColor + '; border-color: ' + item.badgeColor + '; border: 1px solid;">' + item.serviceCategory + '</div>' +
+                            (item.isApprox ? '<br/><div class="popup-approx-badge">📍 موقع تقريبي لتسهيل الوصول</div>' : '') +
+                            '<div class="popup-title">' + item.name + '</div>' +
+                            '<div class="popup-spec">' + item.spec + '</div>' +
+                            '<div class="popup-meta">' +
+                                '<div class="popup-meta-row"><span>التقييم:</span><span>⭐ ' + item.rating + '</span></div>' +
+                                '<div class="popup-meta-row"><span>المسافة:</span><span class="popup-eta">' + distStr + '</span></div>' +
+                                '<div class="popup-meta-row"><span>الوقت المتوقع:</span><span class="popup-eta">' + etaStr + '</span></div>' +
+                                '<div class="popup-meta-row"><span>الحالة:</span><span>' + item.status + '</span></div>' +
+                            '</div>' +
+                            '<div class="popup-buttons">' +
+                                '<button class="btn-details" onclick="AndroidBridge.onMarkerClicked(\'' + item.type + '\', \'' + item.id + '\')">📱 تفاصيل الخدمة والطلب</button>' +
+                                '<div class="popup-buttons-row">' +
+                                    '<a class="btn-call" href="tel:' + item.phone + '">📞 اتصال</a>' +
+                                    '<button class="btn-nav" onclick="AndroidBridge.openNavigation(' + item.lat + ',' + item.lng + ', \'' + item.name.replace(/'/g, "\\'") + '\')">🗺️ وجهني</button>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>';
+
+                        var marker = L.marker([item.lat, item.lng], { icon: pinIcon }).bindPopup(popupHtml, {
+                            maxWidth: 260,
+                            minWidth: 220,
+                            closeButton: false
+                        });
+                        clusterGroup.addLayer(marker);
+                    });
+                };
+
+                window.onload = function() {
+                    try {
+                        initMap();
+                    } catch(e) {
+                        if (window.AndroidBridge && window.AndroidBridge.onMapLoadFailed) {
+                            window.AndroidBridge.onMapLoadFailed();
+                        }
+                    }
+                };
             </script>
         </body>
         </html>
     """.trimIndent()
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 WebView(ctx).apply {
                     webViewRef = this
-                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    isHapticFeedbackEnabled = true
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         cacheMode = WebSettings.LOAD_DEFAULT
-                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                     }
                     webChromeClient = object : WebChromeClient() {
                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
@@ -478,31 +514,14 @@ fun RealLeafletMapView(
             }
         )
 
-        // Loading Indicator
+        // Custom High-Quality Shimmer Loading Skeleton
         AnimatedVisibility(
             visible = isMapLoading,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center)
         ) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.9f),
-                modifier = Modifier.padding(24.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color(0xFF00E5FF),
-                        strokeWidth = 2.5.dp
-                    )
-                    Text("جاري تحميل الخريطة المباشرة...", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
+            MapLoadingSkeleton()
         }
 
         // Fallback UI overlay if network fails
@@ -544,6 +563,149 @@ fun RealLeafletMapView(
                             Text("الرادار المحلي", color = Color(0xFF0F172A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 🎨 Shimmer brush builder
+ */
+@Composable
+fun ShimmerBrush(showShimmer: Boolean = true, targetValue: Float = 1000f): Brush {
+    return if (showShimmer) {
+        val transition = rememberInfiniteTransition(label = "shimmer_trans")
+        val translateAnimation by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = targetValue,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1200, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "shimmer_anim"
+        )
+        Brush.linearGradient(
+            colors = listOf(
+                Color(0xFF0F172A),
+                Color(0xFF1E293B),
+                Color(0xFF0F172A)
+            ),
+            start = Offset.Zero,
+            end = Offset(x = translateAnimation, y = translateAnimation)
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(Color(0xFF0F172A), Color(0xFF0F172A)),
+            start = Offset.Zero,
+            end = Offset.Zero
+        )
+    }
+}
+
+/**
+ * 🗺️ Map Loading Skeleton
+ * Animated, rich visual representation of the map dashboard loading
+ */
+@Composable
+fun MapLoadingSkeleton() {
+    val brush = ShimmerBrush()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF020617))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Top Bar Skeleton
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(brush)
+            )
+
+            // Main Map Skeleton with visual ripples representing radar/mapping
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(brush),
+                contentAlignment = Alignment.Center
+            ) {
+                // Interactive Radar Scanning Ripple inside skeleton
+                val transition = rememberInfiniteTransition(label = "radar_skeleton_trans")
+                val pulseScale by transition.animateFloat(
+                    initialValue = 0.2f,
+                    targetValue = 1.0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1500, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "radar_pulse_scale"
+                )
+                val pulseAlpha by transition.animateFloat(
+                    initialValue = 0.6f,
+                    targetValue = 0.0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1500, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "radar_pulse_alpha"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(180.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xFF00E5FF).copy(alpha = pulseAlpha),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        color = Color(0xFF00E5FF),
+                        strokeWidth = 3.dp
+                    )
+                    Text(
+                        "تحميل دليل اليمن التفاعلي...",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Bottom Items Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(84.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                repeat(2) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(brush)
+                    )
                 }
             }
         }

@@ -26,6 +26,7 @@ import com.example.utils.VisualThemePalette
  * - Search text field
  * - City selector dropdown (Sana'a, Aden, Taiz, etc.)
  * - Categorical filter chips (All, Technicians, Stores, Restaurants, Medical, Properties)
+ * - Advanced distance range and rating score filters
  */
 @Composable
 fun MapFilterBar(
@@ -35,6 +36,10 @@ fun MapFilterBar(
     onCitySelected: (String) -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    maxDistanceKm: Float,
+    onMaxDistanceChange: (Float) -> Unit,
+    minRating: Float,
+    onMinRatingChange: (Float) -> Unit,
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
@@ -171,6 +176,77 @@ fun MapFilterBar(
                     ),
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.testTag("filter_chip_$catKey")
+                )
+            }
+        }
+
+        // Distance & Rating Filter Row (Mobile friendly)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("📍 المسافة:", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            
+            val distanceOptions = listOf(
+                Pair(100.0f, "الكل"),
+                Pair(5.0f, "5 كم 🏃"),
+                Pair(15.0f, "15 كم 🚗"),
+                Pair(30.0f, "30 كم 🚘")
+            )
+            
+            distanceOptions.forEach { (dist, label) ->
+                val isSelected = maxDistanceKm == dist
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onMaxDistanceChange(dist) },
+                    label = { Text(label, fontSize = 11.sp, color = if (isSelected) Color(0xFF0F172A) else Color.White) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF00E5FF),
+                        containerColor = Color(0xFF1E293B)
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = Color(0xFF334155),
+                        selectedBorderColor = Color(0xFF00E5FF)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+            VerticalDivider(modifier = Modifier.height(16.dp), color = Color.White.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Text("⭐️ التقييم:", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+            val ratingOptions = listOf(
+                Pair(0.0f, "الكل"),
+                Pair(4.0f, "4.0+ ⭐️"),
+                Pair(4.5f, "4.5+ ⭐️"),
+                Pair(4.8f, "4.8+ ⭐️")
+            )
+
+            ratingOptions.forEach { (rating, label) ->
+                val isSelected = minRating == rating
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onMinRatingChange(rating) },
+                    label = { Text(label, fontSize = 11.sp, color = if (isSelected) Color(0xFF0F172A) else Color.White) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF00E5FF),
+                        containerColor = Color(0xFF1E293B)
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isSelected,
+                        borderColor = Color(0xFF334155),
+                        selectedBorderColor = Color(0xFF00E5FF)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
         }

@@ -39,6 +39,12 @@ interface SyncDataDao {
     @Query("DELETE FROM sync_data WHERE timestamp < :cutoff")
     suspend fun deleteOlderThan(cutoff: Long)
 
+    @Transaction
+    suspend fun pruneExpiredCache(ttlMillis: Long = 7 * 24 * 60 * 60 * 1000L) { // 7 days default
+        val cutoff = System.currentTimeMillis() - ttlMillis
+        deleteOlderThan(cutoff)
+    }
+
     @Query("DELETE FROM sync_data WHERE key = :key")
     suspend fun deleteByKey(key: String)
 
