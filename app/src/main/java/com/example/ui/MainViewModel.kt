@@ -3057,6 +3057,13 @@ class MainViewModel : ViewModel() {
             }
     }
 
+    fun deleteInternalWallet(walletId: String) {
+        db.collection("internal_wallets").document(walletId).delete()
+            .addOnSuccessListener {
+                triggerNotification("🗑️ تم حذف المحفظة بنجاح")
+            }
+    }
+
     fun performWalletTransaction(
         walletId: String,
         ownerName: String,
