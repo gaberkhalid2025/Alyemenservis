@@ -20,7 +20,7 @@ import kotlin.math.*
 /**
  * 📡 RadarRenderer
  * High-performance radar scanner Canvas with concentric distance rings, sweep line,
- * pulse ripples, and interactive touch navigation.
+ * dual pulse ripples with 800ms offset, fade-out alpha, and cached clustering.
  */
 @Composable
 fun RadarRenderer(
@@ -29,9 +29,13 @@ fun RadarRenderer(
     onItemSelected: (MarkerRenderer.MapItemPoint) -> Unit,
     isHeatmapActive: Boolean,
     maxRangeKm: Float,
+    pulseColor: Color = Color(0xFF00E5FF),
+    pulseCycleDurationMs: Int = 2500,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "radar_anim")
+    
+    // Rotating sweep line (3.5s cycle)
     val sweepAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -42,21 +46,23 @@ fun RadarRenderer(
         label = "sweep_angle"
     )
 
+    // Pulse 1: Primary expanding wave (2.5s cycle with FastOutSlowInEasing)
     val pulseRadius by infiniteTransition.animateFloat(
         initialValue = 0.05f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2400, easing = FastOutSlowInEasing),
+            animation = tween(pulseCycleDurationMs, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "pulse_radius"
+        label = "pulse_radius_1"
     )
 
+    // Pulse 2: Secondary wave with exactly 800ms offset
     val pulseRadius2 by infiniteTransition.animateFloat(
         initialValue = 0.05f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2400, delayMillis = 800, easing = FastOutSlowInEasing),
+            animation = tween(pulseCycleDurationMs, delayMillis = 800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "pulse_radius_2"
@@ -69,6 +75,42 @@ fun RadarRenderer(
         val widthPx = constraints.maxWidth.toFloat()
         val heightPx = constraints.maxHeight.toFloat()
 
+        val centerX = widthPx / 2f + panOffset.x
+        val centerY = heightPx / 2f + panOffset.y
+        val maxRadius = min(widthPx, heightPx) * 0.44f * zoomScale
+
+        // Performance Optimization: Cache screen items and clusters so they are NOT recalculated in every 60fps animation frame
+        val screenItems by remember(items, centerX, centerY, zoomScale) {
+            derivedStateOf {
+                items.map { item ->
+                    item.copy(
+                        x = centerX + item.x * zoomScale,
+                        y = centerY + item.y * zoomScale
+                    )
+                }
+            }
+        }
+
+        val clusters by remember(screenItems, zoomScale) {
+            derivedStateOf {
+                MarkerRenderer.clusterPoints(screenItems, thresholdPx = 45f * zoomScale)
+            }
+        }
+
+        val weightedPoints by remember(items, centerX, centerY, zoomScale, isHeatmapActive) {
+            derivedStateOf {
+                if (isHeatmapActive) {
+                    items.map { item ->
+                        HeatmapRenderer.WeightedPoint(
+                            x = centerX + item.x * zoomScale,
+                            y = centerY + item.y * zoomScale,
+                            weight = 1.2f
+                        )
+                    }
+                } else emptyList()
+            }
+        }
+
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -78,20 +120,13 @@ fun RadarRenderer(
                         panOffset += pan
                     }
                 }
-                .pointerInput(items, zoomScale, panOffset, widthPx, heightPx) {
+                .pointerInput(screenItems) {
                     detectTapGestures { tapOffset ->
-                        val cX = widthPx / 2f + panOffset.x
-                        val cY = heightPx / 2f + panOffset.y
-                        // Find closest item within 50px of tap
-                        val clicked = items.minByOrNull { item ->
-                            val screenX = cX + item.x * zoomScale
-                            val screenY = cY + item.y * zoomScale
-                            sqrt((tapOffset.x - screenX).pow(2) + (tapOffset.y - screenY).pow(2))
+                        val clicked = screenItems.minByOrNull { item ->
+                            sqrt((tapOffset.x - item.x).pow(2) + (tapOffset.y - item.y).pow(2))
                         }
                         if (clicked != null) {
-                            val screenX = cX + clicked.x * zoomScale
-                            val screenY = cY + clicked.y * zoomScale
-                            val dist = sqrt((tapOffset.x - screenX).pow(2) + (tapOffset.y - screenY).pow(2))
+                            val dist = sqrt((tapOffset.x - clicked.x).pow(2) + (tapOffset.y - clicked.y).pow(2))
                             if (dist < 60f) {
                                 onItemSelected(clicked)
                             }
@@ -99,10 +134,6 @@ fun RadarRenderer(
                     }
                 }
         ) {
-            val centerX = size.width / 2f + panOffset.x
-            val centerY = size.height / 2f + panOffset.y
-            val maxRadius = min(size.width, size.height) * 0.44f * zoomScale
-
             // 1. Dark Background Gradient
             drawCircle(
                 brush = Brush.radialGradient(
@@ -119,7 +150,7 @@ fun RadarRenderer(
             for (i in 1..rings) {
                 val ringRadius = maxRadius * (i.toFloat() / rings)
                 drawCircle(
-                    color = Color(0xFF00E5FF).copy(alpha = 0.18f),
+                    color = pulseColor.copy(alpha = 0.18f),
                     radius = ringRadius,
                     center = Offset(centerX, centerY),
                     style = Stroke(width = 1.2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f)))
@@ -128,27 +159,30 @@ fun RadarRenderer(
 
             // 3. Crosshairs
             drawLine(
-                color = Color(0xFF00E5FF).copy(alpha = 0.22f),
+                color = pulseColor.copy(alpha = 0.22f),
                 start = Offset(centerX - maxRadius, centerY),
                 end = Offset(centerX + maxRadius, centerY),
                 strokeWidth = 1f
             )
             drawLine(
-                color = Color(0xFF00E5FF).copy(alpha = 0.22f),
+                color = pulseColor.copy(alpha = 0.22f),
                 start = Offset(centerX, centerY - maxRadius),
                 end = Offset(centerX, centerY + maxRadius),
                 strokeWidth = 1f
             )
 
-            // 4. Expanding Radar Pulses
+            // 4. Expanding Radar Pulses with Alpha Fade-Out
+            val alpha1 = ((1.0f - pulseRadius) * 0.35f).coerceIn(0f, 1f)
             drawCircle(
-                color = Color(0xFF00E5FF).copy(alpha = ((1.0f - pulseRadius) * 0.35f).coerceIn(0f, 1f)),
+                color = pulseColor.copy(alpha = alpha1),
                 radius = maxRadius * pulseRadius,
                 center = Offset(centerX, centerY),
                 style = Stroke(width = 2.2f)
             )
+
+            val alpha2 = ((1.0f - pulseRadius2) * 0.28f).coerceIn(0f, 1f)
             drawCircle(
-                color = Color(0xFF00E5FF).copy(alpha = ((1.0f - pulseRadius2) * 0.25f).coerceIn(0f, 1f)),
+                color = pulseColor.copy(alpha = alpha2),
                 radius = maxRadius * pulseRadius2,
                 center = Offset(centerX, centerY),
                 style = Stroke(width = 1.8f)
@@ -160,7 +194,7 @@ fun RadarRenderer(
             val sweepEndY = (centerY + maxRadius * sin(rad)).toFloat()
             drawLine(
                 brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF00E5FF).copy(alpha = 0.9f), Color(0xFF00E5FF).copy(alpha = 0.15f), Color.Transparent),
+                    colors = listOf(pulseColor.copy(alpha = 0.9f), pulseColor.copy(alpha = 0.15f), Color.Transparent),
                     start = Offset(centerX, centerY),
                     end = Offset(sweepEndX, sweepEndY)
                 ),
@@ -170,14 +204,7 @@ fun RadarRenderer(
             )
 
             // 6. Heatmap Layer (if enabled)
-            if (isHeatmapActive) {
-                val weightedPoints = items.map { item ->
-                    HeatmapRenderer.WeightedPoint(
-                        x = centerX + item.x * zoomScale,
-                        y = centerY + item.y * zoomScale,
-                        weight = 1.2f
-                    )
-                }
+            if (isHeatmapActive && weightedPoints.isNotEmpty()) {
                 HeatmapRenderer.drawHeatmapLayer(
                     drawScope = this,
                     points = weightedPoints,
@@ -185,14 +212,7 @@ fun RadarRenderer(
                 )
             }
 
-            // 7. Cluster & Draw Items
-            val screenItems = items.map { item ->
-                item.copy(
-                    x = centerX + item.x * zoomScale,
-                    y = centerY + item.y * zoomScale
-                )
-            }
-            val clusters = MarkerRenderer.clusterPoints(screenItems, thresholdPx = 45f * zoomScale)
+            // 7. Cluster & Draw Items (Optimized using cached clusters)
             for (cluster in clusters) {
                 val isSelected = cluster.items.any { it.id == selectedItemId }
                 MarkerRenderer.drawCluster(

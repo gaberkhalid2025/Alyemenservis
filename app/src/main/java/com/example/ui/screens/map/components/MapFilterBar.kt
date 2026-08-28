@@ -66,18 +66,37 @@ fun MapFilterBar(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { Text("بحث عن خدمة، فني، مركز أو متجر...", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث", tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp)) },
+                placeholder = { 
+                    Text(
+                        text = "بحث عن خدمة، فني، مركز أو متجر...", 
+                        fontSize = 14.sp, 
+                        fontWeight = FontWeight.Normal,
+                        color = Color(0xFF94A3B8)
+                    ) 
+                },
+                leadingIcon = { 
+                    Icon(
+                        Icons.Default.Search, 
+                        contentDescription = "بحث", 
+                        tint = Color(0xFF00E5FF), 
+                        modifier = Modifier.size(20.dp)
+                    ) 
+                },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
+                        IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                Icons.Default.Clear, 
+                                contentDescription = "مسح", 
+                                tint = Color(0xFF00E5FF), 
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 },
                 textStyle = androidx.compose.ui.text.TextStyle(
                     color = Color.White,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 ),
                 singleLine = true,
@@ -91,11 +110,11 @@ fun MapFilterBar(
                     unfocusedTextColor = Color.White,
                     cursorColor = Color(0xFF00E5FF),
                     focusedPlaceholderColor = Color(0xFF94A3B8),
-                    unfocusedPlaceholderColor = Color(0xFF64748B)
+                    unfocusedPlaceholderColor = Color(0xFF94A3B8)
                 ),
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp)
+                    .height(52.dp)
                     .testTag("map_search_input")
             )
 
