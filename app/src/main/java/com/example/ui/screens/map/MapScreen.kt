@@ -76,7 +76,7 @@ fun MapScreen(
     var isRadarMode by rememberSaveable { mutableStateOf(false) }
     var isHeatmapActive by rememberSaveable { mutableStateOf(false) }
     var selectedCategory by rememberSaveable { mutableStateOf("ALL") }
-    var selectedCity by rememberSaveable { mutableStateOf("الكل") }
+    var selectedCity by rememberSaveable { mutableStateOf("صنعاء") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var maxRangeKm by rememberSaveable { mutableFloatStateOf(25.0f) }
 
@@ -112,18 +112,17 @@ fun MapScreen(
     val filteredProviders = remember(providers, selectedCategory, selectedCity, searchQuery) {
         providers.filter { p ->
             val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROVIDERS"
-            val matchesCity = matchesCityFilter(selectedCity, p.cityId, p.area, p.localNeighborhood)
+            val matchesCity = selectedCity.isEmpty() || p.area.contains(selectedCity) || p.cityId.contains(selectedCity) || p.localNeighborhood.contains(selectedCity)
             val matchesQuery = searchQuery.isEmpty() || p.name.contains(searchQuery, ignoreCase = true) ||
-                    p.profession.contains(searchQuery, ignoreCase = true) || p.customCategoryName.contains(searchQuery, ignoreCase = true) ||
-                    p.specialization.contains(searchQuery, ignoreCase = true)
+                    p.profession.contains(searchQuery, ignoreCase = true) || p.customCategoryName.contains(searchQuery, ignoreCase = true)
             matchesCat && matchesCity && matchesQuery
         }
     }
 
     val filteredStores = remember(stores, selectedCategory, selectedCity, searchQuery) {
         stores.filter { s ->
-            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.categoryId.contains("pharmacy") || s.medicalLicenseNo.isNotBlank() || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("صيدلية") || s.name.contains("مركز")
-            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه") || s.name.contains("مأكولات"))
+            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
+            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
             
             val matchesCat = when (selectedCategory) {
                 "ALL" -> true
@@ -132,7 +131,7 @@ fun MapScreen(
                 "MEDICAL" -> isMedical
                 else -> false
             }
-            val matchesCity = matchesCityFilter(selectedCity, s.cityId, s.localNeighborhood, "")
+            val matchesCity = selectedCity.isEmpty() || s.cityId.contains(selectedCity) || s.localNeighborhood.contains(selectedCity)
             val matchesQuery = searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.description.contains(searchQuery, ignoreCase = true)
             matchesCat && matchesCity && matchesQuery
         }
@@ -141,108 +140,76 @@ fun MapScreen(
     val filteredProperties = remember(properties, selectedCategory, selectedCity, searchQuery) {
         properties.filter { pr ->
             val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROPERTIES"
-            val matchesCity = matchesCityFilter(selectedCity, pr.cityId, pr.localNeighborhood, "")
+            val matchesCity = selectedCity.isEmpty() || pr.cityId.contains(selectedCity) || pr.localNeighborhood.contains(selectedCity)
             val matchesQuery = searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true) || pr.description.contains(searchQuery, ignoreCase = true)
             matchesCat && matchesCity && matchesQuery
         }
     }
 
     // Convert items to MapItemPoints for RadarRenderer
-    val radarPoints = remember(filteredProviders, filteredStores, filteredProperties, userLatState, userLngState, maxRangeKm) {
+    val radarPoints = remember(filteredProviders, filteredStores, filteredProperties, userLatState, userLngState) {
         val list = mutableListOf<MarkerRenderer.MapItemPoint>()
-        val radarMaxPx = 280.0f
+        var angle = 0.0
 
-        filteredProviders.forEach { p ->
-            val coords = com.example.utils.getProviderCoords(p)
-            val itemLat = if (coords.first != 0.0) coords.first else userLatState
-            val itemLng = if (coords.second != 0.0) coords.second else userLngState
-
-            val distanceMeters = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, itemLat, itemLng)
-            val distanceKm = (distanceMeters / 1000.0).coerceAtLeast(0.1)
-
-            val bearingDeg = calculateBearingDegrees(userLatState, userLngState, itemLat, itemLng)
-            val mathAngleRad = Math.toRadians(bearingDeg - 90.0)
-            val normalizedRadius = ((distanceKm / maxRangeKm.toDouble()).coerceIn(0.08, 1.0) * radarMaxPx).toFloat()
-
-            val relX = (normalizedRadius * cos(mathAngleRad)).toFloat()
-            val relY = (normalizedRadius * sin(mathAngleRad)).toFloat()
-
+        filteredProviders.forEachIndexed { i, p ->
+            val d = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, p.latitude, p.longitude)
+            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 15f
+            val rad = Math.toRadians(angle)
             list.add(
                 MarkerRenderer.MapItemPoint(
                     id = p.id,
                     title = p.name,
                     type = "PROVIDER",
-                    x = relX,
-                    y = relY,
+                    x = (r * cos(rad)).toFloat(),
+                    y = (r * sin(rad)).toFloat(),
                     rating = p.rating.toDouble(),
                     isAvailable = p.isAvailable,
                     originalItem = p
                 )
             )
+            angle += 45.0
         }
 
-        filteredStores.forEach { s ->
-            val coords = com.example.utils.getStoreCoords(s)
-            val itemLat = if (coords.first != 0.0) coords.first else userLatState
-            val itemLng = if (coords.second != 0.0) coords.second else userLngState
-
-            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.categoryId.contains("pharmacy") || s.medicalLicenseNo.isNotBlank() || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("صيدلية") || s.name.contains("مركز")
-            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه") || s.name.contains("مأكولات"))
+        filteredStores.forEachIndexed { i, s ->
+            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
+            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
             val typeStr = if (isMedical) "MEDICAL" else if (isRestaurant) "RESTAURANT" else "STORE"
-
-            val distanceMeters = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, itemLat, itemLng)
-            val distanceKm = (distanceMeters / 1000.0).coerceAtLeast(0.1)
-
-            val bearingDeg = calculateBearingDegrees(userLatState, userLngState, itemLat, itemLng)
-            val mathAngleRad = Math.toRadians(bearingDeg - 90.0)
-            val normalizedRadius = ((distanceKm / maxRangeKm.toDouble()).coerceIn(0.08, 1.0) * radarMaxPx).toFloat()
-
-            val relX = (normalizedRadius * cos(mathAngleRad)).toFloat()
-            val relY = (normalizedRadius * sin(mathAngleRad)).toFloat()
-
+            val d = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, s.latitude, s.longitude)
+            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 15f
+            val rad = Math.toRadians(angle)
             list.add(
                 MarkerRenderer.MapItemPoint(
                     id = s.id,
                     title = s.name,
                     type = typeStr,
-                    x = relX,
-                    y = relY,
+                    x = (r * cos(rad)).toFloat(),
+                    y = (r * sin(rad)).toFloat(),
                     rating = s.rating.toDouble(),
                     isAvailable = s.isActive,
                     originalItem = s
                 )
             )
+            angle += 35.0
         }
 
-        filteredProperties.forEach { pr ->
-            val coords = com.example.utils.getPropertyCoords(pr)
-            val itemLat = if (coords.first != 0.0) coords.first else userLatState
-            val itemLng = if (coords.second != 0.0) coords.second else userLngState
-
-            val distanceMeters = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, itemLat, itemLng)
-            val distanceKm = (distanceMeters / 1000.0).coerceAtLeast(0.1)
-
-            val bearingDeg = calculateBearingDegrees(userLatState, userLngState, itemLat, itemLng)
-            val mathAngleRad = Math.toRadians(bearingDeg - 90.0)
-            val normalizedRadius = ((distanceKm / maxRangeKm.toDouble()).coerceIn(0.08, 1.0) * radarMaxPx).toFloat()
-
-            val relX = (normalizedRadius * cos(mathAngleRad)).toFloat()
-            val relY = (normalizedRadius * sin(mathAngleRad)).toFloat()
-
+        filteredProperties.forEachIndexed { i, pr ->
+            val d = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, pr.latitude, pr.longitude)
+            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 15f
+            val rad = Math.toRadians(angle)
             list.add(
                 MarkerRenderer.MapItemPoint(
                     id = pr.id,
                     title = pr.title,
                     type = "PROPERTY",
-                    x = relX,
-                    y = relY,
+                    x = (r * cos(rad)).toFloat(),
+                    y = (r * sin(rad)).toFloat(),
                     rating = 5.0,
                     isAvailable = pr.isActive,
                     originalItem = pr
                 )
             )
+            angle += 50.0
         }
-
         list
     }
 
@@ -449,41 +416,4 @@ fun MapScreen(
             themeColors = themeColors
         )
     }
-}
-
-fun calculateBearingDegrees(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-    if (lat1 == lat2 && lng1 == lng2) return 0.0
-    val dLng = Math.toRadians(lng2 - lng1)
-    val phi1 = Math.toRadians(lat1)
-    val phi2 = Math.toRadians(lat2)
-    val y = kotlin.math.sin(dLng) * kotlin.math.cos(phi2)
-    val x = kotlin.math.cos(phi1) * kotlin.math.sin(phi2) - kotlin.math.sin(phi1) * kotlin.math.cos(phi2) * kotlin.math.cos(dLng)
-    val bearing = Math.atan2(y, x)
-    return (Math.toDegrees(bearing) + 360.0) % 360.0
-}
-
-fun matchesCityFilter(
-    selectedCity: String,
-    cityId: String,
-    area: String,
-    neighborhood: String
-): Boolean {
-    if (selectedCity.isEmpty() || selectedCity == "الكل" || selectedCity == "جميع المدن") {
-        return true
-    }
-    val targetNorm = selectedCity.trim().lowercase()
-    val combinedField = "$cityId $area $neighborhood".lowercase()
-
-    val aliases = when {
-        targetNorm.contains("صنعاء") || targetNorm.contains("sanaa") -> listOf("صنعاء", "san", "sanaa", "ye_san", "ye_sana_cap", "أمانة العاصمة", "العاصمة", "حدة", "السبعين", "شعوب", "معين", "التحرير")
-        targetNorm.contains("عدن") || targetNorm.contains("aden") -> listOf("عدن", "ade", "aden", "ye_ade", "خور مكسر", "المنصورة", "كريتر", "المعلا", "الشيخ عثمان")
-        targetNorm.contains("تعز") || targetNorm.contains("taiz") -> listOf("تعز", "tai", "taiz", "ye_tai")
-        targetNorm.contains("الحديدة") || targetNorm.contains("hodeidah") || targetNorm.contains("hud") -> listOf("الحديدة", "hod", "hud", "hodeidah", "ye_hod")
-        targetNorm.contains("إب") || targetNorm.contains("ibb") -> listOf("إب", "ibb", "ye_ibb")
-        targetNorm.contains("حضرموت") || targetNorm.contains("المكلا") || targetNorm.contains("mukalla") -> listOf("حضرموت", "المكلا", "had", "mukalla", "ye_had")
-        targetNorm.contains("مأرب") || targetNorm.contains("marib") -> listOf("مأرب", "mar", "marib", "ye_mar")
-        else -> listOf(targetNorm)
-    }
-
-    return aliases.any { alias -> combinedField.contains(alias) } || combinedField.isBlank()
 }

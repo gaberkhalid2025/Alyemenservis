@@ -3,7 +3,6 @@ package com.example.ui.screens.chat.components
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,7 +27,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.util.ImageUtils
-import kotlinx.coroutines.delay
 
 @Composable
 fun ChatInputBar(
@@ -39,17 +37,17 @@ fun ChatInputBar(
 ) {
     val context = LocalContext.current
     var textInput by remember { mutableStateOf("") }
-    var showAttachmentMenu by remember { mutableStateOf(false) }
     var isRecordingAudio by remember { mutableStateOf(false) }
-    var recordingTimeSeconds by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var recordDurationSeconds by remember { mutableStateOf(0) }
+    var showAttachmentMenu by remember { mutableStateOf(false) }
 
-    // Timer effect for audio recording
+    // Audio timer effect
     LaunchedEffect(isRecordingAudio) {
         if (isRecordingAudio) {
-            recordingTimeSeconds = 0
+            recordDurationSeconds = 0
             while (isRecordingAudio) {
-                delay(1000)
-                recordingTimeSeconds++
+                kotlinx.coroutines.delay(1000L)
+                recordDurationSeconds++
             }
         }
     }
@@ -60,7 +58,7 @@ fun ChatInputBar(
         if (uri != null) {
             val base64 = ImageUtils.uriToBase64(context, uri, 800, 75)
             if (base64.isNotEmpty()) {
-                onSendMessage("صورة", MediaType.IMAGE, "data:image/jpeg;base64,$base64")
+                onSendMessage("", MediaType.IMAGE, "data:image/jpeg;base64,$base64")
             }
         }
     }
@@ -69,7 +67,7 @@ fun ChatInputBar(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "document.pdf"
+            val fileName = uri.lastPathSegment ?: "file.pdf"
             onSendMessage(fileName, MediaType.FILE, uri.toString())
         }
     }
@@ -110,100 +108,94 @@ fun ChatInputBar(
             }
         }
 
-        // Attachment Sheet Option Row
-        AnimatedVisibility(visible = showAttachmentMenu) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-                    .background(Color(0xFF1E293B), RoundedCornerShape(12.dp))
-                    .padding(vertical = 8.dp, horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-                    showAttachmentMenu = false
-                    imagePickerLauncher.launch("image/*")
-                }) {
-                    Box(modifier = Modifier.size(40.dp).background(Color(0xFF2563EB), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                    Text("معرض الصور", fontSize = 11.sp, color = Color.White)
-                }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-                    showAttachmentMenu = false
-                    filePickerLauncher.launch("*/*")
-                }) {
-                    Box(modifier = Modifier.size(40.dp).background(Color(0xFF9333EA), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                    Text("مستند/ملف", fontSize = 11.sp, color = Color.White)
-                }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-                    showAttachmentMenu = false
-                    imagePickerLauncher.launch("video/*")
-                }) {
-                    Box(modifier = Modifier.size(40.dp).background(Color(0xFF059669), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                    Text("فيديو", fontSize = 11.sp, color = Color.White)
-                }
-            }
-        }
-
-        // Recording Audio Bar
+        // Input controls row
         if (isRecordingAudio) {
+            val mins = recordDurationSeconds / 60
+            val secs = recordDurationSeconds % 60
+            // Audio Recording Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF991B1B), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .background(Color(0xFF1E293B), RoundedCornerShape(22.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Phone, contentDescription = null, tint = Color.Red, modifier = Modifier.size(20.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(Color.Red, CircleShape)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("جاري التسجيل... ${recordingTimeSeconds}s", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "جاري التسجيل... %02d:%02d 🎤".format(mins, secs),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { isRecordingAudio = false }) {
-                        Text("إلغاء", color = Color.LightGray, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = { isRecordingAudio = false },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(Color.DarkGray, CircleShape)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "إلغاء", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
+
                     IconButton(
                         onClick = {
                             isRecordingAudio = false
-                            onSendMessage("تسجيل صوتي (${recordingTimeSeconds}ث)", MediaType.AUDIO, "audio_recorded.mp3")
+                            onSendMessage("تسجيل صوتي (%02d:%02d)".format(mins, secs), MediaType.AUDIO, "audio_record_${System.currentTimeMillis()}")
                         },
-                        modifier = Modifier.size(36.dp).background(Color.White, CircleShape)
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(Color(0xFF10B981), CircleShape)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "إرسال الصوت", tint = Color(0xFF991B1B), modifier = Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "إرسال التسجيل", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                 }
             }
         } else {
-            // Standard Input controls row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Attachment Toggle Button
-                IconButton(
-                    onClick = { showAttachmentMenu = !showAttachmentMenu },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(if (showAttachmentMenu) Color(0xFF1E88E5) else Color.White.copy(alpha = 0.08f), CircleShape)
-                ) {
-                    Icon(
-                        if (showAttachmentMenu) Icons.Default.Close else Icons.Default.Add,
-                        contentDescription = "إرفاق",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                // Attachment Button with Dropdown
+                Box {
+                    IconButton(
+                        onClick = { showAttachmentMenu = true },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "إرفاق", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+
+                    DropdownMenu(
+                        expanded = showAttachmentMenu,
+                        onDismissRequest = { showAttachmentMenu = false },
+                        modifier = Modifier.background(Color(0xFF1E293B))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("🖼️ صورة من المعرض", color = Color.White, fontSize = 12.sp) },
+                            onClick = {
+                                showAttachmentMenu = false
+                                imagePickerLauncher.launch("image/*")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("📄 مستند / ملف", color = Color.White, fontSize = 12.sp) },
+                            onClick = {
+                                showAttachmentMenu = false
+                                filePickerLauncher.launch("*/*")
+                            }
+                        )
+                    }
                 }
 
                 // Text field
@@ -235,17 +227,18 @@ fun ChatInputBar(
                     })
                 )
 
-                // Mic or Send Button
                 if (textInput.isBlank()) {
+                    // Audio Mic Button
                     IconButton(
                         onClick = { isRecordingAudio = true },
                         modifier = Modifier
                             .size(42.dp)
-                            .background(Color(0xFF334155), CircleShape)
+                            .background(Color(0xFF1E88E5), CircleShape)
                     ) {
-                        Icon(Icons.Default.Phone, contentDescription = "تسجيل صوتي", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Text("🎤", fontSize = 18.sp)
                     }
                 } else {
+                    // Send Button
                     IconButton(
                         onClick = {
                             if (textInput.isNotBlank()) {

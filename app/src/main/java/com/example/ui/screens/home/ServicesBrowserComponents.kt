@@ -31,6 +31,7 @@ import com.example.data.CityEntity
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.ui.ProviderCard
+import com.example.ui.components.CategoryChip
 import com.example.ui.components.ProviderListSkeleton
 import com.example.utils.VisualThemePalette
 
@@ -547,73 +548,41 @@ fun ServicesCategoryChips(
         Row(
             modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val isAllSelected = selectedCategory == null
-            Surface(
-                modifier = Modifier
-                        .clickable { onCategorySelect(null) }
-                        .testTag("category_chip_all"),
-                shape = RoundedCornerShape(20.dp),
-                color = if (isAllSelected) themeColors.accent else themeColors.surface,
-                border = BorderStroke(1.dp, if (isAllSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
-            ) {
-                Text(
-                    text = "✨ الكل",
-                    color = if (isAllSelected) Color.Black else Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                )
-            }
+            CategoryChip(
+                name = "✨ الكل",
+                icon = "✨",
+                isSelected = isAllSelected,
+                themeColors = themeColors,
+                onClick = { onCategorySelect(null) }
+            )
 
             displayCats.forEach { cat ->
                 val isSelected = selectedCategory == cat.id
-                val hasSub = categories.any { it.parentId == cat.id }
-                Surface(
-                    modifier = Modifier
-                            .clickable {
-                                if (cat.id == "stores" || cat.parentId == "stores" || cat.id == "restaurants") {
-                                    onTabChange(storesTabName)
-                                    onCategorySelect(cat.id)
-                                } else if (cat.id == "realestate" || cat.parentId == "realestate" || cat.id == "jobs") {
-                                    onTabChange(propertiesTabName)
-                                    onCategorySelect(cat.id)
-                                } else {
-                                    onTabChange("الرئيسية")
-                                    if (isSelected) onCategorySelect(null)
-                                    else onCategorySelect(cat.id)
-                                }
-                            }
-                            .testTag("category_chip_${cat.id}"),
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) themeColors.accent else themeColors.surface,
-                    border = BorderStroke(1.dp, if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(cat.icon, fontSize = 12.sp)
-                        Text(
-                            text = cat.name,
-                            color = if (isSelected) Color.Black else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (hasSub) {
-                            Icon(
-                                imageVector = if (isSelected) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = if (isSelected) Color.Black else Color.Gray,
-                                modifier = Modifier.size(14.dp)
-                            )
+                CategoryChip(
+                    name = cat.name,
+                    icon = cat.icon.ifEmpty { "📂" },
+                    isSelected = isSelected,
+                    themeColors = themeColors,
+                    onClick = {
+                        if (cat.id == "stores" || cat.parentId == "stores" || cat.id == "restaurants") {
+                            onTabChange(storesTabName)
+                            onCategorySelect(cat.id)
+                        } else if (cat.id == "realestate" || cat.parentId == "realestate" || cat.id == "jobs") {
+                            onTabChange(propertiesTabName)
+                            onCategorySelect(cat.id)
+                        } else {
+                            onTabChange("الرئيسية")
+                            if (isSelected) onCategorySelect(null)
+                            else onCategorySelect(cat.id)
                         }
                     }
-                }
+                )
             }
         }
 

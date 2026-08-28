@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
 import com.example.data.PendingProviderEntity
-import com.example.data.InstantRequestEntity
+import com.example.data.models.InstantRequestEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch

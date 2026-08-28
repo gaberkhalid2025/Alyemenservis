@@ -141,16 +141,22 @@ fun Luxury3DNavIcon(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 5.dp, y = (-3).dp)
-                        .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
-                        .background(Color(0xFFEF4444), CircleShape)
-                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                        .offset(x = 6.dp, y = (-5).dp)
+                        .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color(0xFFEF4444), Color(0xFFDC2626))
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .border(1.2.dp, Color.White, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (badgeCount > 99) "99+" else badgeCount.toString(),
                         color = Color.White,
-                        fontSize = 9.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         textAlign = TextAlign.Center
                     )
@@ -408,36 +414,34 @@ fun CategoryChip(name: String, icon: String, isSelected: Boolean, themeColors: V
                 indication = null
             ) { onClick() }
             .padding(horizontal = 4.dp, vertical = 4.dp)
-            .width(76.dp)
+            .width(82.dp)
     ) {
-        val luxuryGoldBrush = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFFFE259),
-                Color(0xFFFFA751),
-                Color(0xFFFFE259)
-            )
+        val emeraldGoldGradient = Brush.linearGradient(
+            colors = if (isSelected) listOf(Color(0xFFFFD700), Color(0xFFF59E0B), Color(0xFFFFD700))
+                     else listOf(Color(0xFF10B981), Color(0xFF059669))
         )
+        val cardBg = if (isSelected) Color(0xFF06382C) else Color(0xFF0F172A)
         
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(if (isSelected) themeColors.accent.copy(alpha = 0.25f) else themeColors.surface)
+                .size(64.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(cardBg)
                 .border(
-                    width = if (isSelected) 2.5.dp else 1.dp,
-                    brush = if (isSelected) luxuryGoldBrush else Brush.linearGradient(listOf(themeColors.accent.copy(alpha = 0.3f), themeColors.accent.copy(alpha = 0.1f))),
-                    shape = CircleShape
+                    width = if (isSelected) 2.5.dp else 1.2.dp,
+                    brush = emeraldGoldGradient,
+                    shape = RoundedCornerShape(18.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
-            CategorySectionIconView(iconStr = icon, size = 26.dp)
+            CategorySectionIconView(iconStr = icon, size = 32.dp)
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(5.dp))
         Text(
             text = name,
-            fontSize = 11.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) themeColors.accent else Color.White,
+            fontSize = 11.5.sp,
+            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+            color = if (isSelected) Color(0xFFFFD700) else Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,

@@ -1,42 +1,23 @@
 package com.example.util
 
+import com.example.utils.*
+
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Badge
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,192 +25,133 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.models.Offer
-import com.example.data.ProductEntity
-import com.example.data.ProviderEntity
-import com.example.data.StoreEntity
-import java.util.Locale
 import kotlin.math.min
 
 /**
- * 🔍 CrossFuzzySearchEngine - محرك البحث الضبابي المتسامح بالأخطاء الإملائية
- * 
- * الميزات:
- * 1. خوارزمية Levenshtein Distance لحساب المسافة التحريرية والتسامح مع الأخطاء الطباعية.
- * 2. دمج خوارزمية Soundex للبحث الصوتي عبر `SearchEnhancer`.
- * 3. دمج البحث بالمرادفات واللهجات اليمنية لربط الكلمات الدارجة بالفئات الفنية.
- * 4. البحث السياقي (Contextual Search) المتكامل عبر الفنيين والمتاجر والحلول.
+ * Levenshtein distance fuzzy matching engine for search queries across categories.
  */
-object CrossFuzzySearchEngine {
+object LevenshteinMatcher {
 
-    /**
-     * حساب مسافة Levenshtein بين كلمتين
-     * @param s1 النص الأول
-     * @param s2 النص الثاني
-     * @return عدد العمليات اللازمة للتحويل
-     */
-    fun levenshteinDistance(s1: String, s2: String): Int {
-        val dp = Array(s1.length + 1) { IntArray(s2.length + 1) }
+    fun calculateDistance(s1: String, s2: String): Int {
+        val str1 = s1.lowercase().trim()
+        val str2 = s2.lowercase().trim()
+        val dp = Array(str1.length + 1) { IntArray(str2.length + 1) }
 
-        for (i in 0..s1.length) {
-            for (j in 0..s2.length) {
-                when {
-                    i == 0 -> dp[i][j] = j
-                    j == 0 -> dp[i][j] = i
-                    else -> {
-                        val cost = if (s1[i - 1].lowercaseChar() == s2[j - 1].lowercaseChar()) 0 else 1
-                        dp[i][j] = min(
-                            dp[i - 1][j] + 1,      // حذف
-                            min(
-                                dp[i][j - 1] + 1,  // إضافة
-                                dp[i - 1][j - 1] + cost // استبدال
-                            )
-                        )
-                    }
-                }
+        for (i in 0..str1.length) dp[i][0] = i
+        for (j in 0..str2.length) dp[0][j] = j
+
+        for (i in 1..str1.length) {
+            for (j in 1..str2.length) {
+                val cost = if (str1[i - 1] == str2[j - 1]) 0 else 1
+                dp[i][j] = minOf(
+                    dp[i - 1][j] + 1,      // deletion
+                    dp[i][j - 1] + 1,      // insertion
+                    dp[i - 1][j - 1] + cost // substitution
+                )
             }
         }
-        return dp[s1.length][s2.length]
+        return dp[str1.length][str2.length]
     }
 
-    /**
-     * حساب نسبة التشابه بين نصين (من 0.0 إلى 1.0)
-     */
-    fun similarityRatio(s1: String, s2: String): Double {
-        if (s1.equals(s2, ignoreCase = true)) return 1.0
-        val maxLen = maxOf(s1.length, s2.length)
-        if (maxLen == 0) return 1.0
-        val dist = levenshteinDistance(s1, s2)
-        return 1.0 - (dist.toDouble() / maxLen.toDouble())
-    }
+    fun isFuzzyMatch(query: String, target: String, maxDistance: Int = 3): Boolean {
+        if (query.isBlank()) return true
+        val q = query.lowercase().trim()
+        val t = target.lowercase().trim()
 
-    /**
-     * فحص مطابقة البحث المتقدم (Levenshtein + Soundex + المرادفات + السياق)
-     * 
-     * @param query نص البحث
-     * @param target النص المستهدف
-     * @param threshold حد القبول للتشابه (الافتراضي 0.6)
-     * @return true إذا كانت النتيجة متطابقة أو مقبولة
-     */
-    fun isFuzzyMatch(query: String, target: String, threshold: Double = 0.6): Boolean {
-        if (query.isBlank() || target.isBlank()) return false
-        val cleanQuery = SearchEnhancer.normalizeArabicPhonetics(query.trim())
-        val cleanTarget = SearchEnhancer.normalizeArabicPhonetics(target.trim())
+        if (t.contains(q)) return true
 
-        // 1. التطابق المباشر
-        if (cleanTarget.contains(cleanQuery)) return true
+        val queryWords = q.split("\\s+".toRegex())
+        val targetWords = t.split("\\s+".toRegex())
 
-        // 2. البحث بالسياق والمرادفات والصوتيات
-        val contextualScore = SearchEnhancer.calculateContextualScore(cleanQuery, cleanTarget)
-        if (contextualScore >= threshold) return true
-
-        // 3. فحص نسبة Levenshtein للكلمات
-        val targetWords = cleanTarget.split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val queryWords = cleanQuery.split(Regex("\\s+")).filter { it.isNotEmpty() }
-
-        for (q in queryWords) {
-            for (t in targetWords) {
-                if (similarityRatio(q, t) >= threshold) {
+        for (qw in queryWords) {
+            for (tw in targetWords) {
+                val allowedDist = when {
+                    qw.length <= 3 -> 1
+                    qw.length <= 5 -> 2
+                    else -> maxDistance
+                }
+                if (calculateDistance(qw, tw) <= allowedDist) {
                     return true
                 }
             }
         }
-
         return false
-    }
-
-    /**
-     * تصفية الفنيين باستخدام البحث الضبابي والسياقي
-     */
-    fun filterTechnicians(query: String, list: List<TechnicianSearchItem>): List<TechnicianSearchItem> {
-        if (query.isBlank()) return list
-        return list.filter { item ->
-            isFuzzyMatch(query, item.name) ||
-            isFuzzyMatch(query, item.profession) ||
-            item.keywords.any { isFuzzyMatch(query, it) }
-        }
-    }
-
-    /**
-     * تصفية المتاجر والمراكز التجارية
-     */
-    fun filterStores(query: String, list: List<StoreSearchItem>): List<StoreSearchItem> {
-        if (query.isBlank()) return list
-        return list.filter { item ->
-            isFuzzyMatch(query, item.name) ||
-            isFuzzyMatch(query, item.category) ||
-            isFuzzyMatch(query, item.address) ||
-            item.keywords.any { isFuzzyMatch(query, it) }
-        }
-    }
-
-    /**
-     * تصفية المقالات والحلول الفنية
-     */
-    fun filterArticles(query: String, list: List<ArticleSearchItem>): List<ArticleSearchItem> {
-        if (query.isBlank()) return list
-        return list.filter { item ->
-            isFuzzyMatch(query, item.title) ||
-            isFuzzyMatch(query, item.summary) ||
-            item.tags.any { isFuzzyMatch(query, it) }
-        }
     }
 }
 
-// ==========================================
-// نماذج البحث الموحدة
-// ==========================================
-
-data class TechnicianSearchItem(
+data class SearchTechnicianItem(
     val id: String,
     val name: String,
     val profession: String,
     val rating: Double,
-    val keywords: List<String> = emptyList()
+    val phone: String
 )
 
-data class StoreSearchItem(
+data class SearchStoreItem(
     val id: String,
     val name: String,
     val category: String,
     val address: String,
-    val keywords: List<String> = emptyList()
+    val isVerified: Boolean = true
 )
 
-data class ArticleSearchItem(
+data class SearchArticleItem(
     val id: String,
     val title: String,
     val summary: String,
-    val tags: List<String> = emptyList()
+    val category: String
 )
 
-// ==========================================
-// واجهة البحث المتسامح بالأخطاء الإملائية
-// ==========================================
+data class SearchResultData(
+    val technicians: List<SearchTechnicianItem> = emptyList(),
+    val stores: List<SearchStoreItem> = emptyList(),
+    val articles: List<SearchArticleItem> = emptyList()
+)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CrossFuzzySearchScreen(
     query: String,
     onQueryChange: (String) -> Unit,
-    technicians: List<TechnicianSearchItem>,
-    stores: List<StoreSearchItem>,
-    articles: List<ArticleSearchItem>,
-    onSelectTechnician: (TechnicianSearchItem) -> Unit,
-    onSelectStore: (StoreSearchItem) -> Unit,
-    onSelectArticle: (ArticleSearchItem) -> Unit,
+    allTechnicians: List<SearchTechnicianItem>,
+    allStores: List<SearchStoreItem>,
+    allArticles: List<SearchArticleItem>,
+    onSelectTechnician: (SearchTechnicianItem) -> Unit,
+    onSelectStore: (SearchStoreItem) -> Unit,
+    onSelectArticle: (SearchArticleItem) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabTitles = listOf("فنيون 👨‍🔧", "محلات ومراكز 🏪", "مقالات وإرشادات 📖")
+    val tabTitles = listOf("👷 فنيون", "🏬 محلات وقوائم", "💡 مقالات وحلول")
 
-    val filteredTechnicians = remember(query, technicians) {
-        CrossFuzzySearchEngine.filterTechnicians(query, technicians)
+    val filteredTechnicians = remember(query, allTechnicians) {
+        if (query.isBlank()) allTechnicians else {
+            allTechnicians.filter {
+                LevenshteinMatcher.isFuzzyMatch(query, it.name) ||
+                        LevenshteinMatcher.isFuzzyMatch(query, it.profession)
+            }
+        }
     }
-    val filteredStores = remember(query, stores) {
-        CrossFuzzySearchEngine.filterStores(query, stores)
+
+    val filteredStores = remember(query, allStores) {
+        if (query.isBlank()) allStores else {
+            allStores.filter {
+                LevenshteinMatcher.isFuzzyMatch(query, it.name) ||
+                        LevenshteinMatcher.isFuzzyMatch(query, it.category) ||
+                        LevenshteinMatcher.isFuzzyMatch(query, it.address)
+            }
+        }
     }
-    val filteredArticles = remember(query, articles) {
-        CrossFuzzySearchEngine.filterArticles(query, articles)
+
+    val filteredArticles = remember(query, allArticles) {
+        if (query.isBlank()) allArticles else {
+            allArticles.filter {
+                LevenshteinMatcher.isFuzzyMatch(query, it.title) ||
+                        LevenshteinMatcher.isFuzzyMatch(query, it.summary) ||
+                        LevenshteinMatcher.isFuzzyMatch(query, it.category)
+            }
+        }
     }
 
     Column(
@@ -243,7 +165,7 @@ fun CrossFuzzySearchScreen(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("بحث ذكي متسامح بالأخطاء (فنيون، محلات، حلول)...") },
+            placeholder = { Text("بحث متسامح بالأخطاء الإملائية (فنيون، محلات، مقالات)...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث") },
             trailingIcon = {
                 if (query.isNotEmpty()) {

@@ -1,7 +1,9 @@
 package com.example.ui.screens.owner
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -16,19 +18,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.data.UnifiedBusinessAccount
 import com.example.rememberBase64Bitmap
 import com.example.ui.MainViewModel
-import com.example.ui.components.AppSnackbarHost
-import com.example.ui.components.SnackbarType
-import com.example.ui.components.showCustomSnackbar
 import com.example.utils.VisualThemePalette
-import kotlinx.coroutines.launch
 
 data class GalleryImageItem(
     val id: String,
@@ -36,29 +34,24 @@ data class GalleryImageItem(
     val isPrimary: Boolean = false
 )
 
-/**
- * 🖼️ GalleryManagementScreen
- * شاشة إدارة ومعرض صور النشاط التجاري مع تكامل OwnerViewModel ونظام AppSnackbar
- */
 @Composable
 fun GalleryManagementScreen(
     account: UnifiedBusinessAccount,
     viewModel: MainViewModel,
-    ownerViewModel: OwnerViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    val galleryList by ownerViewModel.gallery.collectAsState()
+    val context = LocalContext.current
     var showAddImageDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(account.id) {
-        ownerViewModel.initOwnerData(account)
+    var galleryList by remember {
+        mutableStateOf(
+            listOf(
+                GalleryImageItem("1", account.coverImage.ifBlank { account.logoImage }, isPrimary = true)
+            ).filter { it.urlOrBase64.isNotBlank() }
+        )
     }
 
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddImageDialog = true },
@@ -110,30 +103,21 @@ fun GalleryManagementScreen(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 72.dp)
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(galleryList, key = { it.id }) { item ->
                         GalleryGridCard(
                             item = item,
                             themeColors = themeColors,
                             onSetPrimary = {
-                                ownerViewModel.setPrimaryGalleryImage(item.id)
-                                scope.launch {
-                                    snackbarHostState.showCustomSnackbar(
-                                        message = "تم تعيين الصورة كصورة غلاف رئيسية",
-                                        type = SnackbarType.SUCCESS
-                                    )
+                                galleryList = galleryList.map {
+                                    it.copy(isPrimary = it.id == item.id)
                                 }
+                                Toast.makeText(context, "تم تعيين الصورة كصورة غلاف رئيسية", Toast.LENGTH_SHORT).show()
                             },
                             onDelete = {
-                                ownerViewModel.deleteGalleryImage(item.id)
-                                scope.launch {
-                                    snackbarHostState.showCustomSnackbar(
-                                        message = "تم حذف الصورة من المعرض",
-                                        type = SnackbarType.INFO
-                                    )
-                                }
+                                galleryList = galleryList.filter { it.id != item.id }
+                                Toast.makeText(context, "تم حذف الصورة من المعرض", Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -159,14 +143,14 @@ fun GalleryManagementScreen(
                 Button(
                     onClick = {
                         if (imageUrlInput.isNotBlank()) {
-                            ownerViewModel.addGalleryImage(imageUrlInput)
+                            val newItem = GalleryImageItem(
+                                id = java.util.UUID.randomUUID().toString(),
+                                urlOrBase64 = imageUrlInput,
+                                isPrimary = galleryList.isEmpty()
+                            )
+                            galleryList = galleryList + newItem
                             showAddImageDialog = false
-                            scope.launch {
-                                snackbarHostState.showCustomSnackbar(
-                                    message = "تم إضافة الصورة لمعرض الصور بنجاح!",
-                                    type = SnackbarType.SUCCESS
-                                )
-                            }
+                            Toast.makeText(context, "تم إضافة الصورة لمعرض الصور!", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))

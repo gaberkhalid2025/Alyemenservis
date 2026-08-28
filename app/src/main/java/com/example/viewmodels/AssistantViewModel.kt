@@ -21,12 +21,13 @@ import okhttp3.RequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
  * 🤖 AssistantViewModel
  * إدارة المحادثة والمنطق البرمجي للمساعد الذكي لدليل خدمات اليمن.
- * يدعم الذكاء الاصطناعي التوليدي عبر Gemini 2.5 Flash API ومحرك الاستجابة المحلي RAG بدون إنترنت.
+ * يدعم الذكاء الاصطناعي التوليدي عبر Gemini 2.5 Flash API ومحرك الاستجابة المحلي بدون إنترنت.
  */
 class AssistantViewModel : ViewModel() {
 
@@ -91,7 +92,7 @@ class AssistantViewModel : ViewModel() {
                 withContext(Dispatchers.Main) {
                     _chatHistory.value = _chatHistory.value + responseMsg
                     _isGenerating.value = false
-                    if (settings.allowTextToSpeech) {
+                    if (settings.allowTextToSpeechAssistant) {
                         onSpeechSpeak?.invoke(responseMsg.text)
                     }
                 }

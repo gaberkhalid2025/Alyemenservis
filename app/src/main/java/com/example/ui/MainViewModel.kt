@@ -46,7 +46,7 @@ class MainViewModel : ViewModel() {
     internal val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
 
-    internal val _providers = MutableStateFlow<List<ProviderEntity>>(getDefaultProvidersList())
+    internal val _providers = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val providers: StateFlow<List<ProviderEntity>> = _providers.asStateFlow()
 
     internal val _deletedProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
@@ -315,11 +315,11 @@ class MainViewModel : ViewModel() {
     private val _orders = MutableStateFlow<List<com.example.data.OrderEntity>>(emptyList())
     val orders: StateFlow<List<com.example.data.OrderEntity>> = _orders.asStateFlow()
 
-    private val _instantRequests = MutableStateFlow<List<com.example.data.InstantRequestEntity>>(emptyList())
-    val instantRequests: StateFlow<List<com.example.data.InstantRequestEntity>> = _instantRequests.asStateFlow()
+    private val _instantRequests = MutableStateFlow<List<com.example.data.models.InstantRequestEntity>>(emptyList())
+    val instantRequests: StateFlow<List<com.example.data.models.InstantRequestEntity>> = _instantRequests.asStateFlow()
 
-    private val _requestOffers = MutableStateFlow<List<com.example.data.RequestOfferEntity>>(emptyList())
-    val requestOffers: StateFlow<List<com.example.data.RequestOfferEntity>> = _requestOffers.asStateFlow()
+    private val _requestOffers = MutableStateFlow<List<com.example.data.models.RequestOfferEntity>>(emptyList())
+    val requestOffers: StateFlow<List<com.example.data.models.RequestOfferEntity>> = _requestOffers.asStateFlow()
 
     private val _currentUserId = MutableStateFlow("guest")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
@@ -1620,7 +1620,7 @@ class MainViewModel : ViewModel() {
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(com.example.data.InstantRequestEntity::class.java)?.copy(id = doc.id)
+                        doc.toObject(com.example.data.models.InstantRequestEntity::class.java)?.copy(id = doc.id)
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
@@ -1642,7 +1642,7 @@ class MainViewModel : ViewModel() {
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(com.example.data.RequestOfferEntity::class.java)?.copy(id = doc.id)
+                        doc.toObject(com.example.data.models.RequestOfferEntity::class.java)?.copy(id = doc.id)
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
@@ -1867,289 +1867,24 @@ class MainViewModel : ViewModel() {
         // No fake default banners written automatically
     }
 
-    fun getDefaultProvidersList(): List<ProviderEntity> {
-        return listOf(
-            ProviderEntity(
-                id = "p_sanaa_1",
-                name = "المهندس أمين السباعي",
-                phone = "771234567",
-                categoryId = "spaka",
-                profession = "سباك صيانة عامة وسخانات",
-                specialization = "تركيب وصيانة شبكات المياه والسخانات الشمسية",
-                customCategoryName = "سباكة وتمديدات",
-                area = "صنعاء",
-                localNeighborhood = "شارع حدة - بجوار سيتي سنتر",
-                cityId = "ye_san",
-                rating = 4.9f,
-                numReviews = 38,
-                isAvailable = true,
-                isVip = true,
-                isVerified = true,
-                isRecommended = true,
-                latitude = 15.3520,
-                longitude = 44.2010
-            ),
-            ProviderEntity(
-                id = "p_sanaa_2",
-                name = "الأسطورة طارق الكهربائي",
-                phone = "772345678",
-                categoryId = "kahraba",
-                profession = "كهربائي منازل ومنشآت",
-                specialization = "تمديدات كهربائية، لوحات توزيع، وأنظمة حماية",
-                customCategoryName = "كهرباء وتمديدات",
-                area = "صنعاء",
-                localNeighborhood = "السبعين - حي عطان",
-                cityId = "ye_san",
-                rating = 4.8f,
-                numReviews = 45,
-                isAvailable = true,
-                isVip = true,
-                isVerified = true,
-                latitude = 15.3410,
-                longitude = 44.1850
-            ),
-            ProviderEntity(
-                id = "p_sanaa_3",
-                name = "مهندس الطاقة وليد القدسي",
-                phone = "773456789",
-                categoryId = "solar",
-                profession = "مهندس أنظمة طاقة شمسية",
-                specialization = "تركيب وبرمجة إنفرترات وبطاريات ليثيوم والألواح",
-                customCategoryName = "طاقة شمسية",
-                area = "صنعاء",
-                localNeighborhood = "شارع الزبيري - خلف صيدلية بلقيس",
-                cityId = "ye_san",
-                rating = 5.0f,
-                numReviews = 52,
-                isAvailable = true,
-                isVip = true,
-                isVerified = true,
-                isRecommended = true,
-                latitude = 15.3620,
-                longitude = 44.2100
-            ),
-            ProviderEntity(
-                id = "p_sanaa_4",
-                name = "مركز الفارس للتكييف والتبريد",
-                phone = "774567890",
-                categoryId = "ac",
-                profession = "فني تكييف وتبريد معتمد",
-                specialization = "صيانة غسيل وتعبئة فريون تكييف اسبلت ومركزي",
-                customCategoryName = "تكييف وتبريد",
-                area = "صنعاء",
-                localNeighborhood = "شارع الستين الجنوبي",
-                cityId = "ye_san",
-                rating = 4.7f,
-                numReviews = 29,
-                isAvailable = true,
-                isVerified = true,
-                latitude = 15.3300,
-                longitude = 44.1780
-            ),
-            ProviderEntity(
-                id = "p_aden_1",
-                name = "المعلم صادق الدهان",
-                phone = "775678901",
-                categoryId = "dehan",
-                profession = "فني دهانات وديكورات حديثة",
-                specialization = "دهانات جوتن، بديل رخام، بديل خشب، وديكورات فوم",
-                customCategoryName = "دهان وديكور",
-                area = "عدن",
-                localNeighborhood = "المنصورة - شارع التسعين",
-                cityId = "ye_ade",
-                rating = 4.9f,
-                numReviews = 31,
-                isAvailable = true,
-                isVerified = true,
-                latitude = 12.8310,
-                longitude = 44.9920
-            ),
-            ProviderEntity(
-                id = "p_taiz_1",
-                name = "ورشة الحكمة للميكانيك والسيارات",
-                phone = "776789012",
-                categoryId = "car",
-                profession = "ميكانيكي سيارات وفحص كمبيوتر",
-                specialization = "فحص برمجة وصيانة محركات وهجين هايلندر وتويوتا",
-                customCategoryName = "ميكانيك سيارات",
-                area = "تعز",
-                localNeighborhood = "الحوبان - بالقرب من جولة القصر",
-                cityId = "ye_tai",
-                rating = 4.8f,
-                numReviews = 40,
-                isAvailable = true,
-                isVerified = true,
-                latitude = 13.5950,
-                longitude = 44.0450
-            )
-        )
-    }
-
     private fun writeDefaultProviders() {
-        try {
-            getDefaultProvidersList().forEach { p ->
-                db.collection("providers").document(p.id).set(p)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Empty - No fake mock providers
     }
 
     fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
-        return listOf(
-            com.example.data.StoreEntity(
-                id = "st_sanaa_1",
-                name = "سوبرماركت وهايبر الجندلي",
-                description = "أكبر مركز تسوق وتوفير كافة المواد الغذائية والمنزلية واللحوم الطازجة",
-                phone = "777112233",
-                sectionId = "stores",
-                categoryId = "sub_store_4",
-                cityId = "ye_san",
-                localNeighborhood = "شارع حدة - الأصبحي",
-                rating = 4.9f,
-                numReviews = 64,
-                isActive = true,
-                isApproved = true,
-                isVerified = true,
-                isRecommended = true,
-                latitude = 15.3480,
-                longitude = 44.2050
-            ),
-            com.example.data.StoreEntity(
-                id = "st_sanaa_2",
-                name = "مجمع ومستشفى الأمل الطبي التخصصي",
-                description = "مستشفى ومجمع طبي شامل مع عيادات استشارية ومختبرات وصيدلية على مدار 24 ساعة",
-                phone = "777223344",
-                sectionId = "centers",
-                categoryId = "sub_center_2",
-                medicalLicenseNo = "MED-YEM-8842",
-                cityId = "ye_san",
-                localNeighborhood = "شارع الزبيري - مقابل مستشفى الجمهوري",
-                rating = 5.0f,
-                numReviews = 88,
-                isActive = true,
-                isApproved = true,
-                isVerified = true,
-                isRecommended = true,
-                latitude = 15.3650,
-                longitude = 44.2020
-            ),
-            com.example.data.StoreEntity(
-                id = "st_sanaa_3",
-                name = "صيدلية بلقيس الحديثة 24/7",
-                description = "صيدلية شمولية توفر كافة الأدوية النادرة والمستلزمات الطبية وأجهزة السكر والضغط",
-                phone = "777334455",
-                sectionId = "centers",
-                categoryId = "sub_center_2",
-                medicalLicenseNo = "PHARM-9912",
-                cityId = "ye_san",
-                localNeighborhood = "شارع حدة - جولة المصباحي",
-                rating = 4.9f,
-                numReviews = 42,
-                isActive = true,
-                isApproved = true,
-                isVerified = true,
-                latitude = 15.3550,
-                longitude = 44.1980
-            ),
-            com.example.data.StoreEntity(
-                id = "st_sanaa_4",
-                name = "مطعم الشيباني الملكي للسلتة والفحسة",
-                description = "أرقى المأكولات اليمنية الشعبية، السلتة، الفحسة، المشويات واللحم المندي",
-                phone = "777445566",
-                sectionId = "restaurants",
-                categoryId = "sub_rest_1",
-                cityId = "ye_san",
-                localNeighborhood = "شارع حدة - مقابل مركز صخر",
-                rating = 4.8f,
-                numReviews = 110,
-                isActive = true,
-                isApproved = true,
-                isVerified = true,
-                isRecommended = true,
-                latitude = 15.3590,
-                longitude = 44.2080
-            ),
-            com.example.data.StoreEntity(
-                id = "st_aden_1",
-                name = "مركز دبي للإلكترونيات والهواتف",
-                description = "بيع وصيانة أحدث الهواتف الذكية والأجهزة المحمولة مع ضمان معتمد",
-                phone = "777556677",
-                sectionId = "stores",
-                categoryId = "sub_store_2",
-                commercialRegisterNo = "CR-77412",
-                cityId = "ye_ade",
-                localNeighborhood = "كريتر - شارع أروى",
-                rating = 4.7f,
-                numReviews = 35,
-                isActive = true,
-                isApproved = true,
-                isVerified = true,
-                latitude = 12.7790,
-                longitude = 45.0350
-            )
-        )
+        return emptyList()
     }
 
     fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> {
-        return listOf(
-            com.example.data.PropertyEntity(
-                id = "pr_sanaa_1",
-                title = "شقة مفروشة راقية للإيجار في حدة",
-                description = "شقة واسعة 3 غرف وحمامين ومطبخ صالون مفروشة بالكامل مع منظومة طاقة شمسية مستقلة",
-                price = 350.0,
-                currency = "USD",
-                type = "rent",
-                propertyType = "apartment",
-                phone = "778899001",
-                cityId = "ye_san",
-                localNeighborhood = "حدة - خلف الكميم سنتر",
-                rating = 5.0f,
-                isActive = true,
-                isApproved = true,
-                isVerified = true,
-                latitude = 15.3490,
-                longitude = 44.1990
-            ),
-            com.example.data.PropertyEntity(
-                id = "pr_sanaa_2",
-                title = "محل تجاري للبيع في شارع الزبيري",
-                description = "محل تجاري بموقع استثماري مميز واجهة زجاجية، مساحة 45 متر مربع جاهز للديكور",
-                price = 45000000.0,
-                currency = "YER",
-                type = "sale",
-                propertyType = "store",
-                phone = "778899002",
-                cityId = "ye_san",
-                localNeighborhood = "شارع الزبيري",
-                rating = 4.9f,
-                isActive = true,
-                isApproved = true,
-                isVerified = true,
-                latitude = 15.3640,
-                longitude = 44.2040
-            )
-        )
+        return emptyList()
     }
 
     private fun writeDefaultStores() {
-        try {
-            getDefaultStoresList().forEach { s ->
-                db.collection("stores").document(s.id).set(s)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Empty - No fake mock stores
     }
 
     private fun writeDefaultProperties() {
-        try {
-            getDefaultPropertiesList().forEach { p ->
-                db.collection("properties").document(p.id).set(p)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Empty - No fake mock properties
     }
 
     private fun writeDefaultJobs() {
@@ -7423,7 +7158,7 @@ class MainViewModel : ViewModel() {
             else -> 30 * 60 * 1000L // default 30 min
         }
 
-        val req = com.example.data.InstantRequestEntity(
+        val req = com.example.data.models.InstantRequestEntity(
             id = reqId,
             requestCode = requestCode,
             secretPin = secretPin,
@@ -7560,7 +7295,7 @@ class MainViewModel : ViewModel() {
         notes: String = ""
     ) {
         val offerId = java.util.UUID.randomUUID().toString()
-        val offer = com.example.data.RequestOfferEntity(
+        val offer = com.example.data.models.RequestOfferEntity(
             id = offerId,
             requestId = requestId,
             requestCode = requestCode,
@@ -7607,8 +7342,8 @@ class MainViewModel : ViewModel() {
     }
 
     fun acceptRequestOffer(
-        req: com.example.data.InstantRequestEntity,
-        offer: com.example.data.RequestOfferEntity
+        req: com.example.data.models.InstantRequestEntity,
+        offer: com.example.data.models.RequestOfferEntity
     ) {
         db.collection("request_offers").document(offer.id).update("status", "ACCEPTED")
         

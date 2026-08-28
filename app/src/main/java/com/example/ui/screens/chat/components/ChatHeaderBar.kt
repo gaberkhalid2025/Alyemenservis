@@ -2,10 +2,15 @@ package com.example.ui.screens.chat.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,18 +33,16 @@ fun ChatHeaderBar(
     photoUrl: String,
     presence: UserPresence?,
     isTyping: Boolean,
-    onBackClick: () -> Unit,
-    onSearchToggle: () -> Unit,
-    onBlockClick: () -> Unit,
-    onDeleteChannelClick: () -> Unit,
-    onCloseClick: () -> Unit,
     isBlocked: Boolean = false,
     isMuted: Boolean = false,
-    onViewProfileClick: () -> Unit = {},
-    onToggleMuteClick: () -> Unit = {},
-    onReportUserClick: () -> Unit = {},
-    onClearChatClick: () -> Unit = {},
-    onExportChatClick: () -> Unit = {}
+    onBackClick: () -> Unit,
+    onSearchToggle: () -> Unit,
+    onBlockToggle: () -> Unit,
+    onViewProfile: (() -> Unit)? = null,
+    onMuteToggle: (() -> Unit)? = null,
+    onReportUser: (() -> Unit)? = null,
+    onClearChat: (() -> Unit)? = null,
+    onExportChat: (() -> Unit)? = null
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -95,23 +98,22 @@ fun ChatHeaderBar(
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = name.ifBlank { "محادثة" },
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (isMuted) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(Icons.Default.Info, contentDescription = "مكتوم", tint = Color.LightGray, modifier = Modifier.size(14.dp))
-                }
-            }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onViewProfile?.invoke() }
+        ) {
+            Text(
+                text = name.ifBlank { "محادثة" },
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
 
             val statusText = when {
+                isBlocked -> "🚫 مستخدم محظور"
                 isTyping -> "يكتب الآن..."
                 presence?.isOnline == true -> "متصل الآن"
                 presence != null && presence.lastSeen > 0 -> {
@@ -124,7 +126,7 @@ fun ChatHeaderBar(
             Text(
                 text = statusText,
                 fontSize = 11.sp,
-                color = if (isTyping || presence?.isOnline == true) Color(0xFF64FFDA) else Color.Gray
+                color = if (isBlocked) Color.Red else if (isTyping || presence?.isOnline == true) Color(0xFF64FFDA) else Color.Gray
             )
         }
 
@@ -142,90 +144,67 @@ fun ChatHeaderBar(
                 modifier = Modifier.background(Color(0xFF1E293B))
             ) {
                 DropdownMenuItem(
-                    text = { Text("عرض الملف الشخصي 👤", color = Color.White, fontSize = 13.sp) },
+                    text = { Text("👤 عرض الملف الشخصي", color = Color.White, fontSize = 13.sp) },
                     onClick = {
                         showMenu = false
-                        onViewProfileClick()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF38BDF8)) }
-                )
-
-                DropdownMenuItem(
-                    text = { Text(if (isMuted) "إلغاء كتم الإشعارات 🔔" else "كتم الإشعارات 🔕", color = Color.White, fontSize = 13.sp) },
-                    onClick = {
-                        showMenu = false
-                        onToggleMuteClick()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFFBBF24)) }
-                )
-
-                DropdownMenuItem(
-                    text = { Text("الإبلاغ عن المستخدم ⚠️", color = Color(0xFFF97316), fontSize = 13.sp) },
-                    onClick = {
-                        showMenu = false
-                        onReportUserClick()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF97316)) }
-                )
-
-                DropdownMenuItem(
-                    text = { Text("مسح الرسائل 🧹", color = Color.White, fontSize = 13.sp) },
-                    onClick = {
-                        showMenu = false
-                        onClearChatClick()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFA855F7)) }
-                )
-
-                DropdownMenuItem(
-                    text = { Text("تصدير المحادثة 📤", color = Color.White, fontSize = 13.sp) },
-                    onClick = {
-                        showMenu = false
-                        onExportChatClick()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF00E5FF)) }
-                )
-
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (isBlocked) "إلغاء حظر المستخدم ✅" else "حظر المستخدم 🚫",
-                            color = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF4444),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    onClick = {
-                        showMenu = false
-                        onBlockClick()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            if (isBlocked) Icons.Default.CheckCircle else Icons.Default.Close,
-                            contentDescription = null,
-                            tint = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF4444)
-                        )
+                        onViewProfile?.invoke()
                     }
                 )
 
                 DropdownMenuItem(
-                    text = { Text("حذف المحادثة بالكامل 🗑️", color = Color(0xFFEF4444), fontSize = 13.sp) },
+                    text = { Text(if (isMuted) "🔔 إلغاء كتم الإشعارات" else "🔕 كتم الإشعارات", color = Color.White, fontSize = 13.sp) },
                     onClick = {
                         showMenu = false
-                        onDeleteChannelClick()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444)) }
+                        onMuteToggle?.invoke()
+                    }
                 )
 
                 DropdownMenuItem(
-                    text = { Text("إغلاق 🚪", color = Color.Gray, fontSize = 13.sp) },
+                    text = { Text("⚠️ الإبلاغ عن المستخدم", color = Color(0xFFFFB74D), fontSize = 13.sp) },
                     onClick = {
                         showMenu = false
-                        onCloseClick()
+                        onReportUser?.invoke()
+                    }
+                )
+
+                DropdownMenuItem(
+                    text = { Text("🧹 مسح المحادثة", color = Color.White, fontSize = 13.sp) },
+                    onClick = {
+                        showMenu = false
+                        onClearChat?.invoke()
+                    }
+                )
+
+                DropdownMenuItem(
+                    text = { Text("📤 تصدير المحادثة", color = Color.White, fontSize = 13.sp) },
+                    onClick = {
+                        showMenu = false
+                        onExportChat?.invoke()
+                    }
+                )
+
+                Divider(color = Color.White.copy(alpha = 0.1f))
+
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = if (isBlocked) "✅ إلغاء حظر المستخدم" else "🚫 حظر المستخدم",
+                            color = if (isBlocked) Color(0xFF00C853) else Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
                     },
-                    leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray) }
+                    onClick = {
+                        showMenu = false
+                        onBlockToggle()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (isBlocked) Icons.Filled.Check else Icons.Default.Close,
+                            contentDescription = null,
+                            tint = if (isBlocked) Color(0xFF00C853) else Color(0xFFE53935)
+                        )
+                    }
                 )
             }
         }

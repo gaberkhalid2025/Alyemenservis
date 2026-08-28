@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
+import com.example.data.models.MessageStatus
 
 @Composable
 fun AppHeaderBar(
@@ -73,7 +74,8 @@ fun AppHeaderBar(
     }
 
     val headerContext = LocalContext.current
-    val readNotificationIdsState by viewModel.readNotificationIds.collectAsState()
+    val headerSp = remember(headerContext) { headerContext.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
+    var headerReadIds by remember { mutableStateOf(headerSp.getStringSet("read_notif_ids", emptySet()) ?: emptySet()) }
     
     // Calculate unread notifications count
     val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
@@ -95,30 +97,25 @@ fun AppHeaderBar(
             }
         }
     }
-    val unreadNotifCount = remember(filteredNotifs, readNotificationIdsState) {
-        filteredNotifs.count { !it.isRead && it.id !in readNotificationIdsState }
+    val readNotificationIds by viewModel.readNotificationIds.collectAsState()
+    val unreadNotifCount = remember(filteredNotifs, headerReadIds, readNotificationIds) {
+        if (filteredNotifs.isEmpty()) 0
+        else filteredNotifs.count { it.id !in headerReadIds && it.id !in readNotificationIds && !it.isRead }
     }
 
     // Calculate unread chats count
-    val unreadChatsCount = remember(myChannels, cleanUserId, cleanUserPhone, myProvider) {
-        myChannels.sumOf { ch ->
-            val countForUser = if (cleanUserId == ch.customerId || cleanUserPhone == ch.customerPhone) {
-                ch.unreadCountUser
-            } else if (cleanUserId == ch.targetId || cleanUserId == ch.providerId || (myProvider != null && myProvider.id == ch.providerId)) {
-                ch.unreadCountTarget
+    val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
+        if (myChannels.isEmpty()) 0
+        else myChannels.count { ch ->
+            val lastMsg = ch.messages.lastOrNull()
+            if (lastMsg == null) {
+                false
             } else {
-                ch.unreadCount
-            }
-
-            if (countForUser > 0) {
-                countForUser
-            } else {
-                ch.messages.count { msg ->
-                    val isMe = (cleanUserId.isNotEmpty() && msg.senderId == cleanUserId) ||
-                               (cleanUserPhone.isNotEmpty() && (msg.senderId == cleanUserPhone || msg.senderPhone == cleanUserPhone)) ||
-                               (myProvider != null && msg.senderId == myProvider.id)
-                    !isMe && msg.status != "READ" && msg.readAt == 0L
-                }
+                val isMe = lastMsg.senderId == currentUserId || 
+                           lastMsg.senderId == userPhoneState || 
+                           (myProvider != null && lastMsg.senderId == myProvider.id)
+                val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
+                !isMe && lastMsg.status != "READ" && lastMsg.timestamp > readTime
             }
         }
     }
@@ -292,22 +289,25 @@ fun AppHeaderBar(
                 emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
                 vectorIcon = Icons.Default.Notifications,
                 label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = currentScreen == "NOTIFICATIONS",
+                isSelected = unreadNotifCount > 0,
                 badgeCount = unreadNotifCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
                 onClick = {
-                    viewModel.markAllNotificationsAsRead(headerContext)
+                    val allIds = filteredNotifs.map { it.id }.toSet()
+                    headerSp.edit().putStringSet("read_notif_ids", allIds).apply()
+                    headerReadIds = allIds
                     onNotificationsClick()
                 }
             )
 
             // 5. المحادثات
+            val hasUnreadChats = unreadChatsCount > 0
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topChatsIcon.ifEmpty { "✉️" },
                 vectorIcon = Icons.Default.Email,
                 label = if (isEn) "Chats" else "المحادثات",
-                isSelected = currentScreen == "CHAT_LIST",
+                isSelected = hasUnreadChats,
                 badgeCount = unreadChatsCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,

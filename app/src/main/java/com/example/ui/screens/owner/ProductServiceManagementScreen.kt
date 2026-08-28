@@ -1,5 +1,6 @@
 package com.example.ui.screens.owner
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,48 +18,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.data.ProductEntity
 import com.example.data.UnifiedBusinessAccount
 import com.example.rememberBase64Bitmap
 import com.example.ui.MainViewModel
-import com.example.ui.components.AppSnackbarHost
-import com.example.ui.components.SnackbarType
-import com.example.ui.components.showCustomSnackbar
 import com.example.utils.VisualThemePalette
-import kotlinx.coroutines.launch
 import java.util.UUID
 
-/**
- * 🛒 ProductServiceManagementScreen
- * شاشة إدارة وإضافة المنتجات والخدمات للنشاط التجاري مع تكامل OwnerViewModel ونظام AppSnackbar
- */
 @Composable
 fun ProductServiceManagementScreen(
     account: UnifiedBusinessAccount,
     viewModel: MainViewModel,
-    ownerViewModel: OwnerViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    val productsList by ownerViewModel.products.collectAsState()
+    val context = LocalContext.current
+    val productsList by viewModel.products.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var productToEdit by remember { mutableStateOf<ProductEntity?>(null) }
 
-    LaunchedEffect(account.id) {
-        ownerViewModel.listenToProducts(account.id)
+    val myProducts = remember(productsList, account.id) {
+        productsList.filter { it.storeId == account.id }
     }
 
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
@@ -91,7 +80,7 @@ fun ProductServiceManagementScreen(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        "${productsList.size} عنصر",
+                        "${myProducts.size} عنصر",
                         fontSize = 11.sp,
                         color = themeColors.accent,
                         fontWeight = FontWeight.Bold,
@@ -100,7 +89,7 @@ fun ProductServiceManagementScreen(
                 }
             }
 
-            if (productsList.isEmpty()) {
+            if (myProducts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("🛒", fontSize = 48.sp)
@@ -111,10 +100,9 @@ fun ProductServiceManagementScreen(
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 72.dp)
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    items(productsList, key = { it.id }) { product ->
+                    items(myProducts, key = { it.id }) { product ->
                         ProductItemCard(
                             product = product,
                             themeColors = themeColors,
@@ -123,40 +111,12 @@ fun ProductServiceManagementScreen(
                                 showAddDialog = true
                             },
                             onDelete = {
-                                ownerViewModel.deleteProduct(
-                                    productId = product.id,
-                                    onSuccess = {
-                                        scope.launch {
-                                            snackbarHostState.showCustomSnackbar(
-                                                message = "تم حذف المنتج بنجاح",
-                                                type = SnackbarType.SUCCESS
-                                            )
-                                        }
-                                    },
-                                    onError = { err ->
-                                        scope.launch {
-                                            snackbarHostState.showCustomSnackbar(
-                                                message = err,
-                                                type = SnackbarType.ERROR
-                                            )
-                                        }
-                                    }
-                                )
+                                viewModel.deleteProduct(product.id)
+                                Toast.makeText(context, "تم حذف المنتج بنجاح", Toast.LENGTH_SHORT).show()
                             },
                             onToggleAvailable = { isAvail ->
                                 val updated = product.copy(isAvailable = isAvail)
-                                ownerViewModel.saveProduct(
-                                    product = updated,
-                                    onSuccess = {
-                                        scope.launch {
-                                            snackbarHostState.showCustomSnackbar(
-                                                message = if (isAvail) "المنتج متوفر الآن" else "تم تعيين المنتج كغير متوفر",
-                                                type = SnackbarType.INFO
-                                            )
-                                        }
-                                    },
-                                    onError = {}
-                                )
+                                viewModel.saveProduct(updated)
                             }
                         )
                     }
@@ -171,26 +131,9 @@ fun ProductServiceManagementScreen(
             product = productToEdit,
             onDismiss = { showAddDialog = false },
             onSave = { newProd ->
-                ownerViewModel.saveProduct(
-                    product = newProd,
-                    onSuccess = {
-                        showAddDialog = false
-                        scope.launch {
-                            snackbarHostState.showCustomSnackbar(
-                                message = "تم حفظ المنتج بنجاح!",
-                                type = SnackbarType.SUCCESS
-                            )
-                        }
-                    },
-                    onError = { err ->
-                        scope.launch {
-                            snackbarHostState.showCustomSnackbar(
-                                message = err,
-                                type = SnackbarType.ERROR
-                            )
-                        }
-                    }
-                )
+                viewModel.saveProduct(newProd)
+                showAddDialog = false
+                Toast.makeText(context, "تم حفظ المنتج بنجاح!", Toast.LENGTH_SHORT).show()
             }
         )
     }

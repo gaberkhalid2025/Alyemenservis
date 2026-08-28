@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.*
+import com.example.data.models.*
 import com.example.utils.*
 import com.example.utils.*
 import com.example.ui.components.*
@@ -646,7 +647,6 @@ fun AppNavigator(
                                         currentUserId = effUserId,
                                         currentUserName = effUserName,
                                         channelId = if (activeCh != null) activeCh!!.id else if (isChannelId) preSelectedChannelId else null,
-                                        showUserIdInsteadOfNameInChat = settingsState.showUserIdInsteadOfNameInChat,
                                         targetUserId = if (activeCh == null && !isChannelId) preSelectedChannelId else null,
                                         themeColors = themeColors,
                                         onBackClick = {
@@ -662,7 +662,6 @@ fun AppNavigator(
                                         currentUserId = effUserId,
                                         currentUserName = effUserName,
                                         targetUserId = "admin_support",
-                                        showUserIdInsteadOfNameInChat = settingsState.showUserIdInsteadOfNameInChat,
                                         targetUserName = "الدعم الفني والإدارة",
                                         relatedEntityType = "SUPPORT",
                                         themeColors = themeColors,
@@ -703,8 +702,7 @@ fun AppNavigator(
                                 "REGISTER_FORM", "JOIN_REQUEST_STATUS", "LOGIN", 
                                 "PROVIDER_REGISTRATION", "STORE_CREATION", "PROPERTY_CREATION", 
                                 "JOB_CREATION", "CREATE_BOOKING", "REGISTER",
-                                "MAP", "MAP_VIEW", "ADMIN_PANEL", "ADMIN_LOGIN", "OWNER_PANEL",
-                                "CHAT_DIRECT", "CHAT_SUPPORT", "CHAT_LIST"
+                                "MAP", "MAP_VIEW", "ADMIN_PANEL", "ADMIN_LOGIN", "OWNER_PANEL"
                             ) || showGuestRegisterDialogForAction != null || 
                               showAssistantDialog || showRequestServiceModal
 
@@ -1258,16 +1256,22 @@ fun Luxury3DNavIcon(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 5.dp, y = (-3).dp)
-                        .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
-                        .background(Color(0xFFEF4444), CircleShape)
-                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                        .offset(x = 6.dp, y = (-5).dp)
+                        .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color(0xFFEF4444), Color(0xFFDC2626))
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        .border(1.2.dp, Color.White, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (badgeCount > 99) "99+" else badgeCount.toString(),
                         color = Color.White,
-                        fontSize = 9.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         textAlign = TextAlign.Center
                     )
@@ -1321,8 +1325,10 @@ fun AppHeaderBar(
     }
 
     val headerContext = LocalContext.current
-    val readNotificationIdsState by viewModel.readNotificationIds.collectAsState()
-    
+    val headerSp = remember(headerContext) { headerContext.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
+    var headerReadIds by remember { mutableStateOf(headerSp.getStringSet("read_notif_ids", emptySet()) ?: emptySet()) }
+    val readNotificationIds by viewModel.readNotificationIds.collectAsState()
+
     // Calculate unread notifications count
     val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
         allNotifications.filter { notif ->
@@ -1336,32 +1342,24 @@ fun AppHeaderBar(
             }
         }
     }
-    val unreadNotifCount = remember(filteredNotifs, readNotificationIdsState) {
-        filteredNotifs.count { !it.isRead && it.id !in readNotificationIdsState }
+    val unreadNotifCount = remember(filteredNotifs, headerReadIds, readNotificationIds) {
+        if (filteredNotifs.isEmpty()) 0
+        else filteredNotifs.count { it.id !in headerReadIds && it.id !in readNotificationIds && !it.isRead }
     }
 
     // Calculate unread chats count
-    val unreadChatsCount = remember(myChannels, currentUserId, currentUserPhone, myProvider) {
-        val cleanUserId = currentUserId.trim()
-        val cleanPhone = currentUserPhone.trim().replace(" ", "").replace("+", "")
-        myChannels.sumOf { ch ->
-            val countForUser = if (cleanUserId == ch.customerId || cleanPhone == ch.customerPhone) {
-                ch.unreadCountUser
-            } else if (cleanUserId == ch.targetId || cleanUserId == ch.providerId || (myProvider != null && myProvider.id == ch.providerId)) {
-                ch.unreadCountTarget
+    val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
+        if (myChannels.isEmpty()) 0
+        else myChannels.count { ch ->
+            val lastMsg = ch.messages.lastOrNull()
+            if (lastMsg == null) {
+                false
             } else {
-                ch.unreadCount
-            }
-
-            if (countForUser > 0) {
-                countForUser
-            } else {
-                ch.messages.count { msg ->
-                    val isMe = (cleanUserId.isNotEmpty() && msg.senderId == cleanUserId) ||
-                               (cleanPhone.isNotEmpty() && (msg.senderId == cleanPhone || msg.senderPhone == cleanPhone)) ||
-                               (myProvider != null && msg.senderId == myProvider.id)
-                    !isMe && msg.status != "READ" && msg.readAt == 0L
-                }
+                val isMe = lastMsg.senderId == currentUserId || 
+                           lastMsg.senderId == userPhoneState || 
+                           (myProvider != null && lastMsg.senderId == myProvider.id)
+                val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
+                !isMe && lastMsg.status != "READ" && lastMsg.timestamp > readTime
             }
         }
     }
@@ -1533,22 +1531,25 @@ fun AppHeaderBar(
                 emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
                 vectorIcon = Icons.Default.Notifications,
                 label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = currentScreen == "NOTIFICATIONS",
+                isSelected = unreadNotifCount > 0,
                 badgeCount = unreadNotifCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
                 onClick = {
-                    viewModel.markAllNotificationsAsRead(headerContext)
+                    val allIds = filteredNotifs.map { it.id }.toSet()
+                    headerSp.edit().putStringSet("read_notif_ids", allIds).apply()
+                    headerReadIds = allIds
                     onNotificationsClick()
                 }
             )
 
             // 5. المحادثات
+            val hasUnreadChats = unreadChatsCount > 0
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topChatsIcon.ifEmpty { "✉️" },
                 vectorIcon = androidx.compose.material.icons.Icons.Default.Email,
                 label = if (isEn) "Chats" else "المحادثات",
-                isSelected = currentScreen == "CHAT_LIST",
+                isSelected = hasUnreadChats,
                 badgeCount = unreadChatsCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,

@@ -30,7 +30,9 @@ fun ChatBubbleItem(
     message: ChatMessage,
     isMe: Boolean,
     onReplyClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onRetryClick: (() -> Unit)? = null,
+    onMediaClick: ((String, MediaType) -> Unit)? = null
 ) {
     val bubbleColor = if (isMe) Color(0xFF1E88E5) else Color(0xFF1E293B)
     val textColor = Color.White
@@ -99,7 +101,8 @@ fun ChatBubbleItem(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(160.dp)
-                                .clip(RoundedCornerShape(10.dp)),
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onMediaClick?.invoke(message.mediaUrl, MediaType.IMAGE) },
                             contentScale = ContentScale.Crop
                         )
                         Spacer(modifier = Modifier.height(6.dp))
@@ -111,7 +114,8 @@ fun ChatBubbleItem(
                             .fillMaxWidth()
                             .height(160.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color.Black.copy(alpha = 0.4f)),
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clickable { onMediaClick?.invoke(message.mediaUrl, MediaType.VIDEO) },
                         contentAlignment = Alignment.Center
                     ) {
                         if (message.mediaUrl.isNotBlank()) {
@@ -122,18 +126,14 @@ fun ChatBubbleItem(
                                 contentScale = ContentScale.Crop
                             )
                         }
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp)),
-                            contentAlignment = Alignment.Center
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color.Black.copy(alpha = 0.6f),
+                            modifier = Modifier.size(48.dp)
                         ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = "تشغيل الفيديو",
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "تشغيل الفيديو", tint = Color.White, modifier = Modifier.size(32.dp))
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
@@ -143,6 +143,7 @@ fun ChatBubbleItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                            .clickable { onMediaClick?.invoke(message.mediaUrl, MediaType.AUDIO) }
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -153,29 +154,33 @@ fun ChatBubbleItem(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
                 MediaType.FILE -> {
-                    val fileName = message.message.ifBlank { "ملف مرفق" }
-                    val fileIcon = when {
-                        fileName.endsWith(".pdf", ignoreCase = true) -> "📄 [PDF]"
-                        fileName.endsWith(".doc", ignoreCase = true) || fileName.endsWith(".docx", ignoreCase = true) -> "📝 [DOC]"
-                        fileName.endsWith(".xls", ignoreCase = true) || fileName.endsWith(".xlsx", ignoreCase = true) -> "📊 [XLS]"
-                        fileName.endsWith(".zip", ignoreCase = true) || fileName.endsWith(".rar", ignoreCase = true) -> "📦 [ZIP]"
+                    val fileExt = message.mediaUrl.substringAfterLast('.', "").uppercase()
+                    val fileIcon = when (fileExt) {
+                        "PDF" -> "📄 [PDF]"
+                        "DOC", "DOCX" -> "📝 [WORD]"
+                        "XLS", "XLSX" -> "📊 [EXCEL]"
+                        "ZIP", "RAR" -> "📦 [ARCHIVE]"
                         else -> "📎 [FILE]"
                     }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                            .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                            .clickable { onMediaClick?.invoke(message.mediaUrl, MediaType.FILE) }
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(fileIcon, fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(fileName, color = Color(0xFF90CAF9), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                            Text("انقر للفتح أو التنزيل", color = Color.LightGray, fontSize = 10.sp)
-                        }
+                        Text(fileIcon, color = Color(0xFF90CAF9), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = message.message.ifBlank { "ملف مرفق ($fileExt)" },
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
                 else -> {}
             }

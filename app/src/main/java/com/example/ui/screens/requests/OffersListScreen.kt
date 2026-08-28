@@ -24,37 +24,50 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.data.InstantRequestEntity
-import com.example.data.RequestOfferEntity
+import com.example.data.models.InstantRequestEntity
+import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
-import com.example.ui.components.AppSnackbarHost
+import com.google.firebase.firestore.FirebaseFirestore
 
 /**
  * 📋 OffersListScreen
  * شاشة مقارنة العروض المستلمة للطلب (ترتيب حسب السعر، وقت الوصول، التقييم)
- * متصلة بـ RequestsViewModel و AppSnackbarHost
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OffersListScreen(
     requestId: String,
     viewModel: MainViewModel,
-    requestsViewModel: RequestsViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onSelectOffer: (offerId: String) -> Unit = {},
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
+    val firestore = remember { FirebaseFirestore.getInstance() }
 
-    val currentRequest by requestsViewModel.currentRequest.collectAsState()
-    val offersList by requestsViewModel.currentOffers.collectAsState()
+    var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
+    var offersList by remember { mutableStateOf<List<RequestOfferEntity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
 
     var sortBy by remember { mutableStateOf("PRICE_LOW") } // PRICE_LOW, FASTEST, RATING
 
     LaunchedEffect(requestId) {
-        requestsViewModel.listenToRequestDetails(requestId)
+        if (requestId.isNotBlank()) {
+            firestore.collection("instant_requests").document(requestId)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    request = snapshot.toObject(InstantRequestEntity::class.java)
+                }
+
+            firestore.collection("instant_offers")
+                .whereEqualTo("requestId", requestId)
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null) {
+                        offersList = snapshot.documents.mapNotNull { it.toObject(RequestOfferEntity::class.java) }
+                    }
+                    isLoading = false
+                }
+        }
     }
 
     val sortedOffers = when (sortBy) {
@@ -65,13 +78,12 @@ fun OffersListScreen(
     }
 
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text("العروض المقدمة للطلب", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        currentRequest?.let {
+                        request?.let {
                             Text(it.requestCode, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -85,6 +97,13 @@ fun OffersListScreen(
             )
         }
     ) { paddingValues ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -143,7 +162,7 @@ fun OffersListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
                 ) {
-                    items(sortedOffers, key = { it.id }) { offer ->
+                    items(sortedOffers) { offer ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()

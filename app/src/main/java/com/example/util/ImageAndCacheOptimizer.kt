@@ -1,35 +1,61 @@
 package com.example.util
 
 import android.content.Context
+import java.io.File
 
 /**
- * ⚡ ImageAndCacheOptimizer - تحسين استهلاك الذاكرة والكاش وتوفير مساحة التخزين
- * يفوض العمليات إلى المحرك المركزي [ImageOptimizer]
+ * ⚡ ImageAndCacheOptimizer - تحسين استهلاك الذاكرة والكاش لتوفير المساحة وسرعة الأداء
  */
 object ImageAndCacheOptimizer {
+    private const val MAX_CACHE_SIZE_BYTES = 50 * 1024 * 1024L // 50 ميجابايت كحد أقصى
 
-    /**
-     * حساب حجم الكاش الحالي بالميجابايت
-     * @param context سياق التطبيق
-     * @return حجم الكاش بالميجابايت
-     */
     fun getCacheSizeMB(context: Context): Double {
-        return ImageOptimizer.getCacheSizeMB(context)
+        return try {
+            val size = getDirectorySize(context.cacheDir)
+            size.toDouble() / (1024.0 * 1024.0)
+        } catch (e: Exception) {
+            0.0
+        }
     }
 
-    /**
-     * مسح وحذف كافة الملفات المؤقتة المخزنة في الكاش
-     * @param context سياق التطبيق
-     */
     fun clearAllAppCache(context: Context) {
-        ImageOptimizer.clearAllAppCache(context)
+        try {
+            deleteRecursively(context.cacheDir)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
-    /**
-     * فحص وتنظيف الكاش الزائد إذا تجاوز الحد المسموح (50 ميجابايت)
-     * @param context سياق التطبيق
-     */
     fun clearExcessCache(context: Context) {
-        ImageOptimizer.clearExcessCache(context)
+        try {
+            val cacheDir = context.cacheDir
+            val size = getDirectorySize(cacheDir)
+            if (size > MAX_CACHE_SIZE_BYTES) {
+                deleteRecursively(cacheDir)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun getDirectorySize(file: File): Long {
+        var length = 0L
+        file.listFiles()?.let { list ->
+            for (child in list) {
+                length += if (child.isDirectory) getDirectorySize(child) else child.length()
+            }
+        }
+        return length
+    }
+
+    private fun deleteRecursively(file: File) {
+        file.listFiles()?.let { list ->
+            for (child in list) {
+                if (child.isDirectory) {
+                    deleteRecursively(child)
+                }
+                child.delete()
+            }
+        }
     }
 }

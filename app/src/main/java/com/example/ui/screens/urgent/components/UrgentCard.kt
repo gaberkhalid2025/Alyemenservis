@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.InstantRequestEntity
+import com.example.data.models.InstantRequestEntity
 import com.example.ui.components.UrgentTimerComponent
 import com.example.utils.VisualThemePalette
 

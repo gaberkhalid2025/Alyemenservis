@@ -61,15 +61,18 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
             }
 
             val unreadCount = remember(bookings, currentUserPhone, matchingProvider) {
-                val custCount = bookings.count { b ->
-                    b.customerPhone.trim() == currentUserPhone.trim() && currentUserPhone.isNotEmpty() && (b.status == "PENDING" || b.status == "APPROVED" || b.status == "STARTED")
-                }
-                val provCount = if (matchingProvider != null) {
-                    bookings.count { b ->
-                        b.providerId == matchingProvider.id && (b.status == "PENDING" || b.status == "APPROVED" || b.status == "STARTED")
+                if (bookings.isEmpty() || currentUserPhone.isBlank()) 0
+                else {
+                    val custCount = bookings.count { b ->
+                        b.customerPhone.trim() == currentUserPhone.trim() && (b.status == "PENDING" || b.status == "APPROVED")
                     }
-                } else 0
-                custCount + provCount
+                    val provCount = if (matchingProvider != null) {
+                        bookings.count { b ->
+                            b.providerId == matchingProvider.id && b.status == "PENDING"
+                        }
+                    } else 0
+                    custCount + provCount
+                }
             }
 
             // 1. Info Icon ("عن التطبيق")
