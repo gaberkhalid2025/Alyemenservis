@@ -186,6 +186,13 @@ class RestaurantDashboardViewModel(
 /**
  * 🧠 MedicalDashboardViewModel
  */
+data class DoctorItem(
+    val id: String = "",
+    val name: String,
+    val specialty: String,
+    val hours: String
+)
+
 class MedicalDashboardViewModel(
     private val centerId: String,
     private val dashboardRepository: IDashboardRepository
@@ -194,11 +201,43 @@ class MedicalDashboardViewModel(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    private val _eventFlow = MutableSharedFlow<DashboardEvent>()
+    val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
+
+    private val _doctors = MutableStateFlow<List<DoctorItem>>(
+        listOf(
+            DoctorItem("1", "د. أحمد باحاج", "استشاري أمراض القلب والأوعية الدموية", "🕒 الدوام: السبت إلى الخميس (4:00 عصراً - 9:00 مساءً)"),
+            DoctorItem("2", "د. مها الصنعاني", "أخصائية أمراض الأطفال وحديثي الولادة", "🕒 الدوام: طوال أيام الأسبوع (9:00 صباحاً - 1:00 ظهراً)")
+        )
+    )
+    val doctors: StateFlow<List<DoctorItem>> = _doctors.asStateFlow()
+
     init {
         viewModelScope.launch {
             dashboardRepository.getDashboardStats(centerId, "MEDICAL").collect { stats ->
                 _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
             }
+        }
+    }
+
+    fun addDoctor(name: String, specialty: String, hours: String) {
+        if (name.isBlank() || specialty.isBlank()) return
+        val newDoc = DoctorItem(
+            id = System.currentTimeMillis().toString(),
+            name = name,
+            specialty = specialty,
+            hours = if (hours.startsWith("🕒")) hours else "🕒 الدوام: $hours"
+        )
+        _doctors.value = _doctors.value + newDoc
+        viewModelScope.launch {
+            _eventFlow.emit(DashboardEvent.ShowToast("✅ تم تسجيل الطبيب بالعيادة بنجاح!"))
+        }
+    }
+
+    fun deleteDoctor(id: String) {
+        _doctors.value = _doctors.value.filter { it.id != id }
+        viewModelScope.launch {
+            _eventFlow.emit(DashboardEvent.ShowToast("🗑️ تم إزالة الطبيب بنجاح"))
         }
     }
 }
@@ -226,6 +265,14 @@ class PropertyDashboardViewModel(
 /**
  * 🧠 JobPosterDashboardViewModel
  */
+data class JobPostItem(
+    val id: String = "",
+    val title: String,
+    val salaryYer: Double,
+    val location: String,
+    val applicantsCount: Int = 0
+)
+
 class JobPosterDashboardViewModel(
     private val posterId: String,
     private val dashboardRepository: IDashboardRepository
@@ -234,11 +281,44 @@ class JobPosterDashboardViewModel(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    private val _eventFlow = MutableSharedFlow<DashboardEvent>()
+    val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
+
+    private val _jobs = MutableStateFlow<List<JobPostItem>>(
+        listOf(
+            JobPostItem("1", "محاسب مالي خبرة سنتين", 250000.0, "صنعاء - حدة", 8),
+            JobPostItem("2", "مهندس صيانة شبكات وهواتف", 300000.0, "عدن - المعلا", 5)
+        )
+    )
+    val jobs: StateFlow<List<JobPostItem>> = _jobs.asStateFlow()
+
     init {
         viewModelScope.launch {
             dashboardRepository.getDashboardStats(posterId, "JOB").collect { stats ->
                 _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
             }
+        }
+    }
+
+    fun addJob(title: String, salaryYer: Double, location: String) {
+        if (title.isBlank()) return
+        val newJob = JobPostItem(
+            id = System.currentTimeMillis().toString(),
+            title = title,
+            salaryYer = salaryYer,
+            location = location,
+            applicantsCount = 0
+        )
+        _jobs.value = _jobs.value + newJob
+        viewModelScope.launch {
+            _eventFlow.emit(DashboardEvent.ShowToast("✅ تم نشر الشاغر الوظيفي بنجاح!"))
+        }
+    }
+
+    fun deleteJob(id: String) {
+        _jobs.value = _jobs.value.filter { it.id != id }
+        viewModelScope.launch {
+            _eventFlow.emit(DashboardEvent.ShowToast("🗑️ تم حذف الشاغر الوظيفي"))
         }
     }
 }

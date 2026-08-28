@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -56,48 +58,16 @@ fun RegistrationImagePicker(
     var previewImageUri by remember { mutableStateOf<Uri?>(null) }
     var showSourceDialog by remember { mutableStateOf(false) }
 
-    // Compress URI to file <= 300KB
-    val compressImageUri: (Uri) -> Uri = { uri ->
-        try {
-            val inputStream = context.contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            val tempFile = File(context.cacheDir, "comp_${System.currentTimeMillis()}.jpg")
-            var quality = 85
-            val out = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
-            while (out.toByteArray().size > 300 * 1024 && quality > 20) {
-                out.reset()
-                quality -= 15
-                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
-            }
-            val fos = FileOutputStream(tempFile)
-            fos.write(out.toByteArray())
-            fos.flush()
-            fos.close()
-            Uri.fromFile(tempFile)
-        } catch (e: Exception) {
-            uri
-        }
-    }
+    val scope = rememberCoroutineScope()
+    var isProcessingImages by remember { mutableStateOf(false) }
 
-    // Gallery Picker
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            val compressed = uris.map { compressImageUri(it) }
-            val combined = (imagesUris + compressed).take(maxImages)
-            onImagesSelected(combined)
-        }
-    }
-
-    // Camera Capture
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) {
+    // Compress URI to file <= 300KB in background IO dispatcher
+    suspend fun compressSingleUriBg(uri: Uri): Uri {
+        return withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val tempFile = File(context.cacheDir, "cam_${System.currentTimeMillis()}.jpg")
+                val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext uri
+                val bitmap = BitmapFactory.decodeStream(inputStream) ?: return@withContext uri
+                val tempFile = File(context.cacheDir, "comp_${System.currentTimeMillis()}_${(1000..9999).random()}.jpg")
                 var quality = 85
                 val out = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
@@ -110,11 +80,61 @@ fun RegistrationImagePicker(
                 fos.write(out.toByteArray())
                 fos.flush()
                 fos.close()
-                val uri = Uri.fromFile(tempFile)
-                val combined = (imagesUris + listOf(uri)).take(maxImages)
-                onImagesSelected(combined)
+                bitmap.recycle()
+                Uri.fromFile(tempFile)
             } catch (e: Exception) {
-                // handle error
+                uri
+            }
+        }
+    }
+
+    // Gallery Picker
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                isProcessingImages = true
+                val compressed = uris.map { compressSingleUriBg(it) }
+                val combined = (imagesUris + compressed).take(maxImages)
+                onImagesSelected(combined)
+                isProcessingImages = false
+            }
+        }
+    }
+
+    // Camera Capture
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            scope.launch {
+                isProcessingImages = true
+                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    try {
+                        val tempFile = File(context.cacheDir, "cam_${System.currentTimeMillis()}.jpg")
+                        var quality = 85
+                        val out = ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                        while (out.toByteArray().size > 300 * 1024 && quality > 20) {
+                            out.reset()
+                            quality -= 15
+                            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                        }
+                        val fos = FileOutputStream(tempFile)
+                        fos.write(out.toByteArray())
+                        fos.flush()
+                        fos.close()
+                        val uri = Uri.fromFile(tempFile)
+                        val combined = (imagesUris + listOf(uri)).take(maxImages)
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            onImagesSelected(combined)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                isProcessingImages = false
             }
         }
     }
@@ -138,6 +158,29 @@ fun RegistrationImagePicker(
                 fontWeight = FontWeight.Bold,
                 color = themeColors.accent
             )
+        }
+
+        if (isProcessingImages) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(themeColors.accent.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = themeColors.accent,
+                    strokeWidth = 2.dp
+                )
+                Text(
+                    "جاري معالجة وضغط الصور في الخلفية...",
+                    fontSize = 10.5.sp,
+                    color = themeColors.accent,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         if (isUploading) {

@@ -24,6 +24,8 @@ import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+
 /**
  * 🛠️ Standalone Dedicated Dashboard for Technicians & Craftsmen (لوحة الفني المستقلة)
  */
@@ -36,6 +38,27 @@ fun TechnicianDashboard(
 ) {
     val context = LocalContext.current
     var activeTab by remember { mutableIntStateOf(0) }
+
+    val techViewModel = remember(account.id) {
+        TechnicianDashboardViewModel(
+            ownerId = account.id,
+            dashboardRepository = DashboardRepositoryImpl(context),
+            productsRepository = ProductsRepositoryImpl(context),
+            ratingsRepository = RatingsRepositoryImpl(context),
+            galleryRepository = GalleryRepositoryImpl(context)
+        )
+    }
+
+    val techUiState by techViewModel.uiState.collectAsState()
+
+    LaunchedEffect(techViewModel) {
+        techViewModel.eventFlow.collect { event ->
+            when (event) {
+                is DashboardEvent.ShowToast -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                is DashboardEvent.NavigateToDetail -> { /* Navigate */ }
+            }
+        }
+    }
 
     val tabsList = listOf(
         Pair("🔧", "الخدمات والتسعير"),

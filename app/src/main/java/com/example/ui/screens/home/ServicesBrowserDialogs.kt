@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.CityEntity
+import com.example.data.JobEntity
 import com.example.data.PropertyEntity
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
@@ -138,6 +139,19 @@ fun StoreQuickDetailsDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
+    val isRest = store.isRestaurantOrCafe()
+    val isMed = store.isMedicalCenter()
+    val typeIcon = when {
+        isMed -> "🏥"
+        isRest -> "🍽️"
+        else -> "🏪"
+    }
+    val typeTitle = when {
+        isMed -> "مركز طبي / عيادة"
+        isRest -> "مطعم / كافيه"
+        else -> "متجر تجاري"
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
@@ -157,7 +171,7 @@ fun StoreQuickDetailsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("🏪 ${store.name}", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    Text("$typeIcon ${store.name}", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.Red)
                     }
@@ -175,8 +189,14 @@ fun StoreQuickDetailsDialog(
                     )
                 }
 
-                Text("المالك / المدير: ${store.ownerName}", fontSize = 11.5.sp, color = Color.White)
-                Text("المدينة والحي: ${store.cityId} - ${store.localNeighborhood}", fontSize = 11.sp, color = Color.LightGray)
+                Text("نوع المنشأة: $typeTitle", fontSize = 11.5.sp, color = themeColors.accent, fontWeight = FontWeight.SemiBold)
+                if (store.ownerName.isNotEmpty()) {
+                    Text("المالك / المدير: ${store.ownerName}", fontSize = 11.5.sp, color = Color.White)
+                }
+                Text("الموقع: ${store.cityId} - ${store.localNeighborhood}", fontSize = 11.sp, color = Color.LightGray)
+                if (store.workingHours.isNotEmpty()) {
+                    Text("أوقات العمل: ${store.workingHours}", fontSize = 10.5.sp, color = Color.LightGray)
+                }
                 if (store.description.isNotEmpty()) {
                     Text(store.description, fontSize = 10.5.sp, color = Color.Gray)
                 }
@@ -192,7 +212,7 @@ fun StoreQuickDetailsDialog(
                 ) {
                     Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("اتصال مباشر بالمتجر (${store.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                    Text("اتصال مباشر (${store.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
                 }
             }
         }
@@ -259,6 +279,63 @@ fun PropertyQuickDetailsDialog(
                     Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("اتصال بصاحب العقار (${property.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun JobQuickDetailsDialog(
+    job: JobEntity,
+    context: Context,
+    themeColors: VisualThemePalette,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.5.dp, themeColors.accent),
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("💼 ${job.title}", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.Red)
+                    }
+                }
+
+                Text("جهة العمل: ${job.companyName}", fontSize = 11.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Text("الراتب المتوقع: ${job.salary}", fontSize = 11.sp, color = themeColors.accent)
+                Text("الموقع والنوع: ${job.cityId} - ${job.jobType}", fontSize = 11.sp, color = Color.LightGray)
+                if (job.description.isNotEmpty()) {
+                    Text("تفاصيل الوظيفة:\n${job.description}", fontSize = 10.5.sp, color = Color.Gray)
+                }
+
+                Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${job.phone}"))
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                ) {
+                    Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("التواصل والتقديم (${job.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
                 }
             }
         }

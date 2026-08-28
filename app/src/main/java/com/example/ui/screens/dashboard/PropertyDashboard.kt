@@ -24,6 +24,8 @@ import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+
 /**
  * 🏢 Standalone Dedicated Dashboard for Real Estate Offices & Agencies (لوحة العقارات المستقلة)
  */
@@ -36,6 +38,15 @@ fun PropertyDashboard(
 ) {
     val context = LocalContext.current
     var activeTab by remember { mutableIntStateOf(0) }
+
+    val propertyViewModel = remember(account.id) {
+        PropertyDashboardViewModel(
+            ownerId = account.id,
+            dashboardRepository = DashboardRepositoryImpl(context)
+        )
+    }
+
+    val propertyUiState by propertyViewModel.uiState.collectAsState()
 
     val tabsList = listOf(
         Pair("🏠", "العقارات والوحدات"),

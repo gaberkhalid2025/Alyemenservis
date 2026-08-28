@@ -27,6 +27,8 @@ import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+
 /**
  * 🏥 Standalone Dedicated Dashboard for Medical Centers & Clinics (لوحة المركز الطبي والعيادات)
  */
@@ -39,6 +41,24 @@ fun MedicalDashboard(
 ) {
     val context = LocalContext.current
     var activeTab by remember { mutableIntStateOf(0) }
+
+    val medicalViewModel = remember(account.id) {
+        MedicalDashboardViewModel(
+            centerId = account.id,
+            dashboardRepository = DashboardRepositoryImpl(context)
+        )
+    }
+
+    val medicalUiState by medicalViewModel.uiState.collectAsState()
+
+    LaunchedEffect(medicalViewModel) {
+        medicalViewModel.eventFlow.collect { event ->
+            when (event) {
+                is DashboardEvent.ShowToast -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                is DashboardEvent.NavigateToDetail -> { }
+            }
+        }
+    }
 
     val tabsList = listOf(
         Pair("🩺", "العيادات والخدمات"),
@@ -153,7 +173,7 @@ fun MedicalDashboard(
         ) {
             when (activeTab) {
                 0 -> TabProductsServices(account, viewModel, themeColors)
-                1 -> MedicalDoctorsSection(account, viewModel, themeColors)
+                1 -> MedicalDoctorsSection(account, medicalViewModel, themeColors)
                 2 -> TabBookingsOrders(account, viewModel, themeColors)
                 3 -> TabReviewsFeedback(account, viewModel, themeColors)
                 4 -> TabProfileEdit(account, viewModel, themeColors)
@@ -169,7 +189,7 @@ fun MedicalDashboard(
 @Composable
 private fun MedicalDoctorsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    medicalViewModel: MedicalDashboardViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
@@ -178,15 +198,7 @@ private fun MedicalDoctorsSection(
     var doctorSpecialty by remember { mutableStateOf("") }
     var doctorHours by remember { mutableStateOf("") }
 
-    // Interactive custom local state to demonstrate modular adding/deleting
-    var doctorsList by remember {
-        mutableStateOf(
-            listOf(
-                Triple("د. أحمد باحاج", "استشاري أمراض القلب والأوعية الدموية", "🕒 الدوام: السبت إلى الخميس (4:00 عصراً - 9:00 مساءً)"),
-                Triple("د. مها الصنعاني", "أخصائية أمراض الأطفال وحديثي الولادة", "🕒 الدوام: طوال أيام الأسبوع (9:00 صباحاً - 1:00 ظهراً)")
-            )
-        )
-    }
+    val doctorsList by medicalViewModel.doctors.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -238,16 +250,15 @@ private fun MedicalDoctorsSection(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("🩺 ${doc.first}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("🩺 ${doc.name}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(doc.second, fontSize = 11.sp, color = themeColors.accent)
+                            Text(doc.specialty, fontSize = 11.sp, color = themeColors.accent)
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(doc.third, fontSize = 10.sp, color = Color.LightGray)
+                            Text(doc.hours, fontSize = 10.sp, color = Color.LightGray)
                         }
                         IconButton(
                             onClick = {
-                                doctorsList = doctorsList.filter { it != doc }
-                                Toast.makeText(context, "🗑️ تم إزالة الطبيب بنجاح", Toast.LENGTH_SHORT).show()
+                                medicalViewModel.deleteDoctor(doc.id)
                             }
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350))
@@ -288,9 +299,8 @@ private fun MedicalDoctorsSection(
                 Button(
                     onClick = {
                         if (doctorName.isNotBlank() && doctorSpecialty.isNotBlank()) {
-                            doctorsList = doctorsList + Triple(doctorName, doctorSpecialty, "🕒 الدوام: $doctorHours")
+                            medicalViewModel.addDoctor(doctorName, doctorSpecialty, doctorHours)
                             showAddDialog = false
-                            Toast.makeText(context, "✅ تم تسجيل الطبيب بالعيادة!", Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)

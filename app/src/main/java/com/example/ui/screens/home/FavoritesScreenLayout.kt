@@ -29,6 +29,10 @@ import com.example.ui.MainViewModel
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+import com.example.ui.screens.dashboard.FavoritesViewModel
+import com.example.ui.screens.dashboard.DashboardEvent
+
 /**
  * ❤️ شاشة المفضلة الشاملة
  * تتيح للمستخدم حفظ وإدارة الخدمات والمتاجر والعقارات المفضلة للرجوع إليها سريعاً
@@ -45,6 +49,27 @@ fun FavoritesScreenLayout(
     onOpenChat: (channelId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val currentUserId = currentUserPhone.ifBlank { "guest_user" }
+
+    val favoritesViewModel = remember(currentUserId) {
+        FavoritesViewModel(
+            userId = currentUserId,
+            favoritesRepository = FavoritesRepositoryImpl(context)
+        )
+    }
+
+    val favoritesUiState by favoritesViewModel.uiState.collectAsState()
+
+    LaunchedEffect(favoritesViewModel) {
+        favoritesViewModel.eventFlow.collect { event ->
+            when (event) {
+                is DashboardEvent.ShowToast -> android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                is DashboardEvent.NavigateToDetail -> { }
+            }
+        }
+    }
+
     val providers by viewModel.providers.collectAsState()
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()

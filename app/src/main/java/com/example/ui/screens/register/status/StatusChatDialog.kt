@@ -22,17 +22,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.data.ChatChannelEntity
 import com.example.utils.VisualThemePalette
 
 /**
  * 💬 StatusChatDialog - نافذة المحادثة المباشرة المتطورة
- * تدعم إرسال النصوص والمرفقات ومؤشرات الحالة التفاعلية
+ * تدعم إرسال النصوص والمرفقات ومؤشرات الحالة التفاعلية مع تحسين أداء تحميل الصور
  */
 @Composable
 fun StatusChatDialog(
@@ -43,8 +46,17 @@ fun StatusChatDialog(
     onDismiss: () -> Unit,
     themeColors: VisualThemePalette
 ) {
+    val context = LocalContext.current
     var inputText by remember { mutableStateOf("") }
     var selectedAttachmentUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Lifecycle cleanup
+    DisposableEffect(Unit) {
+        onDispose {
+            inputText = ""
+            selectedAttachmentUri = null
+        }
+    }
 
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -142,8 +154,13 @@ fun StatusChatDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         AsyncImage(
-                            model = uri,
-                            contentDescription = "مرفق",
+                            model = ImageRequest.Builder(context)
+                                .data(uri)
+                                .crossfade(true)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .build(),
+                            contentDescription = "مرفق صوري",
                             modifier = Modifier.size(36.dp).clip(RoundedCornerShape(6.dp)),
                             contentScale = ContentScale.Crop
                         )

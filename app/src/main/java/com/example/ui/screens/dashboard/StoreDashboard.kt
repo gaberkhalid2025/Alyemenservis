@@ -24,6 +24,8 @@ import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+
 /**
  * 🏬 Standalone Dedicated Dashboard for Stores & Commercial Centers (لوحة المتجر والمركز التجاري)
  */
@@ -36,6 +38,26 @@ fun StoreDashboard(
 ) {
     val context = LocalContext.current
     var activeTab by remember { mutableIntStateOf(0) }
+
+    val storeViewModel = remember(account.id) {
+        StoreDashboardViewModel(
+            storeId = account.id,
+            dashboardRepository = DashboardRepositoryImpl(context),
+            productsRepository = ProductsRepositoryImpl(context),
+            ratingsRepository = RatingsRepositoryImpl(context)
+        )
+    }
+
+    val storeUiState by storeViewModel.uiState.collectAsState()
+
+    LaunchedEffect(storeViewModel) {
+        storeViewModel.eventFlow.collect { event ->
+            when (event) {
+                is DashboardEvent.ShowToast -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                is DashboardEvent.NavigateToDetail -> { }
+            }
+        }
+    }
 
     val tabsList = listOf(
         Pair("📦", "المنتجات والمخزون"),

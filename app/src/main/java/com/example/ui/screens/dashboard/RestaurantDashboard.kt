@@ -24,6 +24,8 @@ import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+
 /**
  * 🍔 Standalone Dedicated Dashboard for Restaurants & Cafes (لوحة المطعم والكافيه)
  */
@@ -36,6 +38,16 @@ fun RestaurantDashboard(
 ) {
     val context = LocalContext.current
     var activeTab by remember { mutableIntStateOf(0) }
+
+    val restaurantViewModel = remember(account.id) {
+        RestaurantDashboardViewModel(
+            restaurantId = account.id,
+            dashboardRepository = DashboardRepositoryImpl(context),
+            productsRepository = ProductsRepositoryImpl(context)
+        )
+    }
+
+    val restaurantUiState by restaurantViewModel.uiState.collectAsState()
 
     val tabsList = listOf(
         Pair("🍔", "الوجبات والمنيو"),

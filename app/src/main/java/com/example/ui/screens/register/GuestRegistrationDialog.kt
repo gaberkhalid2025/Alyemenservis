@@ -50,6 +50,18 @@ sealed class GuestAuthUiState {
 }
 
 /**
+ * 🔐 Helper extension to safely retrieve FragmentActivity from ContextWrapper hierarchy
+ */
+private fun Context.findFragmentActivity(): FragmentActivity? {
+    var current = this
+    while (current is android.content.ContextWrapper) {
+        if (current is FragmentActivity) return current
+        current = current.baseContext ?: break
+    }
+    return null
+}
+
+/**
  * 🔐 GuestRegistrationDialog - نافذة تسجيل الزوار واسترجاع الحسابات مع دعم البصمة والذاكرة المؤقتة
  */
 @Composable
@@ -81,9 +93,19 @@ fun GuestRegistrationDialog(
     var nameError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
 
+    var activeBiometricPrompt by remember { mutableStateOf<BiometricPrompt?>(null) }
+
+    // Clean up biometric prompt if dialog dismisses or leaves composition
+    DisposableEffect(Unit) {
+        onDispose {
+            activeBiometricPrompt?.cancelAuthentication()
+            activeBiometricPrompt = null
+        }
+    }
+
     // Helper for Biometric Prompt
     val triggerBiometric = {
-        val activity = context as? FragmentActivity
+        val activity = context.findFragmentActivity()
         if (activity != null) {
             val biometricManager = BiometricManager.from(context)
             if (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS) {
@@ -91,7 +113,6 @@ fun GuestRegistrationDialog(
                 val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         super.onAuthenticationSucceeded(result)
-                        // Auto-restore cached user
                         val prefs = context.getSharedPreferences("yemen_services_auth", Context.MODE_PRIVATE)
                         val savedPhone = prefs.getString("last_auth_phone", "") ?: ""
                         val savedPass = prefs.getString("last_auth_pass", "") ?: ""
@@ -109,7 +130,16 @@ fun GuestRegistrationDialog(
                             scope.launch { snackbarHostState.showSnackbar("لم يتم العثور على بيانات سابقة محفوظة للبصمة") }
                         }
                     }
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        super.onAuthenticationError(errorCode, errString)
+                        uiState = GuestAuthUiState.Idle
+                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                            scope.launch { snackbarHostState.showSnackbar("فشلت المصادقة البيومترية: $errString") }
+                        }
+                    }
                 })
+                activeBiometricPrompt = prompt
                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
                     .setTitle("المصادقة البيومترية")
                     .setSubtitle("استخدم بصمة الإصبع أو الوجه لتسجيل الدخول السريع")
@@ -119,6 +149,8 @@ fun GuestRegistrationDialog(
             } else {
                 scope.launch { snackbarHostState.showSnackbar("المصادقة البيومترية غير مفعلة على جهازك") }
             }
+        } else {
+            scope.launch { snackbarHostState.showSnackbar("تعذر تشغيل البصمة على هذا النشاط، يرجى استخدام كلمة المرور") }
         }
     }
 

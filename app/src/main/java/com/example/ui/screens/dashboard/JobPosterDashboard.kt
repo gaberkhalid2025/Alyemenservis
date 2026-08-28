@@ -28,6 +28,8 @@ import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+
 /**
  * 💼 Standalone Dedicated Dashboard for Job Posters & Recruiters (لوحة معلن الوظائف المستقلة)
  */
@@ -40,6 +42,24 @@ fun JobPosterDashboard(
 ) {
     val context = LocalContext.current
     var activeTab by remember { mutableIntStateOf(0) }
+
+    val jobViewModel = remember(account.id) {
+        JobPosterDashboardViewModel(
+            posterId = account.id,
+            dashboardRepository = DashboardRepositoryImpl(context)
+        )
+    }
+
+    val jobUiState by jobViewModel.uiState.collectAsState()
+
+    LaunchedEffect(jobViewModel) {
+        jobViewModel.eventFlow.collect { event ->
+            when (event) {
+                is DashboardEvent.ShowToast -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                is DashboardEvent.NavigateToDetail -> { }
+            }
+        }
+    }
 
     val tabsList = listOf(
         Pair("📢", "إعلانات الوظائف"),

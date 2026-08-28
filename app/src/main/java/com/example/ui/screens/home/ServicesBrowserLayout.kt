@@ -22,6 +22,9 @@ import com.example.ui.components.AdminCustomBannerView
 import com.example.ui.components.BannerSliderView
 import com.example.utils.VisualThemePalette
 
+import com.example.data.repositories.*
+import com.example.ui.screens.dashboard.ServicesBrowserViewModel
+
 /**
  * 🏠 ServicesBrowserLayout - الشاشة الرئيسية لتصفح الخدمات والمتاجر باليمن
  * مفككة ومبنية وفق معمارية Clean Architecture و MVVM النظيفة (<250 سطر)
@@ -37,6 +40,14 @@ fun ServicesBrowserLayout(
     onChatOpen: (String) -> Unit
 ) {
     val context = LocalContext.current
+
+    val browserViewModel = remember {
+        ServicesBrowserViewModel(
+            productsRepository = ProductsRepositoryImpl(context)
+        )
+    }
+
+    val browserUiState by browserViewModel.uiState.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val filteredProviders by viewModel.filteredProviders.collectAsState()
     val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
@@ -56,14 +67,18 @@ fun ServicesBrowserLayout(
     var showFiltersPanel by remember { mutableStateOf(false) }
     var selectedStoreForDetails by remember { mutableStateOf<StoreEntity?>(null) }
     var selectedPropertyForDetails by remember { mutableStateOf<PropertyEntity?>(null) }
+    var selectedJobForDetails by remember { mutableStateOf<JobEntity?>(null) }
     var payingBookingObj by remember { mutableStateOf<BookingEntity?>(null) }
     var providersLimit by remember { mutableStateOf(10) }
     var activeTabName by remember { mutableStateOf("الرئيسية") }
 
     val activeTabs = remember(settingsState) {
         val list = mutableListOf("الرئيسية")
-        if (settingsState.isStoresEnabled) list.add(settingsState.storesTabName)
-        if (settingsState.isPropertiesEnabled) list.add(settingsState.propertiesTabName)
+        if (settingsState.isStoresEnabled) list.add("المحلات والمتاجر")
+        list.add("المطاعم والكافيهات")
+        list.add("المراكز الطبية")
+        if (settingsState.isPropertiesEnabled) list.add("العقارات")
+        list.add("إعلانات الوظائف")
         list.add("المفضلة")
         list.toList()
     }
@@ -152,7 +167,7 @@ fun ServicesBrowserLayout(
                         onOpenChat = onChatOpen
                     )
                 }
-                settingsState.storesTabName -> {
+                "المحلات والمتاجر", "المحلات", settingsState.storesTabName -> {
                     StoresSectionView(
                         viewModel = viewModel,
                         themeColors = themeColors,
@@ -163,13 +178,45 @@ fun ServicesBrowserLayout(
                         }
                     )
                 }
-                settingsState.propertiesTabName -> {
+                "المطاعم والكافيهات", "المطاعم" -> {
+                    RestaurantsSectionView(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onStoreClick = { selectedStoreForDetails = it },
+                        onCreateRestaurantClick = {
+                            onPreselectedRegistrationTypeChange("store")
+                            viewModel.navigateTo("REGISTER")
+                        }
+                    )
+                }
+                "المراكز الطبية", "المراكز" -> {
+                    MedicalCentersSectionView(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onStoreClick = { selectedStoreForDetails = it },
+                        onCreateMedicalClick = {
+                            onPreselectedRegistrationTypeChange("store")
+                            viewModel.navigateTo("REGISTER")
+                        }
+                    )
+                }
+                "العقارات", settingsState.propertiesTabName -> {
                     PropertiesSectionView(
                         viewModel = viewModel,
                         themeColors = themeColors,
                         onPropertyClick = { selectedPropertyForDetails = it },
                         onCreatePropertyClick = {
                             onPreselectedRegistrationTypeChange("property")
+                            viewModel.navigateTo("REGISTER")
+                        }
+                    )
+                }
+                "إعلانات الوظائف", "الوظائف" -> {
+                    JobsSectionView(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onJobClick = { selectedJobForDetails = it },
+                        onCreateJobClick = {
                             viewModel.navigateTo("REGISTER")
                         }
                     )
@@ -228,6 +275,15 @@ fun ServicesBrowserLayout(
             context = context,
             themeColors = themeColors,
             onDismiss = { selectedPropertyForDetails = null }
+        )
+    }
+
+    selectedJobForDetails?.let { job ->
+        JobQuickDetailsDialog(
+            job = job,
+            context = context,
+            themeColors = themeColors,
+            onDismiss = { selectedJobForDetails = null }
         )
     }
 
