@@ -109,14 +109,33 @@ object SecurityCryptoUtils {
      * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES cipher text.
      */
     fun encrypt(plainText: String?): String {
-        return plainText ?: ""
+        if (plainText.isNullOrEmpty()) return ""
+        return try {
+            val key = createFallbackKey()
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.ENCRYPT_MODE, key, getIv())
+            val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+            java.util.Base64.getEncoder().encodeToString(encryptedBytes)
+        } catch (e: Exception) {
+            plainText
+        }
     }
 
     /**
      * Decrypts Base64 encoded AES cipher text back to plain text.
      */
     fun decrypt(encryptedText: String?): String {
-        return encryptedText ?: ""
+        if (encryptedText.isNullOrEmpty()) return ""
+        return try {
+            val key = createFallbackKey()
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, key, getIv())
+            val decodedBytes = java.util.Base64.getDecoder().decode(encryptedText)
+            val decryptedBytes = cipher.doFinal(decodedBytes)
+            String(decryptedBytes, Charsets.UTF_8)
+        } catch (e: Exception) {
+            encryptedText
+        }
     }
 
     /**

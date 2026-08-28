@@ -63,7 +63,8 @@ class ChatViewModel(
         fallbackUserName: String? = null
     ) {
         viewModelScope.launch {
-            val channel = repository.getChannelById(channelId)
+            val channelResult = repository.getChannelById(channelId)
+            val channel = channelResult.getOrNull()
             if (channel != null) {
                 openChannel(channel, currentUserId)
             } else {
@@ -96,7 +97,7 @@ class ChatViewModel(
         relatedEntityType: String? = null
     ) {
         viewModelScope.launch {
-            val channel = repository.getOrCreateChannel(
+            val channelResult = repository.getOrCreateChannel(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,
@@ -107,7 +108,10 @@ class ChatViewModel(
                 relatedEntityId = relatedEntityId,
                 relatedEntityType = relatedEntityType
             )
-            openChannel(channel, currentUserId)
+            val channel = channelResult.getOrNull()
+            if (channel != null) {
+                openChannel(channel, currentUserId)
+            }
         }
     }
 
@@ -143,7 +147,7 @@ class ChatViewModel(
         _isSending.value = true
 
         viewModelScope.launch {
-            val success = repository.sendMessage(
+            val result = repository.sendMessage(
                 channelId = channel.id,
                 senderId = senderId,
                 senderName = senderName,
@@ -154,7 +158,7 @@ class ChatViewModel(
                 replyToText = replyTo?.message
             )
             _isSending.value = false
-            if (success) {
+            if (result.isSuccess) {
                 _replyingToMessage.value = null
                 sendTypingStatus(senderId, false)
             }

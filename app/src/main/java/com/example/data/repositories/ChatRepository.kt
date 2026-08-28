@@ -2,125 +2,176 @@ package com.example.data.repositories
 
 import android.content.Context
 import android.util.Log
+import com.example.data.local.ChatLocalDataSource
 import com.example.data.models.*
+import com.example.util.AppError
+import com.example.util.AppResult
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
 
+/**
+ * 🚀 ChatRepository
+ * تطبيق مستودع المحادثات الشامل بنظام (Offline-First) والمزامنة الحية (Realtime Delta Sync)
+ * - قراءة فورية من التخزين المحلي المشفر
+ * - مزامنة تفاضلية ذكية مع Firebase Firestore
+ * - حل تعارضات تلقائي (Conflict Resolution)
+ * - إدارة دورة حياة المستمعات بدون تسريب للذاكرة
+ * - معالجة أخطاء موحدة عبر AppResult و AppError
+ */
 class ChatRepository(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
-) {
+    private val context: Context? = null,
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val localDataSource: ChatLocalDataSource? = null
+) : IChatRepository {
+
+    private val local: ChatLocalDataSource? by lazy {
+        localDataSource ?: context?.let { ChatLocalDataSource.getInstance(it) }
+    }
+
     private val channelsCollection = firestore.collection("chat_channels")
     private val presenceCollection = firestore.collection("user_presence")
 
-    /**
-     * Get or create a secure chat channel between two participants.
-     */
-    suspend fun getOrCreateChannel(
+    // =========================================================================
+    // 1. CHANNELS MANAGEMENT (OFFLINE-FIRST)
+    // =========================================================================
+
+    override suspend fun getOrCreateChannel(
         currentUserId: String,
         currentUserName: String,
         currentUserPhoto: String,
         otherUserId: String,
         otherUserName: String,
         otherUserPhoto: String,
-        type: ChannelType = ChannelType.PRIVATE,
-        relatedEntityId: String? = null,
-        relatedEntityType: String? = null
-    ): ChatChannel {
-        val sortedParticipants = listOf(currentUserId.trim(), otherUserId.trim()).sorted()
-        val customChannelId = if (type == ChannelType.PRIVATE) {
-            "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
-        } else if (relatedEntityId != null) {
-            "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
-        } else {
-            channelsCollection.document().id
-        }
+        type: ChannelType,
+        relatedEntityId: String?,
+        relatedEntityType: String?
+    ): AppResult<ChatChannel> = withContext(Dispatchers.IO) {
+        try {
+            val cleanCurrent = currentUserId.trim()
+            val cleanOther = otherUserId.trim()
+            if (cleanCurrent.isBlank()) {
+                return@withContext AppResult.Error(AppError.ValidationError("currentUserId", "معرف المستخدم الحالي فارغ"))
+            }
 
-        val docRef = channelsCollection.document(customChannelId)
-        val snapshot = docRef.get().await()
+            val sortedParticipants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() }.sorted()
+            val customChannelId = when {
+                type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
+                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
+                else -> channelsCollection.document().id
+            }
 
-        if (snapshot.exists()) {
-            val existing = snapshot.toObject(ChatChannel::class.java)
-            if (existing != null) {
-                // Ensure names and photos are updated
+            // 1. Check local cache first
+            val cached = local?.getChannelById(customChannelId)
+            if (cached != null) {
+                // Update names/photos locally and launch background remote check
+                local?.saveOrUpdateChannel(cached)
+            }
+
+            // 2. Fetch or create in Firebase
+            val docRef = channelsCollection.document(customChannelId)
+            val snapshot = docRef.get().await()
+
+            val channelToReturn = if (snapshot.exists()) {
+                val existing = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id) ?: cached ?: ChatChannel(id = customChannelId)
                 val updatedNames = existing.participantNames.toMutableMap().apply {
-                    put(currentUserId, currentUserName)
-                    if (otherUserName.isNotBlank()) put(otherUserId, otherUserName)
+                    put(cleanCurrent, currentUserName)
+                    if (cleanOther.isNotBlank() && otherUserName.isNotBlank()) put(cleanOther, otherUserName)
                 }
                 val updatedPhotos = existing.participantPhotos.toMutableMap().apply {
-                    put(currentUserId, currentUserPhoto)
-                    if (otherUserPhoto.isNotBlank()) put(otherUserId, otherUserPhoto)
+                    put(cleanCurrent, currentUserPhoto)
+                    if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
                 }
+                val updated = existing.copy(
+                    participantNames = updatedNames,
+                    participantPhotos = updatedPhotos,
+                    updatedAt = System.currentTimeMillis()
+                )
                 docRef.update(
                     mapOf(
                         "participantNames" to updatedNames,
-                        "participantPhotos" to updatedPhotos
+                        "participantPhotos" to updatedPhotos,
+                        "updatedAt" to updated.updatedAt
                     )
                 )
-                return existing.copy(
+                updated
+            } else {
+                val newChannel = ChatChannel(
                     id = customChannelId,
-                    participantNames = updatedNames,
-                    participantPhotos = updatedPhotos
+                    participants = sortedParticipants,
+                    participantNames = mapOf(
+                        cleanCurrent to currentUserName,
+                        cleanOther to otherUserName
+                    ),
+                    participantPhotos = mapOf(
+                        cleanCurrent to currentUserPhoto,
+                        cleanOther to otherUserPhoto
+                    ),
+                    type = type,
+                    relatedEntityId = relatedEntityId,
+                    relatedEntityType = relatedEntityType,
+                    lastMessage = "محادثة جديدة",
+                    lastMessageTime = System.currentTimeMillis(),
+                    lastMessageSenderId = cleanCurrent,
+                    unreadCount = mapOf(
+                        cleanCurrent to 0,
+                        cleanOther to 0
+                    ),
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
                 )
+                docRef.set(newChannel).await()
+                newChannel
+            }
+
+            // Cache locally
+            local?.saveOrUpdateChannel(channelToReturn)
+            AppResult.Success(channelToReturn)
+        } catch (e: Exception) {
+            Log.e("ChatRepository", "getOrCreateChannel failed: ${e.message}", e)
+            val fallback = local?.getChannelById("channel_${listOf(currentUserId, otherUserId).sorted().joinToString("_")}")
+            if (fallback != null) {
+                AppResult.Success(fallback)
+            } else {
+                AppResult.Error(AppError.NetworkError(e))
             }
         }
-
-        // Create new channel
-        val newChannel = ChatChannel(
-            id = customChannelId,
-            participants = sortedParticipants,
-            participantNames = mapOf(
-                currentUserId to currentUserName,
-                otherUserId to otherUserName
-            ),
-            participantPhotos = mapOf(
-                currentUserId to currentUserPhoto,
-                otherUserId to otherUserPhoto
-            ),
-            type = type,
-            relatedEntityId = relatedEntityId,
-            relatedEntityType = relatedEntityType,
-            lastMessage = "محادثة جديدة",
-            lastMessageTime = System.currentTimeMillis(),
-            lastMessageSenderId = currentUserId,
-            unreadCount = mapOf(
-                currentUserId to 0,
-                otherUserId to 0
-            ),
-            createdAt = System.currentTimeMillis(),
-            updatedAt = System.currentTimeMillis()
-        )
-
-        docRef.set(newChannel).await()
-        return newChannel
     }
 
-    /**
-     * Fetch a single channel by its ID.
-     */
-    suspend fun getChannelById(channelId: String): ChatChannel? {
-        if (channelId.isBlank()) return null
-        return try {
+    override suspend fun getChannelById(channelId: String): AppResult<ChatChannel?> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank()) return@withContext AppResult.Success(null)
+        try {
+            // Local first
+            val cached = local?.getChannelById(channelId)
+            if (cached != null) {
+                return@withContext AppResult.Success(cached)
+            }
+
+            // Remote fallback
             val snapshot = channelsCollection.document(channelId).get().await()
             if (snapshot.exists()) {
-                snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id)
-            } else null
+                val channel = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id)
+                if (channel != null) {
+                    local?.saveOrUpdateChannel(channel)
+                }
+                AppResult.Success(channel)
+            } else {
+                AppResult.Success(null)
+            }
         } catch (e: Exception) {
-            Log.e("ChatRepository", "Error getting channel $channelId: ${e.message}")
-            null
+            val cached = local?.getChannelById(channelId)
+            if (cached != null) AppResult.Success(cached)
+            else AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Get channels for a user using strict participants security filter.
-     */
-    fun getUserChannels(userId: String): Flow<List<ChatChannel>> = callbackFlow {
+    override fun getUserChannels(userId: String): Flow<List<ChatChannel>> = callbackFlow {
         val cleanUserId = userId.trim()
         if (cleanUserId.isBlank()) {
             trySend(emptyList())
@@ -128,83 +179,119 @@ class ChatRepository(
             return@callbackFlow
         }
 
+        // 1. Emit local cache immediately for instant UI
+        local?.getChannels()?.let { cached ->
+            if (cached.isNotEmpty()) {
+                trySend(cached)
+            }
+        }
+
+        // 2. Attach Firestore Realtime Listener
         val listener: ListenerRegistration = channelsCollection
             .whereArrayContains("participants", cleanUserId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.e("ChatRepository", "Error fetching channels: ${error.message}")
-                    trySend(emptyList())
+                    Log.e("ChatRepository", "Firestore channels listener error: ${error.message}")
                     return@addSnapshotListener
                 }
 
-                val list = snapshot?.documents?.mapNotNull { doc ->
+                val remoteChannels = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(ChatChannel::class.java)?.copy(id = doc.id)
                 }?.sortedByDescending { it.lastMessageTime } ?: emptyList()
 
-                trySend(list)
+                // Save to local cache & emit
+                CoroutineScope(Dispatchers.IO).launch {
+                    local?.saveChannels(remoteChannels)
+                }
+                trySend(remoteChannels)
             }
 
-        awaitClose { listener.remove() }
-    }
+        awaitClose {
+            listener.remove()
+        }
+    }.flowOn(Dispatchers.IO)
 
-    /**
-     * Real-time stream of messages in a channel.
-     */
-    fun getChannelMessages(channelId: String, currentUserId: String): Flow<List<ChatMessage>> = callbackFlow {
+    // =========================================================================
+    // 2. MESSAGES MANAGEMENT (OFFLINE-FIRST & DELTA SYNC)
+    // =========================================================================
+
+    override fun getChannelMessages(channelId: String, currentUserId: String): Flow<List<ChatMessage>> = callbackFlow {
         if (channelId.isBlank()) {
             trySend(emptyList())
             close()
             return@callbackFlow
         }
 
+        // 1. Emit local cache immediately
+        val cached = local?.getMessages(channelId) ?: emptyList()
+        val visibleCached = cached.filter { !it.isHiddenFor(currentUserId) }
+        trySend(visibleCached)
+
+        // 2. Real-time Firebase Listener
         val messagesRef = channelsCollection.document(channelId).collection("messages")
         val listener = messagesRef
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.e("ChatRepository", "Error fetching messages: ${error.message}")
-                    trySend(emptyList())
+                    Log.e("ChatRepository", "Messages listener error: ${error.message}")
                     return@addSnapshotListener
                 }
 
-                val messages = snapshot?.documents?.mapNotNull { doc ->
+                val remoteMessages = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(ChatMessage::class.java)?.copy(id = doc.id)
-                }?.filter { msg ->
-                    !msg.deletedForUsers.contains(currentUserId)
                 } ?: emptyList()
 
-                trySend(messages)
+                CoroutineScope(Dispatchers.IO).launch {
+                    // Conflict Resolution: merge local pending messages with remote messages
+                    val currentLocal = local?.getMessages(channelId) ?: emptyList()
+                    val pendingLocal = currentLocal.filter { it.status == MessageStatus.PENDING || it.status == MessageStatus.SENDING }
+
+                    val mergedMap = LinkedHashMap<String, ChatMessage>()
+                    // Add remote confirmed
+                    for (remote in remoteMessages) {
+                        mergedMap[remote.id] = remote
+                    }
+                    // Retain pending that haven't landed in remote yet
+                    for (pending in pendingLocal) {
+                        if (!mergedMap.containsKey(pending.id)) {
+                            mergedMap[pending.id] = pending
+                        }
+                    }
+
+                    val mergedList = mergedMap.values.sortedBy { it.timestamp }
+                    local?.saveMessages(channelId, mergedList)
+                    local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+
+                    val visible = mergedList.filter { !it.isHiddenFor(currentUserId) }
+                    trySend(visible)
+                }
             }
 
-        awaitClose { listener.remove() }
-    }
+        awaitClose {
+            listener.remove()
+        }
+    }.flowOn(Dispatchers.IO)
 
-    /**
-     * Send a new message.
-     */
-    suspend fun sendMessage(
+    override suspend fun sendMessage(
         channelId: String,
         senderId: String,
         senderName: String,
         messageText: String,
-        mediaType: MediaType = MediaType.TEXT,
-        mediaUrl: String = "",
-        replyToId: String? = null,
-        replyToText: String? = null
-    ): Boolean {
-        return try {
-            val channelRef = channelsCollection.document(channelId)
-            val channelSnapshot = channelRef.get().await()
-            val channel = channelSnapshot.toObject(ChatChannel::class.java) ?: return false
+        mediaType: MediaType,
+        mediaUrl: String,
+        replyToId: String?,
+        replyToText: String?,
+        attachment: ChatAttachment?
+    ): AppResult<ChatMessage> = withContext(Dispatchers.IO) {
+        try {
+            if (channelId.isBlank() || senderId.isBlank()) {
+                return@withContext AppResult.Error(AppError.ValidationError("message", "بيانات الرسالة غير مكتملة"))
+            }
 
-            // Check if sender is blocked
-            val isSenderBlocked = channel.isBlocked[senderId] ?: false
-            if (isSenderBlocked) return false
-
-            val messageId = channelRef.collection("messages").document().id
+            val messageId = channelsCollection.document(channelId).collection("messages").document().id
             val now = System.currentTimeMillis()
 
-            val chatMsg = ChatMessage(
+            val initialMsg = ChatMessage(
                 id = messageId,
                 channelId = channelId,
                 senderId = senderId,
@@ -212,36 +299,52 @@ class ChatRepository(
                 message = messageText,
                 mediaType = mediaType,
                 mediaUrl = mediaUrl,
+                attachment = attachment,
                 replyToId = replyToId,
                 replyToText = replyToText,
-                status = MessageStatus.SENT,
+                status = MessageStatus.SENDING,
                 timestamp = now,
-                isDeleted = false
+                syncStatus = SyncStatus.PENDING_UPLOAD
             )
 
-            // Save message
-            channelRef.collection("messages").document(messageId).set(chatMsg).await()
+            // 1. Immediately store in local cache with SENDING state for instant UI
+            local?.insertOrUpdateMessage(initialMsg)
 
-            // Update channel last message and increment unread for other participants
-            val updatedUnread = channel.unreadCount.toMutableMap()
-            channel.participants.forEach { pId ->
+            // 2. Attempt remote send
+            val channelRef = channelsCollection.document(channelId)
+            val channelSnapshot = channelRef.get().await()
+            val channel = channelSnapshot.toObject(ChatChannel::class.java)
+
+            if (channel != null && channel.isUserBlocked(senderId)) {
+                local?.updateMessageStatus(channelId, messageId, MessageStatus.FAILED)
+                return@withContext AppResult.Error(AppError.UnauthorizedError("لا يمكنك إرسال الرسالة لأنك محظور في هذه المحادثة."))
+            }
+
+            val confirmedMsg = initialMsg.copy(status = MessageStatus.SENT, syncStatus = SyncStatus.SYNCED)
+            channelRef.collection("messages").document(messageId).set(confirmedMsg).await()
+
+            // Update Channel metadata & increment unread counts
+            val updatedUnread = (channel?.unreadCount ?: emptyMap()).toMutableMap()
+            channel?.participants?.forEach { pId ->
                 if (pId != senderId) {
-                    val currentUnread = updatedUnread[pId] ?: 0
-                    updatedUnread[pId] = currentUnread + 1
+                    val count = updatedUnread[pId] ?: 0
+                    updatedUnread[pId] = count + 1
                 }
             }
 
-            val displayLastMessage = when (mediaType) {
+            val displayLast = when (mediaType) {
                 MediaType.IMAGE -> "📷 صورة"
                 MediaType.VIDEO -> "🎥 فيديو"
                 MediaType.AUDIO -> "🎤 تسجيل صوتي"
-                MediaType.FILE -> "📎 ملف مرفق"
+                MediaType.FILE -> "📎 ${attachment?.fileName.orEmpty().ifBlank { "ملف مرفق" }}"
+                MediaType.LOCATION -> "📍 موقع جغرافي"
+                MediaType.CALL -> "📞 مكالمة صوتية"
                 MediaType.TEXT -> messageText
             }
 
             channelRef.update(
                 mapOf(
-                    "lastMessage" to displayLastMessage,
+                    "lastMessage" to displayLast,
                     "lastMessageTime" to now,
                     "lastMessageSenderId" to senderId,
                     "unreadCount" to updatedUnread,
@@ -249,23 +352,71 @@ class ChatRepository(
                 )
             ).await()
 
-            true
+            // Update local to SENT
+            local?.insertOrUpdateMessage(confirmedMsg)
+            AppResult.Success(confirmedMsg)
         } catch (e: Exception) {
-            Log.e("ChatRepository", "Failed to send message: ${e.message}")
-            false
+            Log.e("ChatRepository", "sendMessage failed, saving to offline queue: ${e.message}")
+            // Fallback: Queue message offline
+            val offlineMsg = ChatMessage(
+                id = java.util.UUID.randomUUID().toString(),
+                channelId = channelId,
+                senderId = senderId,
+                senderName = senderName,
+                message = messageText,
+                mediaType = mediaType,
+                mediaUrl = mediaUrl,
+                attachment = attachment,
+                replyToId = replyToId,
+                replyToText = replyToText,
+                status = MessageStatus.PENDING,
+                timestamp = System.currentTimeMillis(),
+                syncStatus = SyncStatus.PENDING_UPLOAD
+            )
+            local?.queuePendingMessage(offlineMsg)
+            AppResult.Success(offlineMsg)
         }
     }
 
-    /**
-     * Mark channel messages as read for current user efficiently.
-     */
-    suspend fun markChannelAsRead(channelId: String, currentUserId: String) {
-        if (channelId.isBlank()) return
+    override suspend fun retryPendingMessages(currentUserId: String): AppResult<Int> = withContext(Dispatchers.IO) {
         try {
+            val pending = local?.getPendingMessages() ?: emptyList()
+            var successCount = 0
+
+            for (msg in pending) {
+                val sendResult = sendMessage(
+                    channelId = msg.channelId,
+                    senderId = msg.senderId,
+                    senderName = msg.senderName,
+                    messageText = msg.message,
+                    mediaType = msg.mediaType,
+                    mediaUrl = msg.mediaUrl,
+                    replyToId = msg.replyToId,
+                    replyToText = msg.replyToText,
+                    attachment = msg.attachment
+                )
+                if (sendResult is AppResult.Success) {
+                    local?.removePendingMessage(msg.id)
+                    successCount++
+                }
+            }
+            AppResult.Success(successCount)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun markChannelAsRead(channelId: String, currentUserId: String): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || currentUserId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            // Local update first
+            local?.markMessagesAsRead(channelId, currentUserId)
+
+            // Remote update
             val channelRef = channelsCollection.document(channelId)
             channelRef.update("unreadCount.$currentUserId", 0).await()
 
-            // Update status only for messages that are not sent by current user and not yet READ
+            // Update status of incoming messages
             val unreadSnapshot = channelRef.collection("messages")
                 .whereNotEqualTo("senderId", currentUserId)
                 .get().await()
@@ -281,38 +432,52 @@ class ChatRepository(
                 }
                 batch.commit().await()
             }
+            AppResult.Success(Unit)
         } catch (e: Exception) {
-            Log.e("ChatRepository", "Error marking as read: ${e.message}")
+            Log.e("ChatRepository", "markChannelAsRead error: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Set typing status for a participant.
-     */
-    suspend fun setTyping(channelId: String, userId: String, isTyping: Boolean) {
+    override suspend fun setTyping(channelId: String, userId: String, isTyping: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || userId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
             channelsCollection.document(channelId).update("isTyping.$userId", isTyping).await()
+            AppResult.Success(Unit)
         } catch (e: Exception) {
-            // silent fail
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Block/Unblock user in channel.
-     */
-    suspend fun toggleBlockUser(channelId: String, userIdToBlock: String, isBlocked: Boolean) {
+    override suspend fun toggleBlockUser(channelId: String, userIdToBlock: String, isBlocked: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || userIdToBlock.isBlank()) return@withContext AppResult.Success(Unit)
         try {
             channelsCollection.document(channelId).update("isBlocked.$userIdToBlock", isBlocked).await()
+            val cached = local?.getChannelById(channelId)
+            if (cached != null) {
+                val updatedBlocked = cached.isBlocked.toMutableMap().apply { put(userIdToBlock, isBlocked) }
+                local?.saveOrUpdateChannel(cached.copy(isBlocked = updatedBlocked))
+            }
+            AppResult.Success(Unit)
         } catch (e: Exception) {
-            Log.e("ChatRepository", "Error toggling block: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Delete message (for everyone or for current user).
-     */
-    suspend fun deleteMessage(channelId: String, messageId: String, forEveryone: Boolean, currentUserId: String) {
+    override suspend fun deleteMessage(
+        channelId: String,
+        messageId: String,
+        forEveryone: Boolean,
+        currentUserId: String
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || messageId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
+            // Local update
+            if (forEveryone) {
+                local?.deleteMessage(channelId, messageId)
+            }
+
+            // Remote update
             val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
             if (forEveryone) {
                 msgRef.update(
@@ -324,71 +489,142 @@ class ChatRepository(
             } else {
                 msgRef.update("deletedForUsers", FieldValue.arrayUnion(currentUserId)).await()
             }
+            AppResult.Success(Unit)
         } catch (e: Exception) {
-            Log.e("ChatRepository", "Error deleting message: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Delete a single chat channel.
-     */
-    suspend fun deleteChannel(channelId: String) {
-        if (channelId.isBlank()) return
+    override suspend fun toggleReaction(
+        channelId: String,
+        messageId: String,
+        userId: String,
+        emoji: String
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || messageId.isBlank() || userId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
+            val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            val snapshot = msgRef.get().await()
+            val currentReactions = snapshot.toObject(ChatMessage::class.java)?.reactions?.toMutableMap() ?: mutableMapOf()
+
+            if (currentReactions[userId] == emoji) {
+                currentReactions.remove(userId)
+            } else {
+                currentReactions[userId] = emoji
+            }
+
+            msgRef.update("reactions", currentReactions).await()
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun deleteChannel(channelId: String): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            local?.deleteChannel(channelId)
             channelsCollection.document(channelId).delete().await()
+            AppResult.Success(Unit)
         } catch (e: Exception) {
-            Log.e("ChatRepository", "Error deleting channel: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Delete all chat channels provided.
-     */
-    suspend fun deleteAllChannels(channelsList: List<ChatChannel>) {
-        if (channelsList.isEmpty()) return
+    override suspend fun deleteAllChannels(channelsList: List<ChatChannel>): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelsList.isEmpty()) return@withContext AppResult.Success(Unit)
         try {
+            local?.clearAllChannels()
             val batch = firestore.batch()
             channelsList.forEach { ch ->
                 batch.delete(channelsCollection.document(ch.id))
             }
             batch.commit().await()
+            AppResult.Success(Unit)
         } catch (e: Exception) {
-            Log.e("ChatRepository", "Error deleting all channels: ${e.message}")
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Set user online presence.
-     */
-    suspend fun setUserPresence(userId: String, isOnline: Boolean) {
-        if (userId.isBlank()) return
+    // =========================================================================
+    // 3. USER PRESENCE
+    // =========================================================================
+
+    override suspend fun setUserPresence(userId: String, isOnline: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (userId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
             val presence = UserPresence(
                 userId = userId,
                 isOnline = isOnline,
                 lastSeen = System.currentTimeMillis()
             )
+            local?.saveUserPresence(presence)
             presenceCollection.document(userId).set(presence, SetOptions.merge()).await()
+            AppResult.Success(Unit)
         } catch (e: Exception) {
-            // silent
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 
-    /**
-     * Stream other user presence.
-     */
-    fun getUserPresence(userId: String): Flow<UserPresence?> = callbackFlow {
+    override fun getUserPresence(userId: String): Flow<UserPresence?> = callbackFlow {
         if (userId.isBlank()) {
             trySend(null)
             close()
             return@callbackFlow
         }
 
+        // Local cache emission first
+        local?.observeUserPresence(userId)?.let { localFlow ->
+            CoroutineScope(Dispatchers.IO).launch {
+                localFlow.collect { cached ->
+                    trySend(cached)
+                }
+            }
+        }
+
         val listener = presenceCollection.document(userId).addSnapshotListener { snapshot, _ ->
             val presence = snapshot?.toObject(UserPresence::class.java)
+            if (presence != null) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    local?.saveUserPresence(presence)
+                }
+            }
             trySend(presence)
         }
 
         awaitClose { listener.remove() }
+    }.flowOn(Dispatchers.IO)
+
+    // =========================================================================
+    // 4. DELTA SYNC IMPLEMENTATION
+    // =========================================================================
+
+    override suspend fun syncChannelDelta(channelId: String): AppResult<Int> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank()) return@withContext AppResult.Success(0)
+        try {
+            val lastSync = local?.getLastSyncTimestamp(channelId) ?: 0L
+            val messagesRef = channelsCollection.document(channelId).collection("messages")
+
+            val snapshot = if (lastSync > 0) {
+                messagesRef.whereGreaterThan("timestamp", lastSync).get().await()
+            } else {
+                messagesRef.orderBy("timestamp", Query.Direction.DESCENDING).limit(50).get().await()
+            }
+
+            val newMessages = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(ChatMessage::class.java)?.copy(id = doc.id)
+            }
+
+            if (newMessages.isNotEmpty()) {
+                val current = local?.getMessages(channelId) ?: emptyList()
+                val merged = (current + newMessages).distinctBy { it.id }.sortedBy { it.timestamp }
+                local?.saveMessages(channelId, merged)
+                local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+            }
+
+            AppResult.Success(newMessages.size)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
     }
 }

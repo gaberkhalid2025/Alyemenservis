@@ -58,7 +58,7 @@ fun OfferSelectionScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val firestore = remember { FirebaseFirestore.getInstance() }
-    val chatRepository = remember { ChatRepository(firestore) }
+    val chatRepository = remember { ChatRepository(context = context, firestore = firestore) }
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
@@ -306,7 +306,7 @@ fun OfferSelectionScreen(
                                         val effectiveUserId = currentUserId.ifBlank { currentUserPhone.ifBlank { "client_${System.currentTimeMillis()}" } }
                                         val effectiveUserName = currentUserName.ifBlank { "العميل" }
                                         val targetTechId = curOffer.technicianId.ifBlank { curOffer.technicianPhone }
-                                        val createdChannel = chatRepository.getOrCreateChannel(
+                                        val channelResult = chatRepository.getOrCreateChannel(
                                             currentUserId = effectiveUserId,
                                             currentUserName = effectiveUserName,
                                             currentUserPhoto = "",
@@ -317,17 +317,20 @@ fun OfferSelectionScreen(
                                             relatedEntityId = curReq.id,
                                             relatedEntityType = "URGENT_REQUEST"
                                         )
-                                        newlyCreatedChannel = createdChannel
-                                        viewModel.openChatChannel(
-                                            com.example.data.ChatChannelEntity(
-                                                id = createdChannel.id,
-                                                targetId = targetTechId,
-                                                targetName = curOffer.technicianName,
-                                                targetPhone = curOffer.technicianPhone,
-                                                providerId = targetTechId,
-                                                providerName = curOffer.technicianName
+                                        val createdChannel = channelResult.getOrNull()
+                                        if (createdChannel != null) {
+                                            newlyCreatedChannel = createdChannel
+                                            viewModel.openChatChannel(
+                                                com.example.data.ChatChannelEntity(
+                                                    id = createdChannel.id,
+                                                    targetId = targetTechId,
+                                                    targetName = curOffer.technicianName,
+                                                    targetPhone = curOffer.technicianPhone,
+                                                    providerId = targetTechId,
+                                                    providerName = curOffer.technicianName
+                                                )
                                             )
-                                        )
+                                        }
                                     } catch (e: Exception) {
                                         android.util.Log.e("OfferSelection", "Error creating chat channel: ${e.message}")
                                     }
