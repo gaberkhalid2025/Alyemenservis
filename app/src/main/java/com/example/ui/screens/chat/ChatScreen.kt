@@ -109,25 +109,21 @@ fun ChatScreen(
             .fillMaxSize()
             .background(Color(0xFF0D151F))
     ) {
-        val isBlocked = activeChannel?.isBlocked?.get(otherUserId) == true
         // Header
         ChatHeaderBar(
             name = otherUserName,
             photoUrl = otherUserPhoto,
             presence = presence,
             isTyping = isTypingOther,
-            isBlocked = isBlocked,
             onBackClick = onBackClick,
             onSearchToggle = {
                 isSearchOpen = !isSearchOpen
                 if (!isSearchOpen) chatViewModel.setSearchQuery("")
             },
-            onBlockToggle = {
+            onBlockClick = {
                 if (otherUserId.isNotBlank()) {
-                    val nextBlockState = !isBlocked
-                    chatViewModel.toggleBlock(otherUserId, nextBlockState)
-                    val msg = if (nextBlockState) "تم حظر المستخدم" else "تم إلغاء حظر المستخدم"
-                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    chatViewModel.toggleBlock(otherUserId, true)
+                    Toast.makeText(context, "تم حظر المستخدم", Toast.LENGTH_SHORT).show()
                 }
             }
         )

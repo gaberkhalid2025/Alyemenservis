@@ -71,7 +71,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.*
-import com.example.data.models.*
 import com.example.utils.*
 import com.example.utils.*
 import com.example.ui.components.*
@@ -1256,24 +1255,16 @@ fun Luxury3DNavIcon(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 6.dp, y = (-5).dp)
-                        .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                listOf(Color(0xFFEF4444), Color(0xFFDC2626))
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        .border(1.2.dp, Color.White, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                        .offset(x = 4.dp, y = (-2).dp)
+                        .size(13.dp)
+                        .background(Color.Red, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = if (badgeCount > 99) "99+" else badgeCount.toString(),
                         color = Color.White,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        textAlign = TextAlign.Center
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -1327,8 +1318,7 @@ fun AppHeaderBar(
     val headerContext = LocalContext.current
     val headerSp = remember(headerContext) { headerContext.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
     var headerReadIds by remember { mutableStateOf(headerSp.getStringSet("read_notif_ids", emptySet()) ?: emptySet()) }
-    val readNotificationIds by viewModel.readNotificationIds.collectAsState()
-
+    
     // Calculate unread notifications count
     val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
         allNotifications.filter { notif ->
@@ -1342,24 +1332,20 @@ fun AppHeaderBar(
             }
         }
     }
-    val unreadNotifCount = remember(filteredNotifs, headerReadIds, readNotificationIds) {
-        if (filteredNotifs.isEmpty()) 0
-        else filteredNotifs.count { it.id !in headerReadIds && it.id !in readNotificationIds && !it.isRead }
+    val unreadNotifCount = remember(filteredNotifs, headerReadIds) {
+        filteredNotifs.count { it.id !in headerReadIds }
     }
 
     // Calculate unread chats count
     val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
-        if (myChannels.isEmpty()) 0
-        else myChannels.count { ch ->
+        myChannels.count { ch ->
             val lastMsg = ch.messages.lastOrNull()
             if (lastMsg == null) {
                 false
             } else {
-                val isMe = lastMsg.senderId == currentUserId || 
-                           lastMsg.senderId == userPhoneState || 
-                           (myProvider != null && lastMsg.senderId == myProvider.id)
+                val isMe = lastMsg.senderId == currentUserId || (myProvider != null && lastMsg.senderId == myProvider.id)
                 val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
-                !isMe && lastMsg.status != "READ" && lastMsg.timestamp > readTime
+                !isMe && lastMsg.timestamp > readTime
             }
         }
     }

@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
-import com.example.data.models.MessageStatus
 
 @Composable
 fun AppHeaderBar(
@@ -97,25 +96,20 @@ fun AppHeaderBar(
             }
         }
     }
-    val readNotificationIds by viewModel.readNotificationIds.collectAsState()
-    val unreadNotifCount = remember(filteredNotifs, headerReadIds, readNotificationIds) {
-        if (filteredNotifs.isEmpty()) 0
-        else filteredNotifs.count { it.id !in headerReadIds && it.id !in readNotificationIds && !it.isRead }
+    val unreadNotifCount = remember(filteredNotifs, headerReadIds) {
+        filteredNotifs.count { it.id !in headerReadIds }
     }
 
     // Calculate unread chats count
     val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
-        if (myChannels.isEmpty()) 0
-        else myChannels.count { ch ->
+        myChannels.count { ch ->
             val lastMsg = ch.messages.lastOrNull()
             if (lastMsg == null) {
                 false
             } else {
-                val isMe = lastMsg.senderId == currentUserId || 
-                           lastMsg.senderId == userPhoneState || 
-                           (myProvider != null && lastMsg.senderId == myProvider.id)
+                val isMe = lastMsg.senderId == currentUserId || (myProvider != null && lastMsg.senderId == myProvider.id)
                 val readTime = headerSp.getLong("chat_read_${ch.id}", 0L)
-                !isMe && lastMsg.status != "READ" && lastMsg.timestamp > readTime
+                !isMe && lastMsg.timestamp > readTime
             }
         }
     }

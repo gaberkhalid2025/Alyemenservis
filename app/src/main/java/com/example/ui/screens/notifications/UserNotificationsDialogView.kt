@@ -4,6 +4,7 @@ package com.example.ui.screens.notifications
 
 import android.content.Context
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,23 +18,27 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.NotificationEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.ConfirmationDialog
 import com.example.ui.screens.notifications.components.NotificationEmptyState
 import com.example.ui.screens.notifications.components.NotificationFilterTabs
 import com.example.ui.screens.notifications.components.NotificationItemCard
+import com.example.ui.screens.notifications.components.NotificationLoadingState
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
 
 /**
  * 🔔 UserNotificationsBottomSheet
- * Modern Material 3 Modal Bottom Sheet showing notification streams using MVVM state logic.
+ * Modern Material 3 Modal Bottom Sheet with glassy surface, derivedStateOf filtering,
+ * batch read operations, snackbars, and category chips.
  */
 @Composable
 fun UserNotificationsBottomSheet(
@@ -46,22 +51,119 @@ fun UserNotificationsBottomSheet(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    // Instantiate UserNotificationsViewModel
-    val notificationsViewModel = remember(viewModel) { UserNotificationsViewModel(viewModel) }
-
-    // Collect States
-    val uiState by notificationsViewModel.uiState.collectAsState()
-    val activeTab by notificationsViewModel.activeTab.collectAsState()
-    val selectedTypeFilter by notificationsViewModel.selectedTypeFilter.collectAsState()
-    val validAndFilteredNotifs by notificationsViewModel.validAndFilteredNotifications.collectAsState()
-    val unreadCount by notificationsViewModel.unreadCount.collectAsState()
-    val finalNotifs by notificationsViewModel.finalNotifications.collectAsState()
+    // Direct Flow Collection without remember
+    val allNotifications by viewModel.notifications.collectAsState()
+    val userPhone by viewModel.currentUserPhone.collectAsState()
+    val userId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
     val readIds by viewModel.readNotificationIds.collectAsState()
 
+    var activeTab by remember { mutableStateOf("ALL") } // "ALL", "UNREAD", "IMPORTANT", "READ"
+    var selectedTypeFilter by remember { mutableStateOf("ALL") } // "ALL", "BOOKING", "MESSAGE", "SPECIAL_OFFER", "SYSTEM"
     var showClearAllConfirmDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        notificationsViewModel.loadReadNotifications(context)
+        viewModel.loadReadNotifications(context)
+    }
+
+    // High performance filtering using derivedStateOf
+    val validAndFilteredNotifs by remember {
+        derivedStateOf {
+            val cleanPhone = userPhone.trim().replace(" ", "").replace("+", "")
+            val cleanUserId = userId.trim()
+            val isAdmin = adminRole == "OWNER" || adminRole == "SUPER_ADMIN" || adminRole == "ADMIN" || adminRole == "SUPERVISOR"
+            val seenKeys = mutableSetOf<String>()
+
+            allNotifications.filter { notif ->
+                // 1. Strict Validation Check
+                if (!notif.isValid()) return@filter false
+
+                // 2. Deduplication check
+                val dKey = if (notif.dedupKey.isNotBlank()) notif.dedupKey else "${notif.notificationType}_${notif.title}_${notif.timestamp / (30 * 1000L)}"
+                if (!seenKeys.add(dKey) && notif.id.isBlank()) return@filter false
+
+                // 3. Security & Sensitivity Check
+                val isSensitive = notif.title.contains("كلمة مرور") || notif.message.contains("كلمة المرور") || 
+                                  notif.title.contains("استعادة") || notif.title.contains("رمز التحقق")
+                if (isSensitive) {
+                    val isMyTarget = (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)) ||
+                                     (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId))
+                    if (!isAdmin && !isMyTarget) return@filter false
+                }
+
+                // 4. Role & Audience Targeting Logic
+                if (isAdmin) return@filter true
+
+                val isRegistered = cleanPhone.isNotEmpty() || cleanUserId.isNotEmpty()
+                // Rule: Guests do not receive targeted notifications
+                if (!isRegistered && notif.targetAudience != "ALL") return@filter false
+
+                when (notif.targetAudience.uppercase()) {
+                    "ADMIN_ONLY" -> false
+                    "ALL_REGISTERED_USERS" -> isRegistered
+                    "SPECIFIC_ROLES", "ROLE" -> {
+                        val isProvider = viewModel.isProviderUser
+                        notif.targetRoles.any { r ->
+                            when (r.uppercase()) {
+                                "TECHNICIAN", "PROVIDER" -> isProvider
+                                "STORE" -> isProvider && viewModel.selectedStore != null
+                                "MEDICAL" -> isProvider && viewModel.selectedStore?.sectionId?.contains("medical") == true
+                                "RESTAURANT" -> isProvider && viewModel.selectedStore?.sectionId?.contains("restaurant") == true
+                                "REAL_ESTATE" -> isProvider && viewModel.selectedProperty != null
+                                "USER" -> isRegistered
+                                else -> false
+                            }
+                        }
+                    }
+                    "SPECIFIC_USERS", "SPECIFIC_USER" -> {
+                        (cleanPhone.isNotEmpty() && (notif.targetValue.contains(cleanPhone) || notif.targetUserIds.contains(cleanPhone))) ||
+                        (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId))
+                    }
+                    "REGION" -> {
+                        val currentRes = viewModel.currentUserResidence.value
+                        notif.targetValue.isEmpty() || currentRes.contains(notif.targetValue)
+                    }
+                    "CATEGORY" -> true
+                    "ALL" -> {
+                        when (notif.targetType) {
+                            "ALL" -> true
+                            "USER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
+                            "PROVIDER" -> cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)
+                            "SUPERVISOR" -> false
+                            else -> true
+                        }
+                    }
+                    else -> false
+                }
+            }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }
+        }
+    }
+
+    val unreadCount by remember {
+        derivedStateOf {
+            validAndFilteredNotifs.count { !readIds.contains(it.id) }
+        }
+    }
+
+    val finalNotifs by remember {
+        derivedStateOf {
+            validAndFilteredNotifs.filter { notif ->
+                val matchesTab = when (activeTab) {
+                    "READ" -> readIds.contains(notif.id)
+                    "UNREAD" -> !readIds.contains(notif.id)
+                    "IMPORTANT" -> notif.notificationType == "BOOKING" || notif.notificationType == "ADMIN" || notif.title.contains("عاجل") || notif.title.contains("مهم")
+                    else -> true
+                }
+                val matchesType = when (selectedTypeFilter) {
+                    "BOOKING" -> notif.notificationType == "BOOKING" || notif.title.contains("حجز")
+                    "MESSAGE" -> notif.notificationType == "MESSAGE" || notif.title.contains("دردشة") || notif.title.contains("رسالة")
+                    "SPECIAL_OFFER" -> notif.notificationType == "SPECIAL_OFFER" || notif.title.contains("عرض")
+                    "SYSTEM" -> notif.notificationType == "SYSTEM" || notif.notificationType == "ADMIN"
+                    else -> true
+                }
+                matchesTab && matchesType
+            }
+        }
     }
 
     ModalBottomSheet(
@@ -136,7 +238,7 @@ fun UserNotificationsBottomSheet(
                             FilledTonalButton(
                                 onClick = {
                                     validAndFilteredNotifs.forEach { notif ->
-                                        notificationsViewModel.markNotificationAsRead(context, notif.id)
+                                        viewModel.markNotificationAsRead(context, notif.id)
                                     }
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar("تم تحديد جميع الإشعارات كمقروءة بنجاح ✓")
@@ -174,90 +276,73 @@ fun UserNotificationsBottomSheet(
 
                 HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-                when (uiState) {
-                    is NotificationUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = themeColors.primary)
-                        }
-                    }
-                    is NotificationUiState.Error -> {
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("⚠️ حدث خطأ:", color = Color.Red, fontWeight = FontWeight.Bold)
-                                Text((uiState as NotificationUiState.Error).message, color = Color.White)
-                            }
-                        }
-                    }
-                    is NotificationUiState.Success -> {
-                        // Tabs & Category Filter Chips
-                        val tabCounts = remember(validAndFilteredNotifs.size, unreadCount) {
-                            listOf(
-                                Triple("ALL", "الكل", validAndFilteredNotifs.size),
-                                Triple("UNREAD", "غير مقروءة", unreadCount),
-                                Triple("IMPORTANT", "الهامة ⭐", validAndFilteredNotifs.count { it.notificationType == "BOOKING" || it.title.contains("عاجل") }),
-                                Triple("READ", "مقروءة", validAndFilteredNotifs.size - unreadCount)
-                            )
-                        }
+                // Tabs & Category Filter Chips
+                val tabCounts = remember(validAndFilteredNotifs.size, unreadCount) {
+                    listOf(
+                        Triple("ALL", "الكل", validAndFilteredNotifs.size),
+                        Triple("UNREAD", "غير مقروءة", unreadCount),
+                        Triple("IMPORTANT", "الهامة ⭐", validAndFilteredNotifs.count { it.notificationType == "BOOKING" || it.title.contains("عاجل") }),
+                        Triple("READ", "مقروءة", validAndFilteredNotifs.size - unreadCount)
+                    )
+                }
 
-                        NotificationFilterTabs(
-                            activeTab = activeTab,
-                            onTabSelected = { notificationsViewModel.setActiveTab(it) },
-                            tabCounts = tabCounts,
-                            selectedTypeFilter = selectedTypeFilter,
-                            onTypeFilterSelected = { notificationsViewModel.setSelectedTypeFilter(it) },
-                            themeColors = themeColors
-                        )
+                NotificationFilterTabs(
+                    activeTab = activeTab,
+                    onTabSelected = { activeTab = it },
+                    tabCounts = tabCounts,
+                    selectedTypeFilter = selectedTypeFilter,
+                    onTypeFilterSelected = { selectedTypeFilter = it },
+                    themeColors = themeColors
+                )
 
-                        // Main List or Empty State
-                        if (finalNotifs.isEmpty()) {
-                            NotificationEmptyState(
-                                activeTab = activeTab,
-                                themeColors = themeColors,
-                                modifier = Modifier.weight(1f)
+                // Main List or Empty State
+                if (finalNotifs.isEmpty()) {
+                    NotificationEmptyState(
+                        activeTab = activeTab,
+                        themeColors = themeColors,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        items(
+                            items = finalNotifs,
+                            key = { it.id.ifBlank { "${it.title}_${it.timestamp}" } }
+                        ) { notif ->
+                            NotificationItemCard(
+                                notification = notif,
+                                isUnread = !readIds.contains(notif.id),
+                                onCardClick = {
+                                    viewModel.markNotificationAsRead(context, notif.id)
+                                },
+                                onDeleteClick = {
+                                    viewModel.deleteNotification(notif.id)
+                                    coroutineScope.launch {
+                                        val res = snackbarHostState.showSnackbar(
+                                            message = "تم حذف الإشعار",
+                                            actionLabel = "تراجع"
+                                        )
+                                        if (res == SnackbarResult.ActionPerformed) {
+                                            viewModel.addNotification(
+                                                title = notif.title,
+                                                message = notif.message,
+                                                targetType = notif.targetType,
+                                                targetValue = notif.targetValue,
+                                                targetAudience = notif.targetAudience,
+                                                targetRoles = notif.targetRoles,
+                                                targetUserIds = notif.targetUserIds,
+                                                notificationType = notif.notificationType
+                                            )
+                                        }
+                                    }
+                                },
+                                themeColors = themeColors
                             )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                contentPadding = PaddingValues(bottom = 16.dp)
-                            ) {
-                                items(
-                                    items = finalNotifs,
-                                    key = { it.id.ifBlank { "${it.title}_${it.timestamp}" } }
-                                ) { notif ->
-                                    NotificationItemCard(
-                                        notification = notif,
-                                        isUnread = !readIds.contains(notif.id),
-                                        onCardClick = {
-                                            notificationsViewModel.markNotificationAsRead(context, notif.id)
-                                        },
-                                        onDeleteClick = {
-                                            notificationsViewModel.deleteNotification(notif.id)
-                                            coroutineScope.launch {
-                                                val res = snackbarHostState.showSnackbar(
-                                                    message = "تم حذف الإشعار",
-                                                    actionLabel = "تراجع"
-                                                )
-                                                if (res == SnackbarResult.ActionPerformed) {
-                                                    notificationsViewModel.addNotification(
-                                                        title = notif.title,
-                                                        message = notif.message,
-                                                        targetType = notif.targetType,
-                                                        targetValue = notif.targetValue,
-                                                        targetAudience = notif.targetAudience,
-                                                        targetRoles = notif.targetRoles,
-                                                        targetUserIds = notif.targetUserIds,
-                                                        notificationType = notif.notificationType
-                                                    )
-                                                }
-                                            }
-                                        },
-                                        themeColors = themeColors
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -274,7 +359,7 @@ fun UserNotificationsBottomSheet(
         cancelLabel = "إلغاء",
         isDestructive = true,
         onConfirm = {
-            notificationsViewModel.deleteAllNotifications()
+            viewModel.deleteAllNotifications()
             coroutineScope.launch {
                 snackbarHostState.showSnackbar("تم مسح جميع الإشعارات بنجاح 🗑️")
             }
