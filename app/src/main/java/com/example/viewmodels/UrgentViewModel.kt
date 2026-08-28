@@ -1,17 +1,22 @@
 package com.example.viewmodels
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.NotificationEntity
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
+import com.example.security.BookingSecurityHelper
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -19,7 +24,6 @@ import java.util.UUID
 
 /**
  * 🔒 UrgentUiState
- * يمثل الحالات المختلفة لواجهة المستخدم الخاصة بالطلبات العاجلة.
  */
 sealed class UrgentUiState {
     object Idle : UrgentUiState()
@@ -29,10 +33,14 @@ sealed class UrgentUiState {
     object Empty : UrgentUiState()
 }
 
+sealed class UrgentEvent {
+    data class ShowToast(val message: String) : UrgentEvent()
+    data class ShowSnackbar(val message: String) : UrgentEvent()
+}
+
 /**
  * 🚨 UrgentViewModel
- * إدارة المنطق البرمجي والبيانات للطلبات العاجلة خلال 30 دقيقة.
- * يدعم التزامن المباشر مع Firebase Firestore واستمرار البيانات للعمل بدون إنترنت (Offline persistence).
+ * Manages 30-min urgent requests flow, offers tracking, countdown updates, and security PIN verification.
  */
 class UrgentViewModel : ViewModel() {
 
@@ -40,6 +48,9 @@ class UrgentViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<UrgentUiState>(UrgentUiState.Idle)
     val uiState: StateFlow<UrgentUiState> = _uiState.asStateFlow()
+
+    private val _eventFlow = MutableSharedFlow<UrgentEvent>()
+    val eventFlow: SharedFlow<UrgentEvent> = _eventFlow.asSharedFlow()
 
     private val _urgentRequests = MutableStateFlow<List<InstantRequestEntity>>(emptyList())
     val urgentRequests: StateFlow<List<InstantRequestEntity>> = _urgentRequests.asStateFlow()
@@ -54,77 +65,65 @@ class UrgentViewModel : ViewModel() {
     private var detailsListener: ListenerRegistration? = null
     private var offersListener: ListenerRegistration? = null
 
-    /**
-     * تحميل واستماع للطلبات العاجلة النشطة.
-     */
     fun observeUrgentRequests(currentUserId: String, isProvider: Boolean) {
-        _uiState.value = UrgentUiState.Loading
         requestsListener?.remove()
 
-        var query: Query = firestore.collection("instant_requests")
-        if (!isProvider && currentUserId.isNotBlank() && currentUserId != "guest") {
+        var query: Query = firestore.collection("urgent_requests")
+        if (isProvider) {
+            query = query.whereIn("status", listOf("WAITING_FOR_OFFERS", "REVIEWING_OFFERS"))
+        } else if (currentUserId.isNotBlank()) {
             query = query.whereEqualTo("userId", currentUserId)
         }
 
-        requestsListener = query.orderBy("createdAt", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    _uiState.value = UrgentUiState.Error("خطأ في الاتصال: ${error.localizedMessage}")
-                    return@addSnapshotListener
-                }
+        requestsListener = query.addSnapshotListener { snapshot, error ->
+            if (error != null || snapshot == null) {
+                _urgentRequests.value = emptyList()
+                return@addSnapshotListener
+            }
 
-                if (snapshot != null) {
-                    val list = snapshot.documents.mapNotNull { it.toObject(InstantRequestEntity::class.java) }
-                    val filtered = list.filter {
-                        it.urgencyTime.contains("30") || it.requestCode.startsWith("URG") || it.serviceTitle.contains("عاجل")
-                    }
-                    _urgentRequests.value = filtered
-                    _uiState.value = if (filtered.isEmpty()) UrgentUiState.Empty else UrgentUiState.Idle
-                } else {
-                    _urgentRequests.value = emptyList()
-                    _uiState.value = UrgentUiState.Empty
+            val list = snapshot.documents.mapNotNull { doc ->
+                try {
+                    doc.toObject(InstantRequestEntity::class.java)?.copy(id = doc.id)
+                } catch (e: Exception) {
+                    null
                 }
             }
+            _urgentRequests.value = list
+        }
     }
 
-    /**
-     * تحميل تفاصيل طلب عاجل محدد والعروض المرتبطة به.
-     */
     fun observeRequestDetails(requestId: String) {
         if (requestId.isBlank()) return
-        _uiState.value = UrgentUiState.Loading
-        detailsListener?.remove()
-        offersListener?.remove()
 
-        detailsListener = firestore.collection("instant_requests").document(requestId)
+        detailsListener?.remove()
+        detailsListener = firestore.collection("urgent_requests").document(requestId)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    _uiState.value = UrgentUiState.Error("فشل تحميل الطلب: ${error.localizedMessage}")
+                if (error != null || snapshot == null || !snapshot.exists()) {
+                    _selectedRequest.value = null
                     return@addSnapshotListener
                 }
-                if (snapshot != null && snapshot.exists()) {
-                    _selectedRequest.value = snapshot.toObject(InstantRequestEntity::class.java)
-                } else {
-                    _selectedRequest.value = null
-                }
-                _uiState.value = UrgentUiState.Idle
+                _selectedRequest.value = snapshot.toObject(InstantRequestEntity::class.java)?.copy(id = snapshot.id)
             }
 
-        offersListener = firestore.collection("instant_offers")
-            .whereEqualTo("requestId", requestId)
-            .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    val list = snapshot.documents.mapNotNull { it.toObject(RequestOfferEntity::class.java) }
-                    _offersForRequest.value = list
-                } else {
+        offersListener?.remove()
+        offersListener = firestore.collection("urgent_requests").document(requestId)
+            .collection("offers")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) {
                     _offersForRequest.value = emptyList()
+                    return@addSnapshotListener
                 }
+                val list = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(RequestOfferEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                _offersForRequest.value = list
             }
     }
 
-    /**
-     * إنشاء طلب عاجل جديد لمدة 30 دقيقة.
-     */
     fun createUrgentRequest(
         customerName: String,
         customerPhone: String,
@@ -136,15 +135,16 @@ class UrgentViewModel : ViewModel() {
         serviceDetails: String,
         pinCode: String,
         currentUserId: String,
-        onSuccess: (requestCode: String) -> Unit,
+        onSuccess: (code: String) -> Unit,
         onError: (message: String) -> Unit
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = UrgentUiState.Loading
             try {
-                val uniqueCode = "URG-${(100000..999999).random()}"
                 val reqId = UUID.randomUUID().toString()
+                val uniqueCode = "URG-${(1000..9999).random()}"
                 val now = System.currentTimeMillis()
+
                 val urgentReq = InstantRequestEntity(
                     id = reqId,
                     requestCode = uniqueCode,
@@ -165,7 +165,7 @@ class UrgentViewModel : ViewModel() {
                     expiresAt = now + 30 * 60 * 1000L
                 )
 
-                firestore.collection("instant_requests").document(reqId).set(urgentReq).await()
+                firestore.collection("urgent_requests").document(reqId).set(urgentReq).await()
                 _uiState.value = UrgentUiState.Success("تم إرسال الطلب العاجل بنجاح")
                 onSuccess(uniqueCode)
             } catch (e: Exception) {
@@ -176,9 +176,6 @@ class UrgentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * تقديم عرض عاجل سري للطلب.
-     */
     fun submitUrgentOffer(
         currentReq: InstantRequestEntity,
         price: Double,
@@ -210,8 +207,10 @@ class UrgentViewModel : ViewModel() {
                     createdAt = System.currentTimeMillis()
                 )
 
-                firestore.collection("instant_offers").document(offerId).set(newOffer).await()
-                firestore.collection("instant_requests").document(currentReq.id)
+                firestore.collection("urgent_requests").document(currentReq.id)
+                    .collection("offers").document(offerId).set(newOffer).await()
+
+                firestore.collection("urgent_requests").document(currentReq.id)
                     .update("offersCount", FieldValue.increment(1)).await()
 
                 val notifId = UUID.randomUUID().toString()
@@ -237,9 +236,87 @@ class UrgentViewModel : ViewModel() {
         }
     }
 
-    /**
-     * إلغاء الطلب العاجل بالرمز السري PIN.
-     */
+    fun acceptOffer(
+        requestId: String,
+        offerId: String,
+        providerPhone: String,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = UrgentUiState.Loading
+            try {
+                firestore.collection("urgent_requests").document(requestId).update(
+                    mapOf(
+                        "status" to "ACCEPTED",
+                        "acceptedOfferId" to offerId,
+                        "acceptedTechnicianPhone" to providerPhone
+                    )
+                ).await()
+
+                firestore.collection("urgent_requests").document(requestId)
+                    .collection("offers").document(offerId)
+                    .update("status", "ACCEPTED").await()
+
+                _uiState.value = UrgentUiState.Success("تم قبول العرض بنجاح!")
+                onResult(true, "تم قبول العرض بنجاح")
+            } catch (e: Exception) {
+                val err = e.localizedMessage ?: "فشل قبول العرض"
+                _uiState.value = UrgentUiState.Error(err)
+                onResult(false, err)
+            }
+        }
+    }
+
+    fun cancelUrgentRequest(
+        requestId: String,
+        enteredPin: String,
+        context: Context,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        if (BookingSecurityHelper.isBookingLocked(context, requestId)) {
+            val remainingSecs = BookingSecurityHelper.getRemainingLockoutSeconds(context, requestId)
+            val msg = "الحساب مقفل مؤقتاً لأسباب أمنية بسبب أدخال PIN خاطئ 3 مرات. انتظر $remainingSecs ثانية."
+            _uiState.value = UrgentUiState.Error(msg)
+            onResult(false, msg)
+            return
+        }
+
+        if (enteredPin.isBlank() || enteredPin.length < 4) {
+            val remaining = BookingSecurityHelper.recordFailedAttempt(context, requestId)
+            val msg = "رمز PIN غير صحيح. محاولات متبقية: $remaining"
+            _uiState.value = UrgentUiState.Error(msg)
+            onResult(false, msg)
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = UrgentUiState.Loading
+            try {
+                BookingSecurityHelper.resetAttempts(context, requestId)
+                firestore.collection("urgent_requests").document(requestId)
+                    .update("status", "CANCELLED").await()
+                _uiState.value = UrgentUiState.Success("تم إلغاء الطلب العاجل بنجاح")
+                onResult(true, "تم إلغاء الطلب بنجاح")
+            } catch (e: Exception) {
+                val err = e.localizedMessage ?: "فشل إلغاء الطلب"
+                _uiState.value = UrgentUiState.Error(err)
+                onResult(false, err)
+            }
+        }
+    }
+
+    fun acceptOffer(
+        requestId: String,
+        offerId: String,
+        offer: RequestOfferEntity,
+        onSuccess: () -> Unit,
+        onError: (message: String) -> Unit
+    ) {
+        acceptOffer(requestId, offerId, offer.technicianPhone) { success, msg ->
+            if (success) onSuccess() else onError(msg ?: "حدث خطأ")
+        }
+    }
+
     fun cancelUrgentRequest(
         requestId: String,
         enteredPin: String,
@@ -251,53 +328,15 @@ class UrgentViewModel : ViewModel() {
             onError("رمز PIN غير صحيح!")
             return
         }
-
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = UrgentUiState.Loading
             try {
-                firestore.collection("instant_requests").document(requestId)
+                firestore.collection("urgent_requests").document(requestId)
                     .update("status", "CANCELLED").await()
                 _uiState.value = UrgentUiState.Success("تم إلغاء الطلب العاجل بنجاح")
                 onSuccess()
             } catch (e: Exception) {
                 val err = e.localizedMessage ?: "فشل إلغاء الطلب"
-                _uiState.value = UrgentUiState.Error(err)
-                onError(err)
-            }
-        }
-    }
-
-    /**
-     * قبول عرض محدد للطلب العاجل.
-     */
-    fun acceptOffer(
-        requestId: String,
-        offerId: String,
-        offer: RequestOfferEntity,
-        onSuccess: () -> Unit,
-        onError: (message: String) -> Unit
-    ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _uiState.value = UrgentUiState.Loading
-            try {
-                firestore.collection("instant_requests").document(requestId).update(
-                    mapOf(
-                        "status" to "ACCEPTED",
-                        "acceptedOfferId" to offerId,
-                        "acceptedTechnicianId" to offer.technicianId,
-                        "acceptedTechnicianName" to offer.technicianName,
-                        "acceptedTechnicianPhone" to offer.technicianPhone,
-                        "acceptedPrice" to offer.price
-                    )
-                ).await()
-
-                firestore.collection("instant_offers").document(offerId)
-                    .update("status", "ACCEPTED").await()
-
-                _uiState.value = UrgentUiState.Success("تم قبول العرض بنجاح!")
-                onSuccess()
-            } catch (e: Exception) {
-                val err = e.localizedMessage ?: "فشل قبول العرض"
                 _uiState.value = UrgentUiState.Error(err)
                 onError(err)
             }
