@@ -2,6 +2,9 @@
 
 package com.example.ui.screens.register
 
+import android.content.Context
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +23,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +30,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.register.components.RegistrationField
 import com.example.ui.screens.register.components.RegistrationSubmitButton
@@ -36,7 +40,17 @@ import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
 
 /**
- * 🔐 GuestRegistrationDialog - نافذة تسجيل الزوار واسترجاع الحسابات السابقة
+ * 🔒 حالات واجهة تسجيل الزائر واسترجاع الحساب
+ */
+sealed class GuestAuthUiState {
+    object Idle : GuestAuthUiState()
+    data class Loading(val message: String) : GuestAuthUiState()
+    data class Success(val message: String) : GuestAuthUiState()
+    data class Error(val errorMessage: String) : GuestAuthUiState()
+}
+
+/**
+ * 🔐 GuestRegistrationDialog - نافذة تسجيل الزوار واسترجاع الحسابات مع دعم البصمة والذاكرة المؤقتة
  */
 @Composable
 fun GuestRegistrationDialog(
@@ -56,18 +70,57 @@ fun GuestRegistrationDialog(
 
     var isRestoreMode by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf(currentName) }
-    var phonePrefix by remember { mutableStateOf("+967") }
     var phoneBody by remember {
         mutableStateOf(if (currentPhone.startsWith("+967")) currentPhone.removePrefix("+967") else currentPhone)
     }
     var residence by remember { mutableStateOf(currentResidence) }
     var password by remember { mutableStateOf("") }
 
-    var isLoading by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf("") }
+    var uiState by remember { mutableStateOf<GuestAuthUiState>(GuestAuthUiState.Idle) }
     var phoneError by remember { mutableStateOf<String?>(null) }
     var nameError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
+
+    // Helper for Biometric Prompt
+    val triggerBiometric = {
+        val activity = context as? FragmentActivity
+        if (activity != null) {
+            val biometricManager = BiometricManager.from(context)
+            if (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS) {
+                val executor = ContextCompat.getMainExecutor(context)
+                val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        // Auto-restore cached user
+                        val prefs = context.getSharedPreferences("yemen_services_auth", Context.MODE_PRIVATE)
+                        val savedPhone = prefs.getString("last_auth_phone", "") ?: ""
+                        val savedPass = prefs.getString("last_auth_pass", "") ?: ""
+                        if (savedPhone.isNotEmpty()) {
+                            uiState = GuestAuthUiState.Loading("جاري استرجاع الحساب بالبصمة...")
+                            viewModel.restoreGuestUser(context, savedPhone, savedPass) { success, msg ->
+                                if (success) {
+                                    uiState = GuestAuthUiState.Success("تم استرجاع الحساب بنجاح!")
+                                    onDismiss()
+                                } else {
+                                    uiState = GuestAuthUiState.Error(msg)
+                                }
+                            }
+                        } else {
+                            scope.launch { snackbarHostState.showSnackbar("لم يتم العثور على بيانات سابقة محفوظة للبصمة") }
+                        }
+                    }
+                })
+                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("المصادقة البيومترية")
+                    .setSubtitle("استخدم بصمة الإصبع أو الوجه لتسجيل الدخول السريع")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                    .build()
+                prompt.authenticate(promptInfo)
+            } else {
+                scope.launch { snackbarHostState.showSnackbar("المصادقة البيومترية غير مفعلة على جهازك") }
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -101,54 +154,55 @@ fun GuestRegistrationDialog(
                     }
                 }
 
-                // Snackbar Host
                 SnackbarHost(hostState = snackbarHostState)
 
-                // Status banner when restoring/saving
-                AnimatedVisibility(visible = statusMessage.isNotEmpty() || isLoading) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = themeColors.accent.copy(alpha = 0.15f)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.accent),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Status Banner
+                when (val state = uiState) {
+                    is GuestAuthUiState.Loading -> {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = themeColors.accent.copy(alpha = 0.15f)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = themeColors.accent,
-                                    strokeWidth = 2.dp
-                                )
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = themeColors.accent, strokeWidth = 2.dp)
+                                Text(state.message, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                             }
-                            Text(
-                                text = if (isLoading && statusMessage.isEmpty()) "جاري معالجة طلبك..." else statusMessage,
-                                fontSize = 11.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
                         }
                     }
+                    is GuestAuthUiState.Error -> {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEF5350).copy(alpha = 0.15f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("❌ ${state.errorMessage}", fontSize = 11.sp, color = Color(0xFFEF5350), modifier = Modifier.padding(10.dp))
+                        }
+                    }
+                    is GuestAuthUiState.Success -> {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF10B981).copy(alpha = 0.15f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("✅ ${state.message}", fontSize = 11.sp, color = Color(0xFF10B981), modifier = Modifier.padding(10.dp))
+                        }
+                    }
+                    GuestAuthUiState.Idle -> {}
                 }
 
                 if (isRestoreMode) {
                     Text(
-                        text = "يرجى إدخال رقم هاتفك وكلمة المرور لاسترجاع حسابك وحجوزاتك ومحادثاتك السابقة بالكامل:",
+                        text = "يرجى إدخال رقم هاتفك وكلمة المرور لاسترجاع حسابك أو استخدام البصمة:",
                         fontSize = 11.sp,
                         color = Color.LightGray,
                         lineHeight = 16.sp
                     )
 
-                    // Phone Field
                     RegistrationField(
                         value = phoneBody,
-                        onValueChange = {
-                            phoneBody = it
-                            phoneError = null
-                        },
+                        onValueChange = { phoneBody = it; phoneError = null },
                         label = "رقم الهاتف المسجل (مثلاً 771234567)",
                         placeholder = "771234567",
                         leadingIcon = Icons.Default.Phone,
@@ -157,13 +211,9 @@ fun GuestRegistrationDialog(
                         themeColors = themeColors
                     )
 
-                    // Password Field
                     RegistrationField(
                         value = password,
-                        onValueChange = {
-                            password = it
-                            passwordError = null
-                        },
+                        onValueChange = { password = it; passwordError = null },
                         label = "كلمة المرور",
                         leadingIcon = Icons.Default.Lock,
                         isPassword = true,
@@ -177,7 +227,6 @@ fun GuestRegistrationDialog(
                         onClick = {
                             val cleanPhone = phoneBody.trim()
                             val cleanPassword = password.trim()
-
                             val phoneVal = Validators.validateYemenPhone(cleanPhone)
                             if (!phoneVal.isValid) {
                                 phoneError = phoneVal.errorMessage
@@ -189,35 +238,40 @@ fun GuestRegistrationDialog(
                             }
 
                             val fullPhone = if (cleanPhone.length == 9) cleanPhone else "77$cleanPhone"
-                            isLoading = true
-                            statusMessage = "🔍 جاري البحث عن حسابك برقم الهاتف $fullPhone..."
+                            uiState = GuestAuthUiState.Loading("🔍 جاري البحث عن حسابك برقم الهاتف $fullPhone...")
 
                             viewModel.restoreGuestUser(context, fullPhone, cleanPassword) { success, msg ->
-                                isLoading = false
                                 if (success) {
-                                    statusMessage = "✅ تم العثور على حسابك! جاري استرجاع البيانات..."
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("🔓 تم استرجاع الحساب بنجاح!")
-                                    }
+                                    // Cache in SharedPreferences for Biometrics
+                                    context.getSharedPreferences("yemen_services_auth", Context.MODE_PRIVATE)
+                                        .edit()
+                                        .putString("last_auth_phone", fullPhone)
+                                        .putString("last_auth_pass", cleanPassword)
+                                        .apply()
+
+                                    uiState = GuestAuthUiState.Success("تم العثور على حسابك واسترجاع البيانات!")
+                                    scope.launch { snackbarHostState.showSnackbar("🔓 تم استرجاع الحساب بنجاح!") }
                                     onDismiss()
                                 } else {
-                                    statusMessage = "❌ لم يتم العثور على حساب بهذا الرقم أو كلمة المرور غير صحيحة"
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("❌ $msg")
-                                    }
+                                    uiState = GuestAuthUiState.Error("لم يتم العثور على حساب بهذا الرقم أو كلمة المرور غير صحيحة")
                                 }
                             }
                         },
-                        isLoading = isLoading,
+                        isLoading = uiState is GuestAuthUiState.Loading,
                         loadingText = "جاري البحث واسترجاع الحساب...",
                         themeColors = themeColors
                     )
 
+                    OutlinedButton(
+                        onClick = { triggerBiometric() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = themeColors.accent)
+                    ) {
+                        Text("👆 الدخول بالبصمة البيومترية", fontSize = 11.5.sp)
+                    }
+
                     TextButton(
-                        onClick = {
-                            isRestoreMode = false
-                            statusMessage = ""
-                        },
+                        onClick = { isRestoreMode = false; uiState = GuestAuthUiState.Idle },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
                         Text("إنشاء حساب جديد؟ اضغط هنا للتسجيل", color = themeColors.accent, fontSize = 11.sp)
@@ -231,26 +285,18 @@ fun GuestRegistrationDialog(
                         lineHeight = 16.sp
                     )
 
-                    // Name Field
                     RegistrationField(
                         value = name,
-                        onValueChange = {
-                            name = it
-                            nameError = null
-                        },
+                        onValueChange = { name = it; nameError = null },
                         label = "الاسم الثلاثي بالكامل (إجباري) *",
                         leadingIcon = Icons.Default.Person,
                         errorMessage = nameError,
                         themeColors = themeColors
                     )
 
-                    // Phone Field
                     RegistrationField(
                         value = phoneBody,
-                        onValueChange = {
-                            phoneBody = it
-                            phoneError = null
-                        },
+                        onValueChange = { phoneBody = it; phoneError = null },
                         label = "رقم الهاتف اليمني (إجباري) *",
                         placeholder = "771234567",
                         leadingIcon = Icons.Default.Phone,
@@ -259,7 +305,6 @@ fun GuestRegistrationDialog(
                         themeColors = themeColors
                     )
 
-                    // Residence Field
                     RegistrationField(
                         value = residence,
                         onValueChange = { residence = it },
@@ -271,10 +316,7 @@ fun GuestRegistrationDialog(
                     val isPasswordRequired = settingsState.isUserPasswordRequired
                     RegistrationField(
                         value = password,
-                        onValueChange = {
-                            password = it
-                            passwordError = null
-                        },
+                        onValueChange = { password = it; passwordError = null },
                         label = "إنشاء كلمة مرور للحساب" + (if (isPasswordRequired) " (إجباري) *" else " (اختياري)"),
                         leadingIcon = Icons.Default.Lock,
                         isPassword = true,
@@ -311,15 +353,12 @@ fun GuestRegistrationDialog(
                             val fullPhone = if (cleanPhone.length == 9) cleanPhone else "77$cleanPhone"
                             onRegisterCompleted(cleanName, fullPhone, cleanResidence, cleanPassword)
                         },
-                        isLoading = isLoading,
+                        isLoading = uiState is GuestAuthUiState.Loading,
                         themeColors = themeColors
                     )
 
                     TextButton(
-                        onClick = {
-                            isRestoreMode = true
-                            statusMessage = ""
-                        },
+                        onClick = { isRestoreMode = true; uiState = GuestAuthUiState.Idle },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
                         Text("لديك حساب بالفعل؟ استرجاع الحساب الآن 🔓", color = themeColors.accent, fontSize = 11.sp)

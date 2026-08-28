@@ -3,13 +3,19 @@ package com.example.ui.screens.register.components
 import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
@@ -26,7 +32,8 @@ import com.example.utils.VisualThemePalette
 import java.util.Locale
 
 /**
- * 📝 RegistrationField - حقل إدخال موحد لشاشات التسجيل مع دعم الإدخال الصوتي والتحقق
+ * 📝 RegistrationField - حقل إدخال موحد متطور لشاشات التسجيل
+ * يدعم: زر مسح الحقل، الإكمال التلقائي، والإدخال الصوتي مع معالجة الأخطاء
  */
 @Composable
 fun RegistrationField(
@@ -38,6 +45,7 @@ fun RegistrationField(
     errorMessage: String? = null,
     isPassword: Boolean = false,
     enableVoiceInput: Boolean = true,
+    suggestions: List<String> = emptyList(),
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     singleLine: Boolean = true,
     minLines: Int = 1,
@@ -47,6 +55,17 @@ fun RegistrationField(
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    // Auto-complete filtered suggestions
+    val filteredSuggestions by remember(value, suggestions) {
+        derivedStateOf {
+            if (value.length >= 1 && suggestions.isNotEmpty()) {
+                suggestions.filter { it.contains(value.trim(), ignoreCase = true) && it != value }
+            } else {
+                emptyList()
+            }
+        }
+    }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -58,6 +77,8 @@ fun RegistrationField(
             if (!spokenText.isNullOrBlank()) {
                 onValueChange(if (value.isBlank()) spokenText else "$value $spokenText")
             }
+        } else {
+            Toast.makeText(context, "لم يتم التقاط أي صوت، يرجى المحاولة ثانية", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -72,6 +93,18 @@ fun RegistrationField(
             },
             trailingIcon = {
                 Row {
+                    // 1. Clear Button
+                    if (value.isNotEmpty() && !isPassword) {
+                        IconButton(onClick = { onValueChange("") }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "مسح النص",
+                                tint = Color.Gray
+                            )
+                        }
+                    }
+
+                    // 2. Password visibility toggle
                     if (isPassword) {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
@@ -81,6 +114,8 @@ fun RegistrationField(
                             )
                         }
                     }
+
+                    // 3. Voice Input
                     if (enableVoiceInput && !isPassword) {
                         IconButton(onClick = {
                             try {
@@ -94,7 +129,7 @@ fun RegistrationField(
                                 }
                                 speechLauncher.launch(intent)
                             } catch (e: Exception) {
-                                // Speech recognition unavailable
+                                Toast.makeText(context, "خاصية التعرف الصوتي غير متوفرة على جهازك", Toast.LENGTH_SHORT).show()
                             }
                         }) {
                             Icon(
@@ -126,6 +161,25 @@ fun RegistrationField(
             modifier = Modifier.fillMaxWidth()
         )
 
+        // Suggestions chips for Auto-Complete
+        AnimatedVisibility(visible = filteredSuggestions.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(filteredSuggestions) { suggestion ->
+                    SuggestionChip(
+                        onClick = { onValueChange(suggestion) },
+                        label = { Text(suggestion, fontSize = 10.sp, color = themeColors.accent) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(containerColor = Color(0xFF1E293B))
+                    )
+                }
+            }
+        }
+
+        // Error message view
         AnimatedVisibility(visible = !errorMessage.isNullOrBlank()) {
             errorMessage?.let { err ->
                 Text(

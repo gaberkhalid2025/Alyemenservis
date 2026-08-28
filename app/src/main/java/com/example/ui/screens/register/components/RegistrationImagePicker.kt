@@ -1,10 +1,14 @@
 package com.example.ui.screens.register.components
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -13,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,14 +25,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.utils.VisualThemePalette
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 
 /**
- * 📷 RegistrationImagePicker - مكون اختيار ومعاينة الصور مع نسبة التقدم ورفع الحساب
+ * 📷 RegistrationImagePicker - مكون اختيار والتقاط الصور بالكاميرا مع الضغط والمعاينة المكبرة
  */
 @Composable
 fun RegistrationImagePicker(
@@ -42,12 +52,70 @@ fun RegistrationImagePicker(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var previewImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showSourceDialog by remember { mutableStateOf(false) }
+
+    // Compress URI to file <= 300KB
+    val compressImageUri: (Uri) -> Uri = { uri ->
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            val tempFile = File(context.cacheDir, "comp_${System.currentTimeMillis()}.jpg")
+            var quality = 85
+            val out = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            while (out.toByteArray().size > 300 * 1024 && quality > 20) {
+                out.reset()
+                quality -= 15
+                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            }
+            val fos = FileOutputStream(tempFile)
+            fos.write(out.toByteArray())
+            fos.flush()
+            fos.close()
+            Uri.fromFile(tempFile)
+        } catch (e: Exception) {
+            uri
+        }
+    }
+
+    // Gallery Picker
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
         if (uris.isNotEmpty()) {
-            val combined = (imagesUris + uris).take(maxImages)
+            val compressed = uris.map { compressImageUri(it) }
+            val combined = (imagesUris + compressed).take(maxImages)
             onImagesSelected(combined)
+        }
+    }
+
+    // Camera Capture
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            try {
+                val tempFile = File(context.cacheDir, "cam_${System.currentTimeMillis()}.jpg")
+                var quality = 85
+                val out = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                while (out.toByteArray().size > 300 * 1024 && quality > 20) {
+                    out.reset()
+                    quality -= 15
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                }
+                val fos = FileOutputStream(tempFile)
+                fos.write(out.toByteArray())
+                fos.flush()
+                fos.close()
+                val uri = Uri.fromFile(tempFile)
+                val combined = (imagesUris + listOf(uri)).take(maxImages)
+                onImagesSelected(combined)
+            } catch (e: Exception) {
+                // handle error
+            }
         }
     }
 
@@ -95,7 +163,7 @@ fun RegistrationImagePicker(
             if (imagesUris.size < maxImages) {
                 item {
                     OutlinedCard(
-                        onClick = { galleryLauncher.launch("image/*") },
+                        onClick = { showSourceDialog = true },
                         colors = CardDefaults.outlinedCardColors(containerColor = Color(0xFF0F172A)),
                         border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(themeColors.accent)),
                         shape = RoundedCornerShape(12.dp),
@@ -120,6 +188,7 @@ fun RegistrationImagePicker(
                         .size(80.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .clickable { previewImageUri = uri }
                 ) {
                     AsyncImage(
                         model = uri,
@@ -136,6 +205,76 @@ fun RegistrationImagePicker(
                             .background(Color.Red, CircleShape)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "حذف الصورة", tint = Color.White, modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    // Source Selection Dialog (Camera or Gallery)
+    if (showSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showSourceDialog = false },
+            title = { Text("📷 اختيار مصدر الصورة", fontSize = 13.sp, color = themeColors.accent) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            showSourceDialog = false
+                            cameraLauncher.launch(null)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                    ) {
+                        Text("📸 التقاط بالكاميرا المباشرة", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showSourceDialog = false
+                            galleryLauncher.launch("image/*")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("🖼️ اختيار من المعرض والاستوديو", color = Color.White)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showSourceDialog = false }) {
+                    Text("إلغاء", color = Color.Gray)
+                }
+            },
+            containerColor = Color(0xFF0F172A)
+        )
+    }
+
+    // Fullscreen Zoomed Preview Dialog
+    previewImageUri?.let { uri ->
+        Dialog(onDismissRequest = { previewImageUri = null }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(380.dp)
+                    .border(2.dp, themeColors.accent, RoundedCornerShape(16.dp))
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = "معاينة مكبرة",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().padding(12.dp)
+                    )
+                    IconButton(
+                        onClick = { previewImageUri = null },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
                     }
                 }
             }

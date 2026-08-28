@@ -2,7 +2,6 @@
 
 package com.example.ui.screens.register
 
-import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,15 +12,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.data.ChatChannelEntity
-import com.example.data.UnifiedBusinessAccount
 import com.example.ui.MainViewModel
-import com.example.ui.screens.dashboard.*
 import com.example.ui.screens.register.status.*
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
 
 /**
  * 📊 JoinRequestStatusScreen - الشاشة الموحدة لمتابعة حالة طلب الانضمام أو الدخول للوحات التحكم
+ * تعتمد على UseCase و Router و StateFlow النظيف
  */
 @Composable
 fun JoinRequestStatusScreen(
@@ -32,75 +30,53 @@ fun JoinRequestStatusScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val useCase = remember { JoinStatusUseCase() }
 
     val joinPhone by viewModel.joinRequestPhone.collectAsState()
     val pendingProviders by viewModel.pendingProviders.collectAsState()
     val providers by viewModel.providers.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
     val bookings by viewModel.bookings.collectAsState()
-    val chatChannels by viewModel.chatChannels.collectAsState()
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
     val categories by viewModel.categories.collectAsState()
 
     var activeChatChannel by remember { mutableStateOf<ChatChannelEntity?>(null) }
 
-    val matchingPending = remember(pendingProviders, joinPhone) {
-        pendingProviders.find { it.phone.trim() == joinPhone.trim() && joinPhone.isNotEmpty() }
-    }
-    val matchingApproved = remember(providers, joinPhone) {
-        providers.find { it.phone.trim() == joinPhone.trim() && joinPhone.isNotEmpty() }
-    }
-    val matchingStore = remember(stores, joinPhone) {
-        val cleanJoin = joinPhone.trim().replace(" ", "").replace("+", "")
-        stores.find {
-            (it.ownerId.trim().replace(" ", "").replace("+", "") == cleanJoin ||
-                    it.phone.trim().replace(" ", "").replace("+", "") == cleanJoin) &&
-                    cleanJoin.isNotEmpty() && !it.isDeleted
-        }
-    }
-    val matchingProperty = remember(properties, joinPhone) {
-        val cleanJoin = joinPhone.trim().replace(" ", "").replace("+", "")
-        properties.find {
-            (it.ownerId.trim().replace(" ", "").replace("+", "") == cleanJoin ||
-                    it.phone.trim().replace(" ", "").replace("+", "") == cleanJoin) &&
-                    cleanJoin.isNotEmpty() && !it.isDeleted
-        }
+    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications) {
+        useCase.determineStatus(
+            joinPhone = joinPhone,
+            pendingProviders = pendingProviders,
+            providers = providers,
+            stores = stores,
+            properties = properties,
+            categories = categories,
+            notifications = notifications
+        )
     }
 
-    // 🏬 1. If Store/Restaurant/Medical center is Active
-    if (matchingStore != null && matchingStore.isActive) {
-        val isRest = matchingStore.sectionId.contains("restaurant") || matchingStore.name.contains("مطعم")
-        val isMed = matchingStore.sectionId.contains("medical") || matchingStore.name.contains("عيادة")
-        val acc = UnifiedBusinessAccount.fromStore(matchingStore, if (isRest) "restaurants" else if (isMed) "medical" else "stores")
-
-        if (isRest) {
-            RestaurantDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
-        } else if (isMed) {
-            MedicalDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
-        } else {
-            StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
-        }
+    // Active Store / Property Routing
+    if (currentStatus is JoinStatus.ActiveStore || currentStatus is JoinStatus.ActiveProperty) {
+        JoinStatusRouter.RouteToDashboard(
+            status = currentStatus,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            context = context,
+            scope = scope,
+            snackbarHostState = snackbarHostState,
+            onOpenChat = { activeChatChannel = it }
+        )
         return
     }
 
-    // 🏠 2. If Property is Active
-    if (matchingProperty != null && matchingProperty.isActive) {
-        val acc = UnifiedBusinessAccount.fromProperty(matchingProperty)
-        PropertyDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
-        return
-    }
-
-    // 👷 3. If Provider/Technician is Approved
-    if (matchingApproved != null) {
-        val categoryName = remember(matchingApproved.categoryId) {
-            categories.find { it.id == matchingApproved.categoryId }?.name ?: "صيانة فنية"
+    // Approved Technician View
+    if (currentStatus is JoinStatus.ApprovedTechnician) {
+        val approved = currentStatus.provider
+        val myBookings = remember(bookings, approved.id) {
+            bookings.filter { it.providerId == approved.id }
         }
-        val myBookings = remember(bookings, matchingApproved.id) {
-            bookings.filter { it.providerId == matchingApproved.id }
-        }
-        val myNotifications = remember(notifications, matchingApproved.phone) {
-            notifications.filter { it.targetValue == matchingApproved.phone || it.targetType == "ALL" }
+        val myNotifications = remember(notifications, approved.phone) {
+            notifications.filter { it.targetValue == approved.phone || it.targetType == "ALL" }
         }
 
         Scaffold(
@@ -114,12 +90,12 @@ fun JoinRequestStatusScreen(
                     .verticalScroll(rememberScrollState())
             ) {
                 ApprovedTechnicianView(
-                    provider = matchingApproved,
-                    categoryName = categoryName,
+                    provider = approved,
+                    categoryName = currentStatus.categoryName,
                     bookings = myBookings,
                     notifications = myNotifications,
                     onToggleAvailability = {
-                        viewModel.updateProviderEntity(matchingApproved.copy(isAvailable = !matchingApproved.isAvailable))
+                        viewModel.updateProviderEntity(approved.copy(isAvailable = !approved.isAvailable))
                         scope.launch { snackbarHostState.showSnackbar("تم تحديث حالة التوافر") }
                     },
                     onAcceptBooking = { bookingId ->
@@ -131,9 +107,9 @@ fun JoinRequestStatusScreen(
                         scope.launch { snackbarHostState.showSnackbar("❌ تم الاعتذار عن الطلب") }
                     },
                     onOpenChatWithCustomer = { custPhone, custName ->
-                        viewModel.getOrCreateChatChannel(matchingApproved.id, matchingApproved.name, custPhone, custName)
+                        viewModel.getOrCreateChatChannel(approved.id, approved.name, custPhone, custName)
                         activeChatChannel = ChatChannelEntity(
-                            id = "chat_p_${matchingApproved.id}_u_$custPhone",
+                            id = "chat_p_${approved.id}_u_$custPhone",
                             userName = custName,
                             lastMessage = "",
                             messages = emptyList()
@@ -147,9 +123,9 @@ fun JoinRequestStatusScreen(
         activeChatChannel?.let { channel ->
             StatusChatDialog(
                 chatChannel = channel,
-                currentUserId = matchingApproved.id,
+                currentUserId = approved.id,
                 onSendMessage = { msg ->
-                    viewModel.replyToChatChannel(channel.id, matchingApproved.id, msg, matchingApproved.name)
+                    viewModel.replyToChatChannel(channel.id, approved.id, msg, approved.name)
                 },
                 onDismiss = { activeChatChannel = null },
                 themeColors = themeColors
@@ -158,11 +134,7 @@ fun JoinRequestStatusScreen(
         return
     }
 
-    // ⏳ 4. Store/Property/Technician Pending Approvals
-    val rejectionNotif = notifications.find {
-        it.targetValue == joinPhone && (it.title.contains("رفض") || it.message.contains("رفض"))
-    }
-
+    // Pending & Rejected Views
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = themeColors.surface
@@ -175,64 +147,68 @@ fun JoinRequestStatusScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            when {
-                rejectionNotif != null -> {
+            when (currentStatus) {
+                is JoinStatus.Rejected -> {
                     RejectedView(
-                        reason = rejectionNotif.message,
+                        reason = currentStatus.reason,
                         onReapply = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
-                matchingStore != null && !matchingStore.isActive -> {
+                is JoinStatus.PendingStore -> {
+                    val store = currentStatus.store
                     PendingApprovalView(
                         title = "⏳ طلب انضمام النشاط التجاري قيد المراجعة",
-                        message = "تم استلام طلب انضمام النشاط '${matchingStore.name}' وهو قيد التدقيق والاعتماد الإداري.",
+                        message = "تم استلام طلب انضمام النشاط '${store.name}' وهو قيد التدقيق والاعتماد الإداري.",
                         detailsList = listOf(
-                            "اسم النشاط" to matchingStore.name,
-                            "اسم المالك" to matchingStore.ownerName,
-                            "رقم الهاتف" to matchingStore.phone,
-                            "المنطقة" to "${matchingStore.cityId} - ${matchingStore.localNeighborhood}"
+                            "اسم النشاط" to store.name,
+                            "اسم المالك" to store.ownerName,
+                            "رقم الهاتف" to store.phone,
+                            "المنطقة" to "${store.cityId} - ${store.localNeighborhood}"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
-                matchingProperty != null && !matchingProperty.isActive -> {
+                is JoinStatus.PendingProperty -> {
+                    val prop = currentStatus.property
                     PendingApprovalView(
                         title = "⏳ إعلان العقار قيد المراجعة",
-                        message = "تم استلام إعلان العقار '${matchingProperty.title}' وهو قيد المراجعة والاعتماد الظاهر.",
+                        message = "تم استلام إعلان العقار '${prop.title}' وهو قيد المراجعة والاعتماد الظاهر.",
                         detailsList = listOf(
-                            "عنوان العقار" to matchingProperty.title,
-                            "السعر" to "${matchingProperty.price} ${matchingProperty.currency}",
-                            "رقم التواصل" to matchingProperty.phone,
-                            "المنطقة" to "${matchingProperty.cityId} - ${matchingProperty.localNeighborhood}"
+                            "عنوان العقار" to prop.title,
+                            "السعر" to "${prop.price} ${prop.currency}",
+                            "رقم التواصل" to prop.phone,
+                            "المنطقة" to "${prop.cityId} - ${prop.localNeighborhood}"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
-                matchingPending != null -> {
+                is JoinStatus.PendingTechnician -> {
+                    val pending = currentStatus.provider
                     PendingApprovalView(
                         title = "⏳ طلب الانضمام كفني قيد المراجعة",
                         message = "تم استلام بياناتك بنجاح وجاري مراجعة المؤهلات وتفعيل الملف الشخصي.",
                         detailsList = listOf(
-                            "الاسم" to matchingPending.name,
-                            "رقم التواصل" to matchingPending.phone,
-                            "المنطقة" to "${matchingPending.area} - ${matchingPending.localNeighborhood}"
+                            "الاسم" to pending.name,
+                            "رقم التواصل" to pending.phone,
+                            "المنطقة" to "${pending.area} - ${pending.localNeighborhood}"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
-                else -> {
+                is JoinStatus.PendingGeneric -> {
                     PendingApprovalView(
                         title = "⏳ طلب الانضمام قيد المراجعة والتدقيق",
                         message = "طلبك قيد المراجعة الإدارية. سيصلك إشعار فور الاعتماد وتفعيل حسابك.",
-                        detailsList = listOf("رقم الهاتف المسجل" to joinPhone),
+                        detailsList = listOf("رقم الهاتف المسجل" to currentStatus.phone),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
+                else -> {}
             }
         }
     }
