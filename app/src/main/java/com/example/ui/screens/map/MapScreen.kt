@@ -33,8 +33,7 @@ import com.example.ui.createBookingDirectly
 import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.OfflineMapManager
-import com.example.utils.VisualThemePalette
-import com.example.utils.resolveThemePalette
+import com.example.utils.*
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
@@ -72,11 +71,14 @@ fun MapScreen(
     val userLatState by viewModel.userLatitude.collectAsState()
     val userLngState by viewModel.userLongitude.collectAsState()
 
+    val safeUserLat = if (userLatState != 0.0) userLatState else 15.3694
+    val safeUserLng = if (userLngState != 0.0) userLngState else 44.1910
+
     // Persistent State
     var isRadarMode by rememberSaveable { mutableStateOf(false) }
     var isHeatmapActive by rememberSaveable { mutableStateOf(false) }
     var selectedCategory by rememberSaveable { mutableStateOf("ALL") }
-    var selectedCity by rememberSaveable { mutableStateOf("صنعاء") }
+    var selectedCity by rememberSaveable { mutableStateOf("الكل") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var maxRangeKm by rememberSaveable { mutableFloatStateOf(25.0f) }
 
@@ -108,21 +110,47 @@ fun MapScreen(
         }
     }
 
+    // Helper for resilient city matching
+    fun matchesCityFilter(cityFilter: String, entityCityId: String, entityArea: String, entityNeighborhood: String): Boolean {
+        if (cityFilter.isEmpty() || cityFilter == "الكل" || cityFilter == "جميع المدن والمحافظات") return true
+        val normFilter = cityFilter.trim().lowercase()
+        val combined = "$entityCityId $entityArea $entityNeighborhood".lowercase()
+        
+        return when {
+            normFilter.contains("صنعاء") -> combined.contains("صنعاء") || combined.contains("sanaa") || combined.contains("ye_san") || entityCityId == "1" || combined.contains("حدة") || combined.contains("السبعين") || combined.contains("التحرير")
+            normFilter.contains("عدن") -> combined.contains("عدن") || combined.contains("aden") || combined.contains("ye_ade") || entityCityId == "2" || combined.contains("كريتر") || combined.contains("المعلا") || combined.contains("المنصورة") || combined.contains("الشيخ عثمان")
+            normFilter.contains("تعز") -> combined.contains("تعز") || combined.contains("taiz") || combined.contains("ye_tai") || entityCityId == "3" || combined.contains("الحوبان") || combined.contains("صالة")
+            normFilter.contains("الحديدة") -> combined.contains("الحديدة") || combined.contains("hodeidah") || combined.contains("ye_hud") || combined.contains("الحالي") || combined.contains("الميناء")
+            normFilter.contains("إب") -> combined.contains("إب") || combined.contains("ibb") || combined.contains("ye_ibb") || combined.contains("يريم") || combined.contains("العدين")
+            normFilter.contains("حضرموت") || normFilter.contains("المكلا") -> combined.contains("حضرموت") || combined.contains("المكلا") || combined.contains("mukalla") || combined.contains("سيئون") || combined.contains("ye_had")
+            normFilter.contains("مأرب") -> combined.contains("مأرب") || combined.contains("marib") || combined.contains("ye_mar")
+            normFilter.contains("ذمار") -> combined.contains("ذمار") || combined.contains("dhamar") || combined.contains("ye_dha")
+            else -> combined.contains(normFilter)
+        }
+    }
+
     // Filtered lists
     val filteredProviders = remember(providers, selectedCategory, selectedCity, searchQuery) {
+        val cleanQuery = searchQuery.trim().lowercase()
         providers.filter { p ->
             val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROVIDERS"
-            val matchesCity = selectedCity.isEmpty() || p.area.contains(selectedCity) || p.cityId.contains(selectedCity) || p.localNeighborhood.contains(selectedCity)
-            val matchesQuery = searchQuery.isEmpty() || p.name.contains(searchQuery, ignoreCase = true) ||
-                    p.profession.contains(searchQuery, ignoreCase = true) || p.customCategoryName.contains(searchQuery, ignoreCase = true)
+            val matchesCity = matchesCityFilter(selectedCity, p.cityId, p.area, p.localNeighborhood)
+            val matchesQuery = cleanQuery.isEmpty() ||
+                    p.name.lowercase().contains(cleanQuery) ||
+                    p.profession.lowercase().contains(cleanQuery) ||
+                    p.customCategoryName.lowercase().contains(cleanQuery) ||
+                    p.specialization.lowercase().contains(cleanQuery) ||
+                    p.area.lowercase().contains(cleanQuery) ||
+                    p.localNeighborhood.lowercase().contains(cleanQuery)
             matchesCat && matchesCity && matchesQuery
         }
     }
 
     val filteredStores = remember(stores, selectedCategory, selectedCity, searchQuery) {
+        val cleanQuery = searchQuery.trim().lowercase()
         stores.filter { s ->
-            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
-            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
+            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية") || s.name.contains("مستشفى") || s.name.contains("عيادة")
+            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه") || s.name.contains("مأكولات") || s.name.contains("شاورما"))
             
             val matchesCat = when (selectedCategory) {
                 "ALL" -> true
@@ -131,29 +159,39 @@ fun MapScreen(
                 "MEDICAL" -> isMedical
                 else -> false
             }
-            val matchesCity = selectedCity.isEmpty() || s.cityId.contains(selectedCity) || s.localNeighborhood.contains(selectedCity)
-            val matchesQuery = searchQuery.isEmpty() || s.name.contains(searchQuery, ignoreCase = true) || s.description.contains(searchQuery, ignoreCase = true)
+            val matchesCity = matchesCityFilter(selectedCity, s.cityId, "", s.localNeighborhood)
+            val matchesQuery = cleanQuery.isEmpty() ||
+                    s.name.lowercase().contains(cleanQuery) ||
+                    s.description.lowercase().contains(cleanQuery) ||
+                    s.localNeighborhood.lowercase().contains(cleanQuery) ||
+                    s.sectionId.lowercase().contains(cleanQuery) ||
+                    s.categoryId.lowercase().contains(cleanQuery)
             matchesCat && matchesCity && matchesQuery
         }
     }
 
     val filteredProperties = remember(properties, selectedCategory, selectedCity, searchQuery) {
+        val cleanQuery = searchQuery.trim().lowercase()
         properties.filter { pr ->
             val matchesCat = selectedCategory == "ALL" || selectedCategory == "PROPERTIES"
-            val matchesCity = selectedCity.isEmpty() || pr.cityId.contains(selectedCity) || pr.localNeighborhood.contains(selectedCity)
-            val matchesQuery = searchQuery.isEmpty() || pr.title.contains(searchQuery, ignoreCase = true) || pr.description.contains(searchQuery, ignoreCase = true)
+            val matchesCity = matchesCityFilter(selectedCity, pr.cityId, "", pr.localNeighborhood)
+            val matchesQuery = cleanQuery.isEmpty() ||
+                    pr.title.lowercase().contains(cleanQuery) ||
+                    pr.description.lowercase().contains(cleanQuery) ||
+                    pr.localNeighborhood.lowercase().contains(cleanQuery)
             matchesCat && matchesCity && matchesQuery
         }
     }
 
     // Convert items to MapItemPoints for RadarRenderer
-    val radarPoints = remember(filteredProviders, filteredStores, filteredProperties, userLatState, userLngState) {
+    val radarPoints = remember(filteredProviders, filteredStores, filteredProperties, safeUserLat, safeUserLng) {
         val list = mutableListOf<MarkerRenderer.MapItemPoint>()
         var angle = 0.0
 
         filteredProviders.forEachIndexed { i, p ->
-            val d = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, p.latitude, p.longitude)
-            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 15f
+            val coords = getProviderCoords(p)
+            val d = MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, coords.first, coords.second)
+            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 10f
             val rad = Math.toRadians(angle)
             list.add(
                 MarkerRenderer.MapItemPoint(
@@ -167,15 +205,16 @@ fun MapScreen(
                     originalItem = p
                 )
             )
-            angle += 45.0
+            angle += 40.0
         }
 
         filteredStores.forEachIndexed { i, s ->
+            val coords = getStoreCoords(s)
             val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
             val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
             val typeStr = if (isMedical) "MEDICAL" else if (isRestaurant) "RESTAURANT" else "STORE"
-            val d = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, s.latitude, s.longitude)
-            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 15f
+            val d = MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, coords.first, coords.second)
+            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 10f
             val rad = Math.toRadians(angle)
             list.add(
                 MarkerRenderer.MapItemPoint(
@@ -193,8 +232,9 @@ fun MapScreen(
         }
 
         filteredProperties.forEachIndexed { i, pr ->
-            val d = MapDistanceCalculator.calculateDistanceMeters(userLatState, userLngState, pr.latitude, pr.longitude)
-            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 15f
+            val coords = getPropertyCoords(pr)
+            val d = MapDistanceCalculator.calculateDistanceMeters(safeUserLat, safeUserLng, coords.first, coords.second)
+            val r = (d / 1000.0).coerceIn(1.0, 30.0).toFloat() * 10f
             val rad = Math.toRadians(angle)
             list.add(
                 MarkerRenderer.MapItemPoint(
@@ -208,7 +248,7 @@ fun MapScreen(
                     originalItem = pr
                 )
             )
-            angle += 50.0
+            angle += 45.0
         }
         list
     }
@@ -251,7 +291,7 @@ fun MapScreen(
                 )
             } else {
                 RealLeafletMapView(
-                    userCoords = Pair(userLatState, userLngState),
+                    userCoords = Pair(safeUserLat, safeUserLng),
                     nearbyProviders = filteredProviders,
                     nearbyStores = filteredStores,
                     nearbyProperties = filteredProperties,
@@ -304,7 +344,7 @@ fun MapScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.4f))
                         ) {
                             Text(
-                                text = "${radarPoints.size} خدمة متوفرة",
+                                text = "${radarPoints.size} متوفر",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF00E5FF),
@@ -321,8 +361,10 @@ fun MapScreen(
                     selectedCity = selectedCity,
                     onCitySelected = { city ->
                         selectedCity = city
-                        val coords = OfflineMapManager.getCityCoordinates(city)
-                        viewModel.updateUserLocation(coords.latitude, coords.longitude)
+                        if (city != "الكل") {
+                            val coords = OfflineMapManager.getCityCoordinates(city)
+                            viewModel.updateUserLocation(coords.latitude, coords.longitude)
+                        }
                     },
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
@@ -369,8 +411,8 @@ fun MapScreen(
             selectedEntity?.let { entity ->
                 MapBottomSheet(
                     entity = entity,
-                    userLat = userLatState,
-                    userLng = userLngState,
+                    userLat = safeUserLat,
+                    userLng = safeUserLng,
                     onDismiss = { selectedEntity = null },
                     onRequestBooking = { p ->
                         bookingProviderTarget = p
@@ -393,8 +435,8 @@ fun MapScreen(
     bookingProviderTarget?.let { provider ->
         MapBookingDialog(
             provider = provider,
-            userLat = userLatState,
-            userLng = userLngState,
+            userLat = safeUserLat,
+            userLng = safeUserLng,
             onDismiss = { bookingProviderTarget = null },
             onConfirmBooking = { notes ->
                 viewModel.createBookingDirectly(

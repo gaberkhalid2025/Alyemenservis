@@ -39,15 +39,18 @@ import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.getProviderCoords
 import com.example.utils.getStoreCoords
 import com.example.utils.getPropertyCoords
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * 🗺️ RealLeafletMapView
  * Production-ready OpenStreetMap Leaflet implementation with:
  * - Dynamic marker updates without full page reloads
+ * - High-speed JSON serialization preventing syntax crashes
  * - WebChromeClient for JavaScript console & error monitoring in Logcat
  * - Offline tile caching via OfflineMapManager
- * - Approximate fallback coordinates for zero-coordinate entities
- * - Smooth CircularProgressIndicator during map initialization
+ * - Accurate fallback coordinates for zero-coordinate entities
+ * - Interactive custom popup cards with direct calling and directions
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -68,147 +71,159 @@ fun RealLeafletMapView(
     var hasLoadError by remember { mutableStateOf(false) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
+    // Safe user coordinates fallback (Default to Sana'a if 0,0)
+    val safeUserLat = if (userCoords.first != 0.0) userCoords.first else 15.3694
+    val safeUserLng = if (userCoords.second != 0.0) userCoords.second else 44.1910
+
     // Run cache purge in background
     LaunchedEffect(Unit) {
         OfflineMapManager.purgeCacheIfNeeded(context)
     }
 
-    // Build JSON data with approximate fallback coordinates for items with lat/lng = 0
-    val providerMarkers = nearbyProviders.mapIndexed { idx, p ->
-        val baseCoords = getProviderCoords(p)
-        val walkOffset = dynamicOffsets[p.id] ?: Pair(0.0, 0.0)
-        val rawLat = baseCoords.first + walkOffset.first
-        val rawLng = baseCoords.second + walkOffset.second
+    // Build structured JSON array for markers
+    val markersJsonArray = remember(nearbyProviders, nearbyStores, nearbyProperties, dynamicOffsets, safeUserLat, safeUserLng) {
+        val jsonArray = JSONArray()
 
-        // Fallback for (0,0) coordinates
-        val isApproximate = rawLat == 0.0 && rawLng == 0.0
-        val liveLat = if (isApproximate) userCoords.first + ((idx % 5) * 0.003 - 0.006) else rawLat
-        val liveLng = if (isApproximate) userCoords.second + (((idx / 5) % 5) * 0.003 - 0.006) else rawLng
+        // 1. Providers
+        nearbyProviders.forEachIndexed { idx, p ->
+            val baseCoords = getProviderCoords(p)
+            val walkOffset = dynamicOffsets[p.id] ?: Pair(0.0, 0.0)
+            var rawLat = baseCoords.first + walkOffset.first
+            var rawLng = baseCoords.second + walkOffset.second
 
-        val categoryEmoji = when {
-            p.categoryId.contains("spaka") || p.profession.contains("سباك") -> "🔧"
-            p.categoryId.contains("kahraba") || p.profession.contains("كهربا") -> "⚡"
-            p.categoryId.contains("solar") || p.profession.contains("طاقة") -> "☀️"
-            p.categoryId.contains("dehan") || p.profession.contains("دهان") -> "🎨"
-            p.categoryId.contains("hadada") || p.profession.contains("حداد") -> "🔨"
-            p.categoryId.contains("ac") || p.categoryId.contains("tabreed") || p.profession.contains("تكييف") -> "❄️"
-            p.categoryId.contains("car") || p.categoryId.contains("mechanic") || p.profession.contains("ميكانيك") -> "🚗"
-            p.categoryId.contains("carpentry") || p.categoryId.contains("najjara") || p.profession.contains("نجار") -> "🪚"
-            else -> "👷"
+            val isApproximate = (rawLat == 0.0 && rawLng == 0.0)
+            if (isApproximate) {
+                rawLat = safeUserLat + ((idx % 5) * 0.003 - 0.006)
+                rawLng = safeUserLng + (((idx / 5) % 5) * 0.003 - 0.006)
+            }
+
+            val categoryEmoji = when {
+                p.categoryId.contains("spaka") || p.profession.contains("سباك") -> "🔧"
+                p.categoryId.contains("kahraba") || p.profession.contains("كهربا") -> "⚡"
+                p.categoryId.contains("solar") || p.profession.contains("طاقة") -> "☀️"
+                p.categoryId.contains("dehan") || p.profession.contains("دهان") -> "🎨"
+                p.categoryId.contains("hadada") || p.profession.contains("حداد") -> "🔨"
+                p.categoryId.contains("ac") || p.categoryId.contains("tabreed") || p.profession.contains("تكييف") -> "❄️"
+                p.categoryId.contains("car") || p.categoryId.contains("mechanic") || p.profession.contains("ميكانيك") -> "🚗"
+                p.categoryId.contains("carpentry") || p.categoryId.contains("najjara") || p.profession.contains("نجار") -> "🪚"
+                else -> "👷"
+            }
+
+            val pSpec = p.customCategoryName.ifEmpty { p.specialization.ifEmpty { p.profession } }
+            val cleanSpec = if (pSpec.isBlank()) "فني صيانة معتمد" else pSpec
+
+            val obj = JSONObject().apply {
+                put("id", p.id)
+                put("type", "PROVIDER")
+                put("name", p.name.ifBlank { "فني دليل اليمن" })
+                put("lat", rawLat)
+                put("lng", rawLng)
+                put("isApprox", isApproximate)
+                put("emoji", categoryEmoji)
+                put("spec", cleanSpec)
+                put("phone", p.phone)
+                put("rating", if (p.rating > 0) String.format("%.1f", p.rating) else "5.0")
+                put("status", if (p.isAvailable) "متاح لاستقبال الطلبات 🟢" else "مشغول حالياً 🟡")
+                put("badgeColor", "#00E5FF")
+                put("serviceCategory", "فنيون صيانة")
+            }
+            jsonArray.put(obj)
         }
-        val safeName = p.name.replace("\"", "\\\"").replace("'", "\\'")
-        val pSpec = (p.customCategoryName.ifEmpty { p.specialization.ifEmpty { p.profession } }).replace("\"", "\\\"").replace("'", "\\'")
-        val cleanSpec = if (pSpec.isEmpty()) "فني صيانة معتمد" else pSpec
-        val safePhone = p.phone.replace("\"", "")
-        """
-        {
-            id: "${p.id}",
-            type: "PROVIDER",
-            name: "$safeName",
-            lat: $liveLat,
-            lng: $liveLng,
-            isApprox: $isApproximate,
-            emoji: "$categoryEmoji",
-            spec: "$cleanSpec",
-            phone: "$safePhone",
-            rating: "${p.rating}",
-            status: "${if (p.isAvailable) "متاح لاستقبال الطلبات 🟢" else "مشغول حالياً 🟡"}",
-            badgeColor: "#00E5FF",
-            serviceCategory: "فنيون صيانة"
+
+        // 2. Stores & Medical Centers & Restaurants
+        nearbyStores.forEachIndexed { idx, s ->
+            val coords = getStoreCoords(s)
+            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.categoryId.contains("pharmacy") || s.medicalLicenseNo.isNotBlank() || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("عيادة") || s.name.contains("صيدلية")
+            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("مأكولات") || s.name.contains("كافيه") || s.name.contains("شاورما"))
+
+            val emoji = when {
+                isMedical -> "🏥"
+                isRestaurant -> "🍔"
+                s.sectionId.contains("supermarket") || s.name.contains("بقالة") || s.name.contains("هايبر") -> "🛒"
+                else -> "🏪"
+            }
+
+            var rawLat = coords.first
+            var rawLng = coords.second
+            val isApproximate = (rawLat == 0.0 && rawLng == 0.0)
+            if (isApproximate) {
+                rawLat = safeUserLat + (((idx + 2) % 6) * 0.0035 - 0.007)
+                rawLng = safeUserLng + ((((idx + 2) / 6) % 6) * 0.0035 - 0.007)
+            }
+
+            val (badgeColor, categoryLabel) = when {
+                isMedical -> Pair("#EC4899", "مراكز طبية وصيدليات")
+                isRestaurant -> Pair("#F59E0B", "مطاعم وكافيهات")
+                else -> Pair("#10B981", "متاجر وأسواق")
+            }
+
+            val cleanDesc = s.description.ifBlank { if (isMedical) "مركز طبي / صيدلية معتمدة" else "محل / متجر معتمد" }.take(60)
+
+            val obj = JSONObject().apply {
+                put("id", s.id)
+                put("type", "STORE")
+                put("name", s.name.ifBlank { "متجر معتمد" })
+                put("lat", rawLat)
+                put("lng", rawLng)
+                put("isApprox", isApproximate)
+                put("emoji", emoji)
+                put("spec", cleanDesc)
+                put("phone", s.phone)
+                put("rating", if (s.rating > 0) String.format("%.1f", s.rating) else "5.0")
+                put("status", if (s.isActive) "مفتوح ويستقبل الطلبات 🟢" else "مغلق حالياً 🔴")
+                put("badgeColor", badgeColor)
+                put("serviceCategory", categoryLabel)
+            }
+            jsonArray.put(obj)
         }
-        """
+
+        // 3. Properties
+        nearbyProperties.forEachIndexed { idx, pr ->
+            val coords = getPropertyCoords(pr)
+            var rawLat = coords.first
+            var rawLng = coords.second
+            val isApproximate = (rawLat == 0.0 && rawLng == 0.0)
+            if (isApproximate) {
+                rawLat = safeUserLat + (((idx + 4) % 5) * 0.004 - 0.008)
+                rawLng = safeUserLng + ((((idx + 4) / 5) % 5) * 0.004 - 0.008)
+            }
+
+            val priceFormatted = if (pr.price > 0) "${pr.price} ${pr.currency.ifEmpty { "ريال" }}" else "حسب الاتفاق"
+            val cleanDesc = pr.description.ifBlank { "عقار معروض" }.take(60)
+
+            val obj = JSONObject().apply {
+                put("id", pr.id)
+                put("type", "PROPERTY")
+                put("name", pr.title.ifBlank { "عقار معروض" })
+                put("lat", rawLat)
+                put("lng", rawLng)
+                put("isApprox", isApproximate)
+                put("emoji", "🏠")
+                put("spec", "$cleanDesc ($priceFormatted)")
+                put("phone", pr.phone)
+                put("rating", "5.0")
+                put("status", "معروض للإيجار / البيع 🟢")
+                put("badgeColor", "#8B5CF6")
+                put("serviceCategory", "عقارات وشقق")
+            }
+            jsonArray.put(obj)
+        }
+
+        jsonArray.toString()
     }
-
-    val storeMarkers = nearbyStores.mapIndexed { idx, s ->
-        val coords = getStoreCoords(s)
-        val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.categoryId.contains("pharmacy") || s.medicalLicenseNo.isNotBlank() || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("عيادة") || s.name.contains("صيدلية")
-        val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("مأكولات") || s.name.contains("كافيه") || s.name.contains("شاورما"))
-        
-        val emoji = when {
-            isMedical -> "🏥"
-            isRestaurant -> "🍔"
-            s.sectionId.contains("supermarket") || s.name.contains("بقالة") || s.name.contains("هايبر") -> "🛒"
-            else -> "🏪"
-        }
-        val safeName = s.name.replace("\"", "\\\"").replace("'", "\\'")
-        val safeDesc = s.description.replace("\"", "\\\"").replace("'", "\\'").take(60)
-        val cleanDesc = if (safeDesc.isEmpty()) (if (isMedical) "مركز طبي / صيدلية معتمدة" else "محل / متجر معتمد") else safeDesc
-        val safePhone = s.phone.replace("\"", "")
-        
-        val isApproximate = coords.first == 0.0 && coords.second == 0.0
-        val liveLat = if (isApproximate) userCoords.first + (((idx + 2) % 6) * 0.0035 - 0.007) else coords.first
-        val liveLng = if (isApproximate) userCoords.second + ((((idx + 2) / 6) % 6) * 0.0035 - 0.007) else coords.second
-
-        val (badgeColor, categoryLabel) = when {
-            isMedical -> Pair("#EC4899", "مراكز طبية وصيدليات")
-            isRestaurant -> Pair("#F59E0B", "مطاعم وكافيهات")
-            else -> Pair("#10B981", "متاجر وأسواق")
-        }
-
-        """
-        {
-            id: "${s.id}",
-            type: "STORE",
-            name: "$safeName",
-            lat: $liveLat,
-            lng: $liveLng,
-            isApprox: $isApproximate,
-            emoji: "$emoji",
-            spec: "$cleanDesc",
-            phone: "$safePhone",
-            rating: "${s.rating}",
-            status: "${if (s.isActive) "مفتوح ويستقبل الطلبات 🟢" else "مغلق حالياً 🔴"}",
-            badgeColor: "$badgeColor",
-            serviceCategory: "$categoryLabel"
-        }
-        """
-    }
-
-    val propertyMarkers = nearbyProperties.mapIndexed { idx, pr ->
-        val coords = getPropertyCoords(pr)
-        val safeTitle = pr.title.replace("\"", "\\\"").replace("'", "\\'")
-        val safeDesc = pr.description.replace("\"", "\\\"").replace("'", "\\'").take(60)
-        val cleanDesc = if (safeDesc.isEmpty()) "عقار معروض" else safeDesc
-        val safePhone = pr.phone.replace("\"", "")
-        val priceFormatted = "${pr.price} ${pr.currency}"
-
-        val isApproximate = coords.first == 0.0 && coords.second == 0.0
-        val liveLat = if (isApproximate) userCoords.first + (((idx + 4) % 5) * 0.004 - 0.008) else coords.first
-        val liveLng = if (isApproximate) userCoords.second + ((((idx + 4) / 5) % 5) * 0.004 - 0.008) else coords.second
-
-        """
-        {
-            id: "${pr.id}",
-            type: "PROPERTY",
-            name: "$safeTitle",
-            lat: $liveLat,
-            lng: $liveLng,
-            isApprox: $isApproximate,
-            emoji: "🏠",
-            spec: "$cleanDesc ($priceFormatted)",
-            phone: "$safePhone",
-            rating: "5.0",
-            status: "معروض للإيجار / البيع 🟢",
-            badgeColor: "#8B5CF6",
-            serviceCategory: "عقارات وشقق"
-        }
-        """
-    }
-
-    val markersJson = (providerMarkers + storeMarkers + propertyMarkers).joinToString(",")
 
     // Hot-update markers in WebView if already initialized
-    LaunchedEffect(markersJson) {
-        webViewRef?.evaluateJavascript("if (window.updateMapMarkers) { window.updateMapMarkers([$markersJson]); }", null)
+    LaunchedEffect(markersJsonArray) {
+        webViewRef?.evaluateJavascript("if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }", null)
     }
 
-    val htmlContent = remember(userCoords, markersJson) {
+    val htmlContent = remember(safeUserLat, safeUserLng, markersJsonArray) {
         try {
             val template = context.assets.open("map.html").bufferedReader().use { it.readText() }
             template
-                .replace("_USER_LAT_", userCoords.first.toString())
-                .replace("_USER_LNG_", userCoords.second.toString())
-                .replace("_MARKERS_JSON_", markersJson)
+                .replace("_USER_LAT_", safeUserLat.toString())
+                .replace("_USER_LNG_", safeUserLng.toString())
+                .replace("_MARKERS_JSON_", markersJsonArray)
         } catch (e: Exception) {
             Log.e("RealLeafletMapView", "Error reading map.html asset", e)
             ""
@@ -233,7 +248,7 @@ fun RealLeafletMapView(
                     }
                     webChromeClient = object : WebChromeClient() {
                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                            Log.d("RealLeafletMapView", "${consoleMessage?.message()} -- From line ${consoleMessage?.lineNumber()} of ${consoleMessage?.sourceId()}")
+                            Log.d("RealLeafletMapView", "${consoleMessage?.message()} -- line ${consoleMessage?.lineNumber()} of ${consoleMessage?.sourceId()}")
                             return true
                         }
                     }
@@ -340,7 +355,7 @@ fun RealLeafletMapView(
         ) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF0F172A).copy(alpha = 0.9f),
+                color = Color(0xFF0F172A).copy(alpha = 0.92f),
                 modifier = Modifier.padding(24.dp)
             ) {
                 Row(
@@ -353,7 +368,7 @@ fun RealLeafletMapView(
                         color = Color(0xFF00E5FF),
                         strokeWidth = 2.5.dp
                     )
-                    Text("جاري تحميل الخريطة المباشرة...", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("جاري تحميل الخريطة والخدمات...", fontSize = 13.sp, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

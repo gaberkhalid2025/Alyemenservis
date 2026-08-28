@@ -66,15 +66,20 @@ fun MapFilterBar(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = { Text("بحث عن خدمة أو فني...", fontSize = 12.sp, color = Color(0xFF64748B)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp)) },
+                placeholder = { Text("بحث عن خدمة، فني، مركز أو متجر...", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث", tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(20.dp)) {
-                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+                        IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
                         }
                     }
                 },
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                ),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -83,7 +88,10 @@ fun MapFilterBar(
                     focusedBorderColor = Color(0xFF00E5FF),
                     unfocusedBorderColor = Color(0xFF334155),
                     focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedTextColor = Color.White,
+                    cursorColor = Color(0xFF00E5FF),
+                    focusedPlaceholderColor = Color(0xFF94A3B8),
+                    unfocusedPlaceholderColor = Color(0xFF64748B)
                 ),
                 modifier = Modifier
                     .weight(1f)
@@ -121,6 +129,16 @@ fun MapFilterBar(
                     onDismissRequest = { isCityMenuExpanded = false },
                     modifier = Modifier.background(Color(0xFF1E293B))
                 ) {
+                    DropdownMenuItem(
+                        text = { Text("جميع المدن والمحافظات", color = Color(0xFF00E5FF), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
+                        onClick = {
+                            onCitySelected("الكل")
+                            isCityMenuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
+                        }
+                    )
                     OfflineMapManager.MAJOR_YEMENI_CITIES.forEach { city ->
                         DropdownMenuItem(
                             text = { Text(city.nameAr, color = Color.White, fontSize = 13.sp) },
@@ -129,7 +147,7 @@ fun MapFilterBar(
                                 isCityMenuExpanded = false
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
                             }
                         )
                     }

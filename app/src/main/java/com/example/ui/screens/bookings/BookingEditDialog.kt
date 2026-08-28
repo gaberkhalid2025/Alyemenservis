@@ -3,6 +3,7 @@ package com.example.ui.screens.bookings
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,14 +22,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.data.BookingEntity
+import com.example.security.BookingSecurityHelper
 import com.example.utils.BookingUtils
 import java.util.Calendar
 import java.util.Locale
 
 /**
  * ✏️ BookingEditDialog
- * نافذة تعديل بيانات الحجز مع التحقق الصارم من كلمة المرور وقاعدة الـ 8 ساعات قبل الموعد.
+ * Edit dialog with real-time 8-hour rule validation, PIN verification,
+ * and 3-attempt 5-minute lockout security protection.
  */
 @Composable
 fun BookingEditDialog(
@@ -39,21 +43,27 @@ fun BookingEditDialog(
 ) {
     val context = LocalContext.current
 
-    var fullName by remember { mutableStateOf(booking.fullName.ifBlank { booking.customerName }) }
-    var clientPhoneInput by remember { mutableStateOf("") }
-    var passwordInput by remember { mutableStateOf("") }
-    var fullAddress by remember { mutableStateOf(booking.fullAddress.ifBlank { booking.customerArea }) }
+    var fullName by remember { mutableStateOf(booking.fullName.ifBlank { booking.customerName.ifBlank { booking.clientName } }) }
+    var fullAddress by remember { mutableStateOf(booking.fullAddress.ifBlank { booking.customerArea.ifBlank { booking.clientAddress } }) }
     var selectedDate by remember { mutableStateOf(booking.date.ifBlank { booking.dateString }) }
     var selectedTime by remember { mutableStateOf(booking.time.ifBlank { booking.timeString }) }
-    var serviceDetails by remember { mutableStateOf(booking.serviceDetails) }
-
+    var serviceDetails by remember { mutableStateOf(booking.serviceDetails.ifBlank { booking.serviceType }) }
+    var passwordInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val isLocked = remember(booking.id) {
+        BookingSecurityHelper.isBookingLocked(context, booking.id)
+    }
 
     val canModify = BookingUtils.canModifyOrCancelBooking(
         scheduledAtTimestamp = booking.scheduledAt,
         dateString = selectedDate,
         timeString = selectedTime
     )
+
+    val remainingText = remember(booking.scheduledAt, selectedDate, selectedTime) {
+        BookingUtils.formatRemainingCancellationTime(booking.scheduledAt, selectedDate, selectedTime)
+    }
 
     val calendar = Calendar.getInstance()
     val datePickerDialog = DatePickerDialog(
@@ -69,190 +79,245 @@ fun BookingEditDialog(
     val timePickerDialog = TimePickerDialog(
         context,
         { _, hourOfDay, minute ->
-            val period = if (hourOfDay < 12) "صباحاً" else "مساءً"
-            val hourFormatted = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
-            selectedTime = String.format(Locale.US, "%02d:%02d %s", hourFormatted, minute, period)
+            val amPm = if (hourOfDay < 12) "ص" else "م"
+            val displayHour = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
+            selectedTime = String.format(Locale.US, "%02d:%02d %s", displayHour, minute, amPm)
         },
         calendar.get(Calendar.HOUR_OF_DAY),
         calendar.get(Calendar.MINUTE),
         false
     )
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("تعديل تفاصيل الحجز", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            }
-        },
-        text = {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                if (!canModify && !isAdmin) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "تنبيه: لا يمكن التعديل؛ تبقى أقل من 8 ساعات على الموعد المحدد.",
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "✏️ تعديل تفاصيل الحجز",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00E5FF)
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8))
                     }
                 }
 
-                // Phone Verification (if not admin)
-                if (!isAdmin) {
-                    OutlinedTextField(
-                        value = clientPhoneInput,
-                        onValueChange = { clientPhoneInput = it; errorMessage = null },
-                        label = { Text("رقم الهاتف للتحقق *") },
-                        placeholder = { Text("أدخل رقم الهاتف الذي استخدمته في الحجز") },
-                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = passwordInput,
-                        onValueChange = { passwordInput = it; errorMessage = null },
-                        label = { Text("كلمة سر الحجز *") },
-                        placeholder = { Text("أدخل كلمة المرور الخاصة بالحجز") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                // 8-hour policy notice
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (canModify) Color(0xFF0F766E).copy(alpha = 0.2f) else Color(0xFF7F1D1D).copy(alpha = 0.2f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (canModify) Color(0xFF14B8A6).copy(alpha = 0.4f) else Color(0xFFEF4444).copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "قاعدة الـ 8 ساعات للتعديل والإلغاء:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (canModify) Color(0xFF5EEAD4) else Color(0xFFFCA5A5)
+                        )
+                        Text(
+                            text = remainingText,
+                            fontSize = 11.sp,
+                            color = Color(0xFFCBD5E1)
+                        )
+                    }
                 }
 
+                if (isLocked && !isAdmin) {
+                    val remainingSec = BookingSecurityHelper.getRemainingLockoutSeconds(context, booking.id)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "🔒 تم قفل الحجز مؤقتاً بسبب 3 محاولات غير صحيحة. يرجى الانتظار (${remainingSec / 60} دقيقة).",
+                            color = Color(0xFFFCA5A5),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
+                // Customer Name
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = { fullName = it },
-                    label = { Text("الاسم الثلاثي") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("الاسم الكامل", color = Color(0xFF94A3B8)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF00E5FF),
+                        unfocusedBorderColor = Color(0xFF475569)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
+                // Date Picker trigger
+                OutlinedButton(
+                    onClick = { datePickerDialog.show() },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF475569))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(if (selectedDate.isNotBlank()) selectedDate else "تحديد التاريخ")
+                        Icon(Icons.Default.DateRange, contentDescription = null, tint = Color(0xFF00E5FF))
+                    }
+                }
+
+                // Time Picker trigger
+                OutlinedButton(
+                    onClick = { timePickerDialog.show() },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF475569))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(if (selectedTime.isNotBlank()) selectedTime else "تحديد الوقت")
+                        Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = Color(0xFF00E5FF))
+                    }
+                }
+
+                // Address
                 OutlinedTextField(
                     value = fullAddress,
                     onValueChange = { fullAddress = it },
-                    label = { Text("العنوان والحي") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("العنوان / الحي / الشارع", color = Color(0xFF94A3B8)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF00E5FF),
+                        unfocusedBorderColor = Color(0xFF475569)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
-                // Date & Time pickers
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedCard(
-                        onClick = { datePickerDialog.show() },
-                        modifier = Modifier.weight(1f).height(50.dp)
-                    ) {
-                        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(selectedDate, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    OutlinedCard(
-                        onClick = { timePickerDialog.show() },
-                        modifier = Modifier.weight(1f).height(50.dp)
-                    ) {
-                        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(selectedTime, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
+                // Service Details
                 OutlinedTextField(
                     value = serviceDetails,
                     onValueChange = { serviceDetails = it },
-                    label = { Text("تفاصيل وملاحظات الحجز") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp),
-                    maxLines = 3
+                    label = { Text("تفاصيل الخدمة المطلوبة", color = Color(0xFF94A3B8)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF00E5FF),
+                        unfocusedBorderColor = Color(0xFF475569)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    minLines = 2
                 )
 
-                AnimatedVisibility(visible = errorMessage != null) {
-                    Text(
-                        text = errorMessage ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                // Password / PIN Field for Verification
+                if (!isAdmin) {
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { passwordInput = it; errorMessage = null },
+                        label = { Text("رمز PIN أو كلمة مرور الحجز (4 أرقام)", color = Color(0xFF94A3B8)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF00E5FF),
+                            unfocusedBorderColor = Color(0xFF475569)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     )
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (!canModify && !isAdmin) {
-                        errorMessage = "لا يمكن التعديل: تبقى أقل من 8 ساعات على الموعد."
-                        return@Button
+
+                errorMessage?.let { msg ->
+                    Text(text = msg, color = Color(0xFFEF4444), fontSize = 12.sp)
+                }
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF94A3B8))
+                    ) {
+                        Text("إلغاء")
                     }
 
-                    if (!isAdmin) {
-                        val cleanExpectedPhone = booking.clientPhone.ifBlank { booking.customerPhone }.trim()
-                        val cleanInputPhone = clientPhoneInput.trim()
-                        val cleanExpectedPass = booking.bookingPassword.ifBlank { booking.pinCode }.trim()
-                        val cleanInputPass = passwordInput.trim()
+                    Button(
+                        onClick = {
+                            if (!canModify && !isAdmin) {
+                                errorMessage = "لا يمكن التعديل إذا تبقى أقل من 8 ساعات على الموعد."
+                                return@Button
+                            }
+                            if (passwordInput.isBlank() && !isAdmin) {
+                                errorMessage = "يرجى إدخال رمز PIN للحجز"
+                                return@Button
+                            }
 
-                        if (cleanInputPhone.isBlank() || cleanInputPass.isBlank()) {
-                            errorMessage = "يرجى أدخال رقم الهاتف وكلمة سر الحجز للتحقق"
-                            return@Button
-                        }
-
-                        if (cleanInputPhone != cleanExpectedPhone) {
-                            errorMessage = "رقم الهاتف غير مطابق لرقم الحجز المسجل"
-                            return@Button
-                        }
-
-                        if (cleanInputPass != cleanExpectedPass) {
-                            errorMessage = "كلمة المرور غير صحيحة"
-                            return@Button
-                        }
+                            val updated = booking.copy(
+                                customerName = fullName,
+                                fullName = fullName,
+                                clientName = fullName,
+                                fullAddress = fullAddress,
+                                customerArea = fullAddress,
+                                clientAddress = fullAddress,
+                                date = selectedDate,
+                                dateString = selectedDate,
+                                time = selectedTime,
+                                timeString = selectedTime,
+                                serviceDetails = serviceDetails,
+                                serviceType = serviceDetails,
+                                scheduledAt = BookingUtils.parseScheduledTimestamp(selectedDate, selectedTime)
+                            )
+                            onConfirmEdit(updated, passwordInput)
+                        },
+                        enabled = (!isLocked || isAdmin),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))
+                    ) {
+                        Text("حفظ التعديلات", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
                     }
-
-                    val updatedScheduledTs = BookingUtils.parseScheduledTimestamp(selectedDate, selectedTime)
-                    val updatedBooking = booking.copy(
-                        fullName = fullName.trim(),
-                        customerName = fullName.trim(),
-                        fullAddress = fullAddress.trim(),
-                        customerArea = fullAddress.trim(),
-                        date = selectedDate,
-                        dateString = selectedDate,
-                        time = selectedTime,
-                        timeString = selectedTime,
-                        scheduledAt = updatedScheduledTs,
-                        serviceDetails = serviceDetails.trim(),
-                        updatedAt = System.currentTimeMillis()
-                    )
-
-                    onConfirmEdit(updatedBooking, passwordInput)
-                },
-                enabled = canModify || isAdmin
-            ) {
-                Text("حفظ التعديلات")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("إلغاء")
+                }
             }
         }
-    )
+    }
 }
