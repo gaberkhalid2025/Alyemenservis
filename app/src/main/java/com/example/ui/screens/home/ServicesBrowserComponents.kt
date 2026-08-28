@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -544,73 +545,170 @@ fun ServicesCategoryChips(
             }
         }
 
-        Row(
-            modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val isAllSelected = selectedCategory == null
-            Surface(
-                modifier = Modifier
-                        .clickable { onCategorySelect(null) }
-                        .testTag("category_chip_all"),
-                shape = RoundedCornerShape(20.dp),
-                color = if (isAllSelected) themeColors.accent else themeColors.surface,
-                border = BorderStroke(1.dp, if (isAllSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
+        if (selectedCategory == null) {
+            val chunkedCats = remember(displayCats) { displayCats.chunked(2) }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "✨ الكل",
-                    color = if (isAllSelected) Color.Black else Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                )
-            }
+                chunkedCats.forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowItems.forEach { cat ->
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        if (cat.id == "stores" || cat.parentId == "stores" || cat.id == "restaurants") {
+                                            onTabChange(storesTabName)
+                                            onCategorySelect(cat.id)
+                                        } else if (cat.id == "realestate" || cat.parentId == "realestate" || cat.id == "jobs") {
+                                            onTabChange(propertiesTabName)
+                                            onCategorySelect(cat.id)
+                                        } else {
+                                            onTabChange("الرئيسية")
+                                            onCategorySelect(cat.id)
+                                        }
+                                    }
+                                    .testTag("category_grid_${cat.id}"),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFF112211), // Elegant deep emerald background
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFFFFD700), // Gold
+                                            Color(0xFF10B981)  // Emerald
+                                        )
+                                    )
+                                ),
+                                shadowElevation = 6.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // 3D-styled Icon Container
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFF1A3322),
+                                        border = BorderStroke(1.5.dp, Color(0xFFFFD700)),
+                                        shadowElevation = 4.dp,
+                                        modifier = Modifier.size(42.dp)
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            Text(
+                                                text = cat.icon,
+                                                fontSize = 20.sp,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
 
-            displayCats.forEach { cat ->
-                val isSelected = selectedCategory == cat.id
-                val hasSub = categories.any { it.parentId == cat.id }
-                Surface(
-                    modifier = Modifier
-                            .clickable {
-                                if (cat.id == "stores" || cat.parentId == "stores" || cat.id == "restaurants") {
-                                    onTabChange(storesTabName)
-                                    onCategorySelect(cat.id)
-                                } else if (cat.id == "realestate" || cat.parentId == "realestate" || cat.id == "jobs") {
-                                    onTabChange(propertiesTabName)
-                                    onCategorySelect(cat.id)
-                                } else {
-                                    onTabChange("الرئيسية")
-                                    if (isSelected) onCategorySelect(null)
-                                    else onCategorySelect(cat.id)
+                                    Column(
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = cat.name,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        val subCount = categories.count { it.parentId == cat.id }
+                                        Text(
+                                            text = if (subCount > 0) "📌 $subCount أقسام" else "💼 دليل الخدمة",
+                                            color = Color(0xFF10B981), // Emerald Accent
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
-                            .testTag("category_chip_${cat.id}"),
+                        }
+                        // Handle odd number of items by adding an empty spacer
+                        if (rowItems.size < 2) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val isAllSelected = selectedCategory == null
+                Surface(
+                    modifier = Modifier
+                            .clickable { onCategorySelect(null) }
+                            .testTag("category_chip_all"),
                     shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) themeColors.accent else themeColors.surface,
-                    border = BorderStroke(1.dp, if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
+                    color = if (isAllSelected) themeColors.accent else themeColors.surface,
+                    border = BorderStroke(1.dp, if (isAllSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    Text(
+                        text = "✨ الكل",
+                        color = if (isAllSelected) Color.Black else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    )
+                }
+
+                displayCats.forEach { cat ->
+                    val isSelected = selectedCategory == cat.id
+                    val hasSub = categories.any { it.parentId == cat.id }
+                    Surface(
+                        modifier = Modifier
+                                .clickable {
+                                    if (cat.id == "stores" || cat.parentId == "stores" || cat.id == "restaurants") {
+                                        onTabChange(storesTabName)
+                                        onCategorySelect(cat.id)
+                                    } else if (cat.id == "realestate" || cat.parentId == "realestate" || cat.id == "jobs") {
+                                        onTabChange(propertiesTabName)
+                                        onCategorySelect(cat.id)
+                                    } else {
+                                        onTabChange("الرئيسية")
+                                        if (isSelected) onCategorySelect(null)
+                                        else onCategorySelect(cat.id)
+                                    }
+                                }
+                                .testTag("category_chip_${cat.id}"),
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) themeColors.accent else themeColors.surface,
+                        border = BorderStroke(1.dp, if (isSelected) Color.Transparent else themeColors.accent.copy(alpha = 0.3f))
                     ) {
-                        Text(cat.icon, fontSize = 12.sp)
-                        Text(
-                            text = cat.name,
-                            color = if (isSelected) Color.Black else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (hasSub) {
-                            Icon(
-                                imageVector = if (isSelected) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = if (isSelected) Color.Black else Color.Gray,
-                                modifier = Modifier.size(14.dp)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(cat.icon, fontSize = 12.sp)
+                            Text(
+                                text = cat.name,
+                                color = if (isSelected) Color.Black else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
+                            if (hasSub) {
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = if (isSelected) Color.Black else Color.Gray,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                 }

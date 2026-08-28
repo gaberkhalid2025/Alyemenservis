@@ -138,20 +138,25 @@ fun Luxury3DNavIcon(
             }
 
             if (badgeCount > 0) {
-                Box(
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF10B981), // Emerald Green
+                    border = BorderStroke(1.dp, Color(0xFFFFD700)), // Gold border
+                    shadowElevation = 3.dp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .offset(x = 4.dp, y = (-2).dp)
-                        .size(13.dp)
-                        .background(Color.Red, CircleShape),
-                    contentAlignment = Alignment.Center
+                        .size(15.dp)
                 ) {
-                    Text(
-                        text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                        color = Color.White,
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Text(
+                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                            color = Color(0xFFFFD700), // Gold text
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }

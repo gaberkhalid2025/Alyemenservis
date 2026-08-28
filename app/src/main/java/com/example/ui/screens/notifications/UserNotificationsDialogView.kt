@@ -51,19 +51,21 @@ fun UserNotificationsBottomSheet(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    // Direct Flow Collection without remember
-    val allNotifications by viewModel.notifications.collectAsState()
-    val userPhone by viewModel.currentUserPhone.collectAsState()
-    val userId by viewModel.currentUserId.collectAsState()
-    val adminRole by viewModel.adminRole.collectAsState()
-    val readIds by viewModel.readNotificationIds.collectAsState()
+    val notifViewModel = remember(viewModel) { NotificationViewModel(viewModel) }
 
-    var activeTab by remember { mutableStateOf("ALL") } // "ALL", "UNREAD", "IMPORTANT", "READ"
-    var selectedTypeFilter by remember { mutableStateOf("ALL") } // "ALL", "BOOKING", "MESSAGE", "SPECIAL_OFFER", "SYSTEM"
+    // Flow Collections via NotificationViewModel
+    val allNotifications by notifViewModel.notifications.collectAsState()
+    val userPhone by notifViewModel.currentUserPhone.collectAsState()
+    val userId by notifViewModel.currentUserId.collectAsState()
+    val adminRole by notifViewModel.adminRole.collectAsState()
+    val readIds by notifViewModel.readNotificationIds.collectAsState()
+
+    val activeTab by notifViewModel.activeTab.collectAsState()
+    val selectedTypeFilter by notifViewModel.selectedTypeFilter.collectAsState()
     var showClearAllConfirmDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        viewModel.loadReadNotifications(context)
+        notifViewModel.loadReadNotifications(context)
     }
 
     // High performance filtering using derivedStateOf
@@ -102,7 +104,7 @@ fun UserNotificationsBottomSheet(
                     "ADMIN_ONLY" -> false
                     "ALL_REGISTERED_USERS" -> isRegistered
                     "SPECIFIC_ROLES", "ROLE" -> {
-                        val isProvider = viewModel.isProviderUser
+                        val isProvider = notifViewModel.isProviderUser
                         notif.targetRoles.any { r ->
                             when (r.uppercase()) {
                                 "TECHNICIAN", "PROVIDER" -> isProvider
@@ -120,7 +122,7 @@ fun UserNotificationsBottomSheet(
                         (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId))
                     }
                     "REGION" -> {
-                        val currentRes = viewModel.currentUserResidence.value
+                        val currentRes = notifViewModel.currentUserResidence.value
                         notif.targetValue.isEmpty() || currentRes.contains(notif.targetValue)
                     }
                     "CATEGORY" -> true
@@ -237,9 +239,7 @@ fun UserNotificationsBottomSheet(
                         if (unreadCount > 0) {
                             FilledTonalButton(
                                 onClick = {
-                                    validAndFilteredNotifs.forEach { notif ->
-                                        viewModel.markNotificationAsRead(context, notif.id)
-                                    }
+                                    notifViewModel.markAllAsRead(context, validAndFilteredNotifs)
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar("تم تحديد جميع الإشعارات كمقروءة بنجاح ✓")
                                     }
@@ -288,10 +288,10 @@ fun UserNotificationsBottomSheet(
 
                 NotificationFilterTabs(
                     activeTab = activeTab,
-                    onTabSelected = { activeTab = it },
+                    onTabSelected = { notifViewModel.setActiveTab(it) },
                     tabCounts = tabCounts,
                     selectedTypeFilter = selectedTypeFilter,
-                    onTypeFilterSelected = { selectedTypeFilter = it },
+                    onTypeFilterSelected = { notifViewModel.setSelectedTypeFilter(it) },
                     themeColors = themeColors
                 )
 
@@ -318,17 +318,17 @@ fun UserNotificationsBottomSheet(
                                 notification = notif,
                                 isUnread = !readIds.contains(notif.id),
                                 onCardClick = {
-                                    viewModel.markNotificationAsRead(context, notif.id)
+                                    notifViewModel.markNotificationAsRead(context, notif.id)
                                 },
                                 onDeleteClick = {
-                                    viewModel.deleteNotification(notif.id)
+                                    notifViewModel.deleteNotification(notif.id)
                                     coroutineScope.launch {
                                         val res = snackbarHostState.showSnackbar(
                                             message = "تم حذف الإشعار",
                                             actionLabel = "تراجع"
                                         )
                                         if (res == SnackbarResult.ActionPerformed) {
-                                            viewModel.addNotification(
+                                            notifViewModel.addNotification(
                                                 title = notif.title,
                                                 message = notif.message,
                                                 targetType = notif.targetType,
@@ -359,7 +359,7 @@ fun UserNotificationsBottomSheet(
         cancelLabel = "إلغاء",
         isDestructive = true,
         onConfirm = {
-            viewModel.deleteAllNotifications()
+            notifViewModel.deleteAllNotifications()
             coroutineScope.launch {
                 snackbarHostState.showSnackbar("تم مسح جميع الإشعارات بنجاح 🗑️")
             }

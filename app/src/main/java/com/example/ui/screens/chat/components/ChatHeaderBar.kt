@@ -75,12 +75,16 @@ fun ChatHeaderBar(
                 }
             }
 
-            // Online green dot
-            if (presence?.isOnline == true) {
+            val isOnline = presence?.isOnline == true
+            val isAway = !isOnline && presence != null && (System.currentTimeMillis() - presence.lastSeen < 15 * 60 * 1000L)
+
+            // Online/Away indicator dot
+            if (isOnline || isAway) {
+                val dotColor = if (isOnline) Color(0xFF00C853) else Color(0xFFFFB300)
                 Box(
                     modifier = Modifier
                         .size(12.dp)
-                        .background(Color(0xFF00C853), CircleShape)
+                        .background(dotColor, CircleShape)
                         .border(2.dp, Color(0xFF142030), CircleShape)
                         .align(Alignment.BottomEnd)
                 )
@@ -99,9 +103,13 @@ fun ChatHeaderBar(
                 overflow = TextOverflow.Ellipsis
             )
 
+            val isOnline = presence?.isOnline == true
+            val isAway = !isOnline && presence != null && (System.currentTimeMillis() - presence.lastSeen < 15 * 60 * 1000L)
+
             val statusText = when {
                 isTyping -> "يكتب الآن..."
-                presence?.isOnline == true -> "متصل الآن"
+                isOnline -> "متصل الآن"
+                isAway -> "نشط مؤخراً"
                 presence != null && presence.lastSeen > 0 -> {
                     val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
                     "آخر ظهور ${sdf.format(Date(presence.lastSeen))}"
@@ -112,7 +120,7 @@ fun ChatHeaderBar(
             Text(
                 text = statusText,
                 fontSize = 11.sp,
-                color = if (isTyping || presence?.isOnline == true) Color(0xFF64FFDA) else Color.Gray
+                color = if (isTyping || isOnline) Color(0xFF64FFDA) else if (isAway) Color(0xFFFFB300) else Color.Gray
             )
         }
 

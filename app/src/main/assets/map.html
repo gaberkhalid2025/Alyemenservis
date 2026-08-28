@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, #map { height: 100%; width: 100%; background: #0B0F19; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+        .leaflet-tile-container img { filter: brightness(0.88) contrast(1.08); }
+        .leaflet-popup-content-wrapper { background: #1E293B !important; color: #FFFFFF !important; border: 2px solid #00E5FF; border-radius: 16px; padding: 4px; box-shadow: 0 12px 30px rgba(0,0,0,0.8); }
+        .leaflet-popup-tip { background: #1E293B !important; }
+        .popup-card { font-family: system-ui, -apple-system, sans-serif; text-align: right; direction: rtl; color: #FFFFFF; padding: 8px 6px; min-width: 210px; }
+        .popup-cat-badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.1); margin-bottom: 4px; font-weight: 600; }
+        .popup-approx-badge { display: inline-block; font-size: 9.5px; padding: 1px 6px; border-radius: 8px; background: rgba(245,158,11,0.2); color: #F59E0B; margin-bottom: 4px; }
+        .popup-title { font-size: 15px; font-weight: 800; color: #00E5FF; margin-bottom: 4px; line-height: 1.3; }
+        .popup-spec { font-size: 12px; color: #CBD5E1; margin-bottom: 6px; }
+        .popup-meta { display: flex; flex-direction: column; gap: 3px; font-size: 11px; margin-bottom: 10px; color: #94A3B8; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 6px 0; }
+        .popup-meta-row { display: flex; justify-content: space-between; }
+        .popup-eta { color: #38BDF8; font-weight: bold; }
+        .popup-buttons { display: flex; flex-direction: column; gap: 6px; }
+        .popup-buttons-row { display: flex; gap: 6px; }
+        .btn-details { width: 100%; background: linear-gradient(135deg, #00E5FF, #00B4D8); color: #0F172A; border: none; padding: 9px 10px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .btn-call { flex: 1; background: #10B981; color: #FFFFFF; border: none; padding: 8px 6px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; text-align: center; text-decoration: none; display: inline-block; }
+        .btn-nav { flex: 1; background: #3B82F6; color: #FFFFFF; border: none; padding: 8px 6px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; text-align: center; }
+        .custom-pin { width: 44px; height: 44px; background: #1E293B; border-width: 3px; border-style: solid; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .custom-pin:active, .custom-pin:hover { transform: scale(1.22); }
+        .user-marker-container { position: relative; width: 32px; height: 32px; }
+        .user-marker { width: 22px; height: 22px; background: #00E5FF; border: 3px solid #FFFFFF; border-radius: 50%; box-shadow: 0 0 20px #00E5FF; position: absolute; top: 5px; left: 5px; z-index: 2; }
+        .user-pulse { position: absolute; width: 46px; height: 46px; background: rgba(0, 229, 255, 0.4); border-radius: 50%; top: -7px; left: -7px; animation: pulseRing 2s infinite ease-out; }
+        @keyframes pulseRing { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+        .marker-cluster-small { background-color: rgba(0, 229, 255, 0.4); }
+        .marker-cluster-small div { background-color: #00E5FF; color: #0F172A; font-weight: 800; }
+        .marker-cluster-medium { background-color: rgba(245, 158, 11, 0.4); }
+        .marker-cluster-medium div { background-color: #F59E0B; color: #0F172A; font-weight: 800; }
+        .marker-cluster-large { background-color: rgba(236, 72, 153, 0.4); }
+        .marker-cluster-large div { background-color: #EC4899; color: #FFFFFF; font-weight: 800; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        var userLat = _USER_LAT_;
+        var userLng = _USER_LNG_;
+        var map = null;
+        var clusterGroup = null;
+
+        function calculateDistKm(lat1, lon1, lat2, lon2) {
+            var R = 6371;
+            var dLat = (lat2-lat1) * Math.PI / 180;
+            var dLon = (lon2-lon1) * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        function computeEtaText(distKm) {
+            if (distKm < 1.0) {
+                var mins = Math.max(1, Math.round(distKm / 5.0 * 60));
+                return '⏱️ ~ ' + mins + ' دقيقة سيراً (' + Math.round(distKm * 1000) + ' م)';
+            } else {
+                var mins = Math.max(1, Math.round(distKm / 35.0 * 60));
+                return '🚘 ~ ' + mins + ' دقيقة بالسيارة (' + distKm.toFixed(1) + ' كم)';
+            }
+        }
+
+        try {
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([userLat, userLng], 14);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                subdomains: 'abcd'
+            }).addTo(map);
+
+            var userIcon = L.divIcon({
+                className: 'user-marker-container',
+                html: '<div class="user-pulse"></div><div class="user-marker"></div>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+            L.marker([userLat, userLng], {icon: userIcon, zIndexOffset: 1000}).addTo(map)
+                .bindPopup("<div class='popup-card'><b style='color:#00E5FF;'>📍 موقعك الحالي المباشر</b><br/><span style='font-size:11px;color:#94A3B8;'>نقطة ارتكاز البحث وحساب المسافات</span></div>");
+
+            clusterGroup = (typeof L.markerClusterGroup === 'function') ? L.markerClusterGroup({
+                chunkedLoading: true,
+                maxClusterRadius: 40,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false
+            }) : L.layerGroup();
+
+            window.updateMapMarkers = function(rawMarkers) {
+                clusterGroup.clearLayers();
+                var bounds = [ [userLat, userLng] ];
+
+                rawMarkers.forEach(function(item) {
+                    if (!item.lat || !item.lng) return;
+                    var distNum = calculateDistKm(userLat, userLng, item.lat, item.lng);
+                    var etaString = computeEtaText(distNum);
+
+                    var customIcon = L.divIcon({
+                        className: 'custom-pin-wrapper',
+                        html: '<div class="custom-pin" style="border-color:' + item.badgeColor + '; box-shadow: 0 0 12px ' + item.badgeColor + '66;">' + item.emoji + '</div>',
+                        iconSize: [44, 44],
+                        iconAnchor: [22, 22]
+                    });
+
+                    var m = L.marker([item.lat, item.lng], {icon: customIcon});
+                    bounds.push([item.lat, item.lng]);
+
+                    var approxBadge = item.isApprox ? '<div class="popup-approx-badge">📍 موقع تقريبي</div>' : '';
+                    var callBtnHtml = item.phone ? '<a href="tel:' + item.phone + '" class="btn-call">📞 اتصال</a>' : '';
+                    var navBtnHtml = '<button onclick="AndroidBridge.openNavigation(' + item.lat + ',' + item.lng + ',\'' + item.name + '\')" class="btn-nav">🗺️ اتجاهات</button>';
+
+                    var popupHtml = "<div class='popup-card'>" +
+                        "<div class='popup-cat-badge' style='color:" + item.badgeColor + "; border: 1px solid " + item.badgeColor + "44;'>" + item.serviceCategory + "</div>" +
+                        approxBadge +
+                        "<div class='popup-title'>" + item.name + "</div>" +
+                        "<div class='popup-spec'>" + item.spec + "</div>" +
+                        "<div class='popup-meta'>" +
+                            "<div class='popup-meta-row'><span>⭐ تقييم: " + item.rating + "</span><span>" + item.status + "</span></div>" +
+                            "<div class='popup-eta'>" + etaString + "</div>" +
+                        "</div>" +
+                        "<div class='popup-buttons'>" +
+                            "<button onclick=\"AndroidBridge.onMarkerClicked('" + item.type + "', '" + item.id + "')\" class='btn-details'>عرض التفاصيل والطلب 🔍</button>" +
+                            "<div class='popup-buttons-row'>" +
+                                callBtnHtml +
+                                navBtnHtml +
+                            "</div>" +
+                        "</div>" +
+                        "</div>";
+
+                    m.bindPopup(popupHtml);
+                    clusterGroup.addLayer(m);
+                });
+
+                map.addLayer(clusterGroup);
+            };
+
+            window.updateMapMarkers([_MARKERS_JSON_]);
+
+            if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+                window.AndroidBridge.onMapReady();
+            }
+        } catch(e) {
+            console.error("Leaflet init error:", e);
+            if (window.AndroidBridge && window.AndroidBridge.onMapLoadFailed) {
+                window.AndroidBridge.onMapLoadFailed();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -22,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.util.Transaction
 import com.example.util.WalletManager
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
@@ -30,7 +29,8 @@ import java.util.*
 
 /**
  * 💳 TransactionHistoryScreen
- * شاشة عرض سجل المعاملات المالية، رصيد المحفظة، الإيداعات والسحوبات مع التصفية والبحث وتصدير التقارير
+ * Displays transaction history logs, wallet balance, deposits, withdrawals and filters.
+ * Refactored using MVVM to utilize [TransactionHistoryViewModel].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,51 +44,18 @@ fun TransactionHistoryScreen(
     val walletManager = remember { WalletManager(context) }
     val numberFormat = remember { DecimalFormat("#,###.##") }
 
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedTypeFilter by remember { mutableStateOf("ALL") }
-    var selectedStatusFilter by remember { mutableStateOf("ALL") }
+    val walletId = remember(currentUserId) { "wallet_$currentUserId" }
+    val viewModel = remember(currentUserId) {
+        TransactionHistoryViewModel(walletManager, walletId)
+    }
+
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedTypeFilter by viewModel.typeFilter.collectAsState()
+    val selectedStatusFilter by viewModel.statusFilter.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+
     var showDepositDialog by remember { mutableStateOf(false) }
     var depositAmountText by remember { mutableStateOf("") }
-
-    val walletId = remember(currentUserId) { "wallet_$currentUserId" }
-    var balance by remember { mutableDoubleStateOf(walletManager.getBalance(walletId)) }
-
-    val allTransactions = remember(balance) {
-        walletManager.getTransactions(walletId)
-    }
-
-    val totalDeposits = remember(allTransactions) {
-        allTransactions.filter { it.type == "DEPOSIT" && it.status == "COMPLETED" }.sumOf { it.amount }
-    }
-
-    val totalWithdrawals = remember(allTransactions) {
-        allTransactions.filter { (it.type == "WITHDRAWAL" || it.type == "PAYMENT") && it.status == "COMPLETED" }.sumOf { it.amount }
-    }
-
-    val filteredTransactions = remember(allTransactions, searchQuery, selectedTypeFilter, selectedStatusFilter) {
-        allTransactions.filter { tx ->
-            val matchesType = when (selectedTypeFilter) {
-                "DEPOSIT" -> tx.type == "DEPOSIT"
-                "WITHDRAWAL" -> tx.type == "WITHDRAWAL"
-                "PAYMENT" -> tx.type == "PAYMENT"
-                "TRANSFER" -> tx.type == "TRANSFER"
-                "REFUND" -> tx.type == "REFUND"
-                else -> true
-            }
-            val matchesStatus = when (selectedStatusFilter) {
-                "COMPLETED" -> tx.status == "COMPLETED"
-                "PENDING" -> tx.status == "PENDING"
-                "FAILED" -> tx.status == "FAILED"
-                "CANCELLED" -> tx.status == "CANCELLED"
-                else -> true
-            }
-            val matchesSearch = searchQuery.isBlank() ||
-                    tx.id.contains(searchQuery, ignoreCase = true) ||
-                    tx.note.contains(searchQuery, ignoreCase = true)
-
-            matchesType && matchesStatus && matchesSearch
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -103,8 +70,11 @@ fun TransactionHistoryScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        val report = "تقرير المعاملات المالية\nالرصيد: ${numberFormat.format(balance)} ريال\nإجمالي الإيداعات: ${numberFormat.format(totalDeposits)} ريال\nإجمالي السحوبات: ${numberFormat.format(totalWithdrawals)} ريال"
-                        Toast.makeText(context, "تم تصدير التقرير المالي بنجاح", Toast.LENGTH_LONG).show()
+                        if (uiState is TransactionHistoryUiState.Success) {
+                            val successState = uiState as TransactionHistoryUiState.Success
+                            val report = "تقرير المعاملات المالية\nالرصيد: ${numberFormat.format(successState.balance)} ريال\nإجمالي الإيداعات: ${numberFormat.format(successState.totalDeposits)} ريال\nإجمالي السحوبات: ${numberFormat.format(successState.totalWithdrawals)} ريال"
+                            Toast.makeText(context, "تم تصدير التقرير المالي بنجاح", Toast.LENGTH_LONG).show()
+                        }
                     }) {
                         Icon(Icons.Default.Share, contentDescription = "تصدير التقرير", tint = Color(0xFF00668B))
                     }
@@ -115,268 +85,306 @@ fun TransactionHistoryScreen(
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(Color(0xFFF8FAFC))
         ) {
-            // بطاقة الرصيد والإحصائيات الرئيسية
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF00668B)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("الرصيد الحالي بالمحفظة", color = Color(0xFFE0F2FE), fontSize = 13.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = numberFormat.format(balance),
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("ريال يمني", fontSize = 14.sp, color = Color(0xFFBAE6FD), modifier = Modifier.padding(bottom = 4.dp))
+            when (val state = uiState) {
+                is TransactionHistoryUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0xFF00668B))
+                    }
+                }
+                is TransactionHistoryUiState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(state.message, color = Color.Red, fontSize = 14.sp)
+                    }
+                }
+                is TransactionHistoryUiState.Success -> {
+                    val filteredTransactions = remember(state.transactions, searchQuery, selectedTypeFilter, selectedStatusFilter) {
+                        state.transactions.filter { tx ->
+                            val matchesType = when (selectedTypeFilter) {
+                                "DEPOSIT" -> tx.type == "DEPOSIT"
+                                "WITHDRAWAL" -> tx.type == "WITHDRAWAL"
+                                "PAYMENT" -> tx.type == "PAYMENT"
+                                "TRANSFER" -> tx.type == "TRANSFER"
+                                "REFUND" -> tx.type == "REFUND"
+                                else -> true
                             }
-                        }
+                            val matchesStatus = when (selectedStatusFilter) {
+                                "COMPLETED" -> tx.status == "COMPLETED"
+                                "PENDING" -> tx.status == "PENDING"
+                                "FAILED" -> tx.status == "FAILED"
+                                "CANCELLED" -> tx.status == "CANCELLED"
+                                else -> true
+                            }
+                            val matchesSearch = searchQuery.isBlank() ||
+                                    tx.id.contains(searchQuery, ignoreCase = true) ||
+                                    tx.note.contains(searchQuery, ignoreCase = true)
 
-                        Button(
-                            onClick = { showDepositDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                            shape = RoundedCornerShape(20.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF00668B), modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("شحن رصيد", color = Color(0xFF00668B), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            matchesType && matchesStatus && matchesSearch
                         }
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.2f))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // إجمالي الإيداعات
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .background(Color(0xFF4CAF50).copy(alpha = 0.3f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF81C784), modifier = Modifier.size(16.dp))
-                            }
-                            Column {
-                                Text("إجمالي الإيداعات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
-                                Text("${numberFormat.format(totalDeposits)} ريال", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-
-                        // إجمالي السحوبات والمدفوعات
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .background(Color(0xFFE53935).copy(alpha = 0.3f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFEF9A9A), modifier = Modifier.size(16.dp))
-                            }
-                            Column {
-                                Text("إجمالي السحوبات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
-                                Text("${numberFormat.format(totalWithdrawals)} ريال", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // شريط البحث
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                placeholder = { Text("بحث برقم المعاملة أو الوصف...", fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF64748B)) },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF00668B),
-                    unfocusedBorderColor = Color(0xFFCBD5E1)
-                )
-            )
-
-            // فلاتر النوع
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val typeFilters = listOf(
-                    "ALL" to "الكل",
-                    "DEPOSIT" to "إيداع 🟢",
-                    "PAYMENT" to "دفع 🔴",
-                    "WITHDRAWAL" to "سحب 💸",
-                    "TRANSFER" to "تحويل 🔁",
-                    "REFUND" to "استرداد ↩️"
-                )
-                items(typeFilters) { (key, label) ->
-                    val isSelected = selectedTypeFilter == key
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { selectedTypeFilter = key },
-                        label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF00668B),
-                            selectedLabelColor = Color.White
-                        )
-                    )
-                }
-            }
-
-            // قائمة المعاملات
-            if (filteredTransactions.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            tint = Color.LightGray,
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Text(
-                            "لا توجد معاملات مطابقة",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Gray
-                        )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(filteredTransactions, key = { it.id }) { tx ->
-                        val isPositive = tx.type == "DEPOSIT" || tx.type == "REFUND"
-                        val formattedDate = remember(tx.timestamp) {
-                            SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale("ar")).format(Date(tx.timestamp))
-                        }
-
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Card with balance & statistics
                         Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF00668B)
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
                         ) {
-                            Row(
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("الرصيد الحالي بالمحفظة", color = Color(0xFFE0F2FE), fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text(
+                                                text = numberFormat.format(state.balance),
+                                                fontSize = 28.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("ريال يمني", fontSize = 14.sp, color = Color(0xFFBAE6FD), modifier = Modifier.padding(bottom = 4.dp))
+                                        }
+                                    }
+
+                                    Button(
+                                        onClick = { showDepositDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                        shape = RoundedCornerShape(20.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF00668B), modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("شحن رصيد", color = Color(0xFF00668B), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.2f))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // Total Deposits
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(Color(0xFF4CAF50).copy(alpha = 0.3f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF81C784), modifier = Modifier.size(16.dp))
+                                        }
+                                        Column {
+                                            Text("إجمالي الإيداعات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
+                                            Text("${numberFormat.format(state.totalDeposits)} ريال", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        }
+                                    }
+
+                                    // Total Withdrawals
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(Color(0xFFE53935).copy(alpha = 0.3f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFEF9A9A), modifier = Modifier.size(16.dp))
+                                        }
+                                        Column {
+                                            Text("إجمالي السحوبات", fontSize = 11.sp, color = Color(0xFFE0F2FE))
+                                            Text("${numberFormat.format(state.totalWithdrawals)} ريال", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Search
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            placeholder = { Text("بحث برقم المعاملة أو الوصف...", fontSize = 13.sp) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF64748B)) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF00668B),
+                                unfocusedBorderColor = Color(0xFFCBD5E1)
+                            )
+                        )
+
+                        // Filters row
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val typeFilters = listOf(
+                                "ALL" to "الكل",
+                                "DEPOSIT" to "إيداع 🟢",
+                                "PAYMENT" to "دفع 🔴",
+                                "WITHDRAWAL" to "سحب 💸",
+                                "TRANSFER" to "تحويل 🔁",
+                                "REFUND" to "استرداد ↩️"
+                            )
+                            items(typeFilters) { (key, label) ->
+                                val isSelected = selectedTypeFilter == key
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { viewModel.setTypeFilter(key) },
+                                    label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFF00668B),
+                                        selectedLabelColor = Color.White
+                                    )
+                                )
+                            }
+                        }
+
+                        // Transaction List
+                        if (filteredTransactions.isEmpty()) {
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    .fillMaxSize()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                // أيقونة نوع المعاملة
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .background(
-                                            if (isPositive) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                                            CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        if (isPositive) Icons.Default.Check else Icons.Default.Close,
+                                        Icons.Default.Info,
                                         contentDescription = null,
-                                        tint = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828),
-                                        modifier = Modifier.size(22.dp)
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.size(64.dp)
                                     )
-                                }
-
-                                // تفاصيل المعاملة
-                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = tx.note.ifEmpty { "معاملة مالية" },
+                                        "لا توجد معاملات مطابقة",
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = Color(0xFF1E293B),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = formattedDate,
-                                        fontSize = 11.sp,
                                         color = Color.Gray
                                     )
-                                    Text(
-                                        text = "رقم المرجع: ${tx.id}",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFF94A3B8)
-                                    )
                                 }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(filteredTransactions, key = { it.id }) { tx ->
+                                    val isPositive = tx.type == "DEPOSIT" || tx.type == "REFUND"
+                                    val formattedDate = remember(tx.timestamp) {
+                                        SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale("ar")).format(Date(tx.timestamp))
+                                    }
 
-                                // المبلغ والحالة
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "${if (isPositive) "+" else "-"}${numberFormat.format(tx.amount)} ريال",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828)
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = when (tx.status.uppercase()) {
-                                            "COMPLETED" -> Color(0xFFE8F5E9)
-                                            "PENDING" -> Color(0xFFFFF3E0)
-                                            "CANCELLED" -> Color(0xFFECEFF1)
-                                            else -> Color(0xFFFFEBEE)
-                                        }
+                                    Card(
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text(
-                                            text = when (tx.status.uppercase()) {
-                                                "COMPLETED" -> "مكتمل"
-                                                "PENDING" -> "قيد المعالجة"
-                                                "CANCELLED" -> "ملغي"
-                                                else -> "فاشل"
-                                            },
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = when (tx.status.uppercase()) {
-                                                "COMPLETED" -> Color(0xFF2E7D32)
-                                                "PENDING" -> Color(0xFFEF6C00)
-                                                "CANCELLED" -> Color(0xFF546E7A)
-                                                else -> Color(0xFFC62828)
-                                            },
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .background(
+                                                        if (isPositive) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                                        CircleShape
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    if (isPositive) Icons.Default.Check else Icons.Default.Close,
+                                                    contentDescription = null,
+                                                    tint = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                                    modifier = Modifier.size(22.dp)
+                                                )
+                                            }
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = tx.note.ifEmpty { "معاملة مالية" },
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    color = Color(0xFF1E293B),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = formattedDate,
+                                                    fontSize = 11.sp,
+                                                    color = Color.Gray
+                                                )
+                                                Text(
+                                                    text = "رقم المرجع: ${tx.id}",
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFF94A3B8)
+                                                )
+                                            }
+
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                Text(
+                                                    text = "${if (isPositive) "+" else "-"}${numberFormat.format(tx.amount)} ريال",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 15.sp,
+                                                    color = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = when (tx.status.uppercase()) {
+                                                        "COMPLETED" -> Color(0xFFE8F5E9)
+                                                        "PENDING" -> Color(0xFFFFF3E0)
+                                                        "CANCELLED" -> Color(0xFFECEFF1)
+                                                        else -> Color(0xFFFFEBEE)
+                                                    }
+                                                ) {
+                                                    Text(
+                                                        text = when (tx.status.uppercase()) {
+                                                            "COMPLETED" -> "مكتمل"
+                                                            "PENDING" -> "قيد المعالجة"
+                                                            "CANCELLED" -> "ملغي"
+                                                            else -> "فاشل"
+                                                        },
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = when (tx.status.uppercase()) {
+                                                            "COMPLETED" -> Color(0xFF2E7D32)
+                                                            "PENDING" -> Color(0xFFEF6C00)
+                                                            "CANCELLED" -> Color(0xFF546E7A)
+                                                            else -> Color(0xFFC62828)
+                                                        },
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -387,7 +395,7 @@ fun TransactionHistoryScreen(
         }
     }
 
-    // نافذة إيداع رصيد فوري
+    // Deposit dialog
     if (showDepositDialog) {
         AlertDialog(
             onDismissRequest = { showDepositDialog = false },
@@ -410,8 +418,7 @@ fun TransactionHistoryScreen(
                     onClick = {
                         val amount = depositAmountText.toDoubleOrNull() ?: 0.0
                         if (amount > 0) {
-                            walletManager.deposit(walletId, amount, "شحن رصيد محفظة فوري")
-                            balance = walletManager.getBalance(walletId)
+                            viewModel.deposit(amount, "شحن رصيد محفظة فوري")
                             showDepositDialog = false
                             depositAmountText = ""
                             Toast.makeText(context, "تم إيداع ${numberFormat.format(amount)} ريال بنجاح!", Toast.LENGTH_SHORT).show()

@@ -1,6 +1,7 @@
 package com.example.ui.screens.chat.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,7 +34,20 @@ fun ChatBubbleItem(
     onReplyClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val bubbleColor = if (isMe) Color(0xFF1E88E5) else Color(0xFF1E293B)
+    val isSupport = !isMe && (
+        message.senderId.contains("admin", ignoreCase = true) ||
+        message.senderId.contains("support", ignoreCase = true) ||
+        message.senderName.contains("الدعم", ignoreCase = true) ||
+        message.senderName.contains("إدارة", ignoreCase = true) ||
+        message.senderName.contains("الادارة", ignoreCase = true)
+    )
+
+    val bubbleColor = when {
+        isMe -> Color(0xFF1E88E5)
+        isSupport -> Color(0xFF112618)
+        else -> Color(0xFF1E293B)
+    }
+
     val textColor = Color.White
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     val formattedTime = timeFormat.format(Date(message.timestamp))
@@ -54,10 +69,37 @@ fun ChatBubbleItem(
                         bottomEnd = if (isMe) 4.dp else 16.dp
                     )
                 )
+                .then(
+                    if (isSupport) {
+                        Modifier.border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFFFFD700), Color(0xFF10B981))
+                            ),
+                            shape = RoundedCornerShape(
+                                topStart = 16.dp,
+                                topEnd = 16.dp,
+                                bottomStart = 4.dp,
+                                bottomEnd = 16.dp
+                            )
+                        )
+                    } else Modifier
+                )
                 .background(bubbleColor)
                 .clickable { onLongClick() }
                 .padding(10.dp)
         ) {
+            // Support badge
+            if (isSupport) {
+                Text(
+                    text = "🛠️ الدعم الفني والإدارة",
+                    fontSize = 10.sp,
+                    color = Color(0xFFFFD700),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+            }
+
             // Replying quote preview
             if (!message.replyToText.isNullOrBlank()) {
                 Surface(
