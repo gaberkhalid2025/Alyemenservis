@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
+import com.example.util.ChatIcons
 import com.example.util.ImageUtils
 import kotlinx.coroutines.delay
 import java.io.File
@@ -313,7 +314,7 @@ fun ChatInputBar(
                             .size(42.dp)
                             .background(Color(0xFF1E88E5), CircleShape)
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "تسجيل صوتي", tint = Color.White, modifier = Modifier.size(22.dp))
+                        Icon(ChatIcons.Mic, contentDescription = "تسجيل صوتي", tint = Color.White, modifier = Modifier.size(22.dp))
                     }
                 }
             }

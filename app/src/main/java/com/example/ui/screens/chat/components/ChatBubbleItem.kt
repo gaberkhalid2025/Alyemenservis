@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,8 @@ import coil.compose.AsyncImage
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.data.models.MessageStatus
+import com.example.util.AudioPlayerManager
+import com.example.util.ChatIcons
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -151,7 +154,12 @@ fun ChatBubbleItem(
                     }
                 }
                 MediaType.AUDIO -> {
-                    var isPlaying by remember { mutableStateOf(false) }
+                    val context = LocalContext.current
+                    val currentPlayingId by AudioPlayerManager.currentPlayingId.collectAsState()
+                    val isAudioPlaying by AudioPlayerManager.isPlaying.collectAsState()
+                    val liveProgress by AudioPlayerManager.playbackProgress.collectAsState()
+                    val isThisAudioActive = currentPlayingId == message.id && isAudioPlaying
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -160,14 +168,23 @@ fun ChatBubbleItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { isPlaying = !isPlaying },
+                            onClick = {
+                                if (isThisAudioActive) {
+                                    AudioPlayerManager.pause()
+                                } else if (currentPlayingId == message.id) {
+                                    AudioPlayerManager.resume()
+                                } else {
+                                    val source = message.mediaUrl.ifBlank { message.attachment?.url.orEmpty() }
+                                    AudioPlayerManager.play(message.id, source, context)
+                                }
+                            },
                             modifier = Modifier
-                                .size(32.dp)
-                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                                .size(34.dp)
+                                .background(if (isThisAudioActive) Color(0xFF10B981) else Color.White.copy(alpha = 0.18f), CircleShape)
                         ) {
                             Icon(
-                                imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "إيقاف" else "تشغيل",
+                                imageVector = if (isThisAudioActive) ChatIcons.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isThisAudioActive) "إيقاف مؤقت" else "تشغيل التسجيل",
                                 tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -175,19 +192,19 @@ fun ChatBubbleItem(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = message.message.ifBlank { "مقطع صوتي 🎤" },
+                                text = message.message.ifBlank { "تسجيل صوتي 🎤" },
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             LinearProgressIndicator(
-                                progress = { if (isPlaying) 0.65f else 0f },
+                                progress = { if (currentPlayingId == message.id) liveProgress else 0f },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(3.dp)
                                     .clip(RoundedCornerShape(2.dp)),
-                                color = Color(0xFF64FFDA),
+                                color = if (isThisAudioActive) Color(0xFF10B981) else Color(0xFF64FFDA),
                                 trackColor = Color.White.copy(alpha = 0.2f),
                             )
                         }

@@ -266,7 +266,7 @@ fun BookingListScreen(
         AlertDialog(
             onDismissRequest = { bookingToDelete = null },
             title = { Text("تأكيد حذف الحجز النهائي", fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت تأكد من رغبتك في حذف الحجز رقم (${bk.bookingCode}) بشكل نهائي؟") },
+            text = { Text("هل أنت متأكد من رغبتك في حذف الحجز رقم (${bk.bookingCode}) بشكل نهائي؟") },
             confirmButton = {
                 Button(
                     onClick = {

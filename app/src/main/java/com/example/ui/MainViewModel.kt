@@ -7455,10 +7455,6 @@ class MainViewModel : ViewModel() {
         triggerNotification("❌ تم رفض طلب انضمام: ${pending.name}")
     }
 
-    fun setAdminRole(role: String) {
-        _adminRole.value = role
-    }
-
     fun clearAllNotifications() {
         _notifications.value = emptyList()
         triggerNotification("🧹 تم مسح كافة الإشعارات")

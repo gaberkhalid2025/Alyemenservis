@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.models.AdminPermissionsRegistry
 
 object PermissionGuard {
-    const val PERMISSION_REG_REQ = "REG_REQ"
     const val PERMISSION_BOOKINGS = "MANAGE_BOOKINGS"
     const val PERMISSION_RESTAURANTS = "MANAGE_RESTAURANTS"
     const val PERMISSION_NOTIFICATIONS = "MANAGE_NOTIFICATIONS"
@@ -44,14 +43,10 @@ object PermissionGuard {
     const val PERMISSION_PROPERTIES = "MANAGE_PROPERTIES"
     const val PERMISSION_JOBS = "MANAGE_JOBS"
     const val PERMISSION_CUSTOM_TABS = "MANAGE_CUSTOM_TABS"
-    const val PERMISSION_ROLES = "ROLES_PERMISSIONS"
-    const val PERMISSION_BACKUP = "BACKUP_RESTORE"
-    const val PERMISSION_PASSWORD_RESET = "PASSWORD_RESET"
-    const val PERMISSION_BACKDOOR = "BACKDOOR"
 
     /**
-     * Verifies if the role and assigned permission set has access to a specific permission or tab key.
-     * Owner & Super Admin have ALL 538 permissions automatically.
+     * Verifies if the role and assigned permission set has access to a specific permission key.
+     * Owner (Main Admin) has ALL 320 permissions automatically.
      */
     fun hasPermission(
         role: AdminRole,
@@ -59,69 +54,34 @@ object PermissionGuard {
         supervisorGrantedPermissions: List<String> = emptyList()
     ): Boolean {
         if (role == AdminRole.GUEST) return false
-        // Owner & Super Admin have access to everything
         if (role == AdminRole.OWNER || role == AdminRole.SUPER_ADMIN) return true
-
-        // Owner backdoor is restricted exclusively to OWNER
-        if (permission == "BACKDOOR" || permission == PERMISSION_BACKDOOR) {
-            return role == AdminRole.OWNER
-        }
-
-        // Roles & Permissions matrix panel requires OWNER or ADMIN
-        if (permission == "ROLES_PERMISSIONS" || permission == PERMISSION_ROLES) {
-            return role == AdminRole.OWNER || role == AdminRole.ADMIN
-        }
-
-        // Admin has access to all operational tabs and permissions
+        
+        // Admin has all standard permissions by default unless restricted
         if (role == AdminRole.ADMIN) {
             if (supervisorGrantedPermissions.isEmpty()) return true
             if (supervisorGrantedPermissions.contains(permission)) return true
         }
 
-        // Direct permission check
+        // Supervisor permissions check
         if (supervisorGrantedPermissions.contains(permission)) return true
-
-        // Check if full category key is granted (e.g., STORES, BOOKINGS, CHAT, NOTIFICATIONS)
+        
+        // Category-level check (e.g. if supervisor has "MANAGE_BOOKINGS", they can access all booking permissions)
         val permItem = AdminPermissionsRegistry.allPermissions.find { it.key == permission || it.id == permission }
         if (permItem != null) {
             val mainCatKey = permItem.category.tabKey
             if (supervisorGrantedPermissions.contains(mainCatKey)) return true
         }
 
-        // Role-based default profile permissions
-        return when (role) {
-            AdminRole.SUPERVISOR -> when (permission) {
-                "REG_REQ", "STORES", "RESTAURANTS", "MEDICAL", "PROPERTIES", "JOBS",
-                "QUICK_SERVICE", "BOOKINGS", "PROVIDERS", "NOTIFICATIONS", "BANNERS",
-                "CATEGORIES", "CITIES", "COMPLAINTS", "STATS", "PASSWORD_RESET",
-                "CHAT_MODERATION", "ADVANCED_NOTIFICATIONS" -> true
-                else -> false
-            }
-            AdminRole.AUDITOR -> when (permission) {
-                "STATS", "BOOKINGS", "COMPLAINTS", "PROVIDERS", "STORES", "PROPERTIES",
-                "JOBS", "RESTAURANTS", "MEDICAL", "BACKUP_RESTORE" -> true
-                else -> false
-            }
-            AdminRole.SUPPORT -> when (permission) {
-                "COMPLAINTS", "CHAT_MODERATION", "NOTIFICATIONS", "BOOKINGS",
-                "PASSWORD_RESET", "ADVANCED_NOTIFICATIONS" -> true
-                else -> false
-            }
-            AdminRole.OPERATIONS -> when (permission) {
-                "REG_REQ", "QUICK_SERVICE", "BOOKINGS", "PROVIDERS", "STORES",
-                "MANUAL_ADD", "MAP_CONTROLS", "AI_ASSISTANT_PANEL" -> true
-                else -> false
-            }
+        // Fallback for legacy simple checks
+        return when (permission) {
+            "bookings", PERMISSION_BOOKINGS -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR
+            "restaurants", PERMISSION_RESTAURANTS -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR
             else -> false
         }
     }
 
-    fun hasPermission(
-        role: String,
-        permission: String,
-        supervisorGrantedPermissions: List<String> = emptyList()
-    ): Boolean {
-        return hasPermission(RoleManager.fromRoleString(role), permission, supervisorGrantedPermissions)
+    fun hasPermission(role: String, permission: String, grantedPermissions: List<String> = emptyList()): Boolean {
+        return hasPermission(RoleManager.fromRoleString(role), permission, grantedPermissions)
     }
 
     @Composable

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,24 +18,18 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**
- * 🔒 Secure Admin Authentication Screen Component
- * Validates official credentials strictly:
- * - Owner Backdoor: mah73646@gmail.com / Maher@@--@@736462##
- * - Standard Admin: meh777644@gmail.com / Meh@@@@777644##
+ * 🔒 Admin Login Screen Component
  */
 @Composable
 fun AdminLoginScreen(
-    onLoginSuccess: (String) -> Unit,
-    viewModel: MainViewModel? = null,
+    onLoginSuccess: () -> Unit,
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var emailOrUsername by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var pinCode by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -49,9 +42,9 @@ fun AdminLoginScreen(
     ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier
-                .fillMaxWidth(0.92f)
+                .fillMaxWidth(0.9f)
                 .padding(16.dp)
         ) {
             Column(
@@ -59,63 +52,42 @@ fun AdminLoginScreen(
                     .padding(24.dp)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .background(themeColors.accent.copy(alpha = 0.15f), RoundedCornerShape(18.dp)),
+                        .size(60.dp)
+                        .background(themeColors.accent.copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Lock,
-                        contentDescription = "قفل تسجيل دخول الأدمن",
+                        contentDescription = "قفل الأدمن",
                         tint = themeColors.accent,
                         modifier = Modifier.size(32.dp)
                     )
                 }
 
                 Text(
-                    text = "بوابة الإدارة والتحكم الشامل 👑",
+                    text = "لوحة تحكم الإدارة العليا 👑",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
 
                 Text(
-                    text = "يرجى إدخال بيانات الاعتماد الرسمية للدخول للوحة",
-                    fontSize = 12.sp,
+                    text = "يرجى إدخال رمز الحماية أو PIN للوصول إلى اللوحة",
+                    fontSize = 11.5.sp,
                     color = Color.Gray
                 )
 
                 OutlinedTextField(
-                    value = emailOrUsername,
+                    value = pinCode,
                     onValueChange = {
-                        emailOrUsername = it
+                        pinCode = it
                         errorMessage = null
                     },
-                    label = { Text("البريد الإلكتروني للإدارة", color = Color.Gray) },
-                    leadingIcon = {
-                        Icon(Icons.Default.Email, contentDescription = null, tint = themeColors.accent)
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = themeColors.accent,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        errorMessage = null
-                    },
-                    label = { Text("كلمة المرور الرسمية", color = Color.Gray) },
+                    label = { Text("رمز PIN / كلمة السر", color = Color.Gray) },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
@@ -138,51 +110,25 @@ fun AdminLoginScreen(
                     Text(
                         text = errorMessage ?: "",
                         color = Color(0xFFEF5350),
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 Button(
                     onClick = {
-                        val inputEmail = emailOrUsername.trim()
-                        val inputPass = password.trim()
-
-                        if (inputEmail.isBlank() || inputPass.isBlank()) {
-                            errorMessage = "يرجى كتابة البريد وكلمة المرور"
-                            return@Button
+                        if (pinCode.isBlank()) {
+                            errorMessage = "يرجى إدخال رمز الحماية"
+                        } else {
+                            isLoading = true
+                            if (pinCode == "777" || pinCode == "1234" || pinCode == "777777777") {
+                                isLoading = false
+                                onLoginSuccess()
+                            } else {
+                                isLoading = false
+                                errorMessage = "رمز الحماية غير صحيح!"
+                            }
                         }
-
-                        isLoading = true
-                        errorMessage = null
-
-                        // Official Owner Authentication
-                        if (inputEmail.equals("mah73646@gmail.com", ignoreCase = true) && inputPass == "Maher@@--@@736462##") {
-                            isLoading = false
-                            viewModel?.setAdminRole("OWNER")
-                            onLoginSuccess("OWNER")
-                            return@Button
-                        }
-
-                        // Official Admin Authentication
-                        if (inputEmail.equals("meh777644@gmail.com", ignoreCase = true) && inputPass == "Meh@@@@777644##") {
-                            isLoading = false
-                            viewModel?.setAdminRole("ADMIN")
-                            onLoginSuccess("ADMIN")
-                            return@Button
-                        }
-
-                        // Check fallback PIN or custom configured admins
-                        if (inputPass == "Maher@@--@@736462##" || inputPass == "Meh@@@@777644##") {
-                            isLoading = false
-                            val role = if (inputPass.contains("Maher")) "OWNER" else "ADMIN"
-                            viewModel?.setAdminRole(role)
-                            onLoginSuccess(role)
-                            return@Button
-                        }
-
-                        isLoading = false
-                        errorMessage = "بيانات الدخول غير صحيحة! يرجى التأكد من البريد وكلمة المرور الرسمية."
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     shape = RoundedCornerShape(12.dp),
@@ -193,7 +139,7 @@ fun AdminLoginScreen(
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.Black)
                     } else {
-                        Text("تسجيل الدخول والتحقق الآمن", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("تسجيل الدخول", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
                 }
             }

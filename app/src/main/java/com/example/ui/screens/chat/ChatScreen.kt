@@ -25,6 +25,7 @@ import com.example.data.models.ChatMessage
 import com.example.ui.screens.chat.components.ChatBubbleItem
 import com.example.ui.screens.chat.components.ChatHeaderBar
 import com.example.ui.screens.chat.components.ChatInputBar
+import com.example.util.AudioPlayerManager
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -86,6 +87,13 @@ fun ChatScreen(
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // Stop active audio on screen exit
+    DisposableEffect(Unit) {
+        onDispose {
+            AudioPlayerManager.stop()
         }
     }
 
@@ -262,7 +270,7 @@ fun ChatScreen(
         AlertDialog(
             onDismissRequest = { showDeleteChannelDialog = false },
             title = { Text("حذف المحادثة بالكامل", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت متاكد من رغبتك في حذف هذه المحادثة وجميع رسائلها؟ لا يمكن استرجاع البيانات بعد الحذف.", color = Color.LightGray, fontSize = 13.sp) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة وجميع رسائلها؟ لا يمكن استرجاع البيانات بعد الحذف.", color = Color.LightGray, fontSize = 13.sp) },
             confirmButton = {
                 Button(
                     onClick = {

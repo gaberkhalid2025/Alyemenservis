@@ -254,7 +254,7 @@ fun ChatListScreen(
         AlertDialog(
             onDismissRequest = { channelToDelete = null },
             title = { Text("حذف المحادثة", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت تأكد من رغبتك في حذف هذه المحادثة بالكامل؟ لا يمكن التراجع بعد الحذف.", color = Color.LightGray, fontSize = 13.sp) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة بالكامل؟ لا يمكن التراجع بعد الحذف.", color = Color.LightGray, fontSize = 13.sp) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -289,7 +289,7 @@ fun ChatListScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
                 ) {
-                    Text("حذف الكل نعم", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("نعم، حذف الكل", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
