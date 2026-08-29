@@ -78,6 +78,7 @@ fun GuestRegistrationDialog(
     val currentName = viewModel.currentUserName.collectAsState().value
     val currentPhone = viewModel.currentUserPhone.collectAsState().value
     val currentResidence = viewModel.currentUserResidence.collectAsState().value
+    val currentUserId = viewModel.currentUserId.collectAsState().value
     val settingsState by viewModel.settings.collectAsState()
 
     var isRestoreMode by remember { mutableStateOf(false) }
@@ -93,22 +94,39 @@ fun GuestRegistrationDialog(
     var nameError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
 
-    var activeBiometricPrompt by remember { mutableStateOf<BiometricPrompt?>(null) }
+    val promptHolder = remember { arrayOf<BiometricPrompt?>(null) }
 
     // Clean up biometric prompt if dialog dismisses or leaves composition
     DisposableEffect(Unit) {
         onDispose {
-            activeBiometricPrompt?.cancelAuthentication()
-            activeBiometricPrompt = null
+            try {
+                promptHolder[0]?.cancelAuthentication()
+            } catch (e: Exception) { }
+            promptHolder[0] = null
+        }
+    }
+
+    LaunchedEffect(currentUserId) {
+        if (currentUserId.isNotEmpty() && uiState is GuestAuthUiState.Loading) {
+            uiState = GuestAuthUiState.Success("تم إنشاء الحساب بنجاح!")
+            kotlinx.coroutines.delay(1000)
+            onDismiss()
         }
     }
 
     // Helper for Biometric Prompt
     val triggerBiometric = {
         val activity = context.findFragmentActivity()
-        if (activity != null) {
-            val biometricManager = BiometricManager.from(context)
-            if (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS) {
+        if (activity == null) {
+            scope.launch { snackbarHostState.showSnackbar("تعذر تشغيل البصمة") }
+        } else {
+            val canAuth = try {
+                val biometricManager = BiometricManager.from(context)
+                biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
+            } catch (e: Exception) {
+                false
+            }
+            if (canAuth) {
                 val executor = ContextCompat.getMainExecutor(context)
                 val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -139,7 +157,7 @@ fun GuestRegistrationDialog(
                         }
                     }
                 })
-                activeBiometricPrompt = prompt
+                promptHolder[0] = prompt
                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
                     .setTitle("المصادقة البيومترية")
                     .setSubtitle("استخدم بصمة الإصبع أو الوجه لتسجيل الدخول السريع")
@@ -149,8 +167,6 @@ fun GuestRegistrationDialog(
             } else {
                 scope.launch { snackbarHostState.showSnackbar("المصادقة البيومترية غير مفعلة على جهازك") }
             }
-        } else {
-            scope.launch { snackbarHostState.showSnackbar("تعذر تشغيل البصمة على هذا النشاط، يرجى استخدام كلمة المرور") }
         }
     }
 
@@ -383,6 +399,14 @@ fun GuestRegistrationDialog(
                             }
 
                             val fullPhone = if (cleanPhone.length == 9) cleanPhone else "77$cleanPhone"
+                            uiState = GuestAuthUiState.Loading("جاري إنشاء الحساب...")
+                            viewModel.registerGuestUser(
+                                context = context,
+                                name = cleanName,
+                                phone = fullPhone,
+                                residence = cleanResidence,
+                                password = cleanPassword
+                            )
                             onRegisterCompleted(cleanName, fullPhone, cleanResidence, cleanPassword)
                         },
                         isLoading = uiState is GuestAuthUiState.Loading,

@@ -43,7 +43,58 @@ fun JobForm(
     var salary by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var termsChecked by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+
+    val isSubmitting by formViewModel.isSubmitting.collectAsState()
+    val formState by formViewModel.formState.collectAsState()
+
+    DisposableEffect(Unit) {
+        onDispose {
+            formViewModel.resetState()
+        }
+    }
+
+    LaunchedEffect(formState) {
+        if (formState is FormUiState.Success) {
+            // Keep state or reset some fields
+        }
+    }
+
+    val onSubmit: () -> Unit = {
+        val phoneVal = Validators.validateYemenPhone(phone)
+        if (!phoneVal.isValid) {
+            scope.launch { snackbarHostState.showSnackbar(phoneVal.errorMessage ?: "خطأ برقم الهاتف") }
+        } else if (jobTitle.isBlank() || companyName.isBlank()) {
+            scope.launch { snackbarHostState.showSnackbar("يرجى ملء جميع الحقول الإلزامية") }
+        } else {
+            formViewModel.setSubmitting(true)
+            formViewModel.setFormState(FormUiState.Loading(stageMessage = "جاري حفظ إعلان الوظيفة وتوثيقه..."))
+            val cleanPhone = if (phone.trim().length == 9) phone.trim() else "77${phone.trim()}"
+
+            scope.launch {
+                try {
+                    val jobEntity = JobEntity(
+                        id = "job_$cleanPhone",
+                        title = jobTitle.ifBlank { "شاغر وظيفي - $companyName" },
+                        companyName = companyName,
+                        managerName = managerName,
+                        phone = cleanPhone,
+                        cityId = city,
+                        salary = salary,
+                        description = description
+                    )
+
+                    viewModel.saveJob(jobEntity)
+                    formViewModel.setFormState(FormUiState.Success(requestId = cleanPhone, message = "🎉 تم نشر إعلان الوظيفة بنجاح بالدليل!"))
+                    snackbarHostState.showSnackbar("🎉 تم نشر إعلان الوظيفة بنجاح بالدليل!")
+                    viewModel.setJoinRequestPhone(context, cleanPhone)
+                } catch (e: Exception) {
+                    formViewModel.setFormState(FormUiState.Error(e.message ?: "فشل نشر إعلان الوظيفة"))
+                } finally {
+                    formViewModel.setSubmitting(false)
+                }
+            }
+        }
+    }
 
     RegistrationSection(
         title = "نشر إعلان وظيفة / شاغر شغلي",
@@ -118,37 +169,17 @@ fun JobForm(
             themeColors = themeColors
         )
 
+        FormStateFeedbackView(
+            state = formState,
+            themeColors = themeColors,
+            onRetry = onSubmit,
+            onDismissError = { formViewModel.clearError() }
+        )
+
         RegistrationSubmitButton(
             text = "نشر إعلان الوظيفة الآن 💼",
-            onClick = {
-                val phoneVal = Validators.validateYemenPhone(phone)
-                if (!phoneVal.isValid) {
-                    scope.launch { snackbarHostState.showSnackbar(phoneVal.errorMessage ?: "خطأ برقم الهاتف") }
-                    return@RegistrationSubmitButton
-                }
-
-                isLoading = true
-                val cleanPhone = if (phone.trim().length == 9) phone.trim() else "77${phone.trim()}"
-
-                scope.launch {
-                    val jobEntity = JobEntity(
-                        id = "job_$cleanPhone",
-                        title = jobTitle.ifBlank { "شاغر وظيفي - $companyName" },
-                        companyName = companyName,
-                        managerName = managerName,
-                        phone = cleanPhone,
-                        cityId = city,
-                        salary = salary,
-                        description = description
-                    )
-
-                    viewModel.saveJob(jobEntity)
-                    isLoading = false
-                    snackbarHostState.showSnackbar("🎉 تم نشر إعلان الوظيفة بنجاح بالدليل!")
-                    viewModel.setJoinRequestPhone(context, cleanPhone)
-                }
-            },
-            isLoading = isLoading,
+            onClick = onSubmit,
+            isLoading = isSubmitting,
             enabled = termsChecked,
             themeColors = themeColors
         )

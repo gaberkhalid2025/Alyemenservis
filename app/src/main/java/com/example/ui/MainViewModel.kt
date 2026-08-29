@@ -692,6 +692,11 @@ class MainViewModel : ViewModel() {
         triggerNotification("🎉 أهلاً بك في الدليل $name، تم تسجيل وحماية حسابك آمنياً بنجاح عبر Firebase Auth!")
     }
 
+    fun resetRegistrationState() {
+        // Safe placeholder for registration flow reset state
+        android.util.Log.d("MainViewModel", "resetRegistrationState triggered")
+    }
+
     fun approveRegisteredUser(userId: String, userName: String = "") {
         _registeredUsersList.value = _registeredUsersList.value.map { u ->
             if (u["id"]?.toString() == userId) {

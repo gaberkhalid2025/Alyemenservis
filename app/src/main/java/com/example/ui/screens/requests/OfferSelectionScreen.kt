@@ -81,25 +81,53 @@ fun OfferSelectionScreen(
     var createdBookingNumber by remember { mutableStateOf("") }
     var newlyCreatedChannel by remember { mutableStateOf<ChatChannel?>(null) }
 
-    LaunchedEffect(offerId) {
+    fun loadOfferAndRequestData() {
         if (offerId.isNotBlank()) {
-            firestore.collection("instant_offers").document(offerId).get()
-                .addOnSuccessListener { offerSnap ->
-                    val o = offerSnap.toObject(RequestOfferEntity::class.java)
-                    offer = o
-                    if (o != null) {
-                        firestore.collection("instant_requests").document(o.requestId).get()
-                            .addOnSuccessListener { reqSnap ->
-                                request = reqSnap.toObject(InstantRequestEntity::class.java)
+            isLoading = true
+            try {
+                firestore.collection("instant_offers").document(offerId).get()
+                    .addOnSuccessListener { offerSnap ->
+                        try {
+                            val o = offerSnap.toObject(RequestOfferEntity::class.java)
+                            offer = o
+                            if (o != null) {
+                                firestore.collection("instant_requests").document(o.requestId).get()
+                                    .addOnSuccessListener { reqSnap ->
+                                        try {
+                                            request = reqSnap.toObject(InstantRequestEntity::class.java)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "خطأ في قراءة بيانات الطلب: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
+                                    .addOnFailureListener {
+                                        isLoading = false
+                                        Toast.makeText(context, "فشل جلب الطلب: ${it.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    }
+                            } else {
                                 isLoading = false
                             }
-                            .addOnFailureListener { isLoading = false }
-                    } else {
-                        isLoading = false
+                        } catch (e: Exception) {
+                            isLoading = false
+                            Toast.makeText(context, "خطأ في قراءة العرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-                .addOnFailureListener { isLoading = false }
+                    .addOnFailureListener {
+                        isLoading = false
+                        Toast.makeText(context, "فشل جلب العرض: ${it.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    }
+            } catch (e: Exception) {
+                isLoading = false
+                Toast.makeText(context, "خطأ غير متوقع: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            isLoading = false
         }
+    }
+
+    LaunchedEffect(offerId) {
+        loadOfferAndRequestData()
     }
 
     Scaffold(
@@ -127,7 +155,14 @@ fun OfferSelectionScreen(
 
         if (curOffer == null || curReq == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("العرض أو الطلب غير موجود.")
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("العرض أو الطلب غير موجود.", color = MaterialTheme.colorScheme.error)
+                    Button(onClick = { loadOfferAndRequestData() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("إعادة المحاولة")
+                    }
+                }
             }
             return@Scaffold
         }
@@ -253,10 +288,20 @@ fun OfferSelectionScreen(
                         return@Button
                     }
 
+                    if (curReq.status == "COMPLETED" || curReq.status == "CANCELLED") {
+                        Toast.makeText(context, "هذا الطلب لم يعد متاحاً للتأكيد (ملغي أو تم اختيار عرض آخر بالفعل).", Toast.LENGTH_LONG).show()
+                        return@Button
+                    }
+                    if (curOffer.status == "REJECTED" || curOffer.status == "CANCELLED") {
+                        Toast.makeText(context, "هذا العرض لم يعد صالحاً للاختيار.", Toast.LENGTH_LONG).show()
+                        return@Button
+                    }
+
                     isSubmitting = true
                     scope.launch {
-                        val bookingId = UUID.randomUUID().toString()
-                        val bNum = "BK-${SimpleDateFormat("yyMMddHHmm", Locale.getDefault()).format(Date())}-${Random.nextInt(1000, 9999)}"
+                        try {
+                            val bookingId = UUID.randomUUID().toString()
+                            val bNum = "BK-${SimpleDateFormat("yyMMddHHmm", Locale.getDefault()).format(Date())}-${Random.nextInt(1000, 9999)}"
 
                         val newBooking = BookingEntity(
                             id = bookingId,
@@ -358,6 +403,10 @@ fun OfferSelectionScreen(
                                 isSubmitting = false
                                 Toast.makeText(context, "فشل تأكيد الحجز: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                             }
+                        } catch (e: Exception) {
+                            isSubmitting = false
+                            Toast.makeText(context, "خطأ غير متوقع: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("confirm_booking_btn"),

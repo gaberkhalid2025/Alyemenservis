@@ -41,6 +41,12 @@ fun RegisterScreen(
     val context = LocalContext.current
     var showRestoreDialog by remember { mutableStateOf(false) }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.resetRegistrationState()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

@@ -57,6 +57,27 @@ fun ChatScreen(
     var isSearchOpen by remember { mutableStateOf(false) }
     var selectedMessageForAction by remember { mutableStateOf<ChatMessage?>(null) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        chatViewModel.eventFlow.collect { event ->
+            when (event) {
+                is ChatEvent.ShowError -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+                is ChatEvent.MessageSent -> {
+                    // Message sent successfully
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(messages) {
+        messages.filter { it.status == com.example.data.models.MessageStatus.FAILED }.forEach {
+            snackbarHostState.showSnackbar("فشل إرسال رسالة: ${it.message}")
+        }
+    }
+
     // Initialize Chat
     LaunchedEffect(channel, channelId, targetUserId) {
         if (channel != null) {
@@ -115,11 +136,12 @@ fun ChatScreen(
 
     var showDeleteChannelDialog by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0D151F))
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0D151F))
+        ) {
         // Header
         ChatHeaderBar(
             name = otherUserName,
@@ -202,7 +224,8 @@ fun ChatScreen(
                             message = msg,
                             isMe = isMe,
                             onReplyClick = { chatViewModel.setReplyingTo(msg) },
-                            onLongClick = { selectedMessageForAction = msg }
+                            onLongClick = { selectedMessageForAction = msg },
+                            onRetryClick = { chatViewModel.resendMessage(msg.id) }
                         )
                     }
                 }
@@ -225,6 +248,12 @@ fun ChatScreen(
             onTyping = { text ->
                 chatViewModel.onUserTyping(currentUserId, text)
             }
+        )
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp)
         )
     }
 

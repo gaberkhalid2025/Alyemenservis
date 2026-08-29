@@ -38,9 +38,49 @@ fun ClientForm(
     var password by remember { mutableStateOf("") }
     var termsChecked by remember { mutableStateOf(false) }
 
-    var isLoading by remember { mutableStateOf(false) }
+    val isSubmitting by formViewModel.isSubmitting.collectAsState()
+    val formState by formViewModel.formState.collectAsState()
     var phoneError by remember { mutableStateOf<String?>(null) }
     var nameError by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            formViewModel.resetState()
+        }
+    }
+
+    LaunchedEffect(formState) {
+        if (formState is FormUiState.Success) {
+            password = ""
+        }
+    }
+
+    val onSubmit: () -> Unit = {
+        val nameVal = Validators.validateName(name, "الاسم")
+        if (!nameVal.isValid) {
+            nameError = nameVal.errorMessage
+        } else {
+            val phoneVal = Validators.validateYemenPhone(phone)
+            if (!phoneVal.isValid) {
+                phoneError = phoneVal.errorMessage
+            } else if (!termsChecked) {
+                scope.launch { snackbarHostState.showSnackbar("يرجى الموافقة على شروط الاستخدام أولاً") }
+            } else {
+                formViewModel.setSubmitting(true)
+                formViewModel.setFormState(FormUiState.Loading(stageMessage = "جاري تسجيل حساب العميل..."))
+                val cleanPhone = if (phone.trim().length == 9) phone.trim() else "77${phone.trim()}"
+                try {
+                    viewModel.registerGuestUser(context, name.trim(), cleanPhone, residence.trim(), password.trim())
+                    formViewModel.setFormState(FormUiState.Success(requestId = "client_${cleanPhone}", message = "🎉 تم تسجيل حسابك بنجاح!"))
+                    scope.launch { snackbarHostState.showSnackbar("🎉 تم تسجيل حسابك بنجاح!") }
+                } catch (e: Exception) {
+                    formViewModel.setFormState(FormUiState.Error(e.message ?: "فشل تسجيل الحساب"))
+                } finally {
+                    formViewModel.setSubmitting(false)
+                }
+            }
+        }
+    }
 
     RegistrationSection(
         title = "بيانات حساب العميل",
@@ -91,33 +131,17 @@ fun ClientForm(
             themeColors = themeColors
         )
 
+        FormStateFeedbackView(
+            state = formState,
+            themeColors = themeColors,
+            onRetry = onSubmit,
+            onDismissError = { formViewModel.clearError() }
+        )
+
         RegistrationSubmitButton(
             text = "إنشاء حساب العميل الآن 🚀",
-            onClick = {
-                val nameVal = Validators.validateName(name, "الاسم")
-                if (!nameVal.isValid) {
-                    nameError = nameVal.errorMessage
-                    return@RegistrationSubmitButton
-                }
-
-                val phoneVal = Validators.validateYemenPhone(phone)
-                if (!phoneVal.isValid) {
-                    phoneError = phoneVal.errorMessage
-                    return@RegistrationSubmitButton
-                }
-
-                if (!termsChecked) {
-                    scope.launch { snackbarHostState.showSnackbar("يرجى الموافقة على شروط الاستخدام أولاً") }
-                    return@RegistrationSubmitButton
-                }
-
-                isLoading = true
-                val cleanPhone = if (phone.trim().length == 9) phone.trim() else "77${phone.trim()}"
-                viewModel.registerGuestUser(context, name.trim(), cleanPhone, residence.trim(), password.trim())
-                isLoading = false
-                scope.launch { snackbarHostState.showSnackbar("🎉 تم تسجيل حسابك بنجاح!") }
-            },
-            isLoading = isLoading,
+            onClick = onSubmit,
+            isLoading = isSubmitting,
             enabled = termsChecked,
             themeColors = themeColors
         )

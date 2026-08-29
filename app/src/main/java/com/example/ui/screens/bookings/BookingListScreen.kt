@@ -39,7 +39,9 @@ fun BookingListScreen(
     onStatusChange: (BookingEntity, String) -> Unit = { _, _ -> },
     onCancelBooking: (BookingEntity, String, String) -> Unit, // booking, reason, password
     onDeleteBooking: (BookingEntity) -> Unit,
-    onOpenChatClick: (BookingEntity) -> Unit
+    onOpenChatClick: (BookingEntity) -> Unit,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -89,6 +91,13 @@ fun BookingListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onRefresh) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "تحديث البيانات")
+                        }
+                    }
                     IconButton(onClick = onCreateNewBookingClick) {
                         Icon(Icons.Default.AddCircle, contentDescription = "حجز جديد", tint = MaterialTheme.colorScheme.primary)
                     }

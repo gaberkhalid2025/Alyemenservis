@@ -323,25 +323,34 @@ fun RequestDetailsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val expectedPin = request?.secretPin ?: request?.cancellationPassword ?: ""
-                        if (cancelPinInput != expectedPin) {
+                        val expectedPin = (request?.secretPin ?: request?.cancellationPassword ?: "").trim()
+                        if (expectedPin.isBlank()) {
+                            Toast.makeText(context, "الرمز السري للطلب غير متوفر، الرجاء التواصل مع الدعم.", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (cancelPinInput.trim() != expectedPin) {
                             Toast.makeText(context, "رمز PIN غير صحيح!", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
                         isCancelling = true
                         scope.launch {
-                            firestore.collection("instant_requests").document(requestId)
-                                .update("status", "CANCELLED")
-                                .addOnSuccessListener {
-                                    isCancelling = false
-                                    showCancelDialog = false
-                                    Toast.makeText(context, "تم إلغاء الطلب بنجاح", Toast.LENGTH_SHORT).show()
-                                }
-                                .addOnFailureListener { e ->
-                                    isCancelling = false
-                                    Toast.makeText(context, "فشل الإلغاء: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                }
+                            try {
+                                firestore.collection("instant_requests").document(requestId)
+                                    .update("status", "CANCELLED")
+                                    .addOnSuccessListener {
+                                        isCancelling = false
+                                        showCancelDialog = false
+                                        Toast.makeText(context, "تم إلغاء الطلب بنجاح", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isCancelling = false
+                                        Toast.makeText(context, "فشل الإلغاء: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    }
+                            } catch (e: Exception) {
+                                isCancelling = false
+                                Toast.makeText(context, "خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),

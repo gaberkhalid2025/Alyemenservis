@@ -22,7 +22,27 @@ data class RegisterUiState(
     val identityUrl: String = "",
     val selectedImageUris: List<String> = emptyList(),
     val uploadingImagesProgress: Float = 0f
-)
+) {
+    fun reset(): RegisterUiState {
+        return RegisterUiState(
+            currentStep = 1,
+            isLoading = false,
+            isSuccess = false,
+            errorMessage = null,
+            successMessage = null,
+            fullName = "",
+            phone = "",
+            passwordPin = "",
+            city = "صنعاء",
+            category = "",
+            experienceYears = "1",
+            bio = "",
+            identityUrl = "",
+            selectedImageUris = emptyList(),
+            uploadingImagesProgress = 0f
+        )
+    }
+}
 
 sealed class RegistrationEvent {
     data class ShowToast(val message: String) : RegistrationEvent()

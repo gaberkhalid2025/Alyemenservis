@@ -42,7 +42,65 @@ fun MedicalForm(
     var password by remember { mutableStateOf("") }
     var photosUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var termsChecked by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+
+    val isSubmitting by formViewModel.isSubmitting.collectAsState()
+    val formState by formViewModel.formState.collectAsState()
+
+    DisposableEffect(Unit) {
+        onDispose {
+            formViewModel.resetState()
+        }
+    }
+
+    LaunchedEffect(formState) {
+        if (formState is FormUiState.Success) {
+            password = ""
+        }
+    }
+
+    val onSubmit: () -> Unit = {
+        val phoneVal = Validators.validateYemenPhone(phone)
+        if (!phoneVal.isValid) {
+            scope.launch { snackbarHostState.showSnackbar(phoneVal.errorMessage ?: "خطأ برقم الهاتف") }
+        } else if (clinicName.isBlank() || doctorName.isBlank()) {
+            scope.launch { snackbarHostState.showSnackbar("يرجى ملء جميع الحقول الإلزامية") }
+        } else {
+            formViewModel.setSubmitting(true)
+            formViewModel.setFormState(FormUiState.Loading(stageMessage = "جاري رفع صور المستندات والعيادة..."))
+            val cleanPhone = if (phone.trim().length == 9) phone.trim() else "77${phone.trim()}"
+
+            scope.launch {
+                try {
+                    val uploadedUrls = formViewModel.uploadImages(context, photosUris) { idx ->
+                        FirebaseStorageUploader.getStorePhotoPath(cleanPhone, idx)
+                    }
+
+                    val storeEntity = StoreEntity(
+                        id = "med_$cleanPhone",
+                        ownerId = cleanPhone,
+                        name = clinicName.ifBlank { "عيادة د. $doctorName" },
+                        ownerName = doctorName,
+                        phone = cleanPhone,
+                        cityId = city,
+                        sectionId = "medical",
+                        coverImage = uploadedUrls.getOrNull(0) ?: "",
+                        logoImage = uploadedUrls.getOrNull(1) ?: "",
+                        images = uploadedUrls,
+                        isActive = false
+                    )
+
+                    viewModel.saveStore(storeEntity)
+                    formViewModel.setFormState(FormUiState.Success(requestId = cleanPhone, message = "⏳ تم تسجيل المركز الطبي بنجاح وهو قيد التوثيق الإداري!"))
+                    snackbarHostState.showSnackbar("⏳ تم تسجيل المركز الطبي بنجاح وهو قيد التوثيق الإداري!")
+                    viewModel.setJoinRequestPhone(context, cleanPhone)
+                } catch (e: Exception) {
+                    formViewModel.setFormState(FormUiState.Error(e.message ?: "فشل تسجيل المركز الطبي"))
+                } finally {
+                    formViewModel.setSubmitting(false)
+                }
+            }
+        }
+    }
 
     RegistrationSection(
         title = "تسجيل مركز طبي / عيادة / صيدلية",
@@ -107,44 +165,17 @@ fun MedicalForm(
             themeColors = themeColors
         )
 
+        FormStateFeedbackView(
+            state = formState,
+            themeColors = themeColors,
+            onRetry = onSubmit,
+            onDismissError = { formViewModel.clearError() }
+        )
+
         RegistrationSubmitButton(
             text = "تسجيل العيادة والمركز الطبي 🏥",
-            onClick = {
-                val phoneVal = Validators.validateYemenPhone(phone)
-                if (!phoneVal.isValid) {
-                    scope.launch { snackbarHostState.showSnackbar(phoneVal.errorMessage ?: "خطأ برقم الهاتف") }
-                    return@RegistrationSubmitButton
-                }
-
-                isLoading = true
-                val cleanPhone = if (phone.trim().length == 9) phone.trim() else "77${phone.trim()}"
-
-                scope.launch {
-                    val uploadedUrls = formViewModel.uploadImages(context, photosUris) { idx ->
-                        FirebaseStorageUploader.getStorePhotoPath(cleanPhone, idx)
-                    }
-
-                    val storeEntity = StoreEntity(
-                        id = "med_$cleanPhone",
-                        ownerId = cleanPhone,
-                        name = clinicName.ifBlank { "عيادة د. $doctorName" },
-                        ownerName = doctorName,
-                        phone = cleanPhone,
-                        cityId = city,
-                        sectionId = "medical",
-                        coverImage = uploadedUrls.getOrNull(0) ?: "",
-                        logoImage = uploadedUrls.getOrNull(1) ?: "",
-                        images = uploadedUrls,
-                        isActive = false
-                    )
-
-                    viewModel.saveStore(storeEntity)
-                    isLoading = false
-                    snackbarHostState.showSnackbar("⏳ تم تسجيل المركز الطبي بنجاح وهو قيد التوثيق الإداري!")
-                    viewModel.setJoinRequestPhone(context, cleanPhone)
-                }
-            },
-            isLoading = isLoading,
+            onClick = onSubmit,
+            isLoading = isSubmitting,
             enabled = termsChecked,
             themeColors = themeColors
         )

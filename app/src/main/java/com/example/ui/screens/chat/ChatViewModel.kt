@@ -18,9 +18,17 @@ sealed class ChatError(open val messageArabic: String) {
     data class UnknownError(val details: String) : ChatError(details)
 }
 
+sealed class ChatEvent {
+    data class ShowError(val message: String) : ChatEvent()
+    data class MessageSent(val messageId: String) : ChatEvent()
+}
+
 class ChatViewModel(
     private val repository: ChatRepository = ChatRepository()
 ) : ViewModel() {
+
+    private val _eventFlow = MutableSharedFlow<ChatEvent>()
+    val eventFlow = _eventFlow.asSharedFlow()
 
     private val _currentChannel = MutableStateFlow<ChatChannel?>(null)
     val currentChannel: StateFlow<ChatChannel?> = _currentChannel.asStateFlow()
@@ -156,45 +164,77 @@ class ChatViewModel(
         _isSending.value = true
 
         viewModelScope.launch {
-            val result = repository.sendMessage(
-                channelId = channel.id,
-                senderId = senderId,
-                senderName = senderName,
-                messageText = text.trim(),
-                mediaType = mediaType,
-                mediaUrl = mediaUrl,
-                replyToId = replyTo?.id,
-                replyToText = replyTo?.message
-            )
-            _isSending.value = false
-            if (result.isSuccess) {
-                _replyingToMessage.value = null
-                sendTypingStatus(senderId, false)
+            try {
+                val result = repository.sendMessage(
+                    channelId = channel.id,
+                    senderId = senderId,
+                    senderName = senderName,
+                    messageText = text.trim(),
+                    mediaType = mediaType,
+                    mediaUrl = mediaUrl,
+                    replyToId = replyTo?.id,
+                    replyToText = replyTo?.message
+                )
+                _isSending.value = false
+                if (result.isSuccess) {
+                    _replyingToMessage.value = null
+                    sendTypingStatus(senderId, false)
+                    val sentMsg = result.getOrNull()
+                    if (sentMsg != null) {
+                        _eventFlow.emit(ChatEvent.MessageSent(sentMsg.id))
+                    }
+                } else {
+                    _eventFlow.emit(ChatEvent.ShowError("فشل إرسال الرسالة"))
+                }
+            } catch (e: Exception) {
+                _isSending.value = false
+                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل الإرسال"))
             }
+        }
+    }
+
+    private fun updateMessageStatus(messageId: String, status: MessageStatus) {
+        _messages.value = _messages.value.map {
+            if (it.id == messageId) it.copy(status = status) else it
         }
     }
 
     /**
      * Resend a failed message by ID.
      */
-    fun resendMessage(messageId: String, senderId: String, senderName: String) {
+    fun resendMessage(messageId: String) {
         val channel = _currentChannel.value ?: return
         val targetMsg = _messages.value.find { it.id == messageId } ?: return
-        
-        _isSending.value = true
+
         viewModelScope.launch {
-            val result = repository.sendMessage(
-                channelId = channel.id,
-                senderId = senderId,
-                senderName = senderName,
-                messageText = targetMsg.message,
-                mediaType = targetMsg.mediaType,
-                mediaUrl = targetMsg.mediaUrl,
-                replyToId = targetMsg.replyToId,
-                replyToText = targetMsg.replyToText
-            )
-            _isSending.value = false
+            updateMessageStatus(messageId, MessageStatus.SENDING)
+            try {
+                val result = repository.sendMessage(
+                    channelId = channel.id,
+                    senderId = targetMsg.senderId,
+                    senderName = targetMsg.senderName,
+                    messageText = targetMsg.message,
+                    mediaType = targetMsg.mediaType,
+                    mediaUrl = targetMsg.mediaUrl,
+                    replyToId = targetMsg.replyToId,
+                    replyToText = targetMsg.replyToText
+                )
+                if (result.isSuccess) {
+                    updateMessageStatus(messageId, MessageStatus.SENT)
+                    _eventFlow.emit(ChatEvent.MessageSent(messageId))
+                } else {
+                    updateMessageStatus(messageId, MessageStatus.FAILED)
+                    _eventFlow.emit(ChatEvent.ShowError("فشل إعادة الإرسال"))
+                }
+            } catch (e: Exception) {
+                updateMessageStatus(messageId, MessageStatus.FAILED)
+                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل إعادة الإرسال"))
+            }
         }
+    }
+
+    fun resendMessage(messageId: String, senderId: String, senderName: String) {
+        resendMessage(messageId)
     }
 
     fun setReplyingTo(message: ChatMessage?) {
@@ -257,6 +297,13 @@ class ChatViewModel(
             _messages.value = emptyList()
             onDeleted()
         }
+    }
+
+    fun resetState() {
+        _currentChannel.value = null
+        _messages.value = emptyList()
+        _replyingToMessage.value = null
+        _searchQuery.value = ""
     }
 
     override fun onCleared() {

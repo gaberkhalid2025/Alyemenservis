@@ -9,7 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,6 +89,11 @@ fun FormStateFeedbackView(
             }
 
             is FormUiState.Error -> {
+                LaunchedEffect(state) {
+                    kotlinx.coroutines.delay(10000L)
+                    onDismissError()
+                }
+
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF3F1D1D)),
                     shape = RoundedCornerShape(12.dp),
@@ -128,9 +133,15 @@ fun FormStateFeedbackView(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            TextButton(
+                                onClick = onDismissError
+                            ) {
+                                Text("تجاهل ❌", fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f))
+                            }
+
                             OutlinedButton(
                                 onClick = onRetry,
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFCA5A5)),

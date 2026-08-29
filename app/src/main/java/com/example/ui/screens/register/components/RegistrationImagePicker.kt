@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -60,13 +62,25 @@ fun RegistrationImagePicker(
 
     val scope = rememberCoroutineScope()
     var isProcessingImages by remember { mutableStateOf(false) }
+    var compressionJob by remember { mutableStateOf<Job?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            compressionJob?.cancel()
+        }
+    }
 
     // Compress URI to file <= 300KB in background IO dispatcher
     suspend fun compressSingleUriBg(uri: Uri): Uri {
-        return withContext(kotlinx.coroutines.Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             try {
                 val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext uri
-                val bitmap = BitmapFactory.decodeStream(inputStream) ?: return@withContext uri
+                val bitmap = try {
+                    BitmapFactory.decodeStream(inputStream)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    return@withContext uri
+                } ?: return@withContext uri
                 val tempFile = File(context.cacheDir, "comp_${System.currentTimeMillis()}_${(1000..9999).random()}.jpg")
                 var quality = 85
                 val out = ByteArrayOutputStream()
@@ -93,7 +107,12 @@ fun RegistrationImagePicker(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
         if (uris.isNotEmpty()) {
-            scope.launch {
+            if (imagesUris.size >= maxImages) {
+                android.widget.Toast.makeText(context, "لا يمكن إضافة أكثر من $maxImages صور", android.widget.Toast.LENGTH_SHORT).show()
+                return@rememberLauncherForActivityResult
+            }
+            compressionJob?.cancel()
+            compressionJob = scope.launch {
                 isProcessingImages = true
                 val compressed = uris.map { compressSingleUriBg(it) }
                 val combined = (imagesUris + compressed).take(maxImages)
@@ -108,9 +127,14 @@ fun RegistrationImagePicker(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
-            scope.launch {
+            if (imagesUris.size >= maxImages) {
+                android.widget.Toast.makeText(context, "لا يمكن إضافة أكثر من $maxImages صور", android.widget.Toast.LENGTH_SHORT).show()
+                return@rememberLauncherForActivityResult
+            }
+            compressionJob?.cancel()
+            compressionJob = scope.launch {
                 isProcessingImages = true
-                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     try {
                         val tempFile = File(context.cacheDir, "cam_${System.currentTimeMillis()}.jpg")
                         var quality = 85
@@ -127,7 +151,7 @@ fun RegistrationImagePicker(
                         fos.close()
                         val uri = Uri.fromFile(tempFile)
                         val combined = (imagesUris + listOf(uri)).take(maxImages)
-                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        withContext(Dispatchers.Main) {
                             onImagesSelected(combined)
                         }
                     } catch (e: Exception) {

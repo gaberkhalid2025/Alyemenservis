@@ -150,21 +150,26 @@ fun JoinRequestStatusScreen(
             when (currentStatus) {
                 is JoinStatus.Rejected -> {
                     RejectedView(
-                        reason = currentStatus.reason,
+                        reason = currentStatus.reason ?: "تم رفض الطلب لعدم استيفاء الشروط الخاصة بالخدمة.",
                         onReapply = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
                 is JoinStatus.PendingStore -> {
                     val store = currentStatus.store
+                    val storeName = store?.name ?: "نشاط تجاري جديد"
+                    val ownerName = store?.ownerName ?: "غير محدد"
+                    val phone = store?.phone ?: "غير محدد"
+                    val city = store?.cityId ?: "صنعاء"
+                    val neighborhood = store?.localNeighborhood ?: ""
                     PendingApprovalView(
                         title = "⏳ طلب انضمام النشاط التجاري قيد المراجعة",
-                        message = "تم استلام طلب انضمام النشاط '${store.name}' وهو قيد التدقيق والاعتماد الإداري.",
+                        message = "تم استلام طلب انضمام النشاط '$storeName' وهو قيد التدقيق والاعتماد الإداري.",
                         detailsList = listOf(
-                            "اسم النشاط" to store.name,
-                            "اسم المالك" to store.ownerName,
-                            "رقم الهاتف" to store.phone,
-                            "المنطقة" to "${store.cityId} - ${store.localNeighborhood}"
+                            "اسم النشاط" to storeName,
+                            "اسم المالك" to ownerName,
+                            "رقم الهاتف" to phone,
+                            "المنطقة" to "$city - $neighborhood"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
@@ -172,14 +177,20 @@ fun JoinRequestStatusScreen(
                 }
                 is JoinStatus.PendingProperty -> {
                     val prop = currentStatus.property
+                    val title = prop?.title ?: "عقار جديد"
+                    val price = prop?.price ?: 0.0
+                    val currency = prop?.currency ?: "ريال يمني"
+                    val phone = prop?.phone ?: "غير محدد"
+                    val city = prop?.cityId ?: "صنعاء"
+                    val neighborhood = prop?.localNeighborhood ?: ""
                     PendingApprovalView(
                         title = "⏳ إعلان العقار قيد المراجعة",
-                        message = "تم استلام إعلان العقار '${prop.title}' وهو قيد المراجعة والاعتماد الظاهر.",
+                        message = "تم استلام إعلان العقار '$title' وهو قيد المراجعة والاعتماد الظاهر.",
                         detailsList = listOf(
-                            "عنوان العقار" to prop.title,
-                            "السعر" to "${prop.price} ${prop.currency}",
-                            "رقم التواصل" to prop.phone,
-                            "المنطقة" to "${prop.cityId} - ${prop.localNeighborhood}"
+                            "عنوان العقار" to title,
+                            "السعر" to "$price $currency",
+                            "رقم التواصل" to phone,
+                            "المنطقة" to "$city - $neighborhood"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
@@ -187,13 +198,17 @@ fun JoinRequestStatusScreen(
                 }
                 is JoinStatus.PendingTechnician -> {
                     val pending = currentStatus.provider
+                    val name = pending?.name ?: "فني جديد"
+                    val phone = pending?.phone ?: "غير محدد"
+                    val area = pending?.area ?: "صنعاء"
+                    val neighborhood = pending?.localNeighborhood ?: ""
                     PendingApprovalView(
                         title = "⏳ طلب الانضمام كفني قيد المراجعة",
                         message = "تم استلام بياناتك بنجاح وجاري مراجعة المؤهلات وتفعيل الملف الشخصي.",
                         detailsList = listOf(
-                            "الاسم" to pending.name,
-                            "رقم التواصل" to pending.phone,
-                            "المنطقة" to "${pending.area} - ${pending.localNeighborhood}"
+                            "الاسم" to name,
+                            "رقم التواصل" to phone,
+                            "المنطقة" to "$area - $neighborhood"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
@@ -203,7 +218,7 @@ fun JoinRequestStatusScreen(
                     PendingApprovalView(
                         title = "⏳ طلب الانضمام قيد المراجعة والتدقيق",
                         message = "طلبك قيد المراجعة الإدارية. سيصلك إشعار فور الاعتماد وتفعيل حسابك.",
-                        detailsList = listOf("رقم الهاتف المسجل" to currentStatus.phone),
+                        detailsList = listOf("رقم الهاتف المسجل" to (currentStatus.phone ?: "غير محدد")),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )

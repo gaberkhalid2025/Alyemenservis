@@ -43,11 +43,35 @@ fun StatusNotificationsSection(
 
         if (notifications.isEmpty()) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.03f)),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.02f)),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
-                    Text("📭 لا توجد إشعارات إدارية جديدة.", fontSize = 10.5.sp, color = Color.Gray)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp, horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "🔔",
+                        fontSize = 32.sp
+                    )
+                    Text(
+                        text = "لا توجد إشعارات إدارية جديدة حالياً",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "سيتم نشر أي تعاميم، عروض عمل، أو تحديثات إدارية هامة هنا فور صدورها.",
+                        fontSize = 10.sp,
+                        color = Color.Gray,
+                        lineHeight = 15.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
                 }
             }
         } else {

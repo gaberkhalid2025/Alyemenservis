@@ -30,10 +30,15 @@ fun BookingsScreenLayout(
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     var isCreatingNewBooking by remember { mutableStateOf(false) }
 
     val isAdmin = adminRole != "GUEST" && adminRole != "SUPERVISOR"
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshData()
+    }
 
     // Filter relevant bookings for the user or admin
     val relevantBookings = remember(bookings, currentUserPhone, currentUserId, isAdmin) {
@@ -72,6 +77,8 @@ fun BookingsScreenLayout(
                 currentUserId = currentUserId.ifBlank { currentUserPhone },
                 isAdmin = isAdmin,
                 isProvider = viewModel.isProviderUser,
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.refreshData() },
                 onBackClick = { viewModel.navigateTo("USER_BROWSE") },
                 onCreateNewBookingClick = { isCreatingNewBooking = true },
                 onUpdateBooking = { updatedBooking ->

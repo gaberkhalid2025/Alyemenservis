@@ -47,9 +47,30 @@ fun RequestsListScreen(
     var selectedTab by remember { mutableIntStateOf(0) } // 0: الكل / النشطة, 1: المكتملة, 2: الملغية
     var requestsList by remember { mutableStateOf<List<InstantRequestEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     val tabs = listOf("النشطة", "المكتملة", "الملغية")
+
+    fun refreshRequests() {
+        isRefreshing = true
+        var query: Query = firestore.collection("instant_requests")
+        if (!isProvider && currentUserId.isNotBlank() && currentUserId != "guest") {
+            query = query.whereEqualTo("userId", currentUserId)
+        }
+        query.orderBy("createdAt", Query.Direction.DESCENDING).get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot != null) {
+                    requestsList = snapshot.documents.mapNotNull { it.toObject(InstantRequestEntity::class.java) }
+                }
+                isRefreshing = false
+                isLoading = false
+            }
+            .addOnFailureListener {
+                isRefreshing = false
+                isLoading = false
+            }
+    }
 
     LaunchedEffect(currentUserId, isProvider) {
         isLoading = true
@@ -93,6 +114,13 @@ fun RequestsListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { refreshRequests() }) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "تحديث الطلبات")
+                        }
+                    }
                     if (!isProvider) {
                         IconButton(onClick = onNavigateToNewRequest) {
                             Icon(Icons.Default.AddCircle, contentDescription = "طلب جديد", tint = MaterialTheme.colorScheme.primary)

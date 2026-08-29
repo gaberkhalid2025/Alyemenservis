@@ -229,4 +229,8 @@ object FirebaseStorageUploader {
 
     fun getChatMessageMediaPath(channelId: String, messageId: String): String =
         "chat/$channelId/${messageId}.webp"
+
+    suspend fun uploadImageToStorage(context: Context, uri: Uri, path: String): Result<String> {
+        return uploadImageUri(context, uri, path, maxDimension = 800, maxSizeBytes = 300 * 1024L)
+    }
 }

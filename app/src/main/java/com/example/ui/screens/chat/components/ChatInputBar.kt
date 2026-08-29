@@ -36,6 +36,7 @@ import com.example.data.models.MediaType
 import com.example.util.ChatIcons
 import com.example.util.ImageUtils
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
@@ -46,11 +47,13 @@ fun ChatInputBar(
     onTyping: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var textInput by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
     var recordingDuration by remember { mutableIntStateOf(0) }
     var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var audioFile by remember { mutableStateOf<File?>(null) }
+    var uploadProgress by remember { mutableStateOf<Float?>(null) }
 
     // Pulsing animation for active recording
     val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
@@ -64,16 +67,38 @@ fun ChatInputBar(
         label = "recording_scale"
     )
 
-    // Image Picker with Mandatory Compression (maxWidth = 800, quality = 75)
+    // Image Picker with Firebase Storage upload
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val base64 = ImageUtils.uriToBase64(context, uri, maxWidth = 800, quality = 75)
-            if (base64.isNotEmpty()) {
-                onSendMessage("", MediaType.IMAGE, "data:image/jpeg;base64,$base64")
-            } else {
-                Toast.makeText(context, "تعذر تحضير الصورة المضغوطة", Toast.LENGTH_SHORT).show()
+            var fileSize = 0L
+            try {
+                context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
+                    fileSize = it.length
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            if (fileSize > 5 * 1024 * 1024) {
+                Toast.makeText(context, "الملف كبير جداً (الحد الأقصى 5 ميجابايت)", Toast.LENGTH_SHORT).show()
+                return@rememberLauncherForActivityResult
+            }
+
+            scope.launch {
+                uploadProgress = 0.1f
+                val randomId = System.currentTimeMillis().toString()
+                val path = com.example.util.FirebaseStorageUploader.getChatMessageMediaPath("direct_chat", randomId)
+                uploadProgress = 0.4f
+                val result = com.example.util.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                uploadProgress = 1.0f
+                delay(300)
+                uploadProgress = null
+                result.onSuccess { downloadUrl ->
+                    onSendMessage("", MediaType.IMAGE, downloadUrl)
+                }.onFailure { exception ->
+                    Toast.makeText(context, "فشل الرفع: ${exception.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -98,6 +123,8 @@ fun ChatInputBar(
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioEncodingBitRate(64000)
+                setAudioSamplingRate(44100)
                 setOutputFile(file.absolutePath)
                 prepare()
                 start()
@@ -125,16 +152,30 @@ fun ChatInputBar(
 
         val file = audioFile
         if (file != null && file.exists() && recordingDuration >= 1) {
-            try {
+            val fileSize = file.length()
+            if (fileSize > 5 * 1024 * 1024) {
+                Toast.makeText(context, "الملف كبير جداً (الحد الأقصى 5 ميجابايت)", Toast.LENGTH_SHORT).show()
+                return
+            }
+            scope.launch {
+                uploadProgress = 0.2f
+                val randomId = System.currentTimeMillis().toString()
+                val path = "chat/audio/audio_rec_$randomId.mp3"
                 val bytes = file.readBytes()
-                val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                onSendMessage(
-                    "تسجيل صوتي (${recordingDuration}ث)",
-                    MediaType.AUDIO,
-                    "data:audio/mp3;base64,$base64"
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
+                uploadProgress = 0.6f
+                val result = com.example.util.FirebaseStorageUploader.uploadBytesToStorage(bytes, path, mimeType = "audio/mp3")
+                uploadProgress = 1.0f
+                delay(300)
+                uploadProgress = null
+                result.onSuccess { downloadUrl ->
+                    onSendMessage(
+                        "تسجيل صوتي (${recordingDuration}ث)",
+                        MediaType.AUDIO,
+                        downloadUrl
+                    )
+                }.onFailure { exception ->
+                    Toast.makeText(context, "فشل الرفع: ${exception.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
         audioFile = null
@@ -162,6 +203,17 @@ fun ChatInputBar(
             .background(Color(0xFF142030))
             .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
+        // Upload Progress Indicator
+        if (uploadProgress != null) {
+            LinearProgressIndicator(
+                progress = uploadProgress ?: 0f,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                color = Color(0xFF1E88E5),
+                trackColor = Color.White.copy(alpha = 0.1f)
+            )
+        }
         // Reply banner
         if (replyingTo != null) {
             Row(

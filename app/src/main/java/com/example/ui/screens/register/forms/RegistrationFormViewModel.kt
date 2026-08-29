@@ -56,12 +56,20 @@ class RegistrationFormViewModel(
     private val _isCompressingImages = MutableStateFlow(false)
     val isCompressingImages: StateFlow<Boolean> = _isCompressingImages.asStateFlow()
 
+    private val _isSubmitting = MutableStateFlow(false)
+    val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
+
+    fun setSubmitting(submitting: Boolean) {
+        _isSubmitting.value = submitting
+    }
+
     /**
      * إعادة تعيين حالة النموذج لـ Idle لمنع ظهور رسائل الأخطاء القديمة عند إعادة الفتح
      */
     fun resetState() {
         _formState.value = FormUiState.Idle
         _isCompressingImages.value = false
+        _isSubmitting.value = false
     }
 
     /**
@@ -76,12 +84,14 @@ class RegistrationFormViewModel(
      */
     fun handleException(throwable: Throwable, defaultMessage: String = "حدث خطأ غير متوقع أثناء معالجة النموذج") {
         Log.e("RegistrationFormViewModel", "Unhandled Exception caught", throwable)
-        val readableMessage = when (throwable) {
-            is IllegalArgumentException -> throwable.message ?: defaultMessage
-            is java.net.UnknownHostException -> "تعذر الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت."
-            else -> throwable.message ?: defaultMessage
-        }
+        val readableMessage = com.example.util.ErrorHandler.getLocalizedMessage(throwable)
         _formState.value = FormUiState.Error(errorMessage = readableMessage)
+    }
+
+    fun clearError() {
+        if (_formState.value is FormUiState.Error) {
+            _formState.value = FormUiState.Idle
+        }
     }
 
     /**
@@ -92,8 +102,8 @@ class RegistrationFormViewModel(
      * @return قائمة بعناوين الملفات المضغوطة
      */
     suspend fun compressImagesInBackground(context: Context, uris: List<Uri>): List<Uri> {
-        return withContext(Dispatchers.IO) {
-            _isCompressingImages.value = true
+        _isCompressingImages.value = true  // ✅ في Main (آمن)
+        val result = withContext(Dispatchers.IO) {
             try {
                 uris.map { uri ->
                     compressSingleUri(context, uri)
@@ -101,10 +111,10 @@ class RegistrationFormViewModel(
             } catch (e: Exception) {
                 Log.e("RegistrationFormVM", "Error compressing images", e)
                 uris
-            } finally {
-                _isCompressingImages.value = false
             }
         }
+        _isCompressingImages.value = false  // ✅ في Main (آمن)
+        return result
     }
 
     private fun compressSingleUri(context: Context, uri: Uri): Uri {
@@ -146,6 +156,7 @@ class RegistrationFormViewModel(
         val compressedUris = compressImagesInBackground(context, imagesUris)
 
         val uploadedUrls = mutableListOf<String>()
+        val failedUrls = mutableListOf<String>()
         compressedUris.forEachIndexed { idx, uri ->
             val stepProgress = 0.2f + (((idx + 1).toFloat() / compressedUris.size) * 0.7f)
             val percent = (stepProgress * 100).toInt()
@@ -154,7 +165,17 @@ class RegistrationFormViewModel(
                 stageMessage = "جاري رفع الصور للسحابة (${idx + 1}/${compressedUris.size})... $percent%"
             )
             val res = FirebaseStorageUploader.uploadImageUri(context, uri, pathGenerator(idx))
-            res.getOrNull()?.let { uploadedUrls.add(it) }
+            val url = res.getOrNull()
+            if (url != null) {
+                uploadedUrls.add(url)
+            } else {
+                failedUrls.add("الصورة ${idx + 1}")
+            }
+        }
+        if (uploadedUrls.isEmpty()) {
+            _formState.value = FormUiState.Error("فشل رفع جميع الصور")
+        } else if (failedUrls.isNotEmpty()) {
+            _formState.value = FormUiState.Error("فشل رفع بعض الصور: ${failedUrls.joinToString(", ")}")
         }
         return uploadedUrls
     }
@@ -173,15 +194,26 @@ class RegistrationFormViewModel(
         val compressedUris = compressImagesInBackground(context, imagesUris)
 
         val uploadedUrls = mutableListOf<String>()
+        val failedUrls = mutableListOf<String>()
         compressedUris.forEachIndexed { idx, uri ->
             val stepProgress = 0.2f + (((idx + 1).toFloat() / compressedUris.size) * 0.5f)
             val percent = (stepProgress * 100).toInt()
             _formState.value = FormUiState.Loading(
                 progress = stepProgress,
-                stageMessage = "جاري رفع الصور للسحابة ($idx+1/${compressedUris.size})... $percent%"
+                stageMessage = "جاري رفع الصور للسحابة (${idx + 1}/${compressedUris.size})... $percent%"
             )
             val res = FirebaseStorageUploader.uploadImageUri(context, uri, "$folderName/${System.currentTimeMillis()}_$idx.jpg")
-            res.getOrNull()?.let { uploadedUrls.add(it) }
+            val url = res.getOrNull()
+            if (url != null) {
+                uploadedUrls.add(url)
+            } else {
+                failedUrls.add("الصورة ${idx + 1}")
+            }
+        }
+        if (uploadedUrls.isEmpty()) {
+            _formState.value = FormUiState.Error("فشل رفع جميع الصور")
+        } else if (failedUrls.isNotEmpty()) {
+            _formState.value = FormUiState.Error("فشل رفع بعض الصور: ${failedUrls.joinToString(", ")}")
         }
         return uploadedUrls
     }

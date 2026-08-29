@@ -11,4 +11,6 @@ sealed class RegistrationLoadingState {
     ) : RegistrationLoadingState()
     data class Success(val message: String) : RegistrationLoadingState()
     data class Error(val message: String) : RegistrationLoadingState()
+
+    fun reset(): RegistrationLoadingState = Idle
 }
