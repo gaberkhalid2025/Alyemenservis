@@ -8,22 +8,33 @@ import android.util.Base64
 import java.io.ByteArrayOutputStream
 
 object ImageUtils {
-    fun uriToBase64(context: Context, uri: Uri, maxWidth: Int = 800, quality: Int = 75): String {
+    fun uriToBase64(
+        context: Context,
+        uri: Uri,
+        maxWidth: Int = 800,
+        quality: Int = 75
+    ): String {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return ""
-            val bitmap = BitmapFactory.decodeStream(inputStream) ?: return ""
-            val scaledBitmap = if (bitmap.width > maxWidth) {
-                val ratio = bitmap.height.toFloat() / bitmap.width.toFloat()
-                val targetHeight = (maxWidth * ratio).toInt()
-                Bitmap.createScaledBitmap(bitmap, maxWidth, targetHeight, true)
-            } else {
-                bitmap
-            }
+            val originalBitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (originalBitmap == null) return ""
+
+            val ratio = originalBitmap.width.toFloat() / originalBitmap.height.toFloat()
+            val targetWidth = minOf(maxWidth, originalBitmap.width)
+            val targetHeight = (targetWidth / ratio).toInt()
+
+            val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, targetWidth, targetHeight, true)
+
             val outputStream = ByteArrayOutputStream()
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-            val bytes = outputStream.toByteArray()
-            Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+            if (scaledBitmap != originalBitmap) originalBitmap.recycle()
+            originalBitmap.recycle()
+
+            Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
         } catch (e: Exception) {
+            e.printStackTrace()
             ""
         }
     }
@@ -32,3 +43,4 @@ object ImageUtils {
         return uriToBase64(context, uri, maxWidth, quality)
     }
 }
+

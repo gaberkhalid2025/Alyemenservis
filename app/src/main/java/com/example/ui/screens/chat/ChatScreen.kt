@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,6 +105,8 @@ fun ChatScreen(
         else messages.filter { it.message.contains(searchQuery, ignoreCase = true) }
     }
 
+    var showDeleteChannelDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -115,6 +118,8 @@ fun ChatScreen(
             photoUrl = otherUserPhoto,
             presence = presence,
             isTyping = isTypingOther,
+            relatedEntityId = activeChannel?.relatedEntityId ?: relatedEntityId,
+            relatedEntityType = activeChannel?.relatedEntityType ?: relatedEntityType,
             onBackClick = onBackClick,
             onSearchToggle = {
                 isSearchOpen = !isSearchOpen
@@ -125,6 +130,9 @@ fun ChatScreen(
                     chatViewModel.toggleBlock(otherUserId, true)
                     Toast.makeText(context, "تم حظر المستخدم", Toast.LENGTH_SHORT).show()
                 }
+            },
+            onDeleteChannelClick = {
+                showDeleteChannelDialog = true
             }
         )
 
@@ -245,6 +253,34 @@ fun ChatScreen(
                 }
             },
             confirmButton = {},
+            containerColor = Color(0xFF1E293B)
+        )
+    }
+
+    // Channel Deletion Confirmation Dialog
+    if (showDeleteChannelDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteChannelDialog = false },
+            title = { Text("حذف المحادثة بالكامل", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = { Text("هل أنت متاكد من رغبتك في حذف هذه المحادثة وجميع رسائلها؟ لا يمكن استرجاع البيانات بعد الحذف.", color = Color.LightGray, fontSize = 13.sp) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteChannelDialog = false
+                        chatViewModel.deleteCurrentChannel {
+                            onBackClick()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                ) {
+                    Text("تأكيد الحذف", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteChannelDialog = false }) {
+                    Text("إلغاء", color = Color.Gray)
+                }
+            },
             containerColor = Color(0xFF1E293B)
         )
     }

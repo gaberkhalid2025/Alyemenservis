@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -11,7 +12,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -150,16 +151,46 @@ fun ChatBubbleItem(
                     }
                 }
                 MediaType.AUDIO -> {
+                    var isPlaying by remember { mutableStateOf(false) }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                            .padding(8.dp),
+                            .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "تشغيل", tint = Color.White)
+                        IconButton(
+                            onClick = { isPlaying = !isPlaying },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "إيقاف" else "تشغيل",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("تسجيل صوتي 🎤", color = Color.White, fontSize = 12.sp)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = message.message.ifBlank { "مقطع صوتي 🎤" },
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { if (isPlaying) 0.65f else 0f },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = Color(0xFF64FFDA),
+                                trackColor = Color.White.copy(alpha = 0.2f),
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                 }

@@ -15,7 +15,8 @@ class ChatListViewModel(
     private val _channels = MutableStateFlow<List<ChatChannel>>(emptyList())
     val channels: StateFlow<List<ChatChannel>> = _channels.asStateFlow()
 
-    private val _selectedFilter = MutableStateFlow("ALL") // ALL, UNREAD, TECHNICIANS, STORES, RESTAURANTS, SUPPORT
+    // Filters: ALL, UNREAD, SUPPORT, TECHNICIANS, STORES, RESTAURANTS
+    private val _selectedFilter = MutableStateFlow("ALL")
     val selectedFilter: StateFlow<String> = _selectedFilter.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
@@ -54,17 +55,21 @@ class ChatListViewModel(
     fun deleteChannel(channelId: String) {
         viewModelScope.launch {
             repository.deleteChannel(channelId)
+            _channels.value = _channels.value.filter { it.id != channelId }
         }
     }
 
     fun deleteAllChannels(channelsList: List<ChatChannel>) {
         viewModelScope.launch {
             repository.deleteAllChannels(channelsList)
+            _channels.value = emptyList()
         }
     }
 
     override fun onCleared() {
         super.onCleared()
         channelsJob?.cancel()
+        channelsJob = null
     }
 }
+

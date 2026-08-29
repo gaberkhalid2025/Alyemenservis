@@ -217,10 +217,23 @@ class ChatViewModel(
         }
     }
 
+    fun deleteCurrentChannel(onDeleted: () -> Unit) {
+        val channel = _currentChannel.value ?: return
+        viewModelScope.launch {
+            repository.deleteChannel(channel.id)
+            _currentChannel.value = null
+            _messages.value = emptyList()
+            onDeleted()
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         messagesJob?.cancel()
+        messagesJob = null
         presenceJob?.cancel()
+        presenceJob = null
         typingJob?.cancel()
+        typingJob = null
     }
 }
