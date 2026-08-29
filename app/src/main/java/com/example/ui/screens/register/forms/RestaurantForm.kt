@@ -108,7 +108,7 @@ fun RestaurantForm(
         )
 
         RegistrationSubmitButton(
-            text = "تسجيل المطعم الان 🍔",
+            text = "تسجيل المطعم الآن 🍔",
             onClick = {
                 val phoneVal = Validators.validateYemenPhone(phone)
                 if (!phoneVal.isValid) {

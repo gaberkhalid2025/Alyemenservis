@@ -34,9 +34,17 @@ class FCMService : FirebaseMessagingService() {
             val phone = if (rawPhone.isNotEmpty()) com.example.util.SecurityCryptoUtils.decrypt(rawPhone) else ""
             if (userId.isNotEmpty() && userId != "guest") {
                 val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val tokenData = mapOf(
+                    "token" to token,
+                    "phone" to phone,
+                    "role" to "CLIENT",
+                    "updatedAt" to System.currentTimeMillis()
+                )
+                db.collection("fcm_tokens").document(userId).set(tokenData)
                 db.collection("registered_users").document(userId).update("fcmToken", token)
                 val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
                 if (cleanPhone.isNotEmpty()) {
+                    db.collection("fcm_tokens").document(cleanPhone).set(tokenData)
                     db.collection("providers").document(cleanPhone).update("fcmToken", token)
                     db.collection("stores").document(cleanPhone).update("fcmToken", token)
                     db.collection("properties").document(cleanPhone).update("fcmToken", token)

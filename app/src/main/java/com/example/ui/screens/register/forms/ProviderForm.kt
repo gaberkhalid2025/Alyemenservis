@@ -93,7 +93,7 @@ fun ProviderForm(
         RegistrationField(
             value = area,
             onValueChange = { area = it },
-            label = "المحافظة/المدينة الرئيسي *",
+            label = "المحافظة/المدينة الرئيسية *",
             leadingIcon = Icons.Default.Place,
             themeColors = themeColors
         )

@@ -20,9 +20,12 @@ data class NotificationEntity(
     val scheduledTime: Long = 0L,
     val customerPhone: String = "",
     val customerName: String = "",
-    val notificationType: String = "NORMAL", // "BOOKING", "MESSAGE", "SYSTEM", "ADMIN", "REGISTRATION_APPROVED", "SPECIAL_OFFER", "NORMAL"
+    val notificationType: String = "NORMAL", // "BOOKING", "MESSAGE", "SYSTEM", "ADMIN", "REGISTRATION_APPROVED", "SPECIAL_OFFER", "NORMAL", "JOIN_REQUEST", "JOIN_APPROVED", "JOIN_REJECTED"
     val channel: String = "IN_APP", // "IN_APP", "FCM", "WHATSAPP", "SMS", "TELEGRAM"
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val relatedRequestId: String = "",
+    val fcmSent: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
 ) {
     // Validation helper to reject dummy, incomplete or corrupted notifications
     fun isValid(): Boolean {

@@ -174,12 +174,115 @@ class StatusRepositoryImpl(
 
     override suspend fun approveJoinRequest(request: PendingProviderEntity): Result<Unit> {
         return try {
+            val requestDoc = firestore.collection("join_requests").document(request.id).get().await()
+            val type = requestDoc.getString("type") ?: "PROVIDER"
+            val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+            val now = System.currentTimeMillis()
+
             val batch = firestore.batch()
             val requestRef = firestore.collection("join_requests").document(request.id)
-            val userRef = firestore.collection("users").document(request.id)
+            batch.update(requestRef, mapOf(
+                "status" to "APPROVED",
+                "approvalStatus" to "APPROVED",
+                "isActive" to true,
+                "approvedAt" to now,
+                "approvedBy" to "ADMIN",
+                "updatedAt" to now
+            ))
 
-            batch.update(requestRef, mapOf("status" to "APPROVED", "updatedAt" to System.currentTimeMillis()))
-            batch.update(userRef, mapOf("status" to "APPROVED", "role" to "PROVIDER", "updatedAt" to System.currentTimeMillis()))
+            // Create Entity in appropriate collection
+            when (type.uppercase()) {
+                "PROVIDER" -> {
+                    val provRef = firestore.collection("providers").document(request.id)
+                    val provData = mapOf(
+                        "id" to request.id,
+                        "name" to request.name,
+                        "phone" to cleanPhone,
+                        "categoryId" to request.categoryId,
+                        "area" to request.area,
+                        "isAvailable" to true,
+                        "subscriptionStatus" to "APPROVED",
+                        "rating" to 5.0f,
+                        "isBlocked" to false,
+                        "createdAt" to now
+                    )
+                    batch.set(provRef, provData)
+                }
+                "STORE", "RESTAURANT", "MEDICAL" -> {
+                    val storeRef = firestore.collection("stores").document(request.id)
+                    val storeData = mapOf(
+                        "id" to request.id,
+                        "name" to (requestDoc.getString("businessName") ?: request.name),
+                        "ownerName" to request.name,
+                        "phone" to cleanPhone,
+                        "category" to request.categoryId,
+                        "city" to request.area,
+                        "isActive" to true,
+                        "isApproved" to true,
+                        "type" to type,
+                        "createdAt" to now
+                    )
+                    batch.set(storeRef, storeData)
+                }
+                "PROPERTY" -> {
+                    val propRef = firestore.collection("properties").document(request.id)
+                    val propData = mapOf(
+                        "id" to request.id,
+                        "title" to (requestDoc.getString("propertyTitle") ?: request.name),
+                        "ownerName" to request.name,
+                        "phone" to cleanPhone,
+                        "category" to request.categoryId,
+                        "city" to request.area,
+                        "isActive" to true,
+                        "isApproved" to true,
+                        "createdAt" to now
+                    )
+                    batch.set(propRef, propData)
+                }
+                "JOB" -> {
+                    val jobRef = firestore.collection("jobs").document(request.id)
+                    val jobData = mapOf(
+                        "id" to request.id,
+                        "jobTitle" to (requestDoc.getString("jobTitle") ?: request.name),
+                        "companyName" to (requestDoc.getString("companyName") ?: request.name),
+                        "phone" to cleanPhone,
+                        "city" to request.area,
+                        "isActive" to true,
+                        "isApproved" to true,
+                        "createdAt" to now
+                    )
+                    batch.set(jobRef, jobData)
+                }
+                else -> {
+                    val userRef = firestore.collection("users").document(request.id)
+                    batch.set(userRef, mapOf(
+                        "id" to request.id,
+                        "name" to request.name,
+                        "phone" to cleanPhone,
+                        "role" to "CLIENT",
+                        "status" to "APPROVED",
+                        "createdAt" to now
+                    ))
+                }
+            }
+
+            // Create notification for user
+            val notifId = java.util.UUID.randomUUID().toString()
+            val notifRef = firestore.collection("notifications").document(notifId)
+            val notif = NotificationEntity(
+                id = notifId,
+                title = "🎉 تم قبول وتوثيق طلب الانضمام!",
+                message = "تهانينا! تمت مراجعة والموافقة على طلب انضمامك ($type). حسابك أصبح نشطاً ومتاحاً الآن.",
+                targetType = "USER",
+                targetValue = cleanPhone,
+                notificationType = "JOIN_APPROVED",
+                relatedRequestId = request.id,
+                isRead = false,
+                fcmSent = false,
+                timestamp = now,
+                createdAt = now
+            )
+            batch.set(notifRef, notif)
 
             batch.commit().await()
             Result.success(Unit)
@@ -191,16 +294,40 @@ class StatusRepositoryImpl(
 
     override suspend fun rejectJoinRequest(request: PendingProviderEntity, reason: String): Result<Unit> {
         return try {
+            val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+            val now = System.currentTimeMillis()
+            val finalReason = reason.ifBlank { "لم تستوفِ المستندات أو الشروط المطلوبة" }
+
             val batch = firestore.batch()
             val requestRef = firestore.collection("join_requests").document(request.id)
-            val userRef = firestore.collection("users").document(request.id)
 
             batch.update(requestRef, mapOf(
                 "status" to "REJECTED",
-                "rejectionReason" to reason.ifBlank { "لم تستوفِ المستندات أو الشروط المطلوبة" },
-                "updatedAt" to System.currentTimeMillis()
+                "approvalStatus" to "REJECTED",
+                "isActive" to false,
+                "rejectionReason" to finalReason,
+                "rejectedAt" to now,
+                "rejectedBy" to "ADMIN",
+                "updatedAt" to now
             ))
-            batch.update(userRef, mapOf("status" to "REJECTED", "updatedAt" to System.currentTimeMillis()))
+
+            // Create notification for user
+            val notifId = java.util.UUID.randomUUID().toString()
+            val notifRef = firestore.collection("notifications").document(notifId)
+            val notif = NotificationEntity(
+                id = notifId,
+                title = "❌ حالة طلب الانضمام",
+                message = "نأسف لإبلاغك بأنه تم رفض طلب الانضمام للسبب التالي: $finalReason",
+                targetType = "USER",
+                targetValue = cleanPhone,
+                notificationType = "JOIN_REJECTED",
+                relatedRequestId = request.id,
+                isRead = false,
+                fcmSent = false,
+                timestamp = now,
+                createdAt = now
+            )
+            batch.set(notifRef, notif)
 
             batch.commit().await()
             Result.success(Unit)

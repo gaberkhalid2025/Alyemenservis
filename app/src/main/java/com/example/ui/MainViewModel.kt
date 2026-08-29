@@ -2564,6 +2564,29 @@ class MainViewModel : ViewModel() {
             )
             // Push to Cloud with robust listeners
             db.collection("pending_providers").document(requestDocId).set(newRequest)
+            
+            val unifiedJoinRequest = com.example.data.models.JoinRequestEntity(
+                id = requestDocId,
+                type = "PROVIDER",
+                status = "PENDING",
+                fullName = name,
+                phone = cleanPhone,
+                passwordHash = password,
+                city = area,
+                area = neighborhood,
+                neighborhood = neighborhood,
+                categoryId = catId,
+                categoryName = customCategoryName.ifBlank { catId },
+                businessName = name,
+                profileImage = finalSelfie,
+                idCardImage = finalIdCard,
+                workImages = finalWorkPhotos,
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            db.collection("join_requests").document(requestDocId).set(unifiedJoinRequest)
                 .addOnSuccessListener {
                     // Send a notification to Admin/Supervisors
                     val adminNotif = NotificationEntity(
@@ -2661,6 +2684,15 @@ class MainViewModel : ViewModel() {
         }
 
         clearPendingFromDbAndState()
+
+        val now = System.currentTimeMillis()
+        db.collection("join_requests").document(request.id).update(mapOf(
+            "status" to "APPROVED",
+            "approvalStatus" to "APPROVED",
+            "isActive" to true,
+            "approvedAt" to now,
+            "updatedAt" to now
+        ))
 
         if (request.profession == "STORE_OWNER") {
             val storeId = "store_" + cleanPhone

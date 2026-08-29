@@ -104,7 +104,7 @@ fun JobForm(
         RegistrationField(
             value = description,
             onValueChange = { description = it },
-            label = "وصف الوصف الوظيفي والمؤهلات المطلوبة *",
+            label = "الوصف الوظيفي والمؤهلات المطلوبة *",
             leadingIcon = Icons.Default.Info,
             singleLine = false,
             minLines = 3,

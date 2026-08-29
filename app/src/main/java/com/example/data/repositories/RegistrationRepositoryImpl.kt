@@ -3,9 +3,12 @@ package com.example.data.repositories
 import android.content.Context
 import android.util.Log
 import com.example.data.LocalAppCacheManager
+import com.example.data.models.JoinRequestEntity
+import com.example.data.NotificationEntity
 import com.example.domain.entities.JoinStatusEntity
 import com.example.domain.entities.RegistrationEntity
 import com.example.security.BookingSecurityHelper
+import com.example.util.NotificationDeduplicator
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.channels.awaitClose
@@ -16,7 +19,8 @@ import java.util.UUID
 
 /**
  * 📦 RegistrationRepositoryImpl
- * Production implementation of IRegistrationRepository with offline-first support.
+ * Production implementation of IRegistrationRepository with strict Firestore schema,
+ * phone deduplication, admin notifications, and real-time status tracking.
  */
 class RegistrationRepositoryImpl(
     private val context: Context
@@ -24,23 +28,81 @@ class RegistrationRepositoryImpl(
 
     private val firestore = FirebaseFirestore.getInstance()
     private val cacheManager = LocalAppCacheManager(context)
+    private val deduplicator = NotificationDeduplicator(context)
+
+    private suspend fun checkExistingPendingRequest(phone: String): Boolean {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        if (cleanPhone.isBlank()) return false
+        val snap = firestore.collection("join_requests")
+            .whereEqualTo("phone", cleanPhone)
+            .whereEqualTo("status", "PENDING")
+            .get()
+            .await()
+        return !snap.isEmpty
+    }
+
+    private suspend fun sendAdminJoinNotification(requestId: String, applicantName: String, phone: String, type: String) {
+        try {
+            if (deduplicator.isJoinNotificationDuplicate(requestId, "JOIN_REQUEST")) {
+                return
+            }
+            val notifId = UUID.randomUUID().toString()
+            val typeTitle = when (type) {
+                "PROVIDER" -> "مهني / فني"
+                "STORE" -> "متجر / محل تجاري"
+                "RESTAURANT" -> "مطعم / كافيه"
+                "MEDICAL" -> "مركز طبي / دكتور"
+                "PROPERTY" -> "عقار / مكتب عقاري"
+                "JOB" -> "إعلان توظيف / صاحب عمل"
+                "CLIENT" -> "عميل جديد"
+                else -> type
+            }
+            val notification = NotificationEntity(
+                id = notifId,
+                title = "📥 طلب انضمام جديد ($typeTitle)",
+                message = "قدم $applicantName ($phone) طلب انضمام جديد. يرجى مراجعة بيانات الطلب والموافقة عليه.",
+                targetType = "ADMIN",
+                targetValue = "",
+                notificationType = "JOIN_REQUEST",
+                relatedRequestId = requestId,
+                isRead = false,
+                fcmSent = false,
+                timestamp = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis()
+            )
+
+            firestore.collection("notifications").document(notifId).set(notification).await()
+            deduplicator.markJoinNotificationSent(requestId, "JOIN_REQUEST")
+        } catch (e: Exception) {
+            Log.e("RegistrationRepository", "Failed to send admin notification", e)
+        }
+    }
 
     override suspend fun registerClient(client: RegistrationEntity.Client): Result<String> {
         return try {
+            val cleanPhone = client.phone.trim().replace(" ", "").replace("+", "")
+            if (checkExistingPendingRequest(cleanPhone)) {
+                return Result.failure(Exception("يوجد طلب تسجيل قيد المراجعة بالفعل لرقم الهاتف هذا"))
+            }
+
             val id = UUID.randomUUID().toString()
-            val docData = mapOf(
-                "id" to id,
-                "fullName" to client.fullName,
-                "name" to client.fullName,
-                "phone" to client.phone,
-                "city" to client.city,
-                "passwordPin" to BookingSecurityHelper.hashPin(client.passwordHash),
-                "profileImageUrl" to client.profileImageUrl,
-                "role" to "CLIENT",
-                "createdAt" to System.currentTimeMillis()
+            val request = JoinRequestEntity(
+                id = id,
+                type = "CLIENT",
+                status = "PENDING",
+                fullName = client.fullName.trim(),
+                phone = cleanPhone,
+                passwordHash = BookingSecurityHelper.hashPin(client.passwordHash),
+                city = client.city.trim(),
+                profileImage = client.profileImageUrl,
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("users").document(id).set(docData).await()
+            firestore.collection("join_requests").document(id).set(request).await()
+            sendAdminJoinNotification(id, request.fullName, cleanPhone, "CLIENT")
             Result.success(id)
         } catch (e: Exception) {
             Log.e("RegistrationRepository", "Error registering client", e)
@@ -50,28 +112,33 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerProvider(provider: RegistrationEntity.Provider): Result<String> {
         return try {
+            val cleanPhone = provider.phone.trim().replace(" ", "").replace("+", "")
+            if (checkExistingPendingRequest(cleanPhone)) {
+                return Result.failure(Exception("يوجد طلب انضمام مهني قيد المراجعة بالفعل لرقم الهاتف هذا"))
+            }
+
             val id = UUID.randomUUID().toString()
-            val docData = mapOf(
-                "id" to id,
-                "fullName" to provider.fullName,
-                "name" to provider.fullName,
-                "phone" to provider.phone,
-                "professionCategory" to provider.professionCategory,
-                "category" to provider.professionCategory,
-                "city" to provider.city,
-                "experienceYears" to provider.experienceYears,
-                "bio" to provider.bio,
-                "identityDocumentUrl" to provider.identityDocumentUrl,
-                "licenseNumber" to provider.licenseNumber,
-                "workImages" to provider.workImages,
-                "passwordPin" to BookingSecurityHelper.hashPin(provider.passwordHash),
-                "role" to "PROVIDER",
-                "status" to "PENDING",
-                "createdAt" to System.currentTimeMillis()
+            val request = JoinRequestEntity(
+                id = id,
+                type = "PROVIDER",
+                status = "PENDING",
+                fullName = provider.fullName.trim(),
+                phone = cleanPhone,
+                passwordHash = BookingSecurityHelper.hashPin(provider.passwordHash),
+                city = provider.city.trim(),
+                categoryId = provider.professionCategory.trim(),
+                categoryName = provider.professionCategory.trim(),
+                idCardImage = provider.identityDocumentUrl,
+                workImages = provider.workImages,
+                businessName = provider.fullName.trim(),
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("join_requests").document(id).set(docData).await()
-            firestore.collection("users").document(id).set(docData).await()
+            firestore.collection("join_requests").document(id).set(request).await()
+            sendAdminJoinNotification(id, request.fullName, cleanPhone, "PROVIDER")
             Result.success(id)
         } catch (e: Exception) {
             Log.e("RegistrationRepository", "Error registering provider", e)
@@ -81,168 +148,228 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerStore(store: RegistrationEntity.Store): Result<String> {
         return try {
+            val cleanPhone = store.phone.trim().replace(" ", "").replace("+", "")
+            if (checkExistingPendingRequest(cleanPhone)) {
+                return Result.failure(Exception("يوجد طلب انضمام متجر قيد المراجعة بالفعل لرقم الهاتف هذا"))
+            }
+
             val id = UUID.randomUUID().toString()
-            val docData = mapOf(
-                "id" to id,
-                "storeName" to store.storeName,
-                "name" to store.storeName,
-                "ownerName" to store.ownerName,
-                "phone" to store.phone,
-                "category" to store.storeCategory,
-                "city" to store.city,
-                "addressDetails" to store.addressDetails,
-                "commercialRegisterNumber" to store.commercialRegisterNumber,
-                "logoUrl" to store.logoUrl,
-                "storeImages" to store.storeImages,
-                "passwordPin" to BookingSecurityHelper.hashPin(store.passwordHash),
-                "type" to "STORE",
-                "status" to "PENDING",
-                "createdAt" to System.currentTimeMillis()
+            val request = JoinRequestEntity(
+                id = id,
+                type = "STORE",
+                status = "PENDING",
+                businessName = store.storeName.trim(),
+                ownerName = store.ownerName.trim(),
+                fullName = store.ownerName.trim(),
+                phone = cleanPhone,
+                passwordHash = BookingSecurityHelper.hashPin(store.passwordHash),
+                categoryId = store.storeCategory.trim(),
+                categoryName = store.storeCategory.trim(),
+                city = store.city.trim(),
+                area = store.addressDetails.trim(),
+                logoImage = store.logoUrl,
+                workImages = store.storeImages,
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("stores").document(id).set(docData).await()
-            firestore.collection("join_requests").document(id).set(docData).await()
+            firestore.collection("join_requests").document(id).set(request).await()
+            sendAdminJoinNotification(id, request.businessName, cleanPhone, "STORE")
             Result.success(id)
         } catch (e: Exception) {
+            Log.e("RegistrationRepository", "Error registering store", e)
             Result.failure(e)
         }
     }
 
     override suspend fun registerRestaurant(restaurant: RegistrationEntity.Restaurant): Result<String> {
         return try {
+            val cleanPhone = restaurant.phone.trim().replace(" ", "").replace("+", "")
+            if (checkExistingPendingRequest(cleanPhone)) {
+                return Result.failure(Exception("يوجد طلب انضمام مطعم قيد المراجعة بالفعل لرقم الهاتف هذا"))
+            }
+
             val id = UUID.randomUUID().toString()
-            val docData = mapOf(
-                "id" to id,
-                "restaurantName" to restaurant.restaurantName,
-                "name" to restaurant.restaurantName,
-                "ownerName" to restaurant.ownerName,
-                "phone" to restaurant.phone,
-                "cuisineType" to restaurant.cuisineType,
-                "city" to restaurant.city,
-                "addressDetails" to restaurant.addressDetails,
-                "logoUrl" to restaurant.logoUrl,
-                "menuImageUrls" to restaurant.menuImageUrls,
-                "passwordPin" to BookingSecurityHelper.hashPin(restaurant.passwordHash),
-                "type" to "RESTAURANT",
-                "status" to "PENDING",
-                "createdAt" to System.currentTimeMillis()
+            val request = JoinRequestEntity(
+                id = id,
+                type = "RESTAURANT",
+                status = "PENDING",
+                businessName = restaurant.restaurantName.trim(),
+                ownerName = restaurant.ownerName.trim(),
+                fullName = restaurant.ownerName.trim(),
+                phone = cleanPhone,
+                passwordHash = BookingSecurityHelper.hashPin(restaurant.passwordHash),
+                categoryId = restaurant.cuisineType.trim(),
+                categoryName = restaurant.cuisineType.trim(),
+                city = restaurant.city.trim(),
+                area = restaurant.addressDetails.trim(),
+                logoImage = restaurant.logoUrl,
+                workImages = restaurant.menuImageUrls,
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("restaurants").document(id).set(docData).await()
-            firestore.collection("join_requests").document(id).set(docData).await()
+            firestore.collection("join_requests").document(id).set(request).await()
+            sendAdminJoinNotification(id, request.businessName, cleanPhone, "RESTAURANT")
             Result.success(id)
         } catch (e: Exception) {
+            Log.e("RegistrationRepository", "Error registering restaurant", e)
             Result.failure(e)
         }
     }
 
     override suspend fun registerMedicalCenter(medical: RegistrationEntity.MedicalCenter): Result<String> {
         return try {
+            val cleanPhone = medical.phone.trim().replace(" ", "").replace("+", "")
+            if (checkExistingPendingRequest(cleanPhone)) {
+                return Result.failure(Exception("يوجد طلب انضمام مركز طبي قيد المراجعة بالفعل لرقم الهاتف هذا"))
+            }
+
             val id = UUID.randomUUID().toString()
-            val docData = mapOf(
-                "id" to id,
-                "centerName" to medical.centerName,
-                "name" to medical.centerName,
-                "specialtyCategory" to medical.specialtyCategory,
-                "doctorName" to medical.doctorName,
-                "phone" to medical.phone,
-                "city" to medical.city,
-                "addressDetails" to medical.addressDetails,
-                "licenseNumber" to medical.licenseNumber,
-                "logoUrl" to medical.logoUrl,
-                "passwordPin" to BookingSecurityHelper.hashPin(medical.passwordHash),
-                "type" to "MEDICAL",
-                "status" to "PENDING",
-                "createdAt" to System.currentTimeMillis()
+            val request = JoinRequestEntity(
+                id = id,
+                type = "MEDICAL",
+                status = "PENDING",
+                businessName = medical.centerName.trim(),
+                ownerName = medical.doctorName.trim(),
+                fullName = medical.doctorName.trim(),
+                phone = cleanPhone,
+                passwordHash = BookingSecurityHelper.hashPin(medical.passwordHash),
+                categoryId = medical.specialtyCategory.trim(),
+                categoryName = medical.specialtyCategory.trim(),
+                city = medical.city.trim(),
+                area = medical.addressDetails.trim(),
+                logoImage = medical.logoUrl,
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("medical_centers").document(id).set(docData).await()
-            firestore.collection("join_requests").document(id).set(docData).await()
+            firestore.collection("join_requests").document(id).set(request).await()
+            sendAdminJoinNotification(id, request.businessName, cleanPhone, "MEDICAL")
             Result.success(id)
         } catch (e: Exception) {
+            Log.e("RegistrationRepository", "Error registering medical center", e)
             Result.failure(e)
         }
     }
 
     override suspend fun registerProperty(property: RegistrationEntity.Property): Result<String> {
         return try {
+            val cleanPhone = property.phone.trim().replace(" ", "").replace("+", "")
+            if (checkExistingPendingRequest(cleanPhone)) {
+                return Result.failure(Exception("يوجد طلب إضافة عقار قيد المراجعة بالفعل لرقم الهاتف هذا"))
+            }
+
             val id = UUID.randomUUID().toString()
-            val docData = mapOf(
-                "id" to id,
-                "title" to property.title,
-                "propertyType" to property.propertyType,
-                "category" to property.category,
-                "ownerName" to property.ownerName,
-                "phone" to property.phone,
-                "city" to property.city,
-                "areaDetails" to property.areaDetails,
-                "priceYer" to property.priceYer,
-                "description" to property.description,
-                "imageUrls" to property.imageUrls,
-                "passwordPin" to BookingSecurityHelper.hashPin(property.passwordHash),
-                "type" to "PROPERTY",
-                "status" to "PENDING",
-                "createdAt" to System.currentTimeMillis()
+            val request = JoinRequestEntity(
+                id = id,
+                type = "PROPERTY",
+                status = "PENDING",
+                propertyTitle = property.title.trim(),
+                propertyType = property.propertyType.trim(),
+                categoryId = property.category.trim(),
+                categoryName = property.category.trim(),
+                ownerName = property.ownerName.trim(),
+                fullName = property.ownerName.trim(),
+                phone = cleanPhone,
+                passwordHash = BookingSecurityHelper.hashPin(property.passwordHash),
+                city = property.city.trim(),
+                area = property.areaDetails.trim(),
+                price = property.priceYer,
+                workImages = property.imageUrls,
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("properties").document(id).set(docData).await()
+            firestore.collection("join_requests").document(id).set(request).await()
+            sendAdminJoinNotification(id, request.propertyTitle, cleanPhone, "PROPERTY")
             Result.success(id)
         } catch (e: Exception) {
+            Log.e("RegistrationRepository", "Error registering property", e)
             Result.failure(e)
         }
     }
 
     override suspend fun registerJob(job: RegistrationEntity.Job): Result<String> {
         return try {
+            val cleanPhone = job.contactPhone.trim().replace(" ", "").replace("+", "")
+            if (checkExistingPendingRequest(cleanPhone)) {
+                return Result.failure(Exception("يوجد إعلان توظيف قيد المراجعة بالفعل لرقم الهاتف هذا"))
+            }
+
             val id = UUID.randomUUID().toString()
-            val docData = mapOf(
-                "id" to id,
-                "jobTitle" to job.jobTitle,
-                "companyName" to job.companyName,
-                "category" to job.category,
-                "contactPhone" to job.contactPhone,
-                "contactEmail" to job.contactEmail,
-                "city" to job.city,
-                "requirements" to job.requirements,
-                "salaryRange" to job.salaryRange,
-                "passwordPin" to BookingSecurityHelper.hashPin(job.passwordHash),
-                "type" to "JOB",
-                "status" to "PENDING",
-                "createdAt" to System.currentTimeMillis()
+            val request = JoinRequestEntity(
+                id = id,
+                type = "JOB",
+                status = "PENDING",
+                jobTitle = job.jobTitle.trim(),
+                companyName = job.companyName.trim(),
+                businessName = job.companyName.trim(),
+                categoryId = job.category.trim(),
+                categoryName = job.category.trim(),
+                phone = cleanPhone,
+                passwordHash = BookingSecurityHelper.hashPin(job.passwordHash),
+                city = job.city.trim(),
+                approvalStatus = "PENDING",
+                submittedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("job_listings").document(id).set(docData).await()
+            firestore.collection("join_requests").document(id).set(request).await()
+            sendAdminJoinNotification(id, request.jobTitle, cleanPhone, "JOB")
             Result.success(id)
         } catch (e: Exception) {
+            Log.e("RegistrationRepository", "Error registering job", e)
             Result.failure(e)
         }
     }
 
     override fun getJoinStatusFlow(phoneNumber: String): Flow<JoinStatusEntity?> = callbackFlow {
-        if (phoneNumber.isBlank()) {
+        val cleanPhone = phoneNumber.trim().replace(" ", "").replace("+", "")
+        if (cleanPhone.isBlank()) {
             trySend(null)
             return@callbackFlow
         }
 
         val listener: ListenerRegistration = firestore.collection("join_requests")
-            .whereEqualTo("phone", phoneNumber.trim())
+            .whereEqualTo("phone", cleanPhone)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     trySend(null)
                     return@addSnapshotListener
                 }
                 if (snapshot != null && !snapshot.isEmpty) {
-                    val doc = snapshot.documents.first()
-                    val entity = JoinStatusEntity(
-                        requestId = doc.id,
-                        applicantName = doc.getString("fullName") ?: doc.getString("name") ?: "",
-                        registrationType = doc.getString("type") ?: doc.getString("role") ?: "PROVIDER",
-                        status = doc.getString("status") ?: "PENDING",
-                        rejectionReason = doc.getString("rejectionReason") ?: "",
-                        createdAt = doc.getLong("createdAt") ?: 0L,
-                        updatedAt = doc.getLong("updatedAt") ?: 0L
-                    )
-                    trySend(entity)
+                    // Get latest request by submittedAt/createdAt
+                    val doc = snapshot.documents.maxByOrNull { it.getLong("submittedAt") ?: it.getLong("createdAt") ?: 0L }
+                    if (doc != null) {
+                        val name = doc.getString("fullName") 
+                            ?: doc.getString("businessName") 
+                            ?: doc.getString("propertyTitle") 
+                            ?: doc.getString("jobTitle") 
+                            ?: doc.getString("name") 
+                            ?: ""
+                        val entity = JoinStatusEntity(
+                            requestId = doc.id,
+                            applicantName = name,
+                            registrationType = doc.getString("type") ?: doc.getString("role") ?: "PROVIDER",
+                            status = doc.getString("status") ?: doc.getString("approvalStatus") ?: "PENDING",
+                            rejectionReason = doc.getString("rejectionReason") ?: "",
+                            createdAt = doc.getLong("submittedAt") ?: doc.getLong("createdAt") ?: 0L,
+                            updatedAt = doc.getLong("updatedAt") ?: 0L
+                        )
+                        trySend(entity)
+                    } else {
+                        trySend(null)
+                    }
                 } else {
                     trySend(null)
                 }

@@ -394,7 +394,7 @@ fun BookingFormScreen(
                     }
                     val cleanPhone = clientPhone.trim()
                     if (cleanPhone.length < 9) {
-                        errorMessage = "يرجى أدخال رقم هاتف يمني صحيح من 9 أرقام"
+                        errorMessage = "يرجى إدخال رقم هاتف يمني صحيح من 9 أرقام"
                         return@Button
                     }
                     if (fullAddress.trim().isEmpty()) {

@@ -22,12 +22,19 @@ class NotificationDeduplicator(private val context: Context) {
     }
 
     fun generateUniqueId(notification: NotificationEntity): String {
+        if (notification.relatedRequestId.isNotBlank() && notification.notificationType.isNotBlank()) {
+            return "${notification.notificationType}_${notification.relatedRequestId}"
+        }
         val target = if (notification.targetValue.isNotBlank()) notification.targetValue else notification.customerPhone
         val timeBucket = notification.timestamp / (60 * 1000L)
         return "${notification.notificationType}_${target}_${timeBucket}"
     }
 
     fun isDuplicate(notification: NotificationEntity): Boolean {
+        if (notification.relatedRequestId.isNotBlank() && notification.notificationType.isNotBlank()) {
+            val reqKey = "${notification.notificationType}_${notification.relatedRequestId}"
+            if (getSentNotifications().contains(reqKey)) return true
+        }
         val uniqueId = if (notification.id.isNotBlank()) notification.id else generateUniqueId(notification)
         val sentSet = getSentNotifications().toSet()
         val isDup = sentSet.contains(uniqueId)
@@ -35,6 +42,22 @@ class NotificationDeduplicator(private val context: Context) {
             Log.d(TAG, "Duplicate notification detected: $uniqueId")
         }
         return isDup
+    }
+
+    fun isJoinNotificationDuplicate(relatedRequestId: String, notificationType: String): Boolean {
+        if (relatedRequestId.isBlank() || notificationType.isBlank()) return false
+        val key = "${notificationType}_${relatedRequestId}"
+        return getSentNotifications().contains(key)
+    }
+
+    fun markJoinNotificationSent(relatedRequestId: String, notificationType: String) {
+        if (relatedRequestId.isBlank() || notificationType.isBlank()) return
+        val key = "${notificationType}_${relatedRequestId}"
+        val list = getSentNotifications().toMutableList()
+        if (!list.contains(key)) {
+            list.add(key)
+            saveSentNotifications(list)
+        }
     }
 
     fun markAsSent(notification: NotificationEntity) {

@@ -71,10 +71,35 @@ fun BookingsScreenLayout(
                 bookings = relevantBookings,
                 currentUserId = currentUserId.ifBlank { currentUserPhone },
                 isAdmin = isAdmin,
+                isProvider = viewModel.isProviderUser,
                 onBackClick = { viewModel.navigateTo("USER_BROWSE") },
                 onCreateNewBookingClick = { isCreatingNewBooking = true },
                 onUpdateBooking = { updatedBooking ->
                     viewModel.updateBookingImpl(updatedBooking)
+                },
+                onStatusChange = { booking, newStatus ->
+                    val updated = booking.copy(status = newStatus)
+                    viewModel.updateBookingImpl(updated)
+                    if (newStatus == "APPROVED") {
+                        // Automatically open chat when accepted
+                        val otherId = booking.clientId.ifEmpty { booking.clientPhone.ifEmpty { "CUSTOMER" } }
+                        val otherName = booking.customerName.ifEmpty { booking.clientName.ifEmpty { "العميل" } }
+                        val otherPhone = booking.clientPhone.ifEmpty { booking.customerPhone }
+                        viewModel.openOrCreateChatChannel(
+                            targetId = otherId,
+                            targetType = "BOOKING",
+                            targetName = otherName,
+                            targetPhone = otherPhone,
+                            targetCategory = booking.category,
+                            relatedEntityId = booking.id,
+                            relatedEntityType = "BOOKING"
+                        ) { createdCh ->
+                            if (createdCh != null && createdCh.id.isNotEmpty()) {
+                                viewModel.db.collection("bookings").document(booking.id).update("relatedChatChannelId", createdCh.id)
+                            }
+                        }
+                    }
+                    Toast.makeText(context, "تم تحديث حالة الحجز إلى: $newStatus", Toast.LENGTH_SHORT).show()
                 },
                 onCancelBooking = { booking, reason, password ->
                     viewModel.attemptCancelBookingImpl(

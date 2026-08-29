@@ -32,9 +32,11 @@ fun BookingListScreen(
     bookings: List<BookingEntity>,
     currentUserId: String = "",
     isAdmin: Boolean = false,
+    isProvider: Boolean = false,
     onBackClick: () -> Unit,
     onCreateNewBookingClick: () -> Unit,
     onUpdateBooking: (BookingEntity) -> Unit,
+    onStatusChange: (BookingEntity, String) -> Unit = { _, _ -> },
     onCancelBooking: (BookingEntity, String, String) -> Unit, // booking, reason, password
     onDeleteBooking: (BookingEntity) -> Unit,
     onOpenChatClick: (BookingEntity) -> Unit
@@ -221,6 +223,8 @@ fun BookingListScreen(
                             booking = bk,
                             currentUserId = currentUserId,
                             isAdmin = isAdmin,
+                            isProvider = isProvider,
+                            onStatusChange = onStatusChange,
                             onEditClick = { bookingToEdit = it },
                             onCancelClick = { bookingToCancel = it },
                             onDeleteClick = { bookingToDelete = it },

@@ -92,7 +92,7 @@ fun ClientForm(
         )
 
         RegistrationSubmitButton(
-            text = "إنشاء حساب العميل الان 🚀",
+            text = "إنشاء حساب العميل الآن 🚀",
             onClick = {
                 val nameVal = Validators.validateName(name, "الاسم")
                 if (!nameVal.isValid) {

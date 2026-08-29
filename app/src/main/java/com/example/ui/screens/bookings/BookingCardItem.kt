@@ -28,12 +28,18 @@ fun BookingCardItem(
     booking: BookingEntity,
     currentUserId: String = "",
     isAdmin: Boolean = false,
+    isProvider: Boolean = false,
+    onStatusChange: (BookingEntity, String) -> Unit = { _, _ -> },
     onEditClick: (BookingEntity) -> Unit,
     onCancelClick: (BookingEntity) -> Unit,
     onDeleteClick: (BookingEntity) -> Unit,
     onOpenChatClick: (BookingEntity) -> Unit
 ) {
     var isPasswordVisible by remember { mutableStateOf(false) }
+
+    val isUserTheClient = remember(booking, currentUserId) {
+        !isAdmin && (booking.clientId == currentUserId || booking.clientPhone == currentUserId || booking.customerPhone == currentUserId || !isProvider)
+    }
 
     val canModifyOrCancel = BookingUtils.canModifyOrCancelBooking(
         scheduledAtTimestamp = booking.scheduledAt,
@@ -54,17 +60,19 @@ fun BookingCardItem(
     val statusColor = when (booking.status) {
         "APPROVED" -> Color(0xFF10B981)
         "PENDING" -> Color(0xFFF59E0B)
+        "IN_PROGRESS" -> Color(0xFF8B5CF6)
         "COMPLETED" -> Color(0xFF3B82F6)
         "CANCELLED", "REJECTED" -> Color(0xFFEF4444)
         else -> MaterialTheme.colorScheme.primary
     }
 
     val statusText = when (booking.status) {
-        "APPROVED" -> "مقبول ومؤكد"
-        "PENDING" -> "قيد الانتظار"
-        "COMPLETED" -> "مكتمل"
-        "CANCELLED" -> "ملغي"
-        "REJECTED" -> "مرفوض"
+        "APPROVED" -> "مقبول ومؤكد ✅"
+        "PENDING" -> "قيد الانتظار ⏳"
+        "IN_PROGRESS" -> "جاري التنفيذ ⚙️"
+        "COMPLETED" -> "مكتمل بنجاح 🎉"
+        "CANCELLED" -> "ملغي ❌"
+        "REJECTED" -> "مرفوض 🚫"
         else -> booking.status
     }
 
@@ -239,67 +247,201 @@ fun BookingCardItem(
                 }
             }
 
-            // Action Buttons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Chat button
-                OutlinedButton(
-                    onClick = { onOpenChatClick(booking) },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(vertical = 6.dp)
+            // Action Buttons based on Role
+            if (isAdmin) {
+                // Admin Actions: Full Control
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("محادثة", fontSize = 12.sp)
-                }
+                    OutlinedButton(
+                        onClick = { onOpenChatClick(booking) },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("محادثة", fontSize = 11.sp)
+                    }
 
-                // Edit Button (Only if > 8 hours and not terminal state)
-                if (!isTerminalState) {
                     Button(
                         onClick = { onEditClick(booking) },
-                        enabled = canModifyOrCancel || isAdmin,
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(vertical = 6.dp)
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("تعديل", fontSize = 12.sp)
+                        Spacer(Modifier.width(2.dp))
+                        Text("تعديل", fontSize = 11.sp)
                     }
 
-                    // Cancel Button (Only if > 8 hours and not terminal state)
-                    Button(
-                        onClick = { onCancelClick(booking) },
-                        enabled = canModifyOrCancel || isAdmin,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("إلغاء", fontSize = 12.sp)
+                    if (!isTerminalState) {
+                        Button(
+                            onClick = { onCancelClick(booking) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(2.dp))
+                            Text("إلغاء", fontSize = 11.sp)
+                        }
+                    } else {
+                        Button(
+                            onClick = { onDeleteClick(booking) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(2.dp))
+                            Text("حذف", fontSize = 11.sp)
+                        }
                     }
-                } else if (isAdmin) {
-                    // Admin Delete
-                    Button(
-                        onClick = { onDeleteClick(booking) },
+                }
+            } else if (!isUserTheClient) {
+                // Provider / Technician Actions
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onOpenChatClick(booking) },
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF64748B)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(vertical = 6.dp)
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("حذف", fontSize = 12.sp)
+                        Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("العميل", fontSize = 11.sp)
+                    }
+
+                    when (booking.status) {
+                        "PENDING" -> {
+                            Button(
+                                onClick = { onStatusChange(booking, "APPROVED") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                modifier = Modifier.weight(1.2f),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("قبول الحجز", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { onStatusChange(booking, "REJECTED") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("اعتذار", fontSize = 11.sp)
+                            }
+                        }
+                        "APPROVED" -> {
+                            Button(
+                                onClick = { onStatusChange(booking, "IN_PROGRESS") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                                modifier = Modifier.weight(1.5f),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("بدء تنفيذ الخدمة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        "IN_PROGRESS" -> {
+                            Button(
+                                onClick = { onStatusChange(booking, "COMPLETED") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                                modifier = Modifier.weight(1.5f),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("إكمال وتسليم الخدمة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Client / Customer Actions
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onOpenChatClick(booking) },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("محادثة", fontSize = 11.sp)
+                    }
+
+                    if (!isTerminalState) {
+                        Button(
+                            onClick = { onEditClick(booking) },
+                            enabled = canModifyOrCancel,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(2.dp))
+                            Text("تعديل", fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = { onCancelClick(booking) },
+                            enabled = canModifyOrCancel,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(2.dp))
+                            Text("إلغاء", fontSize = 11.sp)
+                        }
+                    } else {
+                        // For terminal states (completed/cancelled), client can delete the card locally or from list
+                        Button(
+                            onClick = { onDeleteClick(booking) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF475569)),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(2.dp))
+                            Text("حذف من السجل", fontSize = 11.sp)
+                        }
                     }
                 }
             }
