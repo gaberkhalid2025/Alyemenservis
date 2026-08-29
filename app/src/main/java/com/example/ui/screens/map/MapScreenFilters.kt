@@ -27,17 +27,10 @@ object MapScreenFilters {
         val normFilter = cityFilter.trim().lowercase()
         val combined = "$entityCityId $entityArea $entityNeighborhood".lowercase()
 
-        return when {
-            normFilter.contains("صنعاء") -> combined.contains("صنعاء") || combined.contains("sanaa") || combined.contains("ye_san") || entityCityId == "1" || combined.contains("حدة") || combined.contains("السبعين") || combined.contains("التحرير")
-            normFilter.contains("عدن") -> combined.contains("عدن") || combined.contains("aden") || combined.contains("ye_ade") || entityCityId == "2" || combined.contains("كريتر") || combined.contains("المعلا") || combined.contains("المنصورة") || combined.contains("الشيخ عثمان")
-            normFilter.contains("تعز") -> combined.contains("تعز") || combined.contains("taiz") || combined.contains("ye_tai") || entityCityId == "3" || combined.contains("الحوبان") || combined.contains("صالة")
-            normFilter.contains("الحديدة") -> combined.contains("الحديدة") || combined.contains("hodeidah") || combined.contains("ye_hud") || combined.contains("الحالي") || combined.contains("الميناء")
-            normFilter.contains("إب") -> combined.contains("إب") || combined.contains("ibb") || combined.contains("ye_ibb") || combined.contains("يريم") || combined.contains("العدين")
-            normFilter.contains("حضرموت") || normFilter.contains("المكلا") -> combined.contains("حضرموت") || combined.contains("المكلا") || combined.contains("mukalla") || combined.contains("سيئون") || combined.contains("ye_had")
-            normFilter.contains("مأرب") -> combined.contains("مأرب") || combined.contains("marib") || combined.contains("ye_mar")
-            normFilter.contains("ذمار") -> combined.contains("ذمار") || combined.contains("dhamar") || combined.contains("ye_dha")
-            else -> combined.contains(normFilter)
-        }
+        val matchingKey = CityAliases.ALIASES.keys.find { normFilter.contains(it.lowercase()) }
+        val aliases = if (matchingKey != null) CityAliases.ALIASES[matchingKey] ?: listOf(normFilter) else listOf(normFilter)
+
+        return aliases.any { alias -> combined.contains(alias.lowercase()) }
     }
 
     fun filterProviders(

@@ -34,6 +34,7 @@ import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -443,12 +444,18 @@ fun InstantRequestCard(
 
 @Composable
 fun BiddingCountdownTimer(expiresAt: Long) {
-    var timeLeftMs by remember { mutableLongStateOf(maxOf(0L, expiresAt - System.currentTimeMillis())) }
+    var timeLeftMs by remember(expiresAt) { mutableLongStateOf(maxOf(0L, expiresAt - System.currentTimeMillis())) }
 
     LaunchedEffect(expiresAt) {
-        while (timeLeftMs > 0) {
+        while (isActive && timeLeftMs > 0) {
             delay(1000)
             timeLeftMs = maxOf(0L, expiresAt - System.currentTimeMillis())
+        }
+    }
+
+    DisposableEffect(expiresAt) {
+        onDispose {
+            // Safety cleanup on leave/dispose
         }
     }
 

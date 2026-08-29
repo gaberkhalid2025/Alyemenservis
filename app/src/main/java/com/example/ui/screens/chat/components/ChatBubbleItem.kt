@@ -38,7 +38,8 @@ fun ChatBubbleItem(
     message: ChatMessage,
     isMe: Boolean,
     onReplyClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onRetryClick: ((String) -> Unit)? = null
 ) {
     val isSupport = !isMe && (
         message.senderId.contains("admin", ignoreCase = true) ||
@@ -293,12 +294,24 @@ fun ChatBubbleItem(
                             }
                         }
                         MessageStatus.FAILED -> {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "فشل الإرسال",
-                                tint = Color(0xFFFF8A80),
-                                modifier = Modifier.size(13.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { onRetryClick?.invoke(message.id) }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "إعادة المحاولة",
+                                    tint = Color(0xFFFF8A80),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = "إعادة الإرسال",
+                                    fontSize = 9.sp,
+                                    color = Color(0xFFFF8A80),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }

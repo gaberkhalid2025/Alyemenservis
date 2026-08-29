@@ -9,6 +9,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+/**
+ * 💬 Chat Error Handling State Hierarchy
+ */
+sealed class ChatError(open val messageArabic: String) {
+    object NetworkError : ChatError("فشل الاتصال بالشبكة أثناء إرسال الرسالة")
+    object StorageError : ChatError("تعذر رفع المرفق إلى السحابة (Firebase Storage)")
+    data class UnknownError(val details: String) : ChatError(details)
+}
+
 class ChatViewModel(
     private val repository: ChatRepository = ChatRepository()
 ) : ViewModel() {
@@ -162,6 +171,29 @@ class ChatViewModel(
                 _replyingToMessage.value = null
                 sendTypingStatus(senderId, false)
             }
+        }
+    }
+
+    /**
+     * Resend a failed message by ID.
+     */
+    fun resendMessage(messageId: String, senderId: String, senderName: String) {
+        val channel = _currentChannel.value ?: return
+        val targetMsg = _messages.value.find { it.id == messageId } ?: return
+        
+        _isSending.value = true
+        viewModelScope.launch {
+            val result = repository.sendMessage(
+                channelId = channel.id,
+                senderId = senderId,
+                senderName = senderName,
+                messageText = targetMsg.message,
+                mediaType = targetMsg.mediaType,
+                mediaUrl = targetMsg.mediaUrl,
+                replyToId = targetMsg.replyToId,
+                replyToText = targetMsg.replyToText
+            )
+            _isSending.value = false
         }
     }
 

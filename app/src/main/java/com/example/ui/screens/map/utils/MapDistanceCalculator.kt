@@ -3,8 +3,17 @@ package com.example.ui.screens.map.utils
 import kotlin.math.*
 
 /**
+ * 🚲 TransportMode - وسيلة التنقل لحساب وقت الوصول المتوقع
+ */
+enum class TransportMode(val speedKmH: Double, val icon: String, val labelArabic: String) {
+    WALKING(3.5, "⏱️", "سيراً"),
+    BICYCLE(15.0, "🚲", "بالدراجة"),
+    CAR(35.0, "🚘", "بالسيارة")
+}
+
+/**
  * 🧭 MapDistanceCalculator
- * Precise Haversine distance calculator and ETA estimation (walking: 5 km/h, driving: 35 km/h)
+ * Precise Haversine distance calculator and ETA estimation (walking: 3.5 km/h, bicycle: 15 km/h, driving: 35 km/h)
  */
 object MapDistanceCalculator {
 
@@ -38,18 +47,14 @@ object MapDistanceCalculator {
     }
 
     /**
-     * Compute Estimated Time of Arrival (ETA) text:
-     * - Under 1 km: walking speed ~ 5 km/h
-     * - 1 km and above: driving speed ~ 35 km/h
+     * Compute Estimated Time of Arrival (ETA) text with specified or auto transport mode:
+     * Walking speed: 3.5 km/h
      */
-    fun computeEta(distanceMeters: Double): String {
+    fun computeEta(distanceMeters: Double, mode: TransportMode? = null): String {
         val distKm = distanceMeters / 1000.0
-        return if (distKm < 1.0) {
-            val minutes = max(1, (distKm / 5.0 * 60).roundToInt())
-            "⏱️ ~ $minutes دقيقة سيراً (${distanceMeters.roundToInt()} م)"
-        } else {
-            val minutes = max(1, (distKm / 35.0 * 60).roundToInt())
-            "🚘 ~ $minutes دقيقة بالسيارة (${String.format(java.util.Locale.US, "%.1f", distKm)} كم)"
-        }
+        val selectedMode = mode ?: if (distKm < 1.0) TransportMode.WALKING else TransportMode.CAR
+        val minutes = max(1, (distKm / selectedMode.speedKmH * 60).roundToInt())
+        val distFormatted = if (distKm < 1.0) "${distanceMeters.roundToInt()} م" else "${String.format(java.util.Locale.US, "%.1f", distKm)} كم"
+        return "${selectedMode.icon} ~ $minutes دقيقة ${selectedMode.labelArabic} ($distFormatted)"
     }
 }

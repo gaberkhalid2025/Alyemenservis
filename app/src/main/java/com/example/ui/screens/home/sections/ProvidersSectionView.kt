@@ -1,4 +1,4 @@
-package com.example.ui.screens.home
+package com.example.ui.screens.home.sections
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,17 +14,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.*
+import com.example.data.CategoryEntity
+import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.ui.ProviderCard
 import com.example.ui.components.ProviderListSkeleton
 import com.example.utils.VisualThemePalette
 
 /**
- * 📱 ServicesBrowserContent - المحتوى التفاعلي وعرض قوائم الفنيين ومقدمي الخدمات
+ * 🔧 ProvidersSectionView - عرض واختيار الفنيين ومقدمي الخدمات
  */
 @Composable
-fun ServicesBrowserMainContent(
+fun ProvidersSectionView(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     displayProviders: List<ProviderEntity>,
@@ -34,8 +35,6 @@ fun ServicesBrowserMainContent(
     onCategorySelected: (String?) -> Unit,
     providersLimit: Int,
     onLoadMore: () -> Unit,
-    onStoreClick: (StoreEntity) -> Unit,
-    onPropertyClick: (PropertyEntity) -> Unit,
     onChatOpen: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {

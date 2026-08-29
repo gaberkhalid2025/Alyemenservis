@@ -24,6 +24,7 @@ import com.example.utils.VisualThemePalette
 
 import com.example.data.repositories.*
 import com.example.ui.screens.dashboard.ServicesBrowserViewModel
+import com.example.ui.screens.home.sections.*
 
 /**
  * 🏠 ServicesBrowserLayout - الشاشة الرئيسية لتصفح الخدمات والمتاجر باليمن

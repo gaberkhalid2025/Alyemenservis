@@ -1,6 +1,8 @@
 package com.example.ui.screens.map
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
@@ -39,25 +41,28 @@ class MapScreenState(
     fun clearOffsets() {
         dynamicOffsets.clear()
     }
+
+    companion object {
+        val Saver: Saver<MapScreenState, *> = listSaver(
+            save = { listOf(it.isRadarMode, it.isHeatmapActive, it.selectedCategory, it.selectedCity, it.searchQuery, it.maxRangeKm) },
+            restore = {
+                MapScreenState(
+                    isRadarMode = it[0] as Boolean,
+                    isHeatmapActive = it[1] as Boolean,
+                    selectedCategory = it[2] as String,
+                    selectedCity = it[3] as String,
+                    searchQuery = it[4] as String,
+                    maxRangeKm = (it[5] as Number).toFloat()
+                )
+            }
+        )
+    }
 }
 
 @Composable
 fun rememberMapScreenState(): MapScreenState {
-    val isRadarMode = rememberSaveable { mutableStateOf(false) }
-    val isHeatmapActive = rememberSaveable { mutableStateOf(false) }
-    val selectedCategory = rememberSaveable { mutableStateOf("ALL") }
-    val selectedCity = rememberSaveable { mutableStateOf("الكل") }
-    val searchQuery = rememberSaveable { mutableStateOf("") }
-    val maxRangeKm = rememberSaveable { mutableFloatStateOf(25.0f) }
-
-    return remember {
-        MapScreenState(
-            isRadarMode = isRadarMode.value,
-            isHeatmapActive = isHeatmapActive.value,
-            selectedCategory = selectedCategory.value,
-            selectedCity = selectedCity.value,
-            searchQuery = searchQuery.value,
-            maxRangeKm = maxRangeKm.floatValue
-        )
+    return rememberSaveable(saver = MapScreenState.Saver) {
+        MapScreenState()
     }
 }
+

@@ -10,6 +10,7 @@ import com.example.data.repositories.IStatusRepository
 import com.example.data.repositories.SystemStatusMetrics
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -147,12 +148,23 @@ class StatusViewModel(
         }
     }
 
+    private var isRefreshingGuard = false
+
     private fun startAutoRefresh() {
         autoRefreshJob?.cancel()
         autoRefreshJob = viewModelScope.launch {
-            while (true) {
+            while (coroutineContext.isActive) {
                 delay(30_000L) // 30 seconds auto refresh loop
-                statusRepository.refreshSystemStatus()
+                if (!isRefreshingGuard) {
+                    isRefreshingGuard = true
+                    try {
+                        statusRepository.refreshSystemStatus()
+                    } catch (e: Exception) {
+                        // Silent fail on background refresh
+                    } finally {
+                        isRefreshingGuard = false
+                    }
+                }
             }
         }
     }
@@ -160,5 +172,6 @@ class StatusViewModel(
     override fun onCleared() {
         super.onCleared()
         autoRefreshJob?.cancel()
+        autoRefreshJob = null
     }
 }

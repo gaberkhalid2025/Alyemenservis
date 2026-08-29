@@ -1,18 +1,22 @@
 package com.example.ui.screens.map.utils
 
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
  * 📦 OfflineMapManager
- * Manages OSM Tiles Caching:
+ * Manages OSM Tiles Caching safely off the main thread:
  * - 7 days TTL
  * - 50MB maximum cache capacity
  * - Automatic cache purge when exceeding 45MB
- * - Metadata & coordinates for major Yemeni cities (Sana'a, Aden, Taiz, Hodeidah)
+ * - Metadata & coordinates for major Yemeni cities (Sana'a, Aden, Taiz, Hodeidah, etc.)
  */
 object OfflineMapManager {
 
+    private const val TAG = "OfflineMapManager"
     private const val MAX_CACHE_SIZE_BYTES = 50 * 1024 * 1024L // 50 MB
     private const val PURGE_THRESHOLD_BYTES = 45 * 1024 * 1024L // 45 MB
     private const val CACHE_TTL_MILLIS = 7 * 24 * 60 * 60 * 1000L // 7 days
@@ -43,32 +47,42 @@ object OfflineMapManager {
      * Get or create offline map tiles directory
      */
     fun getTileCacheDir(context: Context): File {
-        val dir = File(context.cacheDir, "osm_tiles_cache")
-        if (!dir.exists()) {
-            dir.mkdirs()
+        return try {
+            val dir = File(context.cacheDir, "osm_tiles_cache")
+            if (!dir.exists()) {
+                dir.mkdirs()
+            }
+            dir
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get tile cache directory", e)
+            context.cacheDir
         }
-        return dir
     }
 
     /**
      * Calculate current cache size in MB
      */
-    fun getCacheSizeMb(context: Context): Double {
-        val dir = getTileCacheDir(context)
-        val sizeBytes = getDirectorySize(dir)
-        return sizeBytes / (1024.0 * 1024.0)
+    suspend fun getCacheSizeMb(context: Context): Double = withContext(Dispatchers.IO) {
+        try {
+            val dir = getTileCacheDir(context)
+            val sizeBytes = getDirectorySize(dir)
+            sizeBytes / (1024.0 * 1024.0)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error calculating cache size", e)
+            0.0
+        }
     }
 
     /**
      * Inspect cache and purge expired tiles (> 7 days) or when size > 45MB
      */
-    fun purgeCacheIfNeeded(context: Context) {
+    suspend fun purgeCacheIfNeeded(context: Context) = withContext(Dispatchers.IO) {
         try {
             val dir = getTileCacheDir(context)
-            if (!dir.exists()) return
+            if (!dir.exists()) return@withContext
 
             val now = System.currentTimeMillis()
-            val files = dir.listFiles() ?: return
+            val files = dir.listFiles() ?: return@withContext
 
             // 1. Delete files older than 7 days
             for (file in files) {
@@ -89,8 +103,9 @@ object OfflineMapManager {
                     }
                 }
             }
+            Log.d(TAG, "Cache purge completed successfully. Final size: ${currentSize / (1024 * 1024)} MB")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error purging offline map cache", e)
         }
     }
 

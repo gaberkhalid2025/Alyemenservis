@@ -80,35 +80,29 @@ fun RadarRenderer(
         val maxRadius = min(widthPx, heightPx) * 0.44f * zoomScale
 
         // Performance Optimization: Cache screen items and clusters so they are NOT recalculated in every 60fps animation frame
-        val screenItems by remember(items, centerX, centerY, zoomScale) {
-            derivedStateOf {
+        val screenItems = remember(items, centerX, centerY, zoomScale) {
+            items.map { item ->
+                item.copy(
+                    x = centerX + item.x * zoomScale,
+                    y = centerY + item.y * zoomScale
+                )
+            }
+        }
+
+        val clusters = remember(screenItems, zoomScale) {
+            MarkerRenderer.clusterPoints(screenItems, thresholdPx = 45f * zoomScale)
+        }
+
+        val weightedPoints = remember(items, centerX, centerY, zoomScale, isHeatmapActive) {
+            if (isHeatmapActive) {
                 items.map { item ->
-                    item.copy(
+                    HeatmapRenderer.WeightedPoint(
                         x = centerX + item.x * zoomScale,
-                        y = centerY + item.y * zoomScale
+                        y = centerY + item.y * zoomScale,
+                        weight = 1.2f
                     )
                 }
-            }
-        }
-
-        val clusters by remember(screenItems, zoomScale) {
-            derivedStateOf {
-                MarkerRenderer.clusterPoints(screenItems, thresholdPx = 45f * zoomScale)
-            }
-        }
-
-        val weightedPoints by remember(items, centerX, centerY, zoomScale, isHeatmapActive) {
-            derivedStateOf {
-                if (isHeatmapActive) {
-                    items.map { item ->
-                        HeatmapRenderer.WeightedPoint(
-                            x = centerX + item.x * zoomScale,
-                            y = centerY + item.y * zoomScale,
-                            weight = 1.2f
-                        )
-                    }
-                } else emptyList()
-            }
+            } else emptyList()
         }
 
         Canvas(
