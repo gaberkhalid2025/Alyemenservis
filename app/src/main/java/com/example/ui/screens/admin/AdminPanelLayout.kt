@@ -19,8 +19,12 @@ import com.example.ui.screens.admin.sections.*
 import com.example.ui.screens.admin.subpanels.AdminLoginScreen
 import com.example.ui.screens.admin.subpanels.AdminTabBar
 import com.example.ui.screens.admin.subpanels.AdminTabItem
+import com.example.util.PermissionGuard
 import com.example.utils.VisualThemePalette
 
+/**
+ * 👑 Complete Admin Master Layout (27 Tabs Navigation & Permissions Integration)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminPanelLayout(
@@ -32,6 +36,7 @@ fun AdminPanelLayout(
     var isAuthorized by remember(adminRole) { mutableStateOf(adminRole != "GUEST") }
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
+    // 27 Complete Required Tabs List
     val adminTabs = remember {
         listOf(
             AdminTabItem("طلبات الانضمام", "⌛", "REG_REQ"),
@@ -48,20 +53,28 @@ fun AdminPanelLayout(
             AdminTabItem("تحكم الأقسام", "🗂️", "CATEGORIES"),
             AdminTabItem("المدن والمحافظات", "🗺️", "CITIES"),
             AdminTabItem("الشكاوى والبلاغات", "⚠️", "COMPLAINTS"),
-            AdminTabItem("إضافة يدوية", "➕", "MANUAL_ADD"),
+            AdminTabItem("الإضافة اليدوية", "➕", "MANUAL_ADD"),
             AdminTabItem("التحليلات الشاملة", "📊", "STATS"),
-            AdminTabItem("الصلاحيات والأدوار", "🛡️", "ROLES_PERMISSIONS"),
+            AdminTabItem("الصلاحيات والأدوار (538)", "🛡️", "ROLES_PERMISSIONS"),
             AdminTabItem("إعدادات النظام", "⚙️", "BACKUP"),
             AdminTabItem("المساعد الذكي", "🤖", "AI_ASSISTANT_PANEL"),
             AdminTabItem("التحكم بالخرائط", "🗺️", "MAP_CONTROLS"),
             AdminTabItem("إدارة المدفوعات", "💳", "ADMIN_PAYMENT_PANEL"),
-            AdminTabItem("البوابة الخلفية", "👑", "BACKDOOR")
+            AdminTabItem("بوابة المالك", "👑", "BACKDOOR"),
+            AdminTabItem("إعادة تعيين كلمات المرور", "🔑", "PASSWORD_RESET"),
+            AdminTabItem("الألوان والثيمات", "🎨", "THEME_COLORS"),
+            AdminTabItem("النسخ الاحتياطي والاستعادة", "💾", "BACKUP_RESTORE"),
+            AdminTabItem("رقابة المحادثات", "💬", "CHAT_MODERATION"),
+            AdminTabItem("رقابة الإشعارات المتقدمة", "📢", "ADVANCED_NOTIFICATIONS")
         )
     }
 
     if (!isAuthorized) {
         AdminLoginScreen(
-            onLoginSuccess = { isAuthorized = true },
+            onLoginSuccess = { role ->
+                isAuthorized = true
+            },
+            viewModel = viewModel,
             themeColors = themeColors,
             modifier = modifier
         )
@@ -93,13 +106,13 @@ fun AdminPanelLayout(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "لوحة تحكم الإدارة العليا",
+                            text = "لوحة تحكم الإدارة العليا (27 قسم نشط)",
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                             color = Color.White
                         )
                         Text(
-                            text = "الرتبة:  | متصل بالنظام الحقيقي 🟢",
+                            text = "الرتبة: $adminRole | الصلاحيات: 538 مفعّلة 🟢 | مزامنة فورية",
                             fontSize = 11.sp,
                             color = themeColors.accent
                         )
@@ -114,7 +127,10 @@ fun AdminPanelLayout(
                         Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color.White)
                     }
                     IconButton(
-                        onClick = { isAuthorized = false },
+                        onClick = {
+                            viewModel.setAdminRole("GUEST")
+                            isAuthorized = false
+                        },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(Icons.Default.Lock, contentDescription = "قفل", tint = Color(0xFFEF5350))
@@ -123,7 +139,7 @@ fun AdminPanelLayout(
             }
         }
 
-        // Horizontal Tab Bar
+        // Horizontal Tab Bar (27 Tabs)
         AdminTabBar(
             tabs = adminTabs,
             selectedIndex = selectedTabIndex,
@@ -133,35 +149,48 @@ fun AdminPanelLayout(
 
         HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp)
 
-        // Main Dynamic Section Container
+        // Main Dynamic Section Container - All 27 Tabs Fully Bound & Guarded
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(14.dp)
         ) {
-            when (activeTag) {
-                "REG_REQ" -> AdminRequestsSection(viewModel = viewModel, themeColors = themeColors)
-                "STORES", "PROPERTIES" -> AdminStoresPropertiesPanel(viewModel = viewModel, themeColors = themeColors)
-                "RESTAURANTS" -> AdminRestaurantsPanel(viewModel = viewModel, themeColors = themeColors)
-                "MEDICAL" -> AdminMedicalPanel(viewModel = viewModel, themeColors = themeColors)
-                "JOBS" -> AdminJobsPanel(viewModel = viewModel, themeColors = themeColors)
-                "QUICK_SERVICE" -> AdminQuickServicePanel(viewModel = viewModel, themeColors = themeColors)
-                "BOOKINGS" -> AdminBookingsSection(viewModel = viewModel, themeColors = themeColors)
-                "PROVIDERS" -> AdminUserManager(mainViewModel = viewModel, themeColors = themeColors)
-                "NOTIFICATIONS" -> AdminNotificationsSection(viewModel = viewModel, themeColors = themeColors)
-                "BANNERS" -> AdminBannersPanel(viewModel = viewModel, themeColors = themeColors)
-                "CATEGORIES" -> AdminCategoriesSection(viewModel = viewModel, themeColors = themeColors)
-                "CITIES" -> AdminCitiesSection(viewModel = viewModel, themeColors = themeColors)
-                "COMPLAINTS" -> AdminComplaintsSection(viewModel = viewModel, themeColors = themeColors)
-                "MANUAL_ADD" -> AdminManualAddSection(viewModel = viewModel, themeColors = themeColors)
-                "STATS" -> AdminAnalyticsPanel(onBack = { selectedTabIndex = 0 })
-                "ROLES_PERMISSIONS" -> AdminRolesPermissionsPanel(viewModel = viewModel, themeColors = themeColors)
-                "BACKUP" -> AdminSystemSettingsSection(viewModel = viewModel, themeColors = themeColors)
-                "AI_ASSISTANT_PANEL" -> AdminAssistantPanel(viewModel = viewModel, themeColors = themeColors)
-                "MAP_CONTROLS" -> AdminMapPanel(viewModel = viewModel, themeColors = themeColors)
-                "ADMIN_PAYMENT_PANEL" -> AdminPaymentPanel(viewModel = viewModel, themeColors = themeColors)
-                "BACKDOOR" -> OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors)
-                else -> AdminRequestsSection(viewModel = viewModel, themeColors = themeColors)
+            val hasAccess = PermissionGuard.hasPermission(adminRole, activeTag)
+            if (!hasAccess) {
+                PermissionGuard.UnauthorizedView(
+                    customMessage = "🔒 ليس لديك صلاحية الوصول لقسم (${adminTabs.getOrNull(selectedTabIndex)?.title ?: activeTag})",
+                    subMessage = "رتبتك الحالية ($adminRole) لا تمتلك الصلاحية الكافية. يرجى مراجعة المالك أو مدير النظام."
+                )
+            } else {
+                when (activeTag) {
+                    "REG_REQ" -> AdminRequestsSection(viewModel = viewModel, themeColors = themeColors)
+                    "STORES", "PROPERTIES" -> AdminStoresPropertiesPanel(viewModel = viewModel, themeColors = themeColors)
+                    "RESTAURANTS" -> AdminRestaurantsPanel(viewModel = viewModel, themeColors = themeColors)
+                    "MEDICAL" -> AdminMedicalPanel(viewModel = viewModel, themeColors = themeColors)
+                    "JOBS" -> AdminJobsPanel(viewModel = viewModel, themeColors = themeColors)
+                    "QUICK_SERVICE" -> AdminQuickServicePanel(viewModel = viewModel, themeColors = themeColors)
+                    "BOOKINGS" -> AdminBookingsSection(viewModel = viewModel, themeColors = themeColors)
+                    "PROVIDERS" -> AdminUserManager(mainViewModel = viewModel, themeColors = themeColors)
+                    "NOTIFICATIONS" -> AdminNotificationsSection(viewModel = viewModel, themeColors = themeColors)
+                    "BANNERS" -> AdminBannersPanel(viewModel = viewModel, themeColors = themeColors)
+                    "CATEGORIES" -> AdminCategoriesSection(viewModel = viewModel, themeColors = themeColors)
+                    "CITIES" -> AdminCitiesSection(viewModel = viewModel, themeColors = themeColors)
+                    "COMPLAINTS" -> AdminComplaintsSection(viewModel = viewModel, themeColors = themeColors)
+                    "MANUAL_ADD" -> AdminManualAddSection(viewModel = viewModel, themeColors = themeColors)
+                    "STATS" -> AdminAnalyticsPanel(onBack = { selectedTabIndex = 0 })
+                    "ROLES_PERMISSIONS" -> AdminRolesPermissionsPanel(viewModel = viewModel, themeColors = themeColors)
+                    "BACKUP" -> AdminSystemSettingsSection(viewModel = viewModel, themeColors = themeColors)
+                    "AI_ASSISTANT_PANEL" -> AdminAssistantPanel(viewModel = viewModel, themeColors = themeColors)
+                    "MAP_CONTROLS" -> AdminMapPanel(viewModel = viewModel, themeColors = themeColors)
+                    "ADMIN_PAYMENT_PANEL" -> AdminPaymentPanel(viewModel = viewModel, themeColors = themeColors)
+                    "BACKDOOR" -> OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors)
+                    "PASSWORD_RESET" -> AdminPasswordResetSection(viewModel = viewModel, themeColors = themeColors)
+                    "THEME_COLORS" -> AdminThemeColorsSection(viewModel = viewModel, themeColors = themeColors)
+                    "BACKUP_RESTORE" -> AdminBackupRestoreSection(viewModel = viewModel, themeColors = themeColors)
+                    "CHAT_MODERATION" -> AdminChatModerationSection(viewModel = viewModel, themeColors = themeColors)
+                    "ADVANCED_NOTIFICATIONS" -> AdminAdvancedNotificationsSection(viewModel = viewModel, themeColors = themeColors)
+                    else -> AdminRequestsSection(viewModel = viewModel, themeColors = themeColors)
+                }
             }
         }
     }
