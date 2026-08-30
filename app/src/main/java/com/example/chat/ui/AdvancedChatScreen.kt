@@ -60,7 +60,15 @@ fun AdvancedChatScreen(
             }
         }
 
-        ChatSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
+        if (searchQuery.isNotEmpty()) {
+            ChatSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                selectedFilterType = null,
+                onFilterTypeSelected = {},
+                onCloseSearch = { searchQuery = "" }
+            )
+        }
 
         // Messages List
         LazyColumn(
