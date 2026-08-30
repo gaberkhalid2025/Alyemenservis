@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
 import com.example.MainActivity
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 🔔 ChatNotificationHelper
@@ -20,6 +21,7 @@ import com.example.MainActivity
  * - Android Direct Reply (RemoteInput) right from notification shade
  * - Notification Stacking / Summary grouping
  * - Deep linking to active chat room
+ * - 5-Minute Channel Notification Throttling (أقصى إشعار واحد كل 5 دقائق لكل قناة لمنع الإزعاج وتوفير الموارد)
  */
 class ChatNotificationHelper(private val context: Context) {
 
@@ -30,6 +32,20 @@ class ChatNotificationHelper(private val context: Context) {
         const val ACTION_DIRECT_REPLY = "com.example.chat.ACTION_DIRECT_REPLY"
         const val NOTIFICATION_GROUP_KEY = "com.example.chat.MESSAGES_GROUP"
         const val SUMMARY_NOTIFICATION_ID = 1001
+
+        private const val THROTTLE_WINDOW_MS = 5 * 60 * 1000L // 5 minutes
+        private val lastNotificationTimes = ConcurrentHashMap<String, Long>()
+
+        fun shouldNotifyChannel(channelId: String): Boolean {
+            val now = System.currentTimeMillis()
+            val lastTime = lastNotificationTimes[channelId] ?: 0L
+            return if (now - lastTime >= THROTTLE_WINDOW_MS) {
+                lastNotificationTimes[channelId] = now
+                true
+            } else {
+                false
+            }
+        }
     }
 
     init {
@@ -74,7 +90,7 @@ class ChatNotificationHelper(private val context: Context) {
     }
 
     /**
-     * Displays a rich chat notification with Direct Reply action.
+     * Displays a rich chat notification with Direct Reply action and 5-min channel throttling.
      */
     fun showMessageNotification(
         messageId: String,
@@ -84,6 +100,11 @@ class ChatNotificationHelper(private val context: Context) {
         messageContent: String,
         isVoiceNote: Boolean = false
     ) {
+        // Enforce 5-minute throttling per channel to avoid notification spam
+        if (!shouldNotifyChannel(roomId)) {
+            return
+        }
+
         val channelId = if (isVoiceNote) CHANNEL_ID_VOICE else CHANNEL_ID_MESSAGES
 
         // 1. PendingIntent to open Chat Room

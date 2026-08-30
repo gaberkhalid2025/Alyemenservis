@@ -227,11 +227,16 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                 }
             }
         } else {
+            var orderPageLimit by remember { mutableIntStateOf(20) }
+            val paginatedOrders = remember(myOrders, orderPageLimit) {
+                myOrders.take(orderPageLimit)
+            }
+
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(myOrders) { order ->
+                items(paginatedOrders) { order ->
                     val deleteCode = remember(order.id) { 
                         (order.id.hashCode().coerceAtLeast(0) % 9000 + 1000).toString() 
                     }
@@ -361,6 +366,18 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+
+                if (myOrders.size > paginatedOrders.size) {
+                    item {
+                        Button(
+                            onClick = { orderPageLimit += 20 },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface)
+                        ) {
+                            Text("تحميل المزيد من الطلبات (${paginatedOrders.size} من ${myOrders.size})", color = themeColors.accent, fontSize = 12.sp)
                         }
                     }
                 }

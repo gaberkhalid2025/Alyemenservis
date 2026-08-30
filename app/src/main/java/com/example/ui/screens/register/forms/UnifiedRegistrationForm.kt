@@ -42,6 +42,20 @@ fun UnifiedRegistrationForm(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(passwordVisible) {
+        if (passwordVisible) {
+            kotlinx.coroutines.delay(3000L)
+            passwordVisible = false
+        }
+    }
+
+    LaunchedEffect(confirmPasswordVisible) {
+        if (confirmPasswordVisible) {
+            kotlinx.coroutines.delay(3000L)
+            confirmPasswordVisible = false
+        }
+    }
     
     // Detailed terms dialog states
     var showTermsDialog by remember { mutableStateOf(false) }
@@ -140,7 +154,7 @@ fun UnifiedRegistrationForm(
         
         OutlinedTextField(
             value = state.entityName,
-            onValueChange = { viewModel.onEvent(RegistrationEvent.EntityNameChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.EntityNameChanged(it)) },
             label = { Text(nameLabel, fontSize = 12.sp) },
             isError = state.entityNameError != null,
             supportingText = { state.entityNameError?.let { Text(it) } },
@@ -152,7 +166,7 @@ fun UnifiedRegistrationForm(
         if (role in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY")) {
             OutlinedTextField(
                 value = state.managerName,
-                onValueChange = { viewModel.onEvent(RegistrationEvent.ManagerNameChanged(it)) },
+                onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.ManagerNameChanged(it)) },
                 label = { Text("اسم المدير / المسؤول", fontSize = 12.sp) },
                 isError = state.managerNameError != null,
                 supportingText = { state.managerNameError?.let { Text(it) } },
@@ -164,7 +178,7 @@ fun UnifiedRegistrationForm(
         // 3. Phone Number
         OutlinedTextField(
             value = state.phone,
-            onValueChange = { viewModel.onEvent(RegistrationEvent.PhoneChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.PhoneChanged(it)) },
             label = { Text("رقم الهاتف (9 أرقام)", fontSize = 12.sp) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             isError = state.phoneError != null,
@@ -176,7 +190,7 @@ fun UnifiedRegistrationForm(
         // 4. Password
         OutlinedTextField(
             value = state.password,
-            onValueChange = { viewModel.onEvent(RegistrationEvent.PasswordChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.PasswordChanged(it)) },
             label = { Text("كلمة المرور", fontSize = 12.sp) },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -194,7 +208,7 @@ fun UnifiedRegistrationForm(
         // 5. Confirm Password
         OutlinedTextField(
             value = state.confirmPassword,
-            onValueChange = { viewModel.onEvent(RegistrationEvent.ConfirmPasswordChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.ConfirmPasswordChanged(it)) },
             label = { Text("تأكيد كلمة المرور", fontSize = 12.sp) },
             visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

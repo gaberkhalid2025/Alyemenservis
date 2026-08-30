@@ -2,12 +2,27 @@ package com.example.ui.screens.register.forms
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 /**
- * Manager for auto-saving and restoring registration drafts.
+ * Manager for auto-saving and restoring registration drafts securely using EncryptedSharedPreferences.
  */
 class RegistrationDraftManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("RegistrationDrafts", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = try {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            "RegistrationDraftsSecure",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        context.getSharedPreferences("RegistrationDrafts", Context.MODE_PRIVATE)
+    }
 
     fun saveDraft(role: String, data: Map<String, String>) {
         val editor = prefs.edit()

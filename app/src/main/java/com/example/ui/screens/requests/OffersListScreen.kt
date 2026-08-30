@@ -61,6 +61,7 @@ fun OffersListScreen(
 
             firestore.collection("instant_offers")
                 .whereEqualTo("requestId", requestId)
+                .limit(20)
                 .addSnapshotListener { snapshot, _ ->
                     if (snapshot != null) {
                         offersList = snapshot.documents.mapNotNull { it.toObject(RequestOfferEntity::class.java) }

@@ -1,8 +1,9 @@
 package com.example.ui.screens.chat.components
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.net.Uri
-import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,7 +11,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,10 +31,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.example.chat.util.ChatValidationUtils
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
+import com.example.ui.screens.chat.ChatAttachmentManager
 import com.example.util.ChatIcons
-import com.example.util.ImageUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -55,7 +57,16 @@ fun ChatInputBar(
     var audioFile by remember { mutableStateOf<File?>(null) }
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
 
-    // Pulsing animation for active recording
+    val attachmentManager = remember { ChatAttachmentManager(context) }
+
+    // 500ms Debounce for Typing Indicator
+    LaunchedEffect(textInput) {
+        if (textInput.isNotEmpty()) {
+            onTyping(textInput)
+            delay(500)
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -67,39 +78,43 @@ fun ChatInputBar(
         label = "recording_scale"
     )
 
-    // Image Picker with Firebase Storage upload
+    // Image Picker with Strict Validation & Compression
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            var fileSize = 0L
-            try {
-                context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
-                    fileSize = it.length
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            if (fileSize > 5 * 1024 * 1024) {
-                Toast.makeText(context, "الملف كبير جداً (الحد الأقصى 5 ميجابايت)", Toast.LENGTH_SHORT).show()
+            val validation = ChatValidationUtils.validateFile(uri, context)
+            if (!validation.isValid) {
+                Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
                 return@rememberLauncherForActivityResult
             }
 
             scope.launch {
-                uploadProgress = 0.1f
-                val randomId = System.currentTimeMillis().toString()
-                val path = com.example.util.FirebaseStorageUploader.getChatMessageMediaPath("direct_chat", randomId)
-                uploadProgress = 0.4f
-                val result = com.example.util.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                uploadProgress = 0.2f
+                val uploadResult = attachmentManager.uploadAttachment(
+                    channelId = "direct_chat",
+                    uri = uri,
+                    type = "image"
+                )
                 uploadProgress = 1.0f
-                delay(300)
+                delay(200)
                 uploadProgress = null
-                result.onSuccess { downloadUrl ->
+
+                uploadResult.onSuccess { downloadUrl ->
                     onSendMessage("", MediaType.IMAGE, downloadUrl)
                 }.onFailure { exception ->
                     Toast.makeText(context, "فشل الرفع: ${exception.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    // Permission launcher for Recording Audio
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "⚠️ يلزم منح إذن الميكروفون لتسجيل وإرسال الرسائل الصوتية", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -115,6 +130,16 @@ fun ChatInputBar(
     }
 
     fun startRecording() {
+        val hasMicPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasMicPermission) {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
         try {
             val file = File(context.cacheDir, "audio_rec_${System.currentTimeMillis()}.mp3")
             audioFile = file
@@ -133,9 +158,9 @@ fun ChatInputBar(
             isRecording = true
         } catch (e: Exception) {
             e.printStackTrace()
-            // Fallback simulated audio state if MIC hardware permission is not granted dynamically
-            audioFile = File(context.cacheDir, "audio_rec_${System.currentTimeMillis()}.mp3").apply { writeText("dummy") }
-            isRecording = true
+            Toast.makeText(context, "تعذر تشغيل مسجل الصوت", Toast.LENGTH_SHORT).show()
+            audioFile = null
+            isRecording = false
         }
     }
 
@@ -152,22 +177,25 @@ fun ChatInputBar(
 
         val file = audioFile
         if (file != null && file.exists() && recordingDuration >= 1) {
-            val fileSize = file.length()
-            if (fileSize > 5 * 1024 * 1024) {
-                Toast.makeText(context, "الملف كبير جداً (الحد الأقصى 5 ميجابايت)", Toast.LENGTH_SHORT).show()
+            val uri = Uri.fromFile(file)
+            val validation = ChatValidationUtils.validateFile(uri, context)
+            if (!validation.isValid) {
+                Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
                 return
             }
+
             scope.launch {
                 uploadProgress = 0.2f
-                val randomId = System.currentTimeMillis().toString()
-                val path = "chat/audio/audio_rec_$randomId.mp3"
-                val bytes = file.readBytes()
-                uploadProgress = 0.6f
-                val result = com.example.util.FirebaseStorageUploader.uploadBytesToStorage(bytes, path, mimeType = "audio/mp3")
+                val uploadResult = attachmentManager.uploadAttachment(
+                    channelId = "direct_chat",
+                    uri = uri,
+                    type = "audio"
+                )
                 uploadProgress = 1.0f
-                delay(300)
+                delay(200)
                 uploadProgress = null
-                result.onSuccess { downloadUrl ->
+
+                uploadResult.onSuccess { downloadUrl ->
                     onSendMessage(
                         "تسجيل صوتي (${recordingDuration}ث)",
                         MediaType.AUDIO,
@@ -214,6 +242,7 @@ fun ChatInputBar(
                 trackColor = Color.White.copy(alpha = 0.1f)
             )
         }
+
         // Reply banner
         if (replyingTo != null) {
             Row(
@@ -311,17 +340,18 @@ fun ChatInputBar(
                         .size(40.dp)
                         .background(Color.White.copy(alpha = 0.08f), CircleShape)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "إرفاق", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Add, contentDescription = "إرفاق صورة", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
 
-                // Text field
+                // Text field (Restricted to 500 characters max)
                 OutlinedTextField(
                     value = textInput,
                     onValueChange = {
-                        textInput = it
-                        onTyping(it)
+                        if (it.length <= ChatValidationUtils.MAX_TEXT_LENGTH) {
+                            textInput = it
+                        }
                     },
-                    placeholder = { Text("اكتب رسالتك هنا...", color = Color.Gray, fontSize = 13.sp) },
+                    placeholder = { Text("اكتب رسالتك هنا (الحد 500 حرف)...", color = Color.Gray, fontSize = 13.sp) },
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(22.dp)),
@@ -336,8 +366,9 @@ fun ChatInputBar(
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = {
-                        if (textInput.isNotBlank()) {
-                            onSendMessage(textInput, MediaType.TEXT, "")
+                        val trimmed = textInput.trim()
+                        if (trimmed.isNotBlank()) {
+                            onSendMessage(trimmed, MediaType.TEXT, "")
                             textInput = ""
                         }
                     })
@@ -347,8 +378,9 @@ fun ChatInputBar(
                 if (textInput.isNotBlank()) {
                     IconButton(
                         onClick = {
-                            if (textInput.isNotBlank()) {
-                                onSendMessage(textInput, MediaType.TEXT, "")
+                            val trimmed = textInput.trim()
+                            if (trimmed.isNotBlank()) {
+                                onSendMessage(trimmed, MediaType.TEXT, "")
                                 textInput = ""
                             }
                         },
@@ -373,4 +405,3 @@ fun ChatInputBar(
         }
     }
 }
-

@@ -75,6 +75,8 @@ fun BookingListScreen(
         }
     }
 
+    var showExportMenu by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -91,16 +93,54 @@ fun BookingListScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        val result = com.example.utils.BookingExportHelper.exportBookingsToCsv(context, filteredBookings)
-                        result.onSuccess { file ->
-                            com.example.utils.BookingExportHelper.shareExportedFile(context, file)
-                            Toast.makeText(context, "تم تجهيز التقرير بنجاح", Toast.LENGTH_SHORT).show()
-                        }.onFailure {
-                            Toast.makeText(context, "فشل تصدير التقرير", Toast.LENGTH_SHORT).show()
+                    Box {
+                        IconButton(onClick = { showExportMenu = true }) {
+                            Icon(Icons.Default.Share, contentDescription = "تصدير التقرير", tint = MaterialTheme.colorScheme.primary)
                         }
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "تصدير التقرير", tint = MaterialTheme.colorScheme.primary)
+                        DropdownMenu(
+                            expanded = showExportMenu,
+                            onDismissRequest = { showExportMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("📄 تصدير مستند PDF") },
+                                onClick = {
+                                    showExportMenu = false
+                                    val result = com.example.utils.BookingExportHelper.exportBookingsToPdf(context, filteredBookings)
+                                    result.onSuccess { file ->
+                                        com.example.utils.BookingExportHelper.shareExportedFile(context, file, "تقرير PDF للحجوزات")
+                                        Toast.makeText(context, "تم تجهيز تقرير PDF بنجاح", Toast.LENGTH_SHORT).show()
+                                    }.onFailure {
+                                        Toast.makeText(context, "فشل تصدير PDF", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("📊 تصدير ملف Excel (XLS)") },
+                                onClick = {
+                                    showExportMenu = false
+                                    val result = com.example.utils.BookingExportHelper.exportBookingsToExcel(context, filteredBookings)
+                                    result.onSuccess { file ->
+                                        com.example.utils.BookingExportHelper.shareExportedFile(context, file, "تقرير Excel للحجوزات")
+                                        Toast.makeText(context, "تم تجهيز ملف Excel بنجاح", Toast.LENGTH_SHORT).show()
+                                    }.onFailure {
+                                        Toast.makeText(context, "فشل تصدير Excel", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("📝 تصدير ملف CSV") },
+                                onClick = {
+                                    showExportMenu = false
+                                    val result = com.example.utils.BookingExportHelper.exportBookingsToCsv(context, filteredBookings)
+                                    result.onSuccess { file ->
+                                        com.example.utils.BookingExportHelper.shareExportedFile(context, file, "تقرير CSV للحجوزات")
+                                        Toast.makeText(context, "تم تجهيز ملف CSV بنجاح", Toast.LENGTH_SHORT).show()
+                                    }.onFailure {
+                                        Toast.makeText(context, "فشل تصدير CSV", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                        }
                     }
                     IconButton(onClick = onRefresh) {
                         if (isRefreshing) {
@@ -228,6 +268,11 @@ fun BookingListScreen(
                     }
                 }
             } else {
+                var pageLimit by remember { mutableIntStateOf(20) }
+                val paginatedList = remember(filteredBookings, pageLimit) {
+                    filteredBookings.take(pageLimit)
+                }
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -236,7 +281,7 @@ fun BookingListScreen(
                     contentPadding = PaddingValues(bottom = 24.dp, top = 8.dp)
                 ) {
                     items(
-                        items = filteredBookings,
+                        items = paginatedList,
                         key = { it.id.ifBlank { it.bookingCode } }
                     ) { bk ->
                         BookingCardItem(
@@ -250,6 +295,20 @@ fun BookingListScreen(
                             onDeleteClick = { bookingToDelete = it },
                             onOpenChatClick = { onOpenChatClick(it) }
                         )
+                    }
+
+                    if (filteredBookings.size > paginatedList.size) {
+                        item {
+                            Button(
+                                onClick = { pageLimit += 20 },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Text("تحميل المزيد من الحجوزات (${paginatedList.size} من ${filteredBookings.size})", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
             }

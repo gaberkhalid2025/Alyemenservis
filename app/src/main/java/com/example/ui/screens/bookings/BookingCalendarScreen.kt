@@ -55,6 +55,7 @@ fun BookingCalendarScreen(
     provider: ProviderEntity,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
+    calendarViewModel: BookingCalendarViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onBack: () -> Unit,
     onBookingSuccess: (BookingEntity) -> Unit
 ) {
@@ -63,16 +64,14 @@ fun BookingCalendarScreen(
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
-    var calendarMonthOffset by remember { mutableIntStateOf(0) }
-    var selectedDateString by remember {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        mutableStateOf(sdf.format(Date()))
-    }
-    var selectedTimeSlot by remember { mutableStateOf<ScheduleManager.TimeSlot?>(null) }
-    var recurrenceOption by remember { mutableStateOf("NONE") } // "NONE", "WEEKLY", "MONTHLY"
-    var clientNotes by remember { mutableStateOf("") }
-    var clientAddress by remember { mutableStateOf("") }
-    var isSubmitting by remember { mutableStateOf(false) }
+    val uiState by calendarViewModel.uiState.collectAsState()
+    val calendarMonthOffset = uiState.calendarMonthOffset
+    val selectedDateString = uiState.selectedDateString
+    val selectedTimeSlot = uiState.selectedTimeSlot
+    val recurrenceOption = uiState.recurrenceOption
+    val clientNotes = uiState.clientNotes
+    val clientAddress = uiState.clientAddress
+    val isSubmitting = uiState.isSubmitting
 
     val calendar = remember(calendarMonthOffset) {
         Calendar.getInstance().apply {
@@ -159,7 +158,7 @@ fun BookingCalendarScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { if (calendarMonthOffset > 0) calendarMonthOffset-- },
+                            onClick = { calendarViewModel.previousMonth() },
                             enabled = calendarMonthOffset > 0
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "الشهر السابق", tint = if (calendarMonthOffset > 0) Color.White else Color.DarkGray)
@@ -173,7 +172,7 @@ fun BookingCalendarScreen(
                         )
 
                         IconButton(
-                            onClick = { if (calendarMonthOffset < 6) calendarMonthOffset++ },
+                            onClick = { calendarViewModel.nextMonth() },
                             enabled = calendarMonthOffset < 6
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "الشهر القادم", tint = if (calendarMonthOffset < 6) Color.White else Color.DarkGray)
@@ -220,24 +219,39 @@ fun BookingCalendarScreen(
                                     if (dayInfo.dayNumber == 0) {
                                         Spacer(modifier = Modifier.weight(1f).height(44.dp))
                                     } else {
-                                        val isSelected = dayInfo.dateString == selectedDateString
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(44.dp)
-                                                .padding(2.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(
-                                                    when {
-                                                        isSelected -> themeColors.accent
-                                                        dayInfo.isHoliday -> Color(0xFFEF4444).copy(alpha = 0.2f)
-                                                        else -> Color(0xFF0F172A).copy(alpha = 0.5f)
-                                                    }
-                                                )
-                                                .clickable {
-                                                    selectedDateString = dayInfo.dateString
-                                                    selectedTimeSlot = null
-                                                },
+                                            val isSelected = dayInfo.dateString == selectedDateString
+                                            val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
+                                            val max30Str = remember {
+                                                val c = Calendar.getInstance()
+                                                c.add(Calendar.DAY_OF_YEAR, 30)
+                                                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.time)
+                                            }
+                                            val isPast = dayInfo.dateString < todayStr
+                                            val isBeyond30 = dayInfo.dateString > max30Str
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(44.dp)
+                                                    .padding(2.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(
+                                                        when {
+                                                            isSelected -> themeColors.accent
+                                                            isPast || isBeyond30 -> Color.Gray.copy(alpha = 0.2f)
+                                                            dayInfo.isHoliday -> Color(0xFFEF4444).copy(alpha = 0.2f)
+                                                            else -> Color(0xFF0F172A).copy(alpha = 0.5f)
+                                                        }
+                                                    )
+                                                    .clickable {
+                                                        if (isPast) {
+                                                            Toast.makeText(context, "لا يمكن حجز موعد في تاريخ سابق", Toast.LENGTH_SHORT).show()
+                                                        } else if (isBeyond30) {
+                                                            Toast.makeText(context, "لا يمكن الحجز لأكثر من 30 يوماً مقدماً", Toast.LENGTH_SHORT).show()
+                                                        } else {
+                                                            calendarViewModel.selectDate(dayInfo.dateString)
+                                                        }
+                                                    },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -348,7 +362,7 @@ fun BookingCalendarScreen(
                                 ),
                                 modifier = Modifier
                                     .clickable(enabled = slot.isAvailable) {
-                                        selectedTimeSlot = slot
+                                        calendarViewModel.selectTimeSlot(slot)
                                     }
                             ) {
                                 Column(
@@ -397,7 +411,7 @@ fun BookingCalendarScreen(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(if (isSel) themeColors.accent.copy(alpha = 0.2f) else Color(0xFF1E293B))
                                 .border(1.dp, if (isSel) themeColors.accent else Color.DarkGray, RoundedCornerShape(10.dp))
-                                .clickable { recurrenceOption = code }
+                                .clickable { calendarViewModel.setRecurrenceOption(code) }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -417,7 +431,7 @@ fun BookingCalendarScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = clientAddress,
-                        onValueChange = { clientAddress = it },
+                        onValueChange = { calendarViewModel.setClientAddress(it) },
                         label = { Text("عنوانك وموقع الخدمة (المدينة، الحي، الشارع)", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
@@ -425,7 +439,7 @@ fun BookingCalendarScreen(
 
                     OutlinedTextField(
                         value = clientNotes,
-                        onValueChange = { clientNotes = it },
+                        onValueChange = { calendarViewModel.setClientNotes(it) },
                         label = { Text("ملاحظات إضافية أو وصف المشكلة للفني", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
@@ -447,7 +461,7 @@ fun BookingCalendarScreen(
                             return@Button
                         }
 
-                        isSubmitting = true
+                        calendarViewModel.setSubmitting(true)
                         val newBooking = BookingEntity(
                             id = "book_${System.currentTimeMillis()}_${(1000..9999).random()}",
                             bookingNumber = "YEM-${(10000..99999).random()}",
@@ -477,7 +491,7 @@ fun BookingCalendarScreen(
                         )
 
                         viewModel.createBooking(newBooking) { success ->
-                            isSubmitting = false
+                            calendarViewModel.setSubmitting(false)
                             if (success) {
                                 // Schedule local 24h & 1h notification reminders
                                 BookingReminderService.scheduleBookingReminders(context, newBooking)

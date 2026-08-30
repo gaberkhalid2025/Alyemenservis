@@ -295,11 +295,12 @@ fun RequestServiceScreen(
                             val uniqueCode = "REQ-${Random.nextInt(100000, 999999)}"
                             val reqId = UUID.randomUUID().toString()
                             val now = System.currentTimeMillis()
+                            val hashedPin = com.example.util.PinHasher.hashPin(pinCode)
                             val request = InstantRequestEntity(
                                 id = reqId,
                                 requestCode = uniqueCode,
-                                secretPin = pinCode,
-                                cancellationPassword = pinCode,
+                                secretPin = hashedPin,
+                                cancellationPassword = hashedPin,
                                 userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
                                 userName = customerName.ifBlank { "عميل" },
                                 userPhone = customerPhone,

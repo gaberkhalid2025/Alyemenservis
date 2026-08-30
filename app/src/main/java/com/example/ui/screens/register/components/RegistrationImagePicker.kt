@@ -70,7 +70,7 @@ fun RegistrationImagePicker(
         }
     }
 
-    // Compress URI to file <= 300KB in background IO dispatcher
+    // Compress URI to file <= 300KB in background IO dispatcher with clarity and dimension verification
     suspend fun compressSingleUriBg(uri: Uri): Uri {
         return withContext(Dispatchers.IO) {
             try {
@@ -81,6 +81,15 @@ fun RegistrationImagePicker(
                     e.printStackTrace()
                     return@withContext uri
                 } ?: return@withContext uri
+
+                // Identity Image Verification: check dimensions and basic clarity
+                if (bitmap.width < 100 || bitmap.height < 100) {
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "⚠️ أبعاد الصورة صغيرة جداً وغير واضحة (الحد الأدنى 100x100)", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    return@withContext uri
+                }
+
                 val tempFile = File(context.cacheDir, "comp_${System.currentTimeMillis()}_${(1000..9999).random()}.jpg")
                 var quality = 85
                 val out = ByteArrayOutputStream()

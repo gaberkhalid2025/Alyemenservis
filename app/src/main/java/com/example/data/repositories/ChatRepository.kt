@@ -186,9 +186,10 @@ class ChatRepository(
             }
         }
 
-        // 2. Attach Firestore Realtime Listener
+        // 2. Attach Firestore Realtime Listener (Limited to 50 active channels to conserve Firestore quota)
         val listener: ListenerRegistration = channelsCollection
             .whereArrayContains("participants", cleanUserId)
+            .limit(50)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ChatRepository", "Firestore channels listener error: ${error.message}")

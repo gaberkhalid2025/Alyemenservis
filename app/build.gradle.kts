@@ -95,6 +95,7 @@ dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation("androidx.fragment:fragment-ktx:1.8.6")
   implementation(libs.androidx.biometric)
+  implementation(libs.androidx.security.crypto)
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
