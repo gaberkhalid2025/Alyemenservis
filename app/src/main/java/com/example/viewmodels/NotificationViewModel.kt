@@ -43,7 +43,7 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
                 if (snapshot != null) {
                     val list = snapshot.documents.mapNotNull { it.toObject(AppNotification::class.java) }
                     _notifications.value = list.sortedByDescending { it.createdAt }
-                    _unreadCount.value = list.count { !it.isRead }
+                    _unreadCount.value = if (list.isEmpty()) 0 else list.count { !it.isRead }
                 }
             }
     }

@@ -6,10 +6,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -149,17 +147,15 @@ fun FavoritesScreenLayout(
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                Column(
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Providers
                     if (selectedTab == 0 || selectedTab == 1) {
                         if (favoriteProviders.isNotEmpty()) {
-                            item {
-                                Text("الفنيون ومقدمو الخدمات المميزون", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
-                            }
-                            items(favoriteProviders) { provider ->
+                            Text("الفنيون ومقدمو الخدمات المميزون", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF60A5FA))
+                            favoriteProviders.forEach { provider ->
                                 FavoriteProviderCard(
                                     provider = provider,
                                     themeColors = themeColors,
@@ -177,10 +173,8 @@ fun FavoritesScreenLayout(
                     // Stores
                     if (selectedTab == 0 || selectedTab == 2) {
                         if (favoriteStores.isNotEmpty()) {
-                            item {
-                                Text("المتاجر والمطاعم المفضلة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF34D399))
-                            }
-                            items(favoriteStores) { store ->
+                            Text("المتاجر والمطاعم المفضلة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF34D399))
+                            favoriteStores.forEach { store ->
                                 FavoriteStoreCard(
                                     store = store,
                                     themeColors = themeColors,
@@ -200,10 +194,8 @@ fun FavoritesScreenLayout(
                     // Properties
                     if (selectedTab == 0 || selectedTab == 3) {
                         if (favoriteProperties.isNotEmpty()) {
-                            item {
-                                Text("العقارات والاستثمارات المحفوظة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA78BFA))
-                            }
-                            items(favoriteProperties) { property ->
+                            Text("العقارات والاستثمارات المحفوظة", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA78BFA))
+                            favoriteProperties.forEach { property ->
                                 FavoritePropertyCard(
                                     property = property,
                                     themeColors = themeColors,
@@ -221,18 +213,16 @@ fun FavoritesScreenLayout(
                     }
 
                     if (favoriteProviders.isEmpty() && favoriteStores.isEmpty() && favoriteProperties.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 40.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
-                                    Text("قائمة المفضلة فارغة حالياً.", color = Color.LightGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    Text("يمكنك الضغط على رمز القلب ❤️ في أي صفحة لإضافتها هنا والوصول إليها بسرعة.", color = Color.Gray, fontSize = 11.sp)
-                                }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
+                                Text("قائمة المفضلة فارغة حالياً.", color = Color.LightGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("يمكنك الضغط على رمز القلب ❤️ في أي صفحة لإضافتها هنا والوصول إليها بسرعة.", color = Color.Gray, fontSize = 11.sp)
                             }
                         }
                     }

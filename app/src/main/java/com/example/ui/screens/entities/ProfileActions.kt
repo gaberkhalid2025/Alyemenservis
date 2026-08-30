@@ -109,33 +109,77 @@ fun ProfileActions(
                 }
             } else {
                 // Regular customer actions
-                // Chat Button
-                Button(
-                    onClick = {
-                        if (currentUserId.isBlank()) {
-                            showGuestDialog = true
-                        } else {
-                            val channelId = when (entityType) {
-                                ProfileEntityType.TECHNICIAN -> "chat_p_$entityId"
-                                ProfileEntityType.STORE -> "chat_store_$entityId"
-                                ProfileEntityType.REAL_ESTATE -> "chat_prop_$entityId"
-                                else -> "chat_general_$entityId"
-                            }
-                            onOpenChat(channelId)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.weight(1f).height(44.dp)
-                ) {
-                    Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("محادثة 💬", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-
                 // Dynamic Primary Action
                 when (entityType) {
+                    ProfileEntityType.STORE, ProfileEntityType.RESTAURANT -> {
+                        // Floating action pill replacement for STORE & RESTAURANT
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onOrderProduct,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (entityType == ProfileEntityType.STORE) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                ),
+                                shape = RoundedCornerShape(24.dp),
+                                modifier = Modifier.weight(1.5f).fillMaxHeight()
+                            ) {
+                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (entityType == ProfileEntityType.STORE) "طلب بضاعة" else "حجز طاولة / طلب", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            Button(
+                                onClick = {
+                                    if (currentUserId.isBlank()) {
+                                        // Guest Dialog should be handled upstream
+                                    } else {
+                                        val channelId = "chat_store_$entityId"
+                                        onOpenChat(channelId)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                                shape = RoundedCornerShape(24.dp),
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            ) {
+                                Icon(Icons.Default.MailOutline, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("محادثة", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            if (entityPhone.isNotBlank()) {
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$entityPhone"))
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                                    shape = RoundedCornerShape(24.dp),
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                ) {
+                                    Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("اتصال", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+                    }
                     ProfileEntityType.TECHNICIAN -> {
+                        Button(
+                            onClick = {
+                                if (currentUserId.isBlank()) {
+                                    // Handled upstream
+                                } else {
+                                    onOpenChat("chat_p_$entityId")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(44.dp)
+                        ) {
+                            Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("محادثة 💬", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                         Button(
                             onClick = onRequestBooking,
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
@@ -147,31 +191,23 @@ fun ProfileActions(
                             Text("طلب حجز صيانة 🔧", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                         }
                     }
-                    ProfileEntityType.STORE -> {
-                        Button(
-                            onClick = onOrderProduct,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1.3f).height(44.dp)
-                        ) {
-                            Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("طلب شراء بضاعة 🛍️", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
-                    ProfileEntityType.RESTAURANT -> {
-                        Button(
-                            onClick = onOrderProduct,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1.3f).height(44.dp)
-                        ) {
-                            Icon(Icons.Default.Menu, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("حجز طاولة / طلب 🍽️", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                        }
-                    }
                     ProfileEntityType.MEDICAL -> {
+                        Button(
+                            onClick = {
+                                if (currentUserId.isBlank()) {
+                                    // Handled upstream
+                                } else {
+                                    onOpenChat("chat_general_$entityId")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(44.dp)
+                        ) {
+                            Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("محادثة 💬", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                         Button(
                             onClick = onRequestBooking,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
@@ -184,6 +220,22 @@ fun ProfileActions(
                         }
                     }
                     ProfileEntityType.REAL_ESTATE -> {
+                        Button(
+                            onClick = {
+                                if (currentUserId.isBlank()) {
+                                    // Handled upstream
+                                } else {
+                                    onOpenChat("chat_prop_$entityId")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(44.dp)
+                        ) {
+                            Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("محادثة 💬", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                         Button(
                             onClick = onRequestBooking,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
@@ -213,6 +265,22 @@ fun ProfileActions(
                         }
                     }
                     ProfileEntityType.GENERAL -> {
+                        Button(
+                            onClick = {
+                                if (currentUserId.isBlank()) {
+                                    // Handled upstream
+                                } else {
+                                    onOpenChat("chat_general_$entityId")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(44.dp)
+                        ) {
+                            Icon(Icons.Default.MailOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("محادثة 💬", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                         Button(
                             onClick = onRequestBooking,
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),

@@ -38,6 +38,11 @@ object SearchAndFilterEngine {
     ): Query {
         var query: Query = db.collection(collectionName)
 
+        if (searchQuery.isNotBlank()) {
+            // Use array-contains for keyword indexing to find products and categories within stores/providers
+            query = query.whereArrayContains("keywords", searchQuery.lowercase().trim())
+        }
+
         if (criteria.city.isNotBlank() && criteria.city != "الكل") {
             query = query.whereEqualTo("city", criteria.city)
         }

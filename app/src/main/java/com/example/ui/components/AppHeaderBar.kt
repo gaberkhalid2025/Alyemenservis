@@ -97,12 +97,12 @@ fun AppHeaderBar(
         }
     }
     val unreadNotifCount = remember(filteredNotifs, headerReadIds) {
-        filteredNotifs.count { it.id !in headerReadIds }
+        if (filteredNotifs.isEmpty()) 0 else filteredNotifs.count { it.id !in headerReadIds }
     }
 
     // Calculate unread chats count
     val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
-        myChannels.count { ch ->
+        if (myChannels.isEmpty()) 0 else myChannels.count { ch ->
             val lastMsg = ch.messages.lastOrNull()
             if (lastMsg == null) {
                 false

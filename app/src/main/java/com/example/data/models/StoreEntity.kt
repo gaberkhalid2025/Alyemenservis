@@ -47,5 +47,6 @@ data class StoreEntity(
     val backgroundColorHex: String = "",
     val commercialRegisterNo: String = "",
     val medicalLicenseNo: String = "",
-    val providerType: String = ""
+    val providerType: String = "",
+    val keywords: List<String> = emptyList()
 )

@@ -63,5 +63,6 @@ data class PendingProviderEntity(
     val specialization: String = "",
     val chatRecipientId: String = "",
     val password: String = "",
-    val providerType: String = ""
+    val providerType: String = "",
+    val keywords: List<String> = emptyList()
 )

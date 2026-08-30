@@ -69,6 +69,7 @@ fun DynamicPolymorphicProfileScreen(
     // Current user authentication states
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
 
     // Determine Entity Type dynamically
     val entityType = remember(provider, store, property, job) {
@@ -124,7 +125,8 @@ fun DynamicPolymorphicProfileScreen(
     }
 
     // Ownership logic: check if logged-in user is the provider/owner
-    val isOwner = remember(currentUserId, currentUserPhone, provider, store, property) {
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isOwner = remember(currentUserId, currentUserPhone, provider, store, property, adminRole) {
         val phoneClean = currentUserPhone.trim()
         val uidClean = currentUserId.trim()
         val provPhone = provider?.phone?.trim() ?: ""
@@ -132,8 +134,9 @@ fun DynamicPolymorphicProfileScreen(
         val storeOwner = store?.ownerId?.trim() ?: ""
         val propPhone = property?.phone?.trim() ?: ""
         val propOwner = property?.ownerId?.trim() ?: ""
-
-        (uidClean.isNotEmpty() && (uidClean == storeOwner || uidClean == propOwner)) ||
+        val isAdmin = adminRole != "GUEST"
+        
+        isAdmin || (uidClean.isNotEmpty() && (uidClean == storeOwner || uidClean == propOwner)) ||
         (phoneClean.isNotEmpty() && (phoneClean == provPhone || phoneClean == storePhone || phoneClean == propPhone))
     }
 

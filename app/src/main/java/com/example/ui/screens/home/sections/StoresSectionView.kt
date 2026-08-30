@@ -113,39 +113,51 @@ fun StoresSectionView(
                 Card(
                     onClick = { onStoreClick(store) },
                     colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(0.8.dp, themeColors.accent.copy(alpha = 0.3f)),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    border = BorderStroke(1.dp, androidx.compose.ui.graphics.Brush.linearGradient(listOf(themeColors.accent.copy(alpha = 0.6f), Color.Transparent))),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF1E293B),
-                            modifier = Modifier.size(44.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            color = themeColors.primary.copy(alpha = 0.1f),
+                            border = BorderStroke(0.5.dp, themeColors.accent.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(52.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("🛍️", fontSize = 22.sp)
+                                Text("🛍️", fontSize = 24.sp)
                             }
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(store.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text(store.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 if (store.isVip) {
-                                    Surface(color = Color(0xFFFFD700), shape = RoundedCornerShape(4.dp)) {
-                                        Text("VIP", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                    Surface(
+                                        color = Color(0xFFFFD700).copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(0.5.dp, Color(0xFFFFD700))
+                                    ) {
+                                        Text("⭐ VIP", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD700), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
                             }
-                            Text("📍 ${store.cityId} - ${store.localNeighborhood}", fontSize = 10.5.sp, color = Color.LightGray)
+                            Text("📍 ${store.cityId} - ${store.localNeighborhood}", fontSize = 11.5.sp, color = Color.LightGray)
                             if (store.workingHours.isNotEmpty()) {
-                                Text("⏱️ ${store.workingHours}", fontSize = 9.5.sp, color = Color.Gray)
+                                Text("⏱️ ${store.workingHours}", fontSize = 10.sp, color = Color.Gray)
                             }
                         }
-                        Text("⭐ ${store.rating}", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.Black.copy(alpha = 0.3f),
+                            border = BorderStroke(0.5.dp, themeColors.accent)
+                        ) {
+                            Text("⭐ ${store.rating}", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
+                        }
                     }
                 }
             }

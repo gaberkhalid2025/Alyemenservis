@@ -82,7 +82,9 @@ fun BookingFormScreen(
         calendar.get(Calendar.YEAR),
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH)
-    )
+    ).apply {
+        datePicker.minDate = System.currentTimeMillis() - 1000
+    }
 
     val timePickerDialog = TimePickerDialog(
         context,
@@ -325,27 +327,7 @@ fun BookingFormScreen(
                 shape = RoundedCornerShape(14.dp)
             )
 
-            // Secret Password Input or Automated Generation
-            OutlinedTextField(
-                value = userSecretPass,
-                onValueChange = {
-                    if (it.length <= 6) userSecretPass = it
-                    errorMessage = null
-                },
-                label = { Text("كلمة مرور الحجز (4 أرقام) - اختياري") },
-                placeholder = { Text("يتم توليدها تلقائياً إن تركت فارغة") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp)
-            )
-
-            Text(
-                text = "🔐 سيتم استخدام كلمة المرور والكود الفريد للتحقق عند التعديل أو الإلغاء بدقة.",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // (Secret Password removed to condense the form)
 
             // Terms
             Row(
