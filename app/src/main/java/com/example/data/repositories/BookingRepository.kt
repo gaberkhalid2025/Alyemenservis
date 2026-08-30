@@ -70,6 +70,16 @@ class BookingRepository(private val context: Context) {
     }
 
     /**
+     * Realtime flow of all bookings for a user with offline fallback.
+     */
+    fun getUserBookings(userId: String, pageLimit: Long = 50): Flow<List<BookingEntity>> = getBookingsFlow(userId, isProvider = false)
+
+    /**
+     * Realtime flow of all bookings for a provider with offline fallback.
+     */
+    fun getProviderBookings(providerId: String, pageLimit: Long = 50): Flow<List<BookingEntity>> = getBookingsFlow(providerId, isProvider = true)
+
+    /**
      * Realtime flow of all bookings for a user or provider with offline fallback.
      */
     fun getBookingsFlow(userId: String, isProvider: Boolean = false): Flow<List<BookingEntity>> = callbackFlow {
@@ -265,6 +275,40 @@ class BookingRepository(private val context: Context) {
         saveToCache(current)
 
         firestore.collection("bookings").document(booking.id)
+            .update(updates)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it.localizedMessage ?: "فشل إلغاء الحجز") }
+    }
+
+    /**
+     * Direct cancellation of a booking by ID.
+     */
+    fun cancelBooking(
+        bookingId: String,
+        cancellationReason: String = "إلغاء من قبل المستخدم",
+        cancelledBy: String = "USER",
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val updates = mapOf(
+            "status" to "CANCELLED",
+            "cancellationReason" to cancellationReason,
+            "cancelledAt" to System.currentTimeMillis(),
+            "cancelledBy" to cancelledBy,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        val current = _cachedBookings.value.map {
+            if (it.id == bookingId) it.copy(
+                status = "CANCELLED",
+                cancellationReason = cancellationReason,
+                cancelledAt = System.currentTimeMillis(),
+                cancelledBy = cancelledBy,
+                updatedAt = System.currentTimeMillis()
+            ) else it
+        }
+        saveToCache(current)
+
+        firestore.collection("bookings").document(bookingId)
             .update(updates)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل إلغاء الحجز") }

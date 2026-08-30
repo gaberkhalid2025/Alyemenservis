@@ -23,7 +23,7 @@ class StatusRepositoryImpl(
 
     private val firestore = FirebaseFirestore.getInstance()
 
-    override fun getSystemMetricsFlow(): Flow<SystemStatusMetrics> = callbackFlow {
+    override fun getSystemMetrics(): Flow<SystemStatusMetrics> = callbackFlow {
         val listener: ListenerRegistration = firestore.collection("join_requests")
             .whereEqualTo("status", "PENDING")
             .addSnapshotListener { snapshot, error ->
@@ -65,7 +65,9 @@ class StatusRepositoryImpl(
         awaitClose { listener.remove() }
     }
 
-    override fun getPendingJoinRequestsFlow(): Flow<List<PendingProviderEntity>> = callbackFlow {
+    override fun getSystemMetricsFlow(): Flow<SystemStatusMetrics> = getSystemMetrics()
+
+    override fun getPendingJoinRequests(): Flow<List<PendingProviderEntity>> = callbackFlow {
         val listener = firestore.collection("join_requests")
             .whereEqualTo("status", "PENDING")
             .addSnapshotListener { snapshot, error ->
@@ -92,7 +94,9 @@ class StatusRepositoryImpl(
         awaitClose { listener.remove() }
     }
 
-    override fun getSystemBookingsFlow(): Flow<List<BookingEntity>> = callbackFlow {
+    override fun getPendingJoinRequestsFlow(): Flow<List<PendingProviderEntity>> = getPendingJoinRequests()
+
+    override fun getSystemBookings(): Flow<List<BookingEntity>> = callbackFlow {
         val listener = firestore.collection("bookings")
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -118,7 +122,9 @@ class StatusRepositoryImpl(
         awaitClose { listener.remove() }
     }
 
-    override fun getInstantRequestsFlow(): Flow<List<InstantRequestEntity>> = callbackFlow {
+    override fun getSystemBookingsFlow(): Flow<List<BookingEntity>> = getSystemBookings()
+
+    override fun getInstantRequests(): Flow<List<InstantRequestEntity>> = callbackFlow {
         val listener = firestore.collection("urgent_requests")
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -149,7 +155,9 @@ class StatusRepositoryImpl(
         awaitClose { listener.remove() }
     }
 
-    override fun getNotificationsFlow(): Flow<List<NotificationEntity>> = callbackFlow {
+    override fun getInstantRequestsFlow(): Flow<List<InstantRequestEntity>> = getInstantRequests()
+
+    override fun getNotifications(): Flow<List<NotificationEntity>> = callbackFlow {
         val listener = firestore.collection("notifications")
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -171,6 +179,8 @@ class StatusRepositoryImpl(
 
         awaitClose { listener.remove() }
     }
+
+    override fun getNotificationsFlow(): Flow<List<NotificationEntity>> = getNotifications()
 
     override suspend fun approveJoinRequest(request: PendingProviderEntity): Result<Unit> {
         return try {

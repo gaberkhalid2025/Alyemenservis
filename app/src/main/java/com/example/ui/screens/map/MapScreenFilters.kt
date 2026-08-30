@@ -7,6 +7,7 @@ import com.example.ui.screens.map.components.MarkerRenderer
 import com.example.utils.getPropertyCoords
 import com.example.utils.getProviderCoords
 import com.example.utils.getStoreCoords
+import com.example.ui.screens.map.utils.CityAliases
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import kotlin.math.cos
 import kotlin.math.sin

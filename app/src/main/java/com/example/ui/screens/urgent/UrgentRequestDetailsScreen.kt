@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
+import com.example.ui.dialogs.MultiDimensionRatingDialog
+import com.example.utils.VisualThemePalette
+import com.example.utils.resolveThemePalette
 import com.example.viewmodels.UrgentViewModel
 
 /**
@@ -34,6 +38,7 @@ fun UrgentRequestDetailsScreen(
     requestId: String,
     viewModel: MainViewModel,
     urgentViewModel: UrgentViewModel = viewModel(),
+    themeColors: VisualThemePalette? = null,
     onNavigateBack: () -> Unit = {},
     onNavigateToOfferSelection: (offerId: String) -> Unit = {},
     onNavigateToUrgentOfferSubmission: (requestId: String) -> Unit = {},
@@ -41,6 +46,8 @@ fun UrgentRequestDetailsScreen(
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val settingsState by viewModel.settings.collectAsState()
+    val activeTheme = themeColors ?: resolveThemePalette(settingsState)
 
     val currentUserId by viewModel.currentUserId.collectAsState()
     val isProvider = viewModel.isProviderUser
@@ -49,6 +56,7 @@ fun UrgentRequestDetailsScreen(
     val offers by urgentViewModel.offersForRequest.collectAsState()
 
     var showCancelDialog by remember { mutableStateOf(false) }
+    var showRatingDialog by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
 
     LaunchedEffect(requestId) {
@@ -135,8 +143,35 @@ fun UrgentRequestDetailsScreen(
                         Text("تقديم عرض سريع الآن ⚡", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
+
+                if (!isProvider && (req.status == "COMPLETED" || req.status == "ACCEPTED")) {
+                    Button(
+                        onClick = { showRatingDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("تقييم الفني / مقدم الخدمة ⭐", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
             }
         }
+    }
+
+    if (showRatingDialog && request != null) {
+        val techId = request!!.acceptedTechnicianId.ifEmpty { request!!.id }
+        val techName = request!!.acceptedTechnicianName.ifEmpty { "الفني المنفذ" }
+        MultiDimensionRatingDialog(
+            targetId = techId,
+            targetName = techName,
+            targetType = "URGENT_PROVIDER",
+            bookingId = request!!.requestCode,
+            viewModel = viewModel,
+            themeColors = activeTheme,
+            onDismiss = { showRatingDialog = false }
+        )
     }
 
     if (showCancelDialog && request != null) {

@@ -201,12 +201,58 @@ fun MapBottomSheet(
                     )
                 }
 
-                // Close Button
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp).testTag("close_bottom_sheet_btn")
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                // Close & Share & Navigation Row
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Share Location
+                    IconButton(
+                        onClick = {
+                            try {
+                                val mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng"
+                                val shareText = "📍 $title\n$subtitle\nالموقع على الخريطة:\n$mapUrl"
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "مشاركة الموقع"))
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        modifier = Modifier.size(32.dp).testTag("share_location_btn")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "مشاركة الموقع", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                    }
+
+                    // Google Maps Navigation
+                    IconButton(
+                        onClick = {
+                            try {
+                                val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($title)")
+                                val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+                                mapIntent.setPackage("com.google.android.apps.maps")
+                                if (mapIntent.resolveActivity(context.packageManager) != null) {
+                                    context.startActivity(mapIntent)
+                                } else {
+                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng"))
+                                    context.startActivity(browserIntent)
+                                }
+                            } catch (e: Exception) {
+                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng"))
+                                context.startActivity(browserIntent)
+                            }
+                        },
+                        modifier = Modifier.size(32.dp).testTag("google_maps_nav_btn")
+                    ) {
+                        Icon(Icons.Default.LocationOn, contentDescription = "فتح في خرائط جوجل", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                    }
+
+                    // Close Button
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp).testTag("close_bottom_sheet_btn")
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                    }
                 }
             }
 

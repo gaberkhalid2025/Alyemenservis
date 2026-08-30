@@ -2,6 +2,7 @@ package com.example.util
 
 import android.content.Context
 import androidx.annotation.Keep
+import com.example.data.models.Transaction
 import java.util.UUID
 
 @Keep

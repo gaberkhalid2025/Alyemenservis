@@ -23,6 +23,24 @@ object MapJsonBuilder {
         safeUserLat: Double,
         safeUserLng: Double
     ): String {
+        return buildMarkersJsonArray(
+            nearbyProviders,
+            nearbyStores,
+            nearbyProperties,
+            dynamicOffsets,
+            safeUserLat,
+            safeUserLng
+        )
+    }
+
+    fun buildMarkersJsonArray(
+        nearbyProviders: List<ProviderEntity>,
+        nearbyStores: List<StoreEntity>,
+        nearbyProperties: List<PropertyEntity>,
+        dynamicOffsets: Map<String, Pair<Double, Double>>,
+        safeUserLat: Double,
+        safeUserLng: Double
+    ): String {
         val jsonArray = JSONArray()
 
         // 1. Providers

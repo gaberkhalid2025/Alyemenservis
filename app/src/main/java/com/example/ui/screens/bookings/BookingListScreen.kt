@@ -91,6 +91,17 @@ fun BookingListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        val result = com.example.utils.BookingExportHelper.exportBookingsToCsv(context, filteredBookings)
+                        result.onSuccess { file ->
+                            com.example.utils.BookingExportHelper.shareExportedFile(context, file)
+                            Toast.makeText(context, "تم تجهيز التقرير بنجاح", Toast.LENGTH_SHORT).show()
+                        }.onFailure {
+                            Toast.makeText(context, "فشل تصدير التقرير", Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "تصدير التقرير", tint = MaterialTheme.colorScheme.primary)
+                    }
                     IconButton(onClick = onRefresh) {
                         if (isRefreshing) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)

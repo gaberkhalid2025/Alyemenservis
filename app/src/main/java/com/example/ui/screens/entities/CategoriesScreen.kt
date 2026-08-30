@@ -20,15 +20,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CategoryEntity
+import com.example.data.repositories.CategoryRepository
 import com.example.ui.MainViewModel
+import com.example.ui.components.SkeletonCard
 import com.example.utils.VisualThemePalette
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 
 @Composable
 fun CategoriesScreen(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
+    categoryRepository: CategoryRepository = remember { CategoryRepository(viewModel.db) },
     onCategoryClick: (String) -> Unit
 ) {
     var categories by remember { mutableStateOf<List<CategoryEntity>>(emptyList()) }
@@ -37,38 +38,17 @@ fun CategoriesScreen(
     var retryCount by remember { mutableStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    DisposableEffect(retryCount) {
+    LaunchedEffect(retryCount) {
         isLoading = true
         errorMessage = null
-        val registration = viewModel.db.collection("categories")
-            .addSnapshotListener { snapshot, error ->
-                isLoading = false
-                if (error != null) {
-                    errorMessage = "فشل تحميل الفئات: ${error.localizedMessage ?: "خطأ غير معروف"}"
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    val fetched = snapshot.documents.mapNotNull { doc ->
-                        try {
-                            val obj = doc.toObject(CategoryEntity::class.java)
-                            if (obj != null) {
-                                if (obj.id.isEmpty()) obj.copy(id = doc.id) else obj
-                            } else {
-                                null
-                            }
-                        } catch (e: Exception) {
-                            null
-                        }
-                    }.distinctBy { it.id }.sortedWith(
-                        compareByDescending<CategoryEntity> { it.isPinned }
-                            .thenBy { it.order }
-                    )
-                    categories = fetched
-                    errorMessage = null
-                }
+        categoryRepository.observeCategories().collect { result ->
+            isLoading = false
+            result.onSuccess { fetched ->
+                categories = fetched
+                errorMessage = null
+            }.onFailure { error ->
+                errorMessage = "فشل تحميل الفئات: ${error.localizedMessage ?: "خطأ غير معروف"}"
             }
-        onDispose {
-            registration.remove()
         }
     }
 
@@ -111,25 +91,16 @@ fun CategoriesScreen(
             }
 
             if (isLoading) {
-                Box(
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            color = themeColors.primary,
-                            modifier = Modifier.testTag("categories_loading_indicator")
-                        )
-                        Text(
-                            text = "جاري تحميل الفئات...",
-                            color = themeColors.textSecondary,
-                            fontSize = 12.sp
-                        )
+                    items(6) {
+                        SkeletonCard(height = 90.dp)
                     }
                 }
             } else if (errorMessage != null && categories.isEmpty()) {

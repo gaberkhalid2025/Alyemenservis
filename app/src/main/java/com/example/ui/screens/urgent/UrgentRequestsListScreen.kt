@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,6 +35,7 @@ fun UrgentRequestsListScreen(
     onNavigateToNewUrgentRequest: () -> Unit = {},
     onNavigateToSubmitUrgentOffer: (requestId: String) -> Unit = {}
 ) {
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
@@ -75,6 +78,14 @@ fun UrgentRequestsListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        val res = com.example.utils.ReportExporter.exportUrgentRequestsToCsv(context, filteredList)
+                        res.onSuccess { file ->
+                            com.example.utils.ReportExporter.shareExportedFile(context, file, "مشاركة تقرير الطلبات العاجلة")
+                        }
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "تصدير التقرير", tint = Color(0xFFD32F2F))
+                    }
                     if (!isProvider) {
                         IconButton(onClick = onNavigateToNewUrgentRequest) {
                             Icon(Icons.Default.AddCircle, contentDescription = "طلب عاجل جديد", tint = Color(0xFFD32F2F))

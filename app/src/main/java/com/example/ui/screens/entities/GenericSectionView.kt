@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -19,12 +20,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CityEntity
+import com.example.ui.components.SkeletonCard
 import com.example.utils.VisualThemePalette
 
 /**
  * ♻️ GenericSectionView (Component 10/10 Architecture)
  * A generic and highly reusable component that handles layout, filtering, skeleton loading,
- * and empty states for all entity screens (Stores, Restaurants, Medical, Real Estate, etc.)
+ * pagination (10 items per page with load more), and empty states for all entity screens.
  */
 @Composable
 fun <T : Any> GenericSectionView(
@@ -42,12 +44,23 @@ fun <T : Any> GenericSectionView(
     onMinRatingSelected: (Float) -> Unit,
     emptyMessage: String,
     extraHeaderContent: @Composable (() -> Unit)? = null,
+    pageSize: Int = 10,
     itemContent: @Composable (T) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
     var selectedCityId by remember { mutableStateOf("الكل") }
     var selectedMinRating by remember { mutableStateOf(0.0f) }
+    var visibleItemCount by remember { mutableIntStateOf(pageSize) }
+
+    // Reset pagination when items or filters change
+    LaunchedEffect(items.size, selectedCategory, selectedCityId, selectedMinRating, searchQuery) {
+        visibleItemCount = pageSize
+    }
+
+    val paginatedItems = remember(items, visibleItemCount) {
+        items.take(visibleItemCount)
+    }
 
     Column(
         modifier = Modifier
@@ -170,21 +183,19 @@ fun <T : Any> GenericSectionView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("$titleIcon $title:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-            Text("${items.size} عنصر", fontSize = 11.sp, color = Color.LightGray)
+            Text("${paginatedItems.size} من ${items.size}", fontSize = 11.sp, color = Color.LightGray)
         }
 
         // 📄 Content Area
         if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = themeColors.accent)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("جاري تحميل $title... $titleIcon", color = Color.LightGray, fontSize = 11.sp)
+                items(6) {
+                    SkeletonCard(height = 140.dp)
                 }
             }
         } else if (items.isEmpty()) {
@@ -207,10 +218,32 @@ fun <T : Any> GenericSectionView(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(items) { item ->
+                items(paginatedItems) { item ->
                     itemContent(item)
+                }
+
+                if (visibleItemCount < items.size) {
+                    item(span = { GridItemSpan(2) }) {
+                        Button(
+                            onClick = { visibleItemCount += pageSize },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent.copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, themeColors.accent),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                "تحميل المزيد (${items.size - visibleItemCount} متبقي) ⬇️",
+                                color = themeColors.accent,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+

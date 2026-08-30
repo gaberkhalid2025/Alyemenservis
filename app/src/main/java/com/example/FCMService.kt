@@ -17,6 +17,47 @@ class FCMService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
+        val data = remoteMessage.data
+        val type = data["type"] ?: data["notificationType"] ?: ""
+
+        if (type.equals("CHAT", ignoreCase = true) || data.containsKey("channelId")) {
+            val channelId = data["channelId"] ?: ""
+            val senderId = data["senderId"] ?: ""
+            val senderName = data["senderName"] ?: "رسالة جديدة"
+            val messageText = data["message"] ?: remoteMessage.notification?.body ?: "لديك رسالة جديدة"
+            val mediaType = data["mediaType"] ?: "TEXT"
+            val mediaUrl = data["mediaUrl"]
+
+            ChatNotificationHelper.showChatMessageNotification(
+                context = this,
+                notificationId = (System.currentTimeMillis() % 100000).toInt(),
+                channelId = channelId,
+                senderId = senderId,
+                senderName = senderName,
+                messageText = messageText,
+                mediaType = mediaType,
+                mediaUrl = mediaUrl
+            )
+            return
+        }
+
+        if (type.equals("URGENT", ignoreCase = true) || data.containsKey("requestCode")) {
+            val requestCode = data["requestCode"] ?: ""
+            val title = data["title"] ?: remoteMessage.notification?.title ?: "طلب طوارئ عاجل"
+            val description = data["description"] ?: remoteMessage.notification?.body ?: ""
+            val city = data["city"] ?: ""
+
+            ChatNotificationHelper.showUrgentRequestNotification(
+                context = this,
+                notificationId = (System.currentTimeMillis() % 100000).toInt(),
+                requestCode = requestCode,
+                title = title,
+                description = description,
+                city = city
+            )
+            return
+        }
+
         val title = remoteMessage.notification?.title ?: remoteMessage.data["title"] ?: "تحديث جديد 🔔"
         val body = remoteMessage.notification?.body ?: remoteMessage.data["body"] ?: "لديك إشعار جديد في تطبيق خدمات اليمن."
         val targetScreen = remoteMessage.data["targetScreen"] ?: "MAIN"

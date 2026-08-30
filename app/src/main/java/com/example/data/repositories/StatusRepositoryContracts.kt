@@ -21,21 +21,6 @@ data class SystemStatusMetrics(
 )
 
 /**
- * 🏛️ Contract Interface: IStatusRepository
- */
-interface IStatusRepository {
-    fun getSystemMetricsFlow(): Flow<SystemStatusMetrics>
-    fun getPendingJoinRequestsFlow(): Flow<List<PendingProviderEntity>>
-    fun getSystemBookingsFlow(): Flow<List<BookingEntity>>
-    fun getInstantRequestsFlow(): Flow<List<InstantRequestEntity>>
-    fun getNotificationsFlow(): Flow<List<NotificationEntity>>
-    suspend fun approveJoinRequest(request: PendingProviderEntity): Result<Unit>
-    suspend fun rejectJoinRequest(request: PendingProviderEntity, reason: String = ""): Result<Unit>
-    suspend fun clearNotifications(): Result<Unit>
-    suspend fun refreshSystemStatus(): Result<Unit>
-}
-
-/**
  * 🏛️ Contract Interface: IUrgentRepository
  */
 interface IUrgentRepository {

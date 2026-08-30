@@ -12,23 +12,39 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.utils.ReportExporter
 import com.example.utils.VisualThemePalette
+import java.text.DecimalFormat
 
 /**
  * 📊 AnalyticsCharts (لوحة تحليلات وإحصاءات الأداء والنمو)
- * رسوم بيانية ومؤشرات تفاعلية للأرباح، عدد الطلبات، ومعدلات التحويل ورضا العملاء.
+ * رسوم بيانية ومؤشرات تفاعلية للأرباح، دعم تعدد العملات (YER, SAR, USD)، وتصدير التقارير المالية CSV.
  */
 @Composable
 fun AnalyticsCharts(
     themeColors: VisualThemePalette,
+    businessName: String = "حساب الأعمال",
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var timePeriod by remember { mutableStateOf("أسبوعي") } // أسبوعي / شهري / سنوي
+    var selectedCurrency by remember { mutableStateOf("YER") } // YER, SAR, USD
 
-    // Mock analytical data
+    val baseIncomeYer = 425000.0
+    val numberFormat = remember { DecimalFormat("#,###.##") }
+
+    val (convertedIncome, currencySymbol) = remember(selectedCurrency, baseIncomeYer) {
+        when (selectedCurrency) {
+            "SAR" -> (baseIncomeYer / 420.0) to "ر.س"
+            "USD" -> (baseIncomeYer / 1600.0) to "$"
+            else -> baseIncomeYer to "ر.ي"
+        }
+    }
+
     val weeklyData = listOf(
         "السبت" to 0.45f,
         "الأحد" to 0.70f,
@@ -50,7 +66,7 @@ fun AnalyticsCharts(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header & Filter
+            // Header & Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -66,6 +82,46 @@ fun AnalyticsCharts(
                     )
                 }
 
+                IconButton(onClick = {
+                    val exportItems = listOf(
+                        "إيرادات الطلبات المباشرة" to (convertedIncome * 0.65),
+                        "إيرادات الاشتراكات والخدمات" to (convertedIncome * 0.25),
+                        "إيرادات العروض الترويجية" to (convertedIncome * 0.10)
+                    )
+                    val result = ReportExporter.exportFinancialReportToCsv(
+                        context = context,
+                        accountName = businessName,
+                        totalIncome = convertedIncome,
+                        currency = currencySymbol,
+                        items = exportItems
+                    )
+                    result.onSuccess { file ->
+                        ReportExporter.shareExportedFile(context, file, "تقرير الأداء المالي - $businessName")
+                    }
+                }) {
+                    Icon(Icons.Default.Share, contentDescription = "تصدير CSV", tint = Color(0xFF00E5FF))
+                }
+            }
+
+            // Currency & Time Period Switchers
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Currency Switcher
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("YER" to "ريال يمني", "SAR" to "سعودي", "USD" to "دولار").forEach { (code, label) ->
+                        FilterChip(
+                            selected = selectedCurrency == code,
+                            onClick = { selectedCurrency = code },
+                            label = { Text(label, fontSize = 10.sp) },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                }
+
+                // Time Period Filter
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf("أسبوعي", "شهري").forEach { period ->
                         FilterChip(
@@ -90,7 +146,7 @@ fun AnalyticsCharts(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("إجمالي الإيرادات", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                        Text("425,000 ر.ي", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        Text("${numberFormat.format(convertedIncome)} $currencySymbol", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
                         Text("+18.4% نمو", fontSize = 10.sp, color = Color(0xFF10B981))
                     }
                 }
@@ -102,7 +158,7 @@ fun AnalyticsCharts(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("الطلبات والحجوزات", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                        Text("142 طلب", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E5FF))
+                        Text("142 طلب", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E5FF))
                         Text("98.2% اكتمال", fontSize = 10.sp, color = Color(0xFF00E5FF))
                     }
                 }
@@ -114,7 +170,7 @@ fun AnalyticsCharts(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("تقييم العملاء", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                        Text("★ 4.9", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                        Text("★ 4.9", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
                         Text("230 مراجعة", fontSize = 10.sp, color = Color(0xFFF59E0B))
                     }
                 }
@@ -168,3 +224,4 @@ fun AnalyticsCharts(
         }
     }
 }
+

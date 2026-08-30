@@ -1,15 +1,25 @@
 package com.example.ui.screens.register.forms
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -17,6 +27,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.utils.VisualThemePalette
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +51,13 @@ fun UnifiedRegistrationForm(
         viewModel.loadDraft(role)
     }
 
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -47,6 +65,69 @@ fun UnifiedRegistrationForm(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 📸 Profile / Entity Photo Picker
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.4f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "الصورة المختارة",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = themeColors.accent.copy(alpha = 0.2f),
+                            modifier = Modifier.size(50.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, contentDescription = null, tint = themeColors.accent)
+                            }
+                        }
+                    }
+
+                    Column {
+                        Text(
+                            text = if (selectedImageUri != null) "تم إرفاق الصورة بنجاح ✅" else "صورة الحساب / الشعار / الهوية",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedImageUri != null) Color(0xFF10B981) else Color.White
+                        )
+                        Text(
+                            text = if (selectedImageUri != null) "انقر لتغيير الصورة" else "اختياري لتوثيق الحساب",
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text(if (selectedImageUri != null) "تغيير" else "اختيار 📷", fontSize = 11.sp, color = Color.White)
+                }
+            }
+        }
         // 1. Entity Name
         val nameLabel = when (role) {
             "CLIENT" -> "الاسم الثلاثي"
