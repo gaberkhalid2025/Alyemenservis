@@ -84,21 +84,27 @@ fun SmartRecommendationsSection(
     val activeStores = remember(stores) { stores.filter { it.isActive && !it.isDeleted } }
     val activeProps = remember(properties) { properties.filter { it.isActive && !it.isDeleted } }
 
-    // Logic: Recommended or Pinned by Admin ONLY
+    // Logic: Recommended, Verified, VIP or Pinned by Admin
     val recommendedStores = remember(activeStores, settingsState.isStoresEnabled) {
         if (!settingsState.isStoresEnabled) emptyList()
-        else activeStores.filter { it.isRecommended || it.isPinned }
-            .sortedWith(compareByDescending<StoreEntity> { it.rating }
+        else {
+            val flagged = activeStores.filter { it.isRecommended || it.isPinned || it.isVerified || it.isVip }
+            val list = if (flagged.isNotEmpty()) flagged else activeStores
+            list.sortedWith(compareByDescending<StoreEntity> { it.rating }
                 .thenByDescending { it.createdAt })
             .take(10)
+        }
     }
 
     val recommendedProps = remember(activeProps, settingsState.isPropertiesEnabled) {
         if (!settingsState.isPropertiesEnabled) emptyList()
-        else activeProps.filter { it.isRecommended || it.isPinned }
-            .sortedWith(compareByDescending<PropertyEntity> { it.rating }
+        else {
+            val flagged = activeProps.filter { it.isRecommended || it.isPinned || it.isVerified || it.isVip }
+            val list = if (flagged.isNotEmpty()) flagged else activeProps
+            list.sortedWith(compareByDescending<PropertyEntity> { it.rating }
                 .thenByDescending { it.createdAt })
             .take(10)
+        }
     }
 
     if (recommendedStores.isNotEmpty() || recommendedProps.isNotEmpty()) {

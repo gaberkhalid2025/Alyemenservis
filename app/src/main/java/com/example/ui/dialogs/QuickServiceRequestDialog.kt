@@ -113,7 +113,9 @@ fun QuickServiceRequestScreen(
     }
 
     LaunchedEffect(selectedSection) {
-        selectedSpecialty = currentSpecialties.first()
+        if (!currentSpecialties.contains(selectedSpecialty)) {
+            selectedSpecialty = currentSpecialties.first()
+        }
     }
 
     BackHandler {
@@ -335,7 +337,7 @@ fun QuickServiceRequestScreen(
                                         userCity = selectedCity,
                                         userNeighborhood = neighborhoodInput.ifBlank { "وسط المدينة" },
                                         categoryId = selectedSection,
-                                        categoryName = "$sectionLabel - $selectedSpecialty",
+                                        categoryName = "$sectionLabel - ${if (currentSpecialties.contains(selectedSpecialty)) selectedSpecialty else currentSpecialties.first()}",
                                         serviceTitle = serviceTitleInput.trim(),
                                         description = fullDesc,
                                         images = emptyList(),

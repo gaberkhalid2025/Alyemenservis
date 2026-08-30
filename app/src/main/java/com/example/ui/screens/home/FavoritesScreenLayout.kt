@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -162,8 +164,14 @@ fun FavoritesScreenLayout(
                                     onClick = { onOpenProviderDetails(provider) },
                                     onRemoveFavorite = { viewModel.toggleFavorite(provider.id) },
                                     onCall = {
-                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
-                                        context.startActivity(intent)
+                                        if (provider.phone.isNotBlank()) {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${provider.phone}"))
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                android.widget.Toast.makeText(context, "تعذر الاتصال", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     }
                                 )
                             }

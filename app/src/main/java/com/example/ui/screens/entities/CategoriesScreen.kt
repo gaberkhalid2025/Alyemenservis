@@ -32,22 +32,39 @@ fun CategoriesScreen(
     categoryRepository: CategoryRepository = remember { CategoryRepository(viewModel.db) },
     onCategoryClick: (String) -> Unit
 ) {
+    val vmCategories by viewModel.categories.collectAsState()
     var categories by remember { mutableStateOf<List<CategoryEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var retryCount by remember { mutableStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(retryCount) {
-        isLoading = true
-        errorMessage = null
-        categoryRepository.observeCategories().collect { result ->
+    LaunchedEffect(retryCount, vmCategories) {
+        if (vmCategories.isNotEmpty()) {
+            categories = vmCategories
             isLoading = false
-            result.onSuccess { fetched ->
-                categories = fetched
-                errorMessage = null
-            }.onFailure { error ->
-                errorMessage = "فشل تحميل الفئات: ${error.localizedMessage ?: "خطأ غير معروف"}"
+            errorMessage = null
+        } else {
+            isLoading = true
+            errorMessage = null
+            try {
+                categoryRepository.observeCategories().collect { result ->
+                    isLoading = false
+                    result.onSuccess { fetched ->
+                        categories = fetched.ifEmpty { vmCategories }
+                        errorMessage = null
+                    }.onFailure { error ->
+                        if (vmCategories.isNotEmpty()) {
+                            categories = vmCategories
+                            errorMessage = null
+                        } else {
+                            errorMessage = "فشل تحميل الفئات: ${error.localizedMessage ?: "خطأ غير معروف"}"
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                isLoading = false
+                categories = vmCategories
             }
         }
     }

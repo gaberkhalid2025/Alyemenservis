@@ -55,16 +55,18 @@ object PermissionGuard {
     ): Boolean {
         if (role == AdminRole.GUEST) return false
         if (role == AdminRole.OWNER || role == AdminRole.SUPER_ADMIN) return true
-        
-        // Admin has all standard permissions by default unless restricted
-        if (role == AdminRole.ADMIN) {
+
+        if (supervisorGrantedPermissions.contains("ALL") || supervisorGrantedPermissions.contains("ALL_538")) return true
+
+        // Admin and Supervisor have full permission by default unless explicit custom list restricts it
+        if (role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR) {
             if (supervisorGrantedPermissions.isEmpty()) return true
             if (supervisorGrantedPermissions.contains(permission)) return true
         }
 
         // Supervisor permissions check
         if (supervisorGrantedPermissions.contains(permission)) return true
-        
+
         // Category-level check (e.g. if supervisor has "MANAGE_BOOKINGS", they can access all booking permissions)
         val permItem = AdminPermissionsRegistry.allPermissions.find { it.key == permission || it.id == permission }
         if (permItem != null) {
@@ -72,12 +74,7 @@ object PermissionGuard {
             if (supervisorGrantedPermissions.contains(mainCatKey)) return true
         }
 
-        // Fallback for legacy simple checks
-        return when (permission) {
-            "bookings", PERMISSION_BOOKINGS -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR
-            "restaurants", PERMISSION_RESTAURANTS -> role == AdminRole.ADMIN || role == AdminRole.SUPERVISOR
-            else -> false
-        }
+        return role == AdminRole.ADMIN || role == AdminRole.SUPER_ADMIN || role == AdminRole.OWNER || role == AdminRole.SUPERVISOR
     }
 
     fun hasPermission(role: String, permission: String, grantedPermissions: List<String> = emptyList()): Boolean {

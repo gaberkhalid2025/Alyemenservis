@@ -125,7 +125,6 @@ fun DynamicPolymorphicProfileScreen(
     }
 
     // Ownership logic: check if logged-in user is the provider/owner
-    val adminRole by viewModel.adminRole.collectAsState()
     val isOwner = remember(currentUserId, currentUserPhone, provider, store, property, adminRole) {
         val phoneClean = currentUserPhone.trim()
         val uidClean = currentUserId.trim()
