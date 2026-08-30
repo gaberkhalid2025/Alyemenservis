@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -139,7 +140,8 @@ fun StoreQuickDetailsDialog(
     store: StoreEntity,
     context: Context,
     themeColors: VisualThemePalette,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenDetails: () -> Unit = {}
 ) {
     val isRest = store.isRestaurantOrCafe()
     val isMed = store.isMedicalCenter()
@@ -204,17 +206,28 @@ fun StoreQuickDetailsDialog(
                 }
 
                 Button(
+                    onClick = onOpenDetails,
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(42.dp)
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = Color.Black)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("🛒 عرض صفحة المتجر والمنتجات بالكامل", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+
+                Button(
                     onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
                         context.startActivity(intent)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                    modifier = Modifier.fillMaxWidth().height(42.dp)
                 ) {
                     Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("اتصال مباشر (${store.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                    Text("اتصال مباشر (${store.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }

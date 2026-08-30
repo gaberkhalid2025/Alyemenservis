@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +48,9 @@ fun PropertiesScreen(
 
     val categories = listOf("الكل", "شقة", "بيت ومستقل", "محل تجاري", "أرض")
 
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
+
     // Determine loading state from properties list presence
     val isLoading = remember(properties) { properties.isEmpty() }
 
@@ -74,183 +78,80 @@ fun PropertiesScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(themeColors.background)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Search Input
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("بحث عن شقة، أرض، بيت للإيجار أو البيع... 🏠", fontSize = 11.sp, color = Color.Gray) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = themeColors.accent,
-                unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f),
-                focusedContainerColor = themeColors.surface,
-                unfocusedContainerColor = themeColors.surface
-            )
+    var showGuestDialog by remember { mutableStateOf(false) }
+
+    if (showGuestDialog) {
+        com.example.ui.screens.register.GuestRegistrationDialog(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = { showGuestDialog = false },
+            onRegisterCompleted = { _, _, _, _ -> showGuestDialog = false }
         )
-
-        // 🏙️ City Filter LazyRow
-        Text("🏙️ اختر المدينة العقارية:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            item {
-                FilterChip(
-                    selected = selectedCityId == "الكل",
-                    onClick = { selectedCityId = "الكل" },
-                    label = { Text("كل المحافظات 🇾🇪", fontSize = 10.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = themeColors.accent,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-            items(cities) { city ->
-                FilterChip(
-                    selected = selectedCityId == city.id,
-                    onClick = { selectedCityId = city.id },
-                    label = { Text("${city.icon} ${city.nameAr}", fontSize = 10.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = themeColors.accent,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-        }
-
-        // 🔑 Listing Type Filter (Rent vs Sale)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("🏷️ طبيعة العقد:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
-            listOf(
-                "الكل" to "الكل",
-                "rent" to "للإيجار 🔑",
-                "sale" to "للبيع والتمليك 📜"
-            ).forEach { (typeVal, typeLabel) ->
-                FilterChip(
-                    selected = selectedTypeFilter == typeVal,
-                    onClick = { selectedTypeFilter = typeVal },
-                    label = { Text(typeLabel, fontSize = 10.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = themeColors.accent,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-        }
-
-        // 🏷️ Property Type Filter LazyRow
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(categories) { cat ->
-                val isSelected = selectedCategory == cat
-                Surface(
-                    color = if (isSelected) themeColors.accent else themeColors.surface,
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.Gray.copy(alpha = 0.3f)),
-                    modifier = Modifier.clickable { selectedCategory = cat }
-                ) {
-                    Text(
-                        text = cat,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) Color.Black else Color.White
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🏠 العقارات والأراضي اليمنيّة:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-            Text("${filteredProperties.size} عقار", fontSize = 11.sp, color = Color.LightGray)
-        }
-
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = themeColors.accent)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("جاري تحميل قائمة العقارات... 🏡", color = Color.LightGray, fontSize = 11.sp)
-                }
-            }
-        } else if (filteredProperties.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🏡", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("لا توجد عقارات مطابقة للتصفية الحالية", color = Color.Gray, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            searchQuery = ""
-                            selectedCategory = "الكل"
-                            selectedCityId = "الكل"
-                            selectedTypeFilter = "الكل"
-                            selectedMinRating = 0.0f
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = themeColors.accent)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إعادة تعيين الفلاتر", color = Color.White, fontSize = 11.sp)
-                    }
-                }
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                items(filteredProperties, key = { it.id }) { prop ->
-                    PropertyCard(
-                        property = prop,
-                        themeColors = themeColors,
-                        onClick = { onPropertyClick(prop) },
-                        onChatClick = { onChatClick(prop) },
-                        onRequestInspectionClick = { onRequestInspectionClick(prop) }
-                    )
-                }
-            }
-        }
     }
+
+    GenericSectionView(
+        themeColors = themeColors,
+        items = filteredProperties,
+        isLoading = isLoading,
+        title = "العقارات والأراضي اليمنيّة",
+        titleIcon = "🏠",
+        searchPlaceholder = "بحث عن شقة، أرض، بيت للإيجار أو البيع... 🏠",
+        categories = categories,
+        cities = cities,
+        onSearchQueryChanged = { searchQuery = it },
+        onCategorySelected = { selectedCategory = it },
+        onCitySelected = { selectedCityId = it },
+        onMinRatingSelected = { selectedMinRating = it },
+        emptyMessage = "لا توجد عقارات مطابقة للتصفية الحالية",
+        extraHeaderContent = {
+            // 🔑 Listing Type Filter (Rent vs Sale)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("🏷️ طبيعة العقد:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+                listOf(
+                    "الكل" to "الكل",
+                    "rent" to "للإيجار 🔑",
+                    "sale" to "للبيع والتمليك 📜"
+                ).forEach { (typeVal, typeLabel) ->
+                    FilterChip(
+                        selected = selectedTypeFilter == typeVal,
+                        onClick = { selectedTypeFilter = typeVal },
+                        label = { Text(typeLabel, fontSize = 10.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = themeColors.accent,
+                            selectedLabelColor = Color.Black
+                        )
+                    )
+                }
+            }
+        },
+        itemContent = { prop ->
+            PropertyCard(
+                property = prop,
+                themeColors = themeColors,
+                isLoggedIn = isLoggedIn,
+                onClick = { onPropertyClick(prop) },
+                onChatClick = {
+                    if (!isLoggedIn) {
+                        showGuestDialog = true
+                    } else {
+                        onChatClick(prop)
+                    }
+                },
+                onRequestInspectionClick = { onRequestInspectionClick(prop) }
+            )
+        }
+    )
 }
 
 @Composable
 fun PropertyCard(
     property: PropertyEntity,
     themeColors: VisualThemePalette,
+    isLoggedIn: Boolean = true,
     onClick: () -> Unit,
     onChatClick: () -> Unit,
     onRequestInspectionClick: () -> Unit
@@ -357,27 +258,55 @@ fun PropertyCard(
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = onRequestInspectionClick,
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
                         modifier = Modifier
-                            .weight(1.1f)
-                            .height(30.dp)
+                            .weight(1f)
+                            .height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Text("طلب معاينة 👁️", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                     }
 
-                    IconButton(
-                        onClick = onChatClick,
-                        modifier = Modifier
-                            .size(30.dp)
-                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "تواصل", tint = Color.White, modifier = Modifier.size(14.dp))
+                    if (property.phone.isNotBlank()) {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        IconButton(
+                            onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${property.phone}"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color(0xFF10B981).copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Phone,
+                                contentDescription = "اتصال",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    if (isLoggedIn) {
+                        IconButton(
+                            onClick = onChatClick,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "محادثة",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }

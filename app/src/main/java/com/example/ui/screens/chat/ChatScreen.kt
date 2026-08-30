@@ -44,6 +44,18 @@ fun ChatScreen(
     chatViewModel: ChatViewModel = viewModel(),
     onBackClick: () -> Unit
 ) {
+    if (currentUserId.isBlank() || currentUserId == "guest") {
+        Box(modifier = Modifier.fillMaxSize().background(themeColors.background), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("⚠️ يرجى تسجيل الدخول أولاً للتمكن من المحادثة", fontSize = 16.sp, color = Color.Red, textAlign = TextAlign.Center)
+                Button(onClick = onBackClick, colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)) {
+                    Text("رجوع", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        return
+    }
+
     val context = LocalContext.current
     val listState = rememberLazyListState()
 

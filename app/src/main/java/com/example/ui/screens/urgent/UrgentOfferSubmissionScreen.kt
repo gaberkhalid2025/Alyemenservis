@@ -47,12 +47,18 @@ fun UrgentOfferSubmissionScreen(
     val uiState by urgentViewModel.uiState.collectAsState()
 
     var priceText by remember { mutableStateOf("") }
-    var estimatedArrival by remember { mutableStateOf("الوصول خلال 15 دقيقة") }
-    var estimatedDuration by remember { mutableStateOf("نصف ساعة") }
+    var estimatedArrival by remember { mutableStateOf(UrgentConstants.urgencyTimeOptions.first()) }
+    var estimatedDuration by remember { mutableStateOf(UrgentConstants.durationOptions.first()) }
     var notesText by remember { mutableStateOf("") }
 
-    val fastArrivalOptions = listOf("الوصول خلال 15 دقيقة", "الوصول خلال 20 دقيقة", "الوصول خلال 30 دقيقة")
-    val durationOptions = listOf("نصف ساعة", "ساعة واحدة", "ساعتان")
+    val formattedPriceLabel = remember(priceText) {
+        val p = priceText.toDoubleOrNull() ?: 0.0
+        if (p > 0) {
+            "%,.0f ريال يمني".format(p)
+        } else {
+            ""
+        }
+    }
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
@@ -130,6 +136,13 @@ fun UrgentOfferSubmissionScreen(
                 value = priceText,
                 onValueChange = { if (it.all { char -> char.isDigit() || char == '.' }) priceText = it },
                 label = { Text("السعر المقترح (ريال يمني)*") },
+                supportingText = {
+                    if (formattedPriceLabel.isNotBlank()) {
+                        Text("السعر المنسق: $formattedPriceLabel", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("الحد الأدنى لتقديم عرض عاجل هو 1,000 ريال يمني")
+                    }
+                },
                 leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFF2E7D32)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth().testTag("urgent_offer_price_input"),
@@ -142,7 +155,7 @@ fun UrgentOfferSubmissionScreen(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                fastArrivalOptions.forEach { opt ->
+                UrgentConstants.urgencyTimeOptions.forEach { opt ->
                     val isSelected = estimatedArrival == opt
                     FilterChip(
                         selected = isSelected,
@@ -162,7 +175,7 @@ fun UrgentOfferSubmissionScreen(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                durationOptions.forEach { opt ->
+                UrgentConstants.durationOptions.forEach { opt ->
                     val isSelected = estimatedDuration == opt
                     FilterChip(
                         selected = isSelected,
@@ -189,7 +202,11 @@ fun UrgentOfferSubmissionScreen(
                 onClick = {
                     val price = priceText.toDoubleOrNull()
                     if (price == null || price <= 0.0) {
-                        scope.launch { snackbarHostState.showSnackbar("يرجى تحديد السعر") }
+                        scope.launch { snackbarHostState.showSnackbar("السعر يجب أن يكون أكبر من 0") }
+                        return@Button
+                    }
+                    if (price < 1000.0) {
+                        scope.launch { snackbarHostState.showSnackbar("الحد الأدنى لتقديم العرض هو 1,000 ريال يمني") }
                         return@Button
                     }
 

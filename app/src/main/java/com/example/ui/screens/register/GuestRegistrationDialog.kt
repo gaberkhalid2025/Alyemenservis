@@ -327,76 +327,21 @@ fun GuestRegistrationDialog(
 
                 } else {
                     Text(
-                        text = "لتفادي الحسابات والاتصالات الوهمية، يرجى إدخال اسمك ورقم هاتفك المعتمد بجمهورية اليمن:",
+                        text = "تسجيل عميل جديد",
                         fontSize = 11.sp,
                         color = Color.LightGray,
-                        lineHeight = 16.sp
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    RegistrationField(
-                        value = name,
-                        onValueChange = { name = it; nameError = null },
-                        label = "الاسم الثلاثي بالكامل (إجباري) *",
-                        leadingIcon = Icons.Default.Person,
-                        errorMessage = nameError,
-                        themeColors = themeColors
-                    )
-
-                    RegistrationField(
-                        value = phoneBody,
-                        onValueChange = { phoneBody = it; phoneError = null },
-                        label = "رقم الهاتف اليمني (إجباري) *",
-                        placeholder = "771234567",
-                        leadingIcon = Icons.Default.Phone,
-                        errorMessage = phoneError,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        themeColors = themeColors
-                    )
-
-                    RegistrationField(
-                        value = residence,
-                        onValueChange = { residence = it },
-                        label = "المحافظة/المنطقة داخل اليمن (إجباري) *",
-                        leadingIcon = Icons.Default.Place,
-                        themeColors = themeColors
-                    )
-
-                    val isPasswordRequired = settingsState.isUserPasswordRequired
-                    RegistrationField(
-                        value = password,
-                        onValueChange = { password = it; passwordError = null },
-                        label = "إنشاء كلمة مرور للحساب" + (if (isPasswordRequired) " (إجباري) *" else " (اختياري)"),
-                        leadingIcon = Icons.Default.Lock,
-                        isPassword = true,
-                        errorMessage = passwordError,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        themeColors = themeColors
-                    )
-
-                    RegistrationSubmitButton(
-                        text = "إتمام التحقق والانطلاق 🚀",
-                        onClick = {
-                            val cleanName = name.trim()
-                            val cleanPhone = phoneBody.trim()
-                            val cleanResidence = residence.trim()
-                            val cleanPassword = password.trim()
-
-                            val nameVal = Validators.validateName(cleanName, "الاسم")
-                            if (!nameVal.isValid) {
-                                nameError = nameVal.errorMessage
-                                return@RegistrationSubmitButton
-                            }
-
-                            val phoneVal = Validators.validateYemenPhone(cleanPhone)
-                            if (!phoneVal.isValid) {
-                                phoneError = phoneVal.errorMessage
-                                return@RegistrationSubmitButton
-                            }
-
-                            if (isPasswordRequired && cleanPassword.isEmpty()) {
-                                passwordError = "كلمة المرور إجبارية بقرار الإدارة"
-                                return@RegistrationSubmitButton
-                            }
+                    com.example.ui.screens.register.forms.UnifiedRegistrationForm(
+                        role = "CLIENT",
+                        themeColors = themeColors,
+                        onRegistrationSuccess = { data ->
+                            val cleanName = data["entityName"] ?: ""
+                            val cleanPhone = data["phone"] ?: ""
+                            val cleanResidence = data["city"] ?: ""
+                            val cleanPassword = data["password"] ?: ""
 
                             val fullPhone = if (cleanPhone.length == 9) cleanPhone else "77$cleanPhone"
                             uiState = GuestAuthUiState.Loading("جاري إنشاء الحساب...")
@@ -408,9 +353,7 @@ fun GuestRegistrationDialog(
                                 password = cleanPassword
                             )
                             onRegisterCompleted(cleanName, fullPhone, cleanResidence, cleanPassword)
-                        },
-                        isLoading = uiState is GuestAuthUiState.Loading,
-                        themeColors = themeColors
+                        }
                     )
 
                     TextButton(

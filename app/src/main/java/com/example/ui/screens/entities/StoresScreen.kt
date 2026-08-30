@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +39,9 @@ fun StoresScreen(
 ) {
     val stores by viewModel.stores.collectAsState()
     val cities by viewModel.cities.collectAsState()
+
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
@@ -72,178 +76,54 @@ fun StoresScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(themeColors.background)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Search Input
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("بحث في المحلات والمتاجر... 🏪", fontSize = 11.sp, color = Color.Gray) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = themeColors.accent,
-                unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f),
-                focusedContainerColor = themeColors.surface,
-                unfocusedContainerColor = themeColors.surface
-            )
+    var showGuestDialog by remember { mutableStateOf(false) }
+
+    if (showGuestDialog) {
+        com.example.ui.screens.register.GuestRegistrationDialog(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = { showGuestDialog = false },
+            onRegisterCompleted = { _, _, _, _ -> showGuestDialog = false }
         )
-
-        // 🏙️ City Filter LazyRow
-        Text("🏙️ اختر المدينة:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            item {
-                FilterChip(
-                    selected = selectedCityId == "الكل",
-                    onClick = { selectedCityId = "الكل" },
-                    label = { Text("كل المدن 🇾🇪", fontSize = 10.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = themeColors.accent,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-            items(cities) { city ->
-                FilterChip(
-                    selected = selectedCityId == city.id,
-                    onClick = { selectedCityId = city.id },
-                    label = { Text("${city.icon} ${city.nameAr}", fontSize = 10.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = themeColors.accent,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-        }
-
-        // ⭐ Rating Filter LazyRow
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("⭐ التقييم الأدنى:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
-            listOf(0.0f, 3.0f, 4.0f, 4.5f).forEach { stars ->
-                FilterChip(
-                    selected = selectedMinRating == stars,
-                    onClick = { selectedMinRating = stars },
-                    label = { Text(if (stars == 0.0f) "الكل" else "⭐ $stars+", fontSize = 10.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = themeColors.accent,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-        }
-
-        // 🏷️ Sub-category Filter LazyRow
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(categories) { cat ->
-                val isSelected = selectedCategory == cat
-                Surface(
-                    color = if (isSelected) themeColors.accent else themeColors.surface,
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.Gray.copy(alpha = 0.3f)),
-                    modifier = Modifier.clickable { selectedCategory = cat }
-                ) {
-                    Text(
-                        text = cat,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) Color.Black else Color.White
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🏪 المحلات التجارية والمتاجر:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-            Text("${filteredStores.size} محل", fontSize = 11.sp, color = Color.LightGray)
-        }
-
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = themeColors.accent)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("جاري تحميل قائمة المتاجر... 🏪", color = Color.LightGray, fontSize = 11.sp)
-                }
-            }
-        } else if (filteredStores.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🏪", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("لا توجد محلات تجارية مطابقة للبحث", color = Color.Gray, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            searchQuery = ""
-                            selectedCategory = "الكل"
-                            selectedCityId = "الكل"
-                            selectedMinRating = 0.0f
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = themeColors.accent)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("إعادة تعيين الفلاتر", color = Color.White, fontSize = 11.sp)
-                    }
-                }
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                items(filteredStores, key = { it.id }) { store ->
-                    StoreItemCard(
-                        store = store,
-                        themeColors = themeColors,
-                        onClick = { onStoreClick(store) },
-                        onChatClick = { onChatClick(store) },
-                        onRequestServiceClick = { onRequestServiceClick(store) }
-                    )
-                }
-            }
-        }
     }
+
+    GenericSectionView(
+        themeColors = themeColors,
+        items = filteredStores,
+        isLoading = isLoading,
+        title = "المحلات التجارية والمتاجر",
+        titleIcon = "🏪",
+        searchPlaceholder = "بحث في المحلات والمتاجر... 🏪",
+        categories = categories,
+        cities = cities,
+        onSearchQueryChanged = { searchQuery = it },
+        onCategorySelected = { selectedCategory = it },
+        onCitySelected = { selectedCityId = it },
+        onMinRatingSelected = { selectedMinRating = it },
+        emptyMessage = "لا توجد محلات تجارية مطابقة للبحث",
+        itemContent = { store ->
+            StoreItemCard(
+                store = store,
+                themeColors = themeColors,
+                onClick = { onStoreClick(store) },
+                onChatClick = {
+                    if (!isLoggedIn) {
+                        showGuestDialog = true
+                    } else {
+                        onChatClick(store)
+                    }
+                },
+                onRequestServiceClick = { onRequestServiceClick(store) }
+            )
+        }
+    )
 }
 
 @Composable
 fun StoreItemCard(
     store: StoreEntity,
     themeColors: VisualThemePalette,
+    isLoggedIn: Boolean = true,
     onClick: () -> Unit,
     onChatClick: () -> Unit,
     onRequestServiceClick: () -> Unit
@@ -325,27 +205,53 @@ fun StoreItemCard(
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
-                        onClick = onRequestServiceClick,
+                        onClick = onClick,
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
                         modifier = Modifier
-                            .weight(1.1f)
-                            .height(30.dp)
+                            .weight(1f)
+                            .height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                     ) {
-                        Text("اطلب الآن 🛒", fontSize = 9.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("عرض التفاصيل 🏪", fontSize = 9.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+
+                    if (store.phone.isNotBlank()) {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        IconButton(
+                            onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${store.phone}"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color(0xFF10B981).copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Phone,
+                                contentDescription = "اتصال",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
 
                     IconButton(
                         onClick = onChatClick,
                         modifier = Modifier
-                            .size(30.dp)
-                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .size(32.dp)
+                            .background(Color.White.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "محادثة", tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "محادثة",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }

@@ -22,7 +22,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
+import androidx.compose.runtime.*
+import androidx.compose.material3.*
 
 @Composable
 fun ProfileActions(
@@ -31,6 +34,7 @@ fun ProfileActions(
     entityPhone: String,
     entityType: ProfileEntityType,
     isOwner: Boolean,
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onOpenChat: (String) -> Unit,
     onRequestBooking: () -> Unit,
@@ -40,6 +44,17 @@ fun ProfileActions(
     onEditGallery: () -> Unit
 ) {
     val context = LocalContext.current
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    var showGuestDialog by remember { mutableStateOf(false) }
+
+    if (showGuestDialog) {
+        com.example.ui.screens.register.GuestRegistrationDialog(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = { showGuestDialog = false },
+            onRegisterCompleted = { _, _, _, _ -> showGuestDialog = false }
+        )
+    }
 
     Card(
         modifier = Modifier
@@ -97,13 +112,17 @@ fun ProfileActions(
                 // Chat Button
                 Button(
                     onClick = {
-                        val channelId = when (entityType) {
-                            ProfileEntityType.TECHNICIAN -> "chat_p_$entityId"
-                            ProfileEntityType.STORE -> "chat_store_$entityId"
-                            ProfileEntityType.REAL_ESTATE -> "chat_prop_$entityId"
-                            else -> "chat_general_$entityId"
+                        if (currentUserId.isBlank()) {
+                            showGuestDialog = true
+                        } else {
+                            val channelId = when (entityType) {
+                                ProfileEntityType.TECHNICIAN -> "chat_p_$entityId"
+                                ProfileEntityType.STORE -> "chat_store_$entityId"
+                                ProfileEntityType.REAL_ESTATE -> "chat_prop_$entityId"
+                                else -> "chat_general_$entityId"
+                            }
+                            onOpenChat(channelId)
                         }
-                        onOpenChat(channelId)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                     shape = RoundedCornerShape(10.dp),

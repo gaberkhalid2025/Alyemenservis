@@ -53,13 +53,17 @@ fun ProfileHeader(
                         )
                     )
             ) {
-                if (profileCover.isNotBlank()) {
-                    SmartAsyncImage(
-                        model = profileCover,
-                        contentDescription = entityName,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                val cover = try {
+                    if (profileCover.isNullOrBlank()) "" else profileCover
+                } catch (e: Exception) {
+                    ""
                 }
+                SmartAsyncImage(
+                    model = cover,
+                    contentDescription = entityName,
+                    modifier = Modifier.fillMaxSize(),
+                    fallbackEmoji = "🏙️"
+                )
                 // Type Tag
                 Box(
                     modifier = Modifier

@@ -17,8 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
-import com.example.ui.screens.register.forms.RegistrationFormFactory
-import com.example.ui.screens.register.forms.RegistrationFormViewModel
 import com.example.utils.VisualThemePalette
 
 /**
@@ -42,9 +40,6 @@ fun ProviderRegisterFormLayout(
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val formViewModel: RegistrationFormViewModel = remember(viewModel) {
-        RegistrationFormViewModel(viewModel)
-    }
 
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
@@ -80,6 +75,11 @@ fun ProviderRegisterFormLayout(
                         )
                     }
                 },
+                actions = {
+                    TextButton(onClick = { viewModel.triggerRestoreAccountDialog.value = true }) {
+                        Text("استرجاع حسابي", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
             )
         },
@@ -90,8 +90,7 @@ fun ProviderRegisterFormLayout(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 0.dp, vertical = 0.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Category selector tabs
@@ -120,17 +119,33 @@ fun ProviderRegisterFormLayout(
                 }
             }
 
-            // Dynamic Form from Factory
-            RegistrationFormFactory.CreateForm(
-                type = activeType,
-                viewModel = viewModel,
-                formViewModel = formViewModel,
+            // Unified Simplified Registration Form
+            com.example.ui.screens.register.forms.UnifiedRegistrationForm(
+                role = activeType.name,
                 themeColors = themeColors,
-                categories = categories,
-                snackbarHostState = snackbarHostState,
-                initialName = currentUserName,
-                initialPhone = currentUserPhone,
-                initialResidence = currentUserResidence
+                onRegistrationSuccess = { data ->
+                    val name = data["entityName"] ?: ""
+                    val phone = data["phone"] ?: ""
+                    val pass = data["password"] ?: ""
+                    
+                    viewModel.setUserSessionDetails(context, name, phone, "صنعاء")
+                    
+                    viewModel.submitJoinForm(
+                        context = context,
+                        name = name,
+                        phone = phone,
+                        catId = activeType.id,
+                        area = data["city"] ?: "صنعاء",
+                        neighborhood = "",
+                        photoPath = "",
+                        idCardPath = "",
+                        gpsCoords = "",
+                        workPhotos = emptyList(),
+                        customCategoryName = data["specialization"] ?: "عام",
+                        password = pass,
+                        productAttachmentsJson = ""
+                    )
+                }
             )
         }
     }

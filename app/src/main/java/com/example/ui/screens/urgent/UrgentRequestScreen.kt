@@ -27,6 +27,8 @@ import com.example.viewmodels.UrgentUiState
 import com.example.viewmodels.UrgentViewModel
 import kotlinx.coroutines.launch
 
+import com.example.ui.screens.urgent.components.UrgentFormFields
+
 /**
  * 🚨 UrgentRequestScreen
  * شاشة طلب خدمة عاجلة خلال 30 دقيقة مع مؤقت فوري وتنبيهات أولوية قصوى.
@@ -60,16 +62,10 @@ fun UrgentRequestScreen(
     var createdRequestCode by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var expandedCategoryDropdown by remember { mutableStateOf(false) }
-    var expandedCityDropdown by remember { mutableStateOf(false) }
 
-    val departments = listOf("خدمات وفنيين", "مراكز ومتاجر", "مطاعم وكافيهات")
-    val subCategories = when (selectedDepartment) {
-        "خدمات وفنيين" -> listOf("سباكة طارئة", "كهرباء وطوارئ ماس", "تكييف وتبريد", "بنشر وسحب سيارات", "أقفال وأبواب", "أجهزة منزلية")
-        "مراكز ومتاجر" -> listOf("قطع غيار مستعجلة", "بطاريات وزيوت", "أدوية ومستلزمات طبية", "إلكترونيات سريعة")
-        else -> listOf("وجبات سريعة طارئة", "مشروبات ومياه", "مأكولات سريعة")
+    val subCategories = remember(selectedDepartment) {
+        UrgentConstants.getSubCategories(selectedDepartment)
     }
-
-    val cities = listOf("صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت", "مأرب", "ذمار")
 
     LaunchedEffect(selectedDepartment) {
         selectedCategory = subCategories.firstOrNull() ?: ""
@@ -139,61 +135,23 @@ fun UrgentRequestScreen(
 
             // بيانات التواصل والموقع
             Text("بيانات التواصل والموقع", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            OutlinedTextField(
-                value = customerName,
-                onValueChange = { customerName = it },
-                label = { Text("الاسم") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth().testTag("urgent_customer_name"),
-                singleLine = true
+            UrgentFormFields(
+                customerName = customerName,
+                onCustomerNameChange = { customerName = it },
+                customerPhone = customerPhone,
+                onCustomerPhoneChange = { customerPhone = it },
+                selectedCity = selectedCity,
+                onCitySelected = { selectedCity = it },
+                selectedArea = selectedArea,
+                onAreaChange = { selectedArea = it }
             )
-
-            OutlinedTextField(
-                value = customerPhone,
-                onValueChange = { customerPhone = it },
-                label = { Text("رقم الهاتف (إجباري)*") },
-                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier = Modifier.fillMaxWidth().testTag("urgent_customer_phone"),
-                singleLine = true
-            )
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(modifier = Modifier.weight(1f)) {
-                    OutlinedTextField(
-                        value = selectedCity,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("المدينة*") },
-                        trailingIcon = {
-                            IconButton(onClick = { expandedCityDropdown = true }) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("urgent_city")
-                    )
-                    DropdownMenu(expanded = expandedCityDropdown, onDismissRequest = { expandedCityDropdown = false }) {
-                        cities.forEach { city ->
-                            DropdownMenuItem(text = { Text(city) }, onClick = { selectedCity = city; expandedCityDropdown = false })
-                        }
-                    }
-                }
-
-                OutlinedTextField(
-                    value = selectedArea,
-                    onValueChange = { selectedArea = it },
-                    label = { Text("الحي / الشارع*") },
-                    modifier = Modifier.weight(1f).testTag("urgent_area"),
-                    singleLine = true
-                )
-            }
 
             HorizontalDivider()
 
             // القسم والتخصص
             Text("قسم الخدمة العاجلة", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                departments.forEach { dept ->
+                UrgentConstants.departments.forEach { dept ->
                     FilterChip(
                         selected = selectedDepartment == dept,
                         onClick = { selectedDepartment = dept },

@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.*
@@ -207,13 +208,37 @@ fun RadarRenderer(
             }
 
             // 7. Cluster & Draw Items (Optimized using cached clusters)
+            val paint = android.graphics.Paint().apply {
+                textSize = 28f
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
             for (cluster in clusters) {
                 val isSelected = cluster.items.any { it.id == selectedItemId }
-                MarkerRenderer.drawCluster(
-                    drawScope = this,
-                    cluster = cluster,
-                    isSelected = isSelected
-                )
+                val count = cluster.items.size
+                val center = Offset(cluster.centerX, cluster.centerY)
+                
+                if (count == 1) {
+                    val item = cluster.items.first()
+                    val emoji = MarkerRenderer.getEmojiForType(item.type)
+                    val color = MarkerRenderer.getColorForType(item.type)
+                    
+                    if (isSelected) {
+                        drawCircle(color = color.copy(alpha = 0.4f), radius = 24f, center = center)
+                    }
+                    
+                    drawContext.canvas.nativeCanvas.drawText(
+                        emoji,
+                        center.x,
+                        center.y + (paint.textSize / 3),
+                        paint
+                    )
+                } else {
+                    MarkerRenderer.drawCluster(
+                        drawScope = this,
+                        cluster = cluster,
+                        isSelected = isSelected
+                    )
+                }
             }
 
             // 8. User Center Point (Glowing Green Beacon)

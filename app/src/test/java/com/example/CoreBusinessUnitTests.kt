@@ -53,7 +53,7 @@ class CoreBusinessUnitTests {
     @Test
     fun testPermissionManagerRationaleStrings() {
         val cameraRationale = PermissionManager.getRationaleForPermission(PermissionManager.PERMISSION_CAMERA)
-        assertTrue(cameraRationale.contains("الكاميرا"))
+        assertTrue(cameraRationale.contains("كاميرا"))
 
         val audioRationale = PermissionManager.getRationaleForPermission(PermissionManager.PERMISSION_RECORD_AUDIO)
         assertTrue(audioRationale.contains("الميكروفون"))

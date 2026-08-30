@@ -36,30 +36,30 @@ fun UrgentTimerComponent(
     isCompact: Boolean = false,
     onTimerExpired: () -> Unit = {}
 ) {
-    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    var timeLeftMs by remember(expiresAt) {
+        mutableStateOf(maxOf(0L, expiresAt - System.currentTimeMillis()))
+    }
 
     LaunchedEffect(expiresAt) {
-        while (true) {
-            currentTime = System.currentTimeMillis()
-            if (currentTime >= expiresAt) {
-                onTimerExpired()
-                break
-            }
+        while (timeLeftMs > 0) {
             delay(1000L)
+            timeLeftMs = maxOf(0L, expiresAt - System.currentTimeMillis())
+            if (timeLeftMs <= 0) {
+                onTimerExpired()
+            }
         }
     }
 
-    val remainingMillis = (expiresAt - currentTime).coerceAtLeast(0L)
-    val remainingSeconds = remainingMillis / 1000L
+    val remainingSeconds = timeLeftMs / 1000L
     val minutes = remainingSeconds / 60
     val seconds = remainingSeconds % 60
 
-    val isExpired = remainingMillis <= 0
-    val isCritical = remainingMillis < (5 * 60 * 1000L) && !isExpired // أقل من 5 دقائق
-    val isWarning = remainingMillis < (10 * 60 * 1000L) && !isCritical && !isExpired // أقل من 10 دقائق
+    val isExpired = timeLeftMs <= 0
+    val isCritical = timeLeftMs < (5 * 60 * 1000L) && !isExpired // أقل من 5 دقائق
+    val isWarning = timeLeftMs < (10 * 60 * 1000L) && !isCritical && !isExpired // أقل من 10 دقائق
 
     val progress = if (totalDurationMillis > 0) {
-        (remainingMillis.toFloat() / totalDurationMillis.toFloat()).coerceIn(0f, 1f)
+        (timeLeftMs.toFloat() / totalDurationMillis.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
     val infiniteTransition = rememberInfiniteTransition(label = "Pulse")

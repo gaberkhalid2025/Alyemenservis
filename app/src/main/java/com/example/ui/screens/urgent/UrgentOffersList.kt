@@ -42,14 +42,20 @@ fun UrgentOffersList(
         )
 
         if (offers.isEmpty()) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color(0xFFD32F2F),
+                    strokeWidth = 2.5.dp
+                )
                 Text(
-                    text = "⏳ في انتظار وصول أول عرض من الفنيين المتاحين...",
+                    text = "⏳ جاري البحث عن عروض الفنيين المتاحة بالمنطقة...",
                     fontSize = 13.sp,
                     color = Color.Gray
                 )

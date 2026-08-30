@@ -1,0 +1,216 @@
+package com.example.ui.screens.entities
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.CityEntity
+import com.example.utils.VisualThemePalette
+
+/**
+ * ♻️ GenericSectionView (Component 10/10 Architecture)
+ * A generic and highly reusable component that handles layout, filtering, skeleton loading,
+ * and empty states for all entity screens (Stores, Restaurants, Medical, Real Estate, etc.)
+ */
+@Composable
+fun <T : Any> GenericSectionView(
+    themeColors: VisualThemePalette,
+    items: List<T>,
+    isLoading: Boolean,
+    title: String,
+    titleIcon: String,
+    searchPlaceholder: String,
+    categories: List<String>,
+    cities: List<CityEntity>,
+    onSearchQueryChanged: (String) -> Unit,
+    onCategorySelected: (String) -> Unit,
+    onCitySelected: (String) -> Unit,
+    onMinRatingSelected: (Float) -> Unit,
+    emptyMessage: String,
+    extraHeaderContent: @Composable (() -> Unit)? = null,
+    itemContent: @Composable (T) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("الكل") }
+    var selectedCityId by remember { mutableStateOf("الكل") }
+    var selectedMinRating by remember { mutableStateOf(0.0f) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(themeColors.background)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // 🔍 Search Input
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = {
+                searchQuery = it
+                onSearchQueryChanged(it)
+            },
+            placeholder = { Text(searchPlaceholder, fontSize = 11.sp, color = Color.Gray) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = themeColors.accent,
+                unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f),
+                focusedContainerColor = themeColors.surface,
+                unfocusedContainerColor = themeColors.surface
+            )
+        )
+
+        // 🏙️ City Filter
+        Text("🏙️ اختر المدينة:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            item {
+                FilterChip(
+                    selected = selectedCityId == "الكل",
+                    onClick = { 
+                        selectedCityId = "الكل" 
+                        onCitySelected("الكل")
+                    },
+                    label = { Text("كل المدن 🇾🇪", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+            items(cities) { city ->
+                FilterChip(
+                    selected = selectedCityId == city.id,
+                    onClick = { 
+                        selectedCityId = city.id 
+                        onCitySelected(city.id)
+                    },
+                    label = { Text("${city.icon} ${city.nameAr}", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+        }
+
+        // ⭐ Rating Filter
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("⭐ التقييم الأدنى:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
+            listOf(0.0f, 3.0f, 4.0f, 4.5f).forEach { stars ->
+                FilterChip(
+                    selected = selectedMinRating == stars,
+                    onClick = { 
+                        selectedMinRating = stars 
+                        onMinRatingSelected(stars)
+                    },
+                    label = { Text(if (stars == 0.0f) "الكل" else "⭐ $stars+", fontSize = 10.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = themeColors.accent,
+                        selectedLabelColor = Color.Black
+                    )
+                )
+            }
+        }
+
+        extraHeaderContent?.invoke()
+
+        // 🏷️ Category Filter
+        if (categories.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(categories) { cat ->
+                    val isSelected = selectedCategory == cat
+                    Surface(
+                        color = if (isSelected) themeColors.accent else themeColors.surface,
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.Gray.copy(alpha = 0.3f)),
+                        modifier = Modifier.clickable { 
+                            selectedCategory = cat 
+                            onCategorySelected(cat)
+                        }
+                    ) {
+                        Text(
+                            text = cat,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.Black else Color.White
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("$titleIcon $title:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+            Text("${items.size} عنصر", fontSize = 11.sp, color = Color.LightGray)
+        }
+
+        // 📄 Content Area
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = themeColors.accent)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("جاري تحميل $title... $titleIcon", color = Color.LightGray, fontSize = 11.sp)
+                }
+            }
+        } else if (items.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("📭", fontSize = 48.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(emptyMessage, color = Color.LightGray, fontSize = 14.sp)
+                }
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(items) { item ->
+                    itemContent(item)
+                }
+            }
+        }
+    }
+}

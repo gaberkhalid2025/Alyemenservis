@@ -132,6 +132,33 @@ fun CategoriesScreen(
                         )
                     }
                 }
+            } else if (errorMessage != null && categories.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = errorMessage ?: "حدث خطأ أثناء تحميل الفئات",
+                            color = Color(0xFFD32F2F),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 20.dp)
+                        )
+                        Button(
+                            onClick = { retryCount++ },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                        ) {
+                            Text("إعادة المحاولة 🔄", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
             } else if (categories.isEmpty() && errorMessage == null) {
                 Box(
                     modifier = Modifier

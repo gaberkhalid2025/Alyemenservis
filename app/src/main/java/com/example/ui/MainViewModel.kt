@@ -1913,14 +1913,18 @@ class MainViewModel : ViewModel() {
 
         var filtered = allProviders
 
-        if (selectedCat != null) {
+        if (!selectedCat.isNullOrBlank() && selectedCat != "ALL" && selectedCat != "الكل") {
             filtered = filtered.filter { it.categoryId == selectedCat }
         }
         if (query.isNotEmpty()) {
             filtered = filtered.filter { 
                 it.name.lowercase().contains(query) || 
+                it.profession.lowercase().contains(query) ||
+                it.specialization.lowercase().contains(query) ||
+                it.customCategoryName.lowercase().contains(query) ||
                 it.area.lowercase().contains(query) || 
-                it.localNeighborhood.lowercase().contains(query)
+                it.localNeighborhood.lowercase().contains(query) ||
+                it.phone.contains(query)
             }
         }
         if (vipOnly) {
@@ -2653,7 +2657,7 @@ class MainViewModel : ViewModel() {
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         sp.edit().remove("join_request_phone").apply()
         _joinRequestPhone.value = ""
-        _currentScreen.value = "REGISTER_FORM"
+        goBack()
     }
 
     fun setJoinRequestPhone(context: android.content.Context, phone: String) {

@@ -172,7 +172,10 @@ fun ServicesBrowserLayout(
                     StoresSectionView(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onStoreClick = { selectedStoreForDetails = it },
+                        onStoreClick = { 
+                            viewModel.selectedStore = it
+                            viewModel.navigateTo("STORE_DETAILS")
+                        },
                         onCreateStoreClick = {
                             onPreselectedRegistrationTypeChange("store")
                             viewModel.navigateTo("REGISTER")
@@ -183,7 +186,10 @@ fun ServicesBrowserLayout(
                     RestaurantsSectionView(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onStoreClick = { selectedStoreForDetails = it },
+                        onStoreClick = { 
+                            viewModel.selectedStore = it
+                            viewModel.navigateTo("STORE_DETAILS")
+                        },
                         onCreateRestaurantClick = {
                             onPreselectedRegistrationTypeChange("store")
                             viewModel.navigateTo("REGISTER")
@@ -194,7 +200,10 @@ fun ServicesBrowserLayout(
                     MedicalCentersSectionView(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onStoreClick = { selectedStoreForDetails = it },
+                        onStoreClick = { 
+                            viewModel.selectedStore = it
+                            viewModel.navigateTo("STORE_DETAILS")
+                        },
                         onCreateMedicalClick = {
                             onPreselectedRegistrationTypeChange("store")
                             viewModel.navigateTo("REGISTER")
@@ -233,7 +242,10 @@ fun ServicesBrowserLayout(
                         onCategorySelected = { viewModel.selectCategory(it ?: "") },
                         providersLimit = providersLimit,
                         onLoadMore = { providersLimit += 10 },
-                        onStoreClick = { selectedStoreForDetails = it },
+                        onStoreClick = { 
+                            viewModel.selectedStore = it
+                            viewModel.navigateTo("STORE_DETAILS")
+                        },
                         onPropertyClick = { selectedPropertyForDetails = it },
                         onChatOpen = onChatOpen
                     )
@@ -266,7 +278,13 @@ fun ServicesBrowserLayout(
             store = store,
             context = context,
             themeColors = themeColors,
-            onDismiss = { selectedStoreForDetails = null }
+            onDismiss = { selectedStoreForDetails = null },
+            onOpenDetails = {
+                val storeToOpen = store
+                selectedStoreForDetails = null
+                viewModel.selectedStore = storeToOpen
+                viewModel.navigateTo("STORE_DETAILS")
+            }
         )
     }
 

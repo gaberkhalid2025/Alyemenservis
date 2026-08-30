@@ -196,10 +196,11 @@ fun AppNavigator(
     CompositionLocalProvider(
         androidx.compose.ui.platform.LocalLayoutDirection provides (if (currentLang == "en") androidx.compose.ui.unit.LayoutDirection.Ltr else androidx.compose.ui.unit.LayoutDirection.Rtl)
     ) {
+        val isFullScreen = currentScreen == "MAP_VIEW" || currentScreen.endsWith("_DETAILS")
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
-                if (currentScreen != "MAP_VIEW") {
+                if (!isFullScreen) {
                     AppHeaderBar(
                         viewModel = viewModel,
                         themeColors = themeColors,
@@ -211,7 +212,7 @@ fun AppNavigator(
                 }
             },
             bottomBar = {
-                if (currentScreen != "MAP_VIEW") {
+                if (!isFullScreen) {
                     AppFooterBar(
                         viewModel = viewModel,
                         themeColors = themeColors,
@@ -223,7 +224,7 @@ fun AppNavigator(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(if (currentScreen == "MAP_VIEW") PaddingValues(0.dp) else innerPadding)
+                    .padding(if (isFullScreen) PaddingValues(0.dp) else innerPadding)
                     .background(themeColors.background)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -642,11 +643,10 @@ fun AppNavigator(
                                     val activeCh by viewModel.activeChatChannel.collectAsState()
                                     val isChannelId = preSelectedChannelId?.startsWith("channel_") == true || preSelectedChannelId?.startsWith("chat_") == true
 
-                                    ChatScreen(
+                                    com.example.chat.ui.AdvancedChatScreen(
                                         currentUserId = effUserId,
-                                        currentUserName = effUserName,
-                                        channelId = if (activeCh != null) activeCh!!.id else if (isChannelId) preSelectedChannelId else null,
-                                        targetUserId = if (activeCh == null && !isChannelId) preSelectedChannelId else null,
+                                        targetUserId = if (activeCh == null && !isChannelId) preSelectedChannelId ?: "unknown" else "unknown",
+                                        targetUserName = if (activeCh == null && !isChannelId) "مستخدم" else "محادثة",
                                         themeColors = themeColors,
                                         onBackClick = {
                                             viewModel.closeActiveChatChannel()
@@ -657,12 +657,10 @@ fun AppNavigator(
                                 "CHAT_SUPPORT" -> {
                                     val effUserId = currentUserIdState.ifBlank { currentUserPhoneState }
                                     val effUserName = currentUserNameState.ifBlank { "مستخدم" }
-                                    ChatScreen(
+                                    com.example.chat.ui.AdvancedChatScreen(
                                         currentUserId = effUserId,
-                                        currentUserName = effUserName,
                                         targetUserId = "admin_support",
                                         targetUserName = "الدعم الفني والإدارة",
-                                        relatedEntityType = "SUPPORT",
                                         themeColors = themeColors,
                                         onBackClick = { viewModel.goBack() }
                                     )
@@ -717,14 +715,16 @@ fun AppNavigator(
                                 }
                             }
 
-                            if (!isRegistrationOrFormOpen) {
-                                FloatingIconsOverlay(
-                                    settings = settingsState,
-                                    themeColors = themeColors,
-                                    isClientUser = isClientUser,
-                                    onAssistantClick = { showAssistantDialog = true },
-                                    onRequestServiceClick = { showRequestServiceModal = true }
-                                )
+                            if (currentScreen == "HOME" || currentScreen == "USER_BROWSE") {
+                                if (!isRegistrationOrFormOpen) {
+                                    FloatingIconsOverlay(
+                                        settings = settingsState,
+                                        themeColors = themeColors,
+                                        isClientUser = isClientUser,
+                                        onAssistantClick = { showAssistantDialog = true },
+                                        onRequestServiceClick = { showRequestServiceModal = true }
+                                    )
+                                }
                             }
                         }
                     }
@@ -2813,37 +2813,36 @@ fun ProviderCard(
                     }
 
                     // 2. 💬 مراسلة فورية داخل التطبيق
-                    if (settingsState.showInstantChatButton) {
-                        Button(
-                            onClick = {
-                                if (provider.isChatDisabled) {
-                                    Toast.makeText(context, "⚠️ عذراً، لقد تم إيقاف خدمة الدردشة مع هذا الفني مؤقتاً بواسطة الإدارة.", Toast.LENGTH_LONG).show()
-                                } else if (currentUserIdState == "guest" && !settingsState.bypassVisitorRegistration && !settingsState.disableChatFirewall) {
-                                    showGuestRegisterDialogForBooking = true
-                                } else {
-                                    val targetId = if (provider.chatRecipientId.isNotEmpty()) provider.chatRecipientId else provider.id
-                                    val customerIdForChat = if (currentUserPhoneState.isNotEmpty()) currentUserPhoneState else currentUserIdState
-                                    val chatRoomId = "chat_p_${targetId}_u_${customerIdForChat}"
-                                    viewModel.getOrCreateChatChannel(
-                                        targetId,
-                                        provider.name,
-                                        customerIdForChat,
-                                        currentUserNameState
-                                    )
-                                    onChatOpen(chatRoomId)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(27.dp),
-                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
-                        ) {
-                            Icon(Icons.Default.Email, contentDescription = "مراسلة", tint = Color.White, modifier = Modifier.size(10.dp))
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text("محادثة", fontSize = 8.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
+                    val isLoggedIn = currentUserIdState.isNotBlank() && currentUserIdState != "guest"
+                    Button(
+                        onClick = {
+                            if (provider.isChatDisabled) {
+                                Toast.makeText(context, "⚠️ عذراً، لقد تم إيقاف خدمة الدردشة مع هذا الفني مؤقتاً بواسطة الإدارة.", Toast.LENGTH_LONG).show()
+                            } else if (currentUserIdState == "guest" && !settingsState.bypassVisitorRegistration && !settingsState.disableChatFirewall) {
+                                showGuestRegisterDialogForBooking = true
+                            } else {
+                                val targetId = if (provider.chatRecipientId.isNotEmpty()) provider.chatRecipientId else provider.id
+                                val customerIdForChat = if (currentUserPhoneState.isNotEmpty()) currentUserPhoneState else currentUserIdState
+                                val chatRoomId = "chat_p_${targetId}_u_${customerIdForChat}"
+                                viewModel.getOrCreateChatChannel(
+                                    targetId,
+                                    provider.name,
+                                    customerIdForChat,
+                                    currentUserNameState
+                                )
+                                onChatOpen(chatRoomId)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(27.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = "مراسلة", tint = Color.White, modifier = Modifier.size(10.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("محادثة", fontSize = 8.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
                     // 3. 💬 الآراء والتجارب
