@@ -44,7 +44,7 @@ fun ReviewOffersDialog(
     onAcceptOffer: (RequestOfferEntity) -> Unit
 ) {
     val context = LocalContext.current
-    val instantReqViewModel: InstantRequestViewModel = viewModel()
+    val instantReqViewModel: InstantRequestUiViewModel = viewModel()
     val uiState by instantReqViewModel.uiState.collectAsState()
 
     val sortedOffers = instantReqViewModel.sortOffers(offers)

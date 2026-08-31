@@ -18,7 +18,7 @@ data class InstantRequestUiState(
     val complaintTarget: String? = null // For Complaint dialog
 )
 
-class InstantRequestViewModel : ViewModel() {
+class InstantRequestUiViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(InstantRequestUiState())
     val uiState: StateFlow<InstantRequestUiState> = _uiState.asStateFlow()
 
