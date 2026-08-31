@@ -3,7 +3,7 @@ package com.example
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
-import com.example.ui.screens.map.CityAliases
+import com.example.ui.screens.map.utils.CityAliases
 import com.example.ui.screens.map.MapScreenFilters
 import com.example.ui.screens.map.utils.MapDistanceCalculator
 import com.example.ui.screens.map.utils.TransportMode

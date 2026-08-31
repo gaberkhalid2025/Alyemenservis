@@ -47,6 +47,11 @@ fun AdminUserManager(
     var selectedFilter by remember { mutableStateOf("الكل") }
     val filters = listOf("الكل", "عميل", "فني", "متجر", "محظور")
 
+    var showResetDialog by remember { mutableStateOf(false) }
+    var selectedUserIdForReset by remember { mutableStateOf("") }
+    var selectedUserNameForReset by remember { mutableStateOf("") }
+    var newPasswordState by remember { mutableStateOf("") }
+
     val filteredUsers = remember(rawUsersList, searchQuery, selectedFilter) {
         rawUsersList.filter { userMap ->
             val name = userMap["name"] as? String ?: ""
@@ -155,38 +160,56 @@ fun AdminUserManager(
                             isBlocked = isBlocked,
                             themeColors = themeColors,
                             actions = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            if (isBlocked) {
-                                                adminViewModel.unblockUser(userId) { success ->
-                                                    scope.launch { snackbarHostState.showSnackbar("تم إلغاء حظر المستخدم") }
-                                                }
-                                            } else {
-                                                adminViewModel.blockUser(userId) { success ->
-                                                    scope.launch { snackbarHostState.showSnackbar("تم حظر المستخدم") }
-                                                }
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
-                                        modifier = Modifier.weight(1f)
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(if (isBlocked) "إلغاء الحظر" else "حظر 🚫", fontSize = 10.5.sp, color = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350))
+                                        OutlinedButton(
+                                            onClick = {
+                                                if (isBlocked) {
+                                                    adminViewModel.unblockUser(userId) { success ->
+                                                        scope.launch { snackbarHostState.showSnackbar("تم إلغاء حظر المستخدم") }
+                                                    }
+                                                } else {
+                                                    adminViewModel.blockUser(userId) { success ->
+                                                        scope.launch { snackbarHostState.showSnackbar("تم حظر المستخدم") }
+                                                    }
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(if (isBlocked) "إلغاء الحظر" else "حظر 🚫", fontSize = 10.5.sp, color = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350))
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                adminViewModel.deleteUser(userId) { success ->
+                                                    scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف حساب المستخدم") }
+                                                }
+                                            },
+                                            modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                                        }
                                     }
 
-                                    IconButton(
+                                    OutlinedButton(
                                         onClick = {
-                                            adminViewModel.deleteUser(userId) { success ->
-                                                scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف حساب المستخدم") }
-                                            }
+                                            selectedUserIdForReset = userId
+                                            selectedUserNameForReset = name
+                                            newPasswordState = ""
+                                            showResetDialog = true
                                         },
-                                        modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Lock, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("تعيين كلمة مرور جديدة 🔑", fontSize = 10.5.sp, color = themeColors.accent)
                                     }
                                 }
                             }
@@ -195,5 +218,54 @@ fun AdminUserManager(
                 }
             }
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            containerColor = Color(0xFF1E293B),
+            title = { Text("🔑 تعيين كلمة مرور لـ $selectedUserNameForReset", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("أدخل كلمة المرور الجديدة التي سيتم تشفيرها وتخزينها بأمان:", color = Color.LightGray, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = newPasswordState,
+                        onValueChange = { newPasswordState = it },
+                        label = { Text("كلمة المرور الجديدة") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newPasswordState.isNotBlank()) {
+                            val hash = com.example.util.PasswordHasher.createSaltedHash(newPasswordState)
+                            val updates = mapOf(
+                                "password" to newPasswordState,
+                                "passwordHash" to hash
+                            )
+                            mainViewModel.db.collection("registered_users").document(selectedUserIdForReset).update(updates)
+                                .addOnSuccessListener {
+                                    scope.launch { snackbarHostState.showSnackbar("🔑 تم تغيير كلمة المرور بنجاح") }
+                                }
+                                .addOnFailureListener {
+                                    scope.launch { snackbarHostState.showSnackbar("❌ فشل تغيير كلمة المرور") }
+                                }
+                            showResetDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("تحديث", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("إلغاء", color = Color.Gray)
+                }
+            }
+        )
     }
 }

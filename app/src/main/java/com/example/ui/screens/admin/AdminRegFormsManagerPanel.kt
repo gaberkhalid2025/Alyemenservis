@@ -38,14 +38,31 @@ fun AdminRegFormsManagerPanel(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val pendingRequestsState by adminViewModel.pendingRequests.collectAsState()
-    val pendingRequests = pendingRequestsState
 
     LaunchedEffect(Unit) {
         adminViewModel.loadPendingRequests()
     }
 
+    var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("الكل") }
     val filters = listOf("الكل", "معلق ⏳", "مرفوض ❌", "مقبول ✓")
+
+    val filteredRequests = remember(pendingRequestsState, selectedFilter, searchQuery) {
+        pendingRequestsState.filter { req ->
+            val matchesFilter = when (selectedFilter) {
+                "معلق ⏳" -> req.status == "PENDING"
+                "مرفوض ❌" -> req.status == "REJECTED"
+                "مقبول ✓" -> req.status == "APPROVED"
+                else -> true
+            }
+            val matchesSearch = searchQuery.isBlank() ||
+                    req.name.contains(searchQuery, ignoreCase = true) ||
+                    req.phone.contains(searchQuery) ||
+                    req.section.contains(searchQuery, ignoreCase = true)
+
+            matchesFilter && matchesSearch
+        }.sortedByDescending { it.createdAt }
+    }
 
     var rejectTarget by remember { mutableStateOf<PendingRequest?>(null) }
     var rejectReason by remember { mutableStateOf("") }
@@ -77,6 +94,29 @@ fun AdminRegFormsManagerPanel(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("بحث باسم المتقدم أو رقم الهاتف...", color = Color.Gray, fontSize = 13.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "مسح", tint = Color.Gray)
+                        }
+                    }
+                },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = themeColors.accent,
+                    unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f)
+                )
+            )
+
             AdminFilterChips(
                 categories = filters,
                 selectedCategory = selectedFilter,
@@ -84,53 +124,55 @@ fun AdminRegFormsManagerPanel(
                 themeColors = themeColors
             )
 
-            if (pendingRequests.isEmpty()) {
+            if (filteredRequests.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("لا توجد طلبات انضمام معلقة حالياً 🎉", color = Color.Gray, fontSize = 13.sp)
+                    Text("لا توجد طلبات تطابق معايير البحث والفلترة 🎉", color = Color.Gray, fontSize = 13.sp)
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(pendingRequests, key = { it.id }) { req ->
+                    items(filteredRequests, key = { it.id }) { req ->
                         AdminEntityCard(
                             title = req.name.ifBlank { "متقدم جديد" },
                             subtitle = "🛠️ ${req.section} • 📱 ${req.phone} • 📍 ${req.city}",
                             details = "📝 التفاصيل: ${req.details.ifBlank { "لا يوجد ملاحظات إضافية" }}",
-                            statusText = "معلق ⏳",
-                            statusColor = Color(0xFFF59E0B),
+                            statusText = if (req.status == "APPROVED") "مقبول ✓" else if (req.status == "REJECTED") "مرفوض ❌" else "معلق ⏳",
+                            statusColor = if (req.status == "APPROVED") Color(0xFF10B981) else if (req.status == "REJECTED") Color(0xFFEF5350) else Color(0xFFF59E0B),
                             themeColors = themeColors,
                             actions = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            adminViewModel.approveProviderRequest(req.id) { success ->
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar(if (success) "✅ تم قبول الطلب واعتماد الحساب" else "❌ فشل قبول الطلب")
+                                if (req.status == "PENDING") {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                adminViewModel.approveProviderRequest(req.id) { success ->
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar(if (success) "✅ تم قبول الطلب واعتماد الحساب" else "❌ فشل قبول الطلب")
+                                                    }
                                                 }
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("قبول وتفعيل ✓", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                    }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("قبول وتفعيل ✓", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        }
 
-                                    Button(
-                                        onClick = { rejectTarget = req },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("رفض الطلب ❌", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        Button(
+                                            onClick = { rejectTarget = req },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("رفض الطلب ❌", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        }
                                     }
                                 }
                             }

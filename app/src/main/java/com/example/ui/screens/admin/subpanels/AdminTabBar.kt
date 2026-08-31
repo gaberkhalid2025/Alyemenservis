@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 
+/**
+ * 🧭 عنصر تبويب لوحة الإدارة (AdminTabItem)
+ */
 data class AdminTabItem(
     val title: String,
     val icon: String,
@@ -25,7 +28,8 @@ data class AdminTabItem(
 )
 
 /**
- * 🧭 Admin Horizontal Scrollable Tab Bar
+ * 🧭 شريط التبويبات الأفقي القابل للتمرير للوحة الإدارة (AdminTabBar)
+ * يوفر تنقلاً سلساً ومصمماً وفق Material 3 لتبويبات الأقسام الإدارية مع دعم الشارات والأيقونات.
  */
 @Composable
 fun AdminTabBar(

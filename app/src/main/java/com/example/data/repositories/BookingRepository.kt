@@ -94,10 +94,10 @@ class BookingRepository(private val context: Context) {
 
         val collection = firestore.collection("bookings")
         val query = if (userId.isNotBlank()) {
-            if (isProvider) collection.whereEqualTo("providerId", userId)
-            else collection.whereEqualTo("clientId", userId)
+            if (isProvider) collection.whereEqualTo("providerId", userId).limit(50)
+            else collection.whereEqualTo("clientId", userId).limit(50)
         } else {
-            collection.orderBy("createdAt", Query.Direction.DESCENDING).limit(100)
+            collection.orderBy("createdAt", Query.Direction.DESCENDING).limit(50)
         }
 
         val listener: ListenerRegistration = query.addSnapshotListener { snapshot, error ->

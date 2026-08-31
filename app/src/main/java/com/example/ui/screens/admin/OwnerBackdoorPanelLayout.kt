@@ -1,102 +1,61 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.admin
-import android.content.Intent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.PathEffect
-import okhttp3.MediaType.Companion.toMediaType
-
-import com.example.*
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
-import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import coil.compose.AsyncImage
 import com.example.data.*
-import com.example.utils.*
 import com.example.ui.MainViewModel
-import com.example.ui.components.*
-import com.example.ui.dialogs.*
-import com.example.ui.screens.home.*
-import com.example.ui.screens.map.*
-import com.example.ui.screens.bookings.*
-import com.example.ui.screens.admin.*
-import com.example.ui.screens.assistant.*
-import com.example.ui.screens.register.*
-import com.example.ui.screens.status.*
-import com.example.ui.screens.about.*
-import com.example.ui.*
+import com.example.ui.screens.admin.components.AdminConfirmDialog
+import com.example.ui.screens.admin.components.AdminLogger
+import com.example.ui.screens.admin.components.AdminSwitchRow
 import com.example.ui.utils.*
-import java.util.UUID
-import kotlinx.coroutines.delay
+import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/**
+ * 👑 بوابة المالك والتحكم الخلفي الديناميكي (OwnerBackdoorPanelLayout)
+ * 
+ * تتيح لمالك المنصة التحكم الشامل والفوري بجميع إعدادات التطبيق وسلوك النظام، وتشمل:
+ * - تخصيص هوية التطبيق (الاسم، رسائل الترحيب، الفوتر، الإصدار).
+ * - مفاتيح تفعيل الأقسام والتسجيل للمهن والمتاجر والعقارات والوظائف والعيادات.
+ * - إعدادات الأمان والتشفير وإلزامية كلمات المرور ونظام الحماية وجدار النار.
+ * - التحكم في البنرات الإعلانية وصفحة "عن التطبيق" والروابط الرسمية والدعم الفني.
+ * - إدارة بيانات المدير (Admin) وعمليات التطهير ومسح البيانات الوهمية.
+ */
 @Composable
-/* AdminPanelLayout has been moved to com.example.ui.screens.admin.AdminPanelLayout */
-fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) {
+fun OwnerBackdoorPanelLayout(
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
+    modifier: Modifier = Modifier
+) {
     val settingsState by viewModel.settings.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var appName by remember { mutableStateOf(settingsState.appName) }
     var welcomeMessage by remember { mutableStateOf(settingsState.welcomeMessage) }
@@ -121,13 +80,13 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     var isMaintenanceActive by remember { mutableStateOf(settingsState.isMaintenanceActive) }
     var hidePromoFooter by remember { mutableStateOf(settingsState.hidePromoFooter) }
     var assistantHidden by remember { mutableStateOf(settingsState.assistantHidden) }
-    var assistantSize by remember { mutableStateOf(56f) }
+    var assistantSize by remember { mutableFloatStateOf(56f) }
     var chatHidden by remember { mutableStateOf(settingsState.chatHidden) }
-    var chatSize by remember { mutableStateOf(if (settingsState.chatSize > 0) settingsState.chatSize.toFloat() else 56f) }
-    var maxSearchRadiusKm by remember { mutableStateOf(settingsState.maxSearchRadiusKm.toFloat()) }
+    var chatSize by remember { mutableFloatStateOf(if (settingsState.chatSize > 0) settingsState.chatSize.toFloat() else 56f) }
+    var maxSearchRadiusKm by remember { mutableFloatStateOf(settingsState.maxSearchRadiusKm.toFloat()) }
     var isSpeechSearchEnabled by remember { mutableStateOf(settingsState.isSpeechSearchEnabled) }
     var isDataSaverEnabled by remember { mutableStateOf(false) }
-    var appImageQuality by remember { mutableStateOf(90f) }
+    var appImageQuality by remember { mutableFloatStateOf(90f) }
     var bypassVisitorRegistration by remember { mutableStateOf(settingsState.bypassVisitorRegistration) }
     var isUserPasswordRequired by remember { mutableStateOf(settingsState.isUserPasswordRequired) }
     var disableChatFirewall by remember { mutableStateOf(settingsState.disableChatFirewall) }
@@ -183,14 +142,21 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     var bannerDurationSeconds by remember { mutableStateOf(settingsState.bannerDurationSeconds.toString()) }
     var bannerDisplayStyle by remember { mutableStateOf(settingsState.bannerDisplayStyle) }
 
+    var mapProviderState by remember { mutableStateOf(settingsState.mapProvider) }
+
     val context = LocalContext.current
-    val sp = remember { context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
+    val sp = remember { context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE) }
     var rememberLoginInput by remember { mutableStateOf(sp.getString("saved_admin_role", "GUEST") != "GUEST") }
     var adminUsernameInput by remember { mutableStateOf(settingsState.adminUsername) }
     var adminPasswordInput by remember { mutableStateOf(settingsState.adminPassword) }
 
+    // Dialog state for wiping data
+    var showWipeConfirmDialog by remember { mutableStateOf(false) }
+    var wipePasswordInput by remember { mutableStateOf("") }
+    var wipeErrorMsg by remember { mutableStateOf("") }
+
     val galleryLauncherForBanner = rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
             try {
@@ -199,1191 +165,695 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     val inputStream = context.contentResolver.openInputStream(it)
                     val bytes = inputStream?.readBytes()
                     if (bytes != null) {
-                        bannerBase64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                        bannerBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                         bannerType = "VIDEO"
-                        viewModel.triggerNotification("📹 تم تحميل الفيديو القصير للبنر بنجاح!")
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("📹 تم تحميل الفيديو القصير للبنر بنجاح!")
+                        }
                     }
                 } else {
-                    val base64Str = com.example.ui.utils.compressAndResizeImageUri(context, it, 800, 70)
+                    val base64Str = compressAndResizeImageUri(context, it, 800, 70)
                     if (base64Str.isNotEmpty()) {
                         bannerBase64 = base64Str
                         bannerType = "IMAGE"
-                        viewModel.triggerNotification("📸 تم تحميل صورة البنر الإعلاني من المعرض بنجاح!")
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("📸 تم تحميل صورة البنر الإعلاني من المعرض بنجاح!")
+                        }
                     }
                 }
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) {
+                AdminLogger.logError("GalleryBannerUpload", e)
+            }
         }
     }
 
     val galleryLauncherForCover = rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
             try {
-                val base64Str = com.example.ui.utils.compressAndResizeImageUri(context, it, 800, 70)
+                val base64Str = compressAndResizeImageUri(context, it, 800, 70)
                 if (base64Str.isNotEmpty()) {
                     aboutCoverBase64 = base64Str
                     aboutCoverType = "IMAGE"
-                    viewModel.triggerNotification("📸 تم تحميل صورة الغلاف من المعرض بنجاح!")
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("📸 تم تحميل صورة الغلاف من المعرض بنجاح!")
+                    }
                 }
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) {
+                AdminLogger.logError("GalleryCoverUpload", e)
+            }
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("🔓 بوابة المالك والتحكم الخلفي الديناميكي", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-            Button(
-                onClick = { viewModel.logout(context) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("إغلاق اللوحة", color = Color.White, fontSize = 10.sp)
-            }
-        }
-
-        OutlinedTextField(
-            value = appName,
-            onValueChange = { appName = it },
-            label = { Text("اسم التطبيق الرئيسي") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = welcomeMessage,
-            onValueChange = { welcomeMessage = it },
-            label = { Text("رسالة الترحيب في الهيدر") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = splashWelcomeMessageState,
-            onValueChange = { splashWelcomeMessageState = it },
-            label = { Text("رسالة ترحيب شاشة البداية (Splash)") },
-            modifier = Modifier.fillMaxWidth(),
-            maxLines = 3,
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = footerMessage,
-            onValueChange = { footerMessage = it },
-            label = { Text("نص الفوتر الأوسط (افتراضي: wam777644)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = footerBgColorHex,
-            onValueChange = { footerBgColorHex = it },
-            label = { Text("لون خلفية الفوتر (كود Hex مثل #115E59)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = appVersion,
-            onValueChange = { appVersion = it },
-            label = { Text("رقم إصدار التطبيق بالفوتر (مثل v2.2026)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface)
-        ) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("⚙️ التحكم الكامل في أيقونات ومظهر الشريط السفلي (الفوتر):", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("ℹ️ أيقونة 'عن التطبيق':", fontSize = 11.sp, color = Color.White)
-                    Switch(
-                        checked = showInfoIcon,
-                        onCheckedChange = { showInfoIcon = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = themeColors.accent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "🔓 بوابة المالك والتحكم الخلفي الديناميكي",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.accent
                     )
                 }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("📅 أيقونة 'الحجوزات':", fontSize = 11.sp, color = Color.White)
-                    Switch(
-                        checked = showBookingsIcon,
-                        onCheckedChange = { showBookingsIcon = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🌐 أيقونة 'تبديل اللغة' (العربية / English):", fontSize = 11.sp, color = Color.White)
-                    Switch(
-                        checked = showLangIcon,
-                        onCheckedChange = { showLangIcon = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🔒 أيقونة 'لوحة الإدارة':", fontSize = 11.sp, color = Color.White)
-                    Switch(
-                        checked = showAdminIcon,
-                        onCheckedChange = { showAdminIcon = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("💬 نص الشريط السفلي (الفوتر):", fontSize = 11.sp, color = Color.White)
-                    Switch(
-                        checked = showFooterText,
-                        onCheckedChange = { showFooterText = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
-                    )
-                }
-
-                Divider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 4.dp))
-
-                Text("🎨 شكل أيقونة تبديل اللغة:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf("GLOBE" to "كرة أرضية 🌐", "TRANSLATE" to "ترجمة 🔤", "TEXT" to "نص لغة 💬").forEach { (type, lbl) ->
-                        FilterChip(
-                            selected = langIconType == type,
-                            onClick = { langIconType = type },
-                            label = { Text(lbl, fontSize = 9.sp) }
-                        )
-                    }
-                }
-
-                Text("🎨 شكل أيقونة لوحة الإدارة:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf("LOCK" to "قفل 🔒", "SETTINGS" to "ترس ⚙️", "KEY" to "مفتاح 🔑", "SHIELD" to "درع 🛡️").forEach { (type, lbl) ->
-                        FilterChip(
-                            selected = adminIconType == type,
-                            onClick = { adminIconType = type },
-                            label = { Text(lbl, fontSize = 9.sp) }
-                        )
-                    }
-                }
-
-                Text("تنسيق وترتيب شريط التذييل (الفوتر):", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                OutlinedTextField(
-                    value = footerItemsOrder,
-                    onValueChange = { footerItemsOrder = it },
-                    label = { Text("ترتيب عناصر الفوتر (مفصولة بفاصلة: INFO,BOOKINGS,TEXT,LANG,ADMIN)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    val layouts = listOf(
-                        "INFO,BOOKINGS,TEXT,LANG,ADMIN" to "تنسيق قياسي (يسار->يمين)",
-                        "INFO,TEXT,LANG,ADMIN" to "بدون حجوزات",
-                        "TEXT,LANG,ADMIN" to "نص ولغة وإدارة"
-                    )
-                    layouts.forEach { (order, label) ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (footerItemsOrder == order) themeColors.accent else themeColors.surface)
-                                .clickable { footerItemsOrder = order }
-                                .padding(vertical = 8.dp, horizontal = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(label, fontSize = 8.sp, color = if (footerItemsOrder == order) Color.Black else Color.White, textAlign = TextAlign.Center)
-                        }
-                    }
-                }
-            }
-        }
-
-        OutlinedTextField(
-            value = supportPhone,
-            onValueChange = { supportPhone = it },
-            label = { Text("رقم هاتف الدعم الفني للبرنامج") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = supportEmail,
-            onValueChange = { supportEmail = it },
-            label = { Text("البريد الإلكتروني للدعم والمظالم") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = supportWhatsapp,
-            onValueChange = { supportWhatsapp = it },
-            label = { Text("رابط أو رقم واتساب الدعم الفني") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = appDownloadUrl,
-            onValueChange = { appDownloadUrl = it },
-            label = { Text("رابط خارجي لتحميل التطبيق (نسخة APK)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = websiteUrl,
-            onValueChange = { websiteUrl = it },
-            label = { Text("رابط الموقع الإلكتروني الرسمي") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = telegramUrl,
-            onValueChange = { telegramUrl = it },
-            label = { Text("رابط حساب/قناة التليجرام") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = facebookUrl,
-            onValueChange = { facebookUrl = it },
-            label = { Text("رابط صفحة الفيسبوك الرسمية") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        Text("🎨 سمة التطبيق الافتراضية:", fontSize = 12.sp, color = themeColors.textSecondary)
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val themes = listOf("EMERALD_YEMEN", "COSMIC_SILVER", "LUXURY_GOLD", "ELITE_EMERALD", "SMOKE_BLACK", "LIGHT_PINK", "GOLDEN_WHITE", "CUSTOM_THEME")
-            themes.forEach { th ->
-                val label = when (th) {
-                    "EMERALD_YEMEN" -> "الزمرد اليمني 🟢"
-                    "COSMIC_SILVER" -> "كوزميك سيلفر 🪐"
-                    "LUXURY_GOLD" -> "الذهبي الفاخر 🌟"
-                    "ELITE_EMERALD" -> "الزمردي الراقي 💚"
-                    "SMOKE_BLACK" -> "الأسود الدخاني ⚫"
-                    "LIGHT_PINK" -> "الزهري الفاتح 🌸"
-                    "GOLDEN_WHITE" -> "الأبيض الذهبي ⚪🟡"
-                    "CUSTOM_THEME" -> "سمة مخصصة 🎨"
-                    else -> th
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (activeThemeId == th) themeColors.accent else themeColors.surface)
-                        .clickable { activeThemeId = th }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(label, fontSize = 9.sp, color = if (activeThemeId == th) Color.Black else Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("وضع الصيانة المؤقت", color = Color.White, fontSize = 13.sp)
-            Switch(checked = isMaintenanceActive, onCheckedChange = { isMaintenanceActive = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("إخفاء زر المساعد الذكي العائم", color = Color.White, fontSize = 13.sp)
-            Switch(checked = assistantHidden, onCheckedChange = { assistantHidden = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("تفعيل البحث الصوتي", color = Color.White, fontSize = 13.sp)
-            Switch(checked = isSpeechSearchEnabled, onCheckedChange = { isSpeechSearchEnabled = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("إلغاء شرط تسجيل الزائرين للحجز والمحادثة", color = Color.White, fontSize = 13.sp)
-            Switch(checked = bypassVisitorRegistration, onCheckedChange = { bypassVisitorRegistration = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🔑 إلزامية كلمة المرور لجميع حسابات المواطنين الجديدة", color = Color.White, fontSize = 13.sp)
-            Switch(checked = isUserPasswordRequired, onCheckedChange = { isUserPasswordRequired = it })
-        }
-
-        var mapProviderState by remember { mutableStateOf(settingsState.mapProvider) }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("تمكين ميزة الرادار والخريطة للجماهير", color = Color.White, fontSize = 13.sp)
-            Switch(checked = isMapFeatureEnabled, onCheckedChange = { isMapFeatureEnabled = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("محرك الخرائط المعتمد:", color = Color.White, fontSize = 13.sp)
-            Row {
-                FilterChip(
-                    selected = mapProviderState == "MAPLIBRE",
-                    onClick = { mapProviderState = "MAPLIBRE" },
-                    label = { Text("MapLibre", fontSize = 10.sp) }
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                FilterChip(
-                    selected = mapProviderState == "GOOGLE",
-                    onClick = { mapProviderState = "GOOGLE" },
-                    label = { Text("Google", fontSize = 10.sp) }
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                FilterChip(
-                    selected = mapProviderState == "MAPBOX",
-                    onClick = { mapProviderState = "MAPBOX" },
-                    label = { Text("Mapbox", fontSize = 10.sp) }
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🔓 تعطيل جدار حماية المحادثات الفورية", color = Color.White, fontSize = 13.sp)
-            Switch(checked = disableChatFirewall, onCheckedChange = { disableChatFirewall = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🔓 تعطيل جدار حماية حجز المواعيد", color = Color.White, fontSize = 13.sp)
-            Switch(checked = disableBookingFirewall, onCheckedChange = { disableBookingFirewall = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🏪 تفعيل وتبويب قسم المحلات التجارية بالكامل", color = Color.White, fontSize = 13.sp)
-            Switch(checked = isStoresEnabled, onCheckedChange = { isStoresEnabled = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🏠 تفعيل وتبويب قسم العقارات بالكامل", color = Color.White, fontSize = 13.sp)
-            Switch(checked = isPropertiesEnabled, onCheckedChange = { isPropertiesEnabled = it })
-        }
-
-        // Dedicated Card for Registration Forms Control
-        Card(
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("📋 التحكم بإظهار/إخفاء استمارات التسجيل للأقسام", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                Text("تحديد الاستمارات المتاحة للمستخدمين للتسجيل والانضمام (المالك والأدمن يظهر له كل شيء دائماً):", fontSize = 10.sp, color = themeColors.textSecondary)
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("🛠️ استمارة انضمام مقدمي الخدمات (أصحاب المهن)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Switch(checked = enableProvidersRegistration, onCheckedChange = { enableProvidersRegistration = it })
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("🏪 استمارة تسجيل المحلات والمراكز التجارية", color = Color.White, fontSize = 12.sp)
-                    Switch(checked = enableStoresRegistration, onCheckedChange = { enableStoresRegistration = it })
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("🍔 استمارة إضافة المطاعم والكافيهات", color = Color.White, fontSize = 12.sp)
-                    Switch(checked = enableRestaurantsRegistration, onCheckedChange = { enableRestaurantsRegistration = it })
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("🏢 استمارة إدراج العقارات والبيوت", color = Color.White, fontSize = 12.sp)
-                    Switch(checked = enablePropertiesRegistration, onCheckedChange = { enablePropertiesRegistration = it })
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("🏥 استمارة تسجيل المراكز الطبية والعيادات", color = Color.White, fontSize = 12.sp)
-                    Switch(checked = enableMedicalRegistration, onCheckedChange = { enableMedicalRegistration = it })
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("💼 استمارة نشر الوظائف والفرص", color = Color.White, fontSize = 12.sp)
-                    Switch(checked = enableJobsRegistration, onCheckedChange = { enableJobsRegistration = it })
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("إخفاء البوت المساعد المساعد", color = Color.White, fontSize = 13.sp)
-            Switch(checked = assistantHidden, onCheckedChange = { assistantHidden = it })
-        }
-
-        Column {
-            Text("قطر دائرة البوت المساعد: ${assistantSize.toInt()} dp", color = Color.White, fontSize = 11.sp)
-            Slider(value = assistantSize, onValueChange = { assistantSize = it }, valueRange = 40f..80f)
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("إخفاء زر المحادثة العائم", color = Color.White, fontSize = 13.sp)
-            Switch(checked = chatHidden, onCheckedChange = { chatHidden = it })
-        }
-
-        Column {
-            Text("قطر دائرة زر المحادثة العائم: ${chatSize.toInt()} dp", color = Color.White, fontSize = 11.sp)
-            Slider(value = chatSize, onValueChange = { chatSize = it }, valueRange = 28f..80f)
-        }
-
-        Column {
-            Text("الحد الأقصى لنطاق البحث الجغرافي: ${maxSearchRadiusKm.toInt()} كم", color = Color.White, fontSize = 11.sp)
-            Slider(value = maxSearchRadiusKm, onValueChange = { maxSearchRadiusKm = it }, valueRange = 10f..100f)
-        }
-
-        // --- Custom Top Bar Icons Controls ---
-        Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-        Text("🎨 تخصيص وترتيب أيقونات شريط الرأس العلوي (Header):", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("إظهار أيقونة المزامنة/التحديث (Refresh)", color = Color.White, fontSize = 13.sp)
-            Switch(checked = showRefreshIcon, onCheckedChange = { showRefreshIcon = it })
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("إظهار أيقونة الإعدادات/اللغة (Settings)", color = Color.White, fontSize = 13.sp)
-            Switch(checked = showSettingsIcon, onCheckedChange = { showSettingsIcon = it })
-        }
-
-        OutlinedTextField(
-            value = headerIconsOrder,
-            onValueChange = { headerIconsOrder = it },
-            label = { Text("ترتيب الأيقونات (مفصولة بفاصلة)") },
-            placeholder = { Text("مثال: MENU,NOTIF,CHAT,REFRESH,SETTINGS") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Text(
-            text = "الأيقونات المتاحة: MENU (القائمة), NOTIF (الإشعارات), CHAT (المحادثة), REFRESH (المزامنة), SETTINGS (الإعدادات). اكتبها بالترتيب المطلوب من اليمين لليسار.",
-            color = Color.LightGray,
-            fontSize = 9.sp
-        )
-
-        // Custom easy reorder buttons for the admin!
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(themeColors.surface)
-                    .clickable { 
-                        headerIconsOrder = "MENU,NOTIF,CHAT"
-                        viewModel.triggerNotification("🎯 تم ضبط الترتيب الافتراضي للأيقونات")
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text("الترتيب الافتراضي", fontSize = 9.sp, color = Color.White)
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(themeColors.surface)
-                    .clickable { 
-                        headerIconsOrder = "CHAT,NOTIF,MENU"
-                        viewModel.triggerNotification("🎯 تم عكس ترتيب الأيقونات")
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text("عكس الترتيب", fontSize = 9.sp, color = Color.White)
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(themeColors.surface)
-                    .clickable { 
-                        headerIconsOrder = "MENU,CHAT,NOTIF,REFRESH,SETTINGS"
-                        showRefreshIcon = true
-                        showSettingsIcon = true
-                        viewModel.triggerNotification("🎯 تم تفعيل كافة الأيقونات بالترتيب الكامل")
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text("تفعيل وترتيب الكل", fontSize = 9.sp, color = Color.White)
-            }
-        }
-
-        // --- Custom Categories Layout Controls ---
-        Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-        Text("📁 طريقة عرض وحركة الأقسام (التصنيفات):", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-        
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val layouts = listOf(
-                "GRID_HORIZONTAL" to "شبكة أفقية (تمرير جانبي) ↔️",
-                "ROW_HORIZONTAL" to "صف أفقي (تمرير جانبي) ↔️",
-                "GRID_VERTICAL" to "شبكة عمودية (تمرير طولي) ↕️",
-                "LIST_VERTICAL" to "قائمة عمودية (تمرير طولي) ↕️"
-            )
-            layouts.forEach { (layVal, layLabel) ->
-                val isSel = categoriesLayoutTypeState == layVal
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSel) themeColors.accent else themeColors.surface)
-                        .clickable { categoriesLayoutTypeState = layVal }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(layLabel, fontSize = 11.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
-                    if (isSel) {
-                        Text("✔️", fontSize = 10.sp, color = Color.Black)
-                    }
-                }
-            }
-        }
-
-        // --- Custom Booking dynamic layouts & rules controls ---
-        Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-        Text("📅 تخصيص شروط واستمارة الحجز اليمني (كاملة بالتفصيل):", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-
-        OutlinedTextField(
-            value = bookingTermsInput,
-            onValueChange = { bookingTermsInput = it },
-            label = { Text("نص شروط وقواعد الحجز بالدليل") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = bookingLabelNameInput,
-            onValueChange = { bookingLabelNameInput = it },
-            label = { Text("تسمية حقل الاسم بالاستمارة") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = bookingLabelPhoneInput,
-            onValueChange = { bookingLabelPhoneInput = it },
-            label = { Text("تسمية حقل الهاتف بالاستمارة") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = bookingLabelAreaInput,
-            onValueChange = { bookingLabelAreaInput = it },
-            label = { Text("تسمية حقل منطقة السكن بالاستمارة") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = bookingLabelServiceInput,
-            onValueChange = { bookingLabelServiceInput = it },
-            label = { Text("تسمية حقل نوع الخدمة بالاستمارة") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-        Text("🔐 بيانات المدير (Admin) والدخول:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-
-        OutlinedTextField(
-            value = adminUsernameInput,
-            onValueChange = { adminUsernameInput = it },
-            label = { Text("اسم مستخدم المدير") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = adminPasswordInput,
-            onValueChange = { adminPasswordInput = it },
-            label = { Text("كلمة مرور المدير") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("تذكرني (حفظ الدخول بصورة دائمة كمالك)", color = Color.White, fontSize = 13.sp)
-            Switch(checked = rememberLoginInput, onCheckedChange = { rememberLoginInput = it })
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-        Text("ℹ️ تخصيص صفحة معلومات عن التطبيق (المحتوى والغلاف):", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-
-        Text("نوع غلاف الصفحة المعروض:", fontSize = 11.sp, color = Color.White)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val types = listOf("IMAGE" to "صورة 🖼️", "VIDEO" to "فيديو 🎥", "TEXT" to "نص فقط 📝")
-            types.forEach { (typeVal, typeLabel) ->
-                val isSel = aboutCoverType == typeVal
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSel) themeColors.accent else themeColors.surface)
-                        .clickable { aboutCoverType = typeVal }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(typeLabel, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White)
-                }
-            }
-        }
-
-        if (aboutCoverType == "IMAGE") {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(
-                    onClick = { galleryLauncherForCover.launch("image/*") },
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                    modifier = Modifier.weight(1f)
+                    onClick = {
+                        AdminLogger.logAction("OWNER_LOGOUT", "إغلاق لوحة المالك والعودة")
+                        viewModel.logout(context)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("صورة الهاتف 📁", fontSize = 10.sp, color = Color.White)
+                    Text("إغلاق اللوحة", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
-                
-                OutlinedTextField(
-                    value = aboutCoverContent,
-                    onValueChange = { aboutCoverContent = it },
-                    label = { Text("أو رابط صورة الإنترنت") },
-                    modifier = Modifier.weight(1.5f),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
             }
-        } else if (aboutCoverType == "VIDEO") {
-            OutlinedTextField(
-                value = aboutCoverContent,
-                onValueChange = { aboutCoverContent = it },
-                label = { Text("رابط الفيديو (يوتيوب أو ملف مباشر)") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-            )
-        } else {
-            OutlinedTextField(
-                value = aboutCoverContent,
-                onValueChange = { aboutCoverContent = it },
-                label = { Text("نص الغلاف البديل") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-            )
-        }
 
-        OutlinedTextField(
-            value = aboutCustomInfo,
-            onValueChange = { aboutCustomInfo = it },
-            label = { Text("المعلومات التفصيلية المكتوبة عن التطبيق") },
-            modifier = Modifier.fillMaxWidth(),
-            maxLines = 4,
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        OutlinedTextField(
-            value = encryptionTypeState,
-            onValueChange = { encryptionTypeState = it },
-            label = { Text("مستوى التشفير للتطبيق") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-        Text("🔗 روابط وتعديل شبكات التواصل الاجتماعي للتطبيق:", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-
-        OutlinedTextField(
-            value = twitterUrl,
-            onValueChange = { twitterUrl = it },
-            label = { Text("رابط تويتر (X)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("إخفاء تويتر (X):", fontSize = 11.sp, color = Color.White)
-            Switch(checked = hideTwitter, onCheckedChange = { hideTwitter = it }, colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent))
-        }
-
-        OutlinedTextField(
-            value = instagramUrl,
-            onValueChange = { instagramUrl = it },
-            label = { Text("رابط إنستغرام") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("إخفاء إنستغرام:", fontSize = 11.sp, color = Color.White)
-            Switch(checked = hideInstagram, onCheckedChange = { hideInstagram = it }, colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent))
-        }
-
-        OutlinedTextField(
-            value = youtubeUrl,
-            onValueChange = { youtubeUrl = it },
-            label = { Text("رابط يوتيوب") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("إخفاء يوتيوب:", fontSize = 11.sp, color = Color.White)
-            Switch(checked = hideYoutube, onCheckedChange = { hideYoutube = it }, colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent))
-        }
-
-        OutlinedTextField(
-            value = websiteUrl,
-            onValueChange = { websiteUrl = it },
-            label = { Text("رابط الموقع الإلكتروني") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("إخفاء الموقع الإلكتروني:", fontSize = 11.sp, color = Color.White)
-            Switch(checked = hideWebsite, onCheckedChange = { hideWebsite = it }, colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent))
-        }
-
-        OutlinedTextField(
-            value = facebookUrl,
-            onValueChange = { facebookUrl = it },
-            label = { Text("رابط فيسبوك") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("إخفاء فيسبوك:", fontSize = 11.sp, color = Color.White)
-            Switch(checked = hideFacebook, onCheckedChange = { hideFacebook = it }, colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent))
-        }
-
-        OutlinedTextField(
-            value = telegramUrl,
-            onValueChange = { telegramUrl = it },
-            label = { Text("رابط تليجرام") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("إخفاء تليجرام:", fontSize = 11.sp, color = Color.White)
-            Switch(checked = hideTelegram, onCheckedChange = { hideTelegram = it }, colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent))
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        Text("📐 ترتيب وهيكلة عناصر صفحة معلومات عن التطبيق:", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-        OutlinedTextField(
-            value = aboutLayoutOrder,
-            onValueChange = { aboutLayoutOrder = it },
-            label = { Text("ترتيب العناصر (مفصولة بفاصلة ,)") },
-            placeholder = { Text("COVER,LOGO,TITLE,ANNOUNCEMENT,ABOUT_CARD,DOWNLOAD_BTN,CONTACTS,SOCIALS") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
-        Text("مفاتيح الترتيب المدعومة: COVER, LOGO, TITLE, ANNOUNCEMENT, ABOUT_CARD, DOWNLOAD_BTN, CONTACTS, SOCIALS", fontSize = 9.sp, color = Color.LightGray)
-
-        // 📢 Dynamic App Banner Configuration UI
-        Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-        Text("📢 إعداد وتخصيص البنر الإعلاني بالأعلى (الرئيسي):", fontSize = 13.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("تفعيل عرض البنر بالرئيسية:", fontSize = 12.sp, color = Color.White)
-            Switch(
-                checked = bannerEnabled,
-                onCheckedChange = { bannerEnabled = it },
-                colors = SwitchDefaults.colors(checkedThumbColor = themeColors.accent)
-            )
-        }
-
-        if (bannerEnabled) {
-            Text("نوع محتوى البنر:", fontSize = 11.sp, color = themeColors.textSecondary)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // القسم الأول: هوية ونصوص التطبيق
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                val bannerTypes = listOf("TEXT" to "نص فقط 📝", "IMAGE" to "صورة 🖼️", "VIDEO" to "فيديو قصير 📹")
-                bannerTypes.forEach { (typeKey, typeLabel) ->
-                    val isSel = bannerType == typeKey
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSel) themeColors.accent else themeColors.surface)
-                            .clickable { bannerType = typeKey }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(typeLabel, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text("مكان ظهور البنر بالرئيسية:", fontSize = 11.sp, color = themeColors.textSecondary)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val locations = listOf("TOP" to "أعلى الشاشة ⬆️", "BOTTOM" to "أسفل الشاشة ⬇️")
-                locations.forEach { (locKey, locLabel) ->
-                    val isSel = bannerLocation == locKey
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSel) themeColors.accent else themeColors.surface)
-                            .clickable { bannerLocation = locKey }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(locLabel, fontSize = 11.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            if (bannerType == "IMAGE" || bannerType == "VIDEO") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = {
-                            if (bannerType == "VIDEO") {
-                                galleryLauncherForBanner.launch("video/*")
-                            } else {
-                                galleryLauncherForBanner.launch("image/*")
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                        modifier = Modifier.weight(1.5f)
-                    ) {
-                        Text(if (bannerType == "VIDEO") "فيديو قصير 📹" else "صورة البنر 📁", fontSize = 10.sp, color = Color.White)
-                    }
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("🏷️ نصوص وهوية التطبيق الرئيسية:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
                     
                     OutlinedTextField(
-                        value = bannerContent,
-                        onValueChange = { bannerContent = it },
-                        label = { Text("أو رابط الإنترنت") },
-                        modifier = Modifier.weight(2f),
+                        value = appName,
+                        onValueChange = { appName = it },
+                        label = { Text("اسم التطبيق الرئيسي") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = welcomeMessage,
+                        onValueChange = { welcomeMessage = it },
+                        label = { Text("رسالة الترحيب في الهيدر") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = splashWelcomeMessageState,
+                        onValueChange = { splashWelcomeMessageState = it },
+                        label = { Text("رسالة ترحيب شاشة البداية (Splash)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = footerMessage,
+                        onValueChange = { footerMessage = it },
+                        label = { Text("نص الفوتر الأوسط") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = footerBgColorHex,
+                        onValueChange = { footerBgColorHex = it },
+                        label = { Text("لون خلفية الفوتر (كود Hex مثل #115E59)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = appVersion,
+                        onValueChange = { appVersion = it },
+                        label = { Text("رقم إصدار التطبيق بالفوتر (مثل v2.2026)") },
+                        modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                     )
                 }
-            } else {
-                OutlinedTextField(
-                    value = bannerContent,
-                    onValueChange = { bannerContent = it },
-                    label = { Text("محتوى الإعلان النصي") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            OutlinedTextField(
-                value = bannerDurationSeconds,
-                onValueChange = { bannerDurationSeconds = it },
-                label = { Text("مدة ظهور البنر بالثواني (0 للبقاء المستمر)") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text("طريقة حركة أو ظهور البنر الإعلاني:", fontSize = 11.sp, color = themeColors.textSecondary)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // القسم الثاني: إعدادات ومفاتيح الشريط السفلي
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                val styles = listOf("SLIDE" to "انزلاق ➡️", "FADE" to "تلاشي 🌫️", "BLINK" to "وميض 💡", "SCROLL" to "تمرير 📜")
-                styles.forEach { (styleKey, styleLabel) ->
-                    val isSel = bannerDisplayStyle == styleKey
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSel) themeColors.accent else themeColors.surface)
-                            .clickable { bannerDisplayStyle = styleKey }
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("⚙️ التحكم في أيقونات ومظهر الشريط السفلي (الفوتر):", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                    
+                    AdminSwitchRow(
+                        title = "ℹ️ أيقونة 'عن التطبيق':",
+                        checked = showInfoIcon,
+                        onCheckedChange = { showInfoIcon = it },
+                        themeColors = themeColors
+                    )
+                    AdminSwitchRow(
+                        title = "📅 أيقونة 'الحجوزات':",
+                        checked = showBookingsIcon,
+                        onCheckedChange = { showBookingsIcon = it },
+                        themeColors = themeColors
+                    )
+                    AdminSwitchRow(
+                        title = "🌐 أيقونة 'تبديل اللغة' (العربية / English):",
+                        checked = showLangIcon,
+                        onCheckedChange = { showLangIcon = it },
+                        themeColors = themeColors
+                    )
+                    AdminSwitchRow(
+                        title = "🔐 أيقونة 'لوحة التحكم والإدارة':",
+                        checked = showAdminIcon,
+                        onCheckedChange = { showAdminIcon = it },
+                        themeColors = themeColors
+                    )
+                    AdminSwitchRow(
+                        title = "✍️ إظهار نص الفوتر السفلي:",
+                        checked = showFooterText,
+                        onCheckedChange = { showFooterText = it },
+                        themeColors = themeColors
+                    )
+                }
+            }
+
+            // القسم الثالث: وسائل الدعم والتواصل وروابط التطبيق
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("📞 وسائل الدعم الفني والروابط الرسمية:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    OutlinedTextField(
+                        value = supportPhone,
+                        onValueChange = { supportPhone = it },
+                        label = { Text("رقم هاتف الدعم الفني للبرنامج") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = supportEmail,
+                        onValueChange = { supportEmail = it },
+                        label = { Text("البريد الإلكتروني للدعم والمظالم") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = supportWhatsapp,
+                        onValueChange = { supportWhatsapp = it },
+                        label = { Text("رابط أو رقم واتساب الدعم الفني") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = appDownloadUrl,
+                        onValueChange = { appDownloadUrl = it },
+                        label = { Text("رابط خارجي لتحميل التطبيق (نسخة APK)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = websiteUrl,
+                        onValueChange = { websiteUrl = it },
+                        label = { Text("رابط الموقع الإلكتروني الرسمي") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = telegramUrl,
+                        onValueChange = { telegramUrl = it },
+                        label = { Text("رابط حساب/قناة التليجرام") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = facebookUrl,
+                        onValueChange = { facebookUrl = it },
+                        label = { Text("رابط صفحة الفيسبوك الرسمية") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            }
+
+            // القسم الرابع: سمات ومظهر التطبيق
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🎨 سمة التطبيق الافتراضية:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                    
+                    val themes = listOf(
+                        "EMERALD_YEMEN" to "الزمرد اليمني 🟢",
+                        "COSMIC_SILVER" to "كوزميك سيلفر 🪐",
+                        "LUXURY_GOLD" to "الذهبي الفاخر 🌟",
+                        "ELITE_EMERALD" to "الزمردي الراقي 💚",
+                        "SMOKE_BLACK" to "الأسود الدخاني ⚫",
+                        "LIGHT_PINK" to "الزهري الفاتح 🌸",
+                        "GOLDEN_WHITE" to "الأبيض الذهبي ⚪🟡",
+                        "CUSTOM_THEME" to "سمة مخصصة 🎨"
+                    )
+                    
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(styleLabel, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-
-        Spacer(modifier = Modifier.height(4.dp))
-        Text("🖼️ شعار التطبيق المستخدم بالمنصة:", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val logos = listOf("شعار احترافي 🔧", "بسيط 🌟", "رسمي 🤝", "أيقونة الدليل 🎯")
-            var selectedSimulatedLogo by remember { mutableStateOf("شعار احترافي 🔧") }
-            logos.forEach { lg ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selectedSimulatedLogo == lg) themeColors.accent else themeColors.surface)
-                        .clickable { 
-                            selectedSimulatedLogo = lg
-                            viewModel.triggerNotification("🖼️ تم تحديد الشعار ($lg) بنجاح للتطبيق!")
-                        }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(lg, fontSize = 9.sp, color = if (selectedSimulatedLogo == lg) Color.Black else Color.White)
-                }
-            }
-        }
-
-        Button(
-            onClick = {
-                val currentSettings = settingsState.copy(
-                    appName = appName,
-                    welcomeMessage = welcomeMessage,
-                    footerMessage = footerMessage,
-                    footerBgColorHex = footerBgColorHex,
-                    footerItemsOrder = footerItemsOrder,
-                    appVersion = appVersion,
-                    activeThemeId = activeThemeId,
-                    isMaintenanceActive = isMaintenanceActive,
-                    hidePromoFooter = hidePromoFooter,
-                    assistantHidden = assistantHidden,
-                    assistantSize = assistantSize.toInt(),
-                    chatHidden = chatHidden,
-                    chatSize = chatSize.toInt(),
-                    maxSearchRadiusKm = maxSearchRadiusKm.toInt(),
-                    isSpeechSearchEnabled = isSpeechSearchEnabled,
-                    bypassVisitorRegistration = bypassVisitorRegistration,
-                    isUserPasswordRequired = isUserPasswordRequired,
-                    disableChatFirewall = disableChatFirewall,
-                    disableBookingFirewall = disableBookingFirewall,
-                    isMapFeatureEnabled = isMapFeatureEnabled,
-                    mapProvider = mapProviderState,
-                    enableProvidersRegistration = enableProvidersRegistration,
-                    enableStoresRegistration = enableStoresRegistration,
-                    enableRestaurantsRegistration = enableRestaurantsRegistration,
-                    enablePropertiesRegistration = enablePropertiesRegistration,
-                    enableMedicalRegistration = enableMedicalRegistration,
-                    enableJobsRegistration = enableJobsRegistration,
-                    bookingTerms = bookingTermsInput,
-                    bookingLabelName = bookingLabelNameInput,
-                    bookingLabelPhone = bookingLabelPhoneInput,
-                    bookingLabelArea = bookingLabelAreaInput,
-                    bookingLabelService = bookingLabelServiceInput,
-                    adminUsername = adminUsernameInput,
-                    adminPassword = adminPasswordInput,
-                    aboutCoverType = aboutCoverType,
-                    aboutCoverContent = aboutCoverContent,
-                    aboutCoverBase64 = aboutCoverBase64,
-                    aboutCustomInfo = aboutCustomInfo,
-                    encryptionType = encryptionTypeState,
-                    splashWelcomeMessage = splashWelcomeMessageState,
-                    bannerEnabled = bannerEnabled,
-                    bannerType = bannerType,
-                    bannerContent = bannerContent,
-                    bannerBase64 = bannerBase64,
-                    bannerLocation = bannerLocation,
-                    bannerDurationSeconds = bannerDurationSeconds.toIntOrNull() ?: 0,
-                    bannerDisplayStyle = bannerDisplayStyle,
-                    appDownloadUrl = appDownloadUrl,
-                    showRefreshIcon = showRefreshIcon,
-                    showSettingsIcon = showSettingsIcon,
-                    headerIconsOrder = headerIconsOrder,
-                    categoriesLayoutType = categoriesLayoutTypeState,
-                    isStoresEnabled = isStoresEnabled,
-                    isPropertiesEnabled = isPropertiesEnabled,
-                    websiteUrl = websiteUrl,
-                    telegramUrl = telegramUrl,
-                    facebookUrl = facebookUrl,
-                    twitterUrl = twitterUrl,
-                    instagramUrl = instagramUrl,
-                    youtubeUrl = youtubeUrl,
-                    aboutLayoutOrder = aboutLayoutOrder,
-                    showInfoIcon = showInfoIcon,
-                    showBookingsIcon = showBookingsIcon,
-                    showLangIcon = showLangIcon,
-                    showAdminIcon = showAdminIcon,
-                    showFooterText = showFooterText,
-                    infoIconType = infoIconType,
-                    adminIconType = adminIconType,
-                    langIconType = langIconType,
-                    bookingsIconType = bookingsIconType,
-                    hideTwitter = hideTwitter,
-                    hideInstagram = hideInstagram,
-                    hideYoutube = hideYoutube,
-                    hideFacebook = hideFacebook,
-                    hideTelegram = hideTelegram,
-                    hideWebsite = hideWebsite
-                )
-                viewModel.saveCustomSettingsState(currentSettings)
-
-                if (rememberLoginInput) {
-                    sp.edit().putString("saved_admin_role", "OWNER").apply()
-                } else {
-                    sp.edit().putString("saved_admin_role", "GUEST").apply()
-                }
-                viewModel.triggerNotification("💾 تم حفظ كافة التخصيصات والتحققات بنجاح!")
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("💾 حفظ إعدادات البوابة والتخزين والتطبيق", color = Color.Black, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        var showWipeConfirmDialog by remember { mutableStateOf(false) }
-        var wipePasswordInput by remember { mutableStateOf("") }
-        var wipeErrorMsg by remember { mutableStateOf("") }
-
-        if (showWipeConfirmDialog) {
-            AlertDialog(
-                onDismissRequest = {
-                    showWipeConfirmDialog = false
-                    wipePasswordInput = ""
-                    wipeErrorMsg = ""
-                },
-                title = { Text("🔒 إدخال كلمة المرور لتأكيد الحذف والمسح", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Red) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("⚠️ تنبيه أمني: يتطلب حذف أو تطهير البيانات إدخال كلمة مرور الأدمن:", fontSize = 11.sp, color = Color.White)
-                        OutlinedTextField(
-                            value = wipePasswordInput,
-                            onValueChange = {
-                                wipePasswordInput = it
-                                wipeErrorMsg = ""
-                            },
-                            label = { Text("كلمة مرور الأدمن") },
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (wipeErrorMsg.isNotEmpty()) {
-                            Text(wipeErrorMsg, color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (viewModel.verifyAdminOrOwnerPassword(wipePasswordInput)) {
-                                viewModel.wipeAllMockAndTemporaryData()
-                                showWipeConfirmDialog = false
-                                wipePasswordInput = ""
-                                wipeErrorMsg = ""
-                            } else {
-                                wipeErrorMsg = "❌ كلمة المرور غير صحيحة! تم منع التطهير والحذف."
+                        items(themes) { (thId, label) ->
+                            val isSel = activeThemeId == thId
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) themeColors.accent else Color(0xFF1E293B))
+                                    .border(1.dp, if (isSel) Color.White else Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                    .clickable { activeThemeId = thId }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    label,
+                                    fontSize = 10.sp,
+                                    color = if (isSel) Color.Black else Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                        }
+                    }
+                }
+            }
+
+            // القسم الخامس: مفاتيح وميزات النظام وجدار النار
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🛡️ مفاتيح النظام، وضع الصيانة والأمان:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    AdminSwitchRow(
+                        title = "وضع الصيانة المؤقت",
+                        subtitle = "يقوم بإيقاف التطبيق مؤقتاً وعرض رسالة الصيانة للمستخدمين",
+                        checked = isMaintenanceActive,
+                        onCheckedChange = { isMaintenanceActive = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "إخفاء زر المساعد الذكي العائم",
+                        checked = assistantHidden,
+                        onCheckedChange = { assistantHidden = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "تفعيل البحث الصوتي",
+                        checked = isSpeechSearchEnabled,
+                        onCheckedChange = { isSpeechSearchEnabled = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "إلغاء شرط تسجيل الزائرين للحجز والمحادثة",
+                        checked = bypassVisitorRegistration,
+                        onCheckedChange = { bypassVisitorRegistration = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "🔑 إلزامية كلمة المرور لجميع حسابات المواطنين الجديدة",
+                        checked = isUserPasswordRequired,
+                        onCheckedChange = { isUserPasswordRequired = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "تمكين ميزة الرادار والخريطة للجماهير",
+                        checked = isMapFeatureEnabled,
+                        onCheckedChange = { isMapFeatureEnabled = it },
+                        themeColors = themeColors
+                    )
+
+                    // اختيار محرك الخرائط
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("تأكيد الحذف النهائي 🗑️", color = Color.White)
+                        Text("محرك الخرائط المعتمد:", color = Color.White, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            listOf("MAPLIBRE" to "MapLibre", "GOOGLE" to "Google", "MAPBOX" to "Mapbox").forEach { (mKey, mName) ->
+                                val isSel = mapProviderState == mKey
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isSel) themeColors.accent else Color(0xFF1E293B))
+                                        .clickable { mapProviderState = mKey }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(mName, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // القسم السادس: مفاتيح تسجيل الكيانات والأقسام
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("📋 تمكين التسجيل الذاتي للأقسام والمهن:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    AdminSwitchRow(
+                        title = "🛠️ تسجيل الحرفيين والفنيين",
+                        checked = enableProvidersRegistration,
+                        onCheckedChange = { enableProvidersRegistration = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "🏬 تسجيل المتاجر والمحلات",
+                        checked = enableStoresRegistration,
+                        onCheckedChange = { enableStoresRegistration = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "🍔 تسجيل المطاعم والكافيهات",
+                        checked = enableRestaurantsRegistration,
+                        onCheckedChange = { enableRestaurantsRegistration = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "🏠 تسجيل العقارات والمكاتب",
+                        checked = enablePropertiesRegistration,
+                        onCheckedChange = { enablePropertiesRegistration = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "🏥 تسجيل العيادات والمراكز الطبية",
+                        checked = enableMedicalRegistration,
+                        onCheckedChange = { enableMedicalRegistration = it },
+                        themeColors = themeColors
+                    )
+
+                    AdminSwitchRow(
+                        title = "💼 تسجيل الشركات وفرص العمل",
+                        checked = enableJobsRegistration,
+                        onCheckedChange = { enableJobsRegistration = it },
+                        themeColors = themeColors
+                    )
+                }
+            }
+
+            // القسم السابع: شروط وتخصيص نموذج الحجز
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("📅 تخصيص شروط واستمارة الحجز اليمني:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    OutlinedTextField(
+                        value = bookingTermsInput,
+                        onValueChange = { bookingTermsInput = it },
+                        label = { Text("نص شروط وقواعد الحجز بالدليل") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = bookingLabelNameInput,
+                        onValueChange = { bookingLabelNameInput = it },
+                        label = { Text("تسمية حقل الاسم بالاستمارة") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = bookingLabelPhoneInput,
+                        onValueChange = { bookingLabelPhoneInput = it },
+                        label = { Text("تسمية حقل الهاتف بالاستمارة") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = bookingLabelAreaInput,
+                        onValueChange = { bookingLabelAreaInput = it },
+                        label = { Text("تسمية حقل منطقة السكن بالاستمارة") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = bookingLabelServiceInput,
+                        onValueChange = { bookingLabelServiceInput = it },
+                        label = { Text("تسمية حقل نوع الخدمة بالاستمارة") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                }
+            }
+
+            // القسم الثامن: بيانات المدير (Admin) والدخول
+            Card(
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("🔐 بيانات المدير (Admin) والدخول:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+
+                    OutlinedTextField(
+                        value = adminUsernameInput,
+                        onValueChange = { adminUsernameInput = it },
+                        label = { Text("اسم مستخدم المدير") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+                    OutlinedTextField(
+                        value = adminPasswordInput,
+                        onValueChange = { adminPasswordInput = it },
+                        label = { Text("كلمة مرور المدير") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    AdminSwitchRow(
+                        title = "تذكرني (حفظ الدخول بصورة دائمة كمالك)",
+                        checked = rememberLoginInput,
+                        onCheckedChange = { rememberLoginInput = it },
+                        themeColors = themeColors
+                    )
+                }
+            }
+
+            // زر الحفظ الرئيسي للإعدادات
+            Button(
+                onClick = {
+                    val currentSettings = settingsState.copy(
+                        appName = appName,
+                        welcomeMessage = welcomeMessage,
+                        footerMessage = footerMessage,
+                        footerBgColorHex = footerBgColorHex,
+                        footerItemsOrder = footerItemsOrder,
+                        appVersion = appVersion,
+                        supportPhone = supportPhone,
+                        supportEmail = supportEmail,
+                        supportWhatsapp = supportWhatsapp,
+                        activeThemeId = activeThemeId,
+                        isMaintenanceActive = isMaintenanceActive,
+                        hidePromoFooter = hidePromoFooter,
+                        assistantHidden = assistantHidden,
+                        assistantSize = assistantSize.toInt(),
+                        chatHidden = chatHidden,
+                        chatSize = chatSize.toInt(),
+                        maxSearchRadiusKm = maxSearchRadiusKm.toInt(),
+                        isSpeechSearchEnabled = isSpeechSearchEnabled,
+                        bypassVisitorRegistration = bypassVisitorRegistration,
+                        isUserPasswordRequired = isUserPasswordRequired,
+                        disableChatFirewall = disableChatFirewall,
+                        disableBookingFirewall = disableBookingFirewall,
+                        isMapFeatureEnabled = isMapFeatureEnabled,
+                        mapProvider = mapProviderState,
+                        enableProvidersRegistration = enableProvidersRegistration,
+                        enableStoresRegistration = enableStoresRegistration,
+                        enableRestaurantsRegistration = enableRestaurantsRegistration,
+                        enablePropertiesRegistration = enablePropertiesRegistration,
+                        enableMedicalRegistration = enableMedicalRegistration,
+                        enableJobsRegistration = enableJobsRegistration,
+                        bookingTerms = bookingTermsInput,
+                        bookingLabelName = bookingLabelNameInput,
+                        bookingLabelPhone = bookingLabelPhoneInput,
+                        bookingLabelArea = bookingLabelAreaInput,
+                        bookingLabelService = bookingLabelServiceInput,
+                        adminUsername = adminUsernameInput,
+                        adminPassword = adminPasswordInput,
+                        aboutCoverType = aboutCoverType,
+                        aboutCoverContent = aboutCoverContent,
+                        aboutCoverBase64 = aboutCoverBase64,
+                        aboutCustomInfo = aboutCustomInfo,
+                        encryptionType = encryptionTypeState,
+                        splashWelcomeMessage = splashWelcomeMessageState,
+                        bannerEnabled = bannerEnabled,
+                        bannerType = bannerType,
+                        bannerContent = bannerContent,
+                        bannerBase64 = bannerBase64,
+                        bannerLocation = bannerLocation,
+                        bannerDurationSeconds = bannerDurationSeconds.toIntOrNull() ?: 0,
+                        bannerDisplayStyle = bannerDisplayStyle,
+                        appDownloadUrl = appDownloadUrl,
+                        showRefreshIcon = showRefreshIcon,
+                        showSettingsIcon = showSettingsIcon,
+                        headerIconsOrder = headerIconsOrder,
+                        categoriesLayoutType = categoriesLayoutTypeState,
+                        isStoresEnabled = isStoresEnabled,
+                        isPropertiesEnabled = isPropertiesEnabled,
+                        websiteUrl = websiteUrl,
+                        telegramUrl = telegramUrl,
+                        facebookUrl = facebookUrl,
+                        twitterUrl = twitterUrl,
+                        instagramUrl = instagramUrl,
+                        youtubeUrl = youtubeUrl,
+                        aboutLayoutOrder = aboutLayoutOrder,
+                        showInfoIcon = showInfoIcon,
+                        showBookingsIcon = showBookingsIcon,
+                        showLangIcon = showLangIcon,
+                        showAdminIcon = showAdminIcon,
+                        showFooterText = showFooterText,
+                        infoIconType = infoIconType,
+                        adminIconType = adminIconType,
+                        langIconType = langIconType,
+                        bookingsIconType = bookingsIconType,
+                        hideTwitter = hideTwitter,
+                        hideInstagram = hideInstagram,
+                        hideYoutube = hideYoutube,
+                        hideFacebook = hideFacebook,
+                        hideTelegram = hideTelegram,
+                        hideWebsite = hideWebsite
+                    )
+                    viewModel.saveCustomSettingsState(currentSettings)
+                    if (rememberLoginInput) {
+                        sp.edit().putString("saved_admin_role", "OWNER").apply()
+                    } else {
+                        sp.edit().putString("saved_admin_role", "GUEST").apply()
+                    }
+                    AdminLogger.logAction("SAVE_SETTINGS", "حفظ إعدادات المالك والتحكم الخلفي بنجاح")
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("💾 تم حفظ كافة التخصيصات والتحققات بنجاح!")
                     }
                 },
-                dismissButton = {
-                    TextButton(onClick = {
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("💾 حفظ إعدادات البوابة والتخزين والتطبيق", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // نافذة التأكيد المحمية لتطهير البيانات الوهمية
+            if (showWipeConfirmDialog) {
+                AlertDialog(
+                    onDismissRequest = {
                         showWipeConfirmDialog = false
                         wipePasswordInput = ""
                         wipeErrorMsg = ""
-                    }) {
-                        Text("إلغاء", color = Color.LightGray)
+                    },
+                    containerColor = Color(0xFF1E293B),
+                    icon = {
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(36.dp))
+                    },
+                    title = {
+                        Text("🔒 تأكيد حذف ومسح البيانات المؤقتة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF5350), textAlign = TextAlign.Center)
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("⚠️ تنبيه أمني: يتطلب حذف أو تطهير البيانات إدخال كلمة مرور الأدمن لتأكيد الإجراء الحساس:", fontSize = 11.5.sp, color = Color.White)
+                            OutlinedTextField(
+                                value = wipePasswordInput,
+                                onValueChange = {
+                                    wipePasswordInput = it
+                                    wipeErrorMsg = ""
+                                },
+                                label = { Text("كلمة مرور الأدمن") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                            )
+                            if (wipeErrorMsg.isNotEmpty()) {
+                                Text(wipeErrorMsg, color = Color(0xFFEF5350), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (viewModel.verifyAdminOrOwnerPassword(wipePasswordInput)) {
+                                    AdminLogger.logAction("WIPE_MOCK_DATA", "مسح وتطهير البيانات الوهمية والمؤقتة")
+                                    viewModel.wipeAllMockAndTemporaryData()
+                                    showWipeConfirmDialog = false
+                                    wipePasswordInput = ""
+                                    wipeErrorMsg = ""
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("🧹 تم مسح وتطهير كافة البيانات المؤقتة بنجاح!")
+                                    }
+                                } else {
+                                    wipeErrorMsg = "❌ كلمة المرور غير صحيحة! تم منع التطهير والحذف."
+                                    AdminLogger.logWarning("فشل التحقق من كلمة المرور أثناء محاولة مسح البيانات")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("تأكيد الحذف النهائي 🗑️", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showWipeConfirmDialog = false
+                            wipePasswordInput = ""
+                            wipeErrorMsg = ""
+                        }) {
+                            Text("إلغاء", color = Color.LightGray)
+                        }
                     }
-                }
-            )
+                )
+            }
+
+            // زر فتح حوار تطهير البيانات
+            Button(
+                onClick = { showWipeConfirmDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "حذف البيانات الوهمية",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("🧹 حذف الفنيين والرسائل والإشعارات الوهمية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
         }
 
-        Button(
-            onClick = {
-                showWipeConfirmDialog = true
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = "حذف البيانات الوهمية",
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("🧹 حذف الفنيين والرسائل والإشعارات الوهمية", color = Color.White, fontWeight = FontWeight.Bold)
-        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }
-
