@@ -2,8 +2,6 @@ package com.example.ui.screens.bookings
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,14 +31,14 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun ReviewOffersDialog(
     request: InstantRequestEntity,
     offers: List<RequestOfferEntity>,
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
     onAcceptOffer: (RequestOfferEntity) -> Unit
@@ -225,8 +223,8 @@ fun ReviewOffersDialog(
                             viewModel.submitReport(
                                 report = com.example.data.ReportEntity(
                                     id = "rep_${System.currentTimeMillis()}",
-                                    reporterName = authViewModel.currentUserName.value,
-                                    reporterPhone = authViewModel.currentUserPhone.value,
+                                    reporterName = viewModel.currentUserName.value,
+                                    reporterPhone = viewModel.currentUserPhone.value,
                                     providerId = uiState.complaintTarget ?: "",
                                     reason = complaintText,
                                     status = "OPEN",

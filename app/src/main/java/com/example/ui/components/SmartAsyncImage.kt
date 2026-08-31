@@ -1,5 +1,4 @@
 package com.example.ui.components
-import com.example.ui.MainViewModel
 
 import android.graphics.BitmapFactory
 import android.util.Base64

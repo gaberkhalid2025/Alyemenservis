@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**
@@ -22,7 +22,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AdminVoiceCallPanel(
-    viewModel: AuthViewModel? = null,
+    viewModel: MainViewModel? = null,
     themeColors: VisualThemePalette? = null
 ) {
     val cardBg = themeColors?.surface ?: Color(0xFF1E293B)

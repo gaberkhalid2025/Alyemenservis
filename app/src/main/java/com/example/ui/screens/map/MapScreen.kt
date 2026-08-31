@@ -3,12 +3,10 @@
 package com.example.ui.screens.map
 
 import androidx.compose.runtime.*
-import com.example.viewmodels.AdminViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
 
@@ -24,18 +22,18 @@ import com.example.utils.resolveThemePalette
  */
 @Composable
 fun MapScreen(
-    adminViewModel: AdminViewModel = viewModel(),
+    viewModel: MainViewModel,
     onBackClick: () -> Unit = {},
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
     onOpenStoreDetails: (StoreEntity) -> Unit = {},
     onOpenPropertyDetails: (PropertyEntity) -> Unit = {},
     onRequestBooking: (ProviderEntity) -> Unit = {},
-    themeColors: VisualThemePalette = resolveThemePalette(adminViewModel.settings.collectAsState().value)
+    themeColors: VisualThemePalette = resolveThemePalette(viewModel.settings.collectAsState().value)
 ) {
     val state = rememberMapScreenState()
 
     MapScreenContent(
-        
+        viewModel = viewModel,
         state = state,
         onBackClick = onBackClick,
         onOpenProviderDetails = onOpenProviderDetails,

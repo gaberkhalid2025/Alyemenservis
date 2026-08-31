@@ -1,5 +1,4 @@
 package com.example.ui.components
-import com.example.ui.MainViewModel
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*

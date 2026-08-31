@@ -7,14 +7,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import com.example.viewmodels.ProviderViewModel
-import com.example.viewmodels.StoreViewModel
-import com.example.viewmodels.BookingViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.viewmodels.AdminViewModel
-import com.example.viewmodels.ChatViewModel
-import com.example.viewmodels.PropertyViewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,7 +25,7 @@ import androidx.core.content.ContextCompat
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
-
+import com.example.ui.MainViewModel
 import com.example.ui.createBookingDirectly
 import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.OfflineMapManager
@@ -47,32 +39,26 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun MapScreenContent(
-    adminViewModel: AdminViewModel = viewModel(),
-    providerViewModel: ProviderViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
-    storeViewModel: StoreViewModel = viewModel(),
-    propertyViewModel: PropertyViewModel = viewModel(),
-    bookingViewModel: BookingViewModel = viewModel(),
-    chatViewModel: ChatViewModel = viewModel(),
+    viewModel: MainViewModel,
     state: MapScreenState = rememberMapScreenState(),
     onBackClick: () -> Unit = {},
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
     onOpenStoreDetails: (StoreEntity) -> Unit = {},
     onOpenPropertyDetails: (PropertyEntity) -> Unit = {},
     onRequestBooking: (ProviderEntity) -> Unit = {},
-    themeColors: VisualThemePalette = resolveThemePalette(adminViewModel.settings.collectAsState().value)
+    themeColors: VisualThemePalette = resolveThemePalette(viewModel.settings.collectAsState().value)
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Data streams from ViewModel
-    val providers by providerViewModel.providers.collectAsState()
-    val stores by storeViewModel.stores.collectAsState()
-    val properties by propertyViewModel.properties.collectAsState()
+    val providers by viewModel.providers.collectAsState()
+    val stores by viewModel.stores.collectAsState()
+    val properties by viewModel.properties.collectAsState()
 
-    val userLatState by authViewModel.userLatitude.collectAsState()
-    val userLngState by authViewModel.userLongitude.collectAsState()
+    val userLatState by viewModel.userLatitude.collectAsState()
+    val userLngState by viewModel.userLongitude.collectAsState()
 
     val safeUserLat = if (userLatState != 0.0) userLatState else 15.3694
     val safeUserLng = if (userLngState != 0.0) userLngState else 44.1910
@@ -84,7 +70,7 @@ fun MapScreenContent(
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
-            authViewModel.startLocationUpdates()
+            viewModel.startLocationUpdates()
             coroutineScope.launch {
                 snackbarHostState.showSnackbar("تم تفعيل نظام تحديد المواقع بنجاح ✓")
             }
@@ -234,7 +220,7 @@ fun MapScreenContent(
                         state.selectedCity = city
                         if (city != "الكل") {
                             val coords = OfflineMapManager.getCityCoordinates(city)
-                            authViewModel.updateUserLocation(coords.latitude, coords.longitude)
+                            viewModel.updateUserLocation(coords.latitude, coords.longitude)
                         }
                     },
                     searchQuery = state.searchQuery,
@@ -261,7 +247,7 @@ fun MapScreenContent(
                 onRecenterLocation = {
                     val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     if (hasFine) {
-                        authViewModel.startLocationUpdates()
+                        viewModel.startLocationUpdates()
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar("تمت إعادة التمركز إلى موقعك الفعلي 📍")
                         }
@@ -271,7 +257,7 @@ fun MapScreenContent(
                         )
                     }
                 },
-                isGpsActive = chatViewModel.isGpsTrackingActive.collectAsState().value,
+                isGpsActive = viewModel.isGpsTrackingActive.collectAsState().value,
                 themeColors = themeColors,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -310,7 +296,7 @@ fun MapScreenContent(
             userLng = safeUserLng,
             onDismiss = { state.bookingProviderTarget = null },
             onConfirmBooking = { notes ->
-                bookingViewModel.createBookingDirectly(
+                viewModel.createBookingDirectly(
                     provider = provider,
                     notes = notes,
                     onSuccess = {

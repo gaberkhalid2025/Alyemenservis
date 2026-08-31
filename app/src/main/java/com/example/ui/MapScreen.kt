@@ -13,7 +13,7 @@ import com.example.utils.resolveThemePalette
  */
 @Composable
 fun MapScreen(
-    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: MainViewModel,
     onBackClick: () -> Unit = {},
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
     onOpenStoreDetails: (StoreEntity) -> Unit = {},

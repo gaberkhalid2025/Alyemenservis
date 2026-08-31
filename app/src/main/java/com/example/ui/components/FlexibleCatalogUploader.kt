@@ -1,5 +1,4 @@
 package com.example.ui.components
-import com.example.ui.MainViewModel
 
 import android.content.Context
 import android.net.Uri

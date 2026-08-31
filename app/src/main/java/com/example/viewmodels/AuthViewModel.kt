@@ -1,17 +1,13 @@
 package com.example.viewmodels
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.repositories.AuthRepository
-import com.example.data.repositories.UserRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class UserAuthState(
     val userId: String = "",
@@ -26,11 +22,9 @@ data class UserAuthState(
  * 🔐 AuthViewModel
  * إدارة تسجيل الدخول، إنشاء الحساب، الصلاحيات وحالة جلسة المستخدم الحالية.
  */
-@HiltViewModel
-class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository = AuthRepository(),
-    private val userRepository: UserRepository = UserRepository()
-) : ViewModel() {
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
     private val _authState = MutableStateFlow(UserAuthState())
     val authState: StateFlow<UserAuthState> = _authState.asStateFlow()
@@ -41,53 +35,51 @@ class AuthViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    val triggerRestoreAccountDialog = MutableStateFlow(false)
-
-
-    val currentUserId: StateFlow<String> = _authState.map { it.userId }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, "")
-    val currentUserName: StateFlow<String> = _authState.map { it.userName }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, "")
-    val currentUserPhone: StateFlow<String> = _authState.map { it.userPhone }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, "")
-    val isOnline: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(true).asStateFlow()
-    val isProviderUser: StateFlow<Boolean> = _authState.map { it.userRole == "PROVIDER" }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, false)
-
-
     fun login(phone: String, pass: String, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
             val cleanPhone = phone.trim()
-            
-            val result = authRepository.loginWithPhone(cleanPhone, pass)
-            _isLoading.value = false
-            
-            result.onSuccess { user ->
-                if (user.isBlocked) {
-                    _errorMessage.value = "هذا الحساب محظور حالياً، يرجى التواصل مع الدعم."
-                    onResult(false, "حساب محظور")
-                } else {
-                    _authState.value = UserAuthState(
-                        userId = user.id,
-                        userName = user.name,
-                        userPhone = user.phone,
-                        userRole = user.role,
-                        isAuthenticated = true
-                    )
-                    onResult(true, "تم تسجيل الدخول بنجاح")
-                }
-            }.onFailure { e ->
-                // fallback for guest user login during transition phase
-                if (e is NoSuchElementException) {
-                    _authState.value = UserAuthState(
-                        userId = cleanPhone,
-                        userName = "مستخدم",
-                        userPhone = cleanPhone,
-                        userRole = "CLIENT",
-                        isAuthenticated = true
-                    )
-                    onResult(true, "مرحباً بك كزائر")
-                } else {
-                    _errorMessage.value = e.message
-                    onResult(false, e.message ?: "خطأ في الاتصال")
-                }
+            try {
+                firestore.collection("users").document(cleanPhone).get()
+                    .addOnSuccessListener { doc ->
+                        _isLoading.value = false
+                        if (doc.exists()) {
+                            val isBlocked = doc.getBoolean("isBlocked") ?: false
+                            if (isBlocked) {
+                                _errorMessage.value = "هذا الحساب محظور حالياً، يرجى التواصل مع الدعم."
+                                onResult(false, "حساب محظور")
+                                return@addOnSuccessListener
+                            }
+                            val role = doc.getString("role") ?: "CLIENT"
+                            val name = doc.getString("name") ?: "مستخدم"
+                            _authState.value = UserAuthState(
+                                userId = cleanPhone,
+                                userName = name,
+                                userPhone = cleanPhone,
+                                userRole = role,
+                                isAuthenticated = true
+                            )
+                            onResult(true, "تم تسجيل الدخول بنجاح")
+                        } else {
+                            // الدخول كزائر مسجل
+                            _authState.value = UserAuthState(
+                                userId = cleanPhone,
+                                userName = "مستخدم",
+                                userPhone = cleanPhone,
+                                userRole = "CLIENT",
+                                isAuthenticated = true
+                            )
+                            onResult(true, "مرحباً بك")
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        _isLoading.value = false
+                        _errorMessage.value = e.message
+                        onResult(false, e.message ?: "خطأ في الاتصال")
+                    }
+            } catch (e: Exception) {
+                _isLoading.value = false
+                onResult(false, e.message ?: "خطأ غير متوقع")
             }
         }
     }
@@ -98,11 +90,5 @@ class AuthViewModel @Inject constructor(
 
     fun setRole(role: String) {
         _authState.value = _authState.value.copy(userRole = role)
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        authRepository.clearListeners()
-        userRepository.clearListeners()
     }
 }

@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,7 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import androidx.compose.runtime.*
 import androidx.compose.material3.*
@@ -36,7 +34,7 @@ fun ProfileActions(
     entityPhone: String,
     entityType: ProfileEntityType,
     isOwner: Boolean,
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onOpenChat: (String) -> Unit,
     onRequestBooking: () -> Unit,
@@ -46,12 +44,12 @@ fun ProfileActions(
     onEditGallery: () -> Unit
 ) {
     val context = LocalContext.current
-    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
+    val currentUserId by viewModel.currentUserId.collectAsState()
     var showGuestDialog by remember { mutableStateOf(false) }
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
-            
+            viewModel = viewModel,
             themeColors = themeColors,
             onDismiss = { showGuestDialog = false },
             onRegisterCompleted = { _, _, _, _ -> showGuestDialog = false }

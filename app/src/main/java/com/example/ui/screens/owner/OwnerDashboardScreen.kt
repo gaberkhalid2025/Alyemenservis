@@ -25,13 +25,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UnifiedBusinessAccount
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun OwnerDashboardScreen(
     account: UnifiedBusinessAccount,
-    viewModel: AuthViewModel,
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onNavigateTab: (Int) -> Unit,
     onBackClick: () -> Unit

@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.BookingEntity
 import com.example.data.PaymentWalletEntity
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**
@@ -31,7 +31,7 @@ import com.example.utils.VisualThemePalette
 fun ServicesBrowserPaymentDialog(
     booking: BookingEntity,
     wallets: List<PaymentWalletEntity>,
-    viewModel: AuthViewModel,
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     context: Context,
     onDismiss: () -> Unit

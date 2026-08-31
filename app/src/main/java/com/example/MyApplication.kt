@@ -4,9 +4,6 @@ import android.app.Application
 import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
 
-
-
-
 class MyApplication : Application() {
 
     override fun onCreate() {

@@ -1,7 +1,6 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.assistant
-import com.example.ui.MainViewModel
 
 import android.app.Activity
 import android.content.Intent
@@ -32,7 +31,7 @@ import com.example.NetworkUtils
 import com.example.VoiceManager
 import com.example.data.AdminSettingsEntity
 import com.example.data.ProviderEntity
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import com.example.viewmodels.AssistantViewModel
 import kotlinx.coroutines.launch
@@ -51,7 +50,7 @@ data class AssistantMessage(
  */
 @Composable
 fun SmartAssistantDialogView(
-    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: MainViewModel,
     settings: AdminSettingsEntity,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,

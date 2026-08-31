@@ -18,7 +18,7 @@ fun ProductGrid(
     products: List<ProductEntity>,
     isOwnerOrAdmin: Boolean,
     themeColors: VisualThemePalette,
-    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: MainViewModel,
     onProductOrderClick: (ProductEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {

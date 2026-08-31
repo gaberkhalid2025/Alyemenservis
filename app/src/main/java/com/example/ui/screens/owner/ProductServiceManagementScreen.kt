@@ -27,14 +27,14 @@ import coil.compose.AsyncImage
 import com.example.data.ProductEntity
 import com.example.data.UnifiedBusinessAccount
 import com.example.rememberBase64Bitmap
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import java.util.UUID
 
 @Composable
 fun ProductServiceManagementScreen(
     account: UnifiedBusinessAccount,
-    viewModel: AuthViewModel,
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

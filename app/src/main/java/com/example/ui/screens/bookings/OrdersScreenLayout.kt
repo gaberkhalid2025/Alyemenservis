@@ -7,8 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.*
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,12 +30,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.*
 import com.example.utils.*
-
+import com.example.ui.MainViewModel
 
 @Composable
-fun OrdersScreenLayout(authViewModel: AuthViewModel = viewModel(), themeColors: VisualThemePalette, onRequestQuickService: () -> Unit = {}) {
+fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette, onRequestQuickService: () -> Unit = {}) {
     val orders by viewModel.orders.collectAsState()
-    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val context = LocalContext.current
 
     // Allow user to query by phone if currentUserPhone is empty

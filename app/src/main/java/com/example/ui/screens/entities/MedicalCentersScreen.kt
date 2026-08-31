@@ -1,11 +1,6 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.ProviderViewModel
-import com.example.viewmodels.SettingsViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.viewmodels.AdminViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,24 +26,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ProviderEntity
-
+import com.example.ui.MainViewModel
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun MedicalCentersScreen(
-    providerViewModel: ProviderViewModel = viewModel(),
-    adminViewModel: AdminViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
-    settingsViewModel: SettingsViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onMedicalCenterClick: (ProviderEntity) -> Unit,
     onChatClick: (ProviderEntity) -> Unit,
     onBookAppointmentClick: (ProviderEntity) -> Unit
 ) {
-    val providers by providerViewModel.providers.collectAsState()
-    val isProvidersLoading by providerViewModel.isProvidersLoading.collectAsState()
-    val cities by settingsViewModel.cities.collectAsState()
+    val providers by viewModel.providers.collectAsState()
+    val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
+    val cities by viewModel.cities.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
@@ -57,8 +49,8 @@ fun MedicalCentersScreen(
 
     val categories = listOf("الكل", "مستشفيات", "عيادات تخصصية", "صيدليات", "مختبرات تحاليل", "مراكز أشعة")
 
-    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
-    val adminRole by adminViewModel.adminRole.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
     val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
     val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
 
@@ -110,7 +102,7 @@ fun MedicalCentersScreen(
     if (showCreateMedicalDialog) {
         com.example.StoreCreateEditDialog(
             store = null,
-            
+            viewModel = viewModel,
             themeColors = themeColors,
             sectionId = "medical",
             onDismiss = { showCreateMedicalDialog = false }
@@ -119,7 +111,7 @@ fun MedicalCentersScreen(
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
-            
+            viewModel = viewModel,
             themeColors = themeColors,
             onDismiss = { showGuestDialog = false },
             onRegisterCompleted = { _, _, _, _ -> showGuestDialog = false }

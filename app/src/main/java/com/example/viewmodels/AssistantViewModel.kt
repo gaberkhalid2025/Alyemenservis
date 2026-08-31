@@ -204,11 +204,11 @@ class AssistantViewModel : ViewModel() {
         return AssistantMessage(text = localText, isUser = false, matchedProviders = localProvs)
     }
 
-    fun generateLocalOfflineResponse(prompt: String, mainViewModel: MainViewModel): Pair<String, List<ProviderEntity>> {
+    fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): Pair<String, List<ProviderEntity>> {
         val qNormalized = normalizeArabic(prompt)
-        val providers = mainViewModel.providers.value
-        val categories = mainViewModel.categories.value
-        val settings = mainViewModel.settings.value
+        val providers = viewModel.providers.value
+        val categories = viewModel.categories.value
+        val settings = viewModel.settings.value
 
         val isSupportContact = qNormalized.contains("رقم") || qNormalized.contains("اتصال") || 
                                qNormalized.contains("دعم") || qNormalized.contains("تواصل") || 

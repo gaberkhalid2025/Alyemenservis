@@ -6,9 +6,6 @@ import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.*
-import com.example.viewmodels.AdminViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -35,7 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-
+import com.example.ui.MainViewModel
 import com.example.ui.screens.register.components.RegistrationField
 import com.example.ui.screens.register.components.RegistrationSubmitButton
 import com.example.util.Validators
@@ -69,8 +66,7 @@ private fun Context.findFragmentActivity(): FragmentActivity? {
  */
 @Composable
 fun GuestRegistrationDialog(
-    adminViewModel: AdminViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
     onRegisterCompleted: (String, String, String, String) -> Unit
@@ -79,11 +75,11 @@ fun GuestRegistrationDialog(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentName = authViewModel.currentUserName.collectAsState().value
-    val currentPhone = authViewModel.currentUserPhone.collectAsState().value
-    val currentResidence = authViewModel.currentUserResidence.collectAsState().value
-    val currentUserId = authViewModel.currentUserId.collectAsState().value
-    val settingsState by adminViewModel.settings.collectAsState()
+    val currentName = viewModel.currentUserName.collectAsState().value
+    val currentPhone = viewModel.currentUserPhone.collectAsState().value
+    val currentResidence = viewModel.currentUserResidence.collectAsState().value
+    val currentUserId = viewModel.currentUserId.collectAsState().value
+    val settingsState by viewModel.settings.collectAsState()
 
     var isRestoreMode by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf(currentName) }
@@ -163,7 +159,7 @@ fun GuestRegistrationDialog(
                             val savedPass = prefs.getString("last_auth_pass", "") ?: ""
                             if (savedPhone.isNotEmpty()) {
                                 uiState = GuestAuthUiState.Loading("جاري استرجاع الحساب بالبصمة...")
-                                authViewModel.restoreGuestUser(context, savedPhone, savedPass) { success, msg ->
+                                viewModel.restoreGuestUser(context, savedPhone, savedPass) { success, msg ->
                                     if (success) {
                                         uiState = GuestAuthUiState.Success("تم استرجاع الحساب بنجاح!")
                                         onDismiss()
@@ -341,7 +337,7 @@ fun GuestRegistrationDialog(
                             val fullPhone = if (cleanPhone.length == 9) cleanPhone else "77$cleanPhone"
                             uiState = GuestAuthUiState.Loading("🔍 جاري البحث عن حسابك برقم الهاتف $fullPhone...")
 
-                            authViewModel.restoreGuestUser(context, fullPhone, cleanPassword) { success, msg ->
+                            viewModel.restoreGuestUser(context, fullPhone, cleanPassword) { success, msg ->
                                 if (success) {
                                     // Cache in EncryptedSharedPreferences for Biometrics
                                     getSecurePrefs()
@@ -398,7 +394,7 @@ fun GuestRegistrationDialog(
 
                             val fullPhone = if (cleanPhone.length == 9) cleanPhone else "77$cleanPhone"
                             uiState = GuestAuthUiState.Loading("جاري إنشاء الحساب...")
-                            authViewModel.registerGuestUser(
+                            viewModel.registerGuestUser(
                                 context = context,
                                 name = cleanName,
                                 phone = fullPhone,

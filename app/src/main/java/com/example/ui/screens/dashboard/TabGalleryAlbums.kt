@@ -1,5 +1,4 @@
 package com.example.ui.screens.dashboard
-import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -23,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.UnifiedBusinessAccount
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
 
@@ -33,7 +32,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun TabGalleryAlbums(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

@@ -5,10 +5,6 @@ package com.example.ui.screens.dashboard
 import com.example.ui.screens.dashboard.*
 import android.content.Intent
 import androidx.compose.ui.geometry.CornerRadius
-import com.example.viewmodels.PropertyViewModel
-import com.example.viewmodels.RegistrationViewModel
-import com.example.viewmodels.NotificationViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.PathEffect
 import okhttp3.MediaType.Companion.toMediaType
@@ -79,7 +75,7 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.*
 import com.example.utils.*
-
+import com.example.ui.MainViewModel
 import com.example.ui.components.*
 import com.example.ui.dialogs.*
 import com.example.ui.screens.home.*
@@ -102,9 +98,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PropertyOwnerDashboardLayout(
     property: com.example.data.PropertyEntity,
-    notificationViewModel: NotificationViewModel = viewModel(),
-    propertyViewModel: PropertyViewModel = viewModel(),
-    registrationViewModel: RegistrationViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     ratings: List<com.example.data.RatingEntity>
 ) {
@@ -198,7 +192,7 @@ fun PropertyOwnerDashboardLayout(
                     onClick = {
                         val dPrice = editPrice.toDoubleOrNull() ?: 0.0
                         if (editTitle.trim().isEmpty() || editPhone.trim().isEmpty() || dPrice <= 0.0) {
-                            notificationViewModel.triggerNotification("⚠️ يرجى تعبئة الحقول والأسعار بطريقة صحيحة!")
+                            viewModel.triggerNotification("⚠️ يرجى تعبئة الحقول والأسعار بطريقة صحيحة!")
                         } else {
                             viewModel.saveProperty(
                                 property.copy(
@@ -311,7 +305,7 @@ fun PropertyOwnerDashboardLayout(
 
         Button(
             onClick = {
-                registrationViewModel.cancelOrResetJoinRequest(context)
+                viewModel.cancelOrResetJoinRequest(context)
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
             shape = RoundedCornerShape(8.dp),
@@ -340,8 +334,8 @@ fun PropertyOwnerDashboardLayout(
                 confirmButton = {
                     Button(
                         onClick = {
-                            propertyViewModel.deletePropertyPermanently(property.id)
-                            registrationViewModel.cancelOrResetJoinRequest(context)
+                            viewModel.deletePropertyPermanently(property.id)
+                            viewModel.cancelOrResetJoinRequest(context)
                             showDeleteConfirm = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red)

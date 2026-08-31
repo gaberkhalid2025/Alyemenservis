@@ -1,10 +1,6 @@
 package com.example.ui.screens.home.sections
 
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.AuthViewModel
-import com.example.viewmodels.AdminViewModel
-import com.example.viewmodels.StoreViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,7 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.StoreEntity
-
+import com.example.ui.MainViewModel
 import com.example.ui.screens.home.extensions.isMedicalCenter
 import com.example.utils.VisualThemePalette
 
@@ -30,16 +26,14 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun MedicalCentersSectionView(
-    storeViewModel: StoreViewModel = viewModel(),
-    adminViewModel: AdminViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onStoreClick: (StoreEntity) -> Unit,
     onCreateMedicalClick: () -> Unit
 ) {
-    val allStores by storeViewModel.stores.collectAsState()
-    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
-    val adminRole by adminViewModel.adminRole.collectAsState()
+    val allStores by viewModel.stores.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
     val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
 
     val medicalList = remember(allStores, currentUserId, adminRole) {

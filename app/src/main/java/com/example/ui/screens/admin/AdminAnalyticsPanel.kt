@@ -1,5 +1,4 @@
 package com.example.ui.screens.admin
-import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -34,18 +33,18 @@ import java.text.DecimalFormat
 @Composable
 fun AdminAnalyticsPanel(
     onBack: () -> Unit = {},
-    viewModel: AdminViewModel = viewModel(),
+    adminViewModel: AdminViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val numberFormat = remember { DecimalFormat("#,###") }
     var selectedPeriod by remember { mutableStateOf("MONTH") } // TODAY, WEEK, MONTH, YEAR
 
-    val stats = viewModel.getSystemStats()
-    val revenueStats = viewModel.getRevenueStats()
-    val bookingStats = viewModel.getBookingStats()
-    val categoryStats = viewModel.getCategoryStats()
-    val cityStats = viewModel.getCityStats()
+    val stats = adminViewModel.getSystemStats()
+    val revenueStats = adminViewModel.getRevenueStats()
+    val bookingStats = adminViewModel.getBookingStats()
+    val categoryStats = adminViewModel.getCategoryStats()
+    val cityStats = adminViewModel.getCityStats()
 
     Scaffold(
         topBar = {
@@ -60,13 +59,13 @@ fun AdminAnalyticsPanel(
                 },
                 actions = {
                     IconButton(onClick = {
-                        viewModel.loadSystemStats()
+                        adminViewModel.loadSystemStats()
                         Toast.makeText(context, "تم تحديث البيانات والإحصائيات", Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color(0xFF00668B))
                     }
                     IconButton(onClick = {
-                        val report = viewModel.exportReport("الإحصائيات والتحليلات")
+                        val report = adminViewModel.exportReport("الإحصائيات والتحليلات")
                         Toast.makeText(context, "تم تصدير التقرير التحليلي بنجاح", Toast.LENGTH_LONG).show()
                     }) {
                         Icon(Icons.Default.Share, contentDescription = "تصدير", tint = Color(0xFF00668B))

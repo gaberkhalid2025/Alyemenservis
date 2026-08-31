@@ -3,11 +3,6 @@ package com.example.ui.screens.home
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.ProviderViewModel
-import com.example.viewmodels.StoreViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.viewmodels.PropertyViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,7 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-
+import com.example.ui.MainViewModel
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
@@ -45,10 +40,7 @@ import com.example.ui.screens.dashboard.DashboardEvent
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreenLayout(
-    providerViewModel: ProviderViewModel = viewModel(),
-    storeViewModel: StoreViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
-    propertyViewModel: PropertyViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit,
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
@@ -57,7 +49,7 @@ fun FavoritesScreenLayout(
     onOpenChat: (channelId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val currentUserId = currentUserPhone.ifBlank { "guest_user" }
 
     val favoritesViewModel = remember(currentUserId) {
@@ -78,11 +70,11 @@ fun FavoritesScreenLayout(
         }
     }
 
-    val providers by providerViewModel.providers.collectAsState()
-    val stores by storeViewModel.stores.collectAsState()
-    val properties by propertyViewModel.properties.collectAsState()
+    val providers by viewModel.providers.collectAsState()
+    val stores by viewModel.stores.collectAsState()
+    val properties by viewModel.properties.collectAsState()
     val favoriteIds by viewModel.favoriteIds.collectAsState()
-    val isProvidersLoading by providerViewModel.isProvidersLoading.collectAsState()
+    val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) } // 0: الكل, 1: فنيين وخدمات, 2: متاجر ومطاعم, 3: عقارات
 

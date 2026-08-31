@@ -1,8 +1,6 @@
 package com.example.ui.screens.dashboard
 
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.BookingViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UnifiedBusinessAccount
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**
@@ -24,11 +22,11 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun TabStatisticsGrowth(
     account: UnifiedBusinessAccount,
-    bookingViewModel: BookingViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
     val allProducts by viewModel.products.collectAsState()
-    val allBookings by bookingViewModel.bookings.collectAsState()
+    val allBookings by viewModel.bookings.collectAsState()
     val allRatings by viewModel.ratings.collectAsState()
 
     val myProducts = remember(allProducts, account.id) {

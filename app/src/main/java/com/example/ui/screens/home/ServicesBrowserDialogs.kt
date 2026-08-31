@@ -32,7 +32,7 @@ import com.example.data.PropertyEntity
 import com.example.data.StoreEntity
 import com.example.ui.screens.home.extensions.isMedicalCenter
 import com.example.ui.screens.home.extensions.isRestaurantOrCafe
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**

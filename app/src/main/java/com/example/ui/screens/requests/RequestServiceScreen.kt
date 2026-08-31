@@ -2,8 +2,6 @@ package com.example.ui.screens.requests
 
 import android.widget.Toast
 import androidx.compose.animation.*
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NotificationEntity
 import com.example.data.models.InstantRequestEntity
-
+import com.example.ui.MainViewModel
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -39,7 +37,7 @@ import kotlin.random.Random
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RequestServiceScreen(
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     onNavigateBack: () -> Unit = {},
     onNavigateToMyRequests: () -> Unit = {}
 ) {
@@ -47,7 +45,7 @@ fun RequestServiceScreen(
     val scope = rememberCoroutineScope()
     val firestore = remember { FirebaseFirestore.getInstance() }
 
-    val currentUserId by authViewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
 
     var customerPhone by remember { mutableStateOf("") }
     var customerName by remember { mutableStateOf("") }

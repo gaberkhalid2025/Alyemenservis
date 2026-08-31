@@ -1,7 +1,7 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.runtime.Composable
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import com.example.data.StoreEntity
 import com.example.data.PropertyEntity
@@ -19,7 +19,7 @@ enum class GenericEntityType {
 @Composable
 fun GenericEntitiesScreen(
     entityType: GenericEntityType,
-    viewModel: AuthViewModel,
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     // Store & Restaurant Callbacks
     onStoreClick: ((StoreEntity) -> Unit)? = null,

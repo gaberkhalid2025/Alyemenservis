@@ -4,11 +4,6 @@ package com.example.ui.screens.home
 
 import android.content.Context
 import androidx.compose.foundation.*
-import com.example.viewmodels.ProviderViewModel
-import com.example.viewmodels.StoreViewModel
-import com.example.viewmodels.SettingsViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.viewmodels.AdminViewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-
+import com.example.ui.MainViewModel
 import com.example.ui.components.AdminCustomBannerView
 import com.example.ui.components.BannerSliderView
 import com.example.utils.VisualThemePalette
@@ -38,10 +33,7 @@ import com.example.ui.screens.home.sections.*
  */
 @Composable
 fun ServicesBrowserLayout(
-    storeViewModel: StoreViewModel = viewModel(),
-    adminViewModel: AdminViewModel = viewModel(),
-    providerViewModel: ProviderViewModel = viewModel(),
-    settingsViewModel: SettingsViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     activeSectionIdForCreation: String,
     onActiveSectionIdForCreationChange: (String) -> Unit,
@@ -58,20 +50,20 @@ fun ServicesBrowserLayout(
     }
 
     val browserUiState by browserViewModel.uiState.collectAsState()
-    val categories by settingsViewModel.categories.collectAsState()
-    val filteredProviders by providerViewModel.filteredProviders.collectAsState()
-    val isProvidersLoading by providerViewModel.isProvidersLoading.collectAsState()
-    val selectedCategory by settingsViewModel.selectedCategoryId.collectAsState()
+    val categories by viewModel.categories.collectAsState()
+    val filteredProviders by viewModel.filteredProviders.collectAsState()
+    val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
+    val selectedCategory by viewModel.selectedCategoryId.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isVipOnly by viewModel.filterVipOnly.collectAsState()
     val isAvailableOnly by viewModel.filterAvailableOnly.collectAsState()
-    val citiesList by settingsViewModel.cities.collectAsState()
+    val citiesList by viewModel.cities.collectAsState()
     val activeCityId by viewModel.filterCityId.collectAsState()
     val radiusKm by viewModel.maxKmRadius.collectAsState()
     val neighborFilter by viewModel.filterNeighborhoodName.collectAsState()
     val phoneOrNameFilter by viewModel.phoneOrNameFilter.collectAsState()
-    val bannersList by adminViewModel.banners.collectAsState()
-    val settingsState by adminViewModel.settings.collectAsState()
+    val bannersList by viewModel.banners.collectAsState()
+    val settingsState by viewModel.settings.collectAsState()
     val paymentWallets by viewModel.paymentWallets.collectAsState()
 
     var showFiltersPanel by remember { mutableStateOf(false) }
@@ -112,7 +104,7 @@ fun ServicesBrowserLayout(
             if (bannersList.isNotEmpty()) {
                 item {
                     BannerSliderView(banners = bannersList, themeColors = themeColors) { catTarget ->
-                        if (catTarget.isNotEmpty()) settingsViewModel.selectCategory(catTarget)
+                        if (catTarget.isNotEmpty()) viewModel.selectCategory(catTarget)
                     }
                 }
             }
@@ -166,11 +158,11 @@ fun ServicesBrowserLayout(
             when (activeTabName) {
                 "المفضلة" -> {
                     FavoritesScreenLayout(
-                        
+                        viewModel = viewModel,
                         themeColors = themeColors,
                         onBackClick = { activeTabName = "الرئيسية" },
                         onOpenProviderDetails = {
-                            providerViewModel.selectedProvider = it
+                            viewModel.selectedProvider = it
                             viewModel.navigateTo("DYNAMIC_PROFILE")
                         },
                         onOpenStoreDetails = { selectedStoreForDetails = it },
@@ -180,10 +172,10 @@ fun ServicesBrowserLayout(
                 }
                 "المحلات والمتاجر", "المحلات", settingsState.storesTabName -> {
                     StoresSectionView(
-                        
+                        viewModel = viewModel,
                         themeColors = themeColors,
                         onStoreClick = { 
-                            storeViewModel.selectedStore = it
+                            viewModel.selectedStore = it
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateStoreClick = {
@@ -193,10 +185,10 @@ fun ServicesBrowserLayout(
                 }
                 "المطاعم والكافيهات", "المطاعم" -> {
                     RestaurantsSectionView(
-                        
+                        viewModel = viewModel,
                         themeColors = themeColors,
                         onStoreClick = { 
-                            storeViewModel.selectedStore = it
+                            viewModel.selectedStore = it
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateRestaurantClick = {
@@ -206,10 +198,10 @@ fun ServicesBrowserLayout(
                 }
                 "المراكز الطبية", "المراكز" -> {
                     MedicalCentersSectionView(
-                        
+                        viewModel = viewModel,
                         themeColors = themeColors,
                         onStoreClick = { 
-                            storeViewModel.selectedStore = it
+                            viewModel.selectedStore = it
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateMedicalClick = {
@@ -219,7 +211,7 @@ fun ServicesBrowserLayout(
                 }
                 "العقارات", settingsState.propertiesTabName -> {
                     PropertiesSectionView(
-                        
+                        viewModel = viewModel,
                         themeColors = themeColors,
                         onPropertyClick = { selectedPropertyForDetails = it },
                         onCreatePropertyClick = {
@@ -229,7 +221,7 @@ fun ServicesBrowserLayout(
                 }
                 "إعلانات الوظائف", "الوظائف" -> {
                     JobsSectionView(
-                        
+                        viewModel = viewModel,
                         themeColors = themeColors,
                         onJobClick = { selectedJobForDetails = it },
                         onCreateJobClick = {
@@ -239,17 +231,17 @@ fun ServicesBrowserLayout(
                 }
                 else -> {
                     ServicesBrowserMainContent(
-                        
+                        viewModel = viewModel,
                         themeColors = themeColors,
                         displayProviders = filteredProviders,
                         isProvidersLoading = isProvidersLoading,
                         categories = categories,
                         selectedCategoryId = selectedCategory,
-                        onCategorySelected = { settingsViewModel.selectCategory(it ?: "") },
+                        onCategorySelected = { viewModel.selectCategory(it ?: "") },
                         providersLimit = providersLimit,
                         onLoadMore = { providersLimit += 10 },
                         onStoreClick = { 
-                            storeViewModel.selectedStore = it
+                            viewModel.selectedStore = it
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onPropertyClick = { selectedPropertyForDetails = it },
@@ -288,7 +280,7 @@ fun ServicesBrowserLayout(
             onOpenDetails = {
                 val storeToOpen = store
                 selectedStoreForDetails = null
-                storeViewModel.selectedStore = storeToOpen
+                viewModel.selectedStore = storeToOpen
                 viewModel.navigateTo("STORE_DETAILS")
             }
         )
@@ -316,7 +308,7 @@ fun ServicesBrowserLayout(
         ServicesBrowserPaymentDialog(
             booking = booking,
             wallets = paymentWallets,
-            
+            viewModel = viewModel,
             themeColors = themeColors,
             context = context,
             onDismiss = { payingBookingObj = null }
@@ -326,7 +318,7 @@ fun ServicesBrowserLayout(
     showCreateStoreModalSection?.let { secId ->
         StoreCreateEditDialog(
             store = null as StoreEntity?,
-            
+            viewModel = viewModel,
             themeColors = themeColors,
             sectionId = secId,
             onDismiss = { showCreateStoreModalSection = null }

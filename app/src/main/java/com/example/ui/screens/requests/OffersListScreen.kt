@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
-
+import com.example.ui.MainViewModel
 import com.google.firebase.firestore.FirebaseFirestore
 
 /**
@@ -37,7 +37,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 @Composable
 fun OffersListScreen(
     requestId: String,
-    viewModel: AuthViewModel,
+    viewModel: MainViewModel,
     onNavigateBack: () -> Unit = {},
     onSelectOffer: (offerId: String) -> Unit = {},
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> }

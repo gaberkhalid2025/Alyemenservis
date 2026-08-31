@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
 
@@ -13,7 +13,7 @@ import com.example.utils.resolveThemePalette
  */
 @Composable
 fun MockMapViewScreen(
-    viewModel: AuthViewModel,
+    viewModel: MainViewModel,
     onBackClick: () -> Unit = {},
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
     onOpenStoreDetails: (StoreEntity) -> Unit = {},

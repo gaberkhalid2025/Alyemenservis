@@ -4,9 +4,6 @@ package com.example.ui.screens.admin
 
 import android.widget.Toast
 import androidx.compose.foundation.*
-import com.example.viewmodels.AdminViewModel
-import com.example.viewmodels.NotificationViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,18 +18,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.example.ui.MainViewModel
 import com.example.util.PermissionGuard
 import com.example.util.RoleManager
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun AdminQuickServicePanel(
-    adminViewModel: AdminViewModel = viewModel(),
-    notificationViewModel: NotificationViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
-    val adminRoleStr by adminViewModel.adminRole.collectAsState()
+    val adminRoleStr by viewModel.adminRole.collectAsState()
     val supervisorPermissions by viewModel.currentSupervisorPermissions.collectAsState()
     if (!PermissionGuard.hasPermission(
             role = RoleManager.fromRoleString(adminRoleStr),
@@ -190,7 +186,7 @@ fun AdminQuickServicePanel(
 
             Button(
                 onClick = {
-                    notificationViewModel.triggerNotification("✅ تم حفظ إعدادات استمارة اطلب خدمتك بنجاح")
+                    viewModel.triggerNotification("✅ تم حفظ إعدادات استمارة اطلب خدمتك بنجاح")
                     Toast.makeText(context, "تم حفظ إعدادات اطلب خدمتك بنجاح!", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),

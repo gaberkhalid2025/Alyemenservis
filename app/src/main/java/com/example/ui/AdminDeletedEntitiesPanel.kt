@@ -4,11 +4,6 @@ import com.example.utils.*
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import com.example.viewmodels.ProviderViewModel
-import com.example.viewmodels.StoreViewModel
-import com.example.viewmodels.JobViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.viewmodels.PropertyViewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -35,7 +30,7 @@ import java.util.Locale
  */
 @Composable
 fun AdminDeletedEntitiesPanel(
-    viewModel: MainViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

@@ -6,10 +6,6 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
-import com.example.viewmodels.InstantRequestViewModel
-import com.example.viewmodels.AdminViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -39,7 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**
@@ -50,18 +46,16 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun QuickServiceRequestScreen(
-    instantRequestViewModel: InstantRequestViewModel = viewModel(),
-    adminViewModel: AdminViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBack: () -> Unit,
     onRequestCreated: () -> Unit
 ) {
     val context = LocalContext.current
-    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
-    val currentUserName by authViewModel.currentUserName.collectAsState()
-    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
-    val settingsState by adminViewModel.settings.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val currentUserName by viewModel.currentUserName.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val settingsState by viewModel.settings.collectAsState()
 
     // Wizard Step State (1, 2, 3)
     var currentStep by remember { mutableIntStateOf(1) }
@@ -336,7 +330,7 @@ fun QuickServiceRequestScreen(
 
                                     isSubmitting = true
 
-                                    instantRequestViewModel.createInstantRequest(
+                                    viewModel.createInstantRequest(
                                         userId = currentUserId.ifBlank { "user_${cleanP}" },
                                         userName = nameInput.ifBlank { "عميل ($cleanP)" },
                                         userPhone = cleanP,
@@ -906,15 +900,13 @@ private fun Step3ContactAndSubmit(
 
 @Composable
 fun QuickServiceRequestDialog(
-    instantRequestViewModel: InstantRequestViewModel = viewModel(),
-    adminViewModel: AdminViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
     onRequestCreated: () -> Unit
 ) {
     QuickServiceRequestScreen(
-        
+        viewModel = viewModel,
         themeColors = themeColors,
         onBack = onDismiss,
         onRequestCreated = onRequestCreated

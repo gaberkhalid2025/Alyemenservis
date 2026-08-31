@@ -42,15 +42,11 @@ data class BookingNote(
  * 📅 BookingViewModel
  * إدارة كاملة لمنطق نظام الحجوزات الذكي، الحماية، الصلاحيات، التحديثات المباشرة، والإلغاء الآمن.
  */
-@dagger.hilt.android.lifecycle.HiltViewModel
-class BookingViewModel @javax.inject.Inject constructor(
-    application: Application,
-    private val repository: com.example.data.repositories.BookingRepository = com.example.data.repositories.BookingRepository()
-) : androidx.lifecycle.AndroidViewModel(application) {
+class BookingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
-    private val notificationManager: BookingNotificationManager by lazy { BookingNotificationManager(application) }
-    private val offlineQueueManager: OfflineQueueManager by lazy { OfflineQueueManager(application) }
+    private val notificationManager: BookingNotificationManager by lazy { BookingNotificationManager(getApplication()) }
+    private val offlineQueueManager: OfflineQueueManager by lazy { OfflineQueueManager(getApplication()) }
 
     private val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
     val bookings: StateFlow<List<BookingEntity>> = _bookings.asStateFlow()
@@ -549,9 +545,5 @@ class BookingViewModel @javax.inject.Inject constructor(
     fun clearMessages() {
         _errorMessage.value = null
         _successMessage.value = null
-    }
-    override fun onCleared() {
-        super.onCleared()
-        repository.clearListeners()
     }
 }

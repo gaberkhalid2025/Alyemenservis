@@ -2,9 +2,6 @@ package com.example.ui.screens.bookings
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.InstantRequestViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -112,8 +109,7 @@ fun InstantRequestCard(
 
 @Composable
 fun CreateInstantRequestDialog(
-    instantRequestViewModel: InstantRequestViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
@@ -160,10 +156,10 @@ fun CreateInstantRequestDialog(
                         return@Button
                     }
                     isSubmitting = true
-                    instantRequestViewModel.createInstantRequest(
-                        userId = authViewModel.currentUserId.value,
-                        userName = authViewModel.currentUserName.value,
-                        userPhone = authViewModel.currentUserPhone.value,
+                    viewModel.createInstantRequest(
+                        userId = viewModel.currentUserId.value,
+                        userName = viewModel.currentUserName.value,
+                        userPhone = viewModel.currentUserPhone.value,
                         userCity = city,
                         userNeighborhood = city,
                         categoryId = "GENERAL",
@@ -197,8 +193,7 @@ fun CreateInstantRequestDialog(
 @Composable
 fun SubmitOfferDialog(
     request: InstantRequestEntity,
-    instantRequestViewModel: InstantRequestViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
@@ -246,12 +241,12 @@ fun SubmitOfferDialog(
                         return@Button
                     }
                     isSubmitting = true
-                    instantRequestViewModel.submitOfferForRequest(
+                    viewModel.submitOfferForRequest(
                         requestId = request.id,
                         requestCode = request.requestCode,
-                        technicianId = authViewModel.currentUserId.value,
-                        technicianName = authViewModel.currentUserName.value,
-                        technicianPhone = authViewModel.currentUserPhone.value,
+                        technicianId = viewModel.currentUserId.value,
+                        technicianName = viewModel.currentUserName.value,
+                        technicianPhone = viewModel.currentUserPhone.value,
                         technicianAvatar = "",
                         technicianRating = 5.0f,
                         price = price.toDoubleOrNull() ?: 0.0,

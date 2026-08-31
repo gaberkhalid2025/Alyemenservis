@@ -1,13 +1,10 @@
 package com.example.ui.dialogs
-import com.example.ui.MainViewModel
 
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import com.example.ui.screens.chat.ChatViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,7 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**
@@ -34,7 +31,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun ForgotPasswordRecoveryDialog(
-    viewModel: MainViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
     onOpenChatWithAdmin: (channelId: String) -> Unit = {}

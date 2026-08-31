@@ -1,11 +1,6 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.SettingsViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.viewmodels.AdminViewModel
-import com.example.viewmodels.PropertyViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,26 +25,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.PropertyEntity
-
+import com.example.ui.MainViewModel
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun PropertiesScreen(
-    adminViewModel: AdminViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel(),
-    settingsViewModel: SettingsViewModel = viewModel(),
-    propertyViewModel: PropertyViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onPropertyClick: (PropertyEntity) -> Unit,
     onChatClick: (PropertyEntity) -> Unit,
     onRequestInspectionClick: (PropertyEntity) -> Unit
 ) {
-    val properties by propertyViewModel.properties.collectAsState()
-    val cities by settingsViewModel.cities.collectAsState()
+    val properties by viewModel.properties.collectAsState()
+    val cities by viewModel.cities.collectAsState()
 
-    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
-    val adminRole by adminViewModel.adminRole.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
     val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
     val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
 
@@ -95,7 +87,7 @@ fun PropertiesScreen(
     if (showCreatePropertyDialog) {
         com.example.PropertyCreateEditDialog(
             property = null,
-            
+            viewModel = viewModel,
             themeColors = themeColors,
             onDismiss = { showCreatePropertyDialog = false }
         )
@@ -103,7 +95,7 @@ fun PropertiesScreen(
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
-            
+            viewModel = viewModel,
             themeColors = themeColors,
             onDismiss = { showGuestDialog = false },
             onRegisterCompleted = { _, _, _, _ -> showGuestDialog = false }

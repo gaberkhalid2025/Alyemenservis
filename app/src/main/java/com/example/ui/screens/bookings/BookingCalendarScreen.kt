@@ -4,9 +4,6 @@ package com.example.ui.screens.bookings
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import com.example.viewmodels.BookingViewModel
-import com.example.viewmodels.AuthViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.BookingEntity
 import com.example.data.ProviderEntity
-
+import com.example.ui.MainViewModel
 import com.example.ui.createBooking
 import com.example.util.BookingReminderService
 import com.example.util.HolidayManager
@@ -56,17 +53,16 @@ import java.util.*
 @Composable
 fun BookingCalendarScreen(
     provider: ProviderEntity,
-    authViewModel: AuthViewModel = viewModel(),
-    bookingViewModel: BookingViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     calendarViewModel: BookingCalendarViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onBack: () -> Unit,
     onBookingSuccess: (BookingEntity) -> Unit
 ) {
     val context = LocalContext.current
-    val bookingsList by bookingViewModel.bookings.collectAsState()
-    val currentUserName by authViewModel.currentUserName.collectAsState()
-    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
+    val bookingsList by viewModel.bookings.collectAsState()
+    val currentUserName by viewModel.currentUserName.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
     val uiState by calendarViewModel.uiState.collectAsState()
     val calendarMonthOffset = uiState.calendarMonthOffset
@@ -494,7 +490,7 @@ fun BookingCalendarScreen(
                             updatedAt = System.currentTimeMillis()
                         )
 
-                        bookingViewModel.createBooking(newBooking) { success ->
+                        viewModel.createBooking(newBooking) { success ->
                             calendarViewModel.setSubmitting(false)
                             if (success) {
                                 // Schedule local 24h & 1h notification reminders

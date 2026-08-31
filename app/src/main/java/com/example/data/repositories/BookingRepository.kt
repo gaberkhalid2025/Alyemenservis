@@ -26,7 +26,7 @@ import java.util.UUID
  * Synchronizes with Firestore while caching locally via LocalAppCacheManager and Moshi.
  * Enforces security validations, 8-hour countdown rule, and SHA-256 PIN hashing.
  */
-class BookingRepository(private val context: Context? = null) {
+class BookingRepository(private val context: Context) {
 
     private val firestore = FirebaseFirestore.getInstance()
     private val cacheManager = LocalAppCacheManager(context)

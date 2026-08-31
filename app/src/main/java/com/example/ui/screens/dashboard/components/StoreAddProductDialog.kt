@@ -1,5 +1,4 @@
 package com.example.ui.screens.dashboard.components
-import com.example.ui.MainViewModel
 
 import android.content.Context
 import android.widget.Toast
@@ -20,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ProductEntity
-
+import com.example.ui.MainViewModel
 import com.example.utils.convertUriToBase64
 import com.example.utils.VisualThemePalette
 import java.util.UUID
@@ -31,7 +30,7 @@ import java.util.UUID
 @Composable
 fun StoreAddProductDialog(
     storeId: String,
-    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     context: Context,
     onDismiss: () -> Unit

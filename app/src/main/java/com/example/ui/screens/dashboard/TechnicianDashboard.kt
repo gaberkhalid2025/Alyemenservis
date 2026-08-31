@@ -2,8 +2,6 @@ package com.example.ui.screens.dashboard
 
 import android.widget.Toast
 import androidx.compose.foundation.*
-import com.example.viewmodels.ProviderViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -23,7 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 import com.example.data.repositories.*
@@ -34,7 +32,7 @@ import com.example.data.repositories.*
 @Composable
 fun TechnicianDashboard(
     account: UnifiedBusinessAccount,
-    providerViewModel: ProviderViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit
 ) {
@@ -72,7 +70,7 @@ fun TechnicianDashboard(
         Pair("📊", "الإحصائيات والنمو")
     )
 
-    val providers by providerViewModel.providers.collectAsState()
+    val providers by viewModel.providers.collectAsState()
     val matchingProvider = providers.find { it.id == account.id || it.phone == account.phone }
     val isVerified = account.isVerified || (matchingProvider?.subscriptionStatus == "APPROVED" || matchingProvider?.isAvailable == true)
 
@@ -193,7 +191,7 @@ fun TechnicianDashboard(
 @Composable
 private fun TechnicianUrgentRequestsSection(
     account: UnifiedBusinessAccount,
-    providerViewModel: ProviderViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

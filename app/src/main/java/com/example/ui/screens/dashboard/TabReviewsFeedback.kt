@@ -1,5 +1,4 @@
 package com.example.ui.screens.dashboard
-import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -9,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.data.UnifiedBusinessAccount
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 /**
@@ -18,7 +17,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun TabReviewsFeedback(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

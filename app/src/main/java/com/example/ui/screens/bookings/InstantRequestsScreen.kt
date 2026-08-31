@@ -1,9 +1,7 @@
 package com.example.ui.screens.bookings
-import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -16,13 +14,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-
+import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InstantRequestsScreen(
-    viewModel: MainViewModel = viewModel(),
+    viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit = {}
 ) {
@@ -33,7 +31,7 @@ fun InstantRequestsScreen(
     val requestOffers by viewModel.requestOffers.collectAsState()
     
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
+    val currentUserId by viewModel.currentUserId.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
 
     val filteredList = remember(instantRequests, uiState.selectedTab, uiState.searchQuery, currentUserPhone, currentUserId) {
