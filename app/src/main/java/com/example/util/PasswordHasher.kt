@@ -49,6 +49,10 @@ object PasswordHasher {
         return "$saltBase64:$hashBase64"
     }
 
+    fun hash(password: String): String {
+        return createSaltedHash(password)
+    }
+
     private fun sha256(input: String): String {
         return try {
             val md = java.security.MessageDigest.getInstance("SHA-256")
@@ -57,6 +61,10 @@ object PasswordHasher {
         } catch (e: Exception) {
             ""
         }
+    }
+
+    fun verify(inputPassword: String, storedSaltedHash: String): Boolean {
+        return verifyPassword(inputPassword, storedSaltedHash)
     }
 
     /**

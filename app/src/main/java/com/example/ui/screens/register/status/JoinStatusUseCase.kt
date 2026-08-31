@@ -66,7 +66,9 @@ class JoinStatusUseCase {
         }
 
         // 3. Check Approved Provider / Technician
-        val matchingApproved = providers.find { it.phone.trim() == joinPhone.trim() }
+        val matchingApproved = providers.find { 
+            it.phone.trim().replace(" ", "").replace("+", "").replace("-", "") == cleanPhone 
+        }
         if (matchingApproved != null) {
             val catName = categories.find { it.id == matchingApproved.categoryId }?.name ?: "صيانة فنية"
             return JoinStatus.ApprovedTechnician(matchingApproved, catName)
@@ -74,7 +76,8 @@ class JoinStatusUseCase {
 
         // 4. Check Rejection Notifications
         val rejectionNotif = notifications.find {
-            it.targetValue == joinPhone && (it.title.contains("رفض") || it.message.contains("رفض"))
+            val cleanTarget = it.targetValue.trim().replace(" ", "").replace("+", "").replace("-", "")
+            cleanTarget == cleanPhone && (it.title.contains("رفض") || it.message.contains("رفض"))
         }
         if (rejectionNotif != null) {
             return JoinStatus.Rejected(rejectionNotif.message)
@@ -88,7 +91,9 @@ class JoinStatusUseCase {
             return JoinStatus.PendingProperty(matchingProperty)
         }
 
-        val matchingPending = pendingProviders.find { it.phone.trim() == joinPhone.trim() }
+        val matchingPending = pendingProviders.find { 
+            it.phone.trim().replace(" ", "").replace("+", "").replace("-", "") == cleanPhone 
+        }
         if (matchingPending != null) {
             return JoinStatus.PendingTechnician(matchingPending)
         }

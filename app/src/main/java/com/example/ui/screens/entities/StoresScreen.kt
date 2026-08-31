@@ -41,23 +41,28 @@ fun StoresScreen(
     val cities by viewModel.cities.collectAsState()
 
     val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
     val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
     var selectedCityId by remember { mutableStateOf("الكل") }
     var selectedMinRating by remember { mutableStateOf(0.0f) }
+    var showCreateStoreDialog by remember { mutableStateOf(false) }
 
     val categories = listOf("الكل", "سوبرماركت", "إلكترونيات", "ملابس وموضة", "مواد بناء", "قطع غيار")
 
     val isLoading = remember(stores) { stores.isEmpty() }
 
-    val filteredStores = remember(stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating) {
+    val filteredStores = remember(stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating, currentUserId, adminRole) {
         stores.filter { store ->
+            val isApprovedOrOwner = store.isApproved || store.ownerId == currentUserId || isAdminUser
             val isPureStore = store.sectionId != "restaurants" &&
                     !store.categoryId.contains("rest", ignoreCase = true) &&
                     !store.categoryId.contains("food", ignoreCase = true) &&
-                    !store.name.contains("مطعم", ignoreCase = true)
+                    !store.name.contains("مطعم", ignoreCase = true) &&
+                    !store.isDeleted
 
             val matchesSearch = searchQuery.isBlank() ||
                     store.name.contains(searchQuery, ignoreCase = true) ||
@@ -72,11 +77,21 @@ fun StoresScreen(
 
             val matchesRating = store.rating >= selectedMinRating
 
-            isPureStore && matchesSearch && matchesCat && matchesCity && matchesRating
+            isApprovedOrOwner && isPureStore && matchesSearch && matchesCat && matchesCity && matchesRating
         }
     }
 
     var showGuestDialog by remember { mutableStateOf(false) }
+
+    if (showCreateStoreDialog) {
+        com.example.StoreCreateEditDialog(
+            store = null,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            sectionId = "stores",
+            onDismiss = { showCreateStoreDialog = false }
+        )
+    }
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
@@ -101,6 +116,16 @@ fun StoresScreen(
         onCitySelected = { selectedCityId = it },
         onMinRatingSelected = { selectedMinRating = it },
         emptyMessage = "لا توجد محلات تجارية مطابقة للبحث",
+        extraHeaderContent = {
+            Button(
+                onClick = { showCreateStoreDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth().height(38.dp)
+            ) {
+                Text("➕ تسجيل وإضافة متجر تجاري جديد", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+            }
+        },
         itemContent = { store ->
             StoreItemCard(
                 store = store,

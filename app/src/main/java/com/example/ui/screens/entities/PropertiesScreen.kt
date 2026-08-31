@@ -40,22 +40,26 @@ fun PropertiesScreen(
     val properties by viewModel.properties.collectAsState()
     val cities by viewModel.cities.collectAsState()
 
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+    val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
     var selectedCityId by remember { mutableStateOf("الكل") }
     var selectedTypeFilter by remember { mutableStateOf("الكل") } // rent, sale
     var selectedMinRating by remember { mutableStateOf(0.0f) }
+    var showCreatePropertyDialog by remember { mutableStateOf(false) }
 
     val categories = listOf("الكل", "شقة", "بيت ومستقل", "محل تجاري", "أرض")
-
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
 
     // Determine loading state from properties list presence
     val isLoading = remember(properties) { properties.isEmpty() }
 
-    val filteredProperties = remember(properties, searchQuery, selectedCategory, selectedCityId, selectedTypeFilter, selectedMinRating) {
+    val filteredProperties = remember(properties, searchQuery, selectedCategory, selectedCityId, selectedTypeFilter, selectedMinRating, currentUserId, adminRole) {
         properties.filter { prop ->
+            val isApprovedOrOwner = prop.isApproved || prop.ownerId == currentUserId || isAdminUser
             val matchesSearch = searchQuery.isBlank() ||
                     prop.title.contains(searchQuery, ignoreCase = true) ||
                     prop.description.contains(searchQuery, ignoreCase = true) ||
@@ -74,11 +78,20 @@ fun PropertiesScreen(
 
             val matchesRating = prop.rating >= selectedMinRating
 
-            matchesSearch && matchesCat && matchesType && matchesCity && matchesRating
+            isApprovedOrOwner && !prop.isDeleted && matchesSearch && matchesCat && matchesType && matchesCity && matchesRating
         }
     }
 
     var showGuestDialog by remember { mutableStateOf(false) }
+
+    if (showCreatePropertyDialog) {
+        com.example.PropertyCreateEditDialog(
+            property = null,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = { showCreatePropertyDialog = false }
+        )
+    }
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
@@ -104,12 +117,22 @@ fun PropertiesScreen(
         onMinRatingSelected = { selectedMinRating = it },
         emptyMessage = "لا توجد عقارات مطابقة للتصفية الحالية",
         extraHeaderContent = {
-            // 🔑 Listing Type Filter (Rent vs Sale)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { showCreatePropertyDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                ) {
+                    Text("➕ تسجيل وإضافة إعلان عقاري جديد", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                }
+
+                // 🔑 Listing Type Filter (Rent vs Sale)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 Text("🏷️ طبيعة العقد:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.LightGray)
                 listOf(
                     "الكل" to "الكل",
@@ -127,7 +150,8 @@ fun PropertiesScreen(
                     )
                 }
             }
-        },
+        }
+    },
         itemContent = { prop ->
             PropertyCard(
                 property = prop,

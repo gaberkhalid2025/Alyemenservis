@@ -40,28 +40,32 @@ fun RestaurantsScreen(
     val stores by viewModel.stores.collectAsState()
     val cities by viewModel.cities.collectAsState()
 
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+    val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("الكل") }
     var selectedCityId by remember { mutableStateOf("الكل") }
     var selectedMinRating by remember { mutableStateOf(0.0f) }
+    var showCreateRestaurantDialog by remember { mutableStateOf(false) }
 
     val categories = listOf("الكل", "وجبات شعبية", "وجبات سريعة", "مشويات", "حلويات وعصائر", "كافيهات")
 
     val isLoading = remember(stores) { stores.isEmpty() }
 
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
-
-    val restaurantStores = remember(stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating) {
+    val restaurantStores = remember(stores, searchQuery, selectedCategory, selectedCityId, selectedMinRating, currentUserId, adminRole) {
         stores.filter { store ->
-            val isRestaurant = store.sectionId == "restaurants" ||
+            val isApprovedOrOwner = store.isApproved || store.ownerId == currentUserId || isAdminUser
+            val isRestaurant = (store.sectionId == "restaurants" ||
                     store.categoryId.contains("rest", ignoreCase = true) ||
                     store.categoryId.contains("food", ignoreCase = true) ||
                     store.categoryId.contains("مطعم", ignoreCase = true) ||
                     store.categoryId.contains("وجب", ignoreCase = true) ||
                     store.name.contains("مطعم", ignoreCase = true) ||
                     store.name.contains("كافيه", ignoreCase = true) ||
-                    store.name.contains("وجبات", ignoreCase = true)
+                    store.name.contains("وجبات", ignoreCase = true)) && !store.isDeleted
 
             val matchesSearch = searchQuery.isBlank() ||
                     store.name.contains(searchQuery, ignoreCase = true) ||
@@ -76,11 +80,21 @@ fun RestaurantsScreen(
 
             val matchesRating = store.rating >= selectedMinRating
 
-            isRestaurant && matchesSearch && matchesCat && matchesCity && matchesRating
+            isApprovedOrOwner && isRestaurant && matchesSearch && matchesCat && matchesCity && matchesRating
         }
     }
 
     var showGuestDialog by remember { mutableStateOf(false) }
+
+    if (showCreateRestaurantDialog) {
+        com.example.StoreCreateEditDialog(
+            store = null,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            sectionId = "restaurants",
+            onDismiss = { showCreateRestaurantDialog = false }
+        )
+    }
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
@@ -105,6 +119,16 @@ fun RestaurantsScreen(
         onCitySelected = { selectedCityId = it },
         onMinRatingSelected = { selectedMinRating = it },
         emptyMessage = "لا توجد مطاعم مطابقة للبحث",
+        extraHeaderContent = {
+            Button(
+                onClick = { showCreateRestaurantDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth().height(38.dp)
+            ) {
+                Text("➕ تسجيل وإضافة مطعم / كافيه جديد", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+            }
+        },
         itemContent = { rest ->
             RestaurantCard(
                 restaurant = rest,

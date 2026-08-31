@@ -86,13 +86,14 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val hashedPassword = com.example.util.PasswordHasher.hash(client.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "CLIENT",
                 status = "PENDING",
                 fullName = client.fullName.trim(),
                 phone = cleanPhone,
-                passwordHash = BookingSecurityHelper.hashPin(client.passwordHash),
+                passwordHash = hashedPassword,
                 city = client.city.trim(),
                 profileImage = client.profileImageUrl,
                 approvalStatus = "PENDING",
@@ -101,7 +102,22 @@ class RegistrationRepositoryImpl(
                 updatedAt = System.currentTimeMillis()
             )
 
+            // Store request in join_requests
             firestore.collection("join_requests").document(id).set(request).await()
+
+            // Store client data in "users" collection
+            val userMap = mapOf(
+                "id" to id,
+                "name" to client.fullName.trim(),
+                "phone" to cleanPhone,
+                "city" to client.city.trim(),
+                "role" to "CLIENT",
+                "password" to hashedPassword,
+                "isBlocked" to false,
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("users").document(cleanPhone).set(userMap).await()
+
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "CLIENT")
             Result.success(id)
         } catch (e: Exception) {
@@ -124,7 +140,7 @@ class RegistrationRepositoryImpl(
                 status = "PENDING",
                 fullName = provider.fullName.trim(),
                 phone = cleanPhone,
-                passwordHash = BookingSecurityHelper.hashPin(provider.passwordHash),
+                passwordHash = com.example.util.PasswordHasher.hash(provider.passwordHash),
                 city = provider.city.trim(),
                 categoryId = provider.professionCategory.trim(),
                 categoryName = provider.professionCategory.trim(),
@@ -162,7 +178,7 @@ class RegistrationRepositoryImpl(
                 ownerName = store.ownerName.trim(),
                 fullName = store.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = BookingSecurityHelper.hashPin(store.passwordHash),
+                passwordHash = com.example.util.PasswordHasher.hash(store.passwordHash),
                 categoryId = store.storeCategory.trim(),
                 categoryName = store.storeCategory.trim(),
                 city = store.city.trim(),
@@ -200,7 +216,7 @@ class RegistrationRepositoryImpl(
                 ownerName = restaurant.ownerName.trim(),
                 fullName = restaurant.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = BookingSecurityHelper.hashPin(restaurant.passwordHash),
+                passwordHash = com.example.util.PasswordHasher.hash(restaurant.passwordHash),
                 categoryId = restaurant.cuisineType.trim(),
                 categoryName = restaurant.cuisineType.trim(),
                 city = restaurant.city.trim(),
@@ -238,7 +254,7 @@ class RegistrationRepositoryImpl(
                 ownerName = medical.doctorName.trim(),
                 fullName = medical.doctorName.trim(),
                 phone = cleanPhone,
-                passwordHash = BookingSecurityHelper.hashPin(medical.passwordHash),
+                passwordHash = com.example.util.PasswordHasher.hash(medical.passwordHash),
                 categoryId = medical.specialtyCategory.trim(),
                 categoryName = medical.specialtyCategory.trim(),
                 city = medical.city.trim(),
@@ -278,7 +294,7 @@ class RegistrationRepositoryImpl(
                 ownerName = property.ownerName.trim(),
                 fullName = property.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = BookingSecurityHelper.hashPin(property.passwordHash),
+                passwordHash = com.example.util.PasswordHasher.hash(property.passwordHash),
                 city = property.city.trim(),
                 area = property.areaDetails.trim(),
                 price = property.priceYer,
@@ -316,7 +332,7 @@ class RegistrationRepositoryImpl(
                 categoryId = job.category.trim(),
                 categoryName = job.category.trim(),
                 phone = cleanPhone,
-                passwordHash = BookingSecurityHelper.hashPin(job.passwordHash),
+                passwordHash = com.example.util.PasswordHasher.hash(job.passwordHash),
                 city = job.city.trim(),
                 approvalStatus = "PENDING",
                 submittedAt = System.currentTimeMillis(),

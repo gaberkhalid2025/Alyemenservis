@@ -227,16 +227,53 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun approveProviderRequest(requestId: String, onComplete: ((Boolean) -> Unit)? = null) {
         viewModelScope.launch {
             try {
-                firestore.collection("provider_requests").document(requestId)
-                    .update("status", "APPROVED")
-                    .addOnSuccessListener {
-                        _pendingRequests.value = _pendingRequests.value.filterNot { it.id == requestId }
-                        recordAuditLog("APPROVE_PROVIDER", "الموافقة على الطلب $requestId")
-                        onComplete?.invoke(true)
+                firestore.collection("join_requests").document(requestId).get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            val type = doc.getString("type") ?: "PROVIDER"
+                            val name = doc.getString("fullName") ?: doc.getString("name") ?: ""
+                            val phone = doc.getString("phone") ?: ""
+
+                            val targetCollection = when (type.uppercase()) {
+                                "STORE" -> "stores"
+                                "RESTAURANT" -> "restaurants"
+                                "MEDICAL" -> "medical"
+                                "PROPERTY" -> "properties"
+                                "JOB" -> "jobs"
+                                "CLIENT" -> "users"
+                                else -> "providers"
+                            }
+
+                            val data = doc.data?.toMutableMap() ?: mutableMapOf()
+                            data["status"] = "APPROVED"
+                            data["approvalStatus"] = "APPROVED"
+
+                            firestore.collection(targetCollection).document(requestId).set(data)
+                                .addOnSuccessListener {
+                                    firestore.collection("join_requests").document(requestId)
+                                        .update(mapOf("status" to "APPROVED", "approvalStatus" to "APPROVED"))
+                                        .addOnSuccessListener {
+                                            val userNotif = mapOf(
+                                                "id" to UUID.randomUUID().toString(),
+                                                "title" to "🎉 تم قبول طلب انضمامك",
+                                                "message" to "تهانينا $name! تم الموافقة على طلب انضمامك وتنشيط حسابك كـ $type بنجاح.",
+                                                "targetType" to "USER",
+                                                "targetValue" to phone,
+                                                "timestamp" to System.currentTimeMillis()
+                                            )
+                                            firestore.collection("notifications").document(userNotif["id"] as String).set(userNotif)
+
+                                            _pendingRequests.value = _pendingRequests.value.filterNot { it.id == requestId }
+                                            recordAuditLog("APPROVE_REQUEST", "الموافقة على طلب $requestId وتنشيطه كـ $type")
+                                            onComplete?.invoke(true)
+                                        }
+                                }
+                                .addOnFailureListener { onComplete?.invoke(false) }
+                        } else {
+                            onComplete?.invoke(false)
+                        }
                     }
-                    .addOnFailureListener {
-                        onComplete?.invoke(false)
-                    }
+                    .addOnFailureListener { onComplete?.invoke(false) }
             } catch (e: Exception) {
                 onComplete?.invoke(false)
             }
@@ -249,19 +286,39 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun rejectProviderRequest(requestId: String, reason: String, onComplete: ((Boolean) -> Unit)? = null) {
         viewModelScope.launch {
             try {
-                val updates = mapOf(
-                    "status" to "REJECTED",
-                    "rejectionReason" to reason
-                )
-                firestore.collection("provider_requests").document(requestId)
-                    .update(updates)
-                    .addOnSuccessListener {
-                        _pendingRequests.value = _pendingRequests.value.filterNot { it.id == requestId }
-                        recordAuditLog("REJECT_PROVIDER", "رفض الطلب $requestId. السبب: $reason")
-                        onComplete?.invoke(true)
-                    }
-                    .addOnFailureListener {
-                        onComplete?.invoke(false)
+                firestore.collection("join_requests").document(requestId).get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            val name = doc.getString("fullName") ?: doc.getString("name") ?: ""
+                            val phone = doc.getString("phone") ?: ""
+                            val type = doc.getString("type") ?: "PROVIDER"
+
+                            val updates = mapOf(
+                                "status" to "REJECTED",
+                                "approvalStatus" to "REJECTED",
+                                "rejectionReason" to reason
+                            )
+                            firestore.collection("join_requests").document(requestId)
+                                .update(updates)
+                                .addOnSuccessListener {
+                                    val userNotif = mapOf(
+                                        "id" to UUID.randomUUID().toString(),
+                                        "title" to "⚠️ تم رفض طلب انضمامك",
+                                        "message" to "عذراً $name، تم رفض طلب انضمامك كـ $type. السبب: $reason",
+                                        "targetType" to "USER",
+                                        "targetValue" to phone,
+                                        "timestamp" to System.currentTimeMillis()
+                                    )
+                                    firestore.collection("notifications").document(userNotif["id"] as String).set(userNotif)
+
+                                    _pendingRequests.value = _pendingRequests.value.filterNot { it.id == requestId }
+                                    recordAuditLog("REJECT_REQUEST", "رفض طلب $requestId كـ $type. السبب: $reason")
+                                    onComplete?.invoke(true)
+                                }
+                                .addOnFailureListener { onComplete?.invoke(false) }
+                        } else {
+                            onComplete?.invoke(false)
+                        }
                     }
             } catch (e: Exception) {
                 onComplete?.invoke(false)
@@ -339,12 +396,35 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun loadPendingRequests() {
         viewModelScope.launch {
             try {
-                firestore.collection("provider_requests")
+                firestore.collection("join_requests")
                     .whereEqualTo("status", "PENDING")
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        val list = snapshot.documents.mapNotNull { it.toObject(PendingRequest::class.java) }
-                        _pendingRequests.value = list
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            Log.w(TAG, "Listen failed.", error)
+                            return@addSnapshotListener
+                        }
+                        if (snapshot != null) {
+                            val list = snapshot.documents.mapNotNull { doc ->
+                                val id = doc.id
+                                val name = doc.getString("fullName") ?: doc.getString("name") ?: ""
+                                val phone = doc.getString("phone") ?: ""
+                                val type = doc.getString("type") ?: ""
+                                val city = doc.getString("city") ?: ""
+                                val status = doc.getString("status") ?: "PENDING"
+                                val timestamp = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                                PendingRequest(
+                                    id = id,
+                                    name = name,
+                                    phone = phone,
+                                    section = type,
+                                    city = city,
+                                    details = "طلب انضمام كـ $type",
+                                    status = status,
+                                    createdAt = timestamp
+                                )
+                            }
+                            _pendingRequests.value = list
+                        }
                     }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed loading pending requests: ${e.message}")

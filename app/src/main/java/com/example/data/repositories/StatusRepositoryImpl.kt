@@ -294,6 +294,10 @@ class StatusRepositoryImpl(
             )
             batch.set(notifRef, notif)
 
+            // Delete from pending_providers so that it is removed from waiting list
+            val pendingRef = firestore.collection("pending_providers").document(request.id)
+            batch.delete(pendingRef)
+
             batch.commit().await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -319,6 +323,13 @@ class StatusRepositoryImpl(
                 "rejectedAt" to now,
                 "rejectedBy" to "ADMIN",
                 "updatedAt" to now
+            ))
+
+            // Update status in pending_providers as well
+            val pendingRef = firestore.collection("pending_providers").document(request.id)
+            batch.update(pendingRef, mapOf(
+                "status" to "REJECTED",
+                "reason" to finalReason
             ))
 
             // Create notification for user

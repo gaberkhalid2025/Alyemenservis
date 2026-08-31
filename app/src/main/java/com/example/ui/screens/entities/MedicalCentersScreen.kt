@@ -50,11 +50,15 @@ fun MedicalCentersScreen(
     val categories = listOf("الكل", "مستشفيات", "عيادات تخصصية", "صيدليات", "مختبرات تحاليل", "مراكز أشعة")
 
     val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
     val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
 
-    val medicalProviders = remember(providers, searchQuery, selectedCategory, selectedCityId, selectedMinRating) {
+    var showCreateMedicalDialog by remember { mutableStateOf(false) }
+
+    val medicalProviders = remember(providers, searchQuery, selectedCategory, selectedCityId, selectedMinRating, currentUserId, adminRole) {
         providers.filter { provider ->
-            // Section categorization
+            val isApprovedOrOwner = provider.subscriptionStatus == "APPROVED" || provider.isVerified || provider.phone == currentUserId || isAdminUser
             val isMedical = provider.categoryId == "medical" ||
                     provider.categoryId == "health" ||
                     provider.categoryId.contains("med", ignoreCase = true) ||
@@ -89,11 +93,21 @@ fun MedicalCentersScreen(
 
             val matchesRating = provider.rating >= selectedMinRating
 
-            isMedical && matchesSearch && matchesCat && matchesCity && matchesRating
+            isApprovedOrOwner && isMedical && matchesSearch && matchesCat && matchesCity && matchesRating
         }
     }
 
     var showGuestDialog by remember { mutableStateOf(false) }
+
+    if (showCreateMedicalDialog) {
+        com.example.StoreCreateEditDialog(
+            store = null,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            sectionId = "medical",
+            onDismiss = { showCreateMedicalDialog = false }
+        )
+    }
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
@@ -118,6 +132,16 @@ fun MedicalCentersScreen(
         onCitySelected = { selectedCityId = it },
         onMinRatingSelected = { selectedMinRating = it },
         emptyMessage = "لا توجد مراكز طبية مطابقة للتصفية الحالية",
+        extraHeaderContent = {
+            Button(
+                onClick = { showCreateMedicalDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth().height(38.dp)
+            ) {
+                Text("➕ تسجيل وإضافة مركز طبي / صيدلية", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+            }
+        },
         itemContent = { provider ->
             MedicalCenterCard(
                 provider = provider,

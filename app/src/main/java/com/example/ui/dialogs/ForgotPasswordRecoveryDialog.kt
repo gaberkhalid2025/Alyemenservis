@@ -41,6 +41,27 @@ fun ForgotPasswordRecoveryDialog(
     var selectedChannel by remember { mutableStateOf("IN_APP_CHAT") } // IN_APP_CHAT, WHATSAPP, TELEGRAM
     var noteInput by remember { mutableStateOf("") }
     var isSubmitted by remember { mutableStateOf(false) }
+    var resetStatus by remember { mutableStateOf("PENDING") } // PENDING, APPROVED, REJECTED
+    var tempPassword by remember { mutableStateOf("") }
+
+    if (isSubmitted) {
+        LaunchedEffect(phoneInput) {
+            val cleanPhone = phoneInput.trim().replace(" ", "")
+            while (true) {
+                viewModel.db.collection("password_resets").document(cleanPhone).get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            val status = doc.getString("status") ?: "PENDING"
+                            resetStatus = status
+                            if (status == "APPROVED") {
+                                tempPassword = doc.getString("tempPassword") ?: doc.getString("newPassword") ?: ""
+                            }
+                        }
+                    }
+                kotlinx.coroutines.delay(3000)
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -139,6 +160,17 @@ fun ForgotPasswordRecoveryDialog(
                         onClick = {
                             if (phoneInput.trim().length >= 7) {
                                 val cleanPhone = phoneInput.trim()
+
+                                // Register reset request in Firestore
+                                val resetRequest = mapOf(
+                                    "phone" to cleanPhone,
+                                    "channel" to selectedChannel,
+                                    "note" to noteInput,
+                                    "status" to "PENDING",
+                                    "createdAt" to System.currentTimeMillis()
+                                )
+                                viewModel.db.collection("password_resets").document(cleanPhone).set(resetRequest)
+
                                 when (selectedChannel) {
                                     "WHATSAPP" -> {
                                         val adminPhone = "967777000000"
@@ -171,22 +203,95 @@ fun ForgotPasswordRecoveryDialog(
                         Text("إرسال طلب الاستعادة الفوري 🚀", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
                 } else {
-                    // Success View
+                    // Dynamic Polling Success / Awaiting Screen
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(48.dp))
-                        Text("تم إرسال طلب استعادة كلمة المرور بنجاح!", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White, textAlign = TextAlign.Center)
-                        Text("سيقوم المشرف بالتحقق من ملكية الحساب وتزويدك ببيانات الدخول الجديدة مباشرة.", fontSize = 11.sp, color = Color.LightGray, textAlign = TextAlign.Center)
+                        when (resetStatus) {
+                            "PENDING" -> {
+                                CircularProgressIndicator(color = themeColors.accent, modifier = Modifier.size(36.dp))
+                                Text(
+                                    text = "⏳ قيد المراجعة والانتظار...",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = themeColors.accent
+                                )
+                                Text(
+                                    text = "لقد تم إرسال طلبك. نرجو عدم إغلاق هذه الصفحة، حيث يتم التحقق من طلبك الآن تلقائياً وتحديث الصفحة فور تعيين كلمة المرور الجديدة من قِبل المشرف.",
+                                    fontSize = 11.sp,
+                                    color = Color.LightGray,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            "APPROVED" -> {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(48.dp))
+                                Text(
+                                    text = "🎉 تم قبول طلبك بنجاح!",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF10B981)
+                                )
+                                Text(
+                                    text = "كلمة المرور المؤقتة الخاصة بك هي:",
+                                    fontSize = 11.sp,
+                                    color = Color.LightGray
+                                )
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981)),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = tempPassword,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = Color.White
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                val clip = android.content.ClipData.newPlainText("password", tempPassword)
+                                                clipboard.setPrimaryClip(clip)
+                                                Toast.makeText(context, "📋 تم نسخ كلمة المرور الجديدة", Toast.LENGTH_SHORT).show()
+                                            }
+                                        ) {
+                                            Icon(Icons.Default.Share, contentDescription = "نسخ", tint = Color.LightGray)
+                                        }
+                                    }
+                                }
+                            }
+                            "REJECTED" -> {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(48.dp))
+                                Text(
+                                    text = "❌ تم رفض طلب استعادة الحساب",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFEF4444)
+                                )
+                                Text(
+                                    text = "عذراً، تعذر التحقق من ملكية الحساب. يرجى التواصل مع الدعم الفني مباشرة لحل المشكلة.",
+                                    fontSize = 11.sp,
+                                    color = Color.LightGray,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(6.dp))
                         Button(
                             onClick = onDismiss,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("تم ومتابعة", color = Color.White, fontSize = 11.sp)
+                            Text("إغلاق", color = Color.White, fontSize = 11.sp)
                         }
                     }
                 }

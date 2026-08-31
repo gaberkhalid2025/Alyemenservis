@@ -216,6 +216,7 @@ fun <T : Any> GenericSectionView(
                 columns = GridCells.Fixed(2),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 90.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 items(paginatedItems) { item ->

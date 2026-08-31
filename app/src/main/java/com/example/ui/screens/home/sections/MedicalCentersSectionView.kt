@@ -32,7 +32,15 @@ fun MedicalCentersSectionView(
     onCreateMedicalClick: () -> Unit
 ) {
     val allStores by viewModel.stores.collectAsState()
-    val medicalList = remember(allStores) { allStores.filter { it.isMedicalCenter() } }
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+
+    val medicalList = remember(allStores, currentUserId, adminRole) {
+        allStores.filter { 
+            it.isMedicalCenter() && !it.isDeleted && (it.isApproved || it.ownerId == currentUserId || isAdminUser)
+        }
+    }
     var selectedSubCategory by remember { mutableStateOf("الكل") }
 
     val subCategories = listOf(

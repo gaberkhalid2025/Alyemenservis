@@ -37,7 +37,12 @@ fun AdminRegFormsManagerPanel(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val pendingRequests = adminViewModel.getPendingRequests()
+    val pendingRequestsState by adminViewModel.pendingRequests.collectAsState()
+    val pendingRequests = pendingRequestsState
+
+    LaunchedEffect(Unit) {
+        adminViewModel.loadPendingRequests()
+    }
 
     var selectedFilter by remember { mutableStateOf("الكل") }
     val filters = listOf("الكل", "معلق ⏳", "مرفوض ❌", "مقبول ✓")

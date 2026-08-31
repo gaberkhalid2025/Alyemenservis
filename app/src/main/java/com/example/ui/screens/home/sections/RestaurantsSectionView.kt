@@ -32,7 +32,15 @@ fun RestaurantsSectionView(
     onCreateRestaurantClick: () -> Unit
 ) {
     val allStores by viewModel.stores.collectAsState()
-    val restaurantsList = remember(allStores) { allStores.filter { it.isRestaurantOrCafe() } }
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+
+    val restaurantsList = remember(allStores, currentUserId, adminRole) {
+        allStores.filter { 
+            it.isRestaurantOrCafe() && !it.isDeleted && (it.isApproved || it.ownerId == currentUserId || isAdminUser)
+        }
+    }
     var selectedSubCategory by remember { mutableStateOf("الكل") }
 
     val subCategories = listOf(

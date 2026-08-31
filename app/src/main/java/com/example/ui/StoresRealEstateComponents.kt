@@ -467,8 +467,10 @@ fun StoresTabContent(
                     store.productAttachmentsJson.lowercase().replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").contains(queryNorm) ||
                     store.specialOffersJson.lowercase().replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").contains(queryNorm)
 
+            val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+
             matchesSection &&
-            (store.isActive || adminRole != "GUEST" || store.ownerId == currentPhone) &&
+            (store.isApproved || store.ownerId == currentPhone || isAdminUser) &&
             matchesSearch &&
             (selectedCityId.isEmpty() || store.cityId == selectedCityId) &&
             (selectedCatId.isEmpty() || store.categoryId == selectedCatId)
@@ -484,11 +486,11 @@ fun StoresTabContent(
         myStore?.let { store ->
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = if (store.isActive) Color(0xFF0F291E) else Color(0xFF2C2414)
+                    containerColor = if (store.isApproved) Color(0xFF0F291E) else Color(0xFF2C2414)
                 ),
                 border = BorderStroke(
                     width = 1.dp,
-                    color = if (store.isActive) Color(0xFF22C55E).copy(alpha = 0.5f) else Color(0xFFEAB308).copy(alpha = 0.5f)
+                    color = if (store.isApproved) Color(0xFF22C55E).copy(alpha = 0.5f) else Color(0xFFEAB308).copy(alpha = 0.5f)
                 ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -500,40 +502,40 @@ fun StoresTabContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (store.isActive) {
-                                if (isEn) "✅ Your business profile was successfully activated!" else "✅ تم تفعيل ملفك التعريفي بنجاح!"
+                            text = if (store.isApproved) {
+                                if (isEn) "✅ Your business profile was successfully activated!" else "✅ تم توثيق ونشر منشأتك التجاريّة بنجاح!"
                             } else {
-                                if (isEn) "⏳ Your shop registration request is under review" else "⏳ طلب انضمام محلك قيد المراجعة"
+                                if (isEn) "⏳ Your shop registration request is under review" else "⏳ طلب تسجيل منشأتك قيد المراجعة والموافقة الإداريّة"
                             },
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (store.isActive) Color(0xFF4ADE80) else Color(0xFFFACC15)
+                            color = if (store.isApproved) Color(0xFF4ADE80) else Color(0xFFFACC15)
                         )
                         Box(
                             modifier = Modifier
                                 .background(
-                                    if (store.isActive) Color(0xFF22C55E).copy(alpha = 0.2f) else Color(0xFFEAB308).copy(alpha = 0.2f),
+                                    if (store.isApproved) Color(0xFF22C55E).copy(alpha = 0.2f) else Color(0xFFEAB308).copy(alpha = 0.2f),
                                     RoundedCornerShape(4.dp)
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = if (store.isActive) {
-                                    if (isEn) "Active" else "نشط ومفعل"
+                                text = if (store.isApproved) {
+                                    if (isEn) "Active" else "نشط وموثق"
                                 } else {
-                                    if (isEn) "Pending" else "قيد التدقيق الإداري"
+                                    if (isEn) "Pending" else "بانتظار موافقة الأدمن ⏳"
                                 },
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (store.isActive) Color(0xFF4ADE80) else Color(0xFFFACC15)
+                                color = if (store.isApproved) Color(0xFF4ADE80) else Color(0xFFFACC15)
                             )
                         }
                     }
                     Text(
-                        text = if (store.isActive) {
-                            if (isEn) "Welcome! Your shop (${store.name}) has been accepted and published. You can now receive orders and customer reviews." else "أهلاً بك يا غالي! تم قبول محلك (${store.name}) ونشره رسمياً للجمهور. يمكنك الآن استقبال طلبات الشراء والتقييمات من الزبائن."
+                        text = if (store.isApproved) {
+                            if (isEn) "Welcome! Your shop (${store.name}) has been accepted and published. You can now receive orders and customer reviews." else "أهلاً بك! تم قبول توثيق منشأتك (${store.name}) ونشرها رسمياً بالدليل. يمكنك الآن استقبال طلبات الشراء والتقييمات من العملاء."
                         } else {
-                            if (isEn) "Your shop registration request (${store.name}) was successfully submitted. It is currently under administrative verification." else "تم تقديم طلب تسجيل محلك (${store.name}) بنجاح. ملفك ومستنداتك قيد التدقيق والفحص الإداري الآن من قبل الإدارة وسنرسل لك إشعاراً فور تفعيله."
+                            if (isEn) "Your shop registration request (${store.name}) was successfully submitted. It is currently under administrative verification." else "تم تقديم طلب تسجيل منشأتك (${store.name}) بنجاح! ملفك ومستنداتك قيد التدقيق والفحص الآن وسنرسل لك إشعاراً فور اعتماد التوثيق والنشر."
                         },
                         fontSize = 10.sp,
                         color = Color.White.copy(alpha = 0.9f)
@@ -541,13 +543,13 @@ fun StoresTabContent(
                     Button(
                         onClick = { onStoreClick(store) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (store.isActive) Color(0xFF22C55E) else Color(0xFFEAB308)
+                            containerColor = if (store.isApproved) Color(0xFF22C55E) else Color(0xFFEAB308)
                         ),
                         modifier = Modifier.fillMaxWidth().height(32.dp),
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Text(
-                            text = if (store.isActive) {
+                            text = if (store.isApproved) {
                                 if (isEn) "📂 View & Manage Completed Profile" else "📂 عرض وإدارة ملفك الشخصي المكتمل"
                             } else {
                                 if (isEn) "👁️ Preview Submitted Details" else "👁️ عرض ومعاينة تفاصيل ملفك المقدم"
@@ -1737,7 +1739,9 @@ fun StoreDetailsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .navigationBarsPadding()
                     .verticalScroll(rememberScrollState())
+                    .padding(bottom = 24.dp)
             ) {
                 // 1. Cover Image Banner
                 val hasCover = store.coverImage.isNotEmpty()

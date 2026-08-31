@@ -23,6 +23,7 @@ import com.example.ui.components.BannerSliderView
 import com.example.utils.VisualThemePalette
 
 import com.example.data.repositories.*
+import com.example.StoreCreateEditDialog
 import com.example.ui.screens.dashboard.ServicesBrowserViewModel
 import com.example.ui.screens.home.sections.*
 
@@ -72,6 +73,7 @@ fun ServicesBrowserLayout(
     var payingBookingObj by remember { mutableStateOf<BookingEntity?>(null) }
     var providersLimit by remember { mutableStateOf(10) }
     var activeTabName by remember { mutableStateOf("الرئيسية") }
+    var showCreateStoreModalSection by remember { mutableStateOf<String?>(null) }
 
     val activeTabs = remember(settingsState) {
         val list = mutableListOf("الرئيسية")
@@ -177,8 +179,7 @@ fun ServicesBrowserLayout(
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateStoreClick = {
-                            onPreselectedRegistrationTypeChange("store")
-                            viewModel.navigateTo("REGISTER")
+                            showCreateStoreModalSection = "stores"
                         }
                     )
                 }
@@ -191,8 +192,7 @@ fun ServicesBrowserLayout(
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateRestaurantClick = {
-                            onPreselectedRegistrationTypeChange("store")
-                            viewModel.navigateTo("REGISTER")
+                            showCreateStoreModalSection = "restaurants"
                         }
                     )
                 }
@@ -205,8 +205,7 @@ fun ServicesBrowserLayout(
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateMedicalClick = {
-                            onPreselectedRegistrationTypeChange("store")
-                            viewModel.navigateTo("REGISTER")
+                            showCreateStoreModalSection = "medical"
                         }
                     )
                 }
@@ -216,8 +215,7 @@ fun ServicesBrowserLayout(
                         themeColors = themeColors,
                         onPropertyClick = { selectedPropertyForDetails = it },
                         onCreatePropertyClick = {
-                            onPreselectedRegistrationTypeChange("property")
-                            viewModel.navigateTo("REGISTER")
+                            showCreateStoreModalSection = "realestate"
                         }
                     )
                 }
@@ -314,6 +312,16 @@ fun ServicesBrowserLayout(
             themeColors = themeColors,
             context = context,
             onDismiss = { payingBookingObj = null }
+        )
+    }
+
+    showCreateStoreModalSection?.let { secId ->
+        StoreCreateEditDialog(
+            store = null as StoreEntity?,
+            viewModel = viewModel,
+            themeColors = themeColors,
+            sectionId = secId,
+            onDismiss = { showCreateStoreModalSection = null }
         )
     }
 }

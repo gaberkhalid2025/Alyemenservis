@@ -338,7 +338,8 @@ fun AppNavigator(
                                     sectionId = activeSectionIdForCreation,
                                     onRegTypeChange = { preselectedRegistrationType = it }
                                 )
-                                "JOIN_REQUEST_STATUS", "STATUS_VIEW" -> com.example.ui.screens.status.StatusScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                                "JOIN_REQUEST_STATUS" -> com.example.ui.screens.register.JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
+                                "STATUS_VIEW" -> com.example.ui.screens.status.StatusScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
                                 "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
                                 "OFFER_SELECTION" -> com.example.ui.screens.requests.OfferSelectionScreen(
                                     offerId = viewModel.selectedOfferId,
@@ -1591,7 +1592,8 @@ fun BoxScope.FloatingIconsOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = 12.dp)
+                .navigationBarsPadding()
+                .padding(start = 12.dp, bottom = 80.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(
                     Brush.horizontalGradient(
@@ -1628,7 +1630,8 @@ fun BoxScope.FloatingIconsOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 12.dp)
+                .navigationBarsPadding()
+                .padding(end = 12.dp, bottom = 80.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(themeColors.accent)
                 .clickable { onAssistantClick() }

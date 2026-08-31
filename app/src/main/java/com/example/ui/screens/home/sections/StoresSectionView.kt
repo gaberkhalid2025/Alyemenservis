@@ -32,7 +32,15 @@ fun StoresSectionView(
     onCreateStoreClick: () -> Unit
 ) {
     val allStores by viewModel.stores.collectAsState()
-    val commercialStores = remember(allStores) { allStores.filter { it.isCommercialStore() } }
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+
+    val commercialStores = remember(allStores, currentUserId, adminRole) {
+        allStores.filter { 
+            it.isCommercialStore() && !it.isDeleted && (it.isApproved || it.ownerId == currentUserId || isAdminUser)
+        }
+    }
     var selectedSubCategory by remember { mutableStateOf("الكل") }
 
     val subCategories = listOf(

@@ -163,6 +163,42 @@ class BookingRepository(private val context: Context) {
             firestore.collection("bookings").document(docId)
                 .set(finalBooking)
                 .addOnSuccessListener {
+                    // Write Notification payloads to "notifications" collection
+                    val userNotifId = UUID.randomUUID().toString()
+                    val userNotif = mapOf(
+                        "id" to userNotifId,
+                        "title" to "📅 تم إنشاء حجزك بنجاح",
+                        "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} وهو قيد المراجعة.",
+                        "targetType" to "USER",
+                        "targetValue" to finalBooking.customerPhone,
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                    firestore.collection("notifications").document(userNotifId).set(userNotif)
+
+                    if (finalBooking.providerPhone.isNotBlank()) {
+                        val providerNotifId = UUID.randomUUID().toString()
+                        val providerNotif = mapOf(
+                            "id" to providerNotifId,
+                            "title" to "🔔 طلب حجز جديد",
+                            "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName}.",
+                            "targetType" to "PROVIDER",
+                            "targetValue" to finalBooking.providerPhone,
+                            "timestamp" to System.currentTimeMillis()
+                        )
+                        firestore.collection("notifications").document(providerNotifId).set(providerNotif)
+                    }
+
+                    val adminNotifId = UUID.randomUUID().toString()
+                    val adminNotif = mapOf(
+                        "id" to adminNotifId,
+                        "title" to "🚨 حجز جديد في الدليل",
+                        "message" to "تم إنشاء حجز جديد #${finalBooking.bookingNumber} للخدمة ${finalBooking.serviceName}.",
+                        "targetType" to "SUPERVISOR",
+                        "targetValue" to "ALL",
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                    firestore.collection("notifications").document(adminNotifId).set(adminNotif)
+
                     onSuccess(finalBooking)
                 }
                 .addOnFailureListener { ex ->

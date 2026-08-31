@@ -31,6 +31,15 @@ fun PropertiesSectionView(
     onCreatePropertyClick: () -> Unit
 ) {
     val properties by viewModel.properties.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
+    val adminRole by viewModel.adminRole.collectAsState()
+    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+
+    val activeProperties = remember(properties, currentUserId, adminRole) {
+        properties.filter { 
+            !it.isDeleted && (it.isApproved || it.ownerId == currentUserId || isAdminUser)
+        }
+    }
     var selectedSubCategory by remember { mutableStateOf("الكل") }
 
     val subCategories = listOf(
@@ -42,11 +51,11 @@ fun PropertiesSectionView(
         "🏘️ عماير وأبراج"
     )
 
-    val filteredList = remember(properties, selectedSubCategory) {
-        if (selectedSubCategory == "الكل") properties
+    val filteredList = remember(activeProperties, selectedSubCategory) {
+        if (selectedSubCategory == "الكل") activeProperties
         else {
             val key = selectedSubCategory.substringAfter(" ").trim()
-            properties.filter { 
+            activeProperties.filter { 
                 it.title.contains(key) || it.propertyType.contains(key) || it.type.contains(key)
             }
         }

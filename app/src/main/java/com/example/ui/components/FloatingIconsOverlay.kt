@@ -44,7 +44,8 @@ fun BoxScope.FloatingIconsOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = 12.dp)
+                .navigationBarsPadding()
+                .padding(start = 12.dp, bottom = 80.dp)
                 .shadow(6.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(
@@ -85,8 +86,9 @@ fun BoxScope.FloatingIconsOverlay(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                .padding(end = 12.dp, bottom = 12.dp)
+                .padding(end = 12.dp, bottom = 80.dp)
                 .shadow(6.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(

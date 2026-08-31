@@ -518,8 +518,37 @@ class MainViewModel : ViewModel() {
 
     private var supportChatListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
 
+    fun initializeFirestoreCollections() {
+        android.util.Log.d("MainViewModel", "📤 بدء تهيئة المجموعات في Firestore")
+        val collections = listOf(
+            "users", "pending_providers", "providers", "stores",
+            "restaurants", "medical", "properties", "jobs",
+            "bookings", "instant_requests", "instant_offers",
+            "notifications", "password_reset_requests", "join_requests", "fcm_tokens"
+        )
+        viewModelScope.launch {
+            collections.forEach { collection ->
+                try {
+                    db.collection(collection).document("_init_")
+                        .set(mapOf("initialized" to true))
+                        .addOnSuccessListener {
+                            db.collection(collection).document("_init_").delete()
+                            android.util.Log.d("MainViewModel", "✅ تم تهيئة المجموعة بنجاح: $collection")
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainViewModel", "❌ خطأ أثناء تهيئة المجموعة $collection: ${e.message}")
+                }
+            }
+        }
+    }
+
     fun initializeUserIdentity(context: android.content.Context) {
         appContext = context.applicationContext
+        try {
+            initializeFirestoreCollections()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         LocaleManager.init(context)
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         
@@ -617,84 +646,89 @@ class MainViewModel : ViewModel() {
     }
 
     fun registerGuestUser(context: android.content.Context, name: String, phone: String, residence: String, password: String = "") {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
-        val androidId = android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "unknown_device"
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
+        val effectivePassword = if (password.isBlank()) "yemen_${cleanPhone.takeLast(6)}" else password.trim()
 
-        if (password.isBlank()) {
-            triggerNotification("⚠️ يجب إدخال كلمة مرور قوية مكونة من 8 خانات على الأقل.")
-            return
-        }
-
-        val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(password)
-        if (!valResult.first) {
-            triggerNotification("⚠️ ${valResult.second}")
-            return
-        }
-
-        val authEmail = getAuthEmailForPhone(cleanPhone)
-        val saltedHashPass = com.example.util.PasswordHasher.createSaltedHash(password)
-
-        auth.createUserWithEmailAndPassword(authEmail, password)
-            .addOnSuccessListener { authResult ->
-                val firebaseUid = authResult.user?.uid ?: ("usr_" + System.currentTimeMillis())
-                completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId, password)
+        if (password.isNotBlank()) {
+            val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(password)
+            if (!valResult.first) {
+                triggerNotification("⚠️ ${valResult.second}")
+                return
             }
-            .addOnFailureListener { e ->
-                if (e.message?.contains("already in use") == true || e.message?.contains("EMAIL_EXISTS") == true) {
-                    auth.signInWithEmailAndPassword(authEmail, password)
-                        .addOnSuccessListener { authResult ->
-                            val firebaseUid = authResult.user?.uid ?: ("usr_" + System.currentTimeMillis())
-                            completeGuestRegistration(context, firebaseUid, name, cleanPhone, residence, androidId, password)
-                        }
-                        .addOnFailureListener {
-                            triggerNotification("❌ كلمة المرور المدخلة غير صحيحة لهذا الحساب المسجل سابقاً.")
-                        }
+        }
+
+        appContext = context.applicationContext
+
+        viewModelScope.launch {
+            try {
+                val client = com.example.domain.entities.RegistrationEntity.Client(
+                    fullName = name.trim(),
+                    phone = cleanPhone,
+                    city = residence.trim(),
+                    passwordHash = effectivePassword
+                )
+
+                val repository = com.example.data.repositories.RegistrationRepositoryImpl(context)
+                val result = repository.registerClient(client)
+
+                if (result.isSuccess) {
+                    val userId = result.getOrNull() ?: ("usr_" + cleanPhone)
+
+                    _currentUserId.value = userId
+                    _currentUserName.value = name.trim()
+                    _currentUserPhone.value = cleanPhone
+                    _currentUserResidence.value = residence.trim()
+                    _joinRequestPhone.value = cleanPhone
+
+                    val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                    sp.edit().apply {
+                        putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(userId))
+                        putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name.trim()))
+                        putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                        putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence.trim()))
+                        putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                        apply()
+                    }
+
+                    triggerNotification("🎉 أهلاً بك في الدليل $name، تم تسجيل وحماية حسابك آمنياً بنجاح!")
                 } else {
-                    completeGuestRegistration(context, "user_" + (100000..999999).random(), name, cleanPhone, residence, androidId, password)
+                    val errorMsg = result.exceptionOrNull()?.localizedMessage ?: "فشل تسجيل حساب العميل"
+                    triggerNotification("❌ $errorMsg")
                 }
+            } catch (e: Exception) {
+                triggerNotification("❌ حدث خطأ أثناء التسجيل: ${e.localizedMessage}")
             }
-    }
-
-    private fun completeGuestRegistration(
-        context: android.content.Context,
-        userId: String,
-        name: String,
-        phone: String,
-        residence: String,
-        androidId: String,
-        password: String = ""
-    ) {
-        _currentUserId.value = userId
-        _currentUserName.value = name
-        _currentUserPhone.value = phone
-        _currentUserResidence.value = residence
-
-        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-        sp.edit().apply {
-            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(userId))
-            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name))
-            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(phone))
-            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence))
-            apply()
         }
-
-        // Save profile WITH password field!
-        val regUser = mapOf(
-            "id" to userId,
-            "name" to name,
-            "phone" to phone,
-            "residence" to residence,
-            "password" to password,
-            "androidId" to androidId,
-            "timestamp" to System.currentTimeMillis()
-        )
-        db.collection("registered_users").document(userId).set(regUser)
-        triggerNotification("🎉 أهلاً بك في الدليل $name، تم تسجيل وحماية حسابك آمنياً بنجاح عبر Firebase Auth!")
     }
 
     fun resetRegistrationState() {
         // Safe placeholder for registration flow reset state
         android.util.Log.d("MainViewModel", "resetRegistrationState triggered")
+    }
+
+    val bookingRepository by lazy {
+        com.example.data.repositories.BookingRepository(appContext ?: throw IllegalStateException("App context not initialized"))
+    }
+
+    private val _createBookingStatus = MutableStateFlow<Result<BookingEntity>?>(null)
+    val createBookingStatus: StateFlow<Result<BookingEntity>?> = _createBookingStatus.asStateFlow()
+
+    fun createBooking(context: android.content.Context, booking: BookingEntity, rawPasswordPin: String = "") {
+        appContext = context.applicationContext
+        viewModelScope.launch {
+            bookingRepository.createBooking(
+                booking = booking,
+                rawPasswordPin = rawPasswordPin,
+                onSuccess = { createdBooking ->
+                    _createBookingStatus.value = Result.success(createdBooking)
+                    triggerNotification("🎉 تم إنشاء حجزك بنجاح برقم: ${createdBooking.bookingNumber}")
+                },
+                onError = { errorMsg ->
+                    _createBookingStatus.value = Result.failure(Exception(errorMsg))
+                    triggerNotification("❌ فشل إنشاء الحجز: $errorMsg")
+                }
+            )
+        }
     }
 
     fun approveRegisteredUser(userId: String, userName: String = "") {
@@ -737,50 +771,140 @@ class MainViewModel : ViewModel() {
         password: String,
         onResult: (Boolean, String) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
         val cleanPass = password.trim()
 
-        val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(cleanPass)
-        if (!valResult.first) {
-            onResult(false, valResult.second ?: "كلمة المرور غير صالحة")
+        if (cleanPass.length < 8) {
+            onResult(false, "⚠️ يجب أن تكون كلمة المرور مكونة من 8 أحرف على الأقل")
             return
         }
 
-        val authEmail = getAuthEmailForPhone(cleanPhone)
+        viewModelScope.launch {
+            try {
+                // 1. Query the Firestore collection "users" by phone number
+                db.collection("users").document(cleanPhone).get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            val storedPass = doc.getString("password") ?: ""
+                            val isVerified = com.example.util.PasswordHasher.verify(cleanPass, storedPass)
+                            
+                            if (isVerified) {
+                                val name = doc.getString("name") ?: "عميل"
+                                val residence = doc.getString("city") ?: "اليمن"
+                                val finalUid = doc.getString("id") ?: ("usr_" + cleanPhone)
 
-        auth.signInWithEmailAndPassword(authEmail, cleanPass)
-            .addOnSuccessListener { authResult ->
-                val firebaseUid = authResult.user?.uid ?: ""
-                db.collection("registered_users").whereEqualTo("phone", cleanPhone).get()
-                    .addOnSuccessListener { qs ->
-                        val doc = qs.documents.firstOrNull()
-                        val name = doc?.getString("name") ?: "المستخدم"
-                        val residence = doc?.getString("residence") ?: "اليمن"
+                                // Restore local session states
+                                _currentUserId.value = finalUid
+                                _currentUserName.value = name
+                                _currentUserPhone.value = cleanPhone
+                                _currentUserResidence.value = residence
+                                _joinRequestPhone.value = cleanPhone
 
-                        val finalUid = if (firebaseUid.isNotEmpty()) firebaseUid else (doc?.getString("id") ?: "user_recovered")
-                        _currentUserId.value = finalUid
-                        _currentUserName.value = name
-                        _currentUserPhone.value = cleanPhone
-                        _currentUserResidence.value = residence
+                                // Securely store session in encrypted SharedPreferences
+                                val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                sp.edit().apply {
+                                    putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(finalUid))
+                                    putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name))
+                                    putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                                    putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence))
+                                    putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                                    apply()
+                                }
 
-                        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                        sp.edit().apply {
-                            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(finalUid))
-                            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name))
-                            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
-                            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence))
-                            apply()
+                                // Hydration: refresh all data listeners
+                                refreshData()
+
+                                triggerNotification("✅ أهلاً بك! تم استعادة حسابك واسترجاع بياناتك بنجاح عزيزي $name!")
+                                onResult(true, "تم استعادة الحساب بنجاح")
+                            } else {
+                                onResult(false, "❌ كلمة المرور المدخلة غير صحيحة")
+                            }
+                        } else {
+                            // Fallback 1: Query "registered_users"
+                            db.collection("registered_users").whereEqualTo("phone", cleanPhone).get()
+                                .addOnSuccessListener { qs ->
+                                    val fallbackDoc = qs.documents.firstOrNull()
+                                    if (fallbackDoc != null) {
+                                        val storedPass = fallbackDoc.getString("password") ?: ""
+                                        if (com.example.util.PasswordHasher.verify(cleanPass, storedPass)) {
+                                            val name = fallbackDoc.getString("name") ?: "عميل"
+                                            val residence = fallbackDoc.getString("residence") ?: "اليمن"
+                                            val finalUid = fallbackDoc.getString("id") ?: ("usr_" + cleanPhone)
+
+                                            _currentUserId.value = finalUid
+                                            _currentUserName.value = name
+                                            _currentUserPhone.value = cleanPhone
+                                            _currentUserResidence.value = residence
+                                            _joinRequestPhone.value = cleanPhone
+
+                                            val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                            sp.edit().apply {
+                                                putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(finalUid))
+                                                putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name))
+                                                putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                                                putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence))
+                                                putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                                                apply()
+                                            }
+
+                                            refreshData()
+                                            triggerNotification("✅ تم استعادة حسابك واسترجاع بياناتك بنجاح عزيزي $name!")
+                                            onResult(true, "تم استعادة الحساب بنجاح")
+                                        } else {
+                                            onResult(false, "❌ كلمة المرور غير صحيحة")
+                                        }
+                                    } else {
+                                        // Fallback 2: Query "providers"
+                                        db.collection("providers").whereEqualTo("phone", cleanPhone).get()
+                                            .addOnSuccessListener { pQs ->
+                                                val pDoc = pQs.documents.firstOrNull()
+                                                if (pDoc != null) {
+                                                    val storedPass = pDoc.getString("password") ?: pDoc.getString("passwordHash") ?: ""
+                                                    if (com.example.util.PasswordHasher.verify(cleanPass, storedPass)) {
+                                                        val name = pDoc.getString("name") ?: "فني معتمد"
+                                                        val finalUid = pDoc.id
+
+                                                        _currentUserId.value = finalUid
+                                                        _currentUserName.value = name
+                                                        _currentUserPhone.value = cleanPhone
+                                                        _joinRequestPhone.value = cleanPhone
+
+                                                        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                                        sp.edit().apply {
+                                                            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(finalUid))
+                                                            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name))
+                                                            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                                                            putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                                                            apply()
+                                                        }
+
+                                                        refreshData()
+                                                        triggerNotification("✅ أهلاً بك! تم استعادة حساب الفني الخاص بك ($name) بنجاح!")
+                                                        onResult(true, "تم استعادة حساب الفني بنجاح")
+                                                    } else {
+                                                        onResult(false, "❌ كلمة المرور غير صحيحة")
+                                                    }
+                                                } else {
+                                                    onResult(false, "❌ رقم الهاتف هذا غير مسجل في النظام")
+                                                }
+                                            }
+                                            .addOnFailureListener {
+                                                onResult(false, "❌ فشل الاستعلام من قاعدة البيانات")
+                                            }
+                                    }
+                                }
+                                .addOnFailureListener {
+                                    onResult(false, "❌ فشل الاستعلام من قاعدة البيانات")
+                                }
                         }
-                        triggerNotification("✅ تم تسجيل الدخول واستعادة حسابك آمنياً بنجاح عزيزي $name!")
-                        onResult(true, "تم استعادة الحساب بنجاح")
                     }
                     .addOnFailureListener {
-                        onResult(true, "تم تسجيل الدخول بنجاح عبر Firebase Auth")
+                        onResult(false, "❌ فشل الاتصال بقاعدة البيانات لاستعادة الحساب")
                     }
+            } catch (e: Exception) {
+                onResult(false, "❌ حدث خطأ غير متوقع: ${e.localizedMessage}")
             }
-            .addOnFailureListener {
-                onResult(false, "❌ فشل استعادة الحساب: كلمة المرور أو رقم الهاتف غير صحيح")
-            }
+        }
     }
 
     fun restoreGuestUser(context: android.content.Context, phone: String, password: String, onResult: (Boolean, String) -> Unit) {
@@ -2523,6 +2647,16 @@ class MainViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
+            try {
+                // Async duplicate check in join_requests
+                val existingSnap = db.collection("join_requests").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
+                    if (!qs.isEmpty) {
+                        triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة لرقم الهاتف هذا")
+                        return@addOnSuccessListener
+                    }
+                }
+            } catch (e: Exception) {}
+
             triggerNotification("⏳ جاري ضغط الصور وحفظ الملفات في سحابة التخزين...")
 
             val finalSelfie = uploadImageStringOrUri(
@@ -2574,9 +2708,19 @@ class MainViewModel : ViewModel() {
             // Push to Cloud with robust listeners
             db.collection("pending_providers").document(requestDocId).set(newRequest)
             
+            val requestType = when (catId.uppercase()) {
+                "STORE" -> "STORE"
+                "RESTAURANT" -> "RESTAURANT"
+                "MEDICAL" -> "MEDICAL"
+                "PROPERTY" -> "PROPERTY"
+                "JOB" -> "JOB"
+                "CLIENT" -> "CLIENT"
+                else -> "PROVIDER"
+            }
+
             val unifiedJoinRequest = com.example.data.models.JoinRequestEntity(
                 id = requestDocId,
-                type = "PROVIDER",
+                type = requestType,
                 status = "PENDING",
                 fullName = name,
                 phone = cleanPhone,
@@ -2586,7 +2730,11 @@ class MainViewModel : ViewModel() {
                 neighborhood = neighborhood,
                 categoryId = catId,
                 categoryName = customCategoryName.ifBlank { catId },
-                businessName = name,
+                businessName = if (requestType == "STORE" || requestType == "RESTAURANT" || requestType == "MEDICAL") name else "",
+                ownerName = name,
+                propertyTitle = if (requestType == "PROPERTY") name else "",
+                jobTitle = if (requestType == "JOB") customCategoryName.ifBlank { name } else "",
+                companyName = if (requestType == "JOB") name else "",
                 profileImage = finalSelfie,
                 idCardImage = finalIdCard,
                 workImages = finalWorkPhotos,
@@ -2653,6 +2801,9 @@ class MainViewModel : ViewModel() {
                     db.collection("pending_providers").document(it.id).delete()
                 } catch (e: Exception) {}
             }
+            try {
+                db.collection("join_requests").document(phone).delete()
+            } catch (e: Exception) {}
         }
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         sp.edit().remove("join_request_phone").apply()
@@ -6751,6 +6902,80 @@ class MainViewModel : ViewModel() {
             db.collection("notifications").document(notif.id).set(notif)
         } catch (e: Exception) {}
         triggerNotification("📩 تم إرسال طلب استعادة وإعادة تعيين كلمة المرور لإدارة التطبيق بنجاح")
+    }
+
+    fun requestPasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
+        if (cleanPhone.length < 9) {
+            onResult(false, "رقم الهاتف غير صالح")
+            return
+        }
+        val request = mapOf(
+            "phone" to cleanPhone,
+            "status" to "PENDING",
+            "requestedAt" to System.currentTimeMillis()
+        )
+        db.collection("password_reset_requests").document(cleanPhone).set(request)
+            .addOnSuccessListener {
+                requestAdminPasswordReset(cleanPhone)
+                onResult(true, "تم إرسال طلب إعادة التعيين للإدارة بنجاح")
+            }
+            .addOnFailureListener {
+                onResult(false, "حدث خطأ أثناء تقديم الطلب: ${it.localizedMessage}")
+            }
+    }
+
+    fun approvePasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
+        db.collection("password_reset_requests").document(cleanPhone).update("status", "APPROVED")
+        
+        // Generate temporary password
+        val chars = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        val tempPassword = (1..8).map { chars.random() }.joinToString("")
+        val hashedPassword = com.example.util.PasswordHasher.createSaltedHash(tempPassword)
+        
+        val batch = db.batch()
+        
+        // Check registered_users
+        db.collection("registered_users").whereEqualTo("phone", cleanPhone).get()
+            .addOnSuccessListener { qs ->
+                val doc = qs.documents.firstOrNull()
+                if (doc != null) {
+                    batch.update(doc.reference, "password", hashedPassword)
+                }
+                
+                // Check providers
+                db.collection("providers").whereEqualTo("phone", cleanPhone).get()
+                    .addOnSuccessListener { pQs ->
+                        val pDoc = pQs.documents.firstOrNull()
+                        if (pDoc != null) {
+                            batch.update(pDoc.reference, "password", hashedPassword)
+                        }
+                        
+                        // Send notification
+                        val notifId = java.util.UUID.randomUUID().toString()
+                        val notifRef = db.collection("notifications").document(notifId)
+                        val notif = NotificationEntity(
+                            id = notifId,
+                            title = "🔑 تم إعادة تعيين كلمة المرور",
+                            message = "تمت الموافقة على طلبك لإعادة تعيين كلمة المرور. كلمة المرور المؤقتة الجديدة هي: $tempPassword  يرجى تغييرها بعد تسجيل الدخول حفاظاً على خصوصيتك.",
+                            targetType = "USER",
+                            targetValue = cleanPhone,
+                            notificationType = "PASSWORD_RESET_APPROVED",
+                            timestamp = System.currentTimeMillis()
+                        )
+                        batch.set(notifRef, notif)
+                        
+                        batch.commit()
+                            .addOnSuccessListener {
+                                triggerNotification("🔑 تم الموافقة على طلب إعادة تعيين كلمة المرور للهاتف ($cleanPhone)")
+                                onResult(true, "تم إعادة التعيين بنجاح. كلمة المرور المؤقتة هي: $tempPassword")
+                            }
+                            .addOnFailureListener {
+                                onResult(false, "فشل حفظ التحديثات: ${it.localizedMessage}")
+                            }
+                    }
+            }
     }
 
     // --- SECONDARY FIREBASE SYNC CONTROL ---
