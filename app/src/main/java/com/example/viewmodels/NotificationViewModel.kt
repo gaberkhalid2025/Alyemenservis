@@ -1,65 +1,97 @@
 package com.example.viewmodels
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.annotation.Keep
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.data.NotificationEntity
+import com.example.data.repositories.NotificationRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.UUID
 
-data class AppNotification(
-    val id: String = UUID.randomUUID().toString(),
-    val targetUserId: String = "",
-    val title: String = "",
-    val body: String = "",
-    val bookingId: String = "",
-    val type: String = "GENERAL",
-    val isRead: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
-)
+sealed class NotificationUiState {
+    object Idle : NotificationUiState()
+    object Loading : NotificationUiState()
+    data class Success(val message: String) : NotificationUiState()
+    data class Error(val message: String) : NotificationUiState()
+}
 
 /**
  * 🔔 NotificationViewModel
- * إدارة الإشعارات الفورية وسجل التنبيهات الخاصة بالمستخدم والفنيين.
+ * إدارة كاملة لمنطق الإشعارات الذكية، التدفق الحي والفلترة المتقدمة.
  */
-class NotificationViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class NotificationViewModel @Inject constructor(
+    private val notificationRepository: NotificationRepository
+) : ViewModel() {
 
-    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private val _uiState = MutableStateFlow<NotificationUiState>(NotificationUiState.Idle)
+    val uiState: StateFlow<NotificationUiState> = _uiState.asStateFlow()
 
-    private val _notifications = MutableStateFlow<List<AppNotification>>(emptyList())
-    val notifications: StateFlow<List<AppNotification>> = _notifications.asStateFlow()
+    private val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
+    val notifications: StateFlow<List<NotificationEntity>> = _notifications.asStateFlow()
 
     private val _unreadCount = MutableStateFlow(0)
     val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
 
-    fun listenForNotifications(userId: String) {
-        if (userId.isBlank()) return
-        firestore.collection("notifications")
-            .whereEqualTo("targetUserId", userId)
-            .addSnapshotListener { snapshot, error ->
-                if (snapshot != null) {
-                    val list = snapshot.documents.mapNotNull { it.toObject(AppNotification::class.java) }
-                    _notifications.value = list.sortedByDescending { it.createdAt }
-                    _unreadCount.value = if (list.isEmpty()) 0 else list.count { !it.isRead }
-                }
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    fun observeUserNotifications(userId: String, phone: String = "", role: String = "CLIENT") {
+        viewModelScope.launch {
+            _isLoading.value = true
+            notificationRepository.observeUserNotifications(userId, phone, role).collect { list ->
+                _isLoading.value = false
+                _notifications.value = list
+                _unreadCount.value = list.count { !it.isRead }
             }
+        }
+    }
+
+    fun observeAdminNotifications() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            notificationRepository.observeAdminNotifications().collect { list ->
+                _isLoading.value = false
+                _notifications.value = list
+                _unreadCount.value = list.count { !it.isRead }
+            }
+        }
     }
 
     fun markAsRead(notificationId: String) {
         viewModelScope.launch {
-            firestore.collection("notifications").document(notificationId).update("isRead", true)
-            _notifications.value = _notifications.value.map {
-                if (it.id == notificationId) it.copy(isRead = true) else it
-            }
-            _unreadCount.value = _notifications.value.count { !it.isRead }
+            notificationRepository.markAsRead(notificationId)
         }
     }
 
-    fun clearAll() {
-        _notifications.value = emptyList()
-        _unreadCount.value = 0
+    fun markAllAsRead() {
+        viewModelScope.launch {
+            val unreadIds = _notifications.value.filter { !it.isRead }.map { it.id }
+            if (unreadIds.isNotEmpty()) {
+                notificationRepository.markAllAsRead(unreadIds)
+            }
+        }
+    }
+
+    fun deleteNotification(notificationId: String) {
+        viewModelScope.launch {
+            notificationRepository.deleteNotification(notificationId)
+        }
+    }
+
+    fun sendNotification(notification: NotificationEntity, onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            val result = notificationRepository.sendNotification(notification)
+            onResult?.invoke(result.isSuccess)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        notificationRepository.clearListeners()
     }
 }
