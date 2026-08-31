@@ -42,7 +42,10 @@ sealed class UrgentEvent {
  * 🚨 UrgentViewModel
  * Manages 30-min urgent requests flow, offers tracking, countdown updates, and security PIN verification.
  */
-class UrgentViewModel : ViewModel() {
+@dagger.hilt.android.lifecycle.HiltViewModel
+class InstantRequestViewModel @javax.inject.Inject constructor(
+    private val repository: com.example.data.repositories.InstantRequestRepository = com.example.data.repositories.InstantRequestRepository()
+) : ViewModel() {
 
     private val firestore by lazy { FirebaseFirestore.getInstance() }
 
@@ -346,11 +349,8 @@ class UrgentViewModel : ViewModel() {
     fun clearUiState() {
         _uiState.value = UrgentUiState.Idle
     }
-
     override fun onCleared() {
         super.onCleared()
-        requestsListener?.remove()
-        detailsListener?.remove()
-        offersListener?.remove()
+        repository.clearListeners()
     }
 }

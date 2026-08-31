@@ -1,10 +1,11 @@
 package com.example.ui.screens.dashboard
+import com.example.ui.MainViewModel
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.example.data.RatingEntity
 import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.dashboard.components.*
 import com.example.utils.VisualThemePalette
 
@@ -16,7 +17,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun UnifiedProfileSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     com.example.ui.screens.dashboard.components.UnifiedProfileSection(account, viewModel, themeColors)
@@ -25,7 +26,7 @@ fun UnifiedProfileSection(
 @Composable
 fun UnifiedSettingsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     com.example.ui.screens.dashboard.components.UnifiedSettingsSection(account, viewModel, themeColors)
@@ -34,7 +35,7 @@ fun UnifiedSettingsSection(
 @Composable
 fun UnifiedProductsServicesSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     com.example.ui.screens.dashboard.components.UnifiedProductsServicesSection(account, viewModel, themeColors)
@@ -43,7 +44,7 @@ fun UnifiedProductsServicesSection(
 @Composable
 fun UnifiedOffersSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     com.example.ui.screens.dashboard.components.UnifiedOffersSection(account, viewModel, themeColors)
@@ -52,7 +53,7 @@ fun UnifiedOffersSection(
 @Composable
 fun UnifiedRatingsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     com.example.ui.screens.dashboard.components.UnifiedRatingsSection(account, viewModel, themeColors)
@@ -61,7 +62,7 @@ fun UnifiedRatingsSection(
 @Composable
 fun UnifiedBookingsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     com.example.ui.screens.dashboard.components.UnifiedBookingsSection(account, viewModel, themeColors)
@@ -70,7 +71,7 @@ fun UnifiedBookingsSection(
 @Composable
 fun UnifiedAttachmentsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     com.example.ui.screens.dashboard.components.UnifiedAttachmentsSection(account, viewModel, themeColors)

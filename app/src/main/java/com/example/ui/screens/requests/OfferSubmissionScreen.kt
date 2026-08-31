@@ -2,6 +2,9 @@ package com.example.ui.screens.requests
 
 import android.widget.Toast
 import androidx.compose.animation.*
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.NotificationEntity
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
-import com.example.ui.MainViewModel
+
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -37,7 +40,8 @@ import java.util.UUID
 @Composable
 fun OfferSubmissionScreen(
     requestId: String,
-    viewModel: MainViewModel,
+    providerViewModel: ProviderViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onOfferSubmitted: () -> Unit = {}
 ) {
@@ -45,8 +49,8 @@ fun OfferSubmissionScreen(
     val scope = rememberCoroutineScope()
     val firestore = remember { FirebaseFirestore.getInstance() }
 
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val isProvider = viewModel.isProviderUser
+    val currentUserId by authViewModel.currentUserId.collectAsState()
+    val isProvider = providerViewModel.isProviderUser
 
     var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
     var isLoadingRequest by remember { mutableStateOf(true) }

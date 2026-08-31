@@ -17,8 +17,8 @@ object BookingSecurityHelper {
     private const val MAX_ATTEMPTS = 3
     private const val LOCKOUT_DURATION_MS = 5 * 60 * 1000L // 5 minutes lockout
 
-    private fun getPrefs(context: Context): SharedPreferences {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun getPrefs(context: Context?): SharedPreferences? {
+        return context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     /**
@@ -38,8 +38,8 @@ object BookingSecurityHelper {
     /**
      * Checks if a booking is currently locked out from cancellation/modification attempts.
      */
-    fun isBookingLocked(context: Context, bookingId: String): Boolean {
-        val prefs = getPrefs(context)
+    fun isBookingLocked(context: Context?, bookingId: String): Boolean {
+        val prefs = getPrefs(context) ?: return false
         val lockTime = prefs.getLong(KEY_LOCKOUT_PREFIX + bookingId, 0L)
         val now = System.currentTimeMillis()
         if (now < lockTime) {
@@ -54,8 +54,8 @@ object BookingSecurityHelper {
     /**
      * Returns remaining lockout time in seconds.
      */
-    fun getRemainingLockoutSeconds(context: Context, bookingId: String): Long {
-        val prefs = getPrefs(context)
+    fun getRemainingLockoutSeconds(context: Context?, bookingId: String): Long {
+        val prefs = getPrefs(context) ?: return 0L
         val lockTime = prefs.getLong(KEY_LOCKOUT_PREFIX + bookingId, 0L)
         val diff = lockTime - System.currentTimeMillis()
         return if (diff > 0) diff / 1000 else 0L
@@ -65,12 +65,11 @@ object BookingSecurityHelper {
      * Records a failed PIN attempt. If attempts reach 3, locks out for 5 minutes.
      * Returns the number of remaining attempts before lockout.
      */
-    fun recordFailedAttempt(context: Context, bookingId: String): Int {
-        val prefs = getPrefs(context)
+    fun recordFailedAttempt(context: Context?, bookingId: String): Int {
+        val prefs = getPrefs(context) ?: return 0
         val currentAttempts = prefs.getInt(KEY_ATTEMPTS_PREFIX + bookingId, 0) + 1
         val editor = prefs.edit()
         editor.putInt(KEY_ATTEMPTS_PREFIX + bookingId, currentAttempts)
-
         if (currentAttempts >= MAX_ATTEMPTS) {
             val lockoutTime = System.currentTimeMillis() + LOCKOUT_DURATION_MS
             editor.putLong(KEY_LOCKOUT_PREFIX + bookingId, lockoutTime)
@@ -84,8 +83,8 @@ object BookingSecurityHelper {
     /**
      * Resets failed attempts and lockout upon successful verification.
      */
-    fun resetAttempts(context: Context, bookingId: String) {
-        val prefs = getPrefs(context)
+    fun resetAttempts(context: Context?, bookingId: String) {
+        val prefs = getPrefs(context) ?: return
         prefs.edit()
             .remove(KEY_ATTEMPTS_PREFIX + bookingId)
             .remove(KEY_LOCKOUT_PREFIX + bookingId)

@@ -1,6 +1,9 @@
 package com.example.ui.screens.admin
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.PropertyViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.admin.components.AdminEntityCard
 import com.example.ui.screens.admin.components.AdminFilterChips
 import com.example.utils.VisualThemePalette
@@ -31,15 +34,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun AdminStoresPropertiesPanel(
     onBack: () -> Unit = {},
-    viewModel: MainViewModel = viewModel(),
+    storeViewModel: StoreViewModel = viewModel(),
+    propertyViewModel: PropertyViewModel = viewModel(), = viewModel(),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val stores by viewModel.stores.collectAsState()
-    val properties by viewModel.properties.collectAsState()
+    val stores by storeViewModel.stores.collectAsState()
+    val properties by propertyViewModel.properties.collectAsState()
 
     var selectedSection by remember { mutableStateOf("المتاجر") }
     val sections = listOf("المتاجر", "العقارات")
@@ -99,7 +103,7 @@ fun AdminStoresPropertiesPanel(
                                     ) {
                                         OutlinedButton(
                                             onClick = {
-                                                viewModel.toggleStoreBlocked(store.id, !store.isBlocked)
+                                                storeViewModel.toggleStoreBlocked(store.id, !store.isBlocked)
                                                 scope.launch { snackbarHostState.showSnackbar(if (store.isBlocked) "تم إلغاء حظر المتجر" else "تم حظر المتجر") }
                                             },
                                             shape = RoundedCornerShape(8.dp),
@@ -111,7 +115,7 @@ fun AdminStoresPropertiesPanel(
 
                                         IconButton(
                                             onClick = {
-                                                viewModel.deleteStore(store.id)
+                                                storeViewModel.deleteStore(store.id)
                                                 scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف المتجر") }
                                             },
                                             modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
@@ -150,7 +154,7 @@ fun AdminStoresPropertiesPanel(
                                     ) {
                                         OutlinedButton(
                                             onClick = {
-                                                viewModel.togglePropertyBlocked(prop.id, !prop.isBlocked)
+                                                propertyViewModel.togglePropertyBlocked(prop.id, !prop.isBlocked)
                                                 scope.launch { snackbarHostState.showSnackbar(if (prop.isBlocked) "تم إلغاء حظر العقار" else "تم حظر العقار") }
                                             },
                                             shape = RoundedCornerShape(8.dp),
@@ -162,7 +166,7 @@ fun AdminStoresPropertiesPanel(
 
                                         IconButton(
                                             onClick = {
-                                                viewModel.deleteProperty(prop.id)
+                                                propertyViewModel.deleteProperty(prop.id)
                                                 scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف العقار") }
                                             },
                                             modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))

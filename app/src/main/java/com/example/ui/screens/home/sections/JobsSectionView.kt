@@ -1,6 +1,8 @@
 package com.example.ui.screens.home.sections
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.JobViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,7 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.JobEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -25,12 +27,12 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun JobsSectionView(
-    viewModel: MainViewModel,
+    jobViewModel: JobViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onJobClick: (JobEntity) -> Unit,
     onCreateJobClick: () -> Unit
 ) {
-    val jobsList by viewModel.jobs.collectAsState()
+    val jobsList by jobViewModel.jobs.collectAsState()
     val activeJobs = remember(jobsList) { jobsList.filter { !it.isDeleted && (it.isApproved || it.isActive) } }
     var selectedSubCategory by remember { mutableStateOf("الكل") }
 

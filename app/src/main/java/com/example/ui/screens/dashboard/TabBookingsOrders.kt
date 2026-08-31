@@ -2,6 +2,8 @@ package com.example.ui.screens.dashboard
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import com.example.viewmodels.BookingViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.BookingEntity
 import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -30,13 +32,13 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun TabBookingsOrders(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    bookingViewModel: BookingViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
     var selectedFilter by remember { mutableStateOf("ALL") }
     
-    val allBookings by viewModel.bookings.collectAsState()
+    val allBookings by bookingViewModel.bookings.collectAsState()
     
     val myBookings = remember(allBookings, account.id, account.phone) {
         allBookings.filter { b ->
@@ -161,7 +163,7 @@ fun TabBookingsOrders(
                                 ) {
                                     Button(
                                         onClick = {
-                                            viewModel.updateBookingStatus(booking.id, "APPROVED")
+                                            bookingViewModel.updateBookingStatus(booking.id, "APPROVED")
                                             Toast.makeText(context, "✅ تم قبول الحجز بنجاح ومزامنة الموعد!", Toast.LENGTH_SHORT).show()
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
@@ -173,7 +175,7 @@ fun TabBookingsOrders(
 
                                     Button(
                                         onClick = {
-                                            viewModel.updateBookingStatus(booking.id, "REJECTED")
+                                            bookingViewModel.updateBookingStatus(booking.id, "REJECTED")
                                             Toast.makeText(context, "❌ تم رفض الحجز!", Toast.LENGTH_SHORT).show()
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
@@ -186,7 +188,7 @@ fun TabBookingsOrders(
                             } else if (booking.status == "APPROVED") {
                                 Button(
                                     onClick = {
-                                        viewModel.updateBookingStatus(booking.id, "COMPLETED")
+                                        bookingViewModel.updateBookingStatus(booking.id, "COMPLETED")
                                         Toast.makeText(context, "🎉 تهانينا! تم إكمال الخدمة بنجاح.", Toast.LENGTH_SHORT).show()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),

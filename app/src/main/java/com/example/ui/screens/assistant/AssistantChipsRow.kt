@@ -1,4 +1,5 @@
 package com.example.ui.screens.assistant
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -11,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -19,7 +20,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AssistantChipsRow(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette,
     onRequestQuickService: () -> Unit,
     onNavigateToMap: () -> Unit,

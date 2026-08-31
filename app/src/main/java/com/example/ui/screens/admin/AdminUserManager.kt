@@ -1,4 +1,5 @@
 package com.example.ui.screens.admin
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -18,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.admin.components.AdminEntityCard
 import com.example.ui.screens.admin.components.AdminFilterChips
 import com.example.utils.VisualThemePalette
@@ -33,7 +34,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AdminUserManager(
     onBack: () -> Unit = {},
-    adminViewModel: AdminViewModel = viewModel(),
+    viewModel: AdminViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
@@ -87,7 +88,7 @@ fun AdminUserManager(
                                 appendLine("${u["name"]},${u["phone"]},${u["role"]},${u["city"]}")
                             }
                         }
-                        adminViewModel.recordAuditLog("EXPORT_USERS", "تصدير المستخدمين")
+                        viewModel.recordAuditLog("EXPORT_USERS", "تصدير المستخدمين")
                         scope.launch { snackbarHostState.showSnackbar("📥 تم تصدير بيانات المستخدمين بنجاح") }
                     }) {
                         Icon(Icons.Default.Share, contentDescription = "تصدير", tint = themeColors.accent)
@@ -162,11 +163,11 @@ fun AdminUserManager(
                                     OutlinedButton(
                                         onClick = {
                                             if (isBlocked) {
-                                                adminViewModel.unblockUser(userId) { success ->
+                                                viewModel.unblockUser(userId) { success ->
                                                     scope.launch { snackbarHostState.showSnackbar("تم إلغاء حظر المستخدم") }
                                                 }
                                             } else {
-                                                adminViewModel.blockUser(userId) { success ->
+                                                viewModel.blockUser(userId) { success ->
                                                     scope.launch { snackbarHostState.showSnackbar("تم حظر المستخدم") }
                                                 }
                                             }
@@ -180,7 +181,7 @@ fun AdminUserManager(
 
                                     IconButton(
                                         onClick = {
-                                            adminViewModel.deleteUser(userId) { success ->
+                                            viewModel.deleteUser(userId) { success ->
                                                 scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف حساب المستخدم") }
                                             }
                                         },

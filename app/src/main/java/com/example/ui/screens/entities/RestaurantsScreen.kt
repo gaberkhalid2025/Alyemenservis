@@ -1,6 +1,11 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.SettingsViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.AdminViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,23 +30,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.StoreEntity
-import com.example.ui.MainViewModel
+
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun RestaurantsScreen(
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
+    adminViewModel: AdminViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onRestaurantClick: (StoreEntity) -> Unit,
     onChatClick: (StoreEntity) -> Unit,
     onOrderMealClick: (StoreEntity) -> Unit
 ) {
-    val stores by viewModel.stores.collectAsState()
-    val cities by viewModel.cities.collectAsState()
+    val stores by storeViewModel.stores.collectAsState()
+    val cities by settingsViewModel.cities.collectAsState()
 
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val adminRole by viewModel.adminRole.collectAsState()
+    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
+    val adminRole by adminViewModel.adminRole.collectAsState()
     val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
     val isLoggedIn = currentUserId.isNotBlank() && currentUserId != "guest"
 
@@ -89,7 +97,7 @@ fun RestaurantsScreen(
     if (showCreateRestaurantDialog) {
         com.example.StoreCreateEditDialog(
             store = null,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             sectionId = "restaurants",
             onDismiss = { showCreateRestaurantDialog = false }
@@ -98,7 +106,7 @@ fun RestaurantsScreen(
 
     if (showGuestDialog) {
         com.example.ui.screens.register.GuestRegistrationDialog(
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             onDismiss = { showGuestDialog = false },
             onRegisterCompleted = { _, _, _, _ -> showGuestDialog = false }

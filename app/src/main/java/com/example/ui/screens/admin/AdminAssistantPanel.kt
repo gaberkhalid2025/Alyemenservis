@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.admin
+import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -25,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
+
 import com.example.util.AiAssistantEngine
 import com.example.util.AiResponse
 import com.example.utils.VisualThemePalette
@@ -36,7 +37,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AdminAssistantPanel(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

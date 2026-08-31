@@ -2,6 +2,18 @@ package com.example.ui
 
 import android.content.Intent
 import androidx.compose.ui.geometry.CornerRadius
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.SettingsViewModel
+import com.example.viewmodels.InstantRequestViewModel
+import com.example.viewmodels.BookingViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.AdminViewModel
+import com.example.ui.screens.chat.ChatViewModel
+import com.example.viewmodels.RegistrationViewModel
+import com.example.viewmodels.PropertyViewModel
+import com.example.viewmodels.NotificationViewModel
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.PathEffect
 import okhttp3.MediaType.Companion.toMediaType
@@ -97,7 +109,7 @@ import kotlinx.coroutines.withContext
 // ------ App Main Navigator ------
 @Composable
 fun AppNavigator(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     permissionLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
     locationPermissions: Array<String>
@@ -202,7 +214,7 @@ fun AppNavigator(
             topBar = {
                 if (!isFullScreen) {
                     AppHeaderBar(
-                        viewModel = viewModel,
+                        
                         themeColors = themeColors,
                         onNotificationsClick = { showNotificationsDialog = true },
                         onChatsClick = { viewModel.navigateTo("CHAT_LIST") },
@@ -214,7 +226,7 @@ fun AppNavigator(
             bottomBar = {
                 if (!isFullScreen) {
                     AppFooterBar(
-                        viewModel = viewModel,
+                        
                         themeColors = themeColors,
                         onInfoClick = { showInfoDialog = true }
                     )
@@ -326,24 +338,24 @@ fun AppNavigator(
                             .align(Alignment.CenterHorizontally)
                     ) {
                         if (settingsState.isMaintenanceActive && adminRole == "GUEST") {
-                            MaintenanceSplashView(settingsState = settingsState, themeColors = themeColors, viewModel = viewModel)
+                            MaintenanceSplashView(settingsState = settingsState, themeColors = themeColors, )
                         } else {
                             when (currentScreen) {
-                                "OWNER_PANEL" -> OwnerBackdoorPanelLayout(viewModel = viewModel, themeColors = themeColors)
-                                "ADMIN_PANEL" -> AdminPanelLayout(viewModel = viewModel, themeColors = themeColors)
+                                "OWNER_PANEL" -> OwnerBackdoorPanelLayout( themeColors = themeColors)
+                                "ADMIN_PANEL" -> AdminPanelLayout( themeColors = themeColors)
                                 "REGISTER_FORM" -> ProviderRegisterFormLayout(
-                                    viewModel = viewModel,
+                                    
                                     themeColors = themeColors,
                                     regType = preselectedRegistrationType,
                                     sectionId = activeSectionIdForCreation,
                                     onRegTypeChange = { preselectedRegistrationType = it }
                                 )
-                                "JOIN_REQUEST_STATUS" -> com.example.ui.screens.register.JoinRequestStatusScreen(viewModel = viewModel, themeColors = themeColors)
-                                "STATUS_VIEW" -> com.example.ui.screens.status.StatusScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
-                                "ABOUT_APP" -> AboutAppScreenContent(viewModel = viewModel, themeColors = themeColors)
+                                "JOIN_REQUEST_STATUS" -> com.example.ui.screens.register.JoinRequestStatusScreen( themeColors = themeColors)
+                                "STATUS_VIEW" -> com.example.ui.screens.status.StatusScreen( themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                                "ABOUT_APP" -> AboutAppScreenContent( themeColors = themeColors)
                                 "OFFER_SELECTION" -> com.example.ui.screens.requests.OfferSelectionScreen(
                                     offerId = viewModel.selectedOfferId,
-                                    viewModel = viewModel,
+                                    
                                     onNavigateBack = { viewModel.goBack() },
                                     onBookingConfirmed = { viewModel.navigateTo("BOOKINGS_VIEW") },
                                     onNavigateToChat = { phone, _ ->
@@ -357,7 +369,7 @@ fun AppNavigator(
                                 )
                                 "URGENT_REQUEST_DETAILS" -> com.example.ui.screens.urgent.UrgentRequestDetailsScreen(
                                     requestId = viewModel.selectedRequestId,
-                                    viewModel = viewModel,
+                                    
                                     onNavigateBack = { viewModel.goBack() },
                                     onNavigateToOfferSelection = { offerId ->
                                         viewModel.selectedOfferId = offerId
@@ -370,7 +382,7 @@ fun AppNavigator(
                                 )
                                 "OFFERS_LIST" -> com.example.ui.screens.requests.OffersListScreen(
                                     requestId = viewModel.selectedRequestId,
-                                    viewModel = viewModel,
+                                    
                                     onNavigateBack = { viewModel.goBack() },
                                     onSelectOffer = { offerId ->
                                         viewModel.selectedOfferId = offerId
@@ -381,11 +393,11 @@ fun AppNavigator(
                                         viewModel.navigateTo("CHAT_DIRECT")
                                     }
                                 )
-                                "BOOKINGS_VIEW" -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
-                                "INSTANT_REQUESTS_VIEW" -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.goBack() })
-                                "ORDERS_VIEW" -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { showRequestServiceModal = true })
+                                "BOOKINGS_VIEW" -> BookingsScreenLayout( themeColors = themeColors)
+                                "INSTANT_REQUESTS_VIEW" -> InstantRequestsScreen( themeColors = themeColors, onBackClick = { viewModel.goBack() })
+                                "ORDERS_VIEW" -> OrdersScreenLayout( themeColors = themeColors, onRequestQuickService = { showRequestServiceModal = true })
                                 "MAP_VIEW" -> com.example.ui.MapScreen(
-                                    viewModel = viewModel,
+                                    
                                     onBackClick = { viewModel.navigateTo("HOME") },
                                     onOpenProviderDetails = { provider ->
                                         viewModel.selectedProvider = provider
@@ -405,7 +417,7 @@ fun AppNavigator(
                                     }
                                 )
                                 "CATEGORIES_VIEW" -> CategoriesScreen(
-                                    viewModel = viewModel,
+                                    
                                     themeColors = themeColors,
                                     onCategoryClick = { catId ->
                                         when (catId) {
@@ -421,7 +433,7 @@ fun AppNavigator(
                                     }
                                 )
                                 "STORES_VIEW" -> StoresScreen(
-                                    viewModel = viewModel,
+                                    
                                     themeColors = themeColors,
                                     onStoreClick = { store ->
                                         viewModel.selectedStore = store
@@ -437,7 +449,7 @@ fun AppNavigator(
                                     }
                                 )
                                 "MEDICAL_VIEW" -> MedicalCentersScreen(
-                                    viewModel = viewModel,
+                                    
                                     themeColors = themeColors,
                                     onMedicalCenterClick = { medical ->
                                         viewModel.selectedProvider = medical
@@ -453,7 +465,7 @@ fun AppNavigator(
                                     }
                                 )
                                 "RESTAURANTS_VIEW" -> RestaurantsScreen(
-                                    viewModel = viewModel,
+                                    
                                     themeColors = themeColors,
                                     onRestaurantClick = { rest ->
                                         viewModel.selectedStore = rest
@@ -469,7 +481,7 @@ fun AppNavigator(
                                     }
                                 )
                                 "PROPERTIES_VIEW" -> PropertiesScreen(
-                                    viewModel = viewModel,
+                                    
                                     themeColors = themeColors,
                                     onPropertyClick = { prop ->
                                         viewModel.selectedProperty = prop
@@ -492,7 +504,7 @@ fun AppNavigator(
                                     )
                                     OwnerProfileScreen(
                                         account = myAccount,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors,
                                         onBackClick = { viewModel.goBack() }
                                     )
@@ -504,7 +516,7 @@ fun AppNavigator(
                                     )
                                     ProductServiceManagementScreen(
                                         account = myAccount,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors
                                     )
                                 }
@@ -515,7 +527,7 @@ fun AppNavigator(
                                     )
                                     PriceManagementScreen(
                                         account = myAccount,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors
                                     )
                                 }
@@ -526,7 +538,7 @@ fun AppNavigator(
                                     )
                                     OffersManagementScreen(
                                         account = myAccount,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors
                                     )
                                 }
@@ -537,14 +549,14 @@ fun AppNavigator(
                                     )
                                     GalleryManagementScreen(
                                         account = myAccount,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors
                                     )
                                 }
                                 "PROVIDER_DETAILS" -> {
                                     DynamicPolymorphicProfileScreen(
                                         provider = viewModel.selectedProvider,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors,
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
@@ -559,7 +571,7 @@ fun AppNavigator(
                                 "STORE_DETAILS" -> {
                                     DynamicPolymorphicProfileScreen(
                                         store = viewModel.selectedStore,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors,
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
@@ -574,7 +586,7 @@ fun AppNavigator(
                                 "PROPERTY_DETAILS" -> {
                                     DynamicPolymorphicProfileScreen(
                                         property = viewModel.selectedProperty,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors,
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
@@ -591,7 +603,7 @@ fun AppNavigator(
                                         provider = viewModel.selectedProvider,
                                         store = viewModel.selectedStore,
                                         property = viewModel.selectedProperty,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors,
                                         onBackClick = { viewModel.goBack() },
                                         onOpenChat = { channelId ->
@@ -605,7 +617,7 @@ fun AppNavigator(
                                 }
                                 "FAVORITES_VIEW" -> {
                                     com.example.ui.screens.home.FavoritesScreenLayout(
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors,
                                         onBackClick = { viewModel.goBack() },
                                         onOpenProviderDetails = { provider ->
@@ -674,7 +686,7 @@ fun AppNavigator(
                                     )
                                     BookingCalendarScreen(
                                         provider = prov,
-                                        viewModel = viewModel,
+                                        
                                         themeColors = themeColors,
                                         onBack = { viewModel.goBack() },
                                         onBookingSuccess = {
@@ -683,7 +695,7 @@ fun AppNavigator(
                                     )
                                 }
                                 else -> ServicesBrowserLayout(
-                                    viewModel = viewModel,
+                                    
                                     themeColors = themeColors,
                                     activeSectionIdForCreation = activeSectionIdForCreation,
                                     onActiveSectionIdForCreationChange = { activeSectionIdForCreation = it },
@@ -735,7 +747,7 @@ fun AppNavigator(
 
     if (showGuestRegisterDialogForAction == "CHAT") {
         GuestRegistrationDialog(
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             onDismiss = { showGuestRegisterDialogForAction = null },
             onRegisterCompleted = { name, phone, residence, password ->
@@ -747,12 +759,12 @@ fun AppNavigator(
     }
 
     if (showInfoDialog) {
-        AboutAppDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { showInfoDialog = false })
+        AboutAppDialogView( themeColors = themeColors, onDismiss = { showInfoDialog = false })
     }
 
     if (showRequestServiceModal) {
         QuickServiceRequestDialog(
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             onDismiss = { showRequestServiceModal = false },
             onRequestCreated = {
@@ -764,7 +776,7 @@ fun AppNavigator(
 
     if (showAssistantDialog) {
         SmartAssistantDialogView(
-            viewModel = viewModel,
+            
             settings = settingsState,
             themeColors = themeColors,
             onDismiss = { showAssistantDialog = false },
@@ -785,7 +797,7 @@ fun AppNavigator(
     }
 
     if (showNotificationsDialog) {
-        UserNotificationsDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { showNotificationsDialog = false })
+        UserNotificationsDialogView( themeColors = themeColors, onDismiss = { showNotificationsDialog = false })
     }
 
     if (showRestoreAccountDialog) {
@@ -1183,8 +1195,7 @@ fun AppNavigator(
 
 // ------ Custom Top App Bar ------
 @Composable
-fun AppHeaderBar(
-    viewModel: MainViewModel,
+fun AppHeaderBar(viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onNotificationsClick: () -> Unit,
     onChatsClick: () -> Unit,
@@ -1196,7 +1207,7 @@ fun AppHeaderBar(
     val allNotifications by viewModel.notifications.collectAsState()
     val userPhoneState by viewModel.currentUserPhone.collectAsState()
     val adminRoleState by viewModel.adminRole.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val chatChannels by viewModel.chatChannels.collectAsState()
     val providers by viewModel.providers.collectAsState()
@@ -1449,7 +1460,7 @@ fun AppHeaderBar(
 
 // ------ Custom Dynamic Footer with Language Switcher and Admin Control ------
 @Composable
-fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onInfoClick: () -> Unit) {
+fun AppFooterBar(viewModel: MainViewModel = viewModel(), themeColors: VisualThemePalette, onInfoClick: () -> Unit) {
     val settingsState by viewModel.settings.collectAsState()
     val currentLang by viewModel.currentLanguage.collectAsState()
     val isEn = currentLang == "en"
@@ -1657,7 +1668,7 @@ fun BoxScope.FloatingIconsOverlay(
 
 // ------ Maintenance Banner view ------
 @Composable
-fun MaintenanceSplashView(settingsState: AdminSettingsEntity, themeColors: VisualThemePalette, viewModel: MainViewModel) {
+fun MaintenanceSplashView(settingsState: AdminSettingsEntity, themeColors: VisualThemePalette,viewModel: MainViewModel = viewModel(),) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -2411,8 +2422,7 @@ fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
 @Composable
 fun ProviderCard(
     provider: ProviderEntity,
-    themeColors: VisualThemePalette,
-    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,viewModel: MainViewModel = viewModel(),
     onChatOpen: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -3873,7 +3883,7 @@ fun ProviderCard(
 
     if (showGuestRegisterDialogForBooking) {
         GuestRegistrationDialog(
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             onDismiss = { showGuestRegisterDialogForBooking = false },
             onRegisterCompleted = { name, phone, residence, password ->

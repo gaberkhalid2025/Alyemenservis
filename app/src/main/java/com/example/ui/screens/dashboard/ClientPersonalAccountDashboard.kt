@@ -4,6 +4,8 @@ package com.example.ui.screens.dashboard
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -24,7 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.BookingEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -33,7 +35,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun ClientPersonalAccountDashboard(
-    viewModel: MainViewModel,
+    authViewModel: AuthViewModel = viewModel(),
     themeColors: VisualThemePalette,
     context: Context,
     currentUserName: String,
@@ -176,7 +178,7 @@ fun ClientPersonalAccountDashboard(
                 Text("💼 الانضمام كشريك", color = themeColors.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
             Button(
-                onClick = { viewModel.logout(context) },
+                onClick = { authViewModel.logout(context) },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.3f)),
                 border = BorderStroke(1.dp, Color.Red),
                 shape = RoundedCornerShape(8.dp),
@@ -190,7 +192,7 @@ fun ClientPersonalAccountDashboard(
     if (showRestoreDialog) {
         RestoreAccountBottomSheet(
             onDismissRequest = { showRestoreDialog = false },
-            viewModel = viewModel,
+            
             themeColors = themeColors
         )
     }

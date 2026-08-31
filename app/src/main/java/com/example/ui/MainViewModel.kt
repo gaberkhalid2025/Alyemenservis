@@ -519,7 +519,7 @@ class MainViewModel : ViewModel() {
     private var supportChatListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
 
     fun initializeFirestoreCollections() {
-        android.util.Log.d("MainViewModel", "📤 بدء تهيئة المجموعات في Firestore")
+        android.util.Log.d("AuthViewModel", "📤 بدء تهيئة المجموعات في Firestore")
         val collections = listOf(
             "users", "pending_providers", "providers", "stores",
             "restaurants", "medical", "properties", "jobs",
@@ -533,10 +533,10 @@ class MainViewModel : ViewModel() {
                         .set(mapOf("initialized" to true))
                         .addOnSuccessListener {
                             db.collection(collection).document("_init_").delete()
-                            android.util.Log.d("MainViewModel", "✅ تم تهيئة المجموعة بنجاح: $collection")
+                            android.util.Log.d("AuthViewModel", "✅ تم تهيئة المجموعة بنجاح: $collection")
                         }
                 } catch (e: Exception) {
-                    android.util.Log.e("MainViewModel", "❌ خطأ أثناء تهيئة المجموعة $collection: ${e.message}")
+                    android.util.Log.e("AuthViewModel", "❌ خطأ أثناء تهيئة المجموعة $collection: ${e.message}")
                 }
             }
         }
@@ -703,7 +703,7 @@ class MainViewModel : ViewModel() {
 
     fun resetRegistrationState() {
         // Safe placeholder for registration flow reset state
-        android.util.Log.d("MainViewModel", "resetRegistrationState triggered")
+        android.util.Log.d("AuthViewModel", "resetRegistrationState triggered")
     }
 
     val bookingRepository by lazy {
@@ -4976,7 +4976,7 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // Bookings Management (Now modularized in MainViewModelBookings.kt)
+    // Bookings Management (Now modularized in AuthViewModelBookings.kt)
     fun addBooking(
         name: String, 
         phone: String, 

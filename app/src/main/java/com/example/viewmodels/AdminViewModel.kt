@@ -138,13 +138,18 @@ data class SystemLog(
  * 👑 AdminViewModel
  * إدارة كاملة لمنطق ولوحة تحكم الإدارة العليا (الأدمن) متضمنة الإعدادات، طلبات الانضمام، الحظر، والإحصائيات والمزامنة.
  */
-class AdminViewModel(application: Application) : AndroidViewModel(application) {
+@dagger.hilt.android.lifecycle.HiltViewModel
+class AdminViewModel @javax.inject.Inject constructor(
+    application: Application,
+    private val repository: com.example.data.repositories.SettingsRepository = com.example.data.repositories.SettingsRepository()
+) : androidx.lifecycle.AndroidViewModel(application) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
-    private val syncManager: SyncManager by lazy { SyncManager(getApplication()) }
+    private val syncManager: SyncManager by lazy { SyncManager(application) }
 
     private val _adminSettings = MutableStateFlow(AdminSettingsEntity())
     val adminSettings: StateFlow<AdminSettingsEntity> = _adminSettings.asStateFlow()
+    val settings: StateFlow<AdminSettingsEntity> = _adminSettings.asStateFlow()
 
     private val _pendingRequests = MutableStateFlow<List<PendingRequest>>(emptyList())
     val pendingRequests: StateFlow<List<PendingRequest>> = _pendingRequests.asStateFlow()
@@ -689,5 +694,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearSystemLogs() {
         _systemLogs.value = emptyList()
+    }
+    override fun onCleared() {
+        super.onCleared()
+        repository.clearListeners()
     }
 }

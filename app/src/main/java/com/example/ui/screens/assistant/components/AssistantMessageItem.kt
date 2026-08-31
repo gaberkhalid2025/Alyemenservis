@@ -1,4 +1,5 @@
 package com.example.ui.screens.assistant.components
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -18,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.VoiceManager
-import com.example.ui.MainViewModel
+
 import com.example.ui.ProviderCard
 import com.example.ui.screens.assistant.AssistantMessage
 import com.example.utils.VisualThemePalette
@@ -31,7 +32,7 @@ import com.example.utils.VisualThemePalette
 fun AssistantMessageItem(
     msg: AssistantMessage,
     themeColors: VisualThemePalette,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onRequestQuickService: () -> Unit,
     onNavigateToMap: () -> Unit,
     onChatOpen: (String) -> Unit,

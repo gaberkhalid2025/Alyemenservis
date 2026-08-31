@@ -1,6 +1,10 @@
 package com.example.ui.screens.home.sections
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.AdminViewModel
+import com.example.viewmodels.AuthViewModel
+import com.example.viewmodels.PropertyViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.PropertyEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -25,14 +29,16 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun PropertiesSectionView(
-    viewModel: MainViewModel,
+    adminViewModel: AdminViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
+    propertyViewModel: PropertyViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onPropertyClick: (PropertyEntity) -> Unit,
     onCreatePropertyClick: () -> Unit
 ) {
-    val properties by viewModel.properties.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val adminRole by viewModel.adminRole.collectAsState()
+    val properties by propertyViewModel.properties.collectAsState()
+    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
+    val adminRole by adminViewModel.adminRole.collectAsState()
     val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
 
     val activeProperties = remember(properties, currentUserId, adminRole) {

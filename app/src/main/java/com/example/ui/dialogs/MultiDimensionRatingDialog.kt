@@ -3,6 +3,8 @@ package com.example.ui.dialogs
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.RatingEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 import java.util.UUID
 
@@ -33,13 +35,13 @@ fun MultiDimensionRatingDialog(
     targetName: String,
     targetType: String,
     bookingId: String = "",
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val currentUserName by viewModel.currentUserName.collectAsState()
-    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val currentUserName by authViewModel.currentUserName.collectAsState()
+    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
 
     var qualityRating by remember { mutableFloatStateOf(5.0f) }
     var speedRating by remember { mutableFloatStateOf(5.0f) }

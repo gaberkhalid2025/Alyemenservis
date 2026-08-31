@@ -4,6 +4,7 @@ plugins {
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.devtools.ksp)
   id("com.google.gms.google-services")
+  
 }
 
 android {

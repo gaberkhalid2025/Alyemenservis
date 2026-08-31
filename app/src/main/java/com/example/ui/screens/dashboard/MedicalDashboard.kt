@@ -2,6 +2,8 @@ package com.example.ui.screens.dashboard
 
 import android.widget.Toast
 import androidx.compose.animation.*
+import com.example.viewmodels.StoreViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,7 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 import com.example.data.repositories.*
@@ -35,7 +37,7 @@ import com.example.data.repositories.*
 @Composable
 fun MedicalDashboard(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit
 ) {
@@ -69,7 +71,7 @@ fun MedicalDashboard(
         Pair("📊", "الإحصائيات والأداء")
     )
 
-    val stores by viewModel.stores.collectAsState()
+    val stores by storeViewModel.stores.collectAsState()
     val matchingStore = stores.find { it.id == account.id || it.phone == account.phone }
     val isVerified = account.isVerified || (matchingStore?.isActive == true)
 

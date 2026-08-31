@@ -1,4 +1,5 @@
 package com.example.ui.components
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*

@@ -15,7 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.ui.MainViewModel
+
 import com.example.ui.ProviderCard
 import com.example.ui.components.ProviderListSkeleton
 import com.example.utils.VisualThemePalette
@@ -25,7 +25,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun ServicesBrowserMainContent(
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette,
     displayProviders: List<ProviderEntity>,
     isProvidersLoading: Boolean,

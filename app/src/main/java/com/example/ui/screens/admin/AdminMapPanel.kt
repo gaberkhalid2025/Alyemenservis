@@ -6,6 +6,10 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.PropertyViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -40,14 +44,16 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AdminMapPanel(
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
+    providerViewModel: ProviderViewModel = viewModel(),
+    propertyViewModel: PropertyViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onOpenMap: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val providers by viewModel.providers.collectAsState(initial = emptyList())
-    val stores by viewModel.stores.collectAsState(initial = emptyList())
-    val properties by viewModel.properties.collectAsState(initial = emptyList())
+    val providers by providerViewModel.providers.collectAsState(initial = emptyList())
+    val stores by storeViewModel.stores.collectAsState(initial = emptyList())
+    val properties by propertyViewModel.properties.collectAsState(initial = emptyList())
 
     var selectedCityFilter by remember { mutableStateOf("الكل") }
     var selectedTypeFilter by remember { mutableStateOf("ALL") } // ALL, PROVIDER, STORE, RESTAURANT, MEDICAL, PROPERTY

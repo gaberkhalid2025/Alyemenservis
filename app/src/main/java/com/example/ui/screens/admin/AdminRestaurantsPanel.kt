@@ -4,6 +4,9 @@ package com.example.ui.screens.admin
 
 import android.widget.Toast
 import androidx.compose.foundation.*
+import com.example.viewmodels.AdminViewModel
+import com.example.viewmodels.StoreViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,17 +20,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
+
 import com.example.util.PermissionGuard
 import com.example.util.RoleManager
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun AdminRestaurantsPanel(
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
+    adminViewModel: AdminViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
-    val adminRoleStr by viewModel.adminRole.collectAsState()
+    val adminRoleStr by adminViewModel.adminRole.collectAsState()
     val supervisorPermissions by viewModel.currentSupervisorPermissions.collectAsState()
     if (!PermissionGuard.hasPermission(
             role = RoleManager.fromRoleString(adminRoleStr),
@@ -40,7 +44,7 @@ fun AdminRestaurantsPanel(
     }
 
     val context = LocalContext.current
-    val stores by viewModel.stores.collectAsState()
+    val stores by storeViewModel.stores.collectAsState()
     val restaurants = stores.filter { 
         it.sectionId == "restaurants" || it.categoryId.contains("rest", true) || it.categoryId.contains("مطعم", true) || it.name.contains("مطعم", true) || it.name.contains("كافيه", true) || it.name.contains("وجب", true) 
     }
@@ -118,7 +122,7 @@ fun AdminRestaurantsPanel(
                                     Text("📞 ${item.phone} • 📍 ${item.cityId}", color = themeColors.textSecondary, fontSize = 11.sp)
                                 }
                                 Row {
-                                    IconButton(onClick = { viewModel.setStoreActive(item.id, !item.isActive) }) {
+                                    IconButton(onClick = { storeViewModel.setStoreActive(item.id, !item.isActive) }) {
                                         Icon(
                                             imageVector = if (item.isActive) Icons.Default.CheckCircle else Icons.Default.Close,
                                             contentDescription = "Active",
@@ -126,7 +130,7 @@ fun AdminRestaurantsPanel(
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
-                                    IconButton(onClick = { viewModel.deleteStore(item.id) }) {
+                                    IconButton(onClick = { storeViewModel.deleteStore(item.id) }) {
                                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(20.dp))
                                     }
                                 }
@@ -138,19 +142,19 @@ fun AdminRestaurantsPanel(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(checked = item.isVip, onCheckedChange = { viewModel.setStoreVip(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFD97706)), modifier = Modifier.size(28.dp))
+                                    Checkbox(checked = item.isVip, onCheckedChange = { storeViewModel.setStoreVip(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFD97706)), modifier = Modifier.size(28.dp))
                                     Text("VIP", fontSize = 10.sp, color = Color.White)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(checked = item.isVerified, onCheckedChange = { viewModel.setStoreVerified(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)), modifier = Modifier.size(28.dp))
+                                    Checkbox(checked = item.isVerified, onCheckedChange = { storeViewModel.setStoreVerified(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)), modifier = Modifier.size(28.dp))
                                     Text("موثق", fontSize = 10.sp, color = Color.White)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(checked = item.isRecommended, onCheckedChange = { viewModel.setStoreRecommended(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)), modifier = Modifier.size(28.dp))
+                                    Checkbox(checked = item.isRecommended, onCheckedChange = { storeViewModel.setStoreRecommended(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEC4899)), modifier = Modifier.size(28.dp))
                                     Text("موصى به", fontSize = 10.sp, color = Color.White)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(checked = item.isPinned, onCheckedChange = { viewModel.setStorePinned(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF10B981)), modifier = Modifier.size(28.dp))
+                                    Checkbox(checked = item.isPinned, onCheckedChange = { storeViewModel.setStorePinned(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFF10B981)), modifier = Modifier.size(28.dp))
                                     Text("تثبيت", fontSize = 10.sp, color = Color.White)
                                 }
                             }
@@ -160,11 +164,11 @@ fun AdminRestaurantsPanel(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(checked = item.isChatDisabled, onCheckedChange = { viewModel.setStoreChatDisabled(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEF4444)), modifier = Modifier.size(28.dp))
+                                    Checkbox(checked = item.isChatDisabled, onCheckedChange = { storeViewModel.setStoreChatDisabled(item.id, it) }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFEF4444)), modifier = Modifier.size(28.dp))
                                     Text("قفل الدردشة", fontSize = 9.sp, color = Color.LightGray)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Checkbox(checked = item.isBlocked, onCheckedChange = { viewModel.setStoreBlocked(item.id, it, "حظر إداري") }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFB91C1C)), modifier = Modifier.size(28.dp))
+                                    Checkbox(checked = item.isBlocked, onCheckedChange = { storeViewModel.setStoreBlocked(item.id, it, "حظر إداري") }, colors = CheckboxDefaults.colors(checkedColor = Color(0xFFB91C1C)), modifier = Modifier.size(28.dp))
                                     Text("حظر المطعم", fontSize = 9.sp, color = Color.LightGray)
                                 }
                             }

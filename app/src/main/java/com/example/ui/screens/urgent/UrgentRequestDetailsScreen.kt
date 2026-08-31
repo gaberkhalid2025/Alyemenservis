@@ -3,6 +3,10 @@ package com.example.ui.screens.urgent
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
+import com.example.viewmodels.AdminViewModel
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -22,11 +26,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.MainViewModel
+
 import com.example.ui.dialogs.MultiDimensionRatingDialog
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
-import com.example.viewmodels.UrgentViewModel
+import com.example.viewmodels.InstantRequestViewModel
 
 /**
  * 🚨 UrgentRequestDetailsScreen
@@ -36,8 +40,10 @@ import com.example.viewmodels.UrgentViewModel
 @Composable
 fun UrgentRequestDetailsScreen(
     requestId: String,
-    viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
+    providerViewModel: ProviderViewModel = viewModel(),
+    adminViewModel: AdminViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
+    urgentViewModel: InstantRequestViewModel = viewModel(),
     themeColors: VisualThemePalette? = null,
     onNavigateBack: () -> Unit = {},
     onNavigateToOfferSelection: (offerId: String) -> Unit = {},
@@ -46,11 +52,11 @@ fun UrgentRequestDetailsScreen(
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val settingsState by viewModel.settings.collectAsState()
+    val settingsState by adminViewModel.settings.collectAsState()
     val activeTheme = themeColors ?: resolveThemePalette(settingsState)
 
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val isProvider = viewModel.isProviderUser
+    val currentUserId by authViewModel.currentUserId.collectAsState()
+    val isProvider = providerViewModel.isProviderUser
 
     val request by urgentViewModel.selectedRequest.collectAsState()
     val offers by urgentViewModel.offersForRequest.collectAsState()
@@ -168,7 +174,7 @@ fun UrgentRequestDetailsScreen(
             targetName = techName,
             targetType = "URGENT_PROVIDER",
             bookingId = request!!.requestCode,
-            viewModel = viewModel,
+            
             themeColors = activeTheme,
             onDismiss = { showRatingDialog = false }
         )

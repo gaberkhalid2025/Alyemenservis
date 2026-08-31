@@ -1,4 +1,5 @@
 package com.example.ui.screens.dashboard
+import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -22,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.ProductEntity
 import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -31,7 +32,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun TabProductsServices(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

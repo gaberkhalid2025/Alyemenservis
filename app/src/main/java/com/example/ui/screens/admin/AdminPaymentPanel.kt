@@ -24,7 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.PaymentAdminSettingsEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -33,7 +33,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AdminPaymentPanel(
-    viewModel: MainViewModel? = null,
+    viewModel: AuthViewModel? = null,
     themeColors: VisualThemePalette? = null,
     onToggleSystem: ((Boolean) -> Unit)? = null,
     onUnlinkAll: (() -> Unit)? = null,

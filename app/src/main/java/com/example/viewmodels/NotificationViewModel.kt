@@ -25,7 +25,11 @@ data class AppNotification(
  * 🔔 NotificationViewModel
  * إدارة الإشعارات الفورية وسجل التنبيهات الخاصة بالمستخدم والفنيين.
  */
-class NotificationViewModel(application: Application) : AndroidViewModel(application) {
+@dagger.hilt.android.lifecycle.HiltViewModel
+class NotificationViewModel @javax.inject.Inject constructor(
+    application: Application,
+    private val repository: com.example.data.repositories.NotificationRepository = com.example.data.repositories.NotificationRepository()
+) : androidx.lifecycle.AndroidViewModel(application) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
@@ -61,5 +65,9 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
     fun clearAll() {
         _notifications.value = emptyList()
         _unreadCount.value = 0
+    }
+    override fun onCleared() {
+        super.onCleared()
+        repository.clearListeners()
     }
 }

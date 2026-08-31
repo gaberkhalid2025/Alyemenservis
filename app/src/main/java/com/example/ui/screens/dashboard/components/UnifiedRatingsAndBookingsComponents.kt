@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -26,7 +26,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun UnifiedRatingsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -56,7 +56,7 @@ fun UnifiedRatingsSection(
 @Composable
 fun UnifiedBookingsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette
 ) {
     var selectedFilter by remember { mutableStateOf("ALL") }
@@ -105,7 +105,7 @@ fun UnifiedBookingsSection(
 @Composable
 fun UnifiedAttachmentsSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

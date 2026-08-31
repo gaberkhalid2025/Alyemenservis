@@ -3,6 +3,10 @@
 package com.example.ui.screens.admin
 import android.content.Intent
 import androidx.compose.ui.geometry.CornerRadius
+import com.example.viewmodels.AdminViewModel
+import com.example.viewmodels.AuthViewModel
+import com.example.viewmodels.NotificationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.PathEffect
 import okhttp3.MediaType.Companion.toMediaType
@@ -73,7 +77,7 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.*
 import com.example.utils.*
-import com.example.ui.MainViewModel
+
 import com.example.ui.components.*
 import com.example.ui.dialogs.*
 import com.example.ui.screens.home.*
@@ -95,8 +99,10 @@ import kotlinx.coroutines.withContext
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 /* AdminPanelLayout has been moved to com.example.ui.screens.admin.AdminPanelLayout */
-fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) {
-    val settingsState by viewModel.settings.collectAsState()
+fun OwnerBackdoorPanelLayout(adminViewModel: AdminViewModel = viewModel(),
+    notificationViewModel: NotificationViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(), themeColors: VisualThemePalette) {
+    val settingsState by adminViewModel.settings.collectAsState()
 
     var appName by remember { mutableStateOf(settingsState.appName) }
     var welcomeMessage by remember { mutableStateOf(settingsState.welcomeMessage) }
@@ -201,14 +207,14 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     if (bytes != null) {
                         bannerBase64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                         bannerType = "VIDEO"
-                        viewModel.triggerNotification("📹 تم تحميل الفيديو القصير للبنر بنجاح!")
+                        notificationViewModel.triggerNotification("📹 تم تحميل الفيديو القصير للبنر بنجاح!")
                     }
                 } else {
                     val base64Str = com.example.ui.utils.compressAndResizeImageUri(context, it, 800, 70)
                     if (base64Str.isNotEmpty()) {
                         bannerBase64 = base64Str
                         bannerType = "IMAGE"
-                        viewModel.triggerNotification("📸 تم تحميل صورة البنر الإعلاني من المعرض بنجاح!")
+                        notificationViewModel.triggerNotification("📸 تم تحميل صورة البنر الإعلاني من المعرض بنجاح!")
                     }
                 }
             } catch (e: Exception) { e.printStackTrace() }
@@ -224,7 +230,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 if (base64Str.isNotEmpty()) {
                     aboutCoverBase64 = base64Str
                     aboutCoverType = "IMAGE"
-                    viewModel.triggerNotification("📸 تم تحميل صورة الغلاف من المعرض بنجاح!")
+                    notificationViewModel.triggerNotification("📸 تم تحميل صورة الغلاف من المعرض بنجاح!")
                 }
             } catch (e: Exception) { e.printStackTrace() }
         }
@@ -244,7 +250,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
         ) {
             Text("🔓 بوابة المالك والتحكم الخلفي الديناميكي", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
             Button(
-                onClick = { viewModel.logout(context) },
+                onClick = { authViewModel.logout(context) },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
             ) {
                 Text("إغلاق اللوحة", color = Color.White, fontSize = 10.sp)
@@ -750,7 +756,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     .background(themeColors.surface)
                     .clickable { 
                         headerIconsOrder = "MENU,NOTIF,CHAT"
-                        viewModel.triggerNotification("🎯 تم ضبط الترتيب الافتراضي للأيقونات")
+                        notificationViewModel.triggerNotification("🎯 تم ضبط الترتيب الافتراضي للأيقونات")
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -763,7 +769,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     .background(themeColors.surface)
                     .clickable { 
                         headerIconsOrder = "CHAT,NOTIF,MENU"
-                        viewModel.triggerNotification("🎯 تم عكس ترتيب الأيقونات")
+                        notificationViewModel.triggerNotification("🎯 تم عكس ترتيب الأيقونات")
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -778,7 +784,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                         headerIconsOrder = "MENU,CHAT,NOTIF,REFRESH,SETTINGS"
                         showRefreshIcon = true
                         showSettingsIcon = true
-                        viewModel.triggerNotification("🎯 تم تفعيل كافة الأيقونات بالترتيب الكامل")
+                        notificationViewModel.triggerNotification("🎯 تم تفعيل كافة الأيقونات بالترتيب الكامل")
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -1203,7 +1209,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                         .background(if (selectedSimulatedLogo == lg) themeColors.accent else themeColors.surface)
                         .clickable { 
                             selectedSimulatedLogo = lg
-                            viewModel.triggerNotification("🖼️ تم تحديد الشعار ($lg) بنجاح للتطبيق!")
+                            notificationViewModel.triggerNotification("🖼️ تم تحديد الشعار ($lg) بنجاح للتطبيق!")
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
@@ -1292,14 +1298,14 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     hideTelegram = hideTelegram,
                     hideWebsite = hideWebsite
                 )
-                viewModel.saveCustomSettingsState(currentSettings)
+                adminViewModel.saveCustomSettingsState(currentSettings)
 
                 if (rememberLoginInput) {
                     sp.edit().putString("saved_admin_role", "OWNER").apply()
                 } else {
                     sp.edit().putString("saved_admin_role", "GUEST").apply()
                 }
-                viewModel.triggerNotification("💾 تم حفظ كافة التخصيصات والتحققات بنجاح!")
+                notificationViewModel.triggerNotification("💾 تم حفظ كافة التخصيصات والتحققات بنجاح!")
             },
             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
             modifier = Modifier.fillMaxWidth()
@@ -1342,8 +1348,8 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 confirmButton = {
                     Button(
                         onClick = {
-                            if (viewModel.verifyAdminOrOwnerPassword(wipePasswordInput)) {
-                                viewModel.wipeAllMockAndTemporaryData()
+                            if (adminViewModel.verifyAdminOrOwnerPassword(wipePasswordInput)) {
+                                adminViewModel.wipeAllMockAndTemporaryData()
                                 showWipeConfirmDialog = false
                                 wipePasswordInput = ""
                                 wipeErrorMsg = ""

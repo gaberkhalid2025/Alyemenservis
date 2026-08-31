@@ -2,6 +2,8 @@ package com.example.ui.screens.dashboard
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,7 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -27,7 +29,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun RestoreAccountBottomSheet(
     onDismissRequest: () -> Unit,
-    viewModel: MainViewModel,
+    authViewModel: AuthViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
@@ -106,7 +108,7 @@ fun RestoreAccountBottomSheet(
                         val cleanPass = restorePass.trim()
                         if (cleanPhone.length == 9 && cleanPass.isNotEmpty()) {
                             isRestoring = true
-                            viewModel.restoreGuestUser(
+                            authViewModel.restoreGuestUser(
                                 context = context,
                                 phone = cleanPhone,
                                 password = cleanPass,

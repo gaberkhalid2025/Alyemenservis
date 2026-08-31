@@ -2,6 +2,12 @@ package com.example.ui.screens.bookings
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.BookingViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.AdminViewModel
+import com.example.viewmodels.ChatViewModel
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -20,16 +26,20 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun BookingsScreenLayout(
-    viewModel: MainViewModel,
+    adminViewModel: AdminViewModel = viewModel(),
+    providerViewModel: ProviderViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
+    bookingViewModel: BookingViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
 
-    val bookings by viewModel.bookings.collectAsState()
-    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val currentUserName by viewModel.currentUserName.collectAsState()
-    val adminRole by viewModel.adminRole.collectAsState()
+    val bookings by bookingViewModel.bookings.collectAsState()
+    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
+    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
+    val currentUserName by authViewModel.currentUserName.collectAsState()
+    val adminRole by adminViewModel.adminRole.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     var isCreatingNewBooking by remember { mutableStateOf(false) }
@@ -63,7 +73,7 @@ fun BookingsScreenLayout(
             BookingFormScreen(
                 onBack = { isCreatingNewBooking = false },
                 onBookingCreated = { newBooking ->
-                    viewModel.createBooking(newBooking) { success ->
+                    bookingViewModel.createBooking(newBooking) { success ->
                         if (success) {
                             Toast.makeText(context, "تم حفظ الحجز وتأكيده بنجاح!", Toast.LENGTH_SHORT).show()
                         }
@@ -76,23 +86,23 @@ fun BookingsScreenLayout(
                 bookings = relevantBookings,
                 currentUserId = currentUserId.ifBlank { currentUserPhone },
                 isAdmin = isAdmin,
-                isProvider = viewModel.isProviderUser,
+                isProvider = providerViewModel.isProviderUser,
                 isRefreshing = isRefreshing,
                 onRefresh = { viewModel.refreshData() },
                 onBackClick = { viewModel.navigateTo("USER_BROWSE") },
                 onCreateNewBookingClick = { isCreatingNewBooking = true },
                 onUpdateBooking = { updatedBooking ->
-                    viewModel.updateBookingImpl(updatedBooking)
+                    bookingViewModel.updateBookingImpl(updatedBooking)
                 },
                 onStatusChange = { booking, newStatus ->
                     val updated = booking.copy(status = newStatus)
-                    viewModel.updateBookingImpl(updated)
+                    bookingViewModel.updateBookingImpl(updated)
                     if (newStatus == "APPROVED") {
                         // Automatically open chat when accepted
                         val otherId = booking.clientId.ifEmpty { booking.clientPhone.ifEmpty { "CUSTOMER" } }
                         val otherName = booking.customerName.ifEmpty { booking.clientName.ifEmpty { "العميل" } }
                         val otherPhone = booking.clientPhone.ifEmpty { booking.customerPhone }
-                        viewModel.openOrCreateChatChannel(
+                        chatViewModel.openOrCreateChatChannel(
                             targetId = otherId,
                             targetType = "BOOKING",
                             targetName = otherName,
@@ -109,7 +119,7 @@ fun BookingsScreenLayout(
                     Toast.makeText(context, "تم تحديث حالة الحجز إلى: $newStatus", Toast.LENGTH_SHORT).show()
                 },
                 onCancelBooking = { booking, reason, password ->
-                    viewModel.attemptCancelBookingImpl(
+                    bookingViewModel.attemptCancelBookingImpl(
                         bookingId = booking.id,
                         input = password,
                         reason = reason
@@ -118,14 +128,14 @@ fun BookingsScreenLayout(
                     }
                 },
                 onDeleteBooking = { booking ->
-                    viewModel.deleteBookingImpl(booking.id)
+                    bookingViewModel.deleteBookingImpl(booking.id)
                 },
                 onOpenChatClick = { booking ->
                     val otherId = booking.providerId.ifEmpty { booking.providerPhone.ifEmpty { "ADMIN" } }
                     val otherName = booking.providerName.ifEmpty { "مقدم الخدمة" }
                     val otherPhone = booking.providerPhone
 
-                    viewModel.openOrCreateChatChannel(
+                    chatViewModel.openOrCreateChatChannel(
                         targetId = otherId,
                         targetType = "BOOKING",
                         targetName = otherName,
@@ -137,7 +147,7 @@ fun BookingsScreenLayout(
                         if (createdCh != null && createdCh.id.isNotEmpty()) {
                             viewModel.db.collection("bookings").document(booking.id).update("relatedChatChannelId", createdCh.id)
                         }
-                        viewModel.openChatChannel(createdCh)
+                        chatViewModel.openChatChannel(createdCh)
                         viewModel.navigateTo("CHAT_DIRECT")
                     }
                 }

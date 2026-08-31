@@ -1,6 +1,13 @@
 package com.example.ui.components
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.BookingViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.AdminViewModel
+import com.example.viewmodels.NotificationViewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -19,11 +26,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 @Composable
-fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onInfoClick: () -> Unit) {
+fun AppFooterBar(
+    viewModel: MainViewModel = viewModel(), themeColors: VisualThemePalette, onInfoClick: () -> Unit) {
     val settingsState by viewModel.settings.collectAsState()
     val currentLang by viewModel.currentLanguage.collectAsState()
     val isEn = currentLang == "en"

@@ -5,6 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.*
+import com.example.viewmodels.SettingsViewModel
+import com.example.viewmodels.BookingViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.AdminViewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,7 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.ui.MainViewModel
+
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
@@ -53,7 +58,10 @@ fun DynamicPolymorphicProfileScreen(
     store: StoreEntity? = null,
     property: PropertyEntity? = null,
     job: JobEntity? = null,
-    viewModel: MainViewModel,
+    settingsViewModel: SettingsViewModel = viewModel(),
+    adminViewModel: AdminViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
+    bookingViewModel: BookingViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit,
     onOpenChat: (channelId: String) -> Unit = {},
@@ -61,15 +69,15 @@ fun DynamicPolymorphicProfileScreen(
     onOrderProduct: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val categories by viewModel.categories.collectAsState()
+    val categories by settingsViewModel.categories.collectAsState()
     val products by viewModel.products.collectAsState()
     val ratings by viewModel.ratings.collectAsState()
-    val bookings by viewModel.bookings.collectAsState()
+    val bookings by bookingViewModel.bookings.collectAsState()
 
     // Current user authentication states
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
-    val adminRole by viewModel.adminRole.collectAsState()
+    val currentUserId by authViewModel.currentUserId.collectAsState(initial = "")
+    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
+    val adminRole by adminViewModel.adminRole.collectAsState()
 
     // Determine Entity Type dynamically
     val entityType = remember(provider, store, property, job) {
@@ -153,7 +161,7 @@ fun DynamicPolymorphicProfileScreen(
             targetId = entityId,
             targetName = entityName,
             targetType = entityType.name,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             onDismiss = { showRatingDialog = false }
         )
@@ -164,7 +172,7 @@ fun DynamicPolymorphicProfileScreen(
             targetId = entityId,
             targetName = entityName,
             targetType = entityType.name,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             onDismiss = { showReportDialog = false }
         )
@@ -246,7 +254,7 @@ fun DynamicPolymorphicProfileScreen(
                 entityPhone = entityPhone,
                 entityType = entityType,
                 isOwner = isOwner,
-                viewModel = viewModel,
+                
                 themeColors = themeColors,
                 onOpenChat = onOpenChat,
                 onRequestBooking = onRequestBooking,

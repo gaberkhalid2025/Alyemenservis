@@ -1,6 +1,9 @@
 package com.example.ui.screens.admin
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.StoreViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.StoreEntity
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.admin.components.AdminEntityCard
 import com.example.ui.screens.admin.components.AdminFilterChips
 import com.example.utils.VisualThemePalette

@@ -1,4 +1,5 @@
 package com.example.ui.screens.chat
+import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -41,7 +42,7 @@ fun ChatScreen(
     relatedEntityId: String? = null,
     relatedEntityType: String? = null,
     themeColors: VisualThemePalette,
-    chatViewModel: ChatViewModel = viewModel(),
+    viewModel: ChatViewModel = viewModel(),
     onBackClick: () -> Unit
 ) {
     if (currentUserId.isBlank() || currentUserId == "guest") {
@@ -59,12 +60,12 @@ fun ChatScreen(
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
-    val currentChannel by chatViewModel.currentChannel.collectAsState()
-    val messages by chatViewModel.messages.collectAsState()
-    val presence by chatViewModel.otherUserPresence.collectAsState()
-    val isTypingOther by chatViewModel.isTypingOther.collectAsState()
-    val replyingTo by chatViewModel.replyingToMessage.collectAsState()
-    val searchQuery by chatViewModel.searchQuery.collectAsState()
+    val currentChannel by viewModel.currentChannel.collectAsState()
+    val messages by viewModel.messages.collectAsState()
+    val presence by viewModel.otherUserPresence.collectAsState()
+    val isTypingOther by viewModel.isTypingOther.collectAsState()
+    val replyingTo by viewModel.replyingToMessage.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
 
     var isSearchOpen by remember { mutableStateOf(false) }
     var selectedMessageForAction by remember { mutableStateOf<ChatMessage?>(null) }
@@ -72,7 +73,7 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
-        chatViewModel.eventFlow.collect { event ->
+        viewModel.eventFlow.collect { event ->
             when (event) {
                 is ChatEvent.ShowError -> {
                     snackbarHostState.showSnackbar(event.message)
@@ -93,9 +94,9 @@ fun ChatScreen(
     // Initialize Chat
     LaunchedEffect(channel, channelId, targetUserId) {
         if (channel != null) {
-            chatViewModel.openChannel(channel, currentUserId)
+            viewModel.openChannel(channel, currentUserId)
         } else if (!channelId.isNullOrBlank()) {
-            chatViewModel.openChannelById(
+            viewModel.openChannelById(
                 channelId = channelId,
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
@@ -103,7 +104,7 @@ fun ChatScreen(
                 fallbackUserName = targetUserName
             )
         } else if (!targetUserId.isNullOrBlank()) {
-            chatViewModel.startDirectChat(
+            viewModel.startDirectChat(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,
@@ -165,11 +166,11 @@ fun ChatScreen(
             onBackClick = onBackClick,
             onSearchToggle = {
                 isSearchOpen = !isSearchOpen
-                if (!isSearchOpen) chatViewModel.setSearchQuery("")
+                if (!isSearchOpen) viewModel.setSearchQuery("")
             },
             onBlockClick = {
                 if (otherUserId.isNotBlank()) {
-                    chatViewModel.toggleBlock(otherUserId, true)
+                    viewModel.toggleBlock(otherUserId, true)
                     Toast.makeText(context, "تم حظر المستخدم", Toast.LENGTH_SHORT).show()
                 }
             },
@@ -189,7 +190,7 @@ fun ChatScreen(
             ) {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { chatViewModel.setSearchQuery(it) },
+                    onValueChange = { viewModel.setSearchQuery(it) },
                     placeholder = { Text("بحث في المحادثة...", fontSize = 12.sp, color = Color.Gray) },
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -200,7 +201,7 @@ fun ChatScreen(
                 )
                 IconButton(onClick = {
                     isSearchOpen = false
-                    chatViewModel.setSearchQuery("")
+                    viewModel.setSearchQuery("")
                 }) {
                     Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
                 }
@@ -235,9 +236,9 @@ fun ChatScreen(
                         ChatBubbleItem(
                             message = msg,
                             isMe = isMe,
-                            onReplyClick = { chatViewModel.setReplyingTo(msg) },
+                            onReplyClick = { viewModel.setReplyingTo(msg) },
                             onLongClick = { selectedMessageForAction = msg },
-                            onRetryClick = { chatViewModel.resendMessage(msg.id) }
+                            onRetryClick = { viewModel.resendMessage(msg.id) }
                         )
                     }
                 }
@@ -247,9 +248,9 @@ fun ChatScreen(
         // Input Bar
         ChatInputBar(
             replyingTo = replyingTo,
-            onCancelReply = { chatViewModel.setReplyingTo(null) },
+            onCancelReply = { viewModel.setReplyingTo(null) },
             onSendMessage = { text, mediaType, mediaUrl ->
-                chatViewModel.sendMessage(
+                viewModel.sendMessage(
                     senderId = currentUserId,
                     senderName = currentUserName,
                     text = text,
@@ -258,7 +259,7 @@ fun ChatScreen(
                 )
             },
             onTyping = { text ->
-                chatViewModel.onUserTyping(currentUserId, text)
+                viewModel.onUserTyping(currentUserId, text)
             }
         )
         }
@@ -280,21 +281,21 @@ fun ChatScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = {
-                        chatViewModel.setReplyingTo(targetMsg)
+                        viewModel.setReplyingTo(targetMsg)
                         selectedMessageForAction = null
                     }) {
                         Text("↩️ الرد على الرسالة", color = Color.White, fontSize = 13.sp)
                     }
                     if (isMe) {
                         TextButton(onClick = {
-                            chatViewModel.deleteMessage(targetMsg.id, true, currentUserId)
+                            viewModel.deleteMessage(targetMsg.id, true, currentUserId)
                             selectedMessageForAction = null
                         }) {
                             Text("🗑️ حذف لدى الجميع", color = Color(0xFFE53935), fontSize = 13.sp)
                         }
                     }
                     TextButton(onClick = {
-                        chatViewModel.deleteMessage(targetMsg.id, false, currentUserId)
+                        viewModel.deleteMessage(targetMsg.id, false, currentUserId)
                         selectedMessageForAction = null
                     }) {
                         Text("🗑️ حذف لدي فقط", color = Color.LightGray, fontSize = 13.sp)
@@ -316,7 +317,7 @@ fun ChatScreen(
                 Button(
                     onClick = {
                         showDeleteChannelDialog = false
-                        chatViewModel.deleteCurrentChannel {
+                        viewModel.deleteCurrentChannel {
                             onBackClick()
                         }
                     },

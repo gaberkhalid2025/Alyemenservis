@@ -1,7 +1,10 @@
 package com.example.ui.screens.dashboard
+import com.example.ui.MainViewModel
 
 import android.widget.Toast
 import androidx.compose.animation.*
+import com.example.viewmodels.JobViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.*
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 import com.example.data.repositories.*
@@ -36,7 +39,7 @@ import com.example.data.repositories.*
 @Composable
 fun JobPosterDashboard(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit
 ) {
@@ -173,7 +176,8 @@ fun JobPosterDashboard(
 }
 
 @Composable
-private fun JobPostingsSection(account: UnifiedBusinessAccount, viewModel: MainViewModel) {
+private fun JobPostingsSection(account: UnifiedBusinessAccount,
+    viewModel: MainViewModel = viewModel(),) {
     val context = LocalContext.current
     var showCreateDialog by remember { mutableStateOf(false) }
     val allJobs by viewModel.jobs.collectAsState()
@@ -322,7 +326,8 @@ private fun JobPostingsSection(account: UnifiedBusinessAccount, viewModel: MainV
 }
 
 @Composable
-private fun JobApplicantsSection(account: UnifiedBusinessAccount, viewModel: MainViewModel) {
+private fun JobApplicantsSection(account: UnifiedBusinessAccount,
+    viewModel: MainViewModel = viewModel(),) {
     val context = LocalContext.current
     val allApps by viewModel.jobApplications.collectAsState()
     val myApplicants = remember(allApps, account.name) {
@@ -385,7 +390,8 @@ private fun JobApplicantsSection(account: UnifiedBusinessAccount, viewModel: Mai
 }
 
 @Composable
-private fun JobPosterSettingsSection(account: UnifiedBusinessAccount, viewModel: MainViewModel) {
+private fun JobPosterSettingsSection(account: UnifiedBusinessAccount,
+    viewModel: MainViewModel = viewModel(),) {
     val context = LocalContext.current
     var isChatEnabled by remember { mutableStateOf(account.isChatEnabled) }
 
@@ -416,7 +422,8 @@ private fun JobPosterSettingsSection(account: UnifiedBusinessAccount, viewModel:
 }
 
 @Composable
-private fun JobPosterStatsSection(account: UnifiedBusinessAccount, viewModel: MainViewModel) {
+private fun JobPosterStatsSection(account: UnifiedBusinessAccount,
+    viewModel: MainViewModel = viewModel(),) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("📊 إحصائيات التوظيف والتفاعل", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF90CAF9))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {

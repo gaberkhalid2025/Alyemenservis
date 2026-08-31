@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.UnifiedBusinessAccount
 import com.example.rememberBase64Bitmap
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 data class GalleryImageItem(
@@ -37,7 +37,7 @@ data class GalleryImageItem(
 @Composable
 fun GalleryManagementScreen(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

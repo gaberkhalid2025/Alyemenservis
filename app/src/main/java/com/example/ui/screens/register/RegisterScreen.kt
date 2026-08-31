@@ -1,6 +1,8 @@
 package com.example.ui.screens.register
 
 import androidx.compose.animation.*
+import com.example.viewmodels.RegistrationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -22,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -31,7 +33,7 @@ import com.example.utils.VisualThemePalette
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
-    viewModel: MainViewModel,
+    registrationViewModel: RegistrationViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit = {},
     onSelectRegistrationType: (RegistrationType) -> Unit = {},
@@ -43,7 +45,7 @@ fun RegisterScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.resetRegistrationState()
+            registrationViewModel.resetRegistrationState()
         }
     }
 
@@ -290,7 +292,7 @@ fun RegisterScreen(
 
     if (showRestoreDialog) {
         GuestRegistrationDialog(
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             onDismiss = { showRestoreDialog = false },
             onRegisterCompleted = { name, phone, residence, pass ->

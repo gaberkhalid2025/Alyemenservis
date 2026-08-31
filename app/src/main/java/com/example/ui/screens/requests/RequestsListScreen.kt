@@ -1,6 +1,9 @@
 package com.example.ui.screens.requests
 
 import androidx.compose.animation.*
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.InstantRequestEntity
-import com.example.ui.MainViewModel
+
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import java.text.SimpleDateFormat
@@ -33,7 +36,8 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RequestsListScreen(
-    viewModel: MainViewModel,
+    providerViewModel: ProviderViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToDetails: (requestId: String) -> Unit = {},
     onNavigateToNewRequest: () -> Unit = {},
@@ -41,8 +45,8 @@ fun RequestsListScreen(
     onNavigateToSubmitOffer: (requestId: String) -> Unit = {}
 ) {
     val firestore = remember { FirebaseFirestore.getInstance() }
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val isProvider = viewModel.isProviderUser
+    val currentUserId by authViewModel.currentUserId.collectAsState()
+    val isProvider = providerViewModel.isProviderUser
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: الكل / النشطة, 1: المكتملة, 2: الملغية
     var requestsList by remember { mutableStateOf<List<InstantRequestEntity>>(emptyList()) }

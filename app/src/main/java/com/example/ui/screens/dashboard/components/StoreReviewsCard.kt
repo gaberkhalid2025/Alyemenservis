@@ -1,4 +1,5 @@
 package com.example.ui.screens.dashboard.components
+import com.example.ui.MainViewModel
 
 import android.content.Context
 import android.widget.Toast
@@ -15,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.RatingEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -24,7 +25,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun StoreReviewsCard(
     storeRatings: List<RatingEntity>,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette,
     context: Context
 ) {

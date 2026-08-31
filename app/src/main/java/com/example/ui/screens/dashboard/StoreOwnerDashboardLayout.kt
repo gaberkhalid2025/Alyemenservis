@@ -4,6 +4,9 @@ package com.example.ui.screens.dashboard
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.RegistrationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.RatingEntity
 import com.example.data.StoreEntity
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.dashboard.components.StoreAddProductDialog
 import com.example.ui.screens.dashboard.components.StoreEditDetailsCard
 import com.example.ui.screens.dashboard.components.StoreProductCatalogCard
@@ -33,7 +36,8 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun StoreOwnerDashboardLayout(
     store: StoreEntity,
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
+    registrationViewModel: RegistrationViewModel = viewModel(),
     themeColors: VisualThemePalette,
     ratings: List<RatingEntity>
 ) {
@@ -79,7 +83,7 @@ fun StoreOwnerDashboardLayout(
         // Part 1: Edit Details Card
         StoreEditDetailsCard(
             store = store,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             context = context
         )
@@ -87,7 +91,7 @@ fun StoreOwnerDashboardLayout(
         // Part 2: Product Catalog management
         StoreProductCatalogCard(
             storeProducts = storeProducts,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             context = context,
             onAddProductClick = { showAddProductDialog = true }
@@ -96,7 +100,7 @@ fun StoreOwnerDashboardLayout(
         // Part 3: Reviews and Replies
         StoreReviewsCard(
             storeRatings = storeRatings,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             context = context
         )
@@ -106,7 +110,7 @@ fun StoreOwnerDashboardLayout(
         // Actions: Logout & Delete Store Account
         Button(
             onClick = {
-                viewModel.cancelOrResetJoinRequest(context)
+                registrationViewModel.cancelOrResetJoinRequest(context)
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
             shape = RoundedCornerShape(8.dp),
@@ -135,8 +139,8 @@ fun StoreOwnerDashboardLayout(
                 confirmButton = {
                     Button(
                         onClick = {
-                            viewModel.deleteStorePermanently(store.id)
-                            viewModel.cancelOrResetJoinRequest(context)
+                            storeViewModel.deleteStorePermanently(store.id)
+                            registrationViewModel.cancelOrResetJoinRequest(context)
                             showDeleteConfirm = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
@@ -160,7 +164,7 @@ fun StoreOwnerDashboardLayout(
     if (showAddProductDialog) {
         StoreAddProductDialog(
             storeId = store.id,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             context = context,
             onDismiss = { showAddProductDialog = false }

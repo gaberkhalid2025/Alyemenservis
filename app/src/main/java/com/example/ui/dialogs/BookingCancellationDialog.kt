@@ -1,4 +1,5 @@
 package com.example.ui.dialogs
+import com.example.ui.MainViewModel
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background

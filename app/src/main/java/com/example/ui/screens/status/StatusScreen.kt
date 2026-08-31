@@ -1,4 +1,5 @@
 package com.example.ui.screens.status
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.repositories.StatusRepositoryImpl
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.flow.collectLatest
 
@@ -192,11 +193,11 @@ fun StatusScreen(
 }
 
 /**
- * Backwards compatible overload for MainViewModel callers.
+ * Backwards compatible overload for callers.
  */
 @Composable
 fun StatusScreen(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette,
     onBackClick: (() -> Unit)? = null
 ) {

@@ -1,4 +1,5 @@
 package com.example
+import com.example.ui.MainViewModel
 
 import com.example.utils.*
 
@@ -11,6 +12,17 @@ import com.example.ui.ProductDetailsDialog
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.*
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.SettingsViewModel
+import com.example.viewmodels.JobViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.AdminViewModel
+import com.example.ui.screens.chat.ChatViewModel
+import com.example.viewmodels.RegistrationViewModel
+import com.example.viewmodels.PropertyViewModel
+import com.example.viewmodels.NotificationViewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.graphics.Brush
@@ -45,7 +57,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import com.example.data.*
-import com.example.ui.MainViewModel
+
 import com.example.ui.components.ReviewInput
 
 @Composable
@@ -71,7 +83,7 @@ fun rememberBase64Bitmap(base64Str: String): ImageBitmap? {
 // --------------------------------------------------------
 @Composable
 fun SmartRecommendationsSection(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onStoreClick: (StoreEntity) -> Unit,
     onPropertyClick: (PropertyEntity) -> Unit
@@ -353,7 +365,7 @@ fun RecommendationItemCard(
 // --------------------------------------------------------
 @Composable
 fun StoresTabContent(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onStoreClick: (StoreEntity) -> Unit,
     onAddStoreClick: () -> Unit,
@@ -733,7 +745,7 @@ fun StoresTabContent(
             }
         } else {
             activeStores.take(itemsToShowLimit).forEach { store ->
-                StoreListItemCard(store = store, themeColors = themeColors, onClick = { onStoreClick(store) }, viewModel = viewModel)
+                StoreListItemCard(store = store, themeColors = themeColors, onClick = { onStoreClick(store) }, )
             }
             if (activeStores.size > itemsToShowLimit) {
                 Button(
@@ -1176,7 +1188,7 @@ fun StoreListItemCard(
 // --------------------------------------------------------
 @Composable
 fun PropertiesTabContent(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onPropertyClick: (PropertyEntity) -> Unit,
     onAddPropertyClick: () -> Unit,
@@ -1651,7 +1663,7 @@ fun PropertyListItemCard(
 @Composable
 fun StoreDetailsDialog(
     store: StoreEntity,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
     onOrderProductClick: (ProductEntity) -> Unit
@@ -1661,7 +1673,7 @@ fun StoreDetailsDialog(
     val customReviews by remember(store.id) {
         DataManager.getReviews(store.id)
     }.collectAsState(initial = emptyList())
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
     val currentUserName by viewModel.currentUserName.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
     val context = LocalContext.current
@@ -2049,7 +2061,7 @@ fun StoreDetailsDialog(
                     if (showEditStoreDialog) {
                         StoreCreateEditDialog(
                             store = store,
-                            viewModel = viewModel,
+                            
                             themeColors = themeColors,
                             onDismiss = { showEditStoreDialog = false }
                         )
@@ -2059,7 +2071,7 @@ fun StoreDetailsDialog(
                         BulkPriceAdjusterDialog(
                             storeId = store.id,
                             products = storeProducts,
-                            viewModel = viewModel,
+                            
                             themeColors = themeColors,
                             onDismiss = { showBulkPriceDialog = false }
                         )
@@ -2068,7 +2080,7 @@ fun StoreDetailsDialog(
                     if (showAddProductDialog) {
                         QuickAddProductDialog(
                             storeId = store.id,
-                            viewModel = viewModel,
+                            
                             themeColors = themeColors,
                             onDismiss = { showAddProductDialog = false }
                         )
@@ -2259,7 +2271,7 @@ fun StoreDetailsDialog(
                                     product = product,
                                     isOwnerOrAdmin = isOwnerOrAdmin,
                                     themeColors = themeColors,
-                                    viewModel = viewModel,
+                                    
                                     isMedical = isMedical,
                                     isRestaurant = isRestaurant,
                                     onOrderClick = { onOrderProductClick(product) }
@@ -2357,7 +2369,7 @@ fun StoreDetailsDialog(
 fun BulkPriceAdjusterDialog(
     storeId: String,
     products: List<ProductEntity>,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
@@ -2631,7 +2643,7 @@ fun BulkPriceAdjusterDialog(
 @Composable
 fun QuickAddProductDialog(
     storeId: String,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
@@ -2735,12 +2747,12 @@ fun QuickAddProductDialog(
 @Composable
 fun PropertyDetailsDialog(
     property: PropertyEntity,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
     val ratings by viewModel.ratings.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
     val currentUserName by viewModel.currentUserName.collectAsState()
     val context = LocalContext.current
 
@@ -2842,7 +2854,7 @@ fun PropertyDetailsDialog(
                     if (showEditDialog) {
                         PropertyCreateEditDialog(
                             property = property,
-                            viewModel = viewModel,
+                            
                             themeColors = themeColors,
                             onDismiss = { showEditDialog = false }
                         )
@@ -3042,7 +3054,7 @@ fun PropertyDetailsDialog(
 @Composable
 fun StoreCreateEditDialog(
     store: StoreEntity?, // Null if creating
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
     sectionId: String = "stores"
@@ -3051,7 +3063,7 @@ fun StoreCreateEditDialog(
     val categories by viewModel.categories.collectAsState()
     val settingsState by viewModel.settings.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val context = LocalContext.current
@@ -3580,7 +3592,7 @@ fun StoreCreateEditDialog(
 @Composable
 fun PropertyCreateEditDialog(
     property: PropertyEntity?,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit,
     sectionId: String = "properties"
@@ -3588,7 +3600,7 @@ fun PropertyCreateEditDialog(
     val cities by viewModel.cities.collectAsState()
     val settingsState by viewModel.settings.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val context = LocalContext.current
@@ -4028,7 +4040,7 @@ fun PropertyCreateEditDialog(
 // --------------------------------------------------------
 @Composable
 fun LegacyAdminStoresPropertiesPanel(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val stores by viewModel.stores.collectAsState()
@@ -4934,7 +4946,7 @@ fun LegacyAdminStoresPropertiesPanel(
         storeToEdit?.let { store ->
             StoreCreateEditDialog(
                 store = store,
-                viewModel = viewModel,
+                
                 themeColors = themeColors,
                 onDismiss = { storeToEdit = null },
                 sectionId = store.sectionId
@@ -4944,7 +4956,7 @@ fun LegacyAdminStoresPropertiesPanel(
         propertyToEdit?.let { prop ->
             PropertyCreateEditDialog(
                 property = prop,
-                viewModel = viewModel,
+                
                 themeColors = themeColors,
                 onDismiss = { propertyToEdit = null },
                 sectionId = prop.sectionId
@@ -5006,7 +5018,7 @@ fun LegacyAdminStoresPropertiesPanel(
 
 @Composable
 fun AdminJobsPanel(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val activatedProviders by viewModel.providers.collectAsState()
@@ -5175,7 +5187,7 @@ fun AdminJobsPanel(
 
 @Composable
 fun AdminJobApplicantsPanel(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -5442,7 +5454,7 @@ fun AdminJobApplicantsPanel(
 
 @Composable
 fun AdminCentralizedBlockedPanel(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val providers by viewModel.providers.collectAsState()
@@ -5598,7 +5610,7 @@ fun AdminCentralizedBlockedPanel(
 
 @Composable
 fun AdminCentralizedDeletedPanel(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val providers by viewModel.providers.collectAsState()

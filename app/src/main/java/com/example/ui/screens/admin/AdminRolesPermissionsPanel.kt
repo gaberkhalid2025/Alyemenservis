@@ -2,6 +2,8 @@ package com.example.ui.screens.admin
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import com.example.viewmodels.NotificationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -63,7 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.models.AdminPermissionsRegistry
 import com.example.data.models.PermissionCategory
 import com.example.data.models.PermissionLevel
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -74,7 +76,7 @@ import com.example.utils.VisualThemePalette
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AdminRolesPermissionsPanel(
-    viewModel: MainViewModel,
+    notificationViewModel: NotificationViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
@@ -684,7 +686,7 @@ fun AdminRolesPermissionsPanel(
 
                 Button(
                     onClick = {
-                        viewModel.triggerNotification("✅ تم حفظ ومزامنة مصفوفة الـ 538 صلاحية للدور $selectedRole بنجاح!")
+                        notificationViewModel.triggerNotification("✅ تم حفظ ومزامنة مصفوفة الـ 538 صلاحية للدور $selectedRole بنجاح!")
                         Toast.makeText(
                             context,
                             "🚀 تم حفظ وتطبيق ${activePermissions.size} صلاحية للدور $selectedRole بنجاح!",

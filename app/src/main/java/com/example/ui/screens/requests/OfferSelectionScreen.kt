@@ -4,6 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.*
+import com.example.viewmodels.AuthViewModel
+import com.example.viewmodels.ChatViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -32,7 +35,7 @@ import com.example.data.models.ChatChannel
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.data.repositories.ChatRepository
-import com.example.ui.MainViewModel
+
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -49,7 +52,8 @@ import kotlin.random.Random
 @Composable
 fun OfferSelectionScreen(
     offerId: String,
-    viewModel: MainViewModel,
+    chatViewModel: ChatViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onBookingConfirmed: (bookingId: String) -> Unit = {},
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> },
@@ -59,9 +63,9 @@ fun OfferSelectionScreen(
     val scope = rememberCoroutineScope()
     val firestore = remember { FirebaseFirestore.getInstance() }
     val chatRepository = remember { ChatRepository(context = context, firestore = firestore) }
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val currentUserName by viewModel.currentUserName.collectAsState()
-    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val currentUserId by authViewModel.currentUserId.collectAsState()
+    val currentUserName by authViewModel.currentUserName.collectAsState()
+    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
 
     var offer by remember { mutableStateOf<RequestOfferEntity?>(null) }
     var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
@@ -365,7 +369,7 @@ fun OfferSelectionScreen(
                                         val createdChannel = channelResult.getOrNull()
                                         if (createdChannel != null) {
                                             newlyCreatedChannel = createdChannel
-                                            viewModel.openChatChannel(
+                                            chatViewModel.openChatChannel(
                                                 com.example.data.ChatChannelEntity(
                                                     id = createdChannel.id,
                                                     targetId = targetTechId,

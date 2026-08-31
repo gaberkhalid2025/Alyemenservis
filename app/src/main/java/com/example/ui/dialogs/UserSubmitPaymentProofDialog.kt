@@ -7,6 +7,8 @@ package com.example.ui.dialogs
 
 import android.content.Intent
 import androidx.compose.ui.geometry.CornerRadius
+import com.example.viewmodels.NotificationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.PathEffect
 import okhttp3.MediaType.Companion.toMediaType
@@ -77,7 +79,7 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.*
 import com.example.utils.*
-import com.example.ui.MainViewModel
+
 import com.example.ui.components.*
 import com.example.ui.dialogs.*
 import com.example.ui.screens.home.*
@@ -102,7 +104,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun UserSubmitPaymentProofDialog(
     booking: com.example.data.BookingEntity,
-    viewModel: MainViewModel,
+    notificationViewModel: NotificationViewModel = viewModel(),
     paymentWallets: List<com.example.data.PaymentWalletEntity>,
     settingsState: com.example.data.AdminSettingsEntity,
     themeColors: VisualThemePalette,
@@ -118,7 +120,7 @@ fun UserSubmitPaymentProofDialog(
     ) { uri ->
         if (uri != null) {
             photoInput = uri.toString()
-            viewModel.triggerNotification("📸 تم اختيار صورة الإثبات من المعرض بنجاح!")
+            notificationViewModel.triggerNotification("📸 تم اختيار صورة الإثبات من المعرض بنجاح!")
         }
     }
 
@@ -238,11 +240,11 @@ fun UserSubmitPaymentProofDialog(
                     Button(
                         onClick = {
                             if (transferIdInput.isBlank() || accountNameInput.isBlank()) {
-                                viewModel.triggerNotification("❌ يرجى ملء رقم الحوالة واسم مرسل الحوالة كاملاً")
+                                notificationViewModel.triggerNotification("❌ يرجى ملء رقم الحوالة واسم مرسل الحوالة كاملاً")
                                 return@Button
                             }
                             if (settingsState.requirePaymentProofImage && photoInput.isBlank()) {
-                                viewModel.triggerNotification("❌ الإدارة تتطلب إرفاق صورة الإثبات أو لقطة الشاشة للتحقق!")
+                                notificationViewModel.triggerNotification("❌ الإدارة تتطلب إرفاق صورة الإثبات أو لقطة الشاشة للتحقق!")
                                 return@Button
                             }
                             val wallet = selectedWallet ?: return@Button
@@ -270,7 +272,7 @@ fun UserSubmitPaymentProofDialog(
                             )
                             
                             docRef.set(payment)
-                            viewModel.triggerNotification("✅ تم إرسال إثبات التحويل بنجاح! جاري مراجعته من الإدارة.")
+                            notificationViewModel.triggerNotification("✅ تم إرسال إثبات التحويل بنجاح! جاري مراجعته من الإدارة.")
                             onDismiss()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),

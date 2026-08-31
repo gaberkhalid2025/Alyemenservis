@@ -3,6 +3,8 @@ package com.example.ui.screens.dashboard.components
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.NotificationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -13,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.StoreEntity
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -22,7 +24,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun StoreEditDetailsCard(
     store: StoreEntity,
-    viewModel: MainViewModel,
+    notificationViewModel: NotificationViewModel = viewModel(),
     themeColors: VisualThemePalette,
     context: Context
 ) {
@@ -74,7 +76,7 @@ fun StoreEditDetailsCard(
             Button(
                 onClick = {
                     if (editName.trim().isEmpty() || editPhone.trim().isEmpty()) {
-                        viewModel.triggerNotification("⚠️ الاسم والهاتف حقول إجبارية!")
+                        notificationViewModel.triggerNotification("⚠️ الاسم والهاتف حقول إجبارية!")
                     } else {
                         viewModel.saveStore(
                             store.copy(

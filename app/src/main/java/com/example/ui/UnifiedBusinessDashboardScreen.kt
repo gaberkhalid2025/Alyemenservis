@@ -23,7 +23,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun UnifiedBusinessDashboardScreen(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit
 ) {

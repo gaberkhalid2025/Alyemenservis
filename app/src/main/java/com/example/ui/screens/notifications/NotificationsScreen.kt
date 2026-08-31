@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NotificationEntity
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.notifications.components.NotificationEmptyState
 import com.example.ui.screens.notifications.components.NotificationsFilterBar
 import com.example.ui.screens.notifications.components.NotificationsList
@@ -30,7 +30,7 @@ import com.example.utils.VisualThemePalette
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette,
     onNavigateBack: () -> Unit,
     onNotificationClick: (NotificationEntity) -> Unit = {}

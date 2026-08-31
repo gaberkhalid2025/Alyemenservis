@@ -4,6 +4,9 @@ package com.example.ui.screens.notifications
 
 import android.content.Context
 import androidx.compose.animation.*
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.PropertyViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -26,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NotificationEntity
-import com.example.ui.MainViewModel
+
 import com.example.ui.components.ConfirmationDialog
 import com.example.ui.screens.notifications.components.NotificationEmptyState
 import com.example.ui.screens.notifications.components.NotificationFilterTabs
@@ -42,7 +45,8 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun UserNotificationsBottomSheet(
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
+    propertyViewModel: PropertyViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
@@ -108,10 +112,10 @@ fun UserNotificationsBottomSheet(
                         notif.targetRoles.any { r ->
                             when (r.uppercase()) {
                                 "TECHNICIAN", "PROVIDER" -> isProvider
-                                "STORE" -> isProvider && viewModel.selectedStore != null
-                                "MEDICAL" -> isProvider && viewModel.selectedStore?.sectionId?.contains("medical") == true
-                                "RESTAURANT" -> isProvider && viewModel.selectedStore?.sectionId?.contains("restaurant") == true
-                                "REAL_ESTATE" -> isProvider && viewModel.selectedProperty != null
+                                "STORE" -> isProvider && storeViewModel.selectedStore != null
+                                "MEDICAL" -> isProvider && storeViewModel.selectedStore?.sectionId?.contains("medical") == true
+                                "RESTAURANT" -> isProvider && storeViewModel.selectedStore?.sectionId?.contains("restaurant") == true
+                                "REAL_ESTATE" -> isProvider && propertyViewModel.selectedProperty != null
                                 "USER" -> isRegistered
                                 else -> false
                             }
@@ -373,12 +377,13 @@ fun UserNotificationsBottomSheet(
  */
 @Composable
 fun UserNotificationsDialogView(
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
+    propertyViewModel: PropertyViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
     UserNotificationsBottomSheet(
-        viewModel = viewModel,
+        
         themeColors = themeColors,
         onDismiss = onDismiss
     )
@@ -389,12 +394,13 @@ fun UserNotificationsDialogView(
  */
 @Composable
 fun UserNotificationsScreen(
-    viewModel: MainViewModel,
+    storeViewModel: StoreViewModel = viewModel(),
+    propertyViewModel: PropertyViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onBack: () -> Unit
 ) {
     UserNotificationsBottomSheet(
-        viewModel = viewModel,
+        
         themeColors = themeColors,
         onDismiss = onBack
     )

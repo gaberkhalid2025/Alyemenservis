@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.NotificationEntity
-import com.example.ui.MainViewModel
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  * and high-performance, real-time read/unread status updates.
  */
 class NotificationViewModel(
-    private val mainViewModel: MainViewModel
+    private val mainViewModel: AuthViewModel
 ) : ViewModel() {
 
     // Filtering inputs
@@ -28,7 +28,7 @@ class NotificationViewModel(
     private val _selectedTypeFilter = MutableStateFlow("ALL") // "ALL", "BOOKING", "MESSAGE", "SPECIAL_OFFER", "SYSTEM"
     val selectedTypeFilter: StateFlow<String> = _selectedTypeFilter.asStateFlow()
 
-    // Expose flows from MainViewModel
+    // Expose flows from AuthViewModel
     val notifications = mainViewModel.notifications
     val currentUserPhone = mainViewModel.currentUserPhone
     val currentUserId = mainViewModel.currentUserId

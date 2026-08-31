@@ -4,6 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.AuthViewModel
+import com.example.viewmodels.StoreViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,12 +39,12 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun StoreProductOrderDialog(
     product: ProductEntity,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val stores by viewModel.stores.collectAsState()

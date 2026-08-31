@@ -1,6 +1,8 @@
 package com.example.ui.screens.urgent
 
 import androidx.compose.animation.*
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,9 +24,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.MainViewModel
+
 import com.example.viewmodels.UrgentUiState
-import com.example.viewmodels.UrgentViewModel
+import com.example.viewmodels.InstantRequestViewModel
 import kotlinx.coroutines.launch
 
 import com.example.ui.screens.urgent.components.UrgentFormFields
@@ -32,20 +34,20 @@ import com.example.ui.screens.urgent.components.UrgentFormFields
 /**
  * 🚨 UrgentRequestScreen
  * شاشة طلب خدمة عاجلة خلال 30 دقيقة مع مؤقت فوري وتنبيهات أولوية قصوى.
- * تستخدم النمط المعماري MVVM مع UrgentViewModel وعرض الملاحظات عبر Snackbar.
+ * تستخدم النمط المعماري MVVM مع InstantRequestViewModel وعرض الملاحظات عبر Snackbar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentRequestScreen(
-    viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
+    urgentViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToUrgentList: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by authViewModel.currentUserId.collectAsState()
     val uiState by urgentViewModel.uiState.collectAsState()
 
     var customerPhone by remember { mutableStateOf("") }

@@ -1,6 +1,11 @@
 package com.example.ui.screens.dashboard
 
 import androidx.compose.foundation.background
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.StoreViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.RegistrationViewModel
+import com.example.viewmodels.PropertyViewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -12,7 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -22,13 +27,16 @@ import com.example.utils.VisualThemePalette
 fun UnifiedBusinessProfileDashboard(
     accountType: String, // "TECHNICIAN", "STORE", "RESTAURANT", "MEDICAL", "REAL_ESTATE", "JOB_POSTER"
     providerId: String,
-    viewModel: MainViewModel,
+    propertyViewModel: PropertyViewModel = viewModel(),
+    storeViewModel: StoreViewModel = viewModel(),
+    providerViewModel: ProviderViewModel = viewModel(),
+    registrationViewModel: RegistrationViewModel = viewModel(),
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
-    val providers by viewModel.providers.collectAsState()
-    val stores by viewModel.stores.collectAsState()
-    val properties by viewModel.properties.collectAsState()
+    val providers by providerViewModel.providers.collectAsState()
+    val stores by storeViewModel.stores.collectAsState()
+    val properties by propertyViewModel.properties.collectAsState()
 
     val cleanId = providerId.trim().replace(" ", "").replace("+", "")
     val activeProvider = remember(providers, providerId) {
@@ -45,7 +53,7 @@ fun UnifiedBusinessProfileDashboard(
         "RESTAURANT" -> {
             if (activeStore != null) {
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "restaurants")
-                RestaurantDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+                RestaurantDashboard(account = acc,  themeColors = themeColors, onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) })
             } else {
                 LoadingOrEmptyDashboard("المطعم")
             }
@@ -53,7 +61,7 @@ fun UnifiedBusinessProfileDashboard(
         "MEDICAL" -> {
             if (activeStore != null) {
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "medical")
-                MedicalDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+                MedicalDashboard(account = acc,  themeColors = themeColors, onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) })
             } else {
                 LoadingOrEmptyDashboard("المركز الطبي")
             }
@@ -61,7 +69,7 @@ fun UnifiedBusinessProfileDashboard(
         "STORE" -> {
             if (activeStore != null) {
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "stores")
-                StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+                StoreDashboard(account = acc,  themeColors = themeColors, onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) })
             } else {
                 LoadingOrEmptyDashboard("المتجر")
             }
@@ -69,7 +77,7 @@ fun UnifiedBusinessProfileDashboard(
         "REAL_ESTATE" -> {
             if (activeProperty != null) {
                 val acc = UnifiedBusinessAccount.fromProperty(activeProperty)
-                PropertyDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+                PropertyDashboard(account = acc,  themeColors = themeColors, onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) })
             } else {
                 LoadingOrEmptyDashboard("العقارات")
             }
@@ -82,15 +90,15 @@ fun UnifiedBusinessProfileDashboard(
                 cityId = activeStore?.cityId ?: activeProvider?.cityId ?: "",
                 businessType = com.example.data.BusinessType.JOB_POSTER
             )
-            JobPosterDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+            JobPosterDashboard(account = acc,  themeColors = themeColors, onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) })
         }
         else -> { // TECHNICIAN or default
             if (activeProvider != null) {
                 val acc = UnifiedBusinessAccount.fromProvider(activeProvider)
-                TechnicianDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+                TechnicianDashboard(account = acc,  themeColors = themeColors, onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) })
             } else if (activeStore != null) {
                 val acc = UnifiedBusinessAccount.fromStore(activeStore, "stores")
-                StoreDashboard(account = acc, viewModel = viewModel, themeColors = themeColors, onBackClick = { viewModel.cancelOrResetJoinRequest(context) })
+                StoreDashboard(account = acc,  themeColors = themeColors, onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) })
             } else {
                 LoadingOrEmptyDashboard("مقدم الخدمة")
             }

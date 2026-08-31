@@ -1,4 +1,5 @@
 package com.example.ui.screens.about
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -25,7 +26,7 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AboutAppDialogView(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
@@ -143,7 +144,7 @@ fun AboutAppDialogView(
  */
 @Composable
 fun AboutAppScreenContent(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     themeColors: VisualThemePalette
 ) {
     val aboutViewModel = remember(viewModel) { AboutViewModel(viewModel) }

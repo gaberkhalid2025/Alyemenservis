@@ -1,4 +1,5 @@
 package com.example.ui.screens.admin
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,18 +31,18 @@ import kotlinx.coroutines.launch
 @Composable
 fun AdminRegFormsManagerPanel(
     onBack: () -> Unit = {},
-    adminViewModel: AdminViewModel = viewModel(),
+    viewModel: AdminViewModel = viewModel(),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val pendingRequestsState by adminViewModel.pendingRequests.collectAsState()
+    val pendingRequestsState by viewModel.pendingRequests.collectAsState()
     val pendingRequests = pendingRequestsState
 
     LaunchedEffect(Unit) {
-        adminViewModel.loadPendingRequests()
+        viewModel.loadPendingRequests()
     }
 
     var selectedFilter by remember { mutableStateOf("الكل") }
@@ -61,7 +62,7 @@ fun AdminRegFormsManagerPanel(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { adminViewModel.loadPendingRequests() }) {
+                    IconButton(onClick = { viewModel.loadPendingRequests() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = themeColors.accent)
                     }
                 },
@@ -111,7 +112,7 @@ fun AdminRegFormsManagerPanel(
                                 ) {
                                     Button(
                                         onClick = {
-                                            adminViewModel.approveProviderRequest(req.id) { success ->
+                                            viewModel.approveProviderRequest(req.id) { success ->
                                                 scope.launch {
                                                     snackbarHostState.showSnackbar(if (success) "✅ تم قبول الطلب واعتماد الحساب" else "❌ فشل قبول الطلب")
                                                 }
@@ -163,7 +164,7 @@ fun AdminRegFormsManagerPanel(
                     onClick = {
                         val req = rejectTarget
                         if (req != null) {
-                            adminViewModel.rejectProviderRequest(req.id, rejectReason.ifBlank { "عدم استيفاء الشروط" }) { success ->
+                            viewModel.rejectProviderRequest(req.id, rejectReason.ifBlank { "عدم استيفاء الشروط" }) { success ->
                                 rejectTarget = null
                                 rejectReason = ""
                                 scope.launch {

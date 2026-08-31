@@ -13,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -22,7 +22,7 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun UnifiedProductsServicesSection(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current

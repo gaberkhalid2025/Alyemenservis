@@ -2,10 +2,12 @@ package com.example.ui.screens.register.status
 
 import android.content.Context
 import androidx.compose.material3.SnackbarHostState
+import com.example.viewmodels.RegistrationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.Composable
 import com.example.data.ChatChannelEntity
 import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.dashboard.MedicalDashboard
 import com.example.ui.screens.dashboard.PropertyDashboard
 import com.example.ui.screens.dashboard.RestaurantDashboard
@@ -22,7 +24,7 @@ object JoinStatusRouter {
     @Composable
     fun RouteToDashboard(
         status: JoinStatus,
-        viewModel: MainViewModel,
+        registrationViewModel: RegistrationViewModel = viewModel(),
         themeColors: VisualThemePalette,
         context: Context,
         scope: CoroutineScope,
@@ -35,21 +37,21 @@ object JoinStatusRouter {
                 when (status.businessType) {
                     "restaurants" -> RestaurantDashboard(
                         account = acc,
-                        viewModel = viewModel,
+                        
                         themeColors = themeColors,
-                        onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                        onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) }
                     )
                     "medical" -> MedicalDashboard(
                         account = acc,
-                        viewModel = viewModel,
+                        
                         themeColors = themeColors,
-                        onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                        onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) }
                     )
                     else -> StoreDashboard(
                         account = acc,
-                        viewModel = viewModel,
+                        
                         themeColors = themeColors,
-                        onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                        onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) }
                     )
                 }
             }
@@ -57,9 +59,9 @@ object JoinStatusRouter {
                 val acc = UnifiedBusinessAccount.fromProperty(status.property)
                 PropertyDashboard(
                     account = acc,
-                    viewModel = viewModel,
+                    
                     themeColors = themeColors,
-                    onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                    onBackClick = { registrationViewModel.cancelOrResetJoinRequest(context) }
                 )
             }
             else -> {

@@ -3,6 +3,15 @@
 package com.example.ui.screens.register
 
 import androidx.compose.foundation.layout.*
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.SettingsViewModel
+import com.example.viewmodels.BookingViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.ChatViewModel
+import com.example.viewmodels.RegistrationViewModel
+import com.example.viewmodels.PropertyViewModel
+import com.example.viewmodels.NotificationViewModel
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -12,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.data.ChatChannelEntity
-import com.example.ui.MainViewModel
+
 import com.example.ui.screens.register.status.*
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
@@ -23,7 +32,14 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun JoinRequestStatusScreen(
-    viewModel: MainViewModel,
+    settingsViewModel: SettingsViewModel = viewModel(),
+    providerViewModel: ProviderViewModel = viewModel(),
+    registrationViewModel: RegistrationViewModel = viewModel(),
+    storeViewModel: StoreViewModel = viewModel(),
+    notificationViewModel: NotificationViewModel = viewModel(),
+    propertyViewModel: PropertyViewModel = viewModel(),
+    bookingViewModel: BookingViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel(),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
@@ -32,14 +48,14 @@ fun JoinRequestStatusScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val useCase = remember { JoinStatusUseCase() }
 
-    val joinPhone by viewModel.joinRequestPhone.collectAsState()
-    val pendingProviders by viewModel.pendingProviders.collectAsState()
-    val providers by viewModel.providers.collectAsState()
-    val notifications by viewModel.notifications.collectAsState()
-    val bookings by viewModel.bookings.collectAsState()
-    val stores by viewModel.stores.collectAsState()
-    val properties by viewModel.properties.collectAsState()
-    val categories by viewModel.categories.collectAsState()
+    val joinPhone by registrationViewModel.joinRequestPhone.collectAsState()
+    val pendingProviders by providerViewModel.pendingProviders.collectAsState()
+    val providers by providerViewModel.providers.collectAsState()
+    val notifications by notificationViewModel.notifications.collectAsState()
+    val bookings by bookingViewModel.bookings.collectAsState()
+    val stores by storeViewModel.stores.collectAsState()
+    val properties by propertyViewModel.properties.collectAsState()
+    val categories by settingsViewModel.categories.collectAsState()
 
     var activeChatChannel by remember { mutableStateOf<ChatChannelEntity?>(null) }
 
@@ -59,7 +75,7 @@ fun JoinRequestStatusScreen(
     if (currentStatus is JoinStatus.ActiveStore || currentStatus is JoinStatus.ActiveProperty) {
         JoinStatusRouter.RouteToDashboard(
             status = currentStatus,
-            viewModel = viewModel,
+            
             themeColors = themeColors,
             context = context,
             scope = scope,
@@ -95,19 +111,19 @@ fun JoinRequestStatusScreen(
                     bookings = myBookings,
                     notifications = myNotifications,
                     onToggleAvailability = {
-                        viewModel.updateProviderEntity(approved.copy(isAvailable = !approved.isAvailable))
+                        providerViewModel.updateProviderEntity(approved.copy(isAvailable = !approved.isAvailable))
                         scope.launch { snackbarHostState.showSnackbar("تم تحديث حالة التوافر") }
                     },
                     onAcceptBooking = { bookingId ->
-                        viewModel.updateBookingStatus(bookingId, "IN_PROGRESS")
+                        bookingViewModel.updateBookingStatus(bookingId, "IN_PROGRESS")
                         scope.launch { snackbarHostState.showSnackbar("✅ تم قبول طلب الحجز") }
                     },
                     onRejectBooking = { bookingId ->
-                        viewModel.updateBookingStatus(bookingId, "REJECTED", "اعتذر الفني لإنشغاله")
+                        bookingViewModel.updateBookingStatus(bookingId, "REJECTED", "اعتذر الفني لإنشغاله")
                         scope.launch { snackbarHostState.showSnackbar("❌ تم الاعتذار عن الطلب") }
                     },
                     onOpenChatWithCustomer = { custPhone, custName ->
-                        viewModel.getOrCreateChatChannel(approved.id, approved.name, custPhone, custName)
+                        chatViewModel.getOrCreateChatChannel(approved.id, approved.name, custPhone, custName)
                         activeChatChannel = ChatChannelEntity(
                             id = "chat_p_${approved.id}_u_$custPhone",
                             userName = custName,
@@ -125,7 +141,7 @@ fun JoinRequestStatusScreen(
                 chatChannel = channel,
                 currentUserId = approved.id,
                 onSendMessage = { msg ->
-                    viewModel.replyToChatChannel(channel.id, approved.id, msg, approved.name)
+                    chatViewModel.replyToChatChannel(channel.id, approved.id, msg, approved.name)
                 },
                 onDismiss = { activeChatChannel = null },
                 themeColors = themeColors
@@ -151,7 +167,7 @@ fun JoinRequestStatusScreen(
                 is JoinStatus.Rejected -> {
                     RejectedView(
                         reason = currentStatus.reason ?: "تم رفض الطلب لعدم استيفاء الشروط الخاصة بالخدمة.",
-                        onReapply = { viewModel.cancelOrResetJoinRequest(context) },
+                        onReapply = { registrationViewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
@@ -171,7 +187,7 @@ fun JoinRequestStatusScreen(
                             "رقم الهاتف" to phone,
                             "المنطقة" to "$city - $neighborhood"
                         ),
-                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        onCancelRequest = { registrationViewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
@@ -192,7 +208,7 @@ fun JoinRequestStatusScreen(
                             "رقم التواصل" to phone,
                             "المنطقة" to "$city - $neighborhood"
                         ),
-                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        onCancelRequest = { registrationViewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
@@ -210,7 +226,7 @@ fun JoinRequestStatusScreen(
                             "رقم التواصل" to phone,
                             "المنطقة" to "$area - $neighborhood"
                         ),
-                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        onCancelRequest = { registrationViewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }
@@ -219,7 +235,7 @@ fun JoinRequestStatusScreen(
                         title = "⏳ طلب الانضمام قيد المراجعة والتدقيق",
                         message = "طلبك قيد المراجعة الإدارية. سيصلك إشعار فور الاعتماد وتفعيل حسابك.",
                         detailsList = listOf("رقم الهاتف المسجل" to (currentStatus.phone ?: "غير محدد")),
-                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        onCancelRequest = { registrationViewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
                     )
                 }

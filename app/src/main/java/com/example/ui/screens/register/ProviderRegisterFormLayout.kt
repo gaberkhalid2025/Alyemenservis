@@ -3,6 +3,10 @@
 package com.example.ui.screens.register
 
 import androidx.compose.foundation.layout.*
+import com.example.viewmodels.AuthViewModel
+import com.example.viewmodels.RegistrationViewModel
+import com.example.viewmodels.SettingsViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 /**
@@ -32,7 +36,9 @@ import com.example.utils.VisualThemePalette
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProviderRegisterFormLayout(
-    viewModel: MainViewModel,
+    authViewModel: AuthViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel(),
+    registrationViewModel: RegistrationViewModel = viewModel(),
     themeColors: VisualThemePalette,
     regType: String,
     sectionId: String = "",
@@ -41,10 +47,10 @@ fun ProviderRegisterFormLayout(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentUserName by viewModel.currentUserName.collectAsState()
-    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
-    val currentUserResidence by viewModel.currentUserResidence.collectAsState()
-    val categories by viewModel.categories.collectAsState()
+    val currentUserName by authViewModel.currentUserName.collectAsState()
+    val currentUserPhone by authViewModel.currentUserPhone.collectAsState()
+    val currentUserResidence by authViewModel.currentUserResidence.collectAsState()
+    val categories by settingsViewModel.categories.collectAsState()
 
     var activeType by remember(regType) { mutableStateOf(RegistrationType.fromId(regType)) }
 
@@ -67,7 +73,7 @@ fun ProviderRegisterFormLayout(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.cancelOrResetJoinRequest(context) }) {
+                    IconButton(onClick = { registrationViewModel.cancelOrResetJoinRequest(context) }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "رجوع",
@@ -76,7 +82,7 @@ fun ProviderRegisterFormLayout(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { viewModel.triggerRestoreAccountDialog.value = true }) {
+                    TextButton(onClick = { authViewModel.triggerRestoreAccountDialog.value = true }) {
                         Text("استرجاع حسابي", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 },
@@ -128,9 +134,9 @@ fun ProviderRegisterFormLayout(
                     val phone = data["phone"] ?: ""
                     val pass = data["password"] ?: ""
                     
-                    viewModel.setUserSessionDetails(context, name, phone, "صنعاء")
+                    authViewModel.setUserSessionDetails(context, name, phone, "صنعاء")
                     
-                    viewModel.submitJoinForm(
+                    registrationViewModel.submitJoinForm(
                         context = context,
                         name = name,
                         phone = phone,

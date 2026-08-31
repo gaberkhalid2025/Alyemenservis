@@ -1,6 +1,15 @@
 package com.example.ui.components
+import com.example.ui.MainViewModel
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.StoreViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodels.AdminViewModel
+import com.example.ui.screens.chat.ChatViewModel
+import com.example.viewmodels.PropertyViewModel
+import com.example.viewmodels.NotificationViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,12 +31,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun AppHeaderBar(
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onNotificationsClick: () -> Unit,
     onChatsClick: () -> Unit,
@@ -39,7 +48,7 @@ fun AppHeaderBar(
     val allNotifications by viewModel.notifications.collectAsState()
     val userPhoneState by viewModel.currentUserPhone.collectAsState()
     val adminRoleState by viewModel.adminRole.collectAsState()
-    val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState(initial = "")
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val chatChannels by viewModel.chatChannels.collectAsState()
     val providers by viewModel.providers.collectAsState()

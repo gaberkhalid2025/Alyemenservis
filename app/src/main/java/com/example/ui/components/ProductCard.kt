@@ -34,7 +34,7 @@ fun ProductListItemCard(
     product: ProductEntity,
     isOwnerOrAdmin: Boolean,
     themeColors: VisualThemePalette,
-    viewModel: MainViewModel,
+    viewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     isMedical: Boolean = false,
     isRestaurant: Boolean = false,
     onOrderClick: () -> Unit

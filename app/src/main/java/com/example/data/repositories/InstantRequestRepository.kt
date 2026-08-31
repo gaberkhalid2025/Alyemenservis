@@ -25,9 +25,20 @@ import kotlin.random.Random
 class InstantRequestRepository(private val context: Context? = null) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private val activeListeners = mutableListOf<ListenerRegistration>()
 
     private val _requests = MutableStateFlow<List<InstantRequestEntity>>(emptyList())
     val requests: StateFlow<List<InstantRequestEntity>> = _requests.asStateFlow()
+
+    fun clearListeners() {
+        try {
+            activeListeners.forEach { it.remove() }
+            activeListeners.clear()
+            Log.d("InstantRequestRepository", "All InstantRequestRepository listeners cleared safely")
+        } catch (e: Exception) {
+            Log.e("InstantRequestRepository", "Error clearing listeners", e)
+        }
+    }
 
     /**
      * 1. إنشاء طلب فوري جديد مع مؤقت زمني مدته 30 دقيقة

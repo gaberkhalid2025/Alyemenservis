@@ -25,13 +25,13 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.UnifiedBusinessAccount
 import com.example.rememberBase64Bitmap
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun OwnerProfileScreen(
     account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    viewModel: AuthViewModel,
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit
 ) {

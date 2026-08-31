@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.CategoryEntity
 import com.example.data.CityEntity
 import com.example.data.ProviderEntity
-import com.example.ui.MainViewModel
+
 import com.example.ui.ProviderCard
 import com.example.ui.components.ProviderListSkeleton
 import com.example.utils.VisualThemePalette

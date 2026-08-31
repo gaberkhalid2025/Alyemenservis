@@ -1,6 +1,8 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.foundation.BorderStroke
+import com.example.viewmodels.SettingsViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,18 +23,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CategoryEntity
 import com.example.data.repositories.CategoryRepository
-import com.example.ui.MainViewModel
+
 import com.example.ui.components.SkeletonCard
 import com.example.utils.VisualThemePalette
 
 @Composable
 fun CategoriesScreen(
-    viewModel: MainViewModel,
+    settingsViewModel: SettingsViewModel = viewModel(),
     themeColors: VisualThemePalette,
     categoryRepository: CategoryRepository = remember { CategoryRepository(viewModel.db) },
     onCategoryClick: (String) -> Unit
 ) {
-    val vmCategories by viewModel.categories.collectAsState()
+    val vmCategories by settingsViewModel.categories.collectAsState()
     var categories by remember { mutableStateOf<List<CategoryEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }

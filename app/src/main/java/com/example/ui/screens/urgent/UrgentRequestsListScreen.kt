@@ -1,6 +1,9 @@
 package com.example.ui.screens.urgent
 
 import androidx.compose.foundation.layout.*
+import com.example.viewmodels.ProviderViewModel
+import com.example.viewmodels.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddCircle
@@ -16,9 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.MainViewModel
+
 import com.example.utils.VisualThemePalette
-import com.example.viewmodels.UrgentViewModel
+import com.example.viewmodels.InstantRequestViewModel
 
 /**
  * ⚡ UrgentRequestsListScreen
@@ -27,8 +30,9 @@ import com.example.viewmodels.UrgentViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentRequestsListScreen(
-    viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
+    providerViewModel: ProviderViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel(),
+    urgentViewModel: InstantRequestViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onNavigateBack: () -> Unit = {},
     onNavigateToDetails: (requestId: String) -> Unit = {},
@@ -38,8 +42,8 @@ fun UrgentRequestsListScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentUserId by viewModel.currentUserId.collectAsState()
-    val isProvider = viewModel.isProviderUser
+    val currentUserId by authViewModel.currentUserId.collectAsState()
+    val isProvider = providerViewModel.isProviderUser
 
     val requestsList by urgentViewModel.urgentRequests.collectAsState()
 
