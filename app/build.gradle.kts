@@ -92,6 +92,7 @@ secrets {
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+  implementation("javax.inject:javax.inject:1")
   implementation(platform(libs.androidx.compose.bom))
   implementation("androidx.fragment:fragment-ktx:1.8.6")
   implementation(libs.androidx.biometric)
