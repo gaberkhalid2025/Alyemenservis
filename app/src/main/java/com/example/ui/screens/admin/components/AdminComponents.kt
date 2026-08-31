@@ -1,6 +1,5 @@
 package com.example.ui.screens.admin.components
 
-import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,15 +19,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 
 /**
- * 🏷️ شارة الحالة الإدارية الموحدة (AdminStatusBadge)
- * تعرض حالة العنصر (نشط، محظور، معلق، VIP) بتنسيق لوني متناسق وتصميم Material 3.
+ * 🏷️ Reusable Admin Status Badge
  */
 @Composable
 fun AdminStatusBadge(
@@ -55,8 +51,7 @@ fun AdminStatusBadge(
 }
 
 /**
- * 🎛️ صف التبديل والمفاتيح الموحد للإعدادات والخيارات (AdminSwitchRow)
- * يدعم العنوان والوصف والأيقونة التعبيرية لتوحيد مفاتيح التفعيل والتعطيل في لوحات الإدارة.
+ * 🎛️ Reusable Admin Switch Row for Settings & Toggles
  */
 @Composable
 fun AdminSwitchRow(
@@ -123,8 +118,7 @@ fun AdminSwitchRow(
 }
 
 /**
- * 🔘 أزرار العمليات الإدارية الموحدة (AdminActionButtons)
- * توفر إجراءات الموافقة، الرفض، الحظر/إلغاء الحظر، التعديل والحذف بتصميم تفاعلي موحد.
+ * 🔘 Reusable Admin Action Buttons
  */
 @Composable
 fun AdminActionButtons(
@@ -202,8 +196,7 @@ fun AdminActionButtons(
 }
 
 /**
- * 🃏 بطاقة الكيان الإداري الشاملة (AdminEntityCard)
- * بطاقة عرض موحدة لكافة الكيانات الإدارية (الفنيين، المحلات، العقارات، الوظائف، المستخدمين)
+ * 🃏 Universal Admin Entity Card
  */
 @Composable
 fun AdminEntityCard(
@@ -286,7 +279,7 @@ fun AdminEntityCard(
 }
 
 /**
- * 🏷️ شريط رقائق الفلترة الإدارية الموحدة (AdminFilterChips)
+ * 🏷️ Reusable Admin Filter Chips Bar
  */
 @Composable
 fun AdminFilterChips(
@@ -323,106 +316,5 @@ fun AdminFilterChips(
                 )
             }
         }
-    }
-}
-
-/**
- * ⚠️ نافذة التأكيد الإدارية الموحدة للعمليات الحساسة (AdminConfirmDialog)
- * تعرض تنبيهاً واضحاً ومحترماً باللغة العربية مع خيارات التأكيد والإلغاء لحماية البيانات من الحذف العرضي.
- */
-@Composable
-fun AdminConfirmDialog(
-    show: Boolean,
-    title: String,
-    message: String,
-    confirmButtonText: String = "تأكيد الإجراء ⚠️",
-    dismissButtonText: String = "إلغاء",
-    isDestructive: Boolean = true,
-    icon: ImageVector = Icons.Default.Warning,
-    themeColors: VisualThemePalette,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    if (show) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            containerColor = Color(0xFF1E293B),
-            icon = {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (isDestructive) Color(0xFFEF5350) else themeColors.accent,
-                    modifier = Modifier.size(36.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            text = {
-                Text(
-                    text = message,
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onConfirm()
-                        onDismiss()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isDestructive) Color(0xFFEF5350) else themeColors.accent
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = confirmButtonText,
-                        color = if (isDestructive) Color.White else Color.Black,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = dismissButtonText,
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        )
-    }
-}
-
-/**
- * 🛡️ نظام تسجيل التدقيق الإداري والأمني الخفيف (AdminLogger)
- * يقوم بتسجيل العمليات الحساسة والأخطاء في Logcat ومتابعة الإجراءات الإدارية بدقة.
- */
-object AdminLogger {
-    private const val TAG = "AdminSecurityAudit"
-
-    fun logAction(action: String, target: String, adminUser: String = "Admin") {
-        Log.i(TAG, "[$adminUser] ACTION: $action -> TARGET: $target (Time: ${System.currentTimeMillis()})")
-    }
-
-    fun logError(operation: String, throwable: Throwable? = null, message: String = "") {
-        Log.e(TAG, "ERROR during $operation: $message", throwable)
-    }
-
-    fun logWarning(warning: String) {
-        Log.w(TAG, "SECURITY_WARNING: $warning")
     }
 }

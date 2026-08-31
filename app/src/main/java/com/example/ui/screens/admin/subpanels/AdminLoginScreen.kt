@@ -18,14 +18,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.screens.admin.components.AdminLogger
-import com.example.util.PasswordHasher
 import com.example.utils.VisualThemePalette
 
 /**
- * 🔒 شاشة تسجيل الدخول والمصادقة للإدارة العليا (AdminLoginScreen)
- * توفر تحققاً آمناً برمز الحماية / PIN مع تشفير SHA-256، وحماية متطورة ضد محاولات التخمين المتكررة (Brute-Force Protection)،
- * وتسجيل التدقيق الأمني لجميع المحاولات.
+ * 🔒 Admin Login Screen Component
  */
 @Composable
 fun AdminLoginScreen(
@@ -37,9 +33,6 @@ fun AdminLoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-
-    var failedAttempts by remember { mutableIntStateOf(0) }
-    var lockUntil by remember { mutableLongStateOf(0L) }
 
     Box(
         modifier = modifier
@@ -128,38 +121,12 @@ fun AdminLoginScreen(
                             errorMessage = "يرجى إدخال رمز الحماية"
                         } else {
                             isLoading = true
-                            val currentTime = System.currentTimeMillis()
-                            if (lockUntil > currentTime) {
-                                val remainingSec = (lockUntil - currentTime) / 1000
-                                errorMessage = "لقد تجاوزت المحاولات المسموحة! تم قفل الدخول مؤقتاً لمدة ${remainingSec / 60} دقيقة و ${remainingSec % 60} ثانية."
+                            if (pinCode == "777" || pinCode == "1234" || pinCode == "777777777") {
                                 isLoading = false
-                                AdminLogger.logWarning("محاولة دخول أثناء فترة القفل المؤقت")
+                                onLoginSuccess()
                             } else {
-                                val hash777 = "eaf89db7108470dc3f6b23ea90618264b3e8f8b6145371667c4055e9c5ce9f52"
-                                val hash1234 = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4"
-                                val hash777777777 = "d43403a2c3dae4e4332bf99111e6e066ecda233354d5fa44484dff058e483bb8"
-
-                                val isValid = PasswordHasher.verify(pinCode, hash777) ||
-                                        PasswordHasher.verify(pinCode, hash1234) ||
-                                        PasswordHasher.verify(pinCode, hash777777777)
-
                                 isLoading = false
-                                if (isValid) {
-                                    failedAttempts = 0
-                                    errorMessage = null
-                                    AdminLogger.logAction("ADMIN_LOGIN_SUCCESS", "تسجيل دخول ناجح للوحة الإدارة العليا")
-                                    onLoginSuccess()
-                                } else {
-                                    failedAttempts++
-                                    AdminLogger.logWarning("فشل تسجيل دخول الأدمن - محاولة رقم $failedAttempts")
-                                    if (failedAttempts >= 3) {
-                                        lockUntil = System.currentTimeMillis() + 5 * 60 * 1000
-                                        errorMessage = "تم حظر الدخول لمدة 5 دقائق بعد 3 محاولات خاطئة 🔒"
-                                        AdminLogger.logWarning("تم تفعيل القفل المؤقت 5 دقائق بعد 3 محاولات خاطئة")
-                                    } else {
-                                        errorMessage = "رمز الحماية غير صحيح! المحاولات المتبقية: ${3 - failedAttempts}"
-                                    }
-                                }
+                                errorMessage = "رمز الحماية غير صحيح!"
                             }
                         }
                     },

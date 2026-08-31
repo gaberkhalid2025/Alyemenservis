@@ -52,11 +52,6 @@ import com.example.data.models.PermissionCategory
 import com.example.data.models.PermissionLevel
 import com.example.utils.VisualThemePalette
 
-/**
- * 🛡️ واجهة محدد ومفوض الصلاحيات الإدارية (AdminPermissionsSelectorView)
- * تتيح تفويض واختيار الصلاحيات (538 صلاحية) بدقة مع دعم القوالب السريعة،
- * البحث الذكي، والفلترة حسب المستوى والفئة وتخصيص صلاحيات المشرفين.
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AdminPermissionsSelectorView(

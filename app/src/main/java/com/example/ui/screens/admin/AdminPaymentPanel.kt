@@ -52,45 +52,6 @@ fun AdminPaymentPanel(
     var linkProperties by remember { mutableStateOf(true) }
     var linkJobs by remember { mutableStateOf(true) }
 
-    val firestore = remember { viewModel?.db ?: com.google.firebase.firestore.FirebaseFirestore.getInstance() }
-
-    LaunchedEffect(Unit) {
-        firestore.collection("payment_settings").document("main_config")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-                if (snapshot != null && snapshot.exists()) {
-                    systemEnabled = snapshot.getBoolean("isPaymentSystemEnabled") ?: true
-                    linkBookings = snapshot.getBoolean("linkBookings") ?: true
-                    linkStores = snapshot.getBoolean("linkStores") ?: true
-                    linkRestaurants = snapshot.getBoolean("linkRestaurants") ?: true
-                    linkMedical = snapshot.getBoolean("linkMedical") ?: true
-                    linkProperties = snapshot.getBoolean("linkProperties") ?: true
-                    linkJobs = snapshot.getBoolean("linkJobs") ?: true
-                }
-            }
-    }
-
-    fun savePaymentSettings(
-        enabled: Boolean = systemEnabled,
-        bookings: Boolean = linkBookings,
-        stores: Boolean = linkStores,
-        restaurants: Boolean = linkRestaurants,
-        medical: Boolean = linkMedical,
-        properties: Boolean = linkProperties,
-        jobs: Boolean = linkJobs
-    ) {
-        val data = mapOf(
-            "isPaymentSystemEnabled" to enabled,
-            "linkBookings" to bookings,
-            "linkStores" to stores,
-            "linkRestaurants" to restaurants,
-            "linkMedical" to medical,
-            "linkProperties" to properties,
-            "linkJobs" to jobs
-        )
-        firestore.collection("payment_settings").document("main_config").set(data)
-    }
-
     var overrideTargetId by remember { mutableStateOf("") }
     var overrideAmount by remember { mutableStateOf("") }
     var showOverrideDialog by remember { mutableStateOf(false) }
@@ -175,7 +136,6 @@ fun AdminPaymentPanel(
                             onCheckedChange = {
                                 systemEnabled = it
                                 onToggleSystem?.invoke(it)
-                                savePaymentSettings(enabled = it)
                                 Toast.makeText(
                                     context,
                                     if (it) "تم تفعيل نظام الدفع الكلي" else "تم تعطيل نظام الدفع الكلي",
@@ -208,10 +168,7 @@ fun AdminPaymentPanel(
                         subtitle = "حساب العربون والعمولات تلقائياً",
                         icon = Icons.Default.DateRange,
                         checked = linkBookings,
-                        onCheckedChange = {
-                            linkBookings = it
-                            savePaymentSettings(bookings = it)
-                        }
+                        onCheckedChange = { linkBookings = it }
                     )
 
                     PaymentSectorToggleRow(
@@ -219,10 +176,7 @@ fun AdminPaymentPanel(
                         subtitle = "الدفع عبر المحافظ الإلكترونية",
                         icon = Icons.Default.ShoppingCart,
                         checked = linkStores,
-                        onCheckedChange = {
-                            linkStores = it
-                            savePaymentSettings(stores = it)
-                        }
+                        onCheckedChange = { linkStores = it }
                     )
 
                     PaymentSectorToggleRow(
@@ -230,10 +184,7 @@ fun AdminPaymentPanel(
                         subtitle = "تسوية الفواتير والتوصيل",
                         icon = Icons.Default.ShoppingCart,
                         checked = linkRestaurants,
-                        onCheckedChange = {
-                            linkRestaurants = it
-                            savePaymentSettings(restaurants = it)
-                        }
+                        onCheckedChange = { linkRestaurants = it }
                     )
 
                     PaymentSectorToggleRow(
@@ -241,10 +192,7 @@ fun AdminPaymentPanel(
                         subtitle = "رسوم المعاينة والاستشارات",
                         icon = Icons.Default.Info,
                         checked = linkMedical,
-                        onCheckedChange = {
-                            linkMedical = it
-                            savePaymentSettings(medical = it)
-                        }
+                        onCheckedChange = { linkMedical = it }
                     )
 
                     PaymentSectorToggleRow(
@@ -252,10 +200,7 @@ fun AdminPaymentPanel(
                         subtitle = "عربون حجز المعاينة أو الإيجار",
                         icon = Icons.Default.Home,
                         checked = linkProperties,
-                        onCheckedChange = {
-                            linkProperties = it
-                            savePaymentSettings(properties = it)
-                        }
+                        onCheckedChange = { linkProperties = it }
                     )
 
                     PaymentSectorToggleRow(
@@ -263,10 +208,7 @@ fun AdminPaymentPanel(
                         subtitle = "رسوم التقديم أو توثيق الحسابات",
                         icon = Icons.Default.Person,
                         checked = linkJobs,
-                        onCheckedChange = {
-                            linkJobs = it
-                            savePaymentSettings(jobs = it)
-                        }
+                        onCheckedChange = { linkJobs = it }
                     )
                 }
             }

@@ -21,8 +21,6 @@ import com.example.ui.MainViewModel
 import com.example.util.PermissionGuard
 import com.example.util.RoleManager
 import com.example.utils.VisualThemePalette
-import com.example.data.StoreEntity
-import kotlinx.coroutines.launch
 
 @Composable
 fun AdminRestaurantsPanel(
@@ -35,14 +33,13 @@ fun AdminRestaurantsPanel(
             role = RoleManager.fromRoleString(adminRoleStr),
             permission = PermissionGuard.PERMISSION_RESTAURANTS,
             supervisorGrantedPermissions = supervisorPermissions
-         )
+        )
     ) {
         PermissionGuard.UnauthorizedView()
         return
     }
 
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val stores by viewModel.stores.collectAsState()
     val restaurants = stores.filter { 
         it.sectionId == "restaurants" || it.categoryId.contains("rest", true) || it.categoryId.contains("مطعم", true) || it.name.contains("مطعم", true) || it.name.contains("كافيه", true) || it.name.contains("وجب", true) 
@@ -52,17 +49,7 @@ fun AdminRestaurantsPanel(
     val displayList = restaurants
     val filteredList = displayList.filter {
         it.name.contains(searchQuery, ignoreCase = true) || it.phone.contains(searchQuery)
-    }.sortedByDescending { it.createdAt }
-
-    // Dialog states
-    var showAddEditDialog by remember { mutableStateOf(false) }
-    var editingRestaurant by remember { mutableStateOf<StoreEntity?>(null) }
-    var restNameState by remember { mutableStateOf("") }
-    var restPhoneState by remember { mutableStateOf("") }
-    var restCityState by remember { mutableStateOf("") }
-    var restNeighborhoodState by remember { mutableStateOf("") }
-    var restHoursState by remember { mutableStateOf("") }
-    var restDescState by remember { mutableStateOf("") }
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -93,19 +80,6 @@ fun AdminRestaurantsPanel(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                }
-
-                IconButton(onClick = {
-                    editingRestaurant = null
-                    restNameState = ""
-                    restPhoneState = ""
-                    restCityState = ""
-                    restNeighborhoodState = ""
-                    restHoursState = "9:00 AM - 11:00 PM"
-                    restDescState = ""
-                    showAddEditDialog = true
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = "إضافة مطعم", tint = themeColors.accent)
                 }
             }
 
@@ -141,21 +115,9 @@ fun AdminRestaurantsPanel(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(item.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    Text("📞 ${item.phone} • 📍 ${item.cityId} - ${item.localNeighborhood}", color = themeColors.textSecondary, fontSize = 11.sp)
+                                    Text("📞 ${item.phone} • 📍 ${item.cityId}", color = themeColors.textSecondary, fontSize = 11.sp)
                                 }
                                 Row {
-                                    IconButton(onClick = {
-                                        editingRestaurant = item
-                                        restNameState = item.name
-                                        restPhoneState = item.phone
-                                        restCityState = item.cityId
-                                        restNeighborhoodState = item.localNeighborhood
-                                        restHoursState = item.workingHours
-                                        restDescState = item.description
-                                        showAddEditDialog = true
-                                    }) {
-                                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = themeColors.accent, modifier = Modifier.size(20.dp))
-                                    }
                                     IconButton(onClick = { viewModel.setStoreActive(item.id, !item.isActive) }) {
                                         Icon(
                                             imageVector = if (item.isActive) Icons.Default.CheckCircle else Icons.Default.Close,
@@ -211,91 +173,5 @@ fun AdminRestaurantsPanel(
                 }
             }
         }
-    }
-
-    // Add / Edit Restaurant Dialog
-    if (showAddEditDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddEditDialog = false },
-            containerColor = Color(0xFF1E293B),
-            title = { Text(if (editingRestaurant == null) "🍔 إضافة مطعم جديد" else "📝 تعديل بيانات المطعم", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    OutlinedTextField(
-                        value = restNameState,
-                        onValueChange = { restNameState = it },
-                        label = { Text("اسم المطعم / الكافيه") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                    OutlinedTextField(
-                        value = restPhoneState,
-                        onValueChange = { restPhoneState = it },
-                        label = { Text("رقم الهاتف") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                    OutlinedTextField(
-                        value = restCityState,
-                        onValueChange = { restCityState = it },
-                        label = { Text("المحافظة") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                    OutlinedTextField(
-                        value = restNeighborhoodState,
-                        onValueChange = { restNeighborhoodState = it },
-                        label = { Text("الحي / المنطقة") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                    OutlinedTextField(
-                        value = restHoursState,
-                        onValueChange = { restHoursState = it },
-                        label = { Text("ساعات العمل") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                    OutlinedTextField(
-                        value = restDescState,
-                        onValueChange = { restDescState = it },
-                        label = { Text("الوصف والتفاصيل") },
-                        modifier = Modifier.fillMaxWidth(),
-                        maxLines = 4,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val base = editingRestaurant ?: StoreEntity()
-                        val finalRest = base.copy(
-                            name = restNameState,
-                            phone = restPhoneState,
-                            cityId = restCityState,
-                            localNeighborhood = restNeighborhoodState,
-                            workingHours = restHoursState,
-                            description = restDescState,
-                            sectionId = "restaurants",
-                            categoryId = "restaurants",
-                            isActive = true,
-                            isApproved = true
-                        )
-                        viewModel.saveStore(finalRest)
-                        showAddEditDialog = false
-                        Toast.makeText(context, "💾 تم حفظ بيانات المطعم بنجاح", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                ) {
-                    Text("حفظ", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddEditDialog = false }) {
-                    Text("إلغاء", color = Color.Gray)
-                }
-            }
-        )
     }
 }

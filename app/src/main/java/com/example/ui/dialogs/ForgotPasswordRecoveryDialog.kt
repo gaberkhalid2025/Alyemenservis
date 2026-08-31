@@ -47,20 +47,18 @@ fun ForgotPasswordRecoveryDialog(
     if (isSubmitted) {
         LaunchedEffect(phoneInput) {
             val cleanPhone = phoneInput.trim().replace(" ", "")
-            val listenerRegistration = viewModel.db.collection("password_resets").document(cleanPhone)
-                .addSnapshotListener { snapshot, error ->
-                    if (error == null && snapshot != null && snapshot.exists()) {
-                        val status = snapshot.getString("status") ?: "PENDING"
-                        resetStatus = status
-                        if (status == "APPROVED") {
-                            tempPassword = snapshot.getString("tempPassword") ?: snapshot.getString("newPassword") ?: ""
+            while (true) {
+                viewModel.db.collection("password_resets").document(cleanPhone).get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            val status = doc.getString("status") ?: "PENDING"
+                            resetStatus = status
+                            if (status == "APPROVED") {
+                                tempPassword = doc.getString("tempPassword") ?: doc.getString("newPassword") ?: ""
+                            }
                         }
                     }
-                }
-            try {
-                kotlinx.coroutines.awaitCancellation()
-            } finally {
-                listenerRegistration.remove()
+                kotlinx.coroutines.delay(3000)
             }
         }
     }

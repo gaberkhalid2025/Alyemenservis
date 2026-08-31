@@ -247,10 +247,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                             val data = doc.data?.toMutableMap() ?: mutableMapOf()
                             data["status"] = "APPROVED"
                             data["approvalStatus"] = "APPROVED"
-                            data["approvedAt"] = System.currentTimeMillis()
-                            data["approvedBy"] = "ADMIN"
-                            data["profileImage"] = doc.getString("profileImage") ?: ""
-                            data["workImages"] = doc.get("workImages") ?: emptyList<String>()
 
                             firestore.collection(targetCollection).document(requestId).set(data)
                                 .addOnSuccessListener {
