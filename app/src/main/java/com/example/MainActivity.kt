@@ -304,6 +304,7 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
 
             LaunchedEffect(context) {
+                viewModel.initializeUserIdentity(context)
                 try {
                     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
                     if (cm != null) {

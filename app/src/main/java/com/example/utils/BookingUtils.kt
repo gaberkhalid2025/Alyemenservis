@@ -110,9 +110,30 @@ object BookingUtils {
     fun isMoreThan8HoursBefore(dateStr: String, timeStr: String): Boolean {
         return canModifyOrCancelBooking(0L, dateStr, timeStr)
     }
+
+    fun isValidYemeniPhone(phone: String): Boolean {
+        val clean = phone.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+        return clean.length >= 7 && (clean.startsWith("7") || clean.startsWith("0"))
+    }
+
+    fun validateBookingForm(clientName: String, phone: String, service: String, date: String): Pair<Boolean, String> {
+        if (clientName.isBlank()) return Pair(false, "يرجى إدخال اسم العميل")
+        if (!isValidYemeniPhone(phone)) return Pair(false, "يرجى إدخال رقم هاتف يمني صحيح")
+        if (service.isBlank()) return Pair(false, "يرجى تحديد الخدمة المطلوبة")
+        if (date.isBlank()) return Pair(false, "يرجى اختيار التاريخ")
+        return Pair(true, "")
+    }
 }
 
 fun isMoreThan8HoursBefore(dateStr: String, timeStr: String): Boolean {
     return BookingUtils.isMoreThan8HoursBefore(dateStr, timeStr)
+}
+
+fun validateBookingForm(clientName: String, phone: String, service: String, date: String): Pair<Boolean, String> {
+    return BookingUtils.validateBookingForm(clientName, phone, service, date)
+}
+
+fun isValidYemeniPhone(phone: String): Boolean {
+    return BookingUtils.isValidYemeniPhone(phone)
 }
 

@@ -5,6 +5,19 @@ object ScreenRoutes {
         return currentScreen == AppScreens.MAP_VIEW || currentScreen.endsWith("_DETAILS")
     }
 
+    fun showBottomBar(currentScreen: String): Boolean {
+        return !isFullScreen(currentScreen) && 
+               currentScreen != AppScreens.CHAT_DIRECT &&
+               currentScreen != AppScreens.ADMIN_PANEL &&
+               currentScreen != AppScreens.OWNER_PANEL
+    }
+
+    fun showTopBar(currentScreen: String): Boolean {
+        return currentScreen != AppScreens.CHAT_DIRECT && 
+               currentScreen != AppScreens.MAP_VIEW &&
+               currentScreen != AppScreens.ADMIN_PANEL
+    }
+
     fun isRegistrationOrFormOpen(
         currentScreen: String,
         showGuestRegisterDialogForAction: String?,
