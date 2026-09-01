@@ -1,27 +1,27 @@
 package com.example.data.repositories.impl
 
 import android.graphics.BitmapFactory
-import android.util.Base64
-import com.example.data.repositories.contracts.IStorageRepository
+import com.example.data.repositories.IStorageRepository
 import com.example.data.repositories.FirebaseOptimizationManager
 import com.example.util.FirebaseStorageUploader
 import com.example.data.utils.AppError
-import com.example.data.utils.AppResult
 import java.util.UUID
 
 class StorageRepositoryImpl : IStorageRepository {
 
-    override suspend fun compressAndUploadImage(imageUriOrBytes: ByteArray, folderName: String): AppResult<String> {
+    override suspend fun compressAndUploadImage(imageUriOrBytes: ByteArray, folderName: String): Result<String> {
         return try {
+            // Use FirebaseOptimizationManager to compress image bytes
             val bitmap = BitmapFactory.decodeByteArray(imageUriOrBytes, 0, imageUriOrBytes.size)
             val compressedBase64 = if (bitmap != null) {
                 FirebaseOptimizationManager.compressImageToWebP(bitmap)
             } else {
-                Base64.encodeToString(imageUriOrBytes, Base64.DEFAULT)
+                android.util.Base64.encodeToString(imageUriOrBytes, android.util.Base64.DEFAULT)
             }
             
-            val decodedBytes = Base64.decode(compressedBase64, Base64.DEFAULT)
+            val decodedBytes = android.util.Base64.decode(compressedBase64, android.util.Base64.DEFAULT)
             
+            // Upload the compressed bytes to Firebase Storage
             val uniqueId = UUID.randomUUID().toString().take(8)
             val storagePath = "$folderName/image_$uniqueId.webp"
             
@@ -35,7 +35,7 @@ class StorageRepositoryImpl : IStorageRepository {
         }
     }
 
-    override suspend fun uploadMultipleImages(imagesBytes: List<ByteArray>, folderName: String): AppResult<List<String>> {
+    override suspend fun uploadMultipleImages(imagesBytes: List<ByteArray>, folderName: String): Result<List<String>> {
         return try {
             val urls = mutableListOf<String>()
             for (bytes in imagesBytes) {

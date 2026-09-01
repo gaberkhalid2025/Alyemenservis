@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class FavoritesUiState(
@@ -48,7 +47,7 @@ class FavoritesViewModel(
 
     fun toggleFavorite(item: FavoriteItemEntity) {
         viewModelScope.launch {
-            val isFav = favoritesRepository.isFavorite(userId, item.targetId).first()
+            val isFav = favoritesRepository.isFavorite(userId, item.targetId)
             if (isFav) {
                 favoritesRepository.removeFavorite(userId, item.targetId).onSuccess {
                     _eventFlow.emit(DashboardEvent.ShowToast("تمت الإزالة من المفضلة"))
