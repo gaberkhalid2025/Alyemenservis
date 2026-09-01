@@ -1,6 +1,6 @@
 package com.example.domain.usecases
 
-import com.example.data.repositories.IRegistrationRepository
+import com.example.data.repositories.contracts.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
 
 /**

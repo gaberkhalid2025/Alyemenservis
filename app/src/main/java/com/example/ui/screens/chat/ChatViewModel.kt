@@ -3,7 +3,8 @@ package com.example.ui.screens.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.*
-import com.example.data.repositories.ChatRepository
+import com.example.data.repositories.contracts.IChatRepository
+import com.example.data.repositories.impl.ChatRepositoryImpl
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -24,7 +25,7 @@ sealed class ChatEvent {
 }
 
 class ChatViewModel(
-    private val repository: ChatRepository = ChatRepository()
+    private val repository: IChatRepository = ChatRepositoryImpl(null)
 ) : ViewModel() {
 
     private val _eventFlow = MutableSharedFlow<ChatEvent>()

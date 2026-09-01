@@ -20,7 +20,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CategoryEntity
-import com.example.data.repositories.CategoryRepository
+import com.example.data.repositories.contracts.ICategoryRepository
+import com.example.data.repositories.impl.CategoryRepositoryImpl
 import com.example.ui.MainViewModel
 import com.example.ui.components.SkeletonCard
 import com.example.utils.VisualThemePalette
@@ -29,7 +30,7 @@ import com.example.utils.VisualThemePalette
 fun CategoriesScreen(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    categoryRepository: CategoryRepository = remember { CategoryRepository(viewModel.db) },
+    categoryRepository: ICategoryRepository = remember { CategoryRepositoryImpl(viewModel.db) },
     onCategoryClick: (String) -> Unit
 ) {
     val vmCategories by viewModel.categories.collectAsState()

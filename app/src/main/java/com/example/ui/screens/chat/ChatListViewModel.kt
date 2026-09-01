@@ -3,13 +3,14 @@ package com.example.ui.screens.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.ChatChannel
-import com.example.data.repositories.ChatRepository
+import com.example.data.repositories.contracts.IChatRepository
+import com.example.data.repositories.impl.ChatRepositoryImpl
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class ChatListViewModel(
-    private val repository: ChatRepository = ChatRepository()
+    private val repository: IChatRepository = ChatRepositoryImpl(null)
 ) : ViewModel() {
 
     private val _channels = MutableStateFlow<List<ChatChannel>>(emptyList())

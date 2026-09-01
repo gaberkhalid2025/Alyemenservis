@@ -147,13 +147,16 @@ fun AdminBannersPanel(
                     onClick = {
                         if (title.isNotBlank()) {
                             viewModel.addBanner(
-                                title = title,
-                                url = url,
-                                redirect = "home",
-                                type = "BANNER",
-                                size = "MEDIUM",
-                                duration = 5,
-                                displayTime = "ALL"
+                                com.example.data.BannerEntity(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    title = title,
+                                    url = url,
+                                    redirectCategory = "home",
+                                    type = "BANNER",
+                                    size = "MEDIUM",
+                                    duration = 5,
+                                    displayTime = "ALL"
+                                )
                             )
                             showAddDialog = false
                             title = ""; url = ""
