@@ -37,17 +37,6 @@ class ChatRepository(
 
     private val channelsCollection = firestore.collection("chat_channels")
     private val presenceCollection = firestore.collection("user_presence")
-    private val activeListeners = mutableListOf<ListenerRegistration>()
-
-    fun clearListeners() {
-        try {
-            activeListeners.forEach { it.remove() }
-            activeListeners.clear()
-            Log.d("ChatRepository", "All ChatRepository listeners cleared safely")
-        } catch (e: Exception) {
-            Log.e("ChatRepository", "Error clearing listeners", e)
-        }
-    }
 
     // =========================================================================
     // 1. CHANNELS MANAGEMENT (OFFLINE-FIRST)

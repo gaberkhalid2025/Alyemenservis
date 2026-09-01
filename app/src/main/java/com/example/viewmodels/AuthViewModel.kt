@@ -1,12 +1,9 @@
 package com.example.viewmodels
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.UserEntity
-import com.example.data.repositories.AuthRepository
-import com.example.data.repositories.UserRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,13 +20,11 @@ data class UserAuthState(
 
 /**
  * 🔐 AuthViewModel
- * إدارة تسجيل الدخول، استرجاع الحساب، تحديث FCM Token، والصلاحيات مع حقن الاعتماديات Hilt
+ * إدارة تسجيل الدخول، إنشاء الحساب، الصلاحيات وحالة جلسة المستخدم الحالية.
  */
-@HiltViewModel
-class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository,
-    private val userRepository: UserRepository
-) : ViewModel() {
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
     private val _authState = MutableStateFlow(UserAuthState())
     val authState: StateFlow<UserAuthState> = _authState.asStateFlow()
@@ -40,80 +35,52 @@ class AuthViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    private val _successMessage = MutableStateFlow<String?>(null)
-    val successMessage: StateFlow<String?> = _successMessage.asStateFlow()
-
     fun login(phone: String, pass: String, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
-            _errorMessage.value = null
-            authRepository.loginWithPhone(phone, pass)
-                .onSuccess { user ->
-                    _isLoading.value = false
-                    _authState.value = UserAuthState(
-                        userId = user.id,
-                        userName = user.name.ifEmpty { "مستخدم" },
-                        userPhone = user.phone,
-                        userRole = user.role.ifEmpty { "CLIENT" },
-                        isAuthenticated = true,
-                        isBlocked = user.isBlocked
-                    )
-                    onResult(true, "تم تسجيل الدخول بنجاح")
-                }
-                .onFailure { err ->
-                    _isLoading.value = false
-                    val msg = err.message ?: "خطأ في تسجيل الدخول"
-                    _errorMessage.value = msg
-                    onResult(false, msg)
-                }
-        }
-    }
-
-    fun registerOrUpdateUser(user: UserEntity, pass: String = "", onResult: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            authRepository.saveOrUpdateUser(user, pass)
-                .onSuccess { savedUser ->
-                    _isLoading.value = false
-                    _authState.value = _authState.value.copy(
-                        userId = savedUser.id,
-                        userName = savedUser.name,
-                        userPhone = savedUser.phone,
-                        userRole = savedUser.role,
-                        isAuthenticated = true
-                    )
-                    onResult(true, "تم الحفظ بنجاح")
-                }
-                .onFailure { err ->
-                    _isLoading.value = false
-                    val msg = err.message ?: "فشل تسجيل/تحديث البيانات"
-                    _errorMessage.value = msg
-                    onResult(false, msg)
-                }
-        }
-    }
-
-    fun resetPassword(phone: String, newPass: String, onResult: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            authRepository.resetPassword(phone, newPass)
-                .onSuccess {
-                    _isLoading.value = false
-                    _successMessage.value = "تم تغيير كلمة المرور بنجاح"
-                    onResult(true, "تم إعادة تعيين كلمة المرور بنجاح")
-                }
-                .onFailure { err ->
-                    _isLoading.value = false
-                    val msg = err.message ?: "فشل إعادة تعيين كلمة المرور"
-                    _errorMessage.value = msg
-                    onResult(false, msg)
-                }
-        }
-    }
-
-    fun updateFcmToken(userId: String, phone: String, token: String, role: String = "CLIENT") {
-        viewModelScope.launch {
-            authRepository.updateFcmToken(userId, phone, token, role)
+            val cleanPhone = phone.trim()
+            try {
+                firestore.collection("users").document(cleanPhone).get()
+                    .addOnSuccessListener { doc ->
+                        _isLoading.value = false
+                        if (doc.exists()) {
+                            val isBlocked = doc.getBoolean("isBlocked") ?: false
+                            if (isBlocked) {
+                                _errorMessage.value = "هذا الحساب محظور حالياً، يرجى التواصل مع الدعم."
+                                onResult(false, "حساب محظور")
+                                return@addOnSuccessListener
+                            }
+                            val role = doc.getString("role") ?: "CLIENT"
+                            val name = doc.getString("name") ?: "مستخدم"
+                            _authState.value = UserAuthState(
+                                userId = cleanPhone,
+                                userName = name,
+                                userPhone = cleanPhone,
+                                userRole = role,
+                                isAuthenticated = true
+                            )
+                            onResult(true, "تم تسجيل الدخول بنجاح")
+                        } else {
+                            // الدخول كزائر مسجل
+                            _authState.value = UserAuthState(
+                                userId = cleanPhone,
+                                userName = "مستخدم",
+                                userPhone = cleanPhone,
+                                userRole = "CLIENT",
+                                isAuthenticated = true
+                            )
+                            onResult(true, "مرحباً بك")
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        _isLoading.value = false
+                        _errorMessage.value = e.message
+                        onResult(false, e.message ?: "خطأ في الاتصال")
+                    }
+            } catch (e: Exception) {
+                _isLoading.value = false
+                onResult(false, e.message ?: "خطأ غير متوقع")
+            }
         }
     }
 
@@ -123,11 +90,5 @@ class AuthViewModel @Inject constructor(
 
     fun setRole(role: String) {
         _authState.value = _authState.value.copy(userRole = role)
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        authRepository.clearListeners()
-        userRepository.clearListeners()
     }
 }

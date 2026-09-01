@@ -106,4 +106,13 @@ object BookingUtils {
         val sixHoursMs = 6 * 60 * 60 * 1000L
         return diffMs in 0..sixHoursMs
     }
+
+    fun isMoreThan8HoursBefore(dateStr: String, timeStr: String): Boolean {
+        return canModifyOrCancelBooking(0L, dateStr, timeStr)
+    }
 }
+
+fun isMoreThan8HoursBefore(dateStr: String, timeStr: String): Boolean {
+    return BookingUtils.isMoreThan8HoursBefore(dateStr, timeStr)
+}
+

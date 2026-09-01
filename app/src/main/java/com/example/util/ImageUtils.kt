@@ -44,3 +44,22 @@ object ImageUtils {
     }
 }
 
+fun convertGenericUriToBase64(context: Context, uri: Uri): String {
+    return ImageUtils.uriToBase64(context, uri)
+}
+
+fun convertBitmapToBase64(bitmap: Bitmap): String {
+    return try {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 75, outputStream)
+        Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+    } catch (e: Exception) {
+        ""
+    }
+}
+
+fun compressAndResizeImageUri(context: Context, uri: Uri, maxDimension: Int = 800, quality: Int = 70): String {
+    return ImageUtils.uriToBase64(context, uri, maxDimension, quality)
+}
+
+

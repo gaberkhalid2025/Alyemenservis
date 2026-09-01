@@ -31,20 +31,9 @@ class BookingRepository(private val context: Context) {
     private val firestore = FirebaseFirestore.getInstance()
     private val cacheManager = LocalAppCacheManager(context)
     private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
-    private val activeListeners = mutableListOf<ListenerRegistration>()
 
     private val _cachedBookings = MutableStateFlow<List<BookingEntity>>(emptyList())
     val cachedBookings: StateFlow<List<BookingEntity>> = _cachedBookings.asStateFlow()
-
-    fun clearListeners() {
-        try {
-            activeListeners.forEach { it.remove() }
-            activeListeners.clear()
-            Log.d("BookingRepository", "All BookingRepository listeners cleared safely")
-        } catch (e: Exception) {
-            Log.e("BookingRepository", "Error clearing listeners", e)
-        }
-    }
 
     init {
         loadFromCache()

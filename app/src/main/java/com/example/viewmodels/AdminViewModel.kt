@@ -10,8 +10,6 @@ import com.example.data.ProviderEntity
 import com.example.util.SyncManager
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -140,10 +138,7 @@ data class SystemLog(
  * 👑 AdminViewModel
  * إدارة كاملة لمنطق ولوحة تحكم الإدارة العليا (الأدمن) متضمنة الإعدادات، طلبات الانضمام، الحظر، والإحصائيات والمزامنة.
  */
-@HiltViewModel
-class AdminViewModel @Inject constructor(
-    application: Application
-) : AndroidViewModel(application) {
+class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val syncManager: SyncManager by lazy { SyncManager(getApplication()) }
