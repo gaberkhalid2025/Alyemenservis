@@ -15,7 +15,51 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 
 class SettingsViewModel : BaseViewModel() {
-    lateinit var mainViewModel: MainViewModel
+    // --- Callback/Lambda Properties for decoupling ---
+    var getAuthViewModel: (() -> AuthViewModel)? = null
+    var getHomeViewModel: (() -> HomeViewModel)? = null
+    var getBookingViewModel: (() -> BookingViewModel)? = null
+    var getAdminViewModel: (() -> AdminViewModel)? = null
+    
+    var getProviders: (() -> MutableStateFlow<List<ProviderEntity>>)? = null
+    var getBookings: (() -> MutableStateFlow<List<BookingEntity>>)? = null
+    var getCategories: (() -> MutableStateFlow<List<CategoryEntity>>)? = null
+    var getStores: (() -> MutableStateFlow<List<StoreEntity>>)? = null
+    var getProperties: (() -> MutableStateFlow<List<PropertyEntity>>)? = null
+    
+    var getPasswordRecoveryWaitingPhone: (() -> MutableStateFlow<String>)? = null
+    var setPasswordRecoveryWaitingPhone: ((String) -> Unit)? = null
+    var verifyAdminOrOwnerPassword: ((String) -> Boolean)? = null
+    var triggerNotification: ((String) -> Unit)? = null
+
+    inner class MainViewModelDelegate {
+        val authViewModel get() = getAuthViewModel?.invoke() ?: throw IllegalStateException("authViewModel not provided")
+        val homeViewModel get() = getHomeViewModel?.invoke() ?: throw IllegalStateException("homeViewModel not provided")
+        val bookingViewModel get() = getBookingViewModel?.invoke() ?: throw IllegalStateException("bookingViewModel not provided")
+        val adminViewModel get() = getAdminViewModel?.invoke() ?: throw IllegalStateException("adminViewModel not provided")
+        
+        val _providers get() = getProviders?.invoke() ?: throw IllegalStateException("_providers not provided")
+        val _bookings get() = getBookings?.invoke() ?: throw IllegalStateException("_bookings not provided")
+        val _categories get() = getCategories?.invoke() ?: throw IllegalStateException("_categories not provided")
+        val _stores get() = getStores?.invoke() ?: throw IllegalStateException("_stores not provided")
+        val _properties get() = getProperties?.invoke() ?: throw IllegalStateException("_properties not provided")
+        
+        val _passwordRecoveryWaitingPhone get() = getPasswordRecoveryWaitingPhone?.invoke() ?: throw IllegalStateException("_passwordRecoveryWaitingPhone not provided")
+        
+        fun setPasswordRecoveryWaitingPhone(phone: String) {
+            this@SettingsViewModel.setPasswordRecoveryWaitingPhone?.invoke(phone)
+        }
+        
+        fun verifyAdminOrOwnerPassword(password: String): Boolean {
+            return this@SettingsViewModel.verifyAdminOrOwnerPassword?.invoke(password) ?: false
+        }
+        
+        fun triggerNotification(msg: String) {
+            this@SettingsViewModel.triggerNotification?.invoke(msg)
+        }
+    }
+    
+    val mainViewModel = MainViewModelDelegate()
 
 data class CardSettings(
         val cardHeight: Int = 180,

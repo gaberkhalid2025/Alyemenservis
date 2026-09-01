@@ -15,7 +15,9 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 
 class InstantRequestViewModel : BaseViewModel() {
-    lateinit var mainViewModel: MainViewModel
+    var triggerNotification: ((String) -> Unit)? = null
+    var addNotification: ((String, String, String, String) -> Unit)? = null
+    var getOrCreateChatChannel: ((String, String, String, String) -> Unit)? = null
 
     internal val _instantRequests = MutableStateFlow<List<com.example.data.models.InstantRequestEntity>>(emptyList())
     val instantRequests: StateFlow<List<com.example.data.models.InstantRequestEntity>> = _instantRequests.asStateFlow()
@@ -111,21 +113,21 @@ fun submitOfferForRequest(
                         "status" to "REVIEWING_OFFERS"
                     ))
                 }
-                mainViewModel.triggerNotification("💰 تم تقديم عرض السعر ($price ر.ي) بنجاح للطلب $requestCode!")
+                triggerNotification?.invoke("💰 تم تقديم عرض السعر ($price ر.ي) بنجاح للطلب $requestCode!")
 
                 // Notify customer about new offer
                 val targetReq = _instantRequests.value.find { it.id == requestId }
                 if (targetReq != null && targetReq.userPhone.isNotBlank()) {
-                    mainViewModel.addNotification(
-                        title = "💰 عرض جديد من $technicianName على طلبك $requestCode",
-                        message = "قدم الفني $technicianName عرض سعر قدره $price ر.ي بوقت وصول $estimatedArrivalTime. افتح العروض لمقارنة الخيارات والاختيار.",
-                        targetType = "USER",
-                        targetValue = targetReq.userPhone
+                    addNotification?.invoke(
+                        "💰 عرض جديد من $technicianName على طلبك $requestCode",
+                        "قدم الفني $technicianName عرض سعر قدره $price ر.ي بوقت وصول $estimatedArrivalTime. افتح العروض لمقارنة الخيارات والاختيار.",
+                        "USER",
+                        targetReq.userPhone
                     )
                 }
             }
             .addOnFailureListener {
-                mainViewModel.triggerNotification("❌ تعذر تقديم العرض: ${it.localizedMessage}")
+                triggerNotification?.invoke("❌ تعذر تقديم العرض: ${it.localizedMessage}")
             }
     }
 
@@ -173,47 +175,47 @@ fun acceptRequestOffer(
         )
 
         db.collection("bookings").document(bookingId).set(booking)
-        mainViewModel.triggerNotification("🎉 تم قبول عرض ${offer.technicianName} بنجاح وتحويل الطلب إلى حجز مؤكد!")
+        triggerNotification?.invoke("🎉 تم قبول عرض ${offer.technicianName} بنجاح وتحويل الطلب إلى حجز مؤكد!")
 
         // Notify winning provider
-        mainViewModel.addNotification(
-            title = "🎉 تم اختيار عرضك للطلب ${req.requestCode}",
-            message = "تهانينا $offer.technicianName! اختار العميل $req.userName عرضك بسعر $offer.price ر.ي للطلب $req.requestCode. يمكنك البدء في التواصل والمباشرة الآن.",
-            targetType = "PROVIDER",
-            targetValue = offer.technicianPhone
+        addNotification?.invoke(
+            "🎉 تم اختيار عرضك للطلب ${req.requestCode}",
+            "تهانينا $offer.technicianName! اختار العميل $req.userName عرضك بسعر $offer.price ر.ي للطلب $req.requestCode. يمكنك البدء في التواصل والمباشرة الآن.",
+            "PROVIDER",
+            offer.technicianPhone
         )
 
         // Notify other bidders
         val otherOffers = _requestOffers.value.filter { it.requestId == req.id && it.id != offer.id }
         otherOffers.forEach { otherOffer ->
             db.collection("request_offers").document(otherOffer.id).update("status", "REJECTED")
-            mainViewModel.addNotification(
-                title = "📢 تم اختيار عرض آخر للطلب ${req.requestCode}",
-                message = "شكراً لمشاركتك. تم اختيار عرض أسعار آخر من قبل العميل للطلب ${req.requestCode}.",
-                targetType = "PROVIDER",
-                targetValue = otherOffer.technicianPhone
+            addNotification?.invoke(
+                "📢 تم اختيار عرض آخر للطلب ${req.requestCode}",
+                "شكراً لمشاركتك. تم اختيار عرض أسعار آخر من قبل العميل للطلب ${req.requestCode}.",
+                "PROVIDER",
+                otherOffer.technicianPhone
             )
         }
 
         // Create active chat channel between customer & winning provider
-        mainViewModel.getOrCreateChatChannel(offer.technicianId, offer.technicianName, req.userPhone, req.userName)
+        getOrCreateChatChannel?.invoke(offer.technicianId, offer.technicianName, req.userPhone, req.userName)
     }
 
 fun completeInstantRequest(requestId: String) {
         db.collection("instant_requests").document(requestId).update("status", "COMPLETED")
             .addOnSuccessListener {
-                mainViewModel.triggerNotification("✅ تم إكمال وتنفيذ الطلب الفوري بنجاح!")
+                triggerNotification?.invoke("✅ تم إكمال وتنفيذ الطلب الفوري بنجاح!")
             }
     }
 
 fun cancelInstantRequest(requestId: String, passwordInput: String = "", isCustomer: Boolean = true, reqPass: String = "") {
         if (isCustomer && reqPass.isNotEmpty() && passwordInput != reqPass) {
-            mainViewModel.triggerNotification("❌ رمز إلقاء/إلغاء الطلب غير صحيح!")
+            triggerNotification?.invoke("❌ رمز إلقاء/إلغاء الطلب غير صحيح!")
             return
         }
         db.collection("instant_requests").document(requestId).update("status", "CANCELLED")
             .addOnSuccessListener {
-                mainViewModel.triggerNotification("🚫 تم إلغاء الطلب الفوري بنجاح.")
+                triggerNotification?.invoke("🚫 تم إلغاء الطلب الفوري بنجاح.")
             }
     }
 

@@ -15,24 +15,60 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 
 class AdminViewModel : BaseViewModel() {
-    lateinit var mainViewModel: MainViewModel
+    // --- Callback/Lambda Properties for decoupling ---
+    var getHomeViewModel: (() -> HomeViewModel)? = null
+    var getSettingsViewModel: (() -> SettingsViewModel)? = null
+    var getBookingViewModel: (() -> BookingViewModel)? = null
+    var getInstantRequestViewModel: (() -> InstantRequestViewModel)? = null
+    var getNotifications: (() -> MutableStateFlow<List<NotificationEntity>>)? = null
+    var onAddNotification: ((String, String, String, String) -> Unit)? = null
+    var onTriggerNotificationFull: ((String, String, String, String) -> Unit)? = null
+    var onTriggerNotification: ((String) -> Unit)? = null
+    var onApplyFilters: (() -> Unit)? = null
+
+    inner class MainViewModelDelegate {
+        val homeViewModel get() = this@AdminViewModel.homeViewModel
+        val settingsViewModel get() = this@AdminViewModel.settingsViewModel
+        val bookingViewModel get() = this@AdminViewModel.bookingViewModel
+        val instantRequestViewModel get() = this@AdminViewModel.instantRequestViewModel
+        val _notifications get() = this@AdminViewModel._notifications
+        
+        fun addNotification(title: String, message: String, targetType: String = "", targetValue: String = "") {
+            this@AdminViewModel.addNotification(title, message, targetType, targetValue)
+        }
+        
+        fun triggerNotification(title: String, message: String, targetType: String = "ALL", targetValue: String = "") {
+            this@AdminViewModel.triggerNotification(title, message, targetType, targetValue)
+        }
+        
+        fun triggerNotification(msg: String) {
+            this@AdminViewModel.onTriggerNotification?.invoke(msg)
+        }
+        
+        fun applyFilters() {
+            this@AdminViewModel.applyFilters()
+        }
+    }
+    
+    val mainViewModel = MainViewModelDelegate()
 
     private val auth get() = com.google.firebase.auth.FirebaseAuth.getInstance()
-    private val homeViewModel get() = mainViewModel.homeViewModel
-    private val settingsViewModel get() = mainViewModel.settingsViewModel
-    private val bookingViewModel get() = mainViewModel.bookingViewModel
-    private val _notifications get() = mainViewModel._notifications
+    private val homeViewModel get() = getHomeViewModel?.invoke() ?: throw IllegalStateException("homeViewModel not provided")
+    private val settingsViewModel get() = getSettingsViewModel?.invoke() ?: throw IllegalStateException("settingsViewModel not provided")
+    private val bookingViewModel get() = getBookingViewModel?.invoke() ?: throw IllegalStateException("bookingViewModel not provided")
+    private val instantRequestViewModel get() = getInstantRequestViewModel?.invoke() ?: throw IllegalStateException("instantRequestViewModel not provided")
+    private val _notifications get() = getNotifications?.invoke() ?: throw IllegalStateException("_notifications not provided")
 
     private fun addNotification(title: String, message: String, targetType: String = "", targetValue: String = "") {
-        mainViewModel.addNotification(title, message, targetType, targetValue)
+        onAddNotification?.invoke(title, message, targetType, targetValue)
     }
 
     private fun triggerNotification(title: String, message: String, targetType: String = "", targetValue: String = "") {
-        mainViewModel.triggerNotification(title, message, targetType, targetValue)
+        onTriggerNotificationFull?.invoke(title, message, targetType, targetValue)
     }
 
     private fun applyFilters() {
-        mainViewModel.applyFilters()
+        onApplyFilters?.invoke()
     }
 
     fun logAdminActivity(adminName: String, action: String, details: String) {

@@ -35,17 +35,17 @@ import kotlin.math.roundToInt
 fun BoxScope.FloatingIconsOverlay(
     settings: AdminSettingsEntity,
     themeColors: VisualThemePalette,
-    isClientUser: Boolean = false,
+    isClientUser: Boolean = true,
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن" (يظهر فقط للعملاء المسجلين، وليس للزوار أو مقدمي الخدمات)
-    if (isClientUser && !settings.footerMessage.contains("hide_urgent_fab")) {
+    // 1. Primary Action FAB: "اطلب خدمتك الآن"
+    if (!settings.footerMessage.contains("hide_urgent_fab")) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .navigationBarsPadding()
-                .padding(start = 12.dp, bottom = 80.dp)
+                .padding(start = 12.dp, bottom = 16.dp)
                 .shadow(6.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(
@@ -88,7 +88,7 @@ fun BoxScope.FloatingIconsOverlay(
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                .padding(end = 12.dp, bottom = 80.dp)
+                .padding(end = 12.dp, bottom = 16.dp)
                 .shadow(6.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(

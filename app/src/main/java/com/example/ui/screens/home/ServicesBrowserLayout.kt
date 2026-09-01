@@ -118,7 +118,11 @@ fun ServicesBrowserLayout(
                     isFilterActive = isFilterActive,
                     onFilterClick = { showFiltersPanel = true },
                     isSpeechSearchEnabled = settingsState.isSpeechSearchEnabled,
-                    onVoiceClick = { /* Voice click handled */ },
+                    onVoiceClick = {
+                        com.example.VoiceManager.onHear?.invoke { heardText ->
+                            viewModel.updateSearchQuery(heardText)
+                        }
+                    },
                     themeColors = themeColors
                 )
             }

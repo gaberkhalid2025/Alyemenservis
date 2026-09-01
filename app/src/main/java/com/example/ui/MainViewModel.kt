@@ -90,9 +90,9 @@ class MainViewModel : BaseViewModel() {
         }
     }
     val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)
-    val adminViewModel = com.example.ui.viewmodels.AdminViewModel().apply { mainViewModel = this@MainViewModel }
-    val settingsViewModel = com.example.ui.viewmodels.SettingsViewModel().apply { mainViewModel = this@MainViewModel }
-    val instantRequestViewModel = com.example.ui.viewmodels.InstantRequestViewModel().apply { mainViewModel = this@MainViewModel }
+    val adminViewModel = com.example.ui.viewmodels.AdminViewModel()
+    val settingsViewModel = com.example.ui.viewmodels.SettingsViewModel()
+    val instantRequestViewModel = com.example.ui.viewmodels.InstantRequestViewModel()
 
     // ------------------- Delegated StateFlows -------------------
     // Auth
@@ -382,6 +382,69 @@ fun initializeUserIdentity(context: android.content.Context) {
         adminViewModel.appContext = appContext
         settingsViewModel.appContext = appContext
         instantRequestViewModel.appContext = appContext
+
+        // Wire up bookingViewModel decoupled delegates
+        bookingViewModel.getCoupons = { _coupons.value }
+        bookingViewModel.getProviders = { _providers.value }
+        bookingViewModel.getCurrentUserPhone = { _currentUserPhone.value }
+        bookingViewModel.getCurrentUserName = { _currentUserName.value }
+        bookingViewModel.getCurrentUserResidence = { _currentUserResidence.value }
+        bookingViewModel.setCurrentUserPhone = { _currentUserPhone.value = it }
+        bookingViewModel.setCurrentUserName = { _currentUserName.value = it }
+        bookingViewModel.setCurrentUserResidence = { _currentUserResidence.value = it }
+        bookingViewModel.onAddNotification = { title, message, targetType, targetValue ->
+            addNotification(title, message, targetType, targetValue)
+        }
+        bookingViewModel.triggerNotificationCallback = { msg ->
+            triggerNotification(msg)
+        }
+        bookingViewModel.onOpenOrCreateChatChannel = { targetId, targetType, targetName, targetPhone, targetCategory, relatedEntityId, relatedEntityType, onComplete ->
+            val custId = _currentUserPhone.value.ifEmpty { "770000000" }
+            val custName = _currentUserName.value.ifEmpty { "عميل التطبيق" }
+            getOrCreateChatChannel(targetId, targetName, custId, custName)
+            onComplete(null)
+        }
+
+        // Wire up adminViewModel decoupled delegates
+        adminViewModel.getHomeViewModel = { homeViewModel }
+        adminViewModel.getSettingsViewModel = { settingsViewModel }
+        adminViewModel.getBookingViewModel = { bookingViewModel }
+        adminViewModel.getInstantRequestViewModel = { instantRequestViewModel }
+        adminViewModel.getNotifications = { _notifications }
+        adminViewModel.onAddNotification = { title, message, targetType, targetValue ->
+            addNotification(title, message, targetType, targetValue)
+        }
+        adminViewModel.onTriggerNotificationFull = { title, message, targetType, targetValue ->
+            triggerNotification(title, message, targetType, targetValue)
+        }
+        adminViewModel.onTriggerNotification = { msg ->
+            triggerNotification(msg)
+        }
+        adminViewModel.onApplyFilters = { applyFilters() }
+
+        // Wire up settingsViewModel decoupled delegates
+        settingsViewModel.getAuthViewModel = { authViewModel }
+        settingsViewModel.getHomeViewModel = { homeViewModel }
+        settingsViewModel.getBookingViewModel = { bookingViewModel }
+        settingsViewModel.getAdminViewModel = { adminViewModel }
+        settingsViewModel.getProviders = { _providers }
+        settingsViewModel.getBookings = { _bookings }
+        settingsViewModel.getCategories = { _categories }
+        settingsViewModel.getStores = { _stores }
+        settingsViewModel.getProperties = { _properties }
+        settingsViewModel.getPasswordRecoveryWaitingPhone = { _passwordRecoveryWaitingPhone }
+        settingsViewModel.setPasswordRecoveryWaitingPhone = { setPasswordRecoveryWaitingPhone(it) }
+        settingsViewModel.verifyAdminOrOwnerPassword = { verifyAdminOrOwnerPassword(it) }
+        settingsViewModel.triggerNotification = { triggerNotification(it) }
+
+        // Wire up instantRequestViewModel decoupled delegates
+        instantRequestViewModel.triggerNotification = { triggerNotification(it) }
+        instantRequestViewModel.addNotification = { title, message, targetType, targetValue ->
+            addNotification(title, message, targetType, targetValue)
+        }
+        instantRequestViewModel.getOrCreateChatChannel = { providerId, providerName, customerPhone, customerName ->
+            getOrCreateChatChannel(providerId, providerName, customerPhone, customerName)
+        }
 
         try {
             // 1. Initialize collections

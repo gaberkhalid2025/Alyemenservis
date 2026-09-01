@@ -26,6 +26,7 @@ import com.example.ui.screens.chat.ChatListScreen
 import com.example.ui.screens.chat.ChatScreen
 import com.example.ui.screens.entities.*
 import com.example.ui.screens.home.FavoritesScreenLayout
+import com.example.ui.screens.home.ServicesBrowserLayout
 import com.example.ui.screens.map.MapScreenLayout
 import com.example.ui.screens.notifications.UserNotificationsDialogView
 import com.example.ui.screens.owner.OwnerDashboardScreen
@@ -88,44 +89,20 @@ fun AppNavigator(
         ) {
             when (currentScreen) {
                 AppScreens.USER_BROWSE, AppScreens.HOME -> {
-                    val banners by viewModel.banners.collectAsState()
-                    val selectedCatName = selectedCategory ?: ""
-                    val filteredProviders = if (selectedCatName.isNotEmpty() && selectedCatName != "الكل") {
-                        providers.filter { it.profession.contains(selectedCatName, ignoreCase = true) || it.specialization.contains(selectedCatName, ignoreCase = true) }
-                    } else providers
+                    var activeSectionIdForCreation by remember { mutableStateOf("") }
+                    var preselectedRegistrationType by remember { mutableStateOf("") }
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item {
-                            if (banners.isNotEmpty()) {
-                                BannerSliderView(banners = banners, themeColors = themeColors) { cat ->
-                                    if (cat.isNotEmpty()) viewModel.selectCategory(cat)
-                                }
-                            }
+                    ServicesBrowserLayout(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        activeSectionIdForCreation = activeSectionIdForCreation,
+                        onActiveSectionIdForCreationChange = { activeSectionIdForCreation = it },
+                        preselectedRegistrationType = preselectedRegistrationType,
+                        onPreselectedRegistrationTypeChange = { preselectedRegistrationType = it },
+                        onChatOpen = { _ ->
+                            viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
                         }
-                        item {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                items(categories) { cat ->
-                                    CategoryChip(
-                                        name = cat.name,
-                                        icon = cat.icon,
-                                        isSelected = selectedCategory == cat.name,
-                                        themeColors = themeColors
-                                    ) { viewModel.selectCategory(cat.name) }
-                                }
-                            }
-                        }
-                        items(filteredProviders) { provider ->
-                            ProviderCard(
-                                provider = provider,
-                                themeColors = themeColors,
-                                viewModel = viewModel,
-                                onChatOpen = { viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }
-                            )
-                        }
-                    }
+                    )
                 }
                 AppScreens.ADMIN_PANEL -> AdminPanelLayout(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.OWNER_PANEL, AppScreens.PRODUCTS_MGMT_VIEW, AppScreens.PRICE_MGMT_VIEW, AppScreens.OFFERS_MGMT_VIEW, AppScreens.GALLERY_MGMT_VIEW -> OwnerDashboardScreen(
