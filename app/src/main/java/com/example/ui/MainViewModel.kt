@@ -1805,6 +1805,23 @@ fun submitJoinForm(
             }
 
             val requestDocId = cleanPhone
+            val requestType = when (catId.uppercase()) {
+                "STORE" -> "STORE"
+                "RESTAURANT" -> "RESTAURANT"
+                "MEDICAL" -> "MEDICAL"
+                "PROPERTY" -> "PROPERTY"
+                "JOB" -> "JOB"
+                "CLIENT" -> "CLIENT"
+                else -> "PROVIDER"
+            }
+
+            val prof = when (requestType) {
+                "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
+                "PROPERTY" -> "PROPERTY_OWNER"
+                "JOB" -> "JOB_POSTER"
+                else -> "TECHNICIAN"
+            }
+
             val newRequest = PendingProviderEntity(
                 id = requestDocId,
                 name = name,
@@ -1817,22 +1834,63 @@ fun submitJoinForm(
                 idPhotoBase64 = encIdCard,
                 workPhotosBase64 = finalWorkPhotos,
                 customCategoryName = customCategoryName,
+                profession = prof,
                 password = password,
                 productAttachmentsJson = productAttachmentsJson
             )
             // Push to Cloud with robust listeners
             db.collection("pending_providers").document(requestDocId).set(newRequest)
-            
-            val requestType = when (catId.uppercase()) {
-                "STORE" -> "STORE"
-                "RESTAURANT" -> "RESTAURANT"
-                "MEDICAL" -> "MEDICAL"
-                "PROPERTY" -> "PROPERTY"
-                "JOB" -> "JOB"
-                "CLIENT" -> "CLIENT"
-                else -> "PROVIDER"
+
+            // Direct Pending Write into respective collections for robust admin visibility and seamless counts
+            if (requestType == "STORE" || requestType == "RESTAURANT" || requestType == "MEDICAL") {
+                val storeSecId = when (requestType) {
+                    "RESTAURANT" -> "restaurants"
+                    "MEDICAL" -> "medical"
+                    else -> "stores"
+                }
+                val newStore = com.example.data.StoreEntity(
+                    id = "store_" + cleanPhone,
+                    sectionId = storeSecId,
+                    name = name,
+                    description = customCategoryName.ifBlank { "محل تجاري معتمد بالدليل" },
+                    ownerId = cleanPhone,
+                    ownerName = name,
+                    phone = phone,
+                    categoryId = if (requestType == "RESTAURANT") "مطاعم وكافيهات" else if (requestType == "MEDICAL") "مراكز طبية وعيادات" else catId,
+                    cityId = area,
+                    localNeighborhood = neighborhood,
+                    isActive = false,
+                    isApproved = false,
+                    password = password,
+                    productAttachmentsJson = productAttachmentsJson,
+                    logoImage = finalSelfie,
+                    createdAt = System.currentTimeMillis()
+                )
+                db.collection("stores").document("store_" + cleanPhone).set(newStore)
+                _stores.value = _stores.value.filter { it.id != "store_" + cleanPhone } + newStore
             }
 
+            if (requestType == "PROPERTY") {
+                val newProp = com.example.data.PropertyEntity(
+                    id = "prop_" + cleanPhone,
+                    title = name,
+                    description = customCategoryName.ifBlank { "عقار معلن وموثق" },
+                    phone = phone,
+                    ownerId = cleanPhone,
+                    ownerName = name,
+                    cityId = area,
+                    localNeighborhood = neighborhood,
+                    isActive = false,
+                    isApproved = false,
+                    password = password,
+                    productAttachmentsJson = productAttachmentsJson,
+                    images = if (finalSelfie.isNotEmpty()) listOf(finalSelfie) else emptyList(),
+                    createdAt = System.currentTimeMillis()
+                )
+                db.collection("properties").document("prop_" + cleanPhone).set(newProp)
+                _properties.value = _properties.value.filter { it.id != "prop_" + cleanPhone } + newProp
+            }
+            
             val unifiedJoinRequest = com.example.data.models.JoinRequestEntity(
                 id = requestDocId,
                 type = requestType,
@@ -1890,7 +1948,7 @@ fun submitJoinForm(
             _pendingTechnicians.value = currentTechs
             
             val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-            sp.edit().putString("join_request_phone", phone).apply()
+            sp.edit().putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(phone)).apply()
             _joinRequestPhone.value = phone
             
             // Add applicant notification!
@@ -1923,12 +1981,12 @@ fun cancelOrResetJoinRequest(context: android.content.Context) {
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         sp.edit().remove("join_request_phone").apply()
         _joinRequestPhone.value = ""
-        goBack()
+        _currentScreen.value = "REGISTER_FORM"
     }
 
 fun setJoinRequestPhone(context: android.content.Context, phone: String) {
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-        sp.edit().putString("join_request_phone", phone).apply()
+        sp.edit().putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(phone)).apply()
         _joinRequestPhone.value = phone
     }
 

@@ -18,6 +18,9 @@ import com.example.ui.MainViewModel
 import com.example.ui.components.*
 import com.example.ui.dialogs.*
 import com.example.ui.screens.admin.AdminPanelLayout
+import com.example.ui.screens.register.RegisterScreen
+import com.example.ui.screens.register.ProviderRegisterFormLayout
+import com.example.ui.screens.register.JoinRequestStatusScreen
 import com.example.ui.screens.assistant.SmartAssistantDialogView
 import com.example.ui.screens.bookings.BookingsScreenLayout
 import com.example.ui.screens.bookings.InstantRequestsScreen
@@ -51,6 +54,9 @@ fun AppNavigator(
     var showAssistantDialog by remember { mutableStateOf(false) }
     var showRequestServiceModal by remember { mutableStateOf(false) }
     var showRestoreAccountDialog by remember { mutableStateOf(false) }
+
+    var activeSectionIdForCreation by remember { mutableStateOf("") }
+    var preselectedRegistrationType by remember { mutableStateOf("") }
 
     val providers by viewModel.providers.collectAsState()
     val categories by viewModel.categories.collectAsState()
@@ -89,9 +95,6 @@ fun AppNavigator(
         ) {
             when (currentScreen) {
                 AppScreens.USER_BROWSE, AppScreens.HOME -> {
-                    var activeSectionIdForCreation by remember { mutableStateOf("") }
-                    var preselectedRegistrationType by remember { mutableStateOf("") }
-
                     ServicesBrowserLayout(
                         viewModel = viewModel,
                         themeColors = themeColors,
@@ -102,6 +105,37 @@ fun AppNavigator(
                         onChatOpen = { _ ->
                             viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
                         }
+                    )
+                }
+                AppScreens.REGISTER_FORM -> {
+                    if (preselectedRegistrationType.isEmpty()) {
+                        RegisterScreen(
+                            viewModel = viewModel,
+                            themeColors = themeColors,
+                            onBackClick = {
+                                viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                            },
+                            onSelectRegistrationType = { type ->
+                                preselectedRegistrationType = type.id
+                            },
+                            onOpenRestoreDialog = {
+                                showRestoreAccountDialog = true
+                            }
+                        )
+                    } else {
+                        ProviderRegisterFormLayout(
+                            viewModel = viewModel,
+                            themeColors = themeColors,
+                            regType = preselectedRegistrationType,
+                            sectionId = activeSectionIdForCreation,
+                            onRegTypeChange = { preselectedRegistrationType = it }
+                        )
+                    }
+                }
+                AppScreens.JOIN_REQUEST_STATUS -> {
+                    JoinRequestStatusScreen(
+                        viewModel = viewModel,
+                        themeColors = themeColors
                     )
                 }
                 AppScreens.ADMIN_PANEL -> AdminPanelLayout(viewModel = viewModel, themeColors = themeColors)

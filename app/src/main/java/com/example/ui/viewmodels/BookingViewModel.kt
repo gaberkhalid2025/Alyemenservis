@@ -108,12 +108,22 @@ open class BookingViewModel : BaseViewModel() {
             db.collection("bookings").document(bId).set(finalized)
                 .addOnSuccessListener {
                     _bookings.value = _bookings.value + finalized
+                    // Notification to Customer
                     onAddNotification?.invoke(
                         "📅 حجز جديد رقم $bNum",
                         "تم تسجيل طلب حجز موعد لدى ${finalized.providerName} بتاريخ ${finalized.dateString} الساعة ${finalized.timeString}.",
                         "USER",
                         finalized.customerPhone.ifEmpty { finalized.clientPhone }
                     )
+                    // Notification to Provider
+                    if (finalized.providerPhone.isNotEmpty()) {
+                        onAddNotification?.invoke(
+                            "📅 حجز جديد رقم $bNum",
+                            "مرحباً يا غالي، تم تسجيل طلب حجز جديد لديك من قبل العميل ${finalized.customerName} بتاريخ ${finalized.dateString} الساعة ${finalized.timeString}.",
+                            "USER",
+                            finalized.providerPhone
+                        )
+                    }
                     onResult(true)
                 }
                 .addOnFailureListener {

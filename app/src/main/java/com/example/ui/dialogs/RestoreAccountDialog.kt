@@ -113,7 +113,7 @@ fun RestoreAccountDialog(
                                     match?.store?.let { if (it.isDeleted) viewModel.restoreStore(it.id) }
                                     match?.property?.let { if (it.isDeleted) viewModel.restoreProperty(it.id) }
                                     viewModel.setJoinRequestPhone(context, cleanPhone)
-                                    viewModel.navigateTo("REGISTER_FORM")
+                                    viewModel.navigateTo("JOIN_REQUEST_STATUS")
                                     Toast.makeText(context, "🔓 تم استعادة حسابك بنجاح! مرحباً بك $provName", Toast.LENGTH_LONG).show()
                                     onDismiss()
                                 } else {

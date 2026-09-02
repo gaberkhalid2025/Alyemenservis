@@ -360,6 +360,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -468,6 +469,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
