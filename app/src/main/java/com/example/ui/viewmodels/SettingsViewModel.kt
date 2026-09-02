@@ -31,6 +31,7 @@ class SettingsViewModel : BaseViewModel() {
     var setPasswordRecoveryWaitingPhone: ((String) -> Unit)? = null
     var verifyAdminOrOwnerPassword: ((String) -> Boolean)? = null
     var triggerNotification: ((String) -> Unit)? = null
+    var clearAllNotificationsAndChatsState: (() -> Unit)? = null
 
     inner class MainViewModelDelegate {
         val authViewModel get() = getAuthViewModel?.invoke() ?: throw IllegalStateException("authViewModel not provided")
@@ -56,6 +57,10 @@ class SettingsViewModel : BaseViewModel() {
         
         fun triggerNotification(msg: String) {
             this@SettingsViewModel.triggerNotification?.invoke(msg)
+        }
+
+        fun clearAllNotificationsAndChatsState() {
+            this@SettingsViewModel.clearAllNotificationsAndChatsState?.invoke()
         }
     }
     
@@ -1257,15 +1262,42 @@ fun wipeAllMockAndTemporaryData() {
                 db.collection("bookings").get().addOnSuccessListener { snapshot ->
                     snapshot?.documents?.forEach { doc -> doc.reference.delete() }
                 }
-                // 5. Delete all mainViewModel.homeViewModel.providers except "p_amin"
+                // 5. Delete all ratings
+                db.collection("ratings").get().addOnSuccessListener { snapshot ->
+                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+                }
+                // 6. Delete all providers except "p_amin", and set "p_amin" to official details
                 db.collection("providers").get().addOnSuccessListener { snapshot ->
                     snapshot?.documents?.forEach { doc ->
                         if (doc.id != "p_amin") {
                             doc.reference.delete()
                         }
                     }
+                    val aminProvider = com.example.data.ProviderEntity(
+                        id = "p_amin",
+                        name = "امين الغرباني",
+                        phone = "777703195",
+                        area = "صنعاء - منطقة الدائري جوار مدرسة أسماء للبنات",
+                        localNeighborhood = "منطقة الدائري جوار مدرسة أسماء للبنات",
+                        cityId = "ye_san",
+                        categoryId = "c_elec",
+                        profession = "صيانة وشبكات متكاملة",
+                        specialization = "خدمات تقنية وفنية معتمدة",
+                        isAvailable = true,
+                        subscriptionStatus = "APPROVED",
+                        isVerified = true,
+                        rating = 5.0f
+                    )
+                    db.collection("providers").document("p_amin").set(aminProvider)
                 }
-                mainViewModel.triggerNotification("🧹 تم تنظيف وحذف كافة البيانات والرسائل والإشعارات والفنيين الوهميين بنجاح!")
+
+                // Reset local state
+                mainViewModel.clearAllNotificationsAndChatsState()
+
+                // Clear local read badges
+                appContext?.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)?.edit()?.clear()?.apply()
+
+                mainViewModel.triggerNotification("🧹 تم تنظيف وحذف كافة البيانات والرسائل والإشعارات والفنيين والتقييمات الوهمية بنجاح!")
             } catch (e: Exception) {
                 mainViewModel.triggerNotification("❌ حدث خطأ أثناء عملية التنظيف")
             }

@@ -436,6 +436,7 @@ fun initializeUserIdentity(context: android.content.Context) {
         settingsViewModel.setPasswordRecoveryWaitingPhone = { setPasswordRecoveryWaitingPhone(it) }
         settingsViewModel.verifyAdminOrOwnerPassword = { verifyAdminOrOwnerPassword(it) }
         settingsViewModel.triggerNotification = { triggerNotification(it) }
+        settingsViewModel.clearAllNotificationsAndChatsState = { clearAllNotificationsAndChatsState() }
 
         // Wire up instantRequestViewModel decoupled delegates
         instantRequestViewModel.triggerNotification = { triggerNotification(it) }
@@ -1441,7 +1442,22 @@ private fun writeDefaultBanners() {
     }
 
 private fun writeDefaultProviders() {
-        // Empty - No fake mock providers
+        val aminProvider = ProviderEntity(
+            id = "p_amin",
+            name = "امين الغرباني",
+            phone = "777703195",
+            area = "صنعاء - منطقة الدائري جوار مدرسة أسماء للبنات",
+            localNeighborhood = "منطقة الدائري جوار مدرسة أسماء للبنات",
+            cityId = "ye_san",
+            categoryId = "c_elec",
+            profession = "صيانة وشبكات متكاملة",
+            specialization = "خدمات تقنية وفنية معتمدة",
+            isAvailable = true,
+            subscriptionStatus = "APPROVED",
+            isVerified = true,
+            rating = 5.0f
+        )
+        db.collection("providers").document("p_amin").set(aminProvider)
     }
 
 override fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
@@ -2322,6 +2338,11 @@ fun addNotification(
 
     fun clearAllNotifications() {
         deleteAllNotifications()
+    }
+
+    fun clearAllNotificationsAndChatsState() {
+        _notifications.value = emptyList()
+        _chatChannels.value = emptyList()
     }
 
     // Additional Delegations & Helpers

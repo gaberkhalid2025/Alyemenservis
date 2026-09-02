@@ -288,10 +288,10 @@ fun ProviderCard(
                         border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.6f)),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        modifier = Modifier.weight(1f).height(32.dp),
+                        modifier = Modifier.weight(1.1f).height(32.dp),
                         contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                     ) {
-                        Text("التقييمات ⭐", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text("الآراء والتجارب 💬", fontSize = 9.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -327,6 +327,7 @@ fun ProviderCard(
         ProviderReviewsListDialog(
             provider = provider,
             themeColors = themeColors,
+            viewModel = viewModel,
             onDismiss = { showReviewsListDialog = false }
         )
     }

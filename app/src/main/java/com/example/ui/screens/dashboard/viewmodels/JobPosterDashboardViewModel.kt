@@ -34,12 +34,7 @@ class JobPosterDashboardViewModel(
     private val _eventFlow = MutableSharedFlow<DashboardEvent>()
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
-    private val _jobs = MutableStateFlow<List<JobPostItem>>(
-        listOf(
-            JobPostItem("1", "محاسب مالي خبرة سنتين", 250000.0, "صنعاء - حدة", 8),
-            JobPostItem("2", "مهندس صيانة شبكات وهواتف", 300000.0, "عدن - المعلا", 5)
-        )
-    )
+    private val _jobs = MutableStateFlow<List<JobPostItem>>(emptyList())
     val jobs: StateFlow<List<JobPostItem>> = _jobs.asStateFlow()
 
     init {

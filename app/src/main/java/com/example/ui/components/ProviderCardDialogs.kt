@@ -104,41 +104,148 @@ fun ProviderDetailsDialog(
 fun ProviderReviewsListDialog(
     provider: ProviderEntity,
     themeColors: VisualThemePalette,
+    viewModel: MainViewModel? = null,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val allRatingsState = viewModel?.ratings?.collectAsState()
+    val providerRatings = remember(allRatingsState?.value, provider.id) {
+        allRatingsState?.value?.filter { it.targetId == provider.id || it.providerId == provider.id } ?: emptyList()
+    }
+
+    var selectedRating by remember { mutableStateOf(5) }
+    var reviewComment by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
             shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.padding(16.dp).fillMaxWidth()
+            modifier = Modifier.padding(12.dp).fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("⭐ آرائ وتقييمات العملاء لـ ${provider.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                Text("متوسط التقييم: ${provider.rating} / 5.0 (إجمالي ${provider.numReviews} تقييم)", fontSize = 11.sp, color = Color.LightGray)
+                Text("💬 الآراء والتجارب لـ ${provider.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                Text("التقييم العام: ${String.format("%.1f", provider.rating)} / 5.0 (إجمالي ${providerRatings.size} رأي وتجربة حقيقية)", fontSize = 11.sp, color = Color.LightGray)
 
-                val reviewsList = listOf("خدمة ممتازة وسريعة جداً!", "فني محترف ويلتزم بالمواعيد دائمًا.")
-
-                reviewsList.forEach { rev ->
+                if (providerRatings.isEmpty()) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text(getStarsString(provider.rating), color = Color.Yellow, fontSize = 12.sp)
-                            Text(rev, fontSize = 11.sp, color = Color.White)
+                        Column(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("📝 لا توجد آراء أو تجارب مسجلة حالياً.", fontSize = 11.5.sp, color = Color.LightGray, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("كن أول من يشارك رأيه وتجربته مع هذا المقدم!", fontSize = 10.5.sp, color = themeColors.accent)
+                        }
+                    }
+                } else {
+                    providerRatings.forEach { rev ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (rev.userName.isNotBlank()) rev.userName else "عميل مجهول",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = themeColors.accent
+                                    )
+                                    Text(getStarsString(rev.rating), color = Color.Yellow, fontSize = 11.sp)
+                                }
+                                if (rev.comment.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(rev.comment, fontSize = 11.sp, color = Color.White)
+                                }
+                            }
                         }
                     }
                 }
 
+                HorizontalDivider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 4.dp))
+
+                Text("✍️ إضافة رأيك وتجربتك:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    (1..5).forEach { star ->
+                        IconButton(
+                            onClick = { selectedRating = star },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text(
+                                text = if (star <= selectedRating) "⭐" else "☆",
+                                fontSize = 18.sp
+                            )
+                        }
+                    }
+                    Text("($selectedRating / 5)", fontSize = 11.sp, color = Color.Yellow, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedTextField(
+                    value = reviewComment,
+                    onValueChange = { reviewComment = it },
+                    placeholder = { Text("اكتب رأيك وتجربتك بالتفصيل هنا...", fontSize = 11.sp, color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = themeColors.accent,
+                        unfocusedBorderColor = Color.Gray
+                    ),
+                    maxLines = 3
+                )
+
+                Button(
+                    onClick = {
+                        if (reviewComment.trim().isBlank()) {
+                            Toast.makeText(context, "يرجى كتابة ملاحظتك أو تجربتك أولاً", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        isSubmitting = true
+                        val newRating = com.example.data.RatingEntity(
+                            id = "rev_" + System.currentTimeMillis(),
+                            targetId = provider.id,
+                            targetType = "PROVIDER",
+                            rating = selectedRating.toFloat(),
+                            comment = reviewComment.trim(),
+                            userName = "عميل تطبيق دليل اليمن",
+                            timestamp = System.currentTimeMillis()
+                        )
+                        viewModel?.addRating(newRating)
+                        Toast.makeText(context, "شكرًا لك! تم إرسال رأيك وتجربتك بنجاح.", Toast.LENGTH_LONG).show()
+                        reviewComment = ""
+                        isSubmitting = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSubmitting,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("إرسال الرأي والتجربة 🚀", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
                 Button(
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("إغلاق", color = Color.White, fontSize = 11.sp)
+                    Text("إغلاق ❌", color = Color.White, fontSize = 11.sp)
                 }
             }
         }
@@ -163,30 +270,24 @@ fun GenericEntityReviewsDialog(
                 modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("⭐ تقييمات وآراء العملاء لـ $title", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                Text("متوسط التقييم: ${String.format("%.1f", rating)} / 5.0 (إجمالي $numReviews تقييم)", fontSize = 10.5.sp, color = Color.LightGray)
+                Text("💬 الآراء والتجارب لـ $title", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                Text("التقييم العام: ${String.format("%.1f", rating)} / 5.0 (إجمالي $numReviews تقييم)", fontSize = 10.5.sp, color = Color.LightGray)
 
-                val reviewsList = listOf(
-                    "تعامل راقي وخدمة متميزة جداً وسرعة في التجاوب 👍",
-                    "جودة عالية والتزام بالمواعيد، نوصي بالتعامل معهم بشدة ⭐"
-                )
-
-                reviewsList.forEach { rev ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text(getStarsString(rating), color = Color.Yellow, fontSize = 11.sp)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(rev, fontSize = 10.5.sp, color = Color.White)
-                        }
+                        Text("📝 لا توجد آراء أو تجارب مسجلة حالياً لهذا القسم.", fontSize = 11.sp, color = Color.LightGray)
                     }
                 }
 
                 Button(
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {

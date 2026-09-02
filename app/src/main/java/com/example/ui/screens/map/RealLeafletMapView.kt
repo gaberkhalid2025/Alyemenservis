@@ -62,6 +62,7 @@ fun RealLeafletMapView(
 
     LaunchedEffect(Unit) {
         OfflineMapManager.purgeCacheIfNeeded(context)
+        Log.d("RealLeafletMapView", "Initializing RealLeafletMapView with user center: ($safeUserLat, $safeUserLng)")
     }
 
     val markersJsonArray = remember(nearbyProviders, nearbyStores, nearbyProperties, dynamicOffsets, safeUserLat, safeUserLng) {
@@ -75,11 +76,16 @@ fun RealLeafletMapView(
         )
     }
 
+    // Dynamic marker update via JavaScript without reloading the entire page
     LaunchedEffect(markersJsonArray) {
-        webViewRef?.evaluateJavascript("if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }", null)
+        webViewRef?.let { webView ->
+            Log.d("RealLeafletMapView", "Updating markers via evaluateJavascript: ${markersJsonArray.length} bytes")
+            webView.evaluateJavascript("if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }", null)
+        }
     }
 
-    val htmlContent = remember(safeUserLat, safeUserLng, markersJsonArray) {
+    // HTML base template - loaded once per coordinate anchor change
+    val htmlContent = remember(safeUserLat, safeUserLng) {
         try {
             val template = context.assets.open("map.html").bufferedReader().use { it.readText() }
             template
@@ -100,9 +106,13 @@ fun RealLeafletMapView(
                     webViewRef = this
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     isHapticFeedbackEnabled = true
+                    setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
+                        databaseEnabled = true
+                        allowFileAccess = true
+                        allowContentAccess = true
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         cacheMode = WebSettings.LOAD_DEFAULT
@@ -110,18 +120,22 @@ fun RealLeafletMapView(
                     }
                     webChromeClient = object : WebChromeClient() {
                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                            Log.d("RealLeafletMapView", "${consoleMessage?.message()} -- line ${consoleMessage?.lineNumber()} of ${consoleMessage?.sourceId()}")
+                            Log.d("RealLeafletMapViewJS", "[${consoleMessage?.message()}] line ${consoleMessage?.lineNumber()} (${consoleMessage?.sourceId()})")
                             return true
                         }
                     }
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
+                            Log.d("RealLeafletMapView", "WebView onPageFinished: $url")
                             isMapLoading = false
+                            // Guarantee latest markers are rendered when page completes loading
+                            evaluateJavascript("if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }", null)
                         }
 
                         override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                             super.onReceivedError(view, request, error)
+                            Log.e("RealLeafletMapView", "WebView error: ${error?.description} (code ${error?.errorCode}) for URL: ${request?.url}")
                             if (request?.isForMainFrame == true) {
                                 hasLoadError = true
                                 isMapLoading = false
@@ -148,14 +162,26 @@ fun RealLeafletMapView(
 
                         @android.webkit.JavascriptInterface
                         fun onMapReady() {
-                            android.os.Handler(android.os.Looper.getMainLooper()).post { isMapLoading = false }
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                Log.d("RealLeafletMapView", "JavaScript signal: onMapReady received successfully")
+                                isMapLoading = false
+                                hasLoadError = false
+                            }
                         }
 
                         @android.webkit.JavascriptInterface
                         fun onMapLoadFailed() {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                Log.e("RealLeafletMapView", "JavaScript signal: onMapLoadFailed received")
                                 hasLoadError = true
                                 isMapLoading = false
+                            }
+                        }
+
+                        @android.webkit.JavascriptInterface
+                        fun switchToRadar() {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                onSwitchToRadar?.invoke()
                             }
                         }
 
@@ -182,13 +208,13 @@ fun RealLeafletMapView(
                     }, "AndroidBridge")
 
                     tag = htmlContent
-                    loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL("https://openstreetmap.org/", htmlContent, "text/html", "UTF-8", null)
                 }
             },
             update = { webView ->
                 if (webView.tag != htmlContent) {
                     webView.tag = htmlContent
-                    webView.loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
+                    webView.loadDataWithBaseURL("https://openstreetmap.org/", htmlContent, "text/html", "UTF-8", null)
                 }
             }
         )

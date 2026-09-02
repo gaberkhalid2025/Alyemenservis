@@ -24,11 +24,13 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun AccountSettings(
     themeColors: VisualThemePalette,
+    initialName: String = "",
+    initialBio: String = "",
     onSaveProfile: (name: String, bio: String, notifyBookings: Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    var businessName by remember { mutableStateOf("المركز المعتمد للصيانة والخدمات") }
-    var businessBio by remember { mutableStateOf("نقدم أفضل خدمات الصيانة المنزلية والتركيبات المعتمدة بأعلى معايير الجودة والضمان.") }
+    var businessName by remember { mutableStateOf(initialName) }
+    var businessBio by remember { mutableStateOf(initialBio) }
     var notifyBookings by remember { mutableStateOf(true) }
     var notifyMessages by remember { mutableStateOf(true) }
     var notifyOffers by remember { mutableStateOf(false) }

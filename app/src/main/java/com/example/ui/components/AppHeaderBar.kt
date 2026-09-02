@@ -100,8 +100,10 @@ fun AppHeaderBar(
         if (filteredNotifs.isEmpty()) 0 else filteredNotifs.count { it.id !in headerReadIds }
     }
 
+    var localReadTrigger by remember { mutableStateOf(0) }
+
     // Calculate unread chats count
-    val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger) {
+    val unreadChatsCount = remember(myChannels, chatChannels, headerSp, chatReadTrigger, localReadTrigger) {
         if (myChannels.isEmpty()) 0 else myChannels.count { ch ->
             val lastMsg = ch.messages.lastOrNull()
             if (lastMsg == null) {
@@ -305,7 +307,16 @@ fun AppHeaderBar(
                 badgeCount = unreadChatsCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
-                onClick = { onChatsClick() }
+                onClick = {
+                    val editor = headerSp.edit()
+                    val now = System.currentTimeMillis()
+                    myChannels.forEach { ch ->
+                        editor.putLong("chat_read_${ch.id}", now)
+                    }
+                    editor.apply()
+                    localReadTrigger += 1
+                    onChatsClick()
+                }
             )
         }
     }

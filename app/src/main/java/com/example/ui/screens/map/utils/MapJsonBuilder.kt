@@ -168,6 +168,7 @@ object MapJsonBuilder {
             jsonArray.put(obj)
         }
 
+        android.util.Log.d("MapJsonBuilder", "Built ${jsonArray.length()} markers for Leaflet Map (Providers: ${nearbyProviders.size}, Stores: ${nearbyStores.size}, Properties: ${nearbyProperties.size})")
         return jsonArray.toString()
     }
 }
