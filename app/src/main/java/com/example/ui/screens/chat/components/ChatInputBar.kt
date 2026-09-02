@@ -43,6 +43,7 @@ import java.io.File
 
 @Composable
 fun ChatInputBar(
+    channelId: String = "direct_chat",
     replyingTo: ChatMessage?,
     onCancelReply: () -> Unit,
     onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit,
@@ -92,7 +93,7 @@ fun ChatInputBar(
             scope.launch {
                 uploadProgress = 0.2f
                 val uploadResult = attachmentManager.uploadAttachment(
-                    channelId = "direct_chat",
+                    channelId = channelId,
                     uri = uri,
                     type = "image"
                 )
@@ -187,7 +188,7 @@ fun ChatInputBar(
             scope.launch {
                 uploadProgress = 0.2f
                 val uploadResult = attachmentManager.uploadAttachment(
-                    channelId = "direct_chat",
+                    channelId = channelId,
                     uri = uri,
                     type = "audio"
                 )

@@ -254,6 +254,7 @@ fun ChatScreen(
         }
 
         ChatInputBar(
+            channelId = activeChannel?.id ?: channelId ?: "direct_chat",
             replyingTo = replyingTo,
             onCancelReply = { chatViewModel.setReplyingTo(null) },
             onSendMessage = { text, mediaType, mediaUrl ->

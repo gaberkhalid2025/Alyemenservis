@@ -40,10 +40,12 @@ fun TabGalleryAlbums(
     var uploadStatus by remember { mutableStateOf("") }
     
     // Extra visual photos for custom albums
-    var albumPhotos by remember { 
-        mutableStateOf<List<String>>(
-            account.rawStore?.images ?: emptyList()
-        ) 
+    var albumPhotos by remember(account) { 
+        val initialPhotos = account.rawStore?.images 
+            ?: account.rawProvider?.portfolioImages 
+            ?: account.rawProperty?.images 
+            ?: emptyList()
+        mutableStateOf(initialPhotos) 
     }
 
     Column(
@@ -79,10 +81,13 @@ fun TabGalleryAlbums(
                             val updatedPhotos = albumPhotos + url
                             albumPhotos = updatedPhotos
                             uploadStatus = "🎉 تم رفع الصورة وإضافتها للألبوم بنجاح!"
-                            // Persist store update
-                            val raw = account.rawStore
-                            if (raw != null) {
-                                viewModel.saveStore(raw.copy(images = updatedPhotos))
+                            // Persist updates to Firestore
+                            if (account.rawStore != null) {
+                                viewModel.saveStore(account.rawStore.copy(images = updatedPhotos))
+                            } else if (account.rawProvider != null) {
+                                viewModel.updateProviderPortfolio(account.rawProvider.id, updatedPhotos)
+                            } else if (account.rawProperty != null) {
+                                viewModel.saveProperty(account.rawProperty.copy(images = updatedPhotos))
                             }
                         } else {
                             uploadStatus = "❌ فشل رفع الصورة، يرجى التحقق من اتصال الإنترنت."
@@ -144,9 +149,12 @@ fun TabGalleryAlbums(
                                 .clickable {
                                     val filtered = albumPhotos.filter { it != img }
                                     albumPhotos = filtered
-                                    val raw = account.rawStore
-                                    if (raw != null) {
-                                        viewModel.saveStore(raw.copy(images = filtered))
+                                    if (account.rawStore != null) {
+                                        viewModel.saveStore(account.rawStore.copy(images = filtered))
+                                    } else if (account.rawProvider != null) {
+                                        viewModel.updateProviderPortfolio(account.rawProvider.id, filtered)
+                                    } else if (account.rawProperty != null) {
+                                        viewModel.saveProperty(account.rawProperty.copy(images = filtered))
                                     }
                                     Toast
                                         .makeText(context, "🗑️ تم إزالة الصورة بنجاح!", Toast.LENGTH_SHORT)

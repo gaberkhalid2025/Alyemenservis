@@ -222,7 +222,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 3. الموافقة على طلب فني / مقدم خدمة
+     * 3. الموافقة على طلب فني / مقدم خدمة / متجر / عقار / توظيف
      */
     fun approveProviderRequest(requestId: String, onComplete: ((Boolean) -> Unit)? = null) {
         viewModelScope.launch {
@@ -230,45 +230,137 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 firestore.collection("join_requests").document(requestId).get()
                     .addOnSuccessListener { doc ->
                         if (doc.exists()) {
-                            val type = doc.getString("type") ?: "PROVIDER"
-                            val name = doc.getString("fullName") ?: doc.getString("name") ?: ""
+                            val type = (doc.getString("type") ?: "PROVIDER").uppercase()
+                            val name = doc.getString("fullName") ?: doc.getString("name") ?: doc.getString("businessName") ?: ""
                             val phone = doc.getString("phone") ?: ""
+                            val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
+                            val catId = doc.getString("categoryId") ?: ""
+                            val catName = doc.getString("categoryName") ?: ""
+                            val city = doc.getString("city") ?: "صنعاء"
+                            val area = doc.getString("area") ?: ""
+                            val profileImg = doc.getString("profileImage") ?: doc.getString("logoImage") ?: ""
+                            val workImgs = (doc.get("workImages") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
-                            val targetCollection = when (type.uppercase()) {
-                                "STORE" -> "stores"
-                                "RESTAURANT" -> "restaurants"
-                                "MEDICAL" -> "medical"
-                                "PROPERTY" -> "properties"
-                                "JOB" -> "jobs"
-                                "CLIENT" -> "users"
-                                else -> "providers"
+                            when (type) {
+                                "PROVIDER" -> {
+                                    val newProvider = com.example.data.ProviderEntity(
+                                        id = if (cleanPhone.isNotEmpty()) cleanPhone else requestId,
+                                        name = name,
+                                        phone = phone,
+                                        categoryId = if (catId.isNotEmpty()) catId else "general",
+                                        area = city,
+                                        localNeighborhood = area,
+                                        customCategoryName = if (catName.isNotEmpty()) catName else "فني معتمد",
+                                        profileImage = profileImg,
+                                        workPhotosBase64 = workImgs,
+                                        isVerified = true,
+                                        isAvailable = true,
+                                        isRecommended = true,
+                                        rating = 5.0f,
+                                        subscriptionStatus = "APPROVED"
+                                    )
+                                    firestore.collection("providers").document(newProvider.id).set(newProvider)
+                                    // Remove from pending_providers
+                                    firestore.collection("pending_providers").document(requestId).delete()
+                                    if (cleanPhone.isNotEmpty()) {
+                                        firestore.collection("pending_providers").document(cleanPhone).delete()
+                                    }
+                                }
+                                "STORE", "RESTAURANT", "MEDICAL" -> {
+                                    val section = when (type) {
+                                        "RESTAURANT" -> "restaurants"
+                                        "MEDICAL" -> "medical"
+                                        else -> "stores"
+                                    }
+                                    val newStore = com.example.data.StoreEntity(
+                                        id = requestId,
+                                        sectionId = section,
+                                        name = name,
+                                        ownerName = doc.getString("ownerName") ?: name,
+                                        ownerId = cleanPhone,
+                                        phone = phone,
+                                        categoryId = catId,
+                                        cityId = city,
+                                        localNeighborhood = area,
+                                        logoImage = profileImg,
+                                        images = workImgs,
+                                        isActive = true,
+                                        isApproved = true,
+                                        isVerified = true,
+                                        isRecommended = true
+                                    )
+                                    firestore.collection("stores").document(requestId).set(newStore)
+                                }
+                                "PROPERTY" -> {
+                                    val newProp = com.example.data.PropertyEntity(
+                                        id = requestId,
+                                        sectionId = "properties",
+                                        title = doc.getString("propertyTitle") ?: name,
+                                        ownerName = doc.getString("ownerName") ?: name,
+                                        ownerId = cleanPhone,
+                                        phone = phone,
+                                        cityId = city,
+                                        localNeighborhood = area,
+                                        propertyType = doc.getString("propertyType") ?: "apartment",
+                                        price = doc.getDouble("price") ?: 0.0,
+                                        images = workImgs,
+                                        isActive = true,
+                                        isApproved = true,
+                                        isVerified = true
+                                    )
+                                    firestore.collection("properties").document(requestId).set(newProp)
+                                }
+                                "JOB" -> {
+                                    val jobMap = mapOf(
+                                        "id" to requestId,
+                                        "jobTitle" to (doc.getString("jobTitle") ?: name),
+                                        "companyName" to (doc.getString("companyName") ?: name),
+                                        "phone" to phone,
+                                        "city" to city,
+                                        "categoryId" to catId,
+                                        "isActive" to true,
+                                        "isApproved" to true,
+                                        "createdAt" to System.currentTimeMillis()
+                                    )
+                                    firestore.collection("jobs").document(requestId).set(jobMap)
+                                }
+                                "CLIENT" -> {
+                                    val userMap = mapOf(
+                                        "id" to (if (cleanPhone.isNotEmpty()) cleanPhone else requestId),
+                                        "name" to name,
+                                        "phone" to cleanPhone,
+                                        "city" to city,
+                                        "role" to "CLIENT",
+                                        "isBlocked" to false,
+                                        "createdAt" to System.currentTimeMillis()
+                                    )
+                                    firestore.collection("users").document(cleanPhone).set(userMap)
+                                }
                             }
 
-                            val data = doc.data?.toMutableMap() ?: mutableMapOf()
-                            data["status"] = "APPROVED"
-                            data["approvalStatus"] = "APPROVED"
-
-                            firestore.collection(targetCollection).document(requestId).set(data)
+                            // Update join_requests status to APPROVED
+                            firestore.collection("join_requests").document(requestId)
+                                .update(mapOf(
+                                    "status" to "APPROVED",
+                                    "approvalStatus" to "APPROVED",
+                                    "isActive" to true,
+                                    "updatedAt" to System.currentTimeMillis()
+                                ))
                                 .addOnSuccessListener {
-                                    firestore.collection("join_requests").document(requestId)
-                                        .update(mapOf("status" to "APPROVED", "approvalStatus" to "APPROVED"))
-                                        .addOnSuccessListener {
-                                            val userNotif = mapOf(
-                                                "id" to UUID.randomUUID().toString(),
-                                                "title" to "🎉 تم قبول طلب انضمامك",
-                                                "message" to "تهانينا $name! تم الموافقة على طلب انضمامك وتنشيط حسابك كـ $type بنجاح.",
-                                                "targetType" to "USER",
-                                                "targetValue" to phone,
-                                                "timestamp" to System.currentTimeMillis()
-                                            )
-                                            firestore.collection("notifications").document(userNotif["id"] as String).set(userNotif)
+                                    val userNotif = mapOf(
+                                        "id" to UUID.randomUUID().toString(),
+                                        "title" to "🎉 تم قبول طلب انضمامك",
+                                        "message" to "تهانينا $name! تم قبول طلب انضمامك وتنشيط حسابك كـ $type بنجاح. يمكنك الآن استخدام لوحة التحكم الخاصة بك.",
+                                        "targetType" to "USER",
+                                        "targetValue" to phone,
+                                        "timestamp" to System.currentTimeMillis()
+                                    )
+                                    firestore.collection("notifications").document(userNotif["id"] as String).set(userNotif)
 
-                                            _pendingRequests.value = _pendingRequests.value.filterNot { it.id == requestId }
-                                            recordAuditLog("APPROVE_REQUEST", "الموافقة على طلب $requestId وتنشيطه كـ $type")
-                                            onComplete?.invoke(true)
-                                        }
+                                    _pendingRequests.value = _pendingRequests.value.filterNot { it.id == requestId }
+                                    recordAuditLog("APPROVE_REQUEST", "الموافقة على طلب $requestId وتنشيطه كـ $type")
+                                    onComplete?.invoke(true)
                                 }
-                                .addOnFailureListener { onComplete?.invoke(false) }
                         } else {
                             onComplete?.invoke(false)
                         }
@@ -291,16 +383,28 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         if (doc.exists()) {
                             val name = doc.getString("fullName") ?: doc.getString("name") ?: ""
                             val phone = doc.getString("phone") ?: ""
+                            val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
                             val type = doc.getString("type") ?: "PROVIDER"
 
                             val updates = mapOf(
                                 "status" to "REJECTED",
                                 "approvalStatus" to "REJECTED",
-                                "rejectionReason" to reason
+                                "rejectionReason" to reason,
+                                "isActive" to false,
+                                "updatedAt" to System.currentTimeMillis()
                             )
                             firestore.collection("join_requests").document(requestId)
                                 .update(updates)
                                 .addOnSuccessListener {
+                                    if (type == "PROVIDER") {
+                                        firestore.collection("pending_providers").document(requestId)
+                                            .update(mapOf("status" to "REJECTED", "reason" to reason))
+                                        if (cleanPhone.isNotEmpty()) {
+                                            firestore.collection("pending_providers").document(cleanPhone)
+                                                .update(mapOf("status" to "REJECTED", "reason" to reason))
+                                        }
+                                    }
+
                                     val userNotif = mapOf(
                                         "id" to UUID.randomUUID().toString(),
                                         "title" to "⚠️ تم رفض طلب انضمامك",

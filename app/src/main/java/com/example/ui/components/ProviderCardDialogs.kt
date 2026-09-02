@@ -144,3 +144,55 @@ fun ProviderReviewsListDialog(
         }
     }
 }
+
+@Composable
+fun GenericEntityReviewsDialog(
+    title: String,
+    rating: Float,
+    numReviews: Int,
+    themeColors: VisualThemePalette,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.padding(16.dp).fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("⭐ تقييمات وآراء العملاء لـ $title", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                Text("متوسط التقييم: ${String.format("%.1f", rating)} / 5.0 (إجمالي $numReviews تقييم)", fontSize = 10.5.sp, color = Color.LightGray)
+
+                val reviewsList = listOf(
+                    "تعامل راقي وخدمة متميزة جداً وسرعة في التجاوب 👍",
+                    "جودة عالية والتزام بالمواعيد، نوصي بالتعامل معهم بشدة ⭐"
+                )
+
+                reviewsList.forEach { rev ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(getStarsString(rating), color = Color.Yellow, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(rev, fontSize = 10.5.sp, color = Color.White)
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("إغلاق ❌", color = Color.White, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}
