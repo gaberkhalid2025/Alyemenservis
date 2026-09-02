@@ -8,7 +8,7 @@ import com.example.data.NotificationEntity
 import com.example.domain.entities.JoinStatusEntity
 import com.example.domain.entities.RegistrationEntity
 import com.example.security.BookingSecurityHelper
-import com.example.util.NotificationDeduplicator
+import com.example.utils.NotificationDeduplicator
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.channels.awaitClose
@@ -86,7 +86,7 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
-            val hashedPassword = com.example.util.PasswordHasher.hash(client.passwordHash)
+            val hashedPassword = com.example.utils.PasswordHasher.hash(client.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "CLIENT",
@@ -140,7 +140,7 @@ class RegistrationRepositoryImpl(
                 status = "PENDING",
                 fullName = provider.fullName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.util.PasswordHasher.hash(provider.passwordHash),
+                passwordHash = com.example.utils.PasswordHasher.hash(provider.passwordHash),
                 city = provider.city.trim(),
                 categoryId = provider.professionCategory.trim(),
                 categoryName = provider.professionCategory.trim(),
@@ -178,7 +178,7 @@ class RegistrationRepositoryImpl(
                 ownerName = store.ownerName.trim(),
                 fullName = store.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.util.PasswordHasher.hash(store.passwordHash),
+                passwordHash = com.example.utils.PasswordHasher.hash(store.passwordHash),
                 categoryId = store.storeCategory.trim(),
                 categoryName = store.storeCategory.trim(),
                 city = store.city.trim(),
@@ -216,7 +216,7 @@ class RegistrationRepositoryImpl(
                 ownerName = restaurant.ownerName.trim(),
                 fullName = restaurant.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.util.PasswordHasher.hash(restaurant.passwordHash),
+                passwordHash = com.example.utils.PasswordHasher.hash(restaurant.passwordHash),
                 categoryId = restaurant.cuisineType.trim(),
                 categoryName = restaurant.cuisineType.trim(),
                 city = restaurant.city.trim(),
@@ -254,7 +254,7 @@ class RegistrationRepositoryImpl(
                 ownerName = medical.doctorName.trim(),
                 fullName = medical.doctorName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.util.PasswordHasher.hash(medical.passwordHash),
+                passwordHash = com.example.utils.PasswordHasher.hash(medical.passwordHash),
                 categoryId = medical.specialtyCategory.trim(),
                 categoryName = medical.specialtyCategory.trim(),
                 city = medical.city.trim(),
@@ -294,7 +294,7 @@ class RegistrationRepositoryImpl(
                 ownerName = property.ownerName.trim(),
                 fullName = property.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.util.PasswordHasher.hash(property.passwordHash),
+                passwordHash = com.example.utils.PasswordHasher.hash(property.passwordHash),
                 city = property.city.trim(),
                 area = property.areaDetails.trim(),
                 price = property.priceYer,
@@ -332,7 +332,7 @@ class RegistrationRepositoryImpl(
                 categoryId = job.category.trim(),
                 categoryName = job.category.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.util.PasswordHasher.hash(job.passwordHash),
+                passwordHash = com.example.utils.PasswordHasher.hash(job.passwordHash),
                 city = job.city.trim(),
                 approvalStatus = "PENDING",
                 submittedAt = System.currentTimeMillis(),

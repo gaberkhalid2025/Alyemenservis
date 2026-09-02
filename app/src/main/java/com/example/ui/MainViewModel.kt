@@ -1306,7 +1306,7 @@ fun seedFirestoreIfEmpty() {
     }
 
 private fun writeDefaultSupervisors() {
-        val crypto = com.example.util.SecurityCryptoUtils
+        val crypto = com.example.utils.SecurityCryptoUtils
         val fbSupervisors = listOf(
             com.example.data.SupervisorEntity(
                 "owner_1", 
@@ -1707,7 +1707,7 @@ override suspend fun uploadImageStringOrUri(
         return try {
             if (input.startsWith("content://") || input.startsWith("file://")) {
                 val uri = android.net.Uri.parse(input)
-                val res = com.example.util.FirebaseStorageUploader.uploadImageUri(
+                val res = com.example.utils.FirebaseStorageUploader.uploadImageUri(
                     context, uri, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
                 )
                 res.getOrDefault(input)
@@ -1716,7 +1716,7 @@ override suspend fun uploadImageStringOrUri(
                 val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
                 val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 if (bitmap != null) {
-                    val res = com.example.util.FirebaseStorageUploader.uploadBitmap(
+                    val res = com.example.utils.FirebaseStorageUploader.uploadBitmap(
                         bitmap, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
                     )
                     res.getOrDefault(input)
@@ -1760,27 +1760,27 @@ fun submitJoinForm(
 
             val finalSelfie = uploadImageStringOrUri(
                 context, photoPath,
-                com.example.util.FirebaseStorageUploader.getProviderProfilePath(cleanPhone),
+                com.example.utils.FirebaseStorageUploader.getProviderProfilePath(cleanPhone),
                 maxSizeBytes = 150 * 1024L
             )
             val finalIdCard = uploadImageStringOrUri(
                 context, idCardPath,
-                com.example.util.FirebaseStorageUploader.getProviderIdCardPath(cleanPhone),
+                com.example.utils.FirebaseStorageUploader.getProviderIdCardPath(cleanPhone),
                 maxSizeBytes = 150 * 1024L
             )
             val finalWorkPhotos = workPhotos.mapIndexed { idx, p ->
                 uploadImageStringOrUri(
                     context, p,
-                    com.example.util.FirebaseStorageUploader.getProviderWorkPhotoPath(cleanPhone, idx),
+                    com.example.utils.FirebaseStorageUploader.getProviderWorkPhotoPath(cleanPhone, idx),
                     maxSizeBytes = 300 * 1024L
                 )
             }
 
-            val encSelfie = if (finalSelfie.isNotEmpty()) com.example.util.SecurityCryptoUtils.encrypt(finalSelfie) else ""
-            val encIdCard = if (finalIdCard.isNotEmpty()) com.example.util.SecurityCryptoUtils.encrypt(finalIdCard) else ""
+            val encSelfie = if (finalSelfie.isNotEmpty()) com.example.utils.SecurityCryptoUtils.encrypt(finalSelfie) else ""
+            val encIdCard = if (finalIdCard.isNotEmpty()) com.example.utils.SecurityCryptoUtils.encrypt(finalIdCard) else ""
 
             if (password.isNotEmpty()) {
-                val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(password)
+                val valResult = com.example.utils.SecurityCryptoUtils.validatePasswordPolicy(password)
                 if (valResult.first) {
                     val authEmail = getAuthEmailForPhone(cleanPhone)
                     auth.createUserWithEmailAndPassword(authEmail, password.trim())

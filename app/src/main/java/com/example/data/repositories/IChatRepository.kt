@@ -1,7 +1,7 @@
 package com.example.data.repositories
 
 import com.example.data.models.*
-import com.example.util.AppResult
+import com.example.utils.AppResult
 import kotlinx.coroutines.flow.Flow
 
 /**

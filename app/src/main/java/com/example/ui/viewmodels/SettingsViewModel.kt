@@ -183,7 +183,7 @@ fun updateBackdoorSettings(
         customSurfaceHex: String = "#121D18"
     ) {
         val passHash = if (adminPassword.isNotEmpty()) {
-            if (adminPassword.length == 64 && adminPassword.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) adminPassword else com.example.util.SecurityCryptoUtils.hashPassword(adminPassword)
+            if (adminPassword.length == 64 && adminPassword.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) adminPassword else com.example.utils.SecurityCryptoUtils.hashPassword(adminPassword)
         } else _settings.value.adminPassword
 
         val updated = _settings.value.copy(
@@ -227,13 +227,13 @@ fun updateAdminSettings(newSettings: AdminSettingsEntity) {
 
 fun initColorSync(context: android.content.Context) {
         // 1. Load Local cached values
-        val localScheme = com.example.util.ColorSyncManager.getLocalColorScheme(context)
+        val localScheme = com.example.utils.ColorSyncManager.getLocalColorScheme(context)
         _colorScheme.value = localScheme
 
-        val localPersonal = com.example.util.ColorSyncManager.getLocalPersonalColors(context)
+        val localPersonal = com.example.utils.ColorSyncManager.getLocalPersonalColors(context)
         _personalColors.value = localPersonal
 
-        _colorSyncLogs.value = com.example.util.ColorSyncManager.getSyncLogs(context)
+        _colorSyncLogs.value = com.example.utils.ColorSyncManager.getSyncLogs(context)
 
         // 2. Real-time Firestore listener for Main Color Scheme
         _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCING
@@ -253,8 +253,8 @@ fun initColorSync(context: android.content.Context) {
                             val currentLocal = _colorScheme.value
                             if (cloudScheme.version > currentLocal.version) {
                                 // Newer cloud version found! Check for potential conflicts.
-                                val cloudSerialized = com.example.util.ColorSyncManager.serializeColorScheme(cloudScheme)
-                                val localSerialized = com.example.util.ColorSyncManager.serializeColorScheme(currentLocal)
+                                val cloudSerialized = com.example.utils.ColorSyncManager.serializeColorScheme(cloudScheme)
+                                val localSerialized = com.example.utils.ColorSyncManager.serializeColorScheme(currentLocal)
                                 
                                 if (cloudSerialized != localSerialized) {
                                     _pendingConflictScheme.value = cloudScheme
@@ -269,7 +269,7 @@ fun initColorSync(context: android.content.Context) {
                                     )
                                 } else {
                                     // Same colors, just update version
-                                    com.example.util.ColorSyncManager.saveLocalColorScheme(context, cloudScheme)
+                                    com.example.utils.ColorSyncManager.saveLocalColorScheme(context, cloudScheme)
                                     _colorScheme.value = cloudScheme
                                     _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
                                 }
@@ -289,10 +289,10 @@ fun initColorSync(context: android.content.Context) {
                                     }
                             } else {
                                 // Versions match. Check content
-                                val cloudSerialized = com.example.util.ColorSyncManager.serializeColorScheme(cloudScheme)
-                                val localSerialized = com.example.util.ColorSyncManager.serializeColorScheme(currentLocal)
+                                val cloudSerialized = com.example.utils.ColorSyncManager.serializeColorScheme(cloudScheme)
+                                val localSerialized = com.example.utils.ColorSyncManager.serializeColorScheme(currentLocal)
                                 if (cloudSerialized != localSerialized) {
-                                    com.example.util.ColorSyncManager.saveLocalColorScheme(context, cloudScheme)
+                                    com.example.utils.ColorSyncManager.saveLocalColorScheme(context, cloudScheme)
                                     _colorScheme.value = cloudScheme
                                     _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
                                     addNewSyncLog(
@@ -319,7 +319,7 @@ fun initColorSync(context: android.content.Context) {
                         .addOnSuccessListener {
                             _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
                             _colorScheme.value = defaultScheme
-                            com.example.util.ColorSyncManager.saveLocalColorScheme(context, defaultScheme)
+                            com.example.utils.ColorSyncManager.saveLocalColorScheme(context, defaultScheme)
                             addNewSyncLog(context, "colors", "success", listOf("تهيئة أولية لنظام الألوان السحابي"), 0, 1)
                         }
                 }
@@ -339,7 +339,7 @@ fun initColorSync(context: android.content.Context) {
                                     if (cloudPersonal != null) {
                                         val localPersonalColors = _personalColors.value
                                         if (cloudPersonal.colorsLastSynced != localPersonalColors.colorsLastSynced) {
-                                            com.example.util.ColorSyncManager.saveLocalPersonalColors(context, cloudPersonal)
+                                            com.example.utils.ColorSyncManager.saveLocalPersonalColors(context, cloudPersonal)
                                             _personalColors.value = cloudPersonal
                                             addNewSyncLog(
                                                 context,
@@ -367,7 +367,7 @@ fun updateCloudColorScheme(context: android.content.Context, newScheme: com.exam
         val oldVer = _colorScheme.value.version
         db.collection("app_settings").document("color_scheme").set(newScheme)
             .addOnSuccessListener {
-                com.example.util.ColorSyncManager.saveLocalColorScheme(context, newScheme)
+                com.example.utils.ColorSyncManager.saveLocalColorScheme(context, newScheme)
                 _colorScheme.value = newScheme
                 _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
                 addNewSyncLog(
@@ -399,7 +399,7 @@ fun updatePersonalColors(context: android.content.Context, personal: com.example
         val nowStr = getCurrentTimestampString()
         val newPersonalEntity = com.example.data.UserColorsEntity(personalColors = personal, colorsLastSynced = nowStr)
         
-        com.example.util.ColorSyncManager.saveLocalPersonalColors(context, newPersonalEntity)
+        com.example.utils.ColorSyncManager.saveLocalPersonalColors(context, newPersonalEntity)
         _personalColors.value = newPersonalEntity
         
         addNewSyncLog(
@@ -461,7 +461,7 @@ fun triggerManualSync(context: android.content.Context) {
                                     mainViewModel.triggerNotification("✅ تم رفع وتحديث ألوان الدليل بنجاح!")
                                 }
                         } else {
-                            com.example.util.ColorSyncManager.saveLocalColorScheme(context, cloud)
+                            com.example.utils.ColorSyncManager.saveLocalColorScheme(context, cloud)
                             _colorScheme.value = cloud
                             _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
                             addNewSyncLog(context, "colors", "success", listOf("ألوان الدليل متزامنة تماماً ومتطابقة مع السحابة"), local.version, cloud.version)
@@ -474,7 +474,7 @@ fun triggerManualSync(context: android.content.Context) {
                         .addOnSuccessListener {
                             _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
                             _colorScheme.value = defaultScheme
-                            com.example.util.ColorSyncManager.saveLocalColorScheme(context, defaultScheme)
+                            com.example.utils.ColorSyncManager.saveLocalColorScheme(context, defaultScheme)
                             addNewSyncLog(context, "colors", "success", listOf("تهيئة أولية ناجحة أثناء المزامنة اليدوية"), 0, 1)
                             mainViewModel.triggerNotification("✅ تم تهيئة ألوان السحابة بنجاح!")
                         }
@@ -492,7 +492,7 @@ fun resolveConflict(context: android.content.Context, useCloud: Boolean) {
         val local = _colorScheme.value
         
         if (useCloud) {
-            com.example.util.ColorSyncManager.saveLocalColorScheme(context, pending)
+            com.example.utils.ColorSyncManager.saveLocalColorScheme(context, pending)
             _colorScheme.value = pending
             _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
             addNewSyncLog(
@@ -511,7 +511,7 @@ fun resolveConflict(context: android.content.Context, useCloud: Boolean) {
             
             db.collection("app_settings").document("color_scheme").set(updatedLocal)
                 .addOnSuccessListener {
-                    com.example.util.ColorSyncManager.saveLocalColorScheme(context, updatedLocal)
+                    com.example.utils.ColorSyncManager.saveLocalColorScheme(context, updatedLocal)
                     _colorScheme.value = updatedLocal
                     _colorSyncStatus.value = com.example.data.ColorSyncStatus.SYNCED
                     addNewSyncLog(
@@ -567,8 +567,8 @@ fun addNewSyncLog(
             versionFrom = versionFrom,
             versionTo = versionTo
         )
-        com.example.util.ColorSyncManager.saveSyncLog(context, newLog)
-        _colorSyncLogs.value = com.example.util.ColorSyncManager.getSyncLogs(context)
+        com.example.utils.ColorSyncManager.saveSyncLog(context, newLog)
+        _colorSyncLogs.value = com.example.utils.ColorSyncManager.getSyncLogs(context)
     }
 
 fun toggleChatParticipant(participantType: ChatParticipantType) {
@@ -1031,7 +1031,7 @@ fun approvePasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
         // Generate temporary password
         val chars = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         val tempPassword = (1..8).map { chars.random() }.joinToString("")
-        val hashedPassword = com.example.util.PasswordHasher.createSaltedHash(tempPassword)
+        val hashedPassword = com.example.utils.PasswordHasher.createSaltedHash(tempPassword)
         
         val batch = db.batch()
         
@@ -1299,6 +1299,44 @@ fun scheduleAutoCleanup(days: Int = 30) {
                     autoCleanupData(days)
                 } catch (e: Exception) {}
             }
+        }
+    }
+
+    // ==========================================
+    // 🔄 Sync Utilities (Transferred from SyncViewModel)
+    // ==========================================
+    fun triggerManualSync(context: android.content.Context, onComplete: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            try {
+                val syncMgr = com.example.utils.SyncManager(context)
+                val success = syncMgr.syncAllSettings()
+                if (success) {
+                    triggerToast("🔄 تم استكمال المزامنة بنجاح")
+                } else {
+                    triggerToast("⚠️ تعذرت المزامنة المباشرة مع السحابة")
+                }
+                onComplete?.invoke(success)
+            } catch (e: Exception) {
+                onComplete?.invoke(false)
+            }
+        }
+    }
+
+    fun resolveConflict(context: android.content.Context, conflict: com.example.utils.Conflict, resolution: com.example.utils.Resolution) {
+        try {
+            com.example.utils.ConflictResolver(context).resolveConflict(conflict, resolution)
+            triggerToast("✅ تم حل التعارض بنجاح")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun retryOfflineQueue(context: android.content.Context) {
+        try {
+            com.example.utils.OfflineQueueManager(context).retryFailedRequests()
+            triggerToast("🚀 جاري إعادة إرسال العمليات المتبقية...")
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

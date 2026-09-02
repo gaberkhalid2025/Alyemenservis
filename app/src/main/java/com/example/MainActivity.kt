@@ -46,7 +46,7 @@ import com.example.ui.screens.status.*
 import com.example.ui.screens.about.*
 import com.example.utils.*
 import com.example.utils.*
-import com.example.viewmodels.*
+import com.example.ui.viewmodels.*
 
 class MainActivity : ComponentActivity() {
     private var lastBackPressTime = 0L
@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         try {
-            com.example.util.SecurityManager.verifyAppSignature(this)
+            com.example.utils.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -289,8 +289,8 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            com.example.util.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
-            com.example.util.SecurityManager.verifyAppSignature(this)
+            com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
+            com.example.utils.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }

@@ -61,7 +61,7 @@ fun FlexibleCatalogUploader(
                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                 return@let
             }
-            val base64 = com.example.ui.utils.convertGenericUriToBase64(context, it)
+            val base64 = com.example.utils.convertGenericUriToBase64(context, it)
             onExcelFileChange(fileName, base64)
             errorMessage = null
             Toast.makeText(context, "✅ تم اختيار جدول البيانات: $fileName", Toast.LENGTH_SHORT).show()
@@ -91,7 +91,7 @@ fun FlexibleCatalogUploader(
                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                 return@let
             }
-            val base64 = com.example.ui.utils.convertGenericUriToBase64(context, it)
+            val base64 = com.example.utils.convertGenericUriToBase64(context, it)
             onPdfFileChange(fileName, base64)
             errorMessage = null
             Toast.makeText(context, "✅ تم اختيار كتالوج PDF: $fileName", Toast.LENGTH_SHORT).show()

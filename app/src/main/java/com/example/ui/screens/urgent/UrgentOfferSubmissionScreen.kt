@@ -21,8 +21,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
 import com.example.ui.components.UrgentTimerComponent
-import com.example.viewmodels.UrgentUiState
-import com.example.viewmodels.UrgentViewModel
+import com.example.ui.viewmodels.UrgentUiState
+import com.example.ui.viewmodels.UrgentViewModel
 import kotlinx.coroutines.launch
 
 /**

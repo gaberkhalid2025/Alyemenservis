@@ -90,7 +90,7 @@ open class BaseViewModel : ViewModel() {
         return try {
             if (input.startsWith("content://") || input.startsWith("file://")) {
                 val uri = android.net.Uri.parse(input)
-                val res = com.example.util.FirebaseStorageUploader.uploadImageUri(
+                val res = com.example.utils.FirebaseStorageUploader.uploadImageUri(
                     context, uri, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
                 )
                 res.getOrDefault(input)
@@ -99,7 +99,7 @@ open class BaseViewModel : ViewModel() {
                 val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
                 val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 if (bitmap != null) {
-                    val res = com.example.util.FirebaseStorageUploader.uploadBitmap(
+                    val res = com.example.utils.FirebaseStorageUploader.uploadBitmap(
                         bitmap, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
                     )
                     res.getOrDefault(input)

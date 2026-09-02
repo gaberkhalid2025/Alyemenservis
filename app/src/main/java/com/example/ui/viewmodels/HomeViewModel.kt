@@ -208,4 +208,82 @@ open class HomeViewModel : BaseViewModel() {
         db.collection("categories").document(categoryId).delete()
         triggerToast("🗑️ تم حذف القسم بنجاح")
     }
+
+    // ==========================================
+    // 🗺️ Map & Location Utilities (Transferred from MapViewModel)
+    // ==========================================
+    internal val _userLatitude = MutableStateFlow(15.3694) // Default Sana'a
+    val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
+
+    internal val _userLongitude = MutableStateFlow(44.1910)
+    val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
+
+    internal val _selectedCityName = MutableStateFlow("صنعاء")
+    val selectedCityName: StateFlow<String> = _selectedCityName.asStateFlow()
+
+    internal val _isManualLocationMode = MutableStateFlow(false)
+    val isManualLocationMode: StateFlow<Boolean> = _isManualLocationMode.asStateFlow()
+
+    fun updateUserLocation(lat: Double, lng: Double) {
+        if (lat != 0.0 && lng != 0.0) {
+            _userLatitude.value = lat
+            _userLongitude.value = lng
+        }
+    }
+
+    fun setManualLocation(lat: Double, lng: Double, cityName: String = "موقع مخصص") {
+        _isManualLocationMode.value = true
+        _userLatitude.value = lat
+        _userLongitude.value = lng
+        _selectedCityName.value = cityName
+    }
+
+    fun selectYemeniCity(cityName: String) {
+        val coords = when (cityName) {
+            "عدن" -> Pair(12.7855, 45.0187)
+            "تعز" -> Pair(13.5795, 44.0209)
+            "إب" -> Pair(13.9667, 44.1833)
+            "الحديدة" -> Pair(14.7978, 42.9545)
+            "المكلا" -> Pair(14.5425, 49.1242)
+            "مأرب" -> Pair(15.4633, 45.3267)
+            "ذمار" -> Pair(14.5427, 44.4051)
+            else -> Pair(15.3694, 44.1910) // صنعاء
+        }
+        setManualLocation(coords.first, coords.second, cityName)
+    }
+
+    fun calculateFormattedDistance(destLat: Double, destLng: Double): String {
+        val meters = com.example.utils.calculateDistanceInMeters(_userLatitude.value, _userLongitude.value, destLat, destLng)
+        return com.example.utils.formatDistance(meters)
+    }
+
+    fun calculateEtaText(destLat: Double, destLng: Double): String {
+        val meters = com.example.utils.calculateDistanceInMeters(_userLatitude.value, _userLongitude.value, destLat, destLng)
+        val km = meters / 1000.0
+        return if (km < 1.0) {
+            val mins = (km / 5.0 * 60.0).toInt().coerceAtLeast(1)
+            "⏱️ ~ $mins دقيقة سيراً"
+        } else {
+            val mins = (km / 40.0 * 60.0).toInt().coerceAtLeast(2)
+            "🚘 ~ $mins دقيقة بالسيارة"
+        }
+    }
+
+    fun openExternalDirections(context: android.content.Context, destLat: Double, destLng: Double, label: String = "الوجهة") {
+        try {
+            val gmapsUri = android.net.Uri.parse("google.navigation:q=$destLat,$destLng")
+            val mapIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, gmapsUri).apply {
+                setPackage("com.google.android.apps.maps")
+            }
+            if (mapIntent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(mapIntent)
+            } else {
+                val browserUri = android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$destLat,$destLng")
+                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, browserUri))
+            }
+        } catch (e: Exception) {
+            val fallbackUri = android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$destLat,$destLng")
+            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, fallbackUri))
+        }
+    }
 }

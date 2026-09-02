@@ -32,11 +32,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.chat.util.ChatValidationUtils
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.ui.screens.chat.ChatAttachmentManager
-import com.example.util.ChatIcons
+import com.example.utils.ChatIcons
+import com.example.utils.ChatValidationUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File

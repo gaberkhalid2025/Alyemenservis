@@ -4,7 +4,7 @@ import com.example.data.models.ChatChannel
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.data.repositories.IChatRepository
-import com.example.util.AppResult
+import com.example.utils.AppResult
 import kotlinx.coroutines.flow.Flow
 
 class GetChannelsUseCase(private val repository: IChatRepository) {

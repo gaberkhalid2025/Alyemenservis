@@ -19,8 +19,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.screens.admin.components.AdminEntityCard
 import com.example.ui.screens.admin.components.AdminFilterChips
 import com.example.utils.VisualThemePalette
-import com.example.viewmodels.AdminViewModel
-import com.example.viewmodels.PendingRequest
+import com.example.ui.viewmodels.AdminViewModel
+import com.example.ui.viewmodels.PendingRequest
 import kotlinx.coroutines.launch
 
 /**
@@ -37,7 +37,7 @@ fun AdminRegFormsManagerPanel(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val pendingRequestsState by adminViewModel.pendingRequests.collectAsState()
+    val pendingRequestsState by adminViewModel.pendingRequests.collectAsState(initial = emptyList())
     val pendingRequests = pendingRequestsState
 
     LaunchedEffect(Unit) {

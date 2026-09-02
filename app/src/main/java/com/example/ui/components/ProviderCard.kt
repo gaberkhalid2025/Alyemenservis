@@ -32,7 +32,7 @@ import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.ui.dialogs.BookingDialog
 import com.example.ui.screens.register.GuestRegistrationDialog
-import com.example.ui.utils.getStarsString
+import com.example.utils.getStarsString
 import com.example.utils.VisualThemePalette
 
 @Composable

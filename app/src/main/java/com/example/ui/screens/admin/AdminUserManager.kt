@@ -22,7 +22,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.screens.admin.components.AdminEntityCard
 import com.example.ui.screens.admin.components.AdminFilterChips
 import com.example.utils.VisualThemePalette
-import com.example.viewmodels.AdminViewModel
+import com.example.ui.viewmodels.AdminViewModel
 import java.util.UUID
 import kotlinx.coroutines.launch
 

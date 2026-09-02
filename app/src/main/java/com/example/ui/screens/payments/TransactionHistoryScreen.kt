@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.Transaction
-import com.example.util.WalletManager
+import com.example.utils.WalletManager
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*

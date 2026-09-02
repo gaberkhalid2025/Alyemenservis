@@ -3,6 +3,7 @@ package com.example.ui.viewmodels
 import com.example.ui.MainViewModel
 
 import android.content.Context
+import androidx.annotation.Keep
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.data.models.*
@@ -13,6 +14,122 @@ import java.util.UUID
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+
+@Keep
+data class PendingRequest(
+    val id: String = "",
+    val name: String = "",
+    val phone: String = "",
+    val section: String = "",
+    val city: String = "",
+    val details: String = "",
+    val status: String = "PENDING", // PENDING, APPROVED, REJECTED
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Keep
+data class SystemStats(
+    val totalProviders: Int = 0,
+    val activeBookings: Int = 0,
+    val completedOrders: Int = 0,
+    val pendingApprovals: Int = 0,
+    val totalUsers: Int = 0,
+    val systemHealth: String = "EXCELLENT"
+)
+
+@Keep
+data class SystemHealth(
+    val status: String = "HEALTHY", // "HEALTHY", "WARNING", "CRITICAL"
+    val uptime: Long = System.currentTimeMillis() - 1000L * 60 * 60 * 24 * 7,
+    val memoryUsage: Double = 34.5,
+    val cpuUsage: Double = 12.8,
+    val activeConnections: Int = 142,
+    val lastError: String? = null
+)
+
+@Keep
+data class StorageUsage(
+    val totalBytes: Long = 10L * 1024 * 1024 * 1024,
+    val usedBytes: Long = 2L * 1024 * 1024 * 1024 + 450 * 1024 * 1024,
+    val freeBytes: Long = 7L * 1024 * 1024 * 1024 + 574 * 1024 * 1024,
+    val imageCount: Int = 854,
+    val documentCount: Int = 128
+)
+
+@Keep
+data class BookingStats(
+    val total: Int = 5120,
+    val pending: Int = 42,
+    val inProgress: Int = 88,
+    val completed: Int = 4850,
+    val cancelled: Int = 140,
+    val today: Int = 34,
+    val thisWeek: Int = 245,
+    val thisMonth: Int = 1120
+)
+
+@Keep
+data class RevenueStats(
+    val totalRevenue: Double = 5420000.0,
+    val platformCommission: Double = 542000.0,
+    val providerPayouts: Double = 4878000.0,
+    val currency: String = "YER",
+    val todayRevenue: Double = 125000.0,
+    val monthRevenue: Double = 1840000.0
+)
+
+@Keep
+data class ProviderStats(
+    val totalVerified: Int = 340,
+    val pendingApproval: Int = 12,
+    val topRated: Int = 95,
+    val suspended: Int = 3
+)
+
+@Keep
+data class CategoryStats(
+    val maintenanceCount: Int = 145,
+    val storeCount: Int = 88,
+    val restaurantCount: Int = 64,
+    val medicalCount: Int = 43
+)
+
+@Keep
+data class CityStats(
+    val sanaaCount: Int = 420,
+    val adenCount: Int = 240,
+    val taizCount: Int = 160,
+    val ibbCount: Int = 100,
+    val mukallaCount: Int = 80
+)
+
+@Keep
+data class AuditLog(
+    val id: String = UUID.randomUUID().toString(),
+    val adminEmail: String = "admin",
+    val action: String = "",
+    val details: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Keep
+data class AdminNotification(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String = "",
+    val message: String = "",
+    val type: String = "INFO",
+    val isRead: Boolean = false,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Keep
+data class SystemLog(
+    val id: String = UUID.randomUUID().toString(),
+    val tag: String = "APP",
+    val message: String = "",
+    val level: String = "INFO", // INFO, WARN, ERROR
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 class AdminViewModel : BaseViewModel() {
     // --- Callback/Lambda Properties for decoupling ---
@@ -482,11 +599,11 @@ fun saveStore(store: com.example.data.StoreEntity) {
 
         viewModelScope.launch {
             val ctx = appContext
-            val finalLogo = if (ctx != null) uploadImageStringOrUri(ctx, finalStore.logoImage, com.example.util.FirebaseStorageUploader.getStoreLogoPath(targetId)) else finalStore.logoImage
-            val finalCover = if (ctx != null) uploadImageStringOrUri(ctx, finalStore.coverImage, com.example.util.FirebaseStorageUploader.getStoreCoverPath(targetId)) else finalStore.coverImage
+            val finalLogo = if (ctx != null) uploadImageStringOrUri(ctx, finalStore.logoImage, com.example.utils.FirebaseStorageUploader.getStoreLogoPath(targetId)) else finalStore.logoImage
+            val finalCover = if (ctx != null) uploadImageStringOrUri(ctx, finalStore.coverImage, com.example.utils.FirebaseStorageUploader.getStoreCoverPath(targetId)) else finalStore.coverImage
             val finalImages = if (ctx != null) {
                 finalStore.images.mapIndexed { idx, img ->
-                    uploadImageStringOrUri(ctx, img, com.example.util.FirebaseStorageUploader.getStorePhotoPath(targetId, idx))
+                    uploadImageStringOrUri(ctx, img, com.example.utils.FirebaseStorageUploader.getStorePhotoPath(targetId, idx))
                 }
             } else finalStore.images
 
@@ -790,7 +907,7 @@ fun saveProperty(property: com.example.data.PropertyEntity) {
             val ctx = appContext
             val finalImages = if (ctx != null) {
                 finalProp.images.mapIndexed { idx, img ->
-                    uploadImageStringOrUri(ctx, img, com.example.util.FirebaseStorageUploader.getPropertyPhotoPath(targetId, idx))
+                    uploadImageStringOrUri(ctx, img, com.example.utils.FirebaseStorageUploader.getPropertyPhotoPath(targetId, idx))
                 }
             } else finalProp.images
 
@@ -1473,7 +1590,7 @@ fun saveProduct(product: com.example.data.ProductEntity) {
         viewModelScope.launch {
             val ctx = appContext
             val finalImg = if (ctx != null && product.imageUrl.isNotEmpty() && !product.imageUrl.startsWith("http")) {
-                uploadImageStringOrUri(ctx, product.imageUrl, com.example.util.FirebaseStorageUploader.getStoreProductPath(product.storeId.ifEmpty { "general" }, targetId))
+                uploadImageStringOrUri(ctx, product.imageUrl, com.example.utils.FirebaseStorageUploader.getStoreProductPath(product.storeId.ifEmpty { "general" }, targetId))
             } else product.imageUrl
 
             val finalProduct = product.copy(id = targetId, imageUrl = finalImg)
@@ -2293,6 +2410,194 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
         } catch (e: Exception) {
             mainViewModel.triggerNotification("❌ فشل تصدير البيانات: ${e.message}")
         }
+    }
+
+    // ==========================================
+    // 📊 Additional Admin & Audit Utilities (Merged from com.example.viewmodels.AdminViewModel)
+    // ==========================================
+    private val _auditLogs = MutableStateFlow<List<AuditLog>>(emptyList())
+    val auditLogs: StateFlow<List<AuditLog>> = _auditLogs.asStateFlow()
+
+    private val _adminNotificationsList = MutableStateFlow<List<AdminNotification>>(emptyList())
+    val adminNotificationsList: StateFlow<List<AdminNotification>> = _adminNotificationsList.asStateFlow()
+
+    private val _systemLogs = MutableStateFlow<List<SystemLog>>(emptyList())
+    val systemLogs: StateFlow<List<SystemLog>> = _systemLogs.asStateFlow()
+
+    private val _pendingRequests = MutableStateFlow<List<PendingRequest>>(emptyList())
+    val pendingRequests: StateFlow<List<PendingRequest>> = _pendingRequests.asStateFlow()
+
+    private val _systemStats = MutableStateFlow(SystemStats())
+    val systemStats: StateFlow<SystemStats> = _systemStats.asStateFlow()
+
+    fun loadPendingRequests() {
+        db.collection("registration_requests")
+            .get()
+            .addOnSuccessListener { snap ->
+                val list = snap.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(PendingRequest::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                _pendingRequests.value = list
+            }
+    }
+
+    fun loadSystemStats() {
+        val totalProvs = homeViewModel?.providers?.value?.size ?: 0
+        _systemStats.value = SystemStats(
+            totalProviders = totalProvs,
+            totalUsers = 0,
+            activeBookings = 0,
+            completedOrders = 0,
+            pendingApprovals = _pendingRequests.value.count { it.status == "PENDING" }
+        )
+    }
+
+    fun getSystemStats(): SystemStats {
+        loadSystemStats()
+        return _systemStats.value
+    }
+
+    fun approveProviderRequest(requestId: String, onResult: ((Boolean) -> Unit)? = null) {
+        db.collection("registration_requests").document(requestId).update("status", "APPROVED")
+            .addOnSuccessListener {
+                recordAuditLog("APPROVE_REQUEST", "تمت الموافقة على طلب الانضمام $requestId")
+                loadPendingRequests()
+                mainViewModel.triggerNotification("✅ تمت الموافقة على طلب الانضمام بنجاح!")
+                onResult?.invoke(true)
+            }
+            .addOnFailureListener {
+                onResult?.invoke(false)
+            }
+    }
+
+    fun rejectProviderRequest(requestId: String, reason: String = "", onResult: ((Boolean) -> Unit)? = null) {
+        db.collection("registration_requests").document(requestId).update(mapOf("status" to "REJECTED", "rejectionReason" to reason))
+            .addOnSuccessListener {
+                recordAuditLog("REJECT_REQUEST", "تم رفض طلب الانضمام $requestId. السبب: $reason")
+                loadPendingRequests()
+                mainViewModel.triggerNotification("🚫 تم رفض طلب الانضمام.")
+                onResult?.invoke(true)
+            }
+            .addOnFailureListener {
+                onResult?.invoke(false)
+            }
+    }
+
+    fun blockUser(userId: String, onResult: ((Boolean) -> Unit)? = null) {
+        db.collection("users").document(userId).update("isBlocked", true)
+            .addOnSuccessListener {
+                recordAuditLog("BLOCK_USER", "حظر المستخدم $userId")
+                mainViewModel.triggerNotification("🚫 تم حظر المستخدم بنجاح.")
+                onResult?.invoke(true)
+            }
+            .addOnFailureListener {
+                onResult?.invoke(false)
+            }
+    }
+
+    fun unblockUser(userId: String, onResult: ((Boolean) -> Unit)? = null) {
+        db.collection("users").document(userId).update("isBlocked", false)
+            .addOnSuccessListener {
+                recordAuditLog("UNBLOCK_USER", "إلغاء حظر المستخدم $userId")
+                mainViewModel.triggerNotification("✅ تم إلغاء حظر المستخدم.")
+                onResult?.invoke(true)
+            }
+            .addOnFailureListener {
+                onResult?.invoke(false)
+            }
+    }
+
+    fun deleteUser(userId: String, onResult: ((Boolean) -> Unit)? = null) {
+        db.collection("users").document(userId).delete()
+            .addOnSuccessListener {
+                recordAuditLog("DELETE_USER", "حذف المستخدم $userId")
+                mainViewModel.triggerNotification("🗑️ تم حذف حساب المستخدم بنجاح.")
+                onResult?.invoke(true)
+            }
+            .addOnFailureListener {
+                onResult?.invoke(false)
+            }
+    }
+
+    fun recordAuditLog(action: String, details: String) {
+        val entry = AuditLog(action = action, details = details)
+        _auditLogs.value = listOf(entry) + _auditLogs.value
+        try {
+            db.collection("admin_audit_logs").document(entry.id).set(entry)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun exportReport(type: String): String {
+        recordAuditLog("EXPORT_REPORT", "تصدير تقرير من نوع $type")
+        return "تقرير شامل للـ $type - التاريخ: ${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())}"
+    }
+
+    fun syncAllData(context: Context, onComplete: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            try {
+                val syncMgr = com.example.utils.SyncManager(context)
+                val res = syncMgr.syncAllSettings()
+                onComplete?.invoke(res)
+            } catch (e: Exception) {
+                onComplete?.invoke(false)
+            }
+        }
+    }
+
+    fun clearCache(context: Context) {
+        try {
+            com.example.utils.SyncManager(context).clearLocalCache()
+            mainViewModel.triggerNotification("🧹 تم مسح الذاكرة المؤقتة بنجاح")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun getSystemHealth(): SystemHealth = SystemHealth()
+    fun getStorageUsage(): StorageUsage = StorageUsage()
+    fun getBookingStats(): BookingStats = BookingStats()
+    fun getRevenueStats(): RevenueStats = RevenueStats()
+    fun getProviderStats(): ProviderStats = ProviderStats()
+    fun getCategoryStats(): CategoryStats = CategoryStats()
+    fun getCityStats(): CityStats = CityStats()
+
+    fun sendAdminNotification(title: String, message: String, target: String) {
+        val notif = AdminNotification(
+            id = UUID.randomUUID().toString(),
+            title = title,
+            message = "$message (الهدف: $target)",
+            type = "BROADCAST",
+            isRead = false,
+            timestamp = System.currentTimeMillis()
+        )
+        _adminNotificationsList.value = listOf(notif) + _adminNotificationsList.value
+        recordAuditLog("SEND_NOTIFICATION", "إرسال إشعار: $title إلى $target")
+    }
+
+    fun getAuditLogs(filter: String = "ALL"): List<AuditLog> {
+        if (filter.isBlank() || filter == "ALL") return _auditLogs.value
+        return _auditLogs.value.filter { it.action.contains(filter, ignoreCase = true) || it.details.contains(filter, ignoreCase = true) }
+    }
+
+    fun exportAuditLogs(): String {
+        recordAuditLog("EXPORT_AUDIT", "تصدير سجل التدقيق والأمان")
+        return buildString {
+            appendLine("ID,Admin,Action,Details,Timestamp")
+            _auditLogs.value.forEach {
+                appendLine("${it.id},${it.adminEmail},${it.action},\"${it.details}\",${it.timestamp}")
+            }
+        }
+    }
+
+    fun getSystemLogs(): List<SystemLog> = _systemLogs.value
+    fun clearSystemLogs() {
+        _systemLogs.value = emptyList()
     }
 
 }

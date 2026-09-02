@@ -75,7 +75,7 @@ fun TabGalleryAlbums(
                 uploadStatus = "جاري معالجة الصورة..."
                 scope.launch {
                     try {
-                        val path = com.example.util.FirebaseStorageUploader.getStorePhotoPath(account.id, System.currentTimeMillis().toInt())
+                        val path = com.example.utils.FirebaseStorageUploader.getStorePhotoPath(account.id, System.currentTimeMillis().toInt())
                         val url = viewModel.uploadImageStringOrUri(context, uri.toString(), path)
                         if (url.isNotEmpty() && url.startsWith("http")) {
                             val updatedPhotos = albumPhotos + url

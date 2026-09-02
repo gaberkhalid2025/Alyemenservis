@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.example.data.local.ChatLocalDataSource
 import com.example.data.models.*
-import com.example.util.AppError
-import com.example.util.AppResult
+import com.example.utils.AppError
+import com.example.utils.AppResult
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration

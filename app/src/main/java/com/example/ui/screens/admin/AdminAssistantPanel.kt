@@ -26,8 +26,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
-import com.example.util.AiAssistantEngine
-import com.example.util.AiResponse
+import com.example.utils.AiAssistantEngine
+import com.example.utils.AiResponse
 import com.example.utils.VisualThemePalette
 
 /**

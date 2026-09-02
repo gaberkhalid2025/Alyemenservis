@@ -35,7 +35,7 @@ import androidx.fragment.app.FragmentActivity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.register.components.RegistrationField
 import com.example.ui.screens.register.components.RegistrationSubmitButton
-import com.example.util.Validators
+import com.example.utils.Validators
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
 

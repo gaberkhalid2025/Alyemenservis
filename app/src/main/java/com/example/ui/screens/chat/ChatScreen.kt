@@ -27,7 +27,7 @@ import com.example.data.models.ChatMessage
 import com.example.ui.screens.chat.components.ChatBubbleItem
 import com.example.ui.screens.chat.components.ChatHeaderBar
 import com.example.ui.screens.chat.components.ChatInputBar
-import com.example.util.AudioPlayerManager
+import com.example.utils.AudioPlayerManager
 import com.example.utils.VisualThemePalette
 
 @Composable

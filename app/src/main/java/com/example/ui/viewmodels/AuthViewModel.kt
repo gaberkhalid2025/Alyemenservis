@@ -60,7 +60,7 @@ open class AuthViewModel : BaseViewModel() {
         val finalPhone = if (cleanPhone.length == 9) cleanPhone else phone
         _joinRequestPhone.value = finalPhone
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-        sp.edit().putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone)).apply()
+        sp.edit().putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone)).apply()
     }
 
     fun initializeUserIdentity(context: Context, onFavoritesLoaded: ((Set<String>) -> Unit)? = null) {
@@ -68,14 +68,14 @@ open class AuthViewModel : BaseViewModel() {
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         
         val rawId = sp.getString("user_id", "guest") ?: "guest"
-        var savedId = if (rawId != "guest" && rawId.isNotEmpty()) com.example.util.SecurityCryptoUtils.decrypt(rawId) else rawId
-        val savedName = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("user_name", "") ?: "")
-        val savedPhone = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("user_phone", "") ?: "")
-        val savedResidence = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("user_residence", "") ?: "")
+        var savedId = if (rawId != "guest" && rawId.isNotEmpty()) com.example.utils.SecurityCryptoUtils.decrypt(rawId) else rawId
+        val savedName = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_name", "") ?: "")
+        val savedPhone = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_phone", "") ?: "")
+        val savedResidence = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_residence", "") ?: "")
 
         if ((savedId == "guest" || savedId.isEmpty()) && savedPhone.isNotEmpty()) {
             savedId = "USR-" + (if (savedPhone.length >= 6) savedPhone.takeLast(6) else (100000..999999).random().toString())
-            sp.edit().putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(savedId)).apply()
+            sp.edit().putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(savedId)).apply()
         }
 
         _currentUserId.value = savedId
@@ -83,7 +83,7 @@ open class AuthViewModel : BaseViewModel() {
         _currentUserPhone.value = savedPhone
         _currentUserResidence.value = savedResidence
         
-        val savedJoinPhone = com.example.util.SecurityCryptoUtils.decrypt(sp.getString("join_request_phone", "") ?: "")
+        val savedJoinPhone = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("join_request_phone", "") ?: "")
         _joinRequestPhone.value = savedJoinPhone
         
         val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
@@ -115,10 +115,10 @@ open class AuthViewModel : BaseViewModel() {
                         _currentUserResidence.value = prov.area
                         
                         sp.edit().apply {
-                            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(prov.id))
-                            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(prov.name))
-                            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(prov.phone))
-                            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(prov.area))
+                            putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(prov.id))
+                            putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(prov.name))
+                            putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(prov.phone))
+                            putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(prov.area))
                             apply()
                         }
                     }
@@ -134,10 +134,10 @@ open class AuthViewModel : BaseViewModel() {
                                 _currentUserResidence.value = pend.area
                                 
                                 sp.edit().apply {
-                                    putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(pendId))
-                                    putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(pend.name))
-                                    putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(pend.phone))
-                                    putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(pend.area))
+                                    putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(pendId))
+                                    putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(pend.name))
+                                    putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(pend.phone))
+                                    putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(pend.area))
                                     apply()
                                 }
                             }
@@ -153,7 +153,7 @@ open class AuthViewModel : BaseViewModel() {
         val effectivePassword = if (password.isBlank()) "yemen_${cleanPhone.takeLast(6)}" else password.trim()
 
         if (password.isNotBlank()) {
-            val valResult = com.example.util.SecurityCryptoUtils.validatePasswordPolicy(password)
+            val valResult = com.example.utils.SecurityCryptoUtils.validatePasswordPolicy(password)
             if (!valResult.first) {
                 triggerToast("⚠️ ${valResult.second}")
                 return
@@ -183,11 +183,11 @@ open class AuthViewModel : BaseViewModel() {
 
                     val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
                     sp.edit().apply {
-                        putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(userId))
-                        putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(name.trim()))
-                        putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
-                        putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(residence.trim()))
-                        putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(cleanPhone))
+                        putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(userId))
+                        putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(name.trim()))
+                        putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(cleanPhone))
+                        putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(residence.trim()))
+                        putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(cleanPhone))
                         apply()
                     }
 
@@ -214,11 +214,11 @@ open class AuthViewModel : BaseViewModel() {
         _joinRequestPhone.value = finalPhone
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         sp.edit().apply {
-            putString("user_name", com.example.util.SecurityCryptoUtils.encrypt(_currentUserName.value))
-            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
-            putString("user_residence", com.example.util.SecurityCryptoUtils.encrypt(_currentUserResidence.value))
-            putString("user_id", com.example.util.SecurityCryptoUtils.encrypt(_currentUserId.value))
-            putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
+            putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(_currentUserName.value))
+            putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
+            putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(_currentUserResidence.value))
+            putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(_currentUserId.value))
+            putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
             apply()
         }
     }
@@ -230,8 +230,8 @@ open class AuthViewModel : BaseViewModel() {
         _joinRequestPhone.value = finalPhone
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         sp.edit().apply {
-            putString("user_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
-            putString("join_request_phone", com.example.util.SecurityCryptoUtils.encrypt(finalPhone))
+            putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
+            putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
             apply()
         }
     }
@@ -262,18 +262,18 @@ open class AuthViewModel : BaseViewModel() {
         if (trimmed.isEmpty()) return false
         if (trimmed == adminPass ||
             trimmed == ownerPass ||
-            com.example.util.SecurityCryptoUtils.hashPassword(trimmed) == adminPass ||
-            com.example.util.SecurityCryptoUtils.hashPassword(trimmed) == ownerPass ||
-            com.example.util.PasswordHasher.verifyPassword(trimmed, adminPass) ||
-            com.example.util.PasswordHasher.verifyPassword(trimmed, ownerPass) ||
-            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, adminPass) ||
-            com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, ownerPass)) {
+            com.example.utils.SecurityCryptoUtils.hashPassword(trimmed) == adminPass ||
+            com.example.utils.SecurityCryptoUtils.hashPassword(trimmed) == ownerPass ||
+            com.example.utils.PasswordHasher.verifyPassword(trimmed, adminPass) ||
+            com.example.utils.PasswordHasher.verifyPassword(trimmed, ownerPass) ||
+            com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, adminPass) ||
+            com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, ownerPass)) {
             return true
         }
         val matchSup = _supervisors.value.find {
             (it.passcode.isNotBlank() && it.passcode.trim() == trimmed) ||
-            (it.passcode.isNotBlank() && com.example.util.PasswordHasher.verifyPassword(trimmed, it.passcode)) ||
-            (it.passcode.isNotBlank() && com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode))
+            (it.passcode.isNotBlank() && com.example.utils.PasswordHasher.verifyPassword(trimmed, it.passcode)) ||
+            (it.passcode.isNotBlank() && com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode))
         }
         return matchSup != null
     }
@@ -300,8 +300,8 @@ open class AuthViewModel : BaseViewModel() {
     }
 
     fun hasAdminPermission(permissionKey: String): Boolean {
-        return com.example.util.PermissionGuard.hasPermission(
-            role = com.example.util.RoleManager.fromRoleString(_adminRole.value),
+        return com.example.utils.PermissionGuard.hasPermission(
+            role = com.example.utils.RoleManager.fromRoleString(_adminRole.value),
             permission = permissionKey,
             supervisorGrantedPermissions = _currentSupervisorPermissions.value
         )

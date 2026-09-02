@@ -471,10 +471,10 @@ open class ChatViewModel : BaseViewModel() {
                 val result = if (isVideo) {
                     val bytes = ctx.contentResolver.openInputStream(uri)?.readBytes()
                     if (bytes != null) {
-                        com.example.util.FirebaseStorageUploader.uploadBytesToStorage(bytes, path, "video/mp4")
+                        com.example.utils.FirebaseStorageUploader.uploadBytesToStorage(bytes, path, "video/mp4")
                     } else Result.failure(Exception("تعذر قراءة ملف الفيديو"))
                 } else {
-                    com.example.util.FirebaseStorageUploader.uploadImageUri(
+                    com.example.utils.FirebaseStorageUploader.uploadImageUri(
                         context = ctx,
                         uri = uri,
                         storagePath = path,

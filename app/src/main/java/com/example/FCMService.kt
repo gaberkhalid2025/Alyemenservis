@@ -70,9 +70,9 @@ class FCMService : FirebaseMessagingService() {
         try {
             val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
             val rawUserId = sp.getString("user_id", "") ?: ""
-            val userId = if (rawUserId.isNotEmpty() && rawUserId != "guest") com.example.util.SecurityCryptoUtils.decrypt(rawUserId) else rawUserId
+            val userId = if (rawUserId.isNotEmpty() && rawUserId != "guest") com.example.utils.SecurityCryptoUtils.decrypt(rawUserId) else rawUserId
             val rawPhone = sp.getString("user_phone", "") ?: ""
-            val phone = if (rawPhone.isNotEmpty()) com.example.util.SecurityCryptoUtils.decrypt(rawPhone) else ""
+            val phone = if (rawPhone.isNotEmpty()) com.example.utils.SecurityCryptoUtils.decrypt(rawPhone) else ""
             if (userId.isNotEmpty() && userId != "guest") {
                 val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 val tokenData = mapOf(

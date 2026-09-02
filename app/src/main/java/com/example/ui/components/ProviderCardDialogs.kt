@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
-import com.example.ui.utils.getStarsString
+import com.example.utils.getStarsString
 import com.example.utils.VisualThemePalette
 
 @Composable
