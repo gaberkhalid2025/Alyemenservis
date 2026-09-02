@@ -38,6 +38,14 @@ open class BaseViewModel : ViewModel() {
         }
     }
 
+    
+    open fun com.google.firebase.firestore.Query.addSnapshotListenerReg(listener: (com.google.firebase.firestore.QuerySnapshot?, com.google.firebase.firestore.FirebaseFirestoreException?) -> Unit) {
+        reg(this.addSnapshotListener(listener))
+    }
+    open fun com.google.firebase.firestore.DocumentReference.addSnapshotListenerReg(listener: (com.google.firebase.firestore.DocumentSnapshot?, com.google.firebase.firestore.FirebaseFirestoreException?) -> Unit) {
+        reg(this.addSnapshotListener(listener))
+    }
+
     open fun reg(listener: ListenerRegistration) {
         firestoreListeners.add(listener)
     }

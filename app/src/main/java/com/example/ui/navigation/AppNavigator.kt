@@ -153,12 +153,14 @@ fun AppNavigator(
                 }
             }
 
-            FloatingIconsOverlay(
-                settings = settingsState,
-                themeColors = themeColors,
-                onAssistantClick = { showAssistantDialog = true },
-                onRequestServiceClick = { showRequestServiceModal = true }
-            )
+            if (currentScreen == AppScreens.USER_BROWSE || currentScreen == AppScreens.HOME || currentScreen == AppScreens.FAVORITES_VIEW) {
+                FloatingIconsOverlay(
+                    settings = settingsState,
+                    themeColors = themeColors,
+                    onAssistantClick = { showAssistantDialog = true },
+                    onRequestServiceClick = { showRequestServiceModal = true }
+                )
+            }
 
             if (showRestoreAccountDialog) {
                 RestoreAccountDialog(viewModel = viewModel, themeColors = themeColors, onDismiss = { showRestoreAccountDialog = false })

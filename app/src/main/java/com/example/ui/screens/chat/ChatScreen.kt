@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import com.example.ui.screens.chat.components.TypingIndicator
+
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -245,6 +247,12 @@ fun ChatScreen(
         }
 
         // Input Bar
+        // Typing Indicator
+        val isTyping = isTypingOther
+        if (isTyping) {
+            TypingIndicator(userName = activeChannel?.participantNames?.values?.firstOrNull { it != currentUserName } ?: "")
+        }
+
         ChatInputBar(
             replyingTo = replyingTo,
             onCancelReply = { chatViewModel.setReplyingTo(null) },

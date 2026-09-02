@@ -14,6 +14,9 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 open class ChatViewModel : BaseViewModel() {
+    private val _isPeerTyping = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isPeerTyping: kotlinx.coroutines.flow.StateFlow<Boolean> = _isPeerTyping
+    fun setTypingStatus(isTyping: Boolean) { _isPeerTyping.value = isTyping }
 
     internal val _chatChannels = MutableStateFlow<List<ChatChannelEntity>>(emptyList())
     val chatChannels: StateFlow<List<ChatChannelEntity>> = _chatChannels.asStateFlow()

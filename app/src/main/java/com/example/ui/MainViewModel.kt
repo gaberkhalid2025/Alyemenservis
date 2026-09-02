@@ -501,11 +501,11 @@ fun initializeUserIdentity(context: android.content.Context) {
 
 private fun setupRealtimeFirestoreListeners() {
         // 1. Settings (Document main_settings)
-        reg(db.collection("settings").document("main_settings").addSnapshotListener { snapshot, error ->
+        db.collection("settings").document("main_settings").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 _isInitialized.value = true
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null && snapshot.exists()) {
                 try {
@@ -520,10 +520,10 @@ private fun setupRealtimeFirestoreListeners() {
                 _settings.value = AdminSettingsEntity()
             }
             _isInitialized.value = true
-        })
+        }
 
         // 1b. Booking Form Fields Listener
-        reg(db.collection("settings").document("booking_fields").addSnapshotListener { snapshot, error ->
+        db.collection("settings").document("booking_fields").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null && snapshot.exists()) {
                 try {
                     snapshot.toObject(BookingFormFields::class.java)?.let {
@@ -531,10 +531,10 @@ private fun setupRealtimeFirestoreListeners() {
                     }
                 } catch (e: Exception) { e.printStackTrace() }
             }
-        })
+        }
 
         // 1c. Booking Distribution Mode Listener
-        reg(db.collection("settings").document("distribution_mode").addSnapshotListener { snapshot, error ->
+        db.collection("settings").document("distribution_mode").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null && snapshot.exists()) {
                 val modeStr = snapshot.getString("mode")
                 if (!modeStr.isNullOrEmpty()) {
@@ -543,13 +543,13 @@ private fun setupRealtimeFirestoreListeners() {
                     } catch (e: Exception) { e.printStackTrace() }
                 }
             }
-        })
+        }
 
         // 2. Categories
-        reg(db.collection("categories").addSnapshotListener { snapshot, error ->
+        db.collection("categories").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -567,10 +567,10 @@ private fun setupRealtimeFirestoreListeners() {
                 }.distinctBy { it.id }.sortedWith(compareByDescending<com.example.data.CategoryEntity> { it.isPinned }.thenBy { it.order })
                 _categories.value = fetched
             }
-        })
+        }
 
         // Custom Profile Tabs
-        db.collection("custom_profile_tabs").addSnapshotListener { snapshot, error ->
+        db.collection("custom_profile_tabs").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.toObjects(com.example.data.CustomProfileTabEntity::class.java)
                 _customProfileTabs.value = fetched.sortedBy { it.displayOrder }
@@ -578,10 +578,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 3. Cities
-        db.collection("cities").addSnapshotListener { snapshot, error ->
+        db.collection("cities").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -597,7 +597,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 3b. Registered Users count listener
-        db.collection("registered_users").addSnapshotListener { snapshot, error ->
+        db.collection("registered_users").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 _registeredUsersCount.value = snapshot.size()
                 val list = snapshot.documents.mapNotNull { doc ->
@@ -610,24 +610,24 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 3c. Internal Wallets Listener
-        db.collection("internal_wallets").addSnapshotListener { snapshot, error ->
+        db.collection("internal_wallets").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 _internalWallets.value = snapshot.documents.mapNotNull { it.toObject(com.example.data.InternalWalletEntity::class.java) }
             }
         }
 
         // 3d. Wallet Transactions Listener
-        db.collection("wallet_transactions").addSnapshotListener { snapshot, error ->
+        db.collection("wallet_transactions").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 _walletTransactions.value = snapshot.documents.mapNotNull { it.toObject(com.example.data.WalletTransactionEntity::class.java) }.sortedByDescending { it.timestamp }
             }
         }
 
         // 4. Banners
-        db.collection("banners").addSnapshotListener { snapshot, error ->
+        db.collection("banners").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -645,11 +645,11 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 5. Providers (Full limit & safe parsing for complete Map & listing coverage)
-        db.collection("providers").limit(250).addSnapshotListener { snapshot, error ->
+        db.collection("providers").limit(250).addSnapshotListenerReg { snapshot, error ->
             _isProvidersLoading.value = false
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val allList = snapshot.documents.mapNotNull { doc ->
@@ -705,10 +705,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 6. Pending Providers (Full limit & safe parsing)
-        db.collection("pending_providers").limit(200).addSnapshotListener { snapshot, error ->
+        db.collection("pending_providers").limit(200).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -742,10 +742,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 7. Bookings (Paginated / limited to 20)
-        db.collection("bookings").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("bookings").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -761,10 +761,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 8. Notifications (Paginated / limited to 20 with strict validation & deduplication)
-        db.collection("notifications").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("notifications").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -786,11 +786,11 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 9. Chat Channels (Paginated / limited to 20)
-        db.collection("chat_channels").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("chat_channels").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             _isChatChannelsLoading.value = false
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -808,10 +808,10 @@ private fun setupRealtimeFirestoreListeners() {
         // 10. General Support Chat Messages are handled dynamically based on currentUserId
 
         // 11. Reports (Paginated / limited to 20)
-        db.collection("reports").limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("reports").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -827,10 +827,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 12. Supervisors (Instantly synced)
-        db.collection("supervisors").limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("supervisors").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -846,10 +846,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 13. Color Palettes (Instantly synced)
-        db.collection("color_themes").addSnapshotListener { snapshot, error ->
+        db.collection("color_themes").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -865,10 +865,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 14. Calls Log (Paginated / limited to 20)
-        db.collection("calls").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("calls").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -884,10 +884,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 15. Coupons
-        db.collection("coupons").limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("coupons").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -903,10 +903,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 16. Payment Wallets
-        db.collection("payment_wallets").limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("payment_wallets").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -922,10 +922,10 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 17. Payments (Paginated / limited to 20)
-        db.collection("payments").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("payments").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                return@addSnapshotListener
+                return@addSnapshotListenerReg
             }
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
@@ -941,7 +941,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 18. Stores (Full limit & safe parsing for Maps & directory coverage)
-        db.collection("stores").limit(250).addSnapshotListener { snapshot, error ->
+        db.collection("stores").limit(250).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1010,7 +1010,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 19. Products (Full limit & safe parsing)
-        db.collection("products").limit(250).addSnapshotListener { snapshot, error ->
+        db.collection("products").limit(250).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1029,7 +1029,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 20. Properties (Full limit & safe parsing for Maps & real estate coverage)
-        db.collection("properties").limit(250).addSnapshotListener { snapshot, error ->
+        db.collection("properties").limit(250).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1094,7 +1094,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 20.1 Jobs (Paginated / limited to 20)
-        db.collection("jobs").limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("jobs").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1115,7 +1115,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 20.2 Job Applications (Paginated / limited to 20)
-        db.collection("job_applications").limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("job_applications").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1130,7 +1130,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 21. Ratings (Paginated / limited to 20)
-        db.collection("ratings").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("ratings").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1145,7 +1145,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 22. Orders (Paginated / limited to 20)
-        db.collection("orders").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("orders").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1160,7 +1160,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 22.1 Offers & Instant Pricing (Real-time synchronization)
-        db.collection("offers").limit(50).addSnapshotListener { snapshot, error ->
+        db.collection("offers").limit(50).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1175,7 +1175,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 23. Activity Logs (Paginated / limited to 20)
-        db.collection("activity_logs").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("activity_logs").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1189,7 +1189,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 24. Instant Requests (Paginated / limited to 20)
-        db.collection("instant_requests").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("instant_requests").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -1211,7 +1211,7 @@ private fun setupRealtimeFirestoreListeners() {
         }
 
         // 25. Request Offers (Paginated / limited to 20)
-        db.collection("request_offers").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListener { snapshot, error ->
+        db.collection("request_offers").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {

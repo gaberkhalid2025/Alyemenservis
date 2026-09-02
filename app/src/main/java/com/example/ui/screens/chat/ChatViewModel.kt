@@ -23,9 +23,12 @@ sealed class ChatEvent {
     data class MessageSent(val messageId: String) : ChatEvent()
 }
 
-class ChatViewModel(
+class ChatViewModel : ViewModel() {
+
+    private val _isPeerTyping = MutableStateFlow(false)
+    val isPeerTyping: StateFlow<Boolean> = _isPeerTyping.asStateFlow()
+
     private val repository: ChatRepository = ChatRepository()
-) : ViewModel() {
 
     private val _eventFlow = MutableSharedFlow<ChatEvent>()
     val eventFlow = _eventFlow.asSharedFlow()

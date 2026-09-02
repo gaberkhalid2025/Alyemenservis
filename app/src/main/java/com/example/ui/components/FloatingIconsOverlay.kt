@@ -80,14 +80,11 @@ fun BoxScope.FloatingIconsOverlay(
 
     // 2. Draggable Smart Assistant FAB (قائم للسحب بحرية على الشاشة)
     if (!settings.assistantHidden) {
-        var offsetX by remember { mutableFloatStateOf(0f) }
-        var offsetY by remember { mutableFloatStateOf(0f) }
 
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
-                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .padding(end = 12.dp, bottom = 16.dp)
                 .shadow(6.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
@@ -96,13 +93,7 @@ fun BoxScope.FloatingIconsOverlay(
                         listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
                     )
                 )
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        offsetX += dragAmount.x
-                        offsetY += dragAmount.y
-                    }
-                }
+
                 .clickable { onAssistantClick() }
                 .border(1.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
                 .padding(horizontal = 10.dp, vertical = 6.dp),

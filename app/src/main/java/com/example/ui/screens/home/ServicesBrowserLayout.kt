@@ -55,6 +55,9 @@ fun ServicesBrowserLayout(
     val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
     val selectedCategory by viewModel.selectedCategoryId.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val stores by viewModel.stores.collectAsState()
+    val properties by viewModel.properties.collectAsState()
+    val products by viewModel.products.collectAsState()
     val isVipOnly by viewModel.filterVipOnly.collectAsState()
     val isAvailableOnly by viewModel.filterAvailableOnly.collectAsState()
     val citiesList by viewModel.cities.collectAsState()
@@ -234,10 +237,37 @@ fun ServicesBrowserLayout(
                     )
                 }
                 else -> {
+                    val searchLower = searchQuery.trim().lowercase()
+                    val matchedStoreIds = if (searchLower.isNotEmpty()) {
+                        products.filter { it.name.lowercase().contains(searchLower) || it.description.lowercase().contains(searchLower) }
+                            .map { it.storeId }.toSet()
+                    } else emptySet()
+                    
+                    val displayStores = if (searchLower.isNotEmpty()) {
+                        stores.filter { store ->
+                            store.name.lowercase().contains(searchLower) ||
+                            store.phone.contains(searchLower) ||
+                            store.categoryId.lowercase().contains(searchLower) ||
+                            matchedStoreIds.contains(store.id)
+                        }
+                    } else emptyList()
+                    
+                    val displayProperties = if (searchLower.isNotEmpty()) {
+                        properties.filter { prop ->
+                            prop.title.lowercase().contains(searchLower) ||
+                            prop.phone.contains(searchLower) ||
+                            prop.cityId.lowercase().contains(searchLower) ||
+                            prop.localNeighborhood.lowercase().contains(searchLower) ||
+                            prop.propertyType.lowercase().contains(searchLower)
+                        }
+                    } else emptyList()
+
                     ServicesBrowserMainContent(
                         viewModel = viewModel,
                         themeColors = themeColors,
                         displayProviders = filteredProviders,
+                        displayStores = displayStores,
+                        displayProperties = displayProperties,
                         isProvidersLoading = isProvidersLoading,
                         categories = categories,
                         selectedCategoryId = selectedCategory,
