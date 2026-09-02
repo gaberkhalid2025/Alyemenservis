@@ -216,7 +216,7 @@ class ChatRepository(
     // 2. MESSAGES MANAGEMENT (OFFLINE-FIRST & DELTA SYNC)
     // =========================================================================
 
-    override fun getChannelMessages(channelId: String, currentUserId: String): Flow<List<ChatMessage>> = callbackFlow {
+    override fun getChannelMessages(channelId: String, currentUserId: String, limit: Int): Flow<List<ChatMessage>> = callbackFlow {
         if (channelId.isBlank()) {
             trySend(emptyList())
             close()
@@ -228,10 +228,11 @@ class ChatRepository(
         val visibleCached = cached.filter { !it.isHiddenFor(currentUserId) }
         trySend(visibleCached)
 
-        // 2. Real-time Firebase Listener
+        // 2. Real-time Firebase Listener with limit to reduce read quota
         val messagesRef = channelsCollection.document(channelId).collection("messages")
         val listener = messagesRef
             .orderBy("timestamp", Query.Direction.ASCENDING)
+            .limitToLast(limit.coerceAtLeast(10).toLong())
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("ChatRepository", "Messages listener error: ${error.message}")

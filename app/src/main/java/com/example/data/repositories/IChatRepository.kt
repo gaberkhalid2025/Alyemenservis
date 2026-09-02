@@ -36,9 +36,9 @@ interface IChatRepository {
     fun getUserChannels(userId: String): Flow<List<ChatChannel>>
 
     /**
-     * مراقبة رسائل القناة بنظام Offline-First مع التحديث الفوري
+     * مراقبة رسائل القناة بنظام Offline-First مع التحديث الفوري والصفحات (Pagination)
      */
-    fun getChannelMessages(channelId: String, currentUserId: String): Flow<List<ChatMessage>>
+    fun getChannelMessages(channelId: String, currentUserId: String, limit: Int = 30): Flow<List<ChatMessage>>
 
     /**
      * إرسال رسالة جديدة مع دعم العمل دون اتصال والمزامنة التلقائية

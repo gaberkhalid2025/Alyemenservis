@@ -47,6 +47,9 @@ fun AdminUserManager(
     var selectedFilter by remember { mutableStateOf("الكل") }
     val filters = listOf("الكل", "عميل", "فني", "متجر", "محظور")
 
+    var resetPasswordTargetUser by remember { mutableStateOf<Map<String, Any>?>(null) }
+    var newTempPasswordInput by remember { mutableStateOf("") }
+
     val filteredUsers = remember(rawUsersList, searchQuery, selectedFilter) {
         rawUsersList.filter { userMap ->
             val name = userMap["name"] as? String ?: ""
@@ -155,38 +158,86 @@ fun AdminUserManager(
                             isBlocked = isBlocked,
                             themeColors = themeColors,
                             actions = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            if (isBlocked) {
-                                                adminViewModel.unblockUser(userId) { success ->
-                                                    scope.launch { snackbarHostState.showSnackbar("تم إلغاء حظر المستخدم") }
-                                                }
-                                            } else {
-                                                adminViewModel.blockUser(userId) { success ->
-                                                    scope.launch { snackbarHostState.showSnackbar("تم حظر المستخدم") }
-                                                }
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
-                                        modifier = Modifier.weight(1f)
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(if (isBlocked) "إلغاء الحظر" else "حظر 🚫", fontSize = 10.5.sp, color = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350))
+                                        OutlinedButton(
+                                            onClick = {
+                                                if (isBlocked) {
+                                                    adminViewModel.unblockUser(userId) { success ->
+                                                        scope.launch { snackbarHostState.showSnackbar("تم إلغاء حظر المستخدم") }
+                                                    }
+                                                } else {
+                                                    adminViewModel.blockUser(userId) { success ->
+                                                        scope.launch { snackbarHostState.showSnackbar("تم حظر المستخدم") }
+                                                    }
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(if (isBlocked) "إلغاء الحظر" else "حظر 🚫", fontSize = 10.5.sp, color = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350))
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                resetPasswordTargetUser = userMap
+                                                newTempPasswordInput = ""
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("تغيير السر 🔑", fontSize = 10.5.sp, color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold)
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                adminViewModel.deleteUser(userId) { success ->
+                                                    scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف حساب المستخدم") }
+                                                }
+                                            },
+                                            modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                                        }
                                     }
 
-                                    IconButton(
-                                        onClick = {
-                                            adminViewModel.deleteUser(userId) { success ->
-                                                scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف حساب المستخدم") }
-                                            }
-                                        },
-                                        modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                    val context = androidx.compose.ui.platform.LocalContext.current
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                                        OutlinedButton(
+                                            onClick = {
+                                                val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
+                                                val msg = android.net.Uri.encode("مرحباً $name، تواصل من إدارة تطبيق دليل خدمات اليمن:")
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/$cleanPhone?text=$msg"))
+                                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, Color(0xFF25D366)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("واتساب 💬", color = Color(0xFF25D366), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
+                                                val msg = android.net.Uri.encode("مرحباً $name، تواصل من إدارة تطبيق دليل خدمات اليمن:")
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/share/url?url=$cleanPhone&text=$msg"))
+                                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = BorderStroke(1.dp, Color(0xFF0088CC)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("تيليجرام ✈️", color = Color(0xFF0088CC), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
@@ -195,5 +246,63 @@ fun AdminUserManager(
                 }
             }
         }
+    }
+
+    if (resetPasswordTargetUser != null) {
+        val target = resetPasswordTargetUser!!
+        val name = target["name"] as? String ?: "المستخدم"
+        val phone = target["phone"] as? String ?: ""
+        val userId = target["id"] as? String ?: phone
+
+        AlertDialog(
+            onDismissRequest = { resetPasswordTargetUser = null },
+            containerColor = Color(0xFF1E293B),
+            title = { Text("🔑 تعيين كلمة مرور جديدة", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("إعادة تعيين كلمة المرور للحساب: $name ($phone)", color = Color.Gray, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = newTempPasswordInput,
+                        onValueChange = { newTempPasswordInput = it },
+                        placeholder = { Text("اكتب كلمة المرور الجديدة...", color = Color.DarkGray) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newTempPasswordInput.trim().length >= 4) {
+                            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
+                            val passData = mapOf("password" to newTempPasswordInput.trim(), "updatedAt" to System.currentTimeMillis())
+                            db.collection("registered_users").document(userId).update(passData)
+                            if (cleanPhone.isNotEmpty()) {
+                                db.collection("registered_users").document(cleanPhone).update(passData)
+                                db.collection("providers").document(cleanPhone).update(passData)
+                            }
+                            mainViewModel.addNotification(
+                                title = "🔑 تم تحديث كلمة المرور للحساب",
+                                message = "عزيزي $name، قامت الإدارة بتعيين كلمة مرور جديدة لحسابك: ${newTempPasswordInput.trim()}",
+                                targetType = "USER",
+                                targetValue = phone
+                            )
+                            resetPasswordTargetUser = null
+                            scope.launch { snackbarHostState.showSnackbar("✅ تم تحديث كلمة المرور وإرسال إشعار للمستخدم") }
+                        } else {
+                            scope.launch { snackbarHostState.showSnackbar("⚠️ كلمة المرور يجب أن لا تقل عن 4 رموز") }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                ) {
+                    Text("حفظ وإرسال 🔑", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { resetPasswordTargetUser = null }) { Text("إلغاء", color = Color.Gray) }
+            }
+        )
     }
 }

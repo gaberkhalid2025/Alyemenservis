@@ -233,4 +233,22 @@ object FirebaseStorageUploader {
     suspend fun uploadImageToStorage(context: Context, uri: Uri, path: String): Result<String> {
         return uploadImageUri(context, uri, path, maxDimension = 800, maxSizeBytes = 300 * 1024L)
     }
+
+    /**
+     * Cleans up temporary image files in cache directory older than 24 hours to save storage and RAM.
+     */
+    suspend fun cleanOldCacheFiles(context: Context) = withContext(Dispatchers.IO) {
+        try {
+            val cacheDir = context.cacheDir
+            val now = System.currentTimeMillis()
+            val maxAge = 24 * 60 * 60 * 1000L // 24 hours
+            cacheDir.listFiles()?.forEach { file ->
+                if (file.isFile && (now - file.lastModified()) > maxAge) {
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }

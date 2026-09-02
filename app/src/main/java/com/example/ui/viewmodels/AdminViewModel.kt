@@ -2462,29 +2462,59 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
     }
 
     fun approveProviderRequest(requestId: String, onResult: ((Boolean) -> Unit)? = null) {
-        db.collection("registration_requests").document(requestId).update("status", "APPROVED")
-            .addOnSuccessListener {
-                recordAuditLog("APPROVE_REQUEST", "تمت الموافقة على طلب الانضمام $requestId")
-                loadPendingRequests()
-                mainViewModel.triggerNotification("✅ تمت الموافقة على طلب الانضمام بنجاح!")
-                onResult?.invoke(true)
-            }
-            .addOnFailureListener {
-                onResult?.invoke(false)
-            }
+        db.collection("registration_requests").document(requestId).get().addOnSuccessListener { snapshot ->
+            val applicantPhone = snapshot.getString("phone") ?: ""
+            val applicantName = snapshot.getString("name") ?: "المتقدم"
+
+            db.collection("registration_requests").document(requestId).update("status", "APPROVED")
+                .addOnSuccessListener {
+                    recordAuditLog("APPROVE_REQUEST", "تمت الموافقة على طلب الانضمام $requestId")
+                    loadPendingRequests()
+                    mainViewModel.triggerNotification("✅ تمت الموافقة على طلب الانضمام بنجاح!")
+                    if (applicantPhone.isNotBlank()) {
+                        mainViewModel.addNotification(
+                            title = "🎉 تهانينا! تمت الموافقة على طلب انضمامك",
+                            message = "عزيزي $applicantName، يسعدنا إعلامك بأنه تم قبول طلب انضمامك واعتماد حسابك كـ فني معتمد في دليل خدمات اليمن.",
+                            targetType = "USER",
+                            targetValue = applicantPhone
+                        )
+                    }
+                    onResult?.invoke(true)
+                }
+                .addOnFailureListener {
+                    onResult?.invoke(false)
+                }
+        }.addOnFailureListener {
+            onResult?.invoke(false)
+        }
     }
 
     fun rejectProviderRequest(requestId: String, reason: String = "", onResult: ((Boolean) -> Unit)? = null) {
-        db.collection("registration_requests").document(requestId).update(mapOf("status" to "REJECTED", "rejectionReason" to reason))
-            .addOnSuccessListener {
-                recordAuditLog("REJECT_REQUEST", "تم رفض طلب الانضمام $requestId. السبب: $reason")
-                loadPendingRequests()
-                mainViewModel.triggerNotification("🚫 تم رفض طلب الانضمام.")
-                onResult?.invoke(true)
-            }
-            .addOnFailureListener {
-                onResult?.invoke(false)
-            }
+        db.collection("registration_requests").document(requestId).get().addOnSuccessListener { snapshot ->
+            val applicantPhone = snapshot.getString("phone") ?: ""
+            val applicantName = snapshot.getString("name") ?: "المتقدم"
+
+            db.collection("registration_requests").document(requestId).update(mapOf("status" to "REJECTED", "rejectionReason" to reason))
+                .addOnSuccessListener {
+                    recordAuditLog("REJECT_REQUEST", "تم رفض طلب الانضمام $requestId. السبب: $reason")
+                    loadPendingRequests()
+                    mainViewModel.triggerNotification("🚫 تم رفض طلب الانضمام.")
+                    if (applicantPhone.isNotBlank()) {
+                        mainViewModel.addNotification(
+                            title = "🚫 تحديث بخصوص طلب الانضمام",
+                            message = "عزيزي $applicantName، نعتذر منك، تم عدم قبول طلب الانضمام حالياً." + (if (reason.isNotBlank()) " السبب: $reason" else ""),
+                            targetType = "USER",
+                            targetValue = applicantPhone
+                        )
+                    }
+                    onResult?.invoke(true)
+                }
+                .addOnFailureListener {
+                    onResult?.invoke(false)
+                }
+        }.addOnFailureListener {
+            onResult?.invoke(false)
+        }
     }
 
     fun blockUser(userId: String, onResult: ((Boolean) -> Unit)? = null) {

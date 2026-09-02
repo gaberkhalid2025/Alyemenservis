@@ -105,32 +105,68 @@ fun AdminRegFormsManagerPanel(
                             statusColor = Color(0xFFF59E0B),
                             themeColors = themeColors,
                             actions = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            adminViewModel.approveProviderRequest(req.id) { success ->
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar(if (success) "✅ تم قبول الطلب واعتماد الحساب" else "❌ فشل قبول الطلب")
-                                                }
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f)
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("قبول وتفعيل ✓", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        Button(
+                                            onClick = {
+                                                adminViewModel.approveProviderRequest(req.id) { success ->
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar(if (success) "✅ تم قبول الطلب واعتماد الحساب" else "❌ فشل قبول الطلب")
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("قبول وتفعيل ✓", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        }
+
+                                        Button(
+                                            onClick = { rejectTarget = req },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("رفض الطلب ❌", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        }
                                     }
 
-                                    Button(
-                                        onClick = { rejectTarget = req },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f)
+                                    val context = androidx.compose.ui.platform.LocalContext.current
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("رفض الطلب ❌", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        OutlinedButton(
+                                            onClick = {
+                                                val cleanPhone = req.phone.replace("+", "").replace(" ", "").trim()
+                                                val msg = android.net.Uri.encode("مرحباً ${req.name}، بخصوص طلب انضمامك كـ ${req.section} في منصة دليل خدمات اليمن:")
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/$cleanPhone?text=$msg"))
+                                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF25D366)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("واتساب 💬", color = Color(0xFF25D366), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                val cleanPhone = req.phone.replace("+", "").replace(" ", "").trim()
+                                                val msg = android.net.Uri.encode("مرحباً ${req.name}، بخصوص طلب انضمامك في منصة دليل خدمات اليمن:")
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/share/url?url=$cleanPhone&text=$msg"))
+                                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0088CC)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("تيليجرام ✈️", color = Color(0xFF0088CC), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
