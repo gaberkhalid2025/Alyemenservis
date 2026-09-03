@@ -236,7 +236,7 @@ object LocaleManager {
             val db = FirebaseFirestore.getInstance()
             val userId = sp.getString("user_id", "guest") ?: "guest"
             if (userId.isNotEmpty() && userId != "guest") {
-                val decId = try { com.example.util.SecurityCryptoUtils.decrypt(userId) } catch (e: Exception) { userId }
+                val decId = try { com.example.utils.SecurityCryptoUtils.decrypt(userId) } catch (e: Exception) { userId }
                 db.collection("registered_users").document(decId).update("preferredLanguage", cleanCode)
             }
         } catch (e: Exception) {

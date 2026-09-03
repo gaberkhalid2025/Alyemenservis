@@ -36,8 +36,8 @@ data class AdminSettingsEntity(
     val supportPhone: String = "777644",
     val supportWhatsapp: String = "777644",
     val supportEmail: String = "mah73646@gmail.com",
-    val adminUsername: String = "meh777644@gmail.com",
-    val adminPassword: String = "Meh@@@@777644##",
+    val adminUsername: String = "mah73646@gmail.com",
+    val adminPassword: String = "Maher@@--@@736462##",
     val ownerEmail: String = "mah73646@gmail.com",
     val ownerPassword: String = "Maher@@--@@736462##",
     

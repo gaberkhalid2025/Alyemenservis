@@ -28,8 +28,8 @@ import coil.compose.AsyncImage
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.data.models.MessageStatus
-import com.example.util.AudioPlayerManager
-import com.example.util.ChatIcons
+import com.example.utils.AudioPlayerManager
+import com.example.utils.ChatIcons
 import java.text.SimpleDateFormat
 import java.util.*
 

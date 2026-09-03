@@ -85,7 +85,7 @@ import com.example.ui.screens.register.*
 import com.example.ui.screens.status.*
 import com.example.ui.screens.about.*
 import com.example.ui.*
-import com.example.ui.utils.*
+import com.example.utils.*
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -204,7 +204,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                         viewModel.triggerNotification("📹 تم تحميل الفيديو القصير للبنر بنجاح!")
                     }
                 } else {
-                    val base64Str = com.example.ui.utils.compressAndResizeImageUri(context, it, 800, 70)
+                    val base64Str = com.example.utils.compressAndResizeImageUri(context, it, 800, 70)
                     if (base64Str.isNotEmpty()) {
                         bannerBase64 = base64Str
                         bannerType = "IMAGE"
@@ -220,7 +220,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     ) { uri ->
         uri?.let {
             try {
-                val base64Str = com.example.ui.utils.compressAndResizeImageUri(context, it, 800, 70)
+                val base64Str = com.example.utils.compressAndResizeImageUri(context, it, 800, 70)
                 if (base64Str.isNotEmpty()) {
                     aboutCoverBase64 = base64Str
                     aboutCoverType = "IMAGE"

@@ -284,6 +284,24 @@ fun DynamicPolymorphicProfileScreen(
                 )
             }
 
+            // 🌟 OWNER & ADMIN DASHBOARD CONTROLS (Customized for each role)
+            if (isOwner || adminRole != "GUEST") {
+                item {
+                    ProfileOwnerAdminControlBar(
+                        entityId = entityId,
+                        entityType = entityType,
+                        provider = provider,
+                        store = store,
+                        property = property,
+                        job = job,
+                        isOwner = isOwner,
+                        isAdmin = adminRole != "GUEST",
+                        viewModel = viewModel,
+                        themeColors = themeColors
+                    )
+                }
+            }
+
             // 🌟 2. POLYMORPHIC STRUCTURED DATA (Tailored Fields per category)
             item {
                 ProfileSpecs(

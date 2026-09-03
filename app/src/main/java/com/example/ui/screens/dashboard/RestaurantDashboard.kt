@@ -50,9 +50,10 @@ fun RestaurantDashboard(
     val restaurantUiState by restaurantViewModel.uiState.collectAsState()
 
     val tabsList = listOf(
-        Pair("🍔", "الوجبات والمنيو"),
-        Pair("🛍️", "طلبات الزبائن"),
-        Pair("💬", "آراء المراجعين"),
+        Pair("🍔", "قائمة الطعام والمنيو"),
+        Pair("🛍️", "طلبات الزبائن والوجبات"),
+        Pair("🏷️", "العروض والخصومات"),
+        Pair("💬", "آراء وتقييمات العملاء"),
         Pair("📝", "الملف التعريفي للمطعم"),
         Pair("📊", "الإحصائيات والأداء")
     )
@@ -162,9 +163,10 @@ fun RestaurantDashboard(
             when (activeTab) {
                 0 -> TabProductsServices(account, viewModel, themeColors)
                 1 -> TabBookingsOrders(account, viewModel, themeColors)
-                2 -> TabReviewsFeedback(account, viewModel, themeColors)
-                3 -> TabProfileEdit(account, viewModel, themeColors)
-                4 -> TabStatisticsGrowth(account, viewModel, themeColors)
+                2 -> TabOffersCoupons(account, viewModel, themeColors)
+                3 -> TabReviewsFeedback(account, viewModel, themeColors)
+                4 -> TabProfileEdit(account, viewModel, themeColors)
+                5 -> TabStatisticsGrowth(account, viewModel, themeColors)
             }
         }
     }

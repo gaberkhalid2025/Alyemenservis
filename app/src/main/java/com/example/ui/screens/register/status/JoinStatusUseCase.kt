@@ -6,6 +6,7 @@ import com.example.data.*
  * 🎯 الحالات المحددة لطلب الانضمام أو الدخول للوحة التحكم
  */
 sealed class JoinStatus {
+    object NoRequest : JoinStatus()
     data class ActiveStore(val store: StoreEntity, val businessType: String) : JoinStatus()
     data class ActiveProperty(val property: PropertyEntity) : JoinStatus()
     data class ApprovedTechnician(val provider: ProviderEntity, val categoryName: String) : JoinStatus()
@@ -41,7 +42,7 @@ class JoinStatusUseCase {
     ): JoinStatus {
         val cleanPhone = joinPhone.trim().replace(" ", "").replace("+", "")
         if (cleanPhone.isEmpty()) {
-            return JoinStatus.PendingGeneric(joinPhone)
+            return JoinStatus.NoRequest
         }
 
         // 1. Check Active Store / Restaurant / Medical
@@ -74,7 +75,14 @@ class JoinStatusUseCase {
             return JoinStatus.ApprovedTechnician(matchingApproved, catName)
         }
 
-        // 4. Check Rejection Notifications
+        // 4. Check Rejection Notifications or Pending Provider Rejection Status
+        val matchingPending = pendingProviders.find { 
+            it.phone.trim().replace(" ", "").replace("+", "").replace("-", "") == cleanPhone 
+        }
+        if (matchingPending != null && (matchingPending.status == "REJECTED" || matchingPending.reason.isNotBlank())) {
+            return JoinStatus.Rejected(matchingPending.reason.ifBlank { "تم رفض طلب الانضمام من قبل الإدارة لعدم استيفاء الشروط." })
+        }
+
         val rejectionNotif = notifications.find {
             val cleanTarget = it.targetValue.trim().replace(" ", "").replace("+", "").replace("-", "")
             cleanTarget == cleanPhone && (it.title.contains("رفض") || it.message.contains("رفض"))
@@ -91,9 +99,6 @@ class JoinStatusUseCase {
             return JoinStatus.PendingProperty(matchingProperty)
         }
 
-        val matchingPending = pendingProviders.find { 
-            it.phone.trim().replace(" ", "").replace("+", "").replace("-", "") == cleanPhone 
-        }
         if (matchingPending != null) {
             return JoinStatus.PendingTechnician(matchingPending)
         }

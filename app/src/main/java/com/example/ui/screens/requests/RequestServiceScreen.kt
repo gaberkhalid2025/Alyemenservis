@@ -295,7 +295,7 @@ fun RequestServiceScreen(
                             val uniqueCode = "REQ-${Random.nextInt(100000, 999999)}"
                             val reqId = UUID.randomUUID().toString()
                             val now = System.currentTimeMillis()
-                            val hashedPin = com.example.util.PinHasher.hashPin(pinCode)
+                            val hashedPin = com.example.utils.PinHasher.hashPin(pinCode)
                             val request = InstantRequestEntity(
                                 id = reqId,
                                 requestCode = uniqueCode,

@@ -2,7 +2,7 @@ package com.example.ui.screens.register
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.repositories.contracts.IRegistrationRepository
+import com.example.data.repositories.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
 import com.example.domain.usecases.RegisterProviderUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow

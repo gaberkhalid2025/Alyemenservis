@@ -30,12 +30,7 @@ fun AdvancedOffersManagementDialog(
     onDismiss: () -> Unit
 ) {
     var offers by remember {
-        mutableStateOf(
-            listOf(
-                OfferUiModel(title = "عرض العيد الخاص", discountPercent = 20, durationDays = 7, isActive = true),
-                OfferUiModel(title = "خصم العملاء الجدد", discountPercent = 15, durationDays = 30, isActive = true)
-            )
-        )
+        mutableStateOf<List<OfferUiModel>>(emptyList())
     }
     var showAddDialog by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }

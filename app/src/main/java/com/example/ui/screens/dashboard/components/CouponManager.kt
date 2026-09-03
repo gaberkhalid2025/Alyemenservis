@@ -39,13 +39,7 @@ fun CouponManager(
     modifier: Modifier = Modifier
 ) {
     var coupons by remember {
-        mutableStateOf(
-            listOf(
-                CouponModel("1", "YEMEN2026", 15, 100, 34, 5000.0, true),
-                CouponModel("2", "WELCOME10", 10, 500, 189, 0.0, true),
-                CouponModel("3", "VIP50", 50, 20, 20, 20000.0, false)
-            )
-        )
+        mutableStateOf<List<CouponModel>>(emptyList())
     }
 
     var showAddDialog by remember { mutableStateOf(false) }

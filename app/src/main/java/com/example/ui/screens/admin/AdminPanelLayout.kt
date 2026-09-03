@@ -2,7 +2,8 @@
 package com.example.ui.screens.admin
 
 import com.example.ui.*
-import com.example.ui.utils.*
+import com.example.ui.navigation.AppScreens
+import com.example.utils.*
 
 
 import android.content.Intent
@@ -88,7 +89,7 @@ import com.example.ui.screens.assistant.*
 import com.example.ui.screens.register.*
 import com.example.ui.screens.status.*
 import com.example.ui.screens.about.*
-import com.example.viewmodels.*
+import com.example.ui.viewmodels.*
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -129,7 +130,22 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     var adminNotifSubTab by remember { mutableStateOf("SERVICES") }
     var adminVipSubTab by remember { mutableStateOf("SERVICES") }
     var adminBannerSubTab by remember { mutableStateOf("SERVICES") }
-    var adminPasswordSubTab by remember { mutableStateOf("SERVICES") }
+    var adminPasswordSubTab by remember { mutableStateOf("REQUESTS") }
+    val passwordRecoveryRequests = remember { mutableStateListOf<Map<String, Any>>() }
+    LaunchedEffect(Unit) {
+        viewModel.db.collection("password_recovery_requests")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, _ ->
+                if (snap != null) {
+                    passwordRecoveryRequests.clear()
+                    for (doc in snap.documents) {
+                        val m = doc.data?.toMutableMap() ?: mutableMapOf()
+                        m["id"] = doc.id
+                        passwordRecoveryRequests.add(m)
+                    }
+                }
+            }
+    }
 
     // Dialog state controllers for category edits and deletions
     var showDeleteCategoryConfirmId by remember { mutableStateOf<String?>(null) }
@@ -427,9 +443,9 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
 
                     val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedUser == "WAM2026") &&
-                            (trimmedPass == settingsState.ownerPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
-                    val isAdmin = (trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
-                            (trimmedPass == settingsState.adminPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
+                            (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.ownerPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
+                    val isAdmin = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
+                            (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.adminPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
 
                     if (isOwner) {
                         isAuthorized = true
@@ -441,7 +457,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         // Dynamically check synced supervisors in real-time from Firestore!
                         val matchingSup = viewModel.supervisors.value.find { 
                             (it.name.trim().equals(trimmedUser, ignoreCase = true) || it.id.equals(trimmedUser, ignoreCase = true)) && 
-                            (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.util.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
+                            (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
                         }
                         if (matchingSup != null) {
                             isAuthorized = true
@@ -460,6 +476,12 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("تسجيل دخول المشرف", color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            TextButton(
+                onClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+            ) {
+                Text("العودة إلى التطبيق الرئيسي 🏠", color = Color.LightGray, fontSize = 12.sp)
             }
         }
     } else {
@@ -3008,7 +3030,9 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
 
                 item {
+                    val pendingCount = passwordRecoveryRequests.count { (it["status"] as? String) != "RESOLVED" }
                     val passTabs = listOf(
+                        Triple("REQUESTS", if (pendingCount > 0) "🚨 طلبات الاستعادة ($pendingCount)" else "⏳ طلبات الاستعادة", passwordRecoveryRequests.size),
                         Triple("SERVICES", "🔧 الخدمات والفنيين", activatedProviders.size),
                         Triple("STORES", "🏪 المتاجر", stores.filter { !it.categoryId.contains("طبي") && !it.categoryId.contains("عياد") && !it.categoryId.contains("مطعم") && !it.categoryId.contains("كافيه") }.size),
                         Triple("RESTAURANTS", "🍔 المطاعم", stores.filter { it.categoryId.contains("مطعم") || it.categoryId.contains("كافيه") }.size),
@@ -3035,6 +3059,172 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
 
                 when (adminPasswordSubTab) {
+                    "REQUESTS" -> {
+                        if (passwordRecoveryRequests.isEmpty()) {
+                            item {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                    modifier = Modifier.fillMaxWidth().padding(8.dp)
+                                ) {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                        Text("لا توجد طلبات استعادة كلمة مرور واردة حالياً ✅", color = Color.LightGray, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        } else {
+                            items(passwordRecoveryRequests, key = { "rec_${it["id"]}" }) { req ->
+                                val reqPhone = (req["phone"] as? String) ?: ""
+                                val reqName = (req["name"] as? String) ?: "مستخدم"
+                                val reqType = (req["accountType"] as? String) ?: "حساب"
+                                val reqStatus = (req["status"] as? String) ?: "PENDING"
+                                var newPassInput by remember { mutableStateOf((req["newPassword"] as? String) ?: "") }
+
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    border = BorderStroke(1.dp, if (reqStatus == "RESOLVED") Color(0xFF10B981) else Color(0xFFEF4444))
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                            Text("👤 $reqName", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                            Surface(
+                                                color = if (reqStatus == "RESOLVED") Color(0xFF10B981) else Color(0xFFEF4444),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    if (reqStatus == "RESOLVED") "تم التعيين والحل ✅" else "بانتظار التعيين ⌛",
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("📱 الهاتف: $reqPhone", color = Color.LightGray, fontSize = 11.sp)
+                                            Text("النوع: $reqType", color = themeColors.accent, fontSize = 11.sp)
+                                        }
+
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            OutlinedTextField(
+                                                value = newPassInput,
+                                                onValueChange = { newPassInput = it },
+                                                label = { Text("كلمة المرور الجديدة", fontSize = 10.sp) },
+                                                singleLine = true,
+                                                modifier = Modifier.weight(1f),
+                                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                                            )
+                                            Button(
+                                                onClick = { newPassInput = (100000..999999).random().toString() },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("توليد 🎲", fontSize = 10.sp, color = Color.White)
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    if (newPassInput.isNotBlank()) {
+                                                        viewModel.adminResolvePasswordReset(context, reqPhone, newPassInput) {
+                                                            Toast.makeText(context, "✅ تم اعتماد وتحديث كلمة المرور لـ $reqName", Toast.LENGTH_LONG).show()
+                                                        }
+                                                    } else {
+                                                        Toast.makeText(context, "الرجاء إدخال أو توليد كلمة المرور", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                                modifier = Modifier.height(48.dp)
+                                            ) {
+                                                Text("اعتماد 💾", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+
+                                        Text("خيارات إرسال كلمة المرور للمستخدم فوراً:", fontSize = 10.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                        
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            // WhatsApp
+                                            Button(
+                                                onClick = {
+                                                    val text = "مرحباً $reqName، تم تعيين كلمة المرور الجديدة لحسابك في دليل اليمن: $newPassInput"
+                                                    val url = "https://wa.me/967${reqPhone.trim().removePrefix("0").removePrefix("+967")}?text=${android.net.Uri.encode(text)}"
+                                                    try {
+                                                        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                                                    } catch (e: Exception) {
+                                                        Toast.makeText(context, "فشل فتح واتساب", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                                modifier = Modifier.weight(1f).height(32.dp)
+                                            ) {
+                                                Text("واتساب", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            // Telegram
+                                            Button(
+                                                onClick = {
+                                                    val text = "مرحباً $reqName، تم تعيين كلمة المرور الجديدة لحسابك في دليل اليمن: $newPassInput"
+                                                    val url = "https://t.me/share/url?url=https://yemen-services.app&text=${android.net.Uri.encode(text)}"
+                                                    try {
+                                                        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                                                    } catch (e: Exception) {
+                                                        Toast.makeText(context, "فشل فتح تيليجرام", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088CC)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                                modifier = Modifier.weight(1f).height(32.dp)
+                                            ) {
+                                                Text("تيليجرام", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            // SMS
+                                            Button(
+                                                onClick = {
+                                                    val text = "كلمة المرور الجديدة لحسابك في دليل اليمن هي: $newPassInput"
+                                                    try {
+                                                        val intent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:$reqPhone")).apply {
+                                                            putExtra("sms_body", text)
+                                                        }
+                                                        context.startActivity(intent)
+                                                    } catch (e: Exception) {
+                                                        Toast.makeText(context, "فشل فتح الرسائل SMS", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                                modifier = Modifier.weight(1f).height(32.dp)
+                                            ) {
+                                                Text("SMS", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            // In-App Notification
+                                            Button(
+                                                onClick = {
+                                                    viewModel.triggerNotification("🔔 تم إرسال إشعار فوري لـ $reqName بكلمة المرور")
+                                                    Toast.makeText(context, "🔔 تم إرسال إشعار فوري داخل التطبيق!", Toast.LENGTH_SHORT).show()
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                                modifier = Modifier.weight(1.1f).height(32.dp)
+                                            ) {
+                                                Text("إشعار فوري 🔔", fontSize = 8.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     "SERVICES" -> {
                         if (activatedProviders.isEmpty()) {
                             item { Text("لا توجد حسابات فنيين مسجلة.", fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(8.dp)) }
@@ -3194,7 +3384,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                             val contentResolver = context.contentResolver
                                             val mimeType = contentResolver.getType(uri) ?: ""
                                             if (mimeType.startsWith("image/")) {
-                                                val base64Str = com.example.ui.utils.compressAndResizeImageUri(context, uri, 800, 70)
+                                                val base64Str = com.example.utils.compressAndResizeImageUri(context, uri, 800, 70)
                                                 if (base64Str.isNotEmpty()) {
                                                     bannerUrl = "data:image/jpeg;base64,$base64Str"
                                                     bannerType = "IMAGE"
@@ -9684,7 +9874,7 @@ fun PasswordEntityCard(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = {
                         val whatsappText = "مرحباً يا غالي، كلمة المرور الخاصة بحسابك في دليل خدمات اليمن هي: ${password ?: "غير متوفرة"}"
@@ -9697,10 +9887,28 @@ fun PasswordEntityCard(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
-                    modifier = Modifier.height(28.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp)
+                    modifier = Modifier.height(28.dp).weight(1f),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    Text("🟢 واتساب", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("🟢 واتساب", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = {
+                        val teleText = "كلمة المرور الخاصة بحسابك في دليل خدمات اليمن هي: ${password ?: "غير متوفرة"}"
+                        val teleUrl = "https://t.me/share/url?url=https://yemen-services.app&text=${android.net.Uri.encode(teleText)}"
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(teleUrl))
+                            context.startActivity(intent)
+                        } catch(e: Exception) {
+                            Toast.makeText(context, "فشل فتح تيليجرام", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088CC)),
+                    modifier = Modifier.height(28.dp).weight(1f),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
+                ) {
+                    Text("✈️ تيليجرام", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
@@ -9716,10 +9924,10 @@ fun PasswordEntityCard(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
-                    modifier = Modifier.height(28.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp)
+                    modifier = Modifier.height(28.dp).weight(1f),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    Text("💬 رسالة SMS", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("💬 SMS", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

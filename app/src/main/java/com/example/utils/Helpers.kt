@@ -385,20 +385,9 @@ fun convertUriToBase64(context: Context, uri: Uri): String {
     }
 }
 
-fun convertGenericUriToBase64(context: Context, uri: Uri): String = convertUriToBase64(context, uri)
-
-fun convertBitmapToBase64(bitmap: Bitmap): String {
-    return try {
-        val outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-        val bytes = outputStream.toByteArray()
-        Base64.encodeToString(bytes, Base64.NO_WRAP)
-    } catch (e: Exception) {
-        ""
-    }
+fun Color.luminance(): Float {
+    return (0.2126f * this.red + 0.7152f * this.green + 0.0722f * this.blue)
 }
-
-fun compressAndResizeImageUri(context: Context, uri: Uri): String = convertUriToBase64(context, uri)
 
 fun isMoreThan8HoursBefore(timestamp: Long): Boolean {
     val diff = timestamp - System.currentTimeMillis()

@@ -32,17 +32,18 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.chat.util.ChatValidationUtils
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.ui.screens.chat.ChatAttachmentManager
-import com.example.util.ChatIcons
+import com.example.utils.ChatIcons
+import com.example.utils.ChatValidationUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
 fun ChatInputBar(
+    channelId: String = "direct_chat",
     replyingTo: ChatMessage?,
     onCancelReply: () -> Unit,
     onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit,
@@ -92,7 +93,7 @@ fun ChatInputBar(
             scope.launch {
                 uploadProgress = 0.2f
                 val uploadResult = attachmentManager.uploadAttachment(
-                    channelId = "direct_chat",
+                    channelId = channelId,
                     uri = uri,
                     type = "image"
                 )
@@ -187,7 +188,7 @@ fun ChatInputBar(
             scope.launch {
                 uploadProgress = 0.2f
                 val uploadResult = attachmentManager.uploadAttachment(
-                    channelId = "direct_chat",
+                    channelId = channelId,
                     uri = uri,
                     type = "audio"
                 )

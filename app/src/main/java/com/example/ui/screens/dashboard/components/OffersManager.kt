@@ -38,12 +38,7 @@ fun OffersManager(
     modifier: Modifier = Modifier
 ) {
     var offers by remember {
-        mutableStateOf(
-            listOf(
-                OfferItem("1", "خصم الصيف الحصري", "خصم 20% على كافة الخدمات المنزلية", 20, "2026-09-30", true),
-                OfferItem("2", "عرض نهاية الأسبوع", "اشترِ قطعة واحصل على الثانية بخصم 50%", 50, "2026-09-10", true)
-            )
-        )
+        mutableStateOf<List<OfferItem>>(emptyList())
     }
 
     var showAddDialog by remember { mutableStateOf(false) }

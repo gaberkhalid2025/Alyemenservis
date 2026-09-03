@@ -33,12 +33,7 @@ class MedicalDashboardViewModel(
     private val _eventFlow = MutableSharedFlow<DashboardEvent>()
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
-    private val _doctors = MutableStateFlow<List<DoctorItem>>(
-        listOf(
-            DoctorItem("1", "د. أحمد باحاج", "استشاري أمراض القلب والأوعية الدموية", "🕒 الدوام: السبت إلى الخميس (4:00 عصراً - 9:00 مساءً)"),
-            DoctorItem("2", "د. مها الصنعاني", "أخصائية أمراض الأطفال وحديثي الولادة", "🕒 الدوام: طوال أيام الأسبوع (9:00 صباحاً - 1:00 ظهراً)")
-        )
-    )
+    private val _doctors = MutableStateFlow<List<DoctorItem>>(emptyList())
     val doctors: StateFlow<List<DoctorItem>> = _doctors.asStateFlow()
 
     init {

@@ -26,7 +26,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.dialogs.MultiDimensionRatingDialog
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
-import com.example.viewmodels.UrgentViewModel
+import com.example.ui.viewmodels.UrgentViewModel
 
 /**
  * 🚨 UrgentRequestDetailsScreen
