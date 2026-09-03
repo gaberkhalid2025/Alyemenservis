@@ -1383,7 +1383,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     val isMedical = s.categoryId.contains("طبي", true) || s.categoryId.contains("عياد", true)
                     val isRestaurant = s.categoryId.contains("مطعم", true) || s.categoryId.contains("كافيه", true)
                     !isMedical && !isRestaurant && (s.name.contains(storesSearchQuery, true) || s.phone.contains(storesSearchQuery, true))
-                }
+                }.distinctBy { it.id }
                 items(filteredStores, key = { it.id }) { s ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -1458,7 +1458,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 val filteredMedical = stores.filter { s ->
                     val isMedical = s.categoryId.contains("طبي", true) || s.categoryId.contains("عياد", true)
                     isMedical && (s.name.contains(medicalSearchQuery, true) || s.phone.contains(medicalSearchQuery, true))
-                }
+                }.distinctBy { it.id }
                 items(filteredMedical, key = { it.id }) { s ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -1524,7 +1524,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
                 val filteredProperties = properties.filter { p ->
                     !p.isDeleted && (p.title.contains(propertiesSearchQuery, true) || p.phone.contains(propertiesSearchQuery, true) || p.cityId.contains(propertiesSearchQuery, true))
-                }
+                }.distinctBy { it.id }
                 items(filteredProperties, key = { it.id }) { p ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -1590,7 +1590,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
                 val filteredJobsList = jobs.filter { j ->
                     !j.isDeleted && (j.title.contains(activeJobsSearchQuery, true) || j.companyName.contains(activeJobsSearchQuery, true) || j.phone.contains(activeJobsSearchQuery, true))
-                }
+                }.distinctBy { it.id }
                 items(filteredJobsList, key = { it.id }) { j ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -1652,7 +1652,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
                 val filteredApplicants = jobApplications.filter { app ->
                     app.applicantName.contains(applicantsSearchQuery, true) || app.applicantPhone.contains(applicantsSearchQuery, true) || app.jobTitle.contains(applicantsSearchQuery, true)
-                }
+                }.distinctBy { it.id }
                 items(filteredApplicants, key = { it.id }) { app ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),

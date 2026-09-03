@@ -94,6 +94,7 @@ fun UnifiedRegistrationForm(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -103,14 +104,14 @@ fun UnifiedRegistrationForm(
                             contentDescription = "الصورة المختارة",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(50.dp)
+                                .size(48.dp)
                                 .clip(RoundedCornerShape(8.dp))
                         )
                     } else {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = themeColors.accent.copy(alpha = 0.2f),
-                            modifier = Modifier.size(50.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Default.Person, contentDescription = null, tint = themeColors.accent)
@@ -123,12 +124,14 @@ fun UnifiedRegistrationForm(
                             text = if (selectedImageUri != null) "تم إرفاق الصورة بنجاح ✅" else "صورة الحساب / الشعار / الهوية",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (selectedImageUri != null) Color(0xFF10B981) else Color.White
+                            color = if (selectedImageUri != null) Color(0xFF10B981) else Color.White,
+                            maxLines = 1
                         )
                         Text(
                             text = if (selectedImageUri != null) "انقر لتغيير الصورة" else "اختياري لتوثيق الحساب",
                             fontSize = 10.sp,
-                            color = Color.Gray
+                            color = Color.Gray,
+                            maxLines = 1
                         )
                     }
                 }
@@ -136,9 +139,18 @@ fun UnifiedRegistrationForm(
                 Button(
                     onClick = { imagePickerLauncher.launch("image/*") },
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.wrapContentWidth()
                 ) {
-                    Text(if (selectedImageUri != null) "تغيير" else "اختيار 📷", fontSize = 11.sp, color = Color.White)
+                    Text(
+                        text = if (selectedImageUri != null) "تغيير الصورة 🔄" else "اختيار 📷",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        softWrap = false,
+                        maxLines = 1
+                    )
                 }
             }
         }

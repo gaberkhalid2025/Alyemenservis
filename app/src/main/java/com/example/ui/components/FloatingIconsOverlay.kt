@@ -39,14 +39,13 @@ fun BoxScope.FloatingIconsOverlay(
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن"
+    // 1. Primary Action FAB: "اطلب خدمتك الآن" (ملتصقة بالشريط السفلي)
     if (!settings.footerMessage.contains("hide_urgent_fab")) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .navigationBarsPadding()
-                .padding(start = 12.dp, bottom = 16.dp)
-                .shadow(6.dp, RoundedCornerShape(20.dp))
+                .padding(start = 12.dp, bottom = 4.dp)
+                .shadow(8.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(
                     Brush.horizontalGradient(
@@ -55,60 +54,59 @@ fun BoxScope.FloatingIconsOverlay(
                 )
                 .clickable { onRequestServiceClick() }
                 .border(1.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 12.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Send,
                     contentDescription = "اطلب خدمتك الآن",
                     tint = Color.White,
-                    modifier = Modifier.size(13.dp)
+                    modifier = Modifier.size(14.dp)
                 )
                 Text(
                     text = "اطلب خدمتك الآن ⚡",
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color.White,
+                    softWrap = false
                 )
             }
         }
     }
 
-    // 2. Draggable Smart Assistant FAB (قائم للسحب بحرية على الشاشة)
+    // 2. Smart Assistant FAB (ملتصقة بالشريط السفلي)
     if (!settings.assistantHidden) {
-
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(end = 12.dp, bottom = 16.dp)
-                .shadow(6.dp, RoundedCornerShape(20.dp))
+                .padding(end = 12.dp, bottom = 4.dp)
+                .shadow(8.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
                     )
                 )
-
                 .clickable { onAssistantClick() }
                 .border(1.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 12.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text("🤖", fontSize = 12.sp)
+                Text("🤖", fontSize = 13.sp)
                 Text(
                     text = "المساعد الذكي",
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color.White,
+                    softWrap = false
                 )
             }
         }

@@ -75,15 +75,15 @@ fun AdminStoresPropertiesPanel(
 
             if (selectedSection == "المتاجر") {
                 if (stores.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                         Text("لا توجد متاجر حالياً", color = Color.Gray, fontSize = 13.sp)
                     }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(stores, key = { it.id }) { store ->
+                        stores.forEach { store ->
                             AdminEntityCard(
                                 title = store.name,
                                 subtitle = "📱 ${store.phone} • 📍 ${store.cityId} - ${store.localNeighborhood}",
@@ -126,15 +126,15 @@ fun AdminStoresPropertiesPanel(
                 }
             } else {
                 if (properties.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                         Text("لا توجد عقارات حالياً", color = Color.Gray, fontSize = 13.sp)
                     }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(properties, key = { it.id }) { prop ->
+                        properties.forEach { prop ->
                             AdminEntityCard(
                                 title = prop.title,
                                 subtitle = "📱 ${prop.phone} • 📍 ${prop.cityId} - ${prop.localNeighborhood}",
