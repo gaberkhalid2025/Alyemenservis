@@ -40,6 +40,7 @@ fun ProviderForm(
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var city by remember { mutableStateOf("صنعاء") }
 
     // Phase 2 Fields (Required in Prompt)
     var yearsOfExperience by remember { mutableStateOf("") }
@@ -54,9 +55,9 @@ fun ProviderForm(
     var verificationDocLevel by remember { mutableIntStateOf(1) }
 
     // Live validation states
-    val isStep1Valid = fullName.trim().length >= 3 && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword
-    val isStep2Valid = yearsOfExperience.isNotBlank() && craftType.isNotBlank()
-    val isStep3Valid = geographicalScope.isNotBlank() && baseServicePrice.isNotBlank()
+    val isStep1Valid = fullName.trim().length >= 3 && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && city.isNotBlank()
+    val isStep2Valid = true // Optional fields
+    val isStep3Valid = true // Optional fields
 
     Card(
         shape = RoundedCornerShape(16.dp),

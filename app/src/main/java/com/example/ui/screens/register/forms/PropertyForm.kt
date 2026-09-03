@@ -50,9 +50,9 @@ fun PropertyForm(
     var amenities by remember { mutableStateOf("مصعد، موقف سيارات، حراسة أمنية، خزان مياه مستقل") }
     var priceRange by remember { mutableStateOf("إيجار شهري / بيع مباشر") }
 
-    val isStep1Valid = officeName.isNotBlank() && phone.length >= 9 && password.length >= 6 && password == confirmPassword
-    val isStep2Valid = roomsCount.isNotBlank() && bathroomsCount.isNotBlank()
-    val isStep3Valid = city.isNotBlank()
+    val isStep1Valid = officeName.isNotBlank() && ownerName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && city.isNotBlank()
+    val isStep2Valid = true // Optional fields
+    val isStep3Valid = true // Optional fields
 
     Card(
         shape = RoundedCornerShape(16.dp),

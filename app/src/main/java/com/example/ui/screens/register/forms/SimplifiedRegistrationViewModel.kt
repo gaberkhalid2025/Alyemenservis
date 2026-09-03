@@ -122,21 +122,23 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
     }
 
     private fun validateManagerName(name: String) {
-        val error = if (name.trim().isEmpty()) "اسم المسؤول مطلوب" else null
+        val error = if (name.trim().isEmpty() && currentRole in listOf("STORE", "RESTAURANT", "MEDICAL")) {
+            "اسم المسؤول/المالك مطلوب"
+        } else null
         _state.update { it.copy(managerNameError = error) }
     }
 
     private fun validatePhone(phone: String) {
         val cleanPhone = phone.trim()
-        val error = if (cleanPhone.length != 9 || !(cleanPhone.startsWith("77") || cleanPhone.startsWith("73") || cleanPhone.startsWith("71") || cleanPhone.startsWith("70") || cleanPhone.startsWith("78"))) {
-            "رقم الهاتف يجب أن يكون 9 أرقام ويبدأ بـ 77, 73, 71, 70, أو 78"
+        val error = if (cleanPhone.length < 9) {
+            "رقم الهاتف يتكون من 9 أرقام"
         } else null
         _state.update { it.copy(phoneError = error) }
     }
 
     private fun validatePassword(password: String) {
-        val error = if (password.length < 8 || !password.any { it.isDigit() } || !password.any { it.isUpperCase() }) {
-            "كلمة المرور يجب أن تحتوي على 8 أحرف، حرف كبير، ورقم"
+        val error = if (password.length < 6) {
+            "كلمة المرور يجب أن لا تقل عن 6 أحرف"
         } else null
         _state.update { it.copy(passwordError = error) }
     }

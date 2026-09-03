@@ -99,6 +99,11 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     val settingsState by viewModel.settings.collectAsState()
 
     var appName by remember { mutableStateOf(settingsState.appName) }
+    var countryFlagEmoji by remember { mutableStateOf(settingsState.countryFlagEmoji) }
+    var aboutAppTitle by remember { mutableStateOf(settingsState.aboutAppTitle) }
+    var aboutAppDescription by remember { mutableStateOf(settingsState.aboutAppDescription) }
+    var registerScreenTitle by remember { mutableStateOf(settingsState.registerScreenTitle) }
+    var registerScreenSubtitle by remember { mutableStateOf(settingsState.registerScreenSubtitle) }
     var welcomeMessage by remember { mutableStateOf(settingsState.welcomeMessage) }
     var footerMessage by remember { mutableStateOf(settingsState.footerMessage) }
     var footerBgColorHex by remember { mutableStateOf(settingsState.footerBgColorHex) }
@@ -255,6 +260,51 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             onValueChange = { appName = it },
             label = { Text("اسم التطبيق الرئيسي") },
             modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = countryFlagEmoji,
+                onValueChange = { countryFlagEmoji = it },
+                label = { Text("شعار / علم الدولة (مثل 🇾🇪)") },
+                modifier = Modifier.weight(1f),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+            )
+            OutlinedTextField(
+                value = registerScreenTitle,
+                onValueChange = { registerScreenTitle = it },
+                label = { Text("عنوان شاشة الانضمام") },
+                modifier = Modifier.weight(2f),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+            )
+        }
+
+        OutlinedTextField(
+            value = registerScreenSubtitle,
+            onValueChange = { registerScreenSubtitle = it },
+            label = { Text("وصف/رسالة شاشة الانضمام") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+        )
+
+        OutlinedTextField(
+            value = aboutAppTitle,
+            onValueChange = { aboutAppTitle = it },
+            label = { Text("عنوان شاشة عن التطبيق") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+        )
+
+        OutlinedTextField(
+            value = aboutAppDescription,
+            onValueChange = { aboutAppDescription = it },
+            label = { Text("وصف وشرح شاشة عن التطبيق") },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3,
             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
         )
 
@@ -1215,6 +1265,11 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             onClick = {
                 val currentSettings = settingsState.copy(
                     appName = appName,
+                    countryFlagEmoji = countryFlagEmoji,
+                    aboutAppTitle = aboutAppTitle,
+                    aboutAppDescription = aboutAppDescription,
+                    registerScreenTitle = registerScreenTitle,
+                    registerScreenSubtitle = registerScreenSubtitle,
                     welcomeMessage = welcomeMessage,
                     footerMessage = footerMessage,
                     footerBgColorHex = footerBgColorHex,

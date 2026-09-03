@@ -83,7 +83,7 @@ jobs:
         RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
         RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-      run: ./gradlew :app:assembleRelease --no-daemon
+      run: ./gradlew :app:assembleRelease --no-daemon -Dksp.incremental=false -Pksp.incremental=false
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4

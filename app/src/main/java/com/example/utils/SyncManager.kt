@@ -128,6 +128,13 @@ class SyncManager(private val context: Context) {
             dataToSync["supportPhone"] = settings.supportPhone
             dataToSync["supportWhatsapp"] = settings.supportWhatsapp
             dataToSync["supportEmail"] = settings.supportEmail
+            dataToSync["countryFlagEmoji"] = settings.countryFlagEmoji
+            dataToSync["appLogoUrl"] = settings.appLogoUrl
+            dataToSync["aboutAppTitle"] = settings.aboutAppTitle
+            dataToSync["aboutAppDescription"] = settings.aboutAppDescription
+            dataToSync["registerScreenTitle"] = settings.registerScreenTitle
+            dataToSync["registerScreenSubtitle"] = settings.registerScreenSubtitle
+            dataToSync["joinTermsNotice"] = settings.joinTermsNotice
             dataToSync["adminUsername"] = settings.adminUsername
             dataToSync["adminPassword"] = settings.adminPassword
             dataToSync["allowVoiceInput"] = settings.allowVoiceInput

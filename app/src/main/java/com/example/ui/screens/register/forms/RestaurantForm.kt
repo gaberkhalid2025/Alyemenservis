@@ -49,9 +49,9 @@ fun RestaurantForm(
     var hasDeliveryService by remember { mutableStateOf(true) }
     var deliveryCoverage by remember { mutableStateOf("توصيل لكافة أحياء المدينة") }
 
-    val isStep1Valid = restaurantName.isNotBlank() && phone.length >= 9 && password.length >= 6 && password == confirmPassword
-    val isStep2Valid = cuisineType.isNotBlank() && staffCount.isNotBlank()
-    val isStep3Valid = workingHours.isNotBlank()
+    val isStep1Valid = restaurantName.isNotBlank() && managerName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && city.isNotBlank()
+    val isStep2Valid = true // Optional fields
+    val isStep3Valid = true // Optional fields
 
     Card(
         shape = RoundedCornerShape(16.dp),
