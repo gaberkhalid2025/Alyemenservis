@@ -1528,19 +1528,19 @@ fun changeAdminCredentials(username: String, password: String) {
         triggerNotification("🔐 تم تغيير بيانات المدير الرئيسي")
     }
 
-fun authenticateAdmin(context: android.content.Context, role: String, remember: Boolean) {
+    fun authenticateAdmin(context: android.content.Context, role: String, remember: Boolean) {
         authViewModel.authenticateAdmin(context, role, remember)
-        _currentScreen.value = "ADMIN_PANEL"
+        navigateTo("ADMIN_PANEL")
     }
 
-fun authenticateAdmin(role: String) {
+    fun authenticateAdmin(role: String) {
         authViewModel.authenticateAdmin(role)
-        _currentScreen.value = "ADMIN_PANEL"
+        navigateTo("ADMIN_PANEL")
     }
 
-fun logout(context: android.content.Context) {
+    fun logout(context: android.content.Context) {
         authViewModel.logout(context)
-        _currentScreen.value = "USER_BROWSE"
+        navigateTo("USER_BROWSE")
     }
 
     fun navigateToScreen(screen: String) = navigateTo(screen)

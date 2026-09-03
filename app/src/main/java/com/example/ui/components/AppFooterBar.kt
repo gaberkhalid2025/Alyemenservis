@@ -110,7 +110,7 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color(0xFFE2E8F0),
-                        letterSpacing = 0.5.sp,
+                        letterSpacing = 0.sp,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

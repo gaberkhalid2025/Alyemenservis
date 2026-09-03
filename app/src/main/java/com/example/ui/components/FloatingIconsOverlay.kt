@@ -39,7 +39,7 @@ fun BoxScope.FloatingIconsOverlay(
     onAssistantClick: () -> Unit,
     onRequestServiceClick: () -> Unit
 ) {
-    // 1. Primary Action FAB: "اطلب خدمتك الآن" (ملتصقة بالشريط السفلي)
+    // 1. Primary Action FAB: "اطلب خدمتك الآن" (ثابتة في مكانها حسب إعدادات الأدمن)
     if (!settings.footerMessage.contains("hide_urgent_fab")) {
         Box(
             modifier = Modifier
@@ -72,13 +72,14 @@ fun BoxScope.FloatingIconsOverlay(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
+                    letterSpacing = 0.sp,
                     softWrap = false
                 )
             }
         }
     }
 
-    // 2. Smart Assistant FAB (ملتصقة بالشريط السفلي)
+    // 2. Smart Assistant FAB: "المساعد الذكي" (ثابتة في مكانها حسب إعدادات الأدمن)
     if (!settings.assistantHidden) {
         Box(
             modifier = Modifier
@@ -106,6 +107,7 @@ fun BoxScope.FloatingIconsOverlay(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
+                    letterSpacing = 0.sp,
                     softWrap = false
                 )
             }

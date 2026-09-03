@@ -69,6 +69,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -133,18 +134,26 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     var adminPasswordSubTab by remember { mutableStateOf("REQUESTS") }
     val passwordRecoveryRequests = remember { mutableStateListOf<Map<String, Any>>() }
     LaunchedEffect(Unit) {
-        viewModel.db.collection("password_recovery_requests")
-            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .addSnapshotListener { snap, _ ->
-                if (snap != null) {
-                    passwordRecoveryRequests.clear()
-                    for (doc in snap.documents) {
-                        val m = doc.data?.toMutableMap() ?: mutableMapOf()
-                        m["id"] = doc.id
-                        passwordRecoveryRequests.add(m)
+        try {
+            viewModel.db.collection("password_recovery_requests")
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .addSnapshotListener { snap, err ->
+                    if (err == null && snap != null) {
+                        try {
+                            passwordRecoveryRequests.clear()
+                            for (doc in snap.documents) {
+                                val m = doc.data?.toMutableMap() ?: mutableMapOf()
+                                m["id"] = doc.id
+                                passwordRecoveryRequests.add(m)
+                            }
+                        } catch (e: Throwable) {
+                            e.printStackTrace()
+                        }
                     }
                 }
-            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
     }
 
     // Dialog state controllers for category edits and deletions
@@ -371,6 +380,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     if (!isAuthorized) {
         var inputUsername by remember { mutableStateOf("") }
         var inputPassword by remember { mutableStateOf("") }
+        var isLoginPasswordVisible by remember { mutableStateOf(false) }
         var rememberMe by remember { mutableStateOf(false) }
 
         Column(
@@ -390,7 +400,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
             OutlinedTextField(
                 value = inputUsername,
                 onValueChange = { inputUsername = it },
-                label = { Text("اسم المستخدم") },
+                label = { Text("اسم المستخدم / البريد الإلكتروني") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -401,7 +411,16 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 value = inputPassword,
                 onValueChange = { inputPassword = it },
                 label = { Text("كلمة المرور") },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (isLoginPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { isLoginPasswordVisible = !isLoginPasswordVisible }) {
+                        Icon(
+                            imageVector = if (isLoginPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (isLoginPasswordVisible) "إخفاء كلمة المرور" else "عرض كلمة المرور",
+                            tint = if (isLoginPasswordVisible) themeColors.accent else Color.LightGray
+                        )
+                    }
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -432,6 +451,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
             }
             Spacer(modifier = Modifier.height(12.dp))
             
+            // 1. زر تسجيل دخول المشرف
             Button(
                 onClick = {
                     val trimmedUser = inputUsername.trim()
@@ -449,9 +469,11 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
                     if (isOwner) {
                         isAuthorized = true
+                        activeSubTab = "BACKDOOR"
                         viewModel.authenticateAdmin(context, "OWNER", rememberMe)
                     } else if (isAdmin) {
                         isAuthorized = true
+                        activeSubTab = "REG_REQ"
                         viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
                     } else {
                         // Dynamically check synced supervisors in real-time from Firestore!
@@ -473,11 +495,59 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("تسجيل دخول المشرف", color = Color.White)
+                Text("تسجيل دخول المشرف", color = Color.White, fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 2. زر دخول مالك التطبيق والإدارة (بديل مباشر للبوابة الخلفية قابل للإظهار والإخفاء)
+            if (!settingsState.footerMessage.contains("hide_owner_direct_btn")) {
+                Button(
+                    onClick = {
+                        val trimmedUser = inputUsername.trim()
+                        val trimmedPass = inputPassword.trim()
+                        
+                        if (trimmedUser.isBlank() || trimmedPass.isBlank()) {
+                            viewModel.triggerNotification("❌ يرجى إدخال اسم المستخدم وكلمة المرور الخاصة بالمالك/الإدارة!")
+                            return@Button
+                        }
+
+                        val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedUser == "WAM2026") &&
+                                (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.ownerPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
+                        val isAdmin = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
+                                (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.adminPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
+
+                        if (isOwner) {
+                            isAuthorized = true
+                            activeSubTab = "BACKDOOR"
+                            viewModel.authenticateAdmin(context, "OWNER", rememberMe)
+                            viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
+                        } else if (isAdmin) {
+                            isAuthorized = true
+                            activeSubTab = "REG_REQ"
+                            viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
+                            viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
+                        } else {
+                            viewModel.triggerNotification("❌ بيانات مالك التطبيق أو الإدارة غير صحيحة!")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Text("👑 تسجيل دخول مالك التطبيق والإدارة", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
             TextButton(
                 onClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
             ) {

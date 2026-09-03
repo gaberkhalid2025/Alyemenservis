@@ -162,6 +162,12 @@ fun AppNavigator(
                         onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                     )
                 }
+                AppScreens.ABOUT_APP -> {
+                    com.example.ui.screens.about.AboutAppScreenContent(
+                        viewModel = viewModel,
+                        themeColors = themeColors
+                    )
+                }
                 else -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("الشاشة المعروضة: $currentScreen", color = Color.White, fontSize = 14.sp)

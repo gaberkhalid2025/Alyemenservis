@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -108,9 +110,9 @@ fun RegistrationField(
                     if (isPassword) {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "عرض كلمة المرور",
-                                tint = if (passwordVisible) themeColors.accent else Color.Gray
+                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = if (passwordVisible) "إخفاء كلمة المرور" else "عرض كلمة المرور",
+                                tint = if (passwordVisible) themeColors.accent else Color.LightGray
                             )
                         }
                     }

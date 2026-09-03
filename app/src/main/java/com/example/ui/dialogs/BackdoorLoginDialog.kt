@@ -189,55 +189,58 @@ fun BackdoorLoginDialog(
                             }
 
                             isAuthenticating = true
+                            try {
+                                // Owner check
+                                val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
+                                        trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) ||
+                                        trimmedUser == "WAM2026") &&
+                                        (trimmedPass == "Maher@@--@@736462##" ||
+                                                trimmedPass == settingsState.ownerPassword ||
+                                                com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) ||
+                                                com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
 
-                            // Owner check
-                            val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                                    trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) ||
-                                    trimmedUser == "WAM2026") &&
-                                    (trimmedPass == "Maher@@--@@736462##" ||
-                                            trimmedPass == settingsState.ownerPassword ||
-                                            com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) ||
-                                            com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
+                                // Admin check
+                                val isAdmin = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
+                                        trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) ||
+                                        trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
+                                        (trimmedPass == "Maher@@--@@736462##" ||
+                                                trimmedPass == settingsState.adminPassword ||
+                                                com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) ||
+                                                com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
 
-                            // Admin check
-                            val isAdmin = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                                    trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) ||
-                                    trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
-                                    (trimmedPass == "Maher@@--@@736462##" ||
-                                            trimmedPass == settingsState.adminPassword ||
-                                            com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) ||
-                                            com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
-
-                            if (isOwner) {
-                                viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                                onDismiss()
-                                viewModel.navigateTo("ADMIN_PANEL")
-                                viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك!")
-                            } else if (isAdmin) {
-                                viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                                onDismiss()
-                                viewModel.navigateTo("ADMIN_PANEL")
-                                viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
-                            } else {
-                                // Supervisor check
-                                val matchingSup = supervisors.find {
-                                    (it.name.trim().equals(trimmedUser, ignoreCase = true) || it.id.equals(trimmedUser, ignoreCase = true)) &&
-                                            (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
-                                }
-                                if (matchingSup != null) {
-                                    viewModel.setSupervisorSession(matchingSup)
-                                    if (rememberMe) {
-                                        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                        sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
-                                    }
+                                if (isOwner) {
                                     onDismiss()
-                                    viewModel.navigateTo("ADMIN_PANEL")
-                                    viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                    viewModel.authenticateAdmin(context, "OWNER", rememberMe)
+                                    viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك!")
+                                } else if (isAdmin) {
+                                    onDismiss()
+                                    viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
+                                    viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
                                 } else {
-                                    viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
+                                    // Supervisor check
+                                    val matchingSup = supervisors.find {
+                                        (it.name.trim().equals(trimmedUser, ignoreCase = true) || it.id.equals(trimmedUser, ignoreCase = true)) &&
+                                                (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
+                                    }
+                                    if (matchingSup != null) {
+                                        viewModel.setSupervisorSession(matchingSup)
+                                        if (rememberMe) {
+                                            val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                            sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
+                                        }
+                                        onDismiss()
+                                        viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
+                                        viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                    } else {
+                                        viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
+                                    }
                                 }
+                            } catch (e: Throwable) {
+                                e.printStackTrace()
+                                viewModel.triggerNotification("❌ حدث خطأ أثناء التحقق: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+                            } finally {
+                                isAuthenticating = false
                             }
-                            isAuthenticating = false
                         },
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),

@@ -13,6 +13,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -211,8 +213,12 @@ fun UnifiedRegistrationForm(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             trailingIcon = {
-                TextButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Text(if (passwordVisible) "إخفاء" else "إظهار", fontSize = 10.sp)
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (passwordVisible) "إخفاء كلمة المرور" else "إظهار كلمة المرور",
+                        tint = if (passwordVisible) themeColors.accent else Color.LightGray
+                    )
                 }
             }
         )
@@ -229,8 +235,12 @@ fun UnifiedRegistrationForm(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             trailingIcon = {
-                TextButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                    Text(if (confirmPasswordVisible) "إخفاء" else "إظهار", fontSize = 10.sp)
+                IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                    Icon(
+                        imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (confirmPasswordVisible) "إخفاء كلمة المرور" else "إظهار كلمة المرور",
+                        tint = if (confirmPasswordVisible) themeColors.accent else Color.LightGray
+                    )
                 }
             }
         )
