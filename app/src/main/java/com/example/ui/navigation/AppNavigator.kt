@@ -140,7 +140,21 @@ fun AppNavigator(
                     requestId = viewModel.selectedRequestId,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onNavigateBack = { viewModel.goBack() }
+                    onNavigateBack = { viewModel.goBack() },
+                    onNavigateToChat = { phone, name ->
+                        viewModel.openOrCreateChatChannel(
+                            targetId = phone,
+                            targetType = "URGENT_REQUEST",
+                            targetName = name.ifEmpty { "فني طوارئ" },
+                            targetPhone = phone,
+                            targetCategory = "طلب عاجل",
+                            relatedEntityId = viewModel.selectedRequestId,
+                            relatedEntityType = "URGENT_REQUEST"
+                        ) { ch ->
+                            viewModel.openChatChannel(ch)
+                            viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+                        }
+                    }
                 )
                 AppScreens.OFFERS_LIST -> UrgentOffersList(
                     offers = viewModel.requestOffers.collectAsState().value,

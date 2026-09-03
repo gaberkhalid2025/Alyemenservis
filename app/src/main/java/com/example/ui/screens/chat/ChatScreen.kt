@@ -232,6 +232,22 @@ fun ChatScreen(
                         .padding(vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    item(key = "load_more_header") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            TextButton(
+                                onClick = { chatViewModel.loadMoreMessages() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF64B5F6))
+                            ) {
+                                Text("📥 تحميل الرسائل السابقة", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
+
                     items(filteredMessages, key = { it.id }) { msg ->
                         val isMe = msg.senderId == currentUserId
                         ChatBubbleItem(
