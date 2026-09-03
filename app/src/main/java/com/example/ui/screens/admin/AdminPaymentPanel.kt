@@ -56,15 +56,14 @@ fun AdminPaymentPanel(
     var overrideAmount by remember { mutableStateOf("") }
     var showOverrideDialog by remember { mutableStateOf(false) }
 
-    LazyColumn(
+    Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
+        Card(
+            modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = cardBg),
                 elevation = CardDefaults.cardElevation(4.dp)
@@ -146,9 +145,7 @@ fun AdminPaymentPanel(
                     }
                 }
             }
-        }
 
-        item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -212,9 +209,7 @@ fun AdminPaymentPanel(
                     )
                 }
             }
-        }
 
-        item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -266,8 +261,6 @@ fun AdminPaymentPanel(
                     }
                 }
             }
-        }
-    }
 
     if (showOverrideDialog) {
         AlertDialog(
@@ -311,9 +304,10 @@ fun AdminPaymentPanel(
         )
     }
 }
+}
 
 @Composable
-private fun PaymentSectorToggleRow(
+fun PaymentSectorToggleRow(
     title: String,
     subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,

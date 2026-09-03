@@ -1699,9 +1699,8 @@ fun StoreDetailsDialog(
     ) { uri: Uri? ->
         uri?.let {
             try {
-                val bytes = context.contentResolver.openInputStream(it)?.readBytes()
-                if (bytes != null) {
-                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                val base64 = com.example.utils.compressAndResizeImageUri(context, it, 800, 70)
+                if (base64.isNotEmpty()) {
                     viewModel.saveStore(store.copy(coverImage = base64))
                     android.widget.Toast.makeText(context, "📸 تم تحديث صورة الغلاف بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -1716,9 +1715,8 @@ fun StoreDetailsDialog(
     ) { uri: Uri? ->
         uri?.let {
             try {
-                val bytes = context.contentResolver.openInputStream(it)?.readBytes()
-                if (bytes != null) {
-                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                val base64 = com.example.utils.compressAndResizeImageUri(context, it, 800, 70)
+                if (base64.isNotEmpty()) {
                     viewModel.saveStore(store.copy(logoImage = base64))
                     android.widget.Toast.makeText(context, "🖼️ تم تحديث صورة الشعار بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -2640,8 +2638,25 @@ fun QuickAddProductDialog(
     var priceStr by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("خدمات") }
     var isOffer by remember { mutableStateOf(false) }
+    var productImageBase64 by remember { mutableStateOf("") }
 
     val context = LocalContext.current
+
+    val productImagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val base64 = com.example.utils.compressAndResizeImageUri(context, uri, 800, 70)
+                if (base64.isNotEmpty()) {
+                    productImageBase64 = base64
+                    android.widget.Toast.makeText(context, "📷 تم اختيار ضغط صورة المنتج بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -2692,9 +2707,22 @@ fun QuickAddProductDialog(
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isOffer, onCheckedChange = { isOffer = it })
-                    Text("تعيين كـ عرض خاص 🔥", fontSize = 11.sp, color = Color.White)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { productImagePickerLauncher.launch("image/*") },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (productImageBase64.isNotEmpty()) Color(0xFF10B981) else themeColors.accent)
+                    ) {
+                        Text(if (productImageBase64.isNotEmpty()) "تم اختيار صورة 📷" else "رفع صورة المنتج 📷", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = isOffer, onCheckedChange = { isOffer = it })
+                        Text("تعيين كـ عرض خاص 🔥", fontSize = 11.sp, color = Color.White)
+                    }
                 }
 
                 Row(
@@ -2712,7 +2740,8 @@ fun QuickAddProductDialog(
                                     description = desc,
                                     price = priceStr.toDoubleOrNull() ?: 0.0,
                                     category = category.ifBlank { "خدمات" },
-                                    isOffer = isOffer
+                                    isOffer = isOffer,
+                                    imageUrl = if (productImageBase64.isNotEmpty()) "data:image/jpeg;base64,$productImageBase64" else ""
                                 )
                                 viewModel.saveProduct(p)
                                 android.widget.Toast.makeText(context, "✅ تم إضافة المنتج بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
@@ -3130,9 +3159,8 @@ fun StoreCreateEditDialog(
     ) { uri ->
         if (uri != null) {
             try {
-                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
-                if (bytes != null) {
-                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                val base64 = com.example.utils.compressAndResizeImageUri(context, uri, 800, 70)
+                if (base64.isNotEmpty()) {
                     logoImageBase64 = base64
                 }
             } catch (e: Exception) {
@@ -3146,9 +3174,8 @@ fun StoreCreateEditDialog(
     ) { uri ->
         if (uri != null) {
             try {
-                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
-                if (bytes != null) {
-                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                val base64 = com.example.utils.compressAndResizeImageUri(context, uri, 800, 70)
+                if (base64.isNotEmpty()) {
                     coverImageBase64 = base64
                 }
             } catch (e: Exception) {
@@ -3186,10 +3213,9 @@ fun StoreCreateEditDialog(
     val storePhotosUriPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
-        val converted = uris.map { uri ->
-            val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
-            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
-            "data:image/jpeg;base64,$base64"
+        val converted = uris.mapNotNull { uri ->
+            val base64 = com.example.utils.compressAndResizeImageUri(context, uri, 800, 70)
+            if (base64.isNotEmpty()) "data:image/jpeg;base64,$base64" else null
         }
         val combined = if (isUnlimited) {
             storePhotosList + converted

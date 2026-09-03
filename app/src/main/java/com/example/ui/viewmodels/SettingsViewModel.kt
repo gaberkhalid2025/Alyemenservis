@@ -1206,13 +1206,13 @@ fun requestPasswordRecoveryGeneral(accountName: String, phone: String, accountTy
 
 fun wipeAllDatabaseData(password: String): Boolean {
         if (mainViewModel.verifyAdminOrOwnerPassword(password)) {
-            val collections = listOf("categories", "providers", "pending_providers", "banners", "settings", "reports", "bookings", "notifications", "chat_channels", "cities")
+            val collections = listOf("categories", "providers", "pending_providers", "banners", "settings", "reports", "bookings", "notifications", "chat_channels", "cities", "stores", "medical", "restaurants", "job_postings", "job_applications", "properties", "products", "reviews")
             collections.forEach { col ->
                 db.collection(col).get().addOnSuccessListener { snapshot ->
                     snapshot.documents.forEach { doc -> doc.reference.delete() }
                 }
             }
-            mainViewModel.triggerNotification("💥 تم مسح كامل قاعدة البيانات وإعادة المجلد العظيم إلى الصفر!")
+            mainViewModel.triggerNotification("💥 تم مسح كامل قاعدة البيانات المحددة بنجاح وإعادتها إلى الصفر!")
             return true
         } else {
             mainViewModel.triggerNotification("❌ كلمة المرور غير صحيحة! فشل تطهير البيانات.")

@@ -44,34 +44,31 @@ fun AdminStoresPropertiesPanel(
     var selectedSection by remember { mutableStateOf("المتاجر") }
     val sections = listOf("المتاجر", "العقارات")
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("🏪 إدارة المتاجر والعقارات", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
-            )
-        },
-        containerColor = Color(0xFF0F172A)
-    ) { paddingValues ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            AdminFilterChips(
-                categories = sections,
-                selectedCategory = selectedSection,
-                onSelectCategory = { selectedSection = it },
-                themeColors = themeColors
-            )
+            Text("🏪 إدارة المتاجر والعقارات", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = themeColors.accent)
+            TextButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("رجوع", color = Color.White, fontSize = 12.sp)
+            }
+        }
+
+        AdminFilterChips(
+            categories = sections,
+            selectedCategory = selectedSection,
+            onSelectCategory = { selectedSection = it },
+            themeColors = themeColors
+        )
 
             if (selectedSection == "المتاجر") {
                 if (stores.isEmpty()) {
@@ -178,4 +175,3 @@ fun AdminStoresPropertiesPanel(
             }
         }
     }
-}

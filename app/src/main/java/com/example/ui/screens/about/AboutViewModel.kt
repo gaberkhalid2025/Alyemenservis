@@ -100,4 +100,75 @@ class AboutViewModel(
         mainViewModel.saveCustomSettingsState(settings.copy(aboutCustomInfo = newInfo))
         mainViewModel.triggerNotification("💾 تم تحديث وحفظ نص شاشة عن التطبيق!")
     }
+
+    /**
+     * Updates contact info (WhatsApp, Phone, Email).
+     */
+    fun updateContactInfo(whatsapp: String, phone: String, email: String) {
+        val settings = mainViewModel.settings.value
+        val updated = settings.copy(
+            supportWhatsapp = whatsapp.trim(),
+            supportPhone = phone.trim(),
+            supportEmail = email.trim()
+        )
+        mainViewModel.saveCustomSettingsState(updated)
+        mainViewModel.triggerNotification("💾 تم حفظ وتحديث أرقام ووسائل الدعم الفني بنجاح!")
+    }
+
+    /**
+     * Updates social media links and URLs.
+     */
+    fun updateSocialLinks(
+        telegram: String,
+        twitter: String,
+        facebook: String,
+        website: String,
+        instagram: String,
+        youtube: String,
+        downloadUrl: String
+    ) {
+        val settings = mainViewModel.settings.value
+        val updated = settings.copy(
+            telegramUrl = telegram.trim(),
+            twitterUrl = twitter.trim(),
+            facebookUrl = facebook.trim(),
+            websiteUrl = website.trim(),
+            instagramUrl = instagram.trim(),
+            youtubeUrl = youtube.trim(),
+            appDownloadUrl = downloadUrl.trim()
+        )
+        mainViewModel.saveCustomSettingsState(updated)
+        mainViewModel.triggerNotification("💾 تم حفظ وتحديث روابط التواصل والموقع بنجاح!")
+    }
+
+    /**
+     * Toggles visibility of specific social platforms.
+     */
+    fun toggleSocialVisibility(platform: String, hide: Boolean) {
+        val settings = mainViewModel.settings.value
+        val updated = when (platform.uppercase()) {
+            "TELEGRAM" -> settings.copy(hideTelegram = hide)
+            "TWITTER" -> settings.copy(hideTwitter = hide)
+            "FACEBOOK" -> settings.copy(hideFacebook = hide)
+            "WEBSITE" -> settings.copy(hideWebsite = hide)
+            "INSTAGRAM" -> settings.copy(hideInstagram = hide)
+            "YOUTUBE" -> settings.copy(hideYoutube = hide)
+            else -> settings
+        }
+        mainViewModel.saveCustomSettingsState(updated)
+    }
+
+    /**
+     * Updates app general identity info.
+     */
+    fun updateAppIdentity(appName: String, appVersion: String, bannerContent: String) {
+        val settings = mainViewModel.settings.value
+        val updated = settings.copy(
+            appName = appName.trim(),
+            appVersion = appVersion.trim(),
+            bannerContent = bannerContent.trim()
+        )
+        mainViewModel.saveCustomSettingsState(updated)
+        mainViewModel.triggerNotification("💾 تم تحديث وحفظ هوية التطبيق بنجاح!")
+    }
 }
