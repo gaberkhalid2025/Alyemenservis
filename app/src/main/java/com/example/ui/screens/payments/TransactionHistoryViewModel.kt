@@ -3,7 +3,7 @@ package com.example.ui.screens.payments
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.Transaction
-import com.example.utils.WalletManager
+import com.example.util.WalletManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

@@ -19,6 +19,10 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Clean Build Cache
+      run: |
+        rm -rf .gradle app/build build
+
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
@@ -83,7 +87,7 @@ jobs:
         RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
         RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-      run: ./gradlew :app:assembleRelease --no-daemon
+      run: ./gradlew clean :app:assembleRelease --no-daemon --stacktrace
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4

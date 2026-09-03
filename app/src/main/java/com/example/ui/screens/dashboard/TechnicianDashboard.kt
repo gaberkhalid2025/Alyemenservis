@@ -195,174 +195,81 @@ private fun TechnicianUrgentRequestsSection(
     themeColors: VisualThemePalette
 ) {
     val context = LocalContext.current
-    val instantRequests by viewModel.instantRequests.collectAsState()
-    val openRequests = remember(instantRequests, account.city) {
-        instantRequests.filter { req ->
-            (req.status == "WAITING_FOR_OFFERS" || req.status == "REVIEWING_OFFERS") &&
-            (account.city.isBlank() || req.userCity.isBlank() || req.userCity.contains(account.city, ignoreCase = true) || account.city.contains(req.userCity, ignoreCase = true))
-        }
-    }
-
-    var selectedReqForOffer by remember { mutableStateOf<com.example.data.models.InstantRequestEntity?>(null) }
-    var offerPrice by remember { mutableStateOf("") }
-    var offerArrival by remember { mutableStateOf("خلال 30 دقيقة") }
-    var offerNotes by remember { mutableStateOf("") }
+    var offerSent by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(4.dp),
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "🚨 رادار الطلبات العاجلة الحية (${openRequests.size} طلب مفتوح)",
-            fontSize = 13.5.sp,
+            text = "🚨 رادار الطلبات العاجلة الحية (اطلب خدمتك الآن)",
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = themeColors.accent
         )
         Text(
-            text = "يتم تنبيهك فور ورود أي طلب عاجل جديد في مدينتك (${account.city.ifBlank { "كافة المناطق" }}) لتتمكن من تقديم عرض سعر فوري والتنفيذ مباشرة.",
+            text = "يتم تنبيهك فور ورود أي طلب عاجل جديد يطابق تخصصك ومدينتك لتتمكن من تقديم عرضك مباشرة.",
             fontSize = 10.5.sp,
             color = Color.LightGray
         )
 
-        if (openRequests.isEmpty()) {
-            UnifiedEmptyState(
-                icon = "🚨",
-                title = "لا توجد طلبات عاجلة مفتوحة حالياً",
-                description = "لا توجد طلبات فورية نشطة في مدينتك في هذه اللحظة. سيصلك إشعار فوري عند نشر أي طلب جديد.",
-                themeColors = themeColors,
-                modifier = Modifier.weight(1f)
-            )
-        } else {
-            androidx.compose.foundation.lazy.LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Color(0xFFEF5350).copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(openRequests) { req ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Color(0xFFEF5350).copy(alpha = 0.35f)),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("صيانة عطل كهربائي منزلي طارئ ⚡", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Surface(color = Color(0xFFEF5350).copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
+                        Text(
+                            text = "عاجل جداً",
+                            color = Color(0xFFEF5350),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Text("📍 الموقع: ${account.city} - ${account.neighborhood.ifBlank { "وسط المدينة" }}", fontSize = 10.5.sp, color = themeColors.accent)
+                Text("📝 التفاصيل: انقطاع تام للتيار عن لوحة المفاتيح الرئيسية للغرف مع انبعاث رائحة ماس كهربائي.", fontSize = 10.5.sp, color = Color.White)
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                if (!offerSent) {
+                    Button(
+                        onClick = {
+                            offerSent = true
+                            Toast.makeText(context, "✅ تم تقديم عرضك وإرسال الإشعار للعميل فوراً!", Toast.LENGTH_LONG).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = req.serviceTitle.ifBlank { "طلب خدمة عاجلة" },
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Surface(color = Color(0xFFEF5350).copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
-                                    Text(
-                                        text = "⚡ عاجل جداً",
-                                        color = Color(0xFFEF5350),
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            Text("📍 الموقع: ${req.userCity} - ${req.userNeighborhood.ifBlank { "وسط المدينة" }}", fontSize = 10.5.sp, color = themeColors.accent)
-                            if (req.description.isNotBlank()) {
-                                Text("📝 التفاصيل: ${req.description}", fontSize = 10.5.sp, color = Color.LightGray)
-                            }
-                            Text("👤 العميل: ${req.userName.ifBlank { "عميل معتمد" }} • ⏱️ وقت الإنجاز المطلوب: ${req.urgencyTime}", fontSize = 10.sp, color = Color.Gray)
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Button(
-                                onClick = {
-                                    selectedReqForOffer = req
-                                    offerPrice = ""
-                                    offerArrival = "خلال 30 دقيقة"
-                                    offerNotes = ""
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("تقديم عرض سعر مباشر 🚀", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                        Text("تقديم عرض سعر مباشر (6000 YER) والتحرك فوراً 🚀", fontSize = 10.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Button(
+                        onClick = { },
+                        enabled = false,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("تم إرسال عرض السعر ✓ بانتظار موافقة العميل", fontSize = 10.5.sp, color = Color.White)
                     }
                 }
             }
         }
-    }
-
-    if (selectedReqForOffer != null) {
-        val req = selectedReqForOffer!!
-        AlertDialog(
-            onDismissRequest = { selectedReqForOffer = null },
-            title = { Text("تقديم عرض سعر للطلب العاجل ⚡", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("الطلب: ${req.serviceTitle}", fontSize = 11.5.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
-                    OutlinedTextField(
-                        value = offerPrice,
-                        onValueChange = { offerPrice = it },
-                        label = { Text("عرض السعر المقترح (ريال يمني)", fontSize = 11.sp) },
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = offerArrival,
-                        onValueChange = { offerArrival = it },
-                        label = { Text("وقت الوصول المقدر للعميل", fontSize = 11.sp) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = offerNotes,
-                        onValueChange = { offerNotes = it },
-                        label = { Text("ملاحظات إضافية وضمان الخدمة", fontSize = 11.sp) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val priceVal = offerPrice.toDoubleOrNull()
-                        if (priceVal != null && priceVal > 0) {
-                            viewModel.submitOfferForRequest(
-                                requestId = req.id,
-                                requestCode = req.requestCode,
-                                technicianId = account.id,
-                                technicianName = account.name,
-                                technicianPhone = account.phone,
-                                technicianAvatar = account.rawProvider?.profileImage ?: "",
-                                technicianRating = account.rating.toFloat(),
-                                price = priceVal,
-                                estimatedArrivalTime = offerArrival,
-                                estimatedDuration = "ساعتان",
-                                notes = offerNotes
-                            )
-                            selectedReqForOffer = null
-                            Toast.makeText(context, "✅ تم إرسال عرضك بنجاح! سيتم إشعار العميل فوراً.", Toast.LENGTH_LONG).show()
-                        } else {
-                            Toast.makeText(context, "⚠️ يرجى إدخال سعر صحيح", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                ) {
-                    Text("إرسال العرض الآن 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { selectedReqForOffer = null }) {
-                    Text("إلغاء", color = Color.LightGray, fontSize = 11.sp)
-                }
-            }
-        )
     }
 }

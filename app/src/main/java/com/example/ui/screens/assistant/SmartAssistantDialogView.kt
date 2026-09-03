@@ -33,7 +33,7 @@ import com.example.data.AdminSettingsEntity
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
-import com.example.ui.viewmodels.AssistantViewModel
+import com.example.viewmodels.AssistantViewModel
 import kotlinx.coroutines.launch
 import java.util.UUID
 

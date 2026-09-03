@@ -3,8 +3,8 @@ package com.example.ui.screens.bookings
 import androidx.lifecycle.ViewModel
 import com.example.data.BookingEntity
 import com.example.data.ProviderEntity
-import com.example.utils.HolidayManager
-import com.example.utils.ScheduleManager
+import com.example.util.HolidayManager
+import com.example.util.ScheduleManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

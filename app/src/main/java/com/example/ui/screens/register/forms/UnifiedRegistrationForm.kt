@@ -319,45 +319,16 @@ fun UnifiedRegistrationForm(
 
         // Submit Button
         Button(
-            onClick = {
-                viewModel.submit(onRegistrationSuccess)
-            },
-            enabled = !state.isLoading,
+            onClick = { viewModel.submit(onRegistrationSuccess) },
+            enabled = state.isFormValid && !state.isLoading,
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = themeColors.accent
-            )
+            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
         ) {
             if (state.isLoading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
             } else {
                 Text("تسجيل وحفظ", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
-        }
-        
-        state.errorMessage?.let { msg ->
-            Text(
-                "⚠️ $msg",
-                color = Color(0xFFEF4444),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        
-        if (state.errorMessage == null && !state.isFormValid && !state.agreedToTerms) {
-            Text(
-                "⚠️ يرجى الموافقة على الشروط والأحكام وتعبئة جميع الحقول المطلوبة بشكل صحيح لتفعيل الحساب.",
-                color = Color(0xFFEF4444),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold
-            )
-        } else if (state.errorMessage == null && !state.isFormValid) {
-            Text(
-                "⚠️ يرجى تصحيح الأخطاء وتعبئة جميع الحقول المطلوبة لتفعيل الحساب.",
-                color = Color(0xFFF59E0B),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold
-            )
         }
         
         if (state.successMessage != null) {

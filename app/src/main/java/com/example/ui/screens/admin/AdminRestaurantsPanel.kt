@@ -18,8 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
-import com.example.utils.PermissionGuard
-import com.example.utils.RoleManager
+import com.example.util.PermissionGuard
+import com.example.util.RoleManager
 import com.example.utils.VisualThemePalette
 
 @Composable

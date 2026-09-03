@@ -1,10 +1,7 @@
 package com.example.ui.screens.entities
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,29 +9,23 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.PropertyEntity
 import com.example.ui.MainViewModel
-import com.example.ui.components.GenericEntityReviewsDialog
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
@@ -189,29 +180,22 @@ fun PropertyCard(
     onChatClick: () -> Unit,
     onRequestInspectionClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    var showReviewsDialog by remember { mutableStateOf(false) }
-
     val imageSource = property.images.firstOrNull() ?: ""
-    val isRent = property.type == "rent"
-    val isVerified = property.isVerified || property.isApproved || property.isVip
 
     Card(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, if (isVerified) themeColors.accent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.25f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 1. Cover Image Section
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(105.dp)
-                    .background(Color(0xFF1E293B))
+                    .height(100.dp)
+                    .background(Color.DarkGray)
             ) {
                 if (imageSource.isNotBlank()) {
                     SmartAsyncImage(
@@ -220,195 +204,136 @@ fun PropertyCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A)))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🏠", fontSize = 34.sp)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("🏠", fontSize = 32.sp)
                     }
                 }
 
-                // Gradient overlay
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
-                                startY = 35f
-                            )
-                        )
-                )
-
-                // Rent / Sale Badge & Rating Badge
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    color = if (property.type == "rent") Color(0xFF3B82F6) else Color(0xFF10B981),
+                    shape = RoundedCornerShape(bottomEnd = 8.dp),
+                    modifier = Modifier.align(Alignment.TopStart)
                 ) {
-                    Surface(
-                        color = if (isRent) Color(0xFF3B82F6) else Color(0xFF10B981),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = if (isRent) "🔑 للإيجار" else "🏷️ للبيع",
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
-                        )
-                    }
+                    Text(
+                        text = if (property.type == "rent") "إيجار" else "بيع",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
 
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.8f),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.clickable { showReviewsDialog = true }
+                Surface(
+                    color = Color.Black.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(bottomStart = 8.dp),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(String.format("%.1f", property.rating), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
+                        Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(String.format("%.1f", property.rating), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
 
-            // 2. Info Section
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Title & Price
+                Text(
+                    text = property.title,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = "${property.price.toInt()} ${property.currency}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = themeColors.accent
+                )
+
+                Text(
+                    text = "🏘️ نوع: " + when(property.propertyType) {
+                        "apartment" -> "شقة"
+                        "house" -> "منزل"
+                        "shop" -> "محل تجاري"
+                        "land" -> "أرض"
+                        else -> property.propertyType
+                    },
+                    fontSize = 9.5.sp,
+                    color = Color.LightGray
+                )
+
+                Text(
+                    text = "📍 ${property.localNeighborhood.ifBlank { "اليمن" }}",
+                    fontSize = 9.5.sp,
+                    color = Color.LightGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = property.title,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "${property.price.toInt()} ${property.currency}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = themeColors.accent
-                    )
-                }
-
-                // Type & Description
-                val typeName = when (property.propertyType) {
-                    "apartment" -> "🏢 شقة"
-                    "house" -> "🏡 منزل"
-                    "villa" -> "🏰 فيلا"
-                    "shop" -> "🏬 محل تجاري"
-                    "land" -> "📐 قطعة أرض"
-                    else -> "🏠 ${property.propertyType}"
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = typeName,
-                        fontSize = 10.sp,
-                        color = themeColors.accent,
-                        maxLines = 1
-                    )
-                    if (property.description.isNotBlank()) {
-                        Text(
-                            text = property.description,
-                            fontSize = 9.sp,
-                            color = Color.LightGray,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false).padding(start = 8.dp)
-                        )
-                    }
-                }
-
-                // Location
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(12.dp))
-                    Spacer(modifier = Modifier.width(2.dp))
-                    val locText = property.localNeighborhood.ifBlank { "اليمن" }
-                    Text(
-                        text = locText,
-                        fontSize = 9.5.sp,
-                        color = Color.LightGray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // 3. Action Buttons Row: [التفاصيل] [التقييمات] [طلب معاينة]
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = onClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
-                    ) {
-                        Text("التفاصيل 📋", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { showReviewsDialog = true },
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.6f)),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        modifier = Modifier.weight(1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
-                    ) {
-                        Text("التقييمات ⭐", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
-
                     Button(
                         onClick = onRequestInspectionClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1.1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                     ) {
-                        Text("معاينة 👁️", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("طلب معاينة 👁️", fontSize = 9.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+
+                    if (property.phone.isNotBlank()) {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        IconButton(
+                            onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${property.phone}"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color(0xFF10B981).copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Phone,
+                                contentDescription = "اتصال",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    if (isLoggedIn) {
+                        IconButton(
+                            onClick = onChatClick,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "محادثة",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
         }
-    }
-
-    if (showReviewsDialog) {
-        GenericEntityReviewsDialog(
-            title = property.title,
-            rating = property.rating,
-            numReviews = property.numReviews,
-            themeColors = themeColors,
-            onDismiss = { showReviewsDialog = false }
-        )
     }
 }

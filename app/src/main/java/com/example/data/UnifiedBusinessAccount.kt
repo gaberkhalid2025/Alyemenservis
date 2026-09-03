@@ -3,7 +3,7 @@ package com.example.data
 import com.example.utils.*
 
 import androidx.annotation.Keep
-import com.example.utils.EntityIdGenerator
+import com.example.util.EntityIdGenerator
 
 @Keep
 enum class BusinessType(val titleArabic: String, val icon: String, val sectionId: String) {

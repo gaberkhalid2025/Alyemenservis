@@ -2,7 +2,7 @@
 package com.example.ui.screens.admin
 
 import com.example.ui.*
-import com.example.utils.*
+import com.example.ui.utils.*
 
 
 import android.content.Intent
@@ -88,7 +88,7 @@ import com.example.ui.screens.assistant.*
 import com.example.ui.screens.register.*
 import com.example.ui.screens.status.*
 import com.example.ui.screens.about.*
-import com.example.ui.viewmodels.*
+import com.example.viewmodels.*
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -360,7 +360,6 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -428,9 +427,9 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
 
                     val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedUser == "WAM2026") &&
-                            (trimmedPass == settingsState.ownerPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
+                            (trimmedPass == settingsState.ownerPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
                     val isAdmin = (trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
-                            (trimmedPass == settingsState.adminPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
+                            (trimmedPass == settingsState.adminPassword || com.example.util.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.util.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
 
                     if (isOwner) {
                         isAuthorized = true
@@ -442,7 +441,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         // Dynamically check synced supervisors in real-time from Firestore!
                         val matchingSup = viewModel.supervisors.value.find { 
                             (it.name.trim().equals(trimmedUser, ignoreCase = true) || it.id.equals(trimmedUser, ignoreCase = true)) && 
-                            (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
+                            (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.util.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
                         }
                         if (matchingSup != null) {
                             isAuthorized = true
@@ -469,7 +468,6 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -3196,7 +3194,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                             val contentResolver = context.contentResolver
                                             val mimeType = contentResolver.getType(uri) ?: ""
                                             if (mimeType.startsWith("image/")) {
-                                                val base64Str = com.example.utils.compressAndResizeImageUri(context, uri, 800, 70)
+                                                val base64Str = com.example.ui.utils.compressAndResizeImageUri(context, uri, 800, 70)
                                                 if (base64Str.isNotEmpty()) {
                                                     bannerUrl = "data:image/jpeg;base64,$base64Str"
                                                     bannerType = "IMAGE"

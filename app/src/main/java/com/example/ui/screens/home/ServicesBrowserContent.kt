@@ -28,8 +28,6 @@ fun ServicesBrowserMainContent(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
     displayProviders: List<ProviderEntity>,
-    displayStores: List<StoreEntity> = emptyList(),
-    displayProperties: List<PropertyEntity> = emptyList(),
     isProvidersLoading: Boolean,
     categories: List<CategoryEntity>,
     selectedCategoryId: String?,

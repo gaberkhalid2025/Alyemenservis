@@ -33,7 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.*
 import com.example.data.models.*
 import com.example.ui.MainViewModel
-import com.example.ui.navigation.AppNavigator
+import com.example.ui.AppNavigator
 import com.example.ui.components.*
 import com.example.ui.dialogs.*
 import com.example.ui.screens.home.*
@@ -46,7 +46,7 @@ import com.example.ui.screens.status.*
 import com.example.ui.screens.about.*
 import com.example.utils.*
 import com.example.utils.*
-import com.example.ui.viewmodels.*
+import com.example.viewmodels.*
 
 class MainActivity : ComponentActivity() {
     private var lastBackPressTime = 0L
@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         try {
-            com.example.utils.SecurityManager.verifyAppSignature(this)
+            com.example.util.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -289,8 +289,8 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
-            com.example.utils.SecurityManager.verifyAppSignature(this)
+            com.example.util.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
+            com.example.util.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -304,7 +304,6 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
 
             LaunchedEffect(context) {
-                viewModel.initializeUserIdentity(context)
                 try {
                     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
                     if (cm != null) {

@@ -35,9 +35,9 @@ import com.example.data.BookingEntity
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.ui.createBooking
-import com.example.utils.BookingReminderService
-import com.example.utils.HolidayManager
-import com.example.utils.ScheduleManager
+import com.example.util.BookingReminderService
+import com.example.util.HolidayManager
+import com.example.util.ScheduleManager
 import com.example.utils.VisualThemePalette
 import java.text.SimpleDateFormat
 import java.util.*

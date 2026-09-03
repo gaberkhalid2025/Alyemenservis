@@ -12,8 +12,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import com.example.ui.screens.chat.components.TypingIndicator
-
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -27,7 +25,7 @@ import com.example.data.models.ChatMessage
 import com.example.ui.screens.chat.components.ChatBubbleItem
 import com.example.ui.screens.chat.components.ChatHeaderBar
 import com.example.ui.screens.chat.components.ChatInputBar
-import com.example.utils.AudioPlayerManager
+import com.example.util.AudioPlayerManager
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -247,14 +245,7 @@ fun ChatScreen(
         }
 
         // Input Bar
-        // Typing Indicator
-        val isTyping = isTypingOther
-        if (isTyping) {
-            TypingIndicator(userName = activeChannel?.participantNames?.values?.firstOrNull { it != currentUserName } ?: "")
-        }
-
         ChatInputBar(
-            channelId = activeChannel?.id ?: channelId ?: "direct_chat",
             replyingTo = replyingTo,
             onCancelReply = { chatViewModel.setReplyingTo(null) },
             onSendMessage = { text, mediaType, mediaUrl ->

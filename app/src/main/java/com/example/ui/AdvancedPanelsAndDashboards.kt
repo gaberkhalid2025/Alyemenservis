@@ -25,11 +25,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
-import com.example.utils.AnalyticsAndReportingEngine
-import com.example.utils.HierarchicalContentManager
-import com.example.utils.ImageAndCacheOptimizer
-import com.example.utils.ReviewsAndRatingsEngine
-import com.example.utils.SearchAndFilterEngine
+import com.example.util.AnalyticsAndReportingEngine
+import com.example.util.HierarchicalContentManager
+import com.example.util.ImageAndCacheOptimizer
+import com.example.util.ReviewsAndRatingsEngine
+import com.example.util.SearchAndFilterEngine
 
 /**
  * 🎨 Interactive Dashboards and Dialogs for Problems 11-15

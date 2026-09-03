@@ -3,7 +3,7 @@ package com.example.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.data.models.*
-import com.example.utils.SecurityCryptoUtils
+import com.example.util.SecurityCryptoUtils
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory

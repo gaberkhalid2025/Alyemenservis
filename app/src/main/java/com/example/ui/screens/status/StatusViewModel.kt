@@ -6,8 +6,8 @@ import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
 import com.example.data.PendingProviderEntity
 import com.example.data.models.InstantRequestEntity
-import com.example.data.repositories.IStatusRepository
-import com.example.data.repositories.SystemStatusMetrics
+import com.example.data.repositories.contracts.IStatusRepository
+import com.example.data.models.SystemStatusMetrics
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive

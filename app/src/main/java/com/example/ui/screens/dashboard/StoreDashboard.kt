@@ -62,7 +62,6 @@ fun StoreDashboard(
     val tabsList = listOf(
         Pair("📦", "المنتجات والمخزون"),
         Pair("🛍️", "طلبات الشراء"),
-        Pair("🏷️", "العروض والكوبونات"),
         Pair("💬", "تقييمات المتجر"),
         Pair("📝", "الملف التجاري للمتجر"),
         Pair("📊", "الإحصائيات والأداء")
@@ -173,10 +172,9 @@ fun StoreDashboard(
             when (activeTab) {
                 0 -> TabProductsServices(account, viewModel, themeColors)
                 1 -> TabBookingsOrders(account, viewModel, themeColors)
-                2 -> TabOffersCoupons(account, viewModel, themeColors)
-                3 -> TabReviewsFeedback(account, viewModel, themeColors)
-                4 -> TabProfileEdit(account, viewModel, themeColors)
-                5 -> TabStatisticsGrowth(account, viewModel, themeColors)
+                2 -> TabReviewsFeedback(account, viewModel, themeColors)
+                3 -> TabProfileEdit(account, viewModel, themeColors)
+                4 -> TabStatisticsGrowth(account, viewModel, themeColors)
             }
         }
     }

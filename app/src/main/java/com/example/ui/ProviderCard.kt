@@ -1,21 +1,25 @@
 package com.example.ui
 
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import com.example.data.ProviderEntity
-import com.example.ui.components.ProviderCard as ComponentProviderCard
-import com.example.utils.VisualThemePalette
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun ProviderCard(
-    provider: ProviderEntity,
-    themeColors: VisualThemePalette,
-    viewModel: MainViewModel,
-    onChatOpen: (String) -> Unit
+    provider: Any? = null,
+    themeColors: Any? = null,
+    viewModel: Any? = null,
+    onChatOpen: (() -> Unit)? = null
 ) {
-    ComponentProviderCard(
-        provider = provider,
-        themeColors = themeColors,
-        viewModel = viewModel,
-        onChatOpen = onChatOpen
-    )
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "مزود الخدمة / فني", style = MaterialTheme.typography.titleMedium)
+        }
+    }
 }

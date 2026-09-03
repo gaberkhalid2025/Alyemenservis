@@ -1,19 +1,11 @@
 package com.example.data.local
 
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.data.BookingEntity
 import com.example.data.models.*
 
-@Entity(
-    tableName = "chat_channels",
-    indices = [
-        Index(value = ["lastMessageTime"]),
-        Index(value = ["updatedAt"]),
-        Index(value = ["syncStatus"])
-    ]
-)
+@Entity(tableName = "chat_channels")
 data class ChatChannelRoomEntity(
     @PrimaryKey val id: String,
     val title: String,
@@ -27,17 +19,7 @@ data class ChatChannelRoomEntity(
     val updatedAt: Long
 )
 
-@Entity(
-    tableName = "chat_messages",
-    indices = [
-        Index(value = ["channelId"]),
-        Index(value = ["timestamp"]),
-        Index(value = ["senderId"]),
-        Index(value = ["status"]),
-        Index(value = ["syncStatus"]),
-        Index(value = ["channelId", "timestamp"])
-    ]
-)
+@Entity(tableName = "chat_messages")
 data class ChatMessageRoomEntity(
     @PrimaryKey val id: String,
     val channelId: String,
@@ -53,17 +35,7 @@ data class ChatMessageRoomEntity(
     val syncStatus: String
 )
 
-@Entity(
-    tableName = "bookings",
-    indices = [
-        Index(value = ["providerId"]),
-        Index(value = ["customerPhone"]),
-        Index(value = ["status"]),
-        Index(value = ["createdAt"]),
-        Index(value = ["scheduledAt"]),
-        Index(value = ["providerId", "status"])
-    ]
-)
+@Entity(tableName = "bookings")
 data class BookingRoomEntity(
     @PrimaryKey val id: String,
     val customerName: String,
@@ -85,15 +57,7 @@ data class BookingRoomEntity(
     val updatedAt: Long
 )
 
-@Entity(
-    tableName = "instant_requests",
-    indices = [
-        Index(value = ["userId"]),
-        Index(value = ["status"]),
-        Index(value = ["createdAt"]),
-        Index(value = ["requestCode"])
-    ]
-)
+@Entity(tableName = "instant_requests")
 data class InstantRequestRoomEntity(
     @PrimaryKey val id: String,
     val requestCode: String,
@@ -111,16 +75,7 @@ data class InstantRequestRoomEntity(
     val offersCount: Int
 )
 
-@Entity(
-    tableName = "request_offers",
-    indices = [
-        Index(value = ["requestId"]),
-        Index(value = ["requestCode"]),
-        Index(value = ["technicianId"]),
-        Index(value = ["status"]),
-        Index(value = ["createdAt"])
-    ]
-)
+@Entity(tableName = "request_offers")
 data class RequestOfferRoomEntity(
     @PrimaryKey val id: String,
     val requestId: String,

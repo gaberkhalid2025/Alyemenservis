@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.BookingEntity
-import com.example.utils.BookingStateMachine
-import com.example.utils.BookingStatus
+import com.example.util.BookingStateMachine
+import com.example.util.BookingStatus
 
 /**
  * 📈 BookingStatusScreen

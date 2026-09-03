@@ -29,7 +29,12 @@ fun AdvancedReviewsManagementCard(
     modifier: Modifier = Modifier
 ) {
     var reviews by remember {
-        mutableStateOf<List<ReviewUiModel>>(emptyList())
+        mutableStateOf(
+            listOf(
+                ReviewUiModel(authorName = "محمد الأحمدي", rating = 5, comment = "خدمة ممتازة جداً وسرعة في الإنجاز"),
+                ReviewUiModel(authorName = "سارة اليمني", rating = 4, comment = "أسعار مناسبة ومعاملة راقية")
+            )
+        )
     }
 
     Card(

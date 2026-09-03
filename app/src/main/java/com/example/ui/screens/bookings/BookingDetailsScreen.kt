@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.BookingEntity
 import com.example.ui.dialogs.BookingCancellationDialog
-import com.example.utils.BookingStateMachine
+import com.example.util.BookingStateMachine
 
 /**
  * 📋 BookingDetailsScreen

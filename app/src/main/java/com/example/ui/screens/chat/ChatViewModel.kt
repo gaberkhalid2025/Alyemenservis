@@ -23,12 +23,9 @@ sealed class ChatEvent {
     data class MessageSent(val messageId: String) : ChatEvent()
 }
 
-class ChatViewModel : ViewModel() {
-
-    private val _isPeerTyping = MutableStateFlow(false)
-    val isPeerTyping: StateFlow<Boolean> = _isPeerTyping.asStateFlow()
-
+class ChatViewModel(
     private val repository: ChatRepository = ChatRepository()
+) : ViewModel() {
 
     private val _eventFlow = MutableSharedFlow<ChatEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
@@ -61,11 +58,8 @@ class ChatViewModel : ViewModel() {
     /**
      * Initialize conversation with channel.
      */
-    private var activeUserId: String = ""
-
     fun openChannel(channel: ChatChannel, currentUserId: String) {
         _currentChannel.value = channel
-        activeUserId = currentUserId
         markAsRead(channel.id, currentUserId)
         listenToMessages(channel.id, currentUserId)
 
@@ -138,22 +132,13 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private var currentLimit = 25
-
     private fun listenToMessages(channelId: String, currentUserId: String) {
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
-            repository.getChannelMessages(channelId, currentUserId, limit = currentLimit).collect { msgList ->
+            repository.getChannelMessages(channelId, currentUserId).collect { msgList ->
                 _messages.value = msgList
             }
         }
-    }
-
-    fun loadMoreMessages() {
-        val channel = _currentChannel.value ?: return
-        if (activeUserId.isBlank()) return
-        currentLimit += 25
-        listenToMessages(channel.id, activeUserId)
     }
 
     private fun listenToPresence(otherUserId: String) {

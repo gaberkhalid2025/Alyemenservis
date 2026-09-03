@@ -39,7 +39,13 @@ fun InventoryManager(
     modifier: Modifier = Modifier
 ) {
     var inventoryList by remember {
-        mutableStateOf<List<InventoryItem>>(emptyList())
+        mutableStateOf(
+            listOf(
+                InventoryItem("1", "SKU-1001", "طقم أدوات صيانة متكامل", 12, 5, 25000.0, true),
+                InventoryItem("2", "SKU-1002", "مضخة مياه إيطالية 1 حصان", 3, 5, 85000.0, true),
+                InventoryItem("3", "SKU-1003", "مفتاح كهربائي ذكي WiFi", 0, 10, 14000.0, false)
+            )
+        )
     }
 
     var showAddItemDialog by remember { mutableStateOf(false) }

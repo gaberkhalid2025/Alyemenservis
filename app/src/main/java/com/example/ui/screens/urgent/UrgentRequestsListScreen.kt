@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
-import com.example.ui.viewmodels.UrgentViewModel
+import com.example.viewmodels.UrgentViewModel
 
 /**
  * ⚡ UrgentRequestsListScreen

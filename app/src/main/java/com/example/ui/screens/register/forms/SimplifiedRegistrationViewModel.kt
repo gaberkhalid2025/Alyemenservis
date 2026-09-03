@@ -122,9 +122,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
     }
 
     private fun validateManagerName(name: String) {
-        val error = if (name.trim().isEmpty() && currentRole in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY")) {
-            "اسم المسؤول مطلوب"
-        } else null
+        val error = if (name.trim().isEmpty()) "اسم المسؤول مطلوب" else null
         _state.update { it.copy(managerNameError = error) }
     }
 
@@ -177,7 +175,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
     fun submit(onSubmitSuccess: (Map<String, String>) -> Unit) {
         validateAll()
         if (_state.value.isFormValid) {
-            _state.update { it.copy(isLoading = true, errorMessage = null) }
+            _state.update { it.copy(isLoading = true) }
             
             // Simulating API call
             viewModelScope.launch {
@@ -195,20 +193,6 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
                     "specialization" to _state.value.specialization
                 ))
             }
-        } else {
-            val st = _state.value
-            val missingFields = mutableListOf<String>()
-            if (st.entityName.isBlank() || st.entityNameError != null) missingFields.add("الاسم / اسم النشاط")
-            if (st.phone.isBlank() || st.phoneError != null) missingFields.add("رقم الهاتف")
-            if (st.password.isBlank() || st.passwordError != null) missingFields.add("كلمة المرور")
-            if (st.confirmPassword.isBlank() || st.confirmPasswordError != null) missingFields.add("تأكيد كلمة المرور")
-            if (currentRole in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY") && (st.managerName.isBlank() || st.managerNameError != null)) {
-                missingFields.add("اسم المدير/المسؤول")
-            }
-            if (!st.agreedToTerms) missingFields.add("الموافقة على الشروط والأحكام")
-            
-            val msg = "عذراً، يرجى إكمال أو تصحيح الحقول التالية: " + missingFields.joinToString("، ")
-            _state.update { it.copy(errorMessage = msg) }
         }
     }
     

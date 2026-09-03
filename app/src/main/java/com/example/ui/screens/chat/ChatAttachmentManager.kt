@@ -2,7 +2,7 @@ package com.example.ui.screens.chat
 
 import android.content.Context
 import android.net.Uri
-import com.example.utils.ChatValidationUtils
+import com.example.chat.util.ChatValidationUtils
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import java.util.UUID

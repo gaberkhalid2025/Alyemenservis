@@ -38,7 +38,13 @@ fun StaffManager(
     modifier: Modifier = Modifier
 ) {
     var staffList by remember {
-        mutableStateOf<List<StaffMember>>(emptyList())
+        mutableStateOf(
+            listOf(
+                StaffMember("1", "م. أحمد الشامي", "مدير العمليات", "777123456", canEditPrices = true, canChat = true),
+                StaffMember("2", "عمر الكبسي", "فني صيانة ميداني", "771987654", canEditPrices = false, canChat = true),
+                StaffMember("3", "سارة المنصوري", "خدمة عملاء واستقبال", "733456789", canEditPrices = false, canChat = true)
+            )
+        )
     }
 
     var showAddDialog by remember { mutableStateOf(false) }

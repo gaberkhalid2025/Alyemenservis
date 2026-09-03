@@ -92,7 +92,7 @@ import com.example.ui.screens.chat.*
 import com.example.ui.screens.notifications.*
 import com.example.ui.screens.dashboard.*
 import com.example.ui.*
-import com.example.utils.*
+import com.example.ui.utils.*
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
