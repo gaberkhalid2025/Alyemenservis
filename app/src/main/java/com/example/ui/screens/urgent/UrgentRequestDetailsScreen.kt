@@ -119,13 +119,17 @@ fun UrgentRequestDetailsScreen(
                     onAcceptOffer = { offer ->
                         urgentViewModel.acceptOffer(req.id, offer.id, offer.technicianPhone) { success, msg ->
                             if (success) {
-                                onNavigateToChat(offer.technicianPhone, offer.technicianName)
                                 onNavigateToOfferSelection(offer.id)
                             }
                         }
                     },
                     onContactProvider = { phone, name ->
-                        onNavigateToChat(phone, name)
+                        if (phone.isNotBlank()) {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                            context.startActivity(intent)
+                        } else {
+                            onNavigateToChat(phone, name)
+                        }
                     }
                 )
 

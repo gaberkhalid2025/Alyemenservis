@@ -51,9 +51,9 @@ fun StoreForm(
     var workingHours by remember { mutableStateOf("9:00 ص - 10:00 م") }
     var returnPolicy by remember { mutableStateOf("استرجاع واستبدال خلال 3 أيام مع الفاتورة") }
 
-    val isStep1Valid = storeName.isNotBlank() && ownerName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && city.isNotBlank()
-    val isStep2Valid = true // Optional fields
-    val isStep3Valid = true // Optional fields
+    val isStep1Valid = storeName.isNotBlank() && phone.length >= 9 && password.length >= 6 && password == confirmPassword
+    val isStep2Valid = commercialRegister.isNotBlank() || taxNumber.isNotBlank()
+    val isStep3Valid = workingHours.isNotBlank()
 
     Card(
         shape = RoundedCornerShape(16.dp),

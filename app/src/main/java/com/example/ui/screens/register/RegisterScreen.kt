@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
@@ -49,7 +48,6 @@ fun RegisterScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val settingsState by viewModel.settings.collectAsState()
     var showRestoreDialog by remember { mutableStateOf(false) }
     var selectedType by remember { mutableStateOf<RegistrationType?>(null) }
     var forceShowForm by remember { mutableStateOf(false) }
@@ -280,19 +278,15 @@ fun RegisterScreen(
                 title = {
                     Column {
                         Text(
-                            text = if (selectedType != null) "📝 استمارة: ${selectedType?.title}" else settingsState.registerScreenTitle.ifBlank { "📝 التسجيل والانضمام" },
-                            fontSize = 14.sp,
+                            text = if (selectedType != null) "📝 استمارة تسجيل: ${selectedType?.title}" else "📝 التسجيل والانضمام",
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            color = Color.White
                         )
                         Text(
-                            text = if (selectedType != null) "يرجى تعبئة الحقول الأساسية لإتمام الطلب" else settingsState.registerScreenSubtitle.ifBlank { "منصتك الشاملة للخدمات والأنشطة في اليمن" },
-                            fontSize = 10.sp,
-                            color = themeColors.accent,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = if (selectedType != null) "يرجى تعبئة الحقول كاملة لاعتماد وتفعيل الحساب" else "منصتك الشاملة للخدمات والأنشطة في اليمن",
+                            fontSize = 10.5.sp,
+                            color = themeColors.accent
                         )
                     }
                 },
@@ -548,34 +542,39 @@ fun RegisterScreen(
                         .fillMaxSize()
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    // شريط معلومات القسم المختار (مدمج وموفر للمساحة)
-                    Row(
+                    // شريط معلومات القسم المختار
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(bottom = 12.dp)
                     ) {
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(selectedType?.icon ?: "📋", fontSize = 18.sp)
-                            Text(
-                                text = "استمارة: ${selectedType?.title}",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        TextButton(
-                            onClick = { selectedType = null },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text("تغيير 🔁", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(selectedType?.icon ?: "📋", fontSize = 24.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "استمارة انضمام: ${selectedType?.title}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = selectedType?.description ?: "",
+                                    fontSize = 10.sp,
+                                    color = Color.LightGray
+                                )
+                            }
+                            TextButton(onClick = { selectedType = null }) {
+                                Text("تغيير 🔁", color = themeColors.accent, fontSize = 11.sp)
+                            }
                         }
                     }
 

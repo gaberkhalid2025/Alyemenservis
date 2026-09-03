@@ -245,9 +245,6 @@ class UrgentViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = UrgentUiState.Loading
             try {
-                val reqDoc = firestore.collection("urgent_requests").document(requestId).get().await()
-                val reqObj = reqDoc.toObject(InstantRequestEntity::class.java)
-
                 firestore.collection("urgent_requests").document(requestId).update(
                     mapOf(
                         "status" to "ACCEPTED",
@@ -259,34 +256,6 @@ class UrgentViewModel : ViewModel() {
                 firestore.collection("urgent_requests").document(requestId)
                     .collection("offers").document(offerId)
                     .update("status", "ACCEPTED").await()
-
-                if (reqObj != null) {
-                    val bookingId = "BK-URG-" + UUID.randomUUID().toString().take(8)
-                    val bookingData = mapOf(
-                        "id" to bookingId,
-                        "bookingNumber" to (reqObj.requestCode.ifBlank { bookingId }),
-                        "bookingCode" to reqObj.requestCode,
-                        "clientId" to reqObj.userId,
-                        "clientName" to reqObj.userName,
-                        "clientPhone" to reqObj.userPhone,
-                        "customerName" to reqObj.userName,
-                        "customerPhone" to reqObj.userPhone,
-                        "providerPhone" to providerPhone,
-                        "category" to reqObj.categoryName,
-                        "serviceType" to reqObj.serviceTitle,
-                        "serviceDetails" to reqObj.description,
-                        "date" to "اليوم (عاجل)",
-                        "time" to "فوراً (30 دقيقة)",
-                        "status" to "APPROVED",
-                        "city" to reqObj.userCity,
-                        "address" to "${reqObj.userCity} - ${reqObj.userNeighborhood}",
-                        "bookingPassword" to reqObj.secretPin,
-                        "pinCode" to reqObj.secretPin,
-                        "createdAt" to System.currentTimeMillis(),
-                        "scheduledAt" to System.currentTimeMillis() + 30 * 60 * 1000L
-                    )
-                    firestore.collection("bookings").document(bookingId).set(bookingData).await()
-                }
 
                 _uiState.value = UrgentUiState.Success("تم قبول العرض بنجاح!")
                 onResult(true, "تم قبول العرض بنجاح")

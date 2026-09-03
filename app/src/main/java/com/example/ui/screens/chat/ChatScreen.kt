@@ -154,7 +154,7 @@ fun ChatScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0D151F))
+                .background(themeColors.background)
         ) {
         // Header
         ChatHeaderBar(
@@ -185,7 +185,7 @@ fun ChatScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF1E293B))
+                    .background(themeColors.surface)
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -195,16 +195,16 @@ fun ChatScreen(
                     placeholder = { Text("بحث في المحادثة...", fontSize = 12.sp, color = Color.Gray) },
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF1E88E5)
+                        focusedTextColor = themeColors.textPrimary,
+                        unfocusedTextColor = themeColors.textPrimary,
+                        focusedBorderColor = themeColors.accent
                     )
                 )
                 IconButton(onClick = {
                     isSearchOpen = false
                     chatViewModel.setSearchQuery("")
                 }) {
-                    Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.White)
+                    Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = themeColors.textPrimary)
                 }
             }
         }
@@ -232,7 +232,7 @@ fun ChatScreen(
                         .padding(vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    item(key = "load_more_header") {
+                    item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -240,14 +240,17 @@ fun ChatScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             TextButton(
-                                onClick = { chatViewModel.loadMoreMessages() },
-                                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF64B5F6))
+                                onClick = { chatViewModel.loadMoreMessages() }
                             ) {
-                                Text("📥 تحميل الرسائل السابقة", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text(
+                                    text = "⬆️ تحميل الرسائل السابقة",
+                                    fontSize = 12.sp,
+                                    color = themeColors.accent,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
-
                     items(filteredMessages, key = { it.id }) { msg ->
                         val isMe = msg.senderId == currentUserId
                         ChatBubbleItem(

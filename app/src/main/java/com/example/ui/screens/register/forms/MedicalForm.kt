@@ -49,9 +49,9 @@ fun MedicalForm(
     var workingHours by remember { mutableStateOf("24 ساعة (طوارئ متواصلة)") }
     var emergencyServicesAvailable by remember { mutableStateOf(true) }
 
-    val isStep1Valid = medicalCenterName.isNotBlank() && medicalDirectorName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && city.isNotBlank()
-    val isStep2Valid = true // Optional fields
-    val isStep3Valid = true // Optional fields
+    val isStep1Valid = medicalCenterName.isNotBlank() && phone.length >= 9 && password.length >= 6 && password == confirmPassword
+    val isStep2Valid = medicalLicenseNumber.isNotBlank() && medicalSpecialties.isNotBlank()
+    val isStep3Valid = workingHours.isNotBlank()
 
     Card(
         shape = RoundedCornerShape(16.dp),

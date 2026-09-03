@@ -40,14 +40,6 @@ data class AdminSettingsEntity(
     val adminPassword: String = "Maher@@--@@736462##",
     val ownerEmail: String = "mah73646@gmail.com",
     val ownerPassword: String = "Maher@@--@@736462##",
-    // Admin Full UI Control Fields
-    val countryFlagEmoji: String = "🇾🇪",
-    val appLogoUrl: String = "",
-    val aboutAppTitle: String = "عن المنصة والدليل الشامل",
-    val aboutAppDescription: String = "الدليل الخدمي الموحد الشامل لجميع المهن والمحلات والمطاعم والمراكز الطبية بالعاصمة والمحافظات اليمنية.",
-    val registerScreenTitle: String = "منصة انضمام مقدمي الخدمات والأعمال",
-    val registerScreenSubtitle: String = "قم بتسجيل حسابك الانضمامي للوصول لآلاف العملاء والمستخدمين يومياً",
-    val joinTermsNotice: String = "بالتسجيل بالمنصة، فإنك توافق على شروط الاستخدام وسياسة حماية البيانات بالجمهورية اليمنية.",
     
     // Notifications control
     val isNotificationsEnabled: Boolean = true,

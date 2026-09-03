@@ -50,9 +50,9 @@ fun JobForm(
     var workStartDate by remember { mutableStateOf("خلال أسبوعين من تاريخ القبول") }
     var salaryRange by remember { mutableStateOf("يحدد بعد المقابلة بناء على الكفاءة") }
 
-    val isStep1Valid = companyName.isNotBlank() && recruiterName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && city.isNotBlank()
-    val isStep2Valid = true // Optional fields
-    val isStep3Valid = true // Optional fields
+    val isStep1Valid = companyName.isNotBlank() && phone.length >= 9 && password.length >= 6 && password == confirmPassword
+    val isStep2Valid = jobTitle.isNotBlank() && requiredQualifications.isNotBlank()
+    val isStep3Valid = workStartDate.isNotBlank()
 
     Card(
         shape = RoundedCornerShape(16.dp),

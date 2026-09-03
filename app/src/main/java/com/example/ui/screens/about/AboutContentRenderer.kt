@@ -123,13 +123,13 @@ fun AboutContentRenderer(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = settingsState.countryFlagEmoji.ifBlank { "🇾🇪" },
+                        text = "🇾🇪",
                         fontSize = 38.sp
                     )
                 }
 
                 Text(
-                    text = settingsState.aboutAppTitle.ifBlank { appTitle },
+                    text = appTitle,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
@@ -151,10 +151,8 @@ fun AboutContentRenderer(
                 }
 
                 Text(
-                    text = settingsState.aboutAppDescription.ifBlank {
-                        settingsState.aboutCustomInfo.ifBlank {
-                            settingsState.bannerContent.ifEmpty { "المنصة الذكية الأولى في اليمن لربط العملاء بالمهنيين، المحلات التجارية، المراكز الطبية، والمطاعم مباشرة." }
-                        }
+                    text = settingsState.aboutCustomInfo.ifBlank {
+                        settingsState.bannerContent.ifEmpty { "المنصة الذكية الأولى في اليمن لربط العملاء بالمهنيين، المحلات التجارية، المراكز الطبية، والمطاعم مباشرة." }
                     },
                     fontSize = 12.sp,
                     color = Color.LightGray,
