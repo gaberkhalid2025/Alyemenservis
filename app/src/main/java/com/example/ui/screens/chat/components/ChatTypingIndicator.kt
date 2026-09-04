@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.*
 
 /**
@@ -71,8 +72,13 @@ fun ChatTypingIndicator(
     userName: String? = null,
     dotColor: Color = Color(0xFF00E5FF),
     dotSize: Dp = 6.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    themeColors: VisualThemePalette? = null
 ) {
+    val activeDotColor = themeColors?.accent ?: dotColor
+    val activeSurfaceColor = themeColors?.surface ?: Color(0xFF1E293B).copy(alpha = 0.95f)
+    val textSecondary = themeColors?.textSecondary ?: Color(0xFF94A3B8)
+
     AnimatedVisibility(
         visible = isTyping,
         enter = fadeIn(animationSpec = tween(200)) + expandVertically(),
@@ -81,7 +87,7 @@ fun ChatTypingIndicator(
     ) {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Color(0xFF1E293B).copy(alpha = 0.95f),
+            color = activeSurfaceColor,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
             Row(
@@ -94,10 +100,10 @@ fun ChatTypingIndicator(
                     text = label,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF94A3B8)
+                    color = textSecondary
                 )
 
-                PulsingDotsWave(dotColor = dotColor, dotSize = dotSize)
+                PulsingDotsWave(dotColor = activeDotColor, dotSize = dotSize)
             }
         }
     }

@@ -104,14 +104,14 @@ fun ChatListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D151F))
+            .background(themeColors.background)
     ) {
         // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF142030))
-                .border(1.dp, Color.White.copy(alpha = 0.08f))
+                .background(themeColors.surface)
+                .border(1.dp, themeColors.border)
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -119,9 +119,9 @@ fun ChatListScreen(
                 onClick = onBackClick,
                 modifier = Modifier
                     .size(36.dp)
-                    .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                    .background(themeColors.textPrimary.copy(alpha = 0.08f), CircleShape)
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = themeColors.textPrimary)
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -129,24 +129,24 @@ fun ChatListScreen(
                     text = "المحادثات والرسائل",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = themeColors.textPrimary
                 )
                 Text(
                     text = "تواصل فوري وآمن 🔒",
                     fontSize = 11.sp,
-                    color = Color(0xFF90CAF9)
+                    color = themeColors.accent
                 )
             }
 
             if (channels.isNotEmpty()) {
                 Box {
                     IconButton(onClick = { showTopMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "خيارات", tint = Color.White)
+                        Icon(Icons.Default.MoreVert, contentDescription = "خيارات", tint = themeColors.textPrimary)
                     }
                     DropdownMenu(
                         expanded = showTopMenu,
                         onDismissRequest = { showTopMenu = false },
-                        modifier = Modifier.background(Color(0xFF1E293B))
+                        modifier = Modifier.background(themeColors.surface)
                     ) {
                         DropdownMenuItem(
                             text = { Text("حذف جميع المحادثات", color = Color(0xFFE53935), fontSize = 13.sp) },
@@ -165,18 +165,18 @@ fun ChatListScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { chatListViewModel.setSearchQuery(it) },
-            placeholder = { Text("بحث في المحادثات...", fontSize = 12.sp, color = Color.Gray) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث", tint = Color.Gray) },
+            placeholder = { Text("بحث في المحادثات...", fontSize = 12.sp, color = themeColors.textSecondary) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث", tint = themeColors.textSecondary) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = Color(0xFF1E88E5),
-                unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                focusedContainerColor = Color(0xFF142030),
-                unfocusedContainerColor = Color(0xFF142030)
+                focusedTextColor = themeColors.textPrimary,
+                unfocusedTextColor = themeColors.textPrimary,
+                focusedBorderColor = themeColors.primary,
+                unfocusedBorderColor = themeColors.border,
+                focusedContainerColor = themeColors.surface,
+                unfocusedContainerColor = themeColors.surface
             ),
             shape = RoundedCornerShape(12.dp),
             singleLine = true
@@ -192,15 +192,15 @@ fun ChatListScreen(
             items(filters) { (key, title) ->
                 val isSelected = selectedFilter == key
                 Surface(
-                    color = if (isSelected) Color(0xFF1E88E5) else Color(0xFF142030),
+                    color = if (isSelected) themeColors.primary else themeColors.surface,
                     shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF1E88E5) else Color.White.copy(alpha = 0.08f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) themeColors.primary else themeColors.border),
                     modifier = Modifier.clickable { chatListViewModel.setFilter(key) }
                 ) {
                     Text(
                         text = title,
                         fontSize = 12.sp,
-                        color = Color.White,
+                        color = if (isSelected) Color.White else themeColors.textPrimary,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                     )
@@ -208,18 +208,18 @@ fun ChatListScreen(
             }
         }
 
-        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp, modifier = Modifier.padding(vertical = 6.dp))
+        HorizontalDivider(color = themeColors.border, thickness = 1.dp, modifier = Modifier.padding(vertical = 6.dp))
 
         // Channels List
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFF1E88E5))
+                CircularProgressIndicator(color = themeColors.primary)
             }
         } else if (filteredChannels.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     text = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة." else "لا توجد محادثات في هذا التصنيف حالياً.",
-                    color = Color.Gray,
+                    color = themeColors.textSecondary,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
                 )
@@ -241,6 +241,7 @@ fun ChatListScreen(
                         otherName = otherName,
                         otherPhoto = otherPhoto,
                         unreadCount = unread,
+                        themeColors = themeColors,
                         onClick = { onChannelClick(channel) },
                         onDeleteClick = { channelToDelete = channel }
                     )
@@ -253,8 +254,8 @@ fun ChatListScreen(
     channelToDelete?.let { targetChannel ->
         AlertDialog(
             onDismissRequest = { channelToDelete = null },
-            title = { Text("حذف المحادثة", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة بالكامل؟ لا يمكن التراجع بعد الحذف.", color = Color.LightGray, fontSize = 13.sp) },
+            title = { Text("حذف المحادثة", color = themeColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة بالكامل؟ لا يمكن التراجع بعد الحذف.", color = themeColors.textSecondary, fontSize = 13.sp) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -268,10 +269,10 @@ fun ChatListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { channelToDelete = null }) {
-                    Text("إلغاء", color = Color.Gray)
+                    Text("إلغاء", color = themeColors.textSecondary)
                 }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 
@@ -279,8 +280,8 @@ fun ChatListScreen(
     if (showDeleteAllDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAllDialog = false },
-            title = { Text("حذف جميع المحادثات", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("سيتم حذف كافة المحادثات والرسائل الخاصة بك بشكل نهائي. هل تريد الاستمرار؟", color = Color.LightGray, fontSize = 13.sp) },
+            title = { Text("حذف جميع المحادثات", color = themeColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = { Text("سيتم حذف كافة المحادثات والرسائل الخاصة بك بشكل نهائي. هل تريد الاستمرار؟", color = themeColors.textSecondary, fontSize = 13.sp) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -294,10 +295,10 @@ fun ChatListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteAllDialog = false }) {
-                    Text("إلغاء", color = Color.Gray)
+                    Text("إلغاء", color = themeColors.textSecondary)
                 }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 }
@@ -308,6 +309,7 @@ private fun ChannelItemCard(
     otherName: String,
     otherPhoto: String,
     unreadCount: Int,
+    themeColors: VisualThemePalette,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -315,9 +317,9 @@ private fun ChannelItemCard(
     val formattedTime = if (channel.lastMessageTime > 0) timeFormat.format(Date(channel.lastMessageTime)) else ""
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF142030)),
+        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         shape = RoundedCornerShape(14.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, themeColors.border),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
@@ -342,7 +344,7 @@ private fun ChannelItemCard(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .background(Color(0xFF1E88E5), CircleShape),
+                        .background(themeColors.primary, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -366,14 +368,14 @@ private fun ChannelItemCard(
                         text = otherName,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = themeColors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = formattedTime,
                         fontSize = 10.5.sp,
-                        color = if (unreadCount > 0) Color(0xFF64B5F6) else Color.Gray
+                        color = if (unreadCount > 0) themeColors.accent else themeColors.textSecondary
                     )
                 }
 
@@ -387,7 +389,7 @@ private fun ChannelItemCard(
                     Text(
                         text = channel.lastMessage.ifBlank { "بدء محادثة جديدة" },
                         fontSize = 12.sp,
-                        color = if (unreadCount > 0) Color.White else Color.LightGray,
+                        color = if (unreadCount > 0) themeColors.textPrimary else themeColors.textSecondary,
                         fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -400,7 +402,7 @@ private fun ChannelItemCard(
                     ) {
                         if (unreadCount > 0) {
                             Surface(
-                                color = Color(0xFF1E88E5),
+                                color = themeColors.primary,
                                 shape = CircleShape,
                                 modifier = Modifier.size(20.dp)
                             ) {
@@ -422,7 +424,7 @@ private fun ChannelItemCard(
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "حذف المحادثة",
-                                tint = Color.Gray.copy(alpha = 0.6f),
+                                tint = themeColors.textSecondary.copy(alpha = 0.6f),
                                 modifier = Modifier.size(16.dp)
                             )
                         }

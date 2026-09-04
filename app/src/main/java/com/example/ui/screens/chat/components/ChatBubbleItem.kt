@@ -33,13 +33,16 @@ import com.example.utils.ChatIcons
 import java.text.SimpleDateFormat
 import java.util.*
 
+import com.example.utils.VisualThemePalette
+
 @Composable
 fun ChatBubbleItem(
     message: ChatMessage,
     isMe: Boolean,
     onReplyClick: () -> Unit,
     onLongClick: () -> Unit,
-    onRetryClick: ((String) -> Unit)? = null
+    onRetryClick: ((String) -> Unit)? = null,
+    themeColors: VisualThemePalette? = null
 ) {
     val isSupport = !isMe && (
         message.senderId.contains("admin", ignoreCase = true) ||
@@ -49,13 +52,19 @@ fun ChatBubbleItem(
         message.senderName.contains("الادارة", ignoreCase = true)
     )
 
+    val primaryColor = themeColors?.primary ?: Color(0xFF1E88E5)
+    val surfaceColor = themeColors?.surface ?: Color(0xFF1E293B)
+    val accentColor = themeColors?.accent ?: Color(0xFF00E5FF)
+    val textPrimaryColor = themeColors?.textPrimary ?: Color.White
+    val textSecondaryColor = themeColors?.textSecondary ?: Color.LightGray
+
     val bubbleColor = when {
-        isMe -> Color(0xFF1E88E5)
+        isMe -> primaryColor
         isSupport -> Color(0xFF112618)
-        else -> Color(0xFF1E293B)
+        else -> surfaceColor
     }
 
-    val textColor = Color.White
+    val textColor = textPrimaryColor
     val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     val formattedTime = timeFormat.format(Date(message.timestamp))
 

@@ -37,6 +37,7 @@ import com.example.data.models.MediaType
 import com.example.ui.screens.chat.ChatAttachmentManager
 import com.example.utils.ChatIcons
 import com.example.utils.ChatValidationUtils
+import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -47,7 +48,8 @@ fun ChatInputBar(
     replyingTo: ChatMessage?,
     onCancelReply: () -> Unit,
     onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit,
-    onTyping: (String) -> Unit
+    onTyping: (String) -> Unit,
+    themeColors: VisualThemePalette? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -57,6 +59,14 @@ fun ChatInputBar(
     var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var audioFile by remember { mutableStateOf<File?>(null) }
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
+
+    val primaryColor = themeColors?.primary ?: Color(0xFF1E88E5)
+    val surfaceColor = themeColors?.surface ?: Color(0xFF142030)
+    val inputBgColor = themeColors?.surface ?: Color(0xFF1E293B)
+    val textPrimary = themeColors?.textPrimary ?: Color.White
+    val textSecondary = themeColors?.textSecondary ?: Color.Gray
+    val accentColor = themeColors?.accent ?: Color(0xFF64B5F6)
+    val borderColor = themeColors?.border ?: Color.White.copy(alpha = 0.15f)
 
     val attachmentManager = remember { ChatAttachmentManager(context) }
 
@@ -144,8 +154,13 @@ fun ChatInputBar(
         try {
             val file = File(context.cacheDir, "audio_rec_${System.currentTimeMillis()}.mp3")
             audioFile = file
-            @Suppress("DEPRECATION")
-            val recorder = MediaRecorder().apply {
+            val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                MediaRecorder(context)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            recorder.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -160,6 +175,7 @@ fun ChatInputBar(
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(context, "تعذر تشغيل مسجل الصوت", Toast.LENGTH_SHORT).show()
+            audioFile?.delete()
             audioFile = null
             isRecording = false
         }
@@ -182,6 +198,9 @@ fun ChatInputBar(
             val validation = ChatValidationUtils.validateFile(uri, context)
             if (!validation.isValid) {
                 Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
+                file.delete()
+                audioFile = null
+                recordingDuration = 0
                 return
             }
 
@@ -205,7 +224,11 @@ fun ChatInputBar(
                 }.onFailure { exception ->
                     Toast.makeText(context, "فشل الرفع: ${exception.message}", Toast.LENGTH_SHORT).show()
                 }
+                // Cleanup temporary audio file from cache
+                file.delete()
             }
+        } else {
+            file?.delete()
         }
         audioFile = null
         recordingDuration = 0
@@ -229,7 +252,7 @@ fun ChatInputBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF142030))
+            .background(surfaceColor)
             .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
         // Upload Progress Indicator
@@ -239,8 +262,8 @@ fun ChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
-                color = Color(0xFF1E88E5),
-                trackColor = Color.White.copy(alpha = 0.1f)
+                color = primaryColor,
+                trackColor = borderColor
             )
         }
 
@@ -250,7 +273,7 @@ fun ChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 6.dp)
-                    .background(Color(0xFF1E293B), RoundedCornerShape(10.dp))
+                    .background(inputBgColor, RoundedCornerShape(10.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -259,17 +282,17 @@ fun ChatInputBar(
                     Text(
                         text = "الرد على ${replyingTo.senderName}:",
                         fontSize = 11.sp,
-                        color = Color(0xFF64B5F6)
+                        color = accentColor
                     )
                     Text(
                         text = replyingTo.message,
                         fontSize = 12.sp,
-                        color = Color.LightGray,
+                        color = textSecondary,
                         maxLines = 1
                     )
                 }
                 IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "إلغاء", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Close, contentDescription = "إلغاء", tint = textSecondary, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -339,9 +362,9 @@ fun ChatInputBar(
                     onClick = { imagePickerLauncher.launch("image/*") },
                     modifier = Modifier
                         .size(40.dp)
-                        .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                        .background(textPrimary.copy(alpha = 0.08f), CircleShape)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "إرفاق صورة", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Add, contentDescription = "إرفاق صورة", tint = textPrimary, modifier = Modifier.size(20.dp))
                 }
 
                 // Text field (Restricted to 500 characters max)
@@ -352,17 +375,17 @@ fun ChatInputBar(
                             textInput = it
                         }
                     },
-                    placeholder = { Text("اكتب رسالتك هنا (الحد 500 حرف)...", color = Color.Gray, fontSize = 13.sp) },
+                    placeholder = { Text("اكتب رسالتك هنا (الحد 500 حرف)...", color = textSecondary, fontSize = 13.sp) },
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(22.dp)),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF1E88E5),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                        focusedContainerColor = Color(0xFF1E293B),
-                        unfocusedContainerColor = Color(0xFF1E293B)
+                        focusedTextColor = textPrimary,
+                        unfocusedTextColor = textPrimary,
+                        focusedBorderColor = primaryColor,
+                        unfocusedBorderColor = borderColor,
+                        focusedContainerColor = inputBgColor,
+                        unfocusedContainerColor = inputBgColor
                     ),
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -387,7 +410,7 @@ fun ChatInputBar(
                         },
                         modifier = Modifier
                             .size(42.dp)
-                            .background(Color(0xFF1E88E5), CircleShape)
+                            .background(primaryColor, CircleShape)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "إرسال", tint = Color.White, modifier = Modifier.size(20.dp))
                     }
@@ -397,7 +420,7 @@ fun ChatInputBar(
                         onClick = { startRecording() },
                         modifier = Modifier
                             .size(42.dp)
-                            .background(Color(0xFF1E88E5), CircleShape)
+                            .background(primaryColor, CircleShape)
                     ) {
                         Icon(ChatIcons.Mic, contentDescription = "تسجيل صوتي", tint = Color.White, modifier = Modifier.size(22.dp))
                     }

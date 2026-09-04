@@ -177,7 +177,8 @@ fun ChatScreen(
             },
             onDeleteChannelClick = {
                 showDeleteChannelDialog = true
-            }
+            },
+            themeColors = themeColors
         )
 
         // In-chat search bar
@@ -192,7 +193,7 @@ fun ChatScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { chatViewModel.setSearchQuery(it) },
-                    placeholder = { Text("بحث في المحادثة...", fontSize = 12.sp, color = Color.Gray) },
+                    placeholder = { Text("بحث في المحادثة...", fontSize = 12.sp, color = themeColors.textSecondary) },
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = themeColors.textPrimary,
@@ -219,7 +220,7 @@ fun ChatScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = if (searchQuery.isNotBlank()) "لا توجد رسائل مطابقة للبحث" else "لا توجد رسائل سابقة. ابدأ المحادثة الآن!",
-                        color = Color.Gray,
+                        color = themeColors.textSecondary,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
@@ -258,7 +259,8 @@ fun ChatScreen(
                             isMe = isMe,
                             onReplyClick = { chatViewModel.setReplyingTo(msg) },
                             onLongClick = { selectedMessageForAction = msg },
-                            onRetryClick = { chatViewModel.resendMessage(msg.id) }
+                            onRetryClick = { chatViewModel.resendMessage(msg.id) },
+                            themeColors = themeColors
                         )
                     }
                 }
@@ -269,7 +271,9 @@ fun ChatScreen(
         // Typing Indicator
         val isTyping = isTypingOther
         if (isTyping) {
-            TypingIndicator(userName = activeChannel?.participantNames?.values?.firstOrNull { it != currentUserName } ?: "")
+            TypingIndicator(
+                userName = activeChannel?.participantNames?.values?.firstOrNull { it != currentUserName } ?: ""
+            )
         }
 
         ChatInputBar(
@@ -287,7 +291,8 @@ fun ChatScreen(
             },
             onTyping = { text ->
                 chatViewModel.onUserTyping(currentUserId, text)
-            }
+            },
+            themeColors = themeColors
         )
         }
 
@@ -304,14 +309,14 @@ fun ChatScreen(
 
         AlertDialog(
             onDismissRequest = { selectedMessageForAction = null },
-            title = { Text("خيارات الرسالة", fontSize = 14.sp, color = Color.White) },
+            title = { Text("خيارات الرسالة", fontSize = 14.sp, color = themeColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = {
                         chatViewModel.setReplyingTo(targetMsg)
                         selectedMessageForAction = null
                     }) {
-                        Text("↩️ الرد على الرسالة", color = Color.White, fontSize = 13.sp)
+                        Text("↩️ الرد على الرسالة", color = themeColors.textPrimary, fontSize = 13.sp)
                     }
                     if (isMe) {
                         TextButton(onClick = {
@@ -325,12 +330,12 @@ fun ChatScreen(
                         chatViewModel.deleteMessage(targetMsg.id, false, currentUserId)
                         selectedMessageForAction = null
                     }) {
-                        Text("🗑️ حذف لدي فقط", color = Color.LightGray, fontSize = 13.sp)
+                        Text("🗑️ حذف لدي فقط", color = themeColors.textSecondary, fontSize = 13.sp)
                     }
                 }
             },
             confirmButton = {},
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 
@@ -338,8 +343,8 @@ fun ChatScreen(
     if (showDeleteChannelDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteChannelDialog = false },
-            title = { Text("حذف المحادثة بالكامل", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة وجميع رسائلها؟ لا يمكن استرجاع البيانات بعد الحذف.", color = Color.LightGray, fontSize = 13.sp) },
+            title = { Text("حذف المحادثة بالكامل", color = themeColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه المحادثة وجميع رسائلها؟ لا يمكن استرجاع البيانات بعد الحذف.", color = themeColors.textSecondary, fontSize = 13.sp) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -355,10 +360,10 @@ fun ChatScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteChannelDialog = false }) {
-                    Text("إلغاء", color = Color.Gray)
+                    Text("إلغاء", color = themeColors.textSecondary)
                 }
             },
-            containerColor = Color(0xFF1E293B)
+            containerColor = themeColors.surface
         )
     }
 }

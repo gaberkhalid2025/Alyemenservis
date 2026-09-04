@@ -59,9 +59,11 @@ fun RegisterScreen(
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val jobs by viewModel.jobs.collectAsState()
+    val registeredUsersList by viewModel.registeredUsersList.collectAsState()
 
     val useCase = remember { JoinStatusUseCase() }
-    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications) {
+    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications, jobs, registeredUsersList) {
         useCase.determineStatus(
             joinPhone = joinPhone,
             pendingProviders = pendingProviders,
@@ -69,7 +71,9 @@ fun RegisterScreen(
             stores = stores,
             properties = properties,
             categories = categories,
-            notifications = notifications
+            notifications = notifications,
+            jobs = jobs,
+            registeredUsersList = registeredUsersList
         )
     }
 

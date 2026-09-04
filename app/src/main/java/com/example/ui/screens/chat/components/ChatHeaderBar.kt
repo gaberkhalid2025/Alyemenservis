@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.models.UserPresence
+import com.example.utils.VisualThemePalette
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,15 +38,23 @@ fun ChatHeaderBar(
     onBackClick: () -> Unit,
     onSearchToggle: () -> Unit,
     onBlockClick: () -> Unit,
-    onDeleteChannelClick: () -> Unit
+    onDeleteChannelClick: () -> Unit,
+    themeColors: VisualThemePalette? = null
 ) {
     var showMenu by remember { mutableStateOf(false) }
+
+    val surfaceColor = themeColors?.surface ?: Color(0xFF142030)
+    val primaryColor = themeColors?.primary ?: Color(0xFF1E88E5)
+    val accentColor = themeColors?.accent ?: Color(0xFF64FFDA)
+    val textPrimary = themeColors?.textPrimary ?: Color.White
+    val textSecondary = themeColors?.textSecondary ?: Color.Gray
+    val borderColor = themeColors?.border ?: Color.White.copy(alpha = 0.08f)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF142030))
-            .border(1.dp, Color.White.copy(alpha = 0.08f))
+            .background(surfaceColor)
+            .border(1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier
@@ -54,7 +63,7 @@ fun ChatHeaderBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBackClick) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = textPrimary)
             }
 
             Box(modifier = Modifier.size(42.dp)) {
@@ -71,7 +80,7 @@ fun ChatHeaderBar(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFF1E88E5), CircleShape),
+                            .background(primaryColor, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -93,7 +102,7 @@ fun ChatHeaderBar(
                         modifier = Modifier
                             .size(12.dp)
                             .background(dotColor, CircleShape)
-                            .border(2.dp, Color(0xFF142030), CircleShape)
+                            .border(2.dp, surfaceColor, CircleShape)
                             .align(Alignment.BottomEnd)
                     )
                 }
@@ -106,7 +115,7 @@ fun ChatHeaderBar(
                     text = name.ifBlank { "محادثة" },
                     fontSize = 14.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -128,22 +137,22 @@ fun ChatHeaderBar(
                 Text(
                     text = statusText,
                     fontSize = 11.sp,
-                    color = if (isTyping || isOnline) Color(0xFF64FFDA) else if (isAway) Color(0xFFFFB300) else Color.Gray
+                    color = if (isTyping || isOnline) accentColor else if (isAway) Color(0xFFFFB300) else textSecondary
                 )
             }
 
             IconButton(onClick = onSearchToggle) {
-                Icon(Icons.Default.Search, contentDescription = "بحث", tint = Color.White)
+                Icon(Icons.Default.Search, contentDescription = "بحث", tint = textPrimary)
             }
 
             Box {
                 IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "خيارات", tint = Color.White)
+                    Icon(Icons.Default.MoreVert, contentDescription = "خيارات", tint = textPrimary)
                 }
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
-                    modifier = Modifier.background(Color(0xFF1E293B))
+                    modifier = Modifier.background(surfaceColor)
                 ) {
                     DropdownMenuItem(
                         text = { Text("حظر المستخدم", color = Color(0xFFFF8A80), fontSize = 13.sp) },
@@ -153,7 +162,7 @@ fun ChatHeaderBar(
                         },
                         leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFFF8A80)) }
                     )
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(color = borderColor)
                     DropdownMenuItem(
                         text = { Text("حذف المحادثة بالكامل", color = Color(0xFFE53935), fontSize = 13.sp, fontWeight = FontWeight.Bold) },
                         onClick = {
@@ -177,14 +186,14 @@ fun ChatHeaderBar(
 
             if (contextText != null) {
                 Surface(
-                    color = Color(0xFF0F172A),
+                    color = primaryColor.copy(alpha = 0.15f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = contextText,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF64B5F6),
+                        color = accentColor,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 14.dp, vertical = 5.dp)

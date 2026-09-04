@@ -54,57 +54,57 @@ fun InstantRequestsScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("🚨 اطلب خدمتك الآن (مزايدة فورية)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                        Text("عروض أسعار تنافسية ومباشرة خلال ساعتين ⏱️", fontSize = 11.sp, color = Color(0xFFA7F3D0))
+                        Text("🚨 اطلب خدمتك الآن (مزايدة فورية)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = themeColors.textPrimary)
+                        Text("عروض أسعار تنافسية ومباشرة خلال ساعتين ⏱️", fontSize = 11.sp, color = themeColors.accent)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = themeColors.textPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { instantReqViewModel.setShowCreateDialog(true) },
-                containerColor = Color(0xFF10B981),
-                contentColor = Color.White,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("اطلب خدمتك الآن ⚡", fontWeight = FontWeight.Bold) }
+                containerColor = themeColors.accent,
+                contentColor = Color.Black,
+                icon = { Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black) },
+                text = { Text("اطلب خدمتك الآن ⚡", fontWeight = FontWeight.Bold, color = Color.Black) }
             )
         },
-        containerColor = Color(0xFF0F172A)
+        containerColor = themeColors.background
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             TabRow(
                 selectedTabIndex = uiState.selectedTab,
-                containerColor = Color(0xFF1E293B),
+                containerColor = themeColors.surface,
                 contentColor = themeColors.accent
             ) {
                 Tab(
                     selected = uiState.selectedTab == 0,
                     onClick = { instantReqViewModel.setTab(0) },
-                    text = { Text("طلباتي السابقة 📑", fontSize = 12.sp) }
+                    text = { Text("طلباتي السابقة 📑", fontSize = 12.sp, color = if (uiState.selectedTab == 0) themeColors.accent else themeColors.textSecondary) }
                 )
                 Tab(
                     selected = uiState.selectedTab == 1,
                     onClick = { instantReqViewModel.setTab(1) },
-                    text = { Text("سوق الطلبات المفتوحة (للفنيين) 🛠️", fontSize = 12.sp) }
+                    text = { Text("سوق الطلبات المفتوحة (للفنيين) 🛠️", fontSize = 12.sp, color = if (uiState.selectedTab == 1) themeColors.accent else themeColors.textSecondary) }
                 )
             }
             
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { instantReqViewModel.setSearchQuery(it) },
-                placeholder = { Text("بحث بالرقم أو الخدمة أو المدينة...", fontSize = 12.sp) },
+                placeholder = { Text("بحث بالرقم أو الخدمة أو المدينة...", fontSize = 12.sp, color = themeColors.textSecondary) },
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = themeColors.accent,
-                    unfocusedBorderColor = Color.DarkGray,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedBorderColor = themeColors.border,
+                    focusedTextColor = themeColors.textPrimary,
+                    unfocusedTextColor = themeColors.textPrimary
                 )
             )
 

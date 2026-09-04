@@ -2775,6 +2775,10 @@ fun addNotification(
         )
     }
 
+    fun cancelInstantRequest(requestId: String, passwordInput: String = "", isCustomer: Boolean = true, reqPass: String = "") {
+        instantRequestViewModel.cancelInstantRequest(requestId, passwordInput, isCustomer, reqPass)
+    }
+
     // Additional Delegation and Facade Functions for UI Components
     fun addNewCategory(nameAr: String, nameEn: String, icon: String, description: String, parentId: String = "", isMainCategory: Boolean = true) =
         adminViewModel.addNewCategory(nameAr, nameEn, icon, description, parentId, isMainCategory)
