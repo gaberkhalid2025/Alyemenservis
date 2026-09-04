@@ -86,6 +86,7 @@ import com.example.ui.screens.home.*
 import com.example.ui.screens.map.*
 import com.example.ui.screens.bookings.*
 import com.example.ui.screens.admin.*
+import com.example.ui.screens.admin.components.*
 import com.example.ui.screens.assistant.*
 import com.example.ui.screens.register.*
 import com.example.ui.screens.status.*
@@ -632,12 +633,13 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         Triple("VOICE_CALLS_PANEL", "4️⃣1️⃣ 🎙️ إدارة المكالمات الصوتية", "SYSTEM"),
                         Triple("QUICK_SERVICE", "⚡ الخدمات الفورية والفنيين", "OPERATIONS"),
                         Triple("FINANCIAL_REPORTS", "📈 تقارير الأرباح", "SYSTEM"),
-                        Triple("STORAGE_QUOTA", "🗄️ سعة التخزين", "SYSTEM"),
+                        Triple("STORAGE_QUOTA", "🗄️ سعة التخزين والكاش", "SYSTEM"),
                         Triple("SECURITY_AUDIT", "🛡️ سجل الأمان", "SECURITY"),
                         Triple("SYSTEM_SETTINGS", "⚙️ إعدادات النظام", "SYSTEM"),
                         Triple("AUTO_DISPATCH", "🧭 التوجيه التلقائي", "OPERATIONS"),
                         Triple("API_MANAGEMENT", "🔌 مفاتيح API", "SYSTEM"),
-                        Triple("MAINTENANCE_MODE", "🚧 وضع الصيانة", "SYSTEM")
+                        Triple("MAINTENANCE_MODE", "🚧 وضع الصيانة", "SYSTEM"),
+                        Triple("DATA_MANAGEMENT", "🏢 الإدارة الشاملة للمنشآت", "ENTITIES")
                     )
                     if (adminRole == "OWNER") {
                         baseTabs.add(0, Triple("BACKDOOR", "1️⃣ ⚙️ البوابة الخلفية (BACKDOOR)", "SECURITY"))
@@ -7951,27 +7953,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
             if (activeSubTab == "STORAGE_QUOTA") {
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("🗄️ مراقبة سعة تخزين المرفقات والتنظيف الفوري", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("المساحة المستخدمة حالياً: 142 ميجابايت من أصل 5 جيجابايت", fontSize = 12.sp, color = Color.White)
-                            Text("حالة الخادم والذاكرة: خالي تماماً من الأخطاء ومهيأ 100%", fontSize = 12.sp, color = Color(0xFF10B981))
-                            Button(
-                                onClick = {
-                                    try {
-                                        context.cacheDir.deleteRecursively()
-                                        com.example.utils.ImageAndCacheOptimizer.clearAllAppCache(context)
-                                        Toast.makeText(context, "🧹 تم تنظيف الكاش والملفات المؤقتة وتسريع التطبيق بنجاح!", Toast.LENGTH_LONG).show()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "🧹 تم تنظيف ذاكرة التخزين المؤقت للصور الكلية بنجاح!", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
-                            ) {
-                                Text("تنظيف الملفات الكاش والذاكرة المؤقتة 🧹", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+                    AdminStorageAndCacheScreenContent(viewModel = viewModel, themeColors = themeColors)
                 }
             }
 
@@ -7989,39 +7971,19 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
             if (activeSubTab == "SYSTEM_SETTINGS") {
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("⚙️ إعدادات النظام العامة وتفضيلات التطبيق", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("إصدار التطبيق: 2.6.0 (محدث لعام 2026)", fontSize = 12.sp, color = Color.White)
-                            Text("اللغة الافتراضية: العربية (مفعل)", fontSize = 12.sp, color = Color.LightGray)
-                        }
-                    }
+                    AdminSystemSettingsScreenContent(viewModel = viewModel, themeColors = themeColors)
                 }
             }
 
             if (activeSubTab == "AUTO_DISPATCH") {
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("🧭 خوارزميات التوجيه التلقائي والذكاء", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("وضع التوجيه الحالي: التوجيه التلقائي لأقرب فني (Auto-Nearest)", fontSize = 12.sp, color = Color(0xFF3B82F6))
-                            Button(onClick = { viewModel.triggerNotification("🧭 تم تحديث خوارزمية التوجيه بنجاح") }) {
-                                Text("تطبيق خوارزمية التوجيه الذكي", fontSize = 11.sp)
-                            }
-                        }
-                    }
+                    AdminAutoRoutingScreenContent(viewModel = viewModel, themeColors = themeColors)
                 }
             }
 
             if (activeSubTab == "API_MANAGEMENT") {
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("🔌 إدارة مفاتيح الربط والخدمات السحابية (API)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            Text("حالة الاتصال بقاعدة بيانات Firebase Firestore: متصل ومنتظم", fontSize = 12.sp, color = Color(0xFF10B981))
-                            Text("حالة ربط خريطة Leaflet / OpenStreetMap: مفعل", fontSize = 12.sp, color = Color.White)
-                        }
-                    }
+                    AdminApiKeysScreenContent(viewModel = viewModel, themeColors = themeColors)
                 }
             }
 
@@ -8148,56 +8110,13 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
             if (activeSubTab == "MAINTENANCE_MODE") {
                 item {
-                    val isMaint = settingsState.isMaintenanceActive
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = if (isMaint) Color(0xFF7F1D1D) else themeColors.surface),
-                        border = BorderStroke(2.dp, if (isMaint) Color.Red else Color(0xFF10B981)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("🚧 مركز إدارة وضع الصيانة والطوارئ المتقدم", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                            
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = if (isMaint) Color.Red.copy(alpha = 0.2f) else Color(0xFF10B981).copy(alpha = 0.2f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(if (isMaint) "🚨 وضع الصيانة نشط حالياً!" else "✅ وضع التشغيل الطبيعي (التطبيق نشط)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (isMaint) Color.Red else Color(0xFF10B981))
-                                        Text(if (isMaint) "التطبيق مغلق أمام الزوار والعملاء مع إظهار شاشة الصيانة." else "التطبيق يعمل بكامل طاقته واستجابة الخدمة 100%.", fontSize = 11.sp, color = Color.White)
-                                    }
-                                }
-                            }
+                    AdminMaintenanceScreenContent(viewModel = viewModel, themeColors = themeColors)
+                }
+            }
 
-                            Button(
-                                onClick = {
-                                    val st = settingsState
-                                    val newStatus = !st.isMaintenanceActive
-                                    viewModel.updateBackdoorSettings(
-                                        st.appName, st.welcomeMessage, st.footerMessage, st.activeThemeId,
-                                        st.supportPhone, st.supportEmail, st.supportWhatsapp,
-                                        newStatus, st.hidePromoFooter, st.assistantHidden, st.assistantSize,
-                                        st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
-                                        false, 90
-                                    )
-                                    Toast.makeText(context, if (newStatus) "🚨 تم تفعيل وضع الصيانة فوراً!" else "🟢 تم إيقاف وضع الصيانة وإعادة تشغيل التطبيق للعملاء!", Toast.LENGTH_LONG).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = if (isMaint) Color(0xFF10B981) else Color.Red),
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
-                            ) {
-                                Text(
-                                    text = if (isMaint) "🟢 إيقاف وضع الصيانة وإعادة فتح التطبيق للجميع" else "🔴 تفعيل وضع الصيانة والطوارئ فوراً 🛑",
-                                    fontSize = 12.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
+            if (activeSubTab == "DATA_MANAGEMENT") {
+                item {
+                    AdminDataManagementScreenContent(viewModel = viewModel, themeColors = themeColors)
                 }
             }
         }
