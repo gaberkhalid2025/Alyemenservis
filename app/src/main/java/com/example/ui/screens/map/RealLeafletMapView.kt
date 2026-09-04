@@ -107,6 +107,9 @@ fun RealLeafletMapView(
                         databaseEnabled = true
                         allowFileAccess = true
                         allowContentAccess = true
+                        allowFileAccessFromFileURLs = true
+                        allowUniversalAccessFromFileURLs = true
+                        javaScriptCanOpenWindowsAutomatically = true
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         cacheMode = WebSettings.LOAD_DEFAULT
@@ -248,7 +251,9 @@ fun RealLeafletMapView(
         if (hasLoadError) {
             MapErrorOverlay(
                 onSwitchToRadar = onSwitchToRadar,
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 96.dp)
             )
         }
     }

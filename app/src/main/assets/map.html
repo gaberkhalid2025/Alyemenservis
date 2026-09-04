@@ -108,21 +108,22 @@
     </div>
 
     <script>
+        // Safe default coordinates (Sana'a center: 15.3694, 44.1910)
         var userLat = 15.3694;
         var userLng = 44.1910;
         try {
-            if (window.AndroidBridge && window.AndroidBridge.getUserLat) {
-                userLat = parseFloat(window.AndroidBridge.getUserLat());
-            } else {
-                userLat = parseFloat("_USER_LAT_");
-            }
-            if (window.AndroidBridge && window.AndroidBridge.getUserLng) {
-                userLng = parseFloat(window.AndroidBridge.getUserLng());
-            } else {
-                userLng = parseFloat("_USER_LNG_");
+            if (window.AndroidBridge) {
+                if (typeof window.AndroidBridge.getUserLat === 'function') {
+                    var parsedLat = parseFloat(window.AndroidBridge.getUserLat());
+                    if (!isNaN(parsedLat) && parsedLat !== 0) userLat = parsedLat;
+                }
+                if (typeof window.AndroidBridge.getUserLng === 'function') {
+                    var parsedLng = parseFloat(window.AndroidBridge.getUserLng());
+                    if (!isNaN(parsedLng) && parsedLng !== 0) userLng = parsedLng;
+                }
             }
         } catch(e) {
-            console.error("Coordinate retrieval failed: " + e);
+            console.error("Coordinate retrieval exception: " + e);
         }
         var map = null;
         var clusterGroup = null;
@@ -131,7 +132,7 @@
             console.error("Map initialization failed: " + reason);
             var overlay = document.getElementById("map-fallback-overlay");
             if (overlay) overlay.style.display = "block";
-            if (window.AndroidBridge && window.AndroidBridge.onMapLoadFailed) {
+            if (window.AndroidBridge && typeof window.AndroidBridge.onMapLoadFailed === 'function') {
                 window.AndroidBridge.onMapLoadFailed();
             }
         }
@@ -163,43 +164,32 @@
             }
 
             try {
-                // Ensure valid coordinates
-                if (!userLat || userLat === 0) userLat = 15.3694;
-                if (!userLng || userLng === 0) userLng = 44.1910;
+                if (isNaN(userLat) || userLat === 0) userLat = 15.3694;
+                if (isNaN(userLng) || userLng === 0) userLng = 44.1910;
 
-                map = L.map('map', { zoomControl: false, attributionControl: false }).setView([userLat, userLng], 14);
+                map = L.map('map', { 
+                    zoomControl: false, 
+                    attributionControl: false,
+                    fadeAnimation: true,
+                    zoomAnimation: true
+                }).setView([userLat, userLng], 14);
 
-                // Try Google Maps first (unblocked and cached locally via Google Global Cache in Yemen)
-                var googleLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                // Multiple high-speed tile layers with automatic fallback
+                var primaryLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
                     maxZoom: 20,
                     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
                     attribution: 'Google Maps'
                 });
 
-                googleLayer.on('tileerror', function() {
-                    console.warn("Google Maps tile server failed. Trying OSM CartoDB fallback...");
-                    map.removeLayer(googleLayer);
-                    
-                    // Fallback to CartoDB
-                    var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                        maxZoom: 19,
-                        subdomains: 'abcd'
+                primaryLayer.on('tileerror', function() {
+                    console.warn("Primary Google tile server warning. Adding fallback tile source...");
+                    var osmBackup = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19
                     });
-                    
-                    cartoLayer.on('tileerror', function() {
-                        console.warn("CartoDB tile server failed. Trying Standard OSM fallback...");
-                        map.removeLayer(cartoLayer);
-                        
-                        // Fallback to Standard OSM
-                        var osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            maxZoom: 19
-                        });
-                        osmLayer.addTo(map);
-                    });
-                    cartoLayer.addTo(map);
+                    osmBackup.addTo(map);
                 });
-                
-                googleLayer.addTo(map);
+
+                primaryLayer.addTo(map);
 
                 var userIcon = L.divIcon({
                     className: 'user-marker-container',
@@ -254,7 +244,7 @@
                                 "<div class='popup-buttons-row'>" +
                                     callBtnHtml +
                                     navBtnHtml +
-                                "</div>" +
+                                    "</div>" +
                             "</div>" +
                             "</div>";
 
@@ -263,33 +253,33 @@
                     });
 
                     map.addLayer(clusterGroup);
-                    console.log("Leaflet map markers updated successfully: " + rawMarkers.length);
+                    console.log("Leaflet map markers updated: " + rawMarkers.length);
                 };
 
                 window.updateMapCenter = function(lat, lng) {
-                    if (map) {
+                    if (map && !isNaN(lat) && !isNaN(lng)) {
+                        userLat = lat;
+                        userLng = lng;
                         map.setView([lat, lng], map.getZoom() || 14);
                     }
                 };
 
                 var initialMarkers = [];
                 try {
-                    if (window.AndroidBridge && window.AndroidBridge.getMarkersJson) {
+                    if (window.AndroidBridge && typeof window.AndroidBridge.getMarkersJson === 'function') {
                         var mJson = window.AndroidBridge.getMarkersJson();
-                        if (mJson) {
+                        if (mJson && mJson.length > 2) {
                             initialMarkers = JSON.parse(mJson);
                         }
-                    } else {
-                        initialMarkers = _MARKERS_JSON_;
                     }
                 } catch(e) {
                     console.error("Markers retrieval failed: " + e);
                 }
-                if (initialMarkers && Array.isArray(initialMarkers)) {
+                if (initialMarkers && Array.isArray(initialMarkers) && initialMarkers.length > 0) {
                     window.updateMapMarkers(initialMarkers);
                 }
 
-                if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+                if (window.AndroidBridge && typeof window.AndroidBridge.onMapReady === 'function') {
                     window.AndroidBridge.onMapReady();
                 }
             } catch(e) {
@@ -297,8 +287,12 @@
             }
         }
 
-        // Call initMapEngine directly since Leaflet is bundled locally
-        initMapEngine();
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initMapEngine);
+        } else {
+            initMapEngine();
+        }
     </script>
 </body>
 </html>

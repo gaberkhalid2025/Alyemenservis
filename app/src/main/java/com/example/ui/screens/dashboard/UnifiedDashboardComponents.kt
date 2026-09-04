@@ -140,3 +140,52 @@ fun UnifiedEmptyState(
 ) {
     com.example.ui.screens.dashboard.components.UnifiedEmptyState(icon, title, description, themeColors, modifier)
 }
+
+@Composable
+fun ProfessionalDashboardHeader(
+    account: UnifiedBusinessAccount,
+    subtitle: String,
+    isVerified: Boolean,
+    isServiceActive: Boolean,
+    onToggleServiceActive: (Boolean) -> Unit,
+    onEditProfileClick: () -> Unit,
+    onShareClick: () -> Unit,
+    onBackClick: () -> Unit,
+    themeColors: VisualThemePalette,
+    coverUrl: String = "",
+    avatarUrl: String = ""
+) {
+    com.example.ui.screens.dashboard.components.ProfessionalDashboardHeader(
+        account = account,
+        subtitle = subtitle,
+        isVerified = isVerified,
+        isServiceActive = isServiceActive,
+        onToggleServiceActive = onToggleServiceActive,
+        onEditProfileClick = onEditProfileClick,
+        onShareClick = onShareClick,
+        onBackClick = onBackClick,
+        themeColors = themeColors,
+        coverUrl = coverUrl,
+        avatarUrl = avatarUrl
+    )
+}
+
+@Composable
+fun ProfessionalQuickStatsGrid(
+    todayOrdersCount: Int,
+    overallRating: Number,
+    activeOffersCount: Int,
+    approxRevenue: String,
+    themeColors: VisualThemePalette,
+    modifier: Modifier = Modifier
+) {
+    com.example.ui.screens.dashboard.components.ProfessionalQuickStatsGrid(
+        todayOrdersCount = todayOrdersCount,
+        overallRating = overallRating,
+        activeOffersCount = activeOffersCount,
+        approxRevenue = approxRevenue,
+        themeColors = themeColors,
+        modifier = modifier
+    )
+}
+

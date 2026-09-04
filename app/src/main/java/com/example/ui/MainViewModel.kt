@@ -1639,9 +1639,20 @@ fun triggerNotification(
         triggerNotification("$title: $message", context)
     }
 
-fun triggerNotification(msg: String, context: android.content.Context? = null) {
+    private var lastNotifMsg: String = ""
+    private var lastNotifTime: Long = 0L
+
+    fun triggerNotification(msg: String, context: android.content.Context? = null) {
+        val now = System.currentTimeMillis()
+        if (msg == lastNotifMsg && (now - lastNotifTime) < 3000L) {
+            return
+        }
+        lastNotifMsg = msg
+        lastNotifTime = now
+
         _toastMessage.value = msg
         val ctx = context ?: appContext
+
         if (ctx != null) {
             try {
                 val channelId = "yemen_services_alerts"
@@ -2246,6 +2257,16 @@ fun addNotification(
     fun updatePropertyEntity(property: PropertyEntity) {
         db.collection("properties").document(property.id).set(property)
         triggerNotification("✅ تم تحديث بيانات العقار بنجاح")
+    }
+    fun updateBusinessAccountStatus(accountId: String, isActive: Boolean) {
+        viewModelScope.launch {
+            try {
+                db.collection("stores").document(accountId).update("isActive", isActive)
+            } catch (e: Exception) {}
+            try {
+                db.collection("providers").document(accountId).update("isAvailable", isActive)
+            } catch (e: Exception) {}
+        }
     }
     fun updateEntityImages(collection: String, id: String, profileImg: String, coverImg: String) {
         val updates = mutableMapOf<String, Any>()

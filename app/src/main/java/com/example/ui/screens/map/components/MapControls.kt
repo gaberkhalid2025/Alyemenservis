@@ -61,8 +61,8 @@ fun MapControls(
                 .testTag("toggle_radar_btn")
         ) {
             Icon(
-                imageVector = if (isRadarMode) Icons.Default.Place else Icons.Default.Refresh,
-                contentDescription = if (isRadarMode) "خريطة OSM" else "رادار"
+                imageVector = if (isRadarMode) Icons.Default.Place else Icons.Default.Explore,
+                contentDescription = if (isRadarMode) "الخريطة الحية" else "رادار الخدمات المحلي"
             )
         }
 

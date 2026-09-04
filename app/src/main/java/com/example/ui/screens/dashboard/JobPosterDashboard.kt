@@ -68,65 +68,58 @@ fun JobPosterDashboard(
         Pair("📊", "الإحصائيات")
     )
 
+    val allJobs by viewModel.jobs.collectAsState()
+    val myJobs = remember(allJobs, account.phone) {
+        allJobs.filter { it.phone == account.phone || it.companyName == account.name }
+    }
+
+    var isServiceActive by remember { mutableStateOf(account.isActive) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0D151F))
     ) {
-        // Top Header Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF142030))
-                .border(1.dp, Color.White.copy(alpha = 0.08f))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(Color.White.copy(alpha = 0.08f), CircleShape)
-            ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = account.name.ifBlank { "لوحة معلن الوظائف" },
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "💼 مسؤول التوظيف والشركات • ${account.city}",
-                    fontSize = 11.sp,
-                    color = Color(0xFF90CAF9)
-                )
-            }
+        // Professional Top Header
+        ProfessionalDashboardHeader(
+            account = account,
+            subtitle = "💼 مسؤول توظيف وشركات • ${account.city.ifBlank { "اليمن" }}",
+            isVerified = true,
+            isServiceActive = isServiceActive,
+            onToggleServiceActive = { active ->
+                isServiceActive = active
+                viewModel.updateBusinessAccountStatus(account.id, active)
+            },
+            onEditProfileClick = { activeTab = 2 },
+            onShareClick = {
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, "وظائف شاغرة معلنة من قِبل ${account.name}: ${account.phone}")
+                    type = "text/plain"
+                }
+                context.startActivity(android.content.Intent.createChooser(sendIntent, "مشاركة حساب التوظيف"))
+            },
+            onBackClick = onBackClick,
+            themeColors = themeColors
+        )
 
-            Surface(
-                color = Color(0xFF00C853),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "معلن معتمد ✓",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    fontSize = 11.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+        // Quick Stats Strip
+        ProfessionalQuickStatsGrid(
+            todayOrdersCount = myJobs.size,
+            overallRating = 5.0,
+            activeOffersCount = myJobs.size,
+            approxRevenue = "${myJobs.size} شواغر",
+            themeColors = themeColors,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+        )
 
         // Horizontal Tabs Bar
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF0D151F))
-                .padding(vertical = 10.dp, horizontal = 8.dp),
+                .padding(vertical = 6.dp, horizontal = 8.dp),
+
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(tabsList.size) { index ->

@@ -73,66 +73,128 @@ fun TechnicianDashboard(
     val providers by viewModel.providers.collectAsState()
     val matchingProvider = providers.find { it.id == account.id || it.phone == account.phone }
     val isVerified = account.isVerified || (matchingProvider?.subscriptionStatus == "APPROVED" || matchingProvider?.isAvailable == true)
+    var isServiceActive by remember { mutableStateOf(account.isActive) }
+    var availabilityStatus by remember { mutableStateOf("ONLINE") } // ONLINE, BUSY, OFFLINE
+    var coverageKm by remember { mutableIntStateOf(15) }
+
+    val instantRequests by viewModel.instantRequests.collectAsState()
+    val urgentCount = remember(instantRequests, account.city) {
+        instantRequests.count { req ->
+            (req.status == "WAITING_FOR_OFFERS" || req.status == "REVIEWING_OFFERS") &&
+            (account.city.isBlank() || req.userCity.isBlank() || req.userCity.contains(account.city, ignoreCase = true) || account.city.contains(req.userCity, ignoreCase = true))
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0F172A))
     ) {
-        // Top Header Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF1E293B))
-                .border(1.dp, Color.White.copy(alpha = 0.08f))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(Color.White.copy(alpha = 0.08f), CircleShape)
-            ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = account.name.ifBlank { "لوحة تحكم الفني" },
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "🛠️ فني معتمد • ${account.neighborhood.ifBlank { account.city }}",
-                    fontSize = 11.sp,
-                    color = themeColors.accent
-                )
-            }
+        // Professional Top Header
+        ProfessionalDashboardHeader(
+            account = account,
+            subtitle = "🛠️ فني وصاحب مهنة • ${account.neighborhood.ifBlank { account.city.ifBlank { "اليمن" } }}",
+            isVerified = isVerified,
+            isServiceActive = isServiceActive && availabilityStatus != "OFFLINE",
+            onToggleServiceActive = { active ->
+                isServiceActive = active
+                availabilityStatus = if (active) "ONLINE" else "OFFLINE"
+                viewModel.updateBusinessAccountStatus(account.id, active)
+            },
+            onEditProfileClick = { activeTab = 5 },
+            onShareClick = {
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, "تواصل مع الفني ${account.name} لخدمات الصيانة المباشرة: ${account.phone}")
+                    type = "text/plain"
+                }
+                context.startActivity(android.content.Intent.createChooser(sendIntent, "مشاركة حساب الفني"))
+            },
+            onBackClick = onBackClick,
+            themeColors = themeColors
+        )
 
-            Surface(
-                color = if (isVerified) Color(0xFF10B981) else Color(0xFFF59E0B),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = if (isVerified) "موثق ✓" else "قيد التوثيق ⏳",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    fontSize = 10.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold
-                )
+        // Availability State Bar & Coverage Radius
+        Surface(
+            color = Color(0xFF1E293B),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("حالة التوفر:", fontSize = 10.5.sp, color = Color.Gray)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(
+                            Triple("ONLINE", "🟢 متاح الآن", Color(0xFF10B981)),
+                            Triple("BUSY", "🟡 مشغول", Color(0xFFF59E0B)),
+                            Triple("OFFLINE", "⚪ غير متصل", Color(0xFF94A3B8))
+                        ).forEach { (st, label, color) ->
+                            val isSelected = availabilityStatus == st
+                            Surface(
+                                color = if (isSelected) color.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = if (isSelected) BorderStroke(1.dp, color) else null,
+                                modifier = Modifier.clickable {
+                                    availabilityStatus = st
+                                    isServiceActive = (st != "OFFLINE")
+                                    Toast.makeText(context, "تم تغيير الحالة إلى: $label", Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) color else Color.LightGray,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("📍 نطاق العمل الجغرافي: ${coverageKm} كم حول ${account.city.ifBlank { "المنطقة" }}", fontSize = 10.sp, color = themeColors.accent)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf(10, 20, 35).forEach { km ->
+                            val isSelected = coverageKm == km
+                            Surface(
+                                color = if (isSelected) themeColors.accent.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.04f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = if (isSelected) BorderStroke(1.dp, themeColors.accent) else null,
+                                modifier = Modifier.clickable { coverageKm = km }
+                            ) {
+                                Text("${km}كم", fontSize = 9.sp, color = if (isSelected) themeColors.accent else Color.Gray, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
+
+        // Quick Stats Strip
+        ProfessionalQuickStatsGrid(
+            todayOrdersCount = urgentCount + 2,
+            overallRating = account.rating,
+            activeOffersCount = urgentCount,
+            approxRevenue = "24,500 ر.ي",
+            themeColors = themeColors,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+        )
 
         // Horizontal Tabs Bar
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF0F172A))
-                .padding(vertical = 10.dp, horizontal = 8.dp),
+                .padding(vertical = 6.dp, horizontal = 8.dp),
+
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(tabsList.size) { index ->

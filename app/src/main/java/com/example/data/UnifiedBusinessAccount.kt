@@ -56,6 +56,9 @@ data class UnifiedBusinessAccount(
 ) {
     val city: String get() = cityId
     val specialty: String get() = description
+    val isActive: Boolean get() = isBookingEnabled && !isDeleted
+    val logoUrl: String get() = logoImage
+    val reviewsCount: Int get() = numReviews
     companion object {
         fun fromProvider(p: ProviderEntity): UnifiedBusinessAccount {
             return UnifiedBusinessAccount(
