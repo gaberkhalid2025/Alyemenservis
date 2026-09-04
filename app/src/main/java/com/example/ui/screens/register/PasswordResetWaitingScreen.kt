@@ -366,7 +366,7 @@ fun PasswordResetWaitingScreen(
                         // In-app chat
                         Button(
                             onClick = {
-                                viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+                                viewModel.openSupportChat()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                             shape = RoundedCornerShape(10.dp),

@@ -386,13 +386,14 @@ private fun RestaurantBookingsAndChatsSection(
 
                             Button(
                                 onClick = {
-                                    viewModel.getOrCreateChatChannel(
-                                        providerId = account.id,
-                                        providerName = account.name,
-                                        customerId = b.clientId.ifBlank { b.customerPhone },
-                                        customerName = b.clientName.ifBlank { b.customerName }
-                                    )
-                                    viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.CHAT_DIRECT)
+                                    viewModel.openOrCreateChatChannel(
+                                        targetId = b.clientId.ifBlank { b.customerPhone },
+                                        targetType = "CUSTOMER",
+                                        targetName = b.clientName.ifBlank { b.customerName },
+                                        targetPhone = b.customerPhone
+                                    ) {
+                                        viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.CHAT_DIRECT)
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                                 shape = RoundedCornerShape(8.dp),

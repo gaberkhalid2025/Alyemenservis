@@ -26,6 +26,8 @@ class InstantRequestViewModel : BaseViewModel() {
     internal val _offers = MutableStateFlow<List<com.example.data.models.Offer>>(emptyList())
     val offers: StateFlow<List<com.example.data.models.Offer>> = _offers.asStateFlow()
 
+    private val repository = com.example.data.repositories.InstantRequestRepository()
+
     fun createInstantRequest(
         userId: String,
         userName: String,
@@ -62,13 +64,11 @@ class InstantRequestViewModel : BaseViewModel() {
             status = "PENDING",
             createdAt = System.currentTimeMillis()
         )
-        db.collection("instant_requests").document(reqId).set(req)
-            .addOnSuccessListener {
-                onResult(true, "تم تقديم الطلب الفوري بنجاح بنظام الكود: $code", reqId)
-            }
-            .addOnFailureListener { e ->
-                onResult(false, e.message ?: "فشل تقديم الطلب", "")
-            }
+        repository.createInstantRequest(
+            request = req,
+            onSuccess = { createdReq -> onResult(true, "تم تقديم الطلب الفوري بنجاح بنظام الكود: $code", createdReq.id) },
+            onError = { err -> onResult(false, err, "") }
+        )
     }
 
 fun submitOfferForRequest(
@@ -102,20 +102,10 @@ fun submitOfferForRequest(
             createdAt = System.currentTimeMillis()
         )
 
-        db.collection("request_offers").document(offerId).set(offer)
-            .addOnSuccessListener {
-                val reqRef = db.collection("instant_requests").document(requestId)
-                db.runTransaction { transaction ->
-                    val snapshot = transaction.get(reqRef)
-                    val currentCount = snapshot.getLong("offersCount")?.toInt() ?: 0
-                    transaction.update(reqRef, mapOf(
-                        "offersCount" to currentCount + 1,
-                        "status" to "REVIEWING_OFFERS"
-                    ))
-                }
+        repository.submitOffer(
+            offer = offer,
+            onSuccess = {
                 triggerNotification?.invoke("💰 تم تقديم عرض السعر ($price ر.ي) بنجاح للطلب $requestCode!")
-
-                // Notify customer about new offer
                 val targetReq = _instantRequests.value.find { it.id == requestId }
                 if (targetReq != null && targetReq.userPhone.isNotBlank()) {
                     addNotification?.invoke(
@@ -125,98 +115,68 @@ fun submitOfferForRequest(
                         targetReq.userPhone
                     )
                 }
+            },
+            onError = { err ->
+                triggerNotification?.invoke("❌ تعذر تقديم العرض: $err")
             }
-            .addOnFailureListener {
-                triggerNotification?.invoke("❌ تعذر تقديم العرض: ${it.localizedMessage}")
-            }
+        )
     }
 
-fun acceptRequestOffer(
+    fun acceptRequestOffer(
         req: com.example.data.models.InstantRequestEntity,
         offer: com.example.data.models.RequestOfferEntity
     ) {
-        db.collection("request_offers").document(offer.id).update("status", "ACCEPTED")
-        
-        db.collection("instant_requests").document(req.id).update(mapOf(
-            "status" to "ACCEPTED",
-            "acceptedOfferId" to offer.id,
-            "acceptedTechnicianId" to offer.technicianId,
-            "acceptedTechnicianName" to offer.technicianName,
-            "acceptedTechnicianPhone" to offer.technicianPhone,
-            "acceptedPrice" to offer.price
-        ))
-
-        val bookingId = java.util.UUID.randomUUID().toString()
-        val booking = com.example.data.BookingEntity(
-            id = bookingId,
-            bookingNumber = req.requestCode,
-            bookingPassword = req.cancellationPassword,
-            pinCode = req.secretPin,
-            clientId = req.userId,
-            clientName = req.userName,
-            clientPhone = req.userPhone,
-            clientAddress = "${req.userCity} - ${req.userNeighborhood}",
-            customerName = req.userName,
-            customerPhone = req.userPhone,
-            customerArea = req.userCity,
+        repository.acceptOffer(
+            requestId = req.id,
+            offerId = offer.id,
             providerId = offer.technicianId,
             providerName = offer.technicianName,
             providerPhone = offer.technicianPhone,
-            category = req.categoryName,
-            serviceType = req.serviceTitle,
-            serviceDetails = req.description,
-            date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH).format(java.util.Date()),
-            time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.ENGLISH).format(java.util.Date()),
-            dateString = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH).format(java.util.Date()),
-            timeString = java.text.SimpleDateFormat("HH:mm", java.util.Locale.ENGLISH).format(java.util.Date()),
-            status = "APPROVED",
-            totalAmount = offer.price,
-            createdAt = System.currentTimeMillis()
-        )
-
-        db.collection("bookings").document(bookingId).set(booking)
-        triggerNotification?.invoke("🎉 تم قبول عرض ${offer.technicianName} بنجاح وتحويل الطلب إلى حجز مؤكد!")
-
-        // Notify winning provider
-        addNotification?.invoke(
-            "🎉 تم اختيار عرضك للطلب ${req.requestCode}",
-            "تهانينا $offer.technicianName! اختار العميل $req.userName عرضك بسعر $offer.price ر.ي للطلب $req.requestCode. يمكنك البدء في التواصل والمباشرة الآن.",
-            "PROVIDER",
-            offer.technicianPhone
-        )
-
-        // Notify other bidders
-        val otherOffers = _requestOffers.value.filter { it.requestId == req.id && it.id != offer.id }
-        otherOffers.forEach { otherOffer ->
-            db.collection("request_offers").document(otherOffer.id).update("status", "REJECTED")
-            addNotification?.invoke(
-                "📢 تم اختيار عرض آخر للطلب ${req.requestCode}",
-                "شكراً لمشاركتك. تم اختيار عرض أسعار آخر من قبل العميل للطلب ${req.requestCode}.",
-                "PROVIDER",
-                otherOffer.technicianPhone
-            )
-        }
-
-        // Create active chat channel between customer & winning provider
-        getOrCreateChatChannel?.invoke(offer.technicianId, offer.technicianName, req.userPhone, req.userName)
-    }
-
-fun completeInstantRequest(requestId: String) {
-        db.collection("instant_requests").document(requestId).update("status", "COMPLETED")
-            .addOnSuccessListener {
-                triggerNotification?.invoke("✅ تم إكمال وتنفيذ الطلب الفوري بنجاح!")
+            acceptedPrice = offer.price,
+            onSuccess = {
+                triggerNotification?.invoke("🎉 تم قبول عرض ${offer.technicianName} بنجاح وتحويل الطلب إلى حجز مؤكد!")
+                addNotification?.invoke(
+                    "🎉 تم اختيار عرضك للطلب ${req.requestCode}",
+                    "تهانينا ${offer.technicianName}! اختار العميل ${req.userName} عرضك بسعر ${offer.price} ر.ي للطلب ${req.requestCode}. يمكنك البدء في التواصل والمباشرة الآن.",
+                    "PROVIDER",
+                    offer.technicianPhone
+                )
+                
+                val otherOffers = _requestOffers.value.filter { it.requestId == req.id && it.id != offer.id }
+                otherOffers.forEach { otherOffer ->
+                    addNotification?.invoke(
+                        "📢 تم اختيار عرض آخر للطلب ${req.requestCode}",
+                        "شكراً لمشاركتك. تم اختيار عرض أسعار آخر من قبل العميل للطلب ${req.requestCode}.",
+                        "PROVIDER",
+                        otherOffer.technicianPhone
+                    )
+                }
+                
+                getOrCreateChatChannel?.invoke(offer.technicianId, offer.technicianName, req.userPhone, req.userName)
+            },
+            onError = { err ->
+                triggerNotification?.invoke("❌ خطأ: $err")
             }
+        )
     }
 
-fun cancelInstantRequest(requestId: String, passwordInput: String = "", isCustomer: Boolean = true, reqPass: String = "") {
+    fun completeInstantRequest(requestId: String) {
+        repository.completeInstantRequest(
+            requestId = requestId,
+            onSuccess = { triggerNotification?.invoke("✅ تم إكمال وتنفيذ الطلب الفوري بنجاح!") },
+            onError = { err -> triggerNotification?.invoke("❌ خطأ: $err") }
+        )
+    }
+
+    fun cancelInstantRequest(requestId: String, passwordInput: String = "", isCustomer: Boolean = true, reqPass: String = "") {
         if (isCustomer && reqPass.isNotEmpty() && passwordInput != reqPass) {
             triggerNotification?.invoke("❌ رمز إلقاء/إلغاء الطلب غير صحيح!")
             return
         }
-        db.collection("instant_requests").document(requestId).update("status", "CANCELLED")
-            .addOnSuccessListener {
-                triggerNotification?.invoke("🚫 تم إلغاء الطلب الفوري بنجاح.")
-            }
+        repository.cancelInstantRequest(
+            requestId = requestId,
+            onSuccess = { triggerNotification?.invoke("🚫 تم إلغاء الطلب الفوري بنجاح.") },
+            onError = { err -> triggerNotification?.invoke("❌ خطأ: $err") }
+        )
     }
-
 }

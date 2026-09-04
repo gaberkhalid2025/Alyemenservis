@@ -270,30 +270,29 @@ class UrgentViewModel : ViewModel() {
                         .collection("offers").document(offerId)
                         .update("status", "ACCEPTED").await()
 
-                    val channelId = "chat_p_${offer.technicianId}_u_${req.customerId}"
                     val dispCustomerName = req.customerName.ifEmpty { "عميل" }
-                    val displayName = "دردشة: ${offer.technicianName} مع $dispCustomerName"
-                    val chatChannel = com.example.data.ChatChannelEntity(
-                        id = channelId,
-                        userName = displayName,
-                        targetId = offer.technicianId,
-                        targetName = offer.technicianName,
-                        customerId = req.customerId,
-                        customerName = dispCustomerName,
-                        lastMessage = "مرحباً! تم قبول عرضك للطلب العاجل رقم ${req.id.take(6)}. تم فتح هذه المحادثة لتنسيق العمل.",
-                        timestamp = System.currentTimeMillis(),
-                        isProvider = false,
-                        messages = listOf(
-                            com.example.data.ChatMessageEntity(
-                                id = java.util.UUID.randomUUID().toString(),
-                                senderId = "system",
-                                message = "مرحباً! تم قبول عرضك للطلب العاجل رقم ${req.id.take(6)}. تم فتح هذه المحادثة لتنسيق العمل.",
-                                timestamp = System.currentTimeMillis(),
-                                senderName = "النظام"
-                            )
-                        )
+                    val chatRepo = com.example.data.repositories.ChatRepository()
+                    val chatResult = chatRepo.getOrCreateChannel(
+                        currentUserId = req.customerId,
+                        currentUserName = dispCustomerName,
+                        currentUserPhoto = "",
+                        otherUserId = offer.technicianId,
+                        otherUserName = offer.technicianName,
+                        otherUserPhoto = offer.technicianAvatar,
+                        type = com.example.data.models.ChannelType.PRIVATE,
+                        relatedEntityId = req.id,
+                        relatedEntityType = "URGENT_REQUEST"
                     )
-                    firestore.collection("chat_channels").document(channelId).set(chatChannel).await()
+
+                    if (chatResult is com.example.utils.AppResult.Success) {
+                        chatRepo.sendMessage(
+                            channelId = chatResult.data.id,
+                            senderId = "system",
+                            senderName = "النظام",
+                            messageText = "مرحباً! تم قبول عرضك للطلب العاجل رقم ${req.id.take(6)}. تم فتح هذه المحادثة لتنسيق العمل.",
+                            mediaType = com.example.data.models.MediaType.TEXT
+                        )
+                    }
                 } else {
                     firestore.collection("urgent_requests").document(requestId).update(
                         mapOf(

@@ -2564,7 +2564,21 @@ fun addNotification(
     fun listenToUserSupportChat(userId: String) = chatViewModel.listenToUserSupportChat(userId)
     fun markChannelMessagesAsRead(channelId: String) = chatViewModel.markChannelMessagesAsRead(channelId)
     fun markMessageAsRead(channelId: String, messageId: String) = chatViewModel.markMessageAsRead(channelId, messageId)
-    fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) = chatViewModel.getOrCreateChatChannel(providerId, providerName, customerId, customerName)
+    fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) {
+        viewModelScope.launch {
+            com.example.data.repositories.ChatRepository().getOrCreateChannel(
+                currentUserId = providerId,
+                currentUserName = providerName,
+                currentUserPhoto = "",
+                otherUserId = customerId,
+                otherUserName = customerName,
+                otherUserPhoto = "",
+                type = com.example.data.models.ChannelType.PRIVATE,
+                relatedEntityId = null,
+                relatedEntityType = null
+            )
+        }
+    }
     fun clearGeneralChatHistory() = chatViewModel.clearGeneralChatHistory()
     fun deleteAllChats() = chatViewModel.deleteAllChats()
     fun deleteChatChannel(channelId: String) = chatViewModel.deleteChatChannel(channelId)
@@ -2621,8 +2635,58 @@ fun addNotification(
     val currentSupervisorPermissions get() = authViewModel.currentSupervisorPermissions
     val triggerRestoreAccountDialog = MutableStateFlow(false)
 
+    var targetChatChannelId by mutableStateOf<String?>(null)
+
+    fun openSupportChat() {
+        val currentUserId = authViewModel.currentUserId.value.ifBlank { return }
+        val currentUserName = authViewModel.currentUserName.value ?: "العميل"
+        val currentUserPhoto = ""
+        
+        viewModelScope.launch {
+            val result = com.example.data.repositories.ChatRepository().getOrCreateChannel(
+                currentUserId = currentUserId,
+                currentUserName = currentUserName,
+                currentUserPhoto = currentUserPhoto,
+                otherUserId = "ADMIN",
+                otherUserName = "الدعم الفني",
+                otherUserPhoto = "",
+                type = com.example.data.models.ChannelType.SUPPORT,
+                relatedEntityId = null,
+                relatedEntityType = null
+            )
+            if (result is AppResult.Success) {
+                targetChatChannelId = result.data.id
+                navigateToScreen("CHAT_DIRECT")
+            }
+        }
+    }
+
     fun openChatChannel(channel: ChatChannelEntity?) {
-        chatViewModel.openChatChannel(channel)
+        if (channel == null) return
+        val currentUserId = authViewModel.currentUserId.value.ifBlank { return }
+        val currentUserName = authViewModel.currentUserName.value ?: ""
+        val currentUserPhoto = ""
+        
+        val otherUserId = if (channel.customerId == currentUserId) channel.targetId else channel.customerId
+        val otherUserName = if (channel.customerId == currentUserId) channel.targetName else channel.customerName
+        
+        viewModelScope.launch {
+            val result = com.example.data.repositories.ChatRepository().getOrCreateChannel(
+                currentUserId = currentUserId,
+                currentUserName = currentUserName,
+                currentUserPhoto = currentUserPhoto,
+                otherUserId = otherUserId,
+                otherUserName = otherUserName,
+                otherUserPhoto = "",
+                type = com.example.data.models.ChannelType.PRIVATE,
+                relatedEntityId = null,
+                relatedEntityType = null
+            )
+            if (result is AppResult.Success) {
+                targetChatChannelId = result.data.id
+                // Note: The caller usually navigates, so we don't navigate here.
+            }
+        }
     }
 
     fun verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
@@ -2725,11 +2789,35 @@ fun addNotification(
         targetCategory: String = "",
         relatedEntityId: String = "",
         relatedEntityType: String = "",
-        onCreated: (ChatChannelEntity) -> Unit
+        onCreated: (ChatChannelEntity?) -> Unit
     ) {
-        chatViewModel.openOrCreateChatChannel(
-            targetId, targetType, targetName, targetPhone, targetCategory, relatedEntityId, relatedEntityType, onCreated
-        )
+        val currentUserId = authViewModel.currentUserId.value.ifBlank { return }
+        val currentUserName = authViewModel.currentUserName.value ?: "العميل"
+        val currentUserPhoto = ""
+        
+        viewModelScope.launch {
+            val result = com.example.data.repositories.ChatRepository().getOrCreateChannel(
+                currentUserId = currentUserId,
+                currentUserName = currentUserName,
+                currentUserPhoto = currentUserPhoto,
+                otherUserId = targetId,
+                otherUserName = targetName,
+                otherUserPhoto = "",
+                type = com.example.data.models.ChannelType.PRIVATE,
+                relatedEntityId = relatedEntityId.takeIf { it.isNotBlank() },
+                relatedEntityType = relatedEntityType.takeIf { it.isNotBlank() }
+            )
+            
+            if (result is AppResult.Success) {
+                targetChatChannelId = result.data.id
+                // We pass a dummy ChatChannelEntity since the callers expect it.
+                // Callers only use createdCh.id.
+                val dummy = ChatChannelEntity(id = result.data.id)
+                onCreated(dummy)
+            } else {
+                onCreated(null)
+            }
+        }
     }
 
     fun sendNotificationToApplicants(title: String, message: String, jobId: String = "") {

@@ -27,7 +27,7 @@ fun UrgentOffersList(
     offers: List<RequestOfferEntity>,
     isOwner: Boolean,
     onAcceptOffer: (RequestOfferEntity) -> Unit,
-    onContactProvider: (phone: String, name: String) -> Unit,
+    onContactProvider: (RequestOfferEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -152,7 +152,7 @@ fun UrgentOffersList(
                                         Text("قبول العرض ✅", fontSize = 12.sp, color = Color.White)
                                     }
                                     OutlinedButton(
-                                        onClick = { onContactProvider(offer.technicianPhone, offer.technicianName) },
+                                        onClick = { onContactProvider(offer) },
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {

@@ -123,12 +123,12 @@ fun UrgentRequestDetailsScreen(
                             }
                         }
                     },
-                    onContactProvider = { phone, name ->
-                        if (phone.isNotBlank()) {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                    onContactProvider = { offer ->
+                        if (offer.technicianPhone.isNotBlank()) {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${offer.technicianPhone}"))
                             context.startActivity(intent)
                         } else {
-                            onNavigateToChat(phone, name)
+                            onNavigateToChat(offer.technicianId, offer.technicianName)
                         }
                     }
                 )

@@ -102,7 +102,7 @@ fun AppNavigator(
                         preselectedRegistrationType = preselectedRegistrationType,
                         onPreselectedRegistrationTypeChange = { preselectedRegistrationType = it },
                         onChatOpen = { _ ->
-                            viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+                            viewModel.openSupportChat()
                         }
                     )
                 }
@@ -116,12 +116,12 @@ fun AppNavigator(
                 )
                 AppScreens.STATUS_VIEW -> StatusScreen(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.CATEGORIES_VIEW -> CategoriesScreen(viewModel = viewModel, themeColors = themeColors, onCategoryClick = { cat -> viewModel.selectCategory(cat); viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
-                AppScreens.STORES_VIEW -> StoresScreen(viewModel = viewModel, themeColors = themeColors, onStoreClick = {}, onChatClick = { viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onRequestServiceClick = { showRequestServiceModal = true })
-                AppScreens.MEDICAL_VIEW -> MedicalCentersScreen(viewModel = viewModel, themeColors = themeColors, onMedicalCenterClick = {}, onChatClick = { viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onBookAppointmentClick = { showRequestServiceModal = true })
-                AppScreens.RESTAURANTS_VIEW -> RestaurantsScreen(viewModel = viewModel, themeColors = themeColors, onRestaurantClick = {}, onChatClick = { viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onOrderMealClick = { showRequestServiceModal = true })
-                AppScreens.PROPERTIES_VIEW -> PropertiesScreen(viewModel = viewModel, themeColors = themeColors, onPropertyClick = {}, onChatClick = { viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onRequestInspectionClick = { showRequestServiceModal = true })
-                AppScreens.CHAT_LIST -> ChatListScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, onChannelClick = { viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
-                AppScreens.CHAT_DIRECT -> ChatScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
+                AppScreens.STORES_VIEW -> StoresScreen(viewModel = viewModel, themeColors = themeColors, onStoreClick = {}, onChatClick = { viewModel.openSupportChat() }, onRequestServiceClick = { showRequestServiceModal = true })
+                AppScreens.MEDICAL_VIEW -> MedicalCentersScreen(viewModel = viewModel, themeColors = themeColors, onMedicalCenterClick = {}, onChatClick = { viewModel.openSupportChat() }, onBookAppointmentClick = { showRequestServiceModal = true })
+                AppScreens.RESTAURANTS_VIEW -> RestaurantsScreen(viewModel = viewModel, themeColors = themeColors, onRestaurantClick = {}, onChatClick = { viewModel.openSupportChat() }, onOrderMealClick = { showRequestServiceModal = true })
+                AppScreens.PROPERTIES_VIEW -> PropertiesScreen(viewModel = viewModel, themeColors = themeColors, onPropertyClick = {}, onChatClick = { viewModel.openSupportChat() }, onRequestInspectionClick = { showRequestServiceModal = true })
+                AppScreens.CHAT_LIST -> ChatListScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, onChannelClick = { ch -> viewModel.targetChatChannelId = ch.id; viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
+                AppScreens.CHAT_DIRECT -> ChatScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, channelId = viewModel.targetChatChannelId, onBackClick = { viewModel.targetChatChannelId = null; viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
                 AppScreens.CREATE_BOOKING -> CreateBookingScreen(onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }, onBookingCreated = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
                 AppScreens.DYNAMIC_PROFILE, AppScreens.OWNER_PROFILE_VIEW, AppScreens.PROVIDER_DETAILS, AppScreens.STORE_DETAILS, AppScreens.PROPERTY_DETAILS -> DynamicPolymorphicProfileScreen(
                     provider = viewModel.selectedProvider,
@@ -154,7 +154,18 @@ fun AppNavigator(
                     offers = viewModel.requestOffers.collectAsState().value,
                     isOwner = viewModel.isProviderUser,
                     onAcceptOffer = { _ -> },
-                    onContactProvider = { _, _ -> viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }
+                    onContactProvider = { offer ->
+                        viewModel.openOrCreateChatChannel(
+                            targetId = offer.technicianId,
+                            targetType = "URGENT_REQUEST",
+                            targetName = offer.technicianName,
+                            targetPhone = offer.technicianPhone,
+                            relatedEntityId = offer.requestId,
+                            relatedEntityType = "URGENT_REQUEST"
+                        ) {
+                            viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+                        }
+                    }
                 )
                 AppScreens.REGISTER_FORM, AppScreens.JOIN_REQUEST_STATUS -> {
                     RegisterScreen(
@@ -213,7 +224,7 @@ fun AppNavigator(
                     settings = settingsState,
                     themeColors = themeColors,
                     onDismiss = { showAssistantDialog = false },
-                    onChatOpen = { viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }
+                    onChatOpen = { viewModel.openSupportChat() }
                 )
             }
             if (showRequestServiceModal) {
