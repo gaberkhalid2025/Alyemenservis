@@ -21,21 +21,21 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
 import com.example.ui.components.UrgentTimerComponent
-import com.example.ui.viewmodels.UrgentUiState
-import com.example.ui.viewmodels.UrgentViewModel
+import com.example.ui.viewmodels.InstantRequestViewModel
+import com.example.ui.viewmodels.InstantUiState
 import kotlinx.coroutines.launch
 
 /**
  * ⚡ UrgentOfferSubmissionScreen
  * تقديم عرض استجابة سريعة للطلبات العاجلة مع مؤقت وخيارات وصول فورية.
- * تعتمد على UrgentViewModel وتدعم Snackbar ورسائل الأخطاء المنظمة.
+ * تعتمد على InstantRequestViewModel وتدعم Snackbar ورسائل الأخطاء المنظمة.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentOfferSubmissionScreen(
     requestId: String,
     viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onOfferSubmitted: () -> Unit = {}
 ) {
@@ -43,8 +43,8 @@ fun UrgentOfferSubmissionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
-    val request by urgentViewModel.selectedRequest.collectAsState()
-    val uiState by urgentViewModel.uiState.collectAsState()
+    val request by instantViewModel.selectedRequest.collectAsState()
+    val uiState by instantViewModel.uiState.collectAsState()
 
     var priceText by remember { mutableStateOf("") }
     var estimatedArrival by remember { mutableStateOf(UrgentConstants.urgencyTimeOptions.first()) }
@@ -62,7 +62,7 @@ fun UrgentOfferSubmissionScreen(
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
-            urgentViewModel.observeRequestDetails(requestId)
+            instantViewModel.observeRequestDetails(requestId)
         }
     }
 
@@ -85,7 +85,7 @@ fun UrgentOfferSubmissionScreen(
             )
         }
     ) { paddingValues ->
-        if (uiState is UrgentUiState.Loading && request == null) {
+        if (uiState is InstantUiState.Loading && request == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xFFD32F2F))
             }
@@ -138,19 +138,17 @@ fun UrgentOfferSubmissionScreen(
                 label = { Text("السعر المقترح (ريال يمني)*") },
                 supportingText = {
                     if (formattedPriceLabel.isNotBlank()) {
-                        Text("السعر المنسق: $formattedPriceLabel", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
-                    } else {
-                        Text("الحد الأدنى لتقديم عرض عاجل هو 1,000 ريال يمني")
+                        Text("المبلغ: $formattedPriceLabel", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
                     }
                 },
-                leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFF2E7D32)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth().testTag("urgent_offer_price_input"),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(12.dp),
                 singleLine = true
             )
 
-            // خيارات الوصول السريع
-            Text("وقت الوصول المؤكد لموقع العميل*", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            // وقت الوصول المتوقع
+            Text("وقت الوصول المتوقع:", fontWeight = FontWeight.Medium, fontSize = 14.sp)
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -160,17 +158,13 @@ fun UrgentOfferSubmissionScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { estimatedArrival = opt },
-                        label = { Text(opt, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFFFFCDD2),
-                            selectedLabelColor = Color(0xFFB71C1C)
-                        )
+                        label = { Text(opt, fontSize = 12.sp) }
                     )
                 }
             }
 
-            // مدة الإنجاز
-            Text("المدة المتوقعة لإنهاء العمل*", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            // المدة المقدرة للإنجاز
+            Text("المدة المقدرة للإنجاز:", fontWeight = FontWeight.Medium, fontSize = 14.sp)
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -197,7 +191,7 @@ fun UrgentOfferSubmissionScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // زر إرسال العرض العاجل
-            val isSubmitting = uiState is UrgentUiState.Loading
+            val isSubmitting = uiState is InstantUiState.Loading
             Button(
                 onClick = {
                     val price = priceText.toDoubleOrNull()
@@ -210,21 +204,21 @@ fun UrgentOfferSubmissionScreen(
                         return@Button
                     }
 
-                    urgentViewModel.submitUrgentOffer(
-                        currentReq = currentReq,
+                    instantViewModel.submitOfferForRequest(
+                        requestId = currentReq.id,
+                        requestCode = currentReq.requestCode,
+                        technicianId = currentUserId,
+                        technicianName = "فني طوارئ معتمد",
+                        technicianPhone = currentUserId,
+                        technicianAvatar = "",
+                        technicianRating = 5.0f,
                         price = price,
-                        estimatedArrival = estimatedArrival,
+                        estimatedArrivalTime = estimatedArrival,
                         estimatedDuration = estimatedDuration,
-                        notesText = notesText,
-                        currentUserId = currentUserId,
-                        onSuccess = {
-                            scope.launch { snackbarHostState.showSnackbar("تم إرسال عرضك الفوري بنجاح!") }
-                            onOfferSubmitted()
-                        },
-                        onError = { err ->
-                            scope.launch { snackbarHostState.showSnackbar(err) }
-                        }
+                        notes = notesText
                     )
+                    scope.launch { snackbarHostState.showSnackbar("تم إرسال عرضك الفوري بنجاح!") }
+                    onOfferSubmitted()
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_urgent_offer_btn"),
                 shape = RoundedCornerShape(12.dp),

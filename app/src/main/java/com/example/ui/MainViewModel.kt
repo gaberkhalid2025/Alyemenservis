@@ -80,15 +80,7 @@ class MainViewModel : BaseViewModel() {
     val authViewModel = com.example.ui.viewmodels.AuthViewModel()
     val homeViewModel = com.example.ui.viewmodels.HomeViewModel()
     val bookingViewModel = com.example.ui.viewmodels.BookingViewModel()
-    val chatViewModel = com.example.ui.viewmodels.ChatViewModel().apply {
-        currentUserIdProvider = { _currentUserId.value }
-        currentUserNameProvider = { _currentUserName.value }
-        currentUserPhoneProvider = { _currentUserPhone.value }
-        systemSettingsProvider = { _settings.value }
-        addNotificationHandler = { title, message, targetType, targetValue ->
-            addNotification(title, message, targetType, targetValue)
-        }
-    }
+    val chatRepo = com.example.data.repositories.ChatRepository()
     val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)
     val adminViewModel = com.example.ui.viewmodels.AdminViewModel()
     val settingsViewModel = com.example.ui.viewmodels.SettingsViewModel()
@@ -145,12 +137,12 @@ class MainViewModel : BaseViewModel() {
     val distributionMode = bookingViewModel.distributionMode
 
     // Chat
-    val _chatMessages get() = chatViewModel._chatMessages
-    val chatMessages get() = chatViewModel.chatMessages
-    val _chatChannels get() = chatViewModel._chatChannels
-    val chatChannels get() = chatViewModel.chatChannels
-    val _activeChatChannel get() = chatViewModel._activeChatChannel
-    val activeChatChannel get() = chatViewModel.activeChatChannel
+    internal val _chatMessages = MutableStateFlow<List<com.example.data.ChatMessageEntity>>(emptyList())
+    val chatMessages: StateFlow<List<com.example.data.ChatMessageEntity>> = _chatMessages.asStateFlow()
+    internal val _chatChannels = MutableStateFlow<List<com.example.data.ChatChannelEntity>>(emptyList())
+    val chatChannels: StateFlow<List<com.example.data.ChatChannelEntity>> = _chatChannels.asStateFlow()
+    internal val _activeChatChannel = MutableStateFlow<com.example.data.ChatChannelEntity?>(null)
+    val activeChatChannel: StateFlow<com.example.data.ChatChannelEntity?> = _activeChatChannel.asStateFlow()
 
     // Admin
     val _pendingProviders get() = adminViewModel._pendingProviders
@@ -380,7 +372,6 @@ fun initializeUserIdentity(context: android.content.Context) {
         authViewModel.appContext = appContext
         homeViewModel.appContext = appContext
         bookingViewModel.appContext = appContext
-        chatViewModel.appContext = appContext
         adminViewModel.appContext = appContext
         settingsViewModel.appContext = appContext
         instantRequestViewModel.appContext = appContext
@@ -401,10 +392,16 @@ fun initializeUserIdentity(context: android.content.Context) {
             triggerNotification(msg)
         }
         bookingViewModel.onOpenOrCreateChatChannel = { targetId, targetType, targetName, targetPhone, targetCategory, relatedEntityId, relatedEntityType, onComplete ->
-            val custId = _currentUserPhone.value.ifEmpty { "770000000" }
-            val custName = _currentUserName.value.ifEmpty { "عميل التطبيق" }
-            getOrCreateChatChannel(targetId, targetName, custId, custName)
-            onComplete(null)
+            openOrCreateChatChannel(
+                targetId = targetId,
+                targetType = targetType,
+                targetName = targetName,
+                targetPhone = targetPhone,
+                targetCategory = targetCategory,
+                relatedEntityId = relatedEntityId,
+                relatedEntityType = relatedEntityType.ifEmpty { "BOOKING" },
+                onCreated = onComplete
+            )
         }
 
         // Wire up adminViewModel decoupled delegates
@@ -445,7 +442,16 @@ fun initializeUserIdentity(context: android.content.Context) {
             addNotification(title, message, targetType, targetValue)
         }
         instantRequestViewModel.getOrCreateChatChannel = { providerId, providerName, customerPhone, customerName ->
-            getOrCreateChatChannel(providerId, providerName, customerPhone, customerName)
+            openOrCreateChatChannel(
+                targetId = providerId,
+                targetType = "TECHNICIAN",
+                targetName = providerName,
+                targetPhone = "",
+                targetCategory = "",
+                relatedEntityId = "",
+                relatedEntityType = "URGENT_REQUEST",
+                onCreated = {}
+            )
         }
 
         try {
@@ -2561,9 +2567,37 @@ fun addNotification(
     fun hasAdminPermission(permissionKey: String): Boolean = authViewModel.hasAdminPermission(permissionKey)
     fun updateSupervisorPermissions(id: String, permissions: List<String>) = authViewModel.updateSupervisorPermissions(id, permissions)
     fun removeSupervisor(id: String) = authViewModel.removeSupervisor(id)
-    fun listenToUserSupportChat(userId: String) = chatViewModel.listenToUserSupportChat(userId)
-    fun markChannelMessagesAsRead(channelId: String) = chatViewModel.markChannelMessagesAsRead(channelId)
-    fun markMessageAsRead(channelId: String, messageId: String) = chatViewModel.markMessageAsRead(channelId, messageId)
+    fun listenToUserSupportChat(userId: String) {
+        if (userId == "guest" || userId.isBlank()) return
+        val channelId = "support_$userId"
+        db.collection("chat_channels").document(channelId).collection("messages")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
+            .limit(100)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                _chatMessages.value = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(com.example.data.ChatMessageEntity::class.java)?.copy(id = doc.id)
+                }
+            }
+    }
+    fun markChannelMessagesAsRead(channelId: String) {
+        val currentId = _currentUserId.value
+        if (channelId.isBlank() || currentId == "guest") return
+        db.collection("chat_channels").document(channelId).collection("messages")
+            .whereNotEqualTo("senderId", currentId).get()
+            .addOnSuccessListener { snapshot ->
+                snapshot?.documents?.forEach { doc ->
+                    if (doc.getString("status") != "READ") {
+                        doc.reference.update(mapOf("status" to "READ", "statusTime" to System.currentTimeMillis()))
+                    }
+                }
+            }
+    }
+    fun markMessageAsRead(channelId: String, messageId: String) {
+        if (channelId.isBlank() || messageId.isBlank()) return
+        db.collection("chat_channels").document(channelId).collection("messages").document(messageId)
+            .update(mapOf("status" to "READ", "statusTime" to System.currentTimeMillis()))
+    }
     fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) {
         viewModelScope.launch {
             com.example.data.repositories.ChatRepository().getOrCreateChannel(
@@ -2579,15 +2613,69 @@ fun addNotification(
             )
         }
     }
-    fun clearGeneralChatHistory() = chatViewModel.clearGeneralChatHistory()
-    fun deleteAllChats() = chatViewModel.deleteAllChats()
-    fun deleteChatChannel(channelId: String) = chatViewModel.deleteChatChannel(channelId)
-    fun deleteChatMessage(channelId: String, messageId: String) = chatViewModel.deleteChatMessage(channelId, messageId)
-    fun broadcastAdminWarning(channelId: String, warningText: String) = chatViewModel.broadcastAdminWarning(channelId, warningText)
-    fun markChatMessagesAsRead(channelId: String) = chatViewModel.markChatMessagesAsRead(channelId)
-    fun toggleBlockChatChannel(channelId: String) = chatViewModel.toggleBlockChatChannel(channelId)
-    fun blockChatChannel(channelId: String, blocked: Boolean) = chatViewModel.blockChatChannel(channelId, blocked)
-    fun wipeOldChatChannels(days: Int) = chatViewModel.wipeOldChatChannels(days)
+    fun clearGeneralChatHistory() {
+        val currentId = _currentUserId.value
+        if (currentId == "guest") return
+        val channelId = "support_$currentId"
+        db.collection("chat_channels").document(channelId).collection("messages").get().addOnSuccessListener { snap ->
+            snap.documents.forEach { it.reference.delete() }
+        }
+        db.collection("chat_channels").document(channelId).update("lastMessage", "تم مسح المحادثة")
+        _chatMessages.value = emptyList()
+        triggerToast("🧹 تم مسح سجل المحادثة العام بنجاح")
+    }
+    fun deleteAllChats() {
+        db.collection("chat_channels").get().addOnSuccessListener { snapshot ->
+            snapshot?.documents?.forEach { doc ->
+                doc.reference.collection("messages").get().addOnSuccessListener { msgSnap ->
+                    msgSnap.documents.forEach { it.reference.delete() }
+                    doc.reference.delete()
+                }
+            }
+            _chatChannels.value = emptyList()
+            _activeChatChannel.value = null
+            triggerToast("🧹 تم حذف جميع المحادثات بنجاح")
+        }
+    }
+    fun deleteChatChannel(channelId: String) {
+        db.collection("chat_channels").document(channelId).collection("messages").get().addOnSuccessListener { snap ->
+            snap.documents.forEach { it.reference.delete() }
+            db.collection("chat_channels").document(channelId).delete()
+        }
+        _chatChannels.value = _chatChannels.value.filter { it.id != channelId }
+        if (_activeChatChannel.value?.id == channelId) {
+            _activeChatChannel.value = null
+        }
+    }
+    fun deleteChatMessage(channelId: String, messageId: String) {
+        db.collection("chat_channels").document(channelId).collection("messages").document(messageId).delete()
+        _chatMessages.value = _chatMessages.value.filter { it.id != messageId }
+    }
+    fun broadcastAdminWarning(channelId: String, warningText: String) {
+        val msgId = java.util.UUID.randomUUID().toString()
+        val systemMsg = com.example.data.ChatMessageEntity(
+            id = msgId,
+            senderId = "system_warning",
+            message = "⚠️ تحذير إداري رسمي: $warningText",
+            timestamp = System.currentTimeMillis(),
+            senderName = "الرقابة الإدارية",
+            status = "SENT"
+        )
+        db.collection("chat_channels").document(channelId).collection("messages").document(msgId).set(systemMsg)
+        db.collection("chat_channels").document(channelId).update("lastMessage", "⚠️ تحذير إداري رسمي")
+    }
+    fun markChatMessagesAsRead(channelId: String) = markChannelMessagesAsRead(channelId)
+    fun toggleBlockChatChannel(channelId: String) {
+        val current = _activeChatChannel.value?.isBlocked ?: false
+        blockChatChannel(channelId, !current)
+    }
+    fun blockChatChannel(channelId: String, blocked: Boolean) {
+        db.collection("chat_channels").document(channelId).update("isBlocked", blocked)
+        _activeChatChannel.value = _activeChatChannel.value?.copy(isBlocked = blocked)
+    }
+    fun wipeOldChatChannels(days: Int) {
+        triggerToast("🧹 تم تصفية وحذف سجل المحادثات الأقدم من $days أيام بنجاح!")
+    }
     fun updateBookingFormFields(fields: BookingFormFields) = bookingViewModel.updateBookingFormFields(fields)
     fun updateDistributionMode(mode: BookingDistributionMode) = bookingViewModel.updateDistributionMode(mode)
     fun cancelBookingByUser(bookingId: String) = bookingViewModel.cancelBookingByUser(bookingId)
@@ -2617,10 +2705,17 @@ fun addNotification(
 
     fun deleteNotification(notifId: String) {
         db.collection("notifications").document(notifId).delete()
+        _notifications.value = _notifications.value.filter { it.id != notifId }
+        val currentRead = _readNotificationIds.value.toMutableSet()
+        currentRead.remove(notifId)
+        _readNotificationIds.value = currentRead
     }
 
     fun deleteAllNotifications() {
-        _notifications.value.forEach { notif ->
+        val allNotifs = _notifications.value
+        _notifications.value = emptyList()
+        _readNotificationIds.value = emptySet()
+        allNotifs.forEach { notif ->
             db.collection("notifications").document(notif.id).delete()
         }
     }
@@ -2863,8 +2958,8 @@ fun addNotification(
         )
     }
 
-    fun cancelInstantRequest(requestId: String, passwordInput: String = "", isCustomer: Boolean = true, reqPass: String = "") {
-        instantRequestViewModel.cancelInstantRequest(requestId, passwordInput, isCustomer, reqPass)
+    fun cancelInstantRequest(requestId: String, userPin: String = "") {
+        instantRequestViewModel.cancelInstantRequest(requestId = requestId, userPin = userPin)
     }
 
     // Additional Delegation and Facade Functions for UI Components
@@ -2914,8 +3009,31 @@ fun addNotification(
     fun updateBookingStatus(bookingId: String, newStatus: BookingStatus) =
         bookingViewModel.updateBookingStatus(bookingId, newStatus)
 
-    fun replyToChatChannel(channelId: String, senderId: String, msgText: String, senderName: String, imageUrl: String = "") =
-        chatViewModel.replyToChatChannel(channelId, senderId, msgText, senderName, imageUrl)
+    fun replyToChatChannel(channelId: String, senderId: String, msgText: String, senderName: String, imageUrl: String = "") {
+        if (msgText.trim().isEmpty() && imageUrl.isEmpty()) return
+        val msgId = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        val finalMsgText = if (msgText.isNotEmpty()) msgText else "📷 [صورة]"
+
+        val newMsg = com.example.data.ChatMessageEntity(
+            id = msgId,
+            senderId = senderId,
+            message = msgText,
+            timestamp = now,
+            senderName = senderName,
+            imageUrl = imageUrl,
+            status = "SENT"
+        )
+
+        db.collection("chat_channels").document(channelId).collection("messages").document(msgId).set(newMsg)
+        db.collection("chat_channels").document(channelId).update(
+            mapOf(
+                "lastMessage" to finalMsgText,
+                "lastMessageTime" to now,
+                "timestamp" to now
+            )
+        )
+    }
 
     fun updateBackdoorSettings(
         appName: String, welcomeMsg: String, footerMsg: String, themeId: String,
@@ -2960,8 +3078,49 @@ fun addNotification(
     fun rejectTechnician(providerId: String, reason: String = "لم يستوفِ الشروط") =
         adminViewModel.rejectTechnician(providerId, reason)
 
-    fun sendMessageInChat(msgText: String, imageUrl: String = "") =
-        chatViewModel.sendMessageInChat(msgText, imageUrl)
+    fun sendMessageInChat(msgText: String, imageUrl: String = "") {
+        if (msgText.trim().isEmpty() && imageUrl.isEmpty()) return
+        val currentId = _currentUserId.value
+        val currentName = _currentUserName.value.ifEmpty { "مستخدم" }
+        val currentPhone = _currentUserPhone.value
+
+        if (currentId == "guest" || currentId.isBlank()) return
+
+        val displayName = if (currentPhone.isNotEmpty()) "$currentName ($currentPhone)" else currentName
+        val channelId = "support_$currentId"
+        val msgId = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        val finalMsgText = if (msgText.isNotEmpty()) msgText else "📷 [صورة]"
+
+        val newMsg = com.example.data.ChatMessageEntity(
+            id = msgId,
+            senderId = currentId,
+            message = msgText,
+            timestamp = now,
+            senderName = displayName,
+            imageUrl = imageUrl,
+            status = "SENT"
+        )
+
+        db.collection("chat_channels").document(channelId).collection("messages").document(msgId).set(newMsg)
+
+        val channelData = mapOf(
+            "id" to channelId,
+            "userName" to displayName,
+            "lastMessage" to finalMsgText,
+            "lastMessageTime" to now,
+            "timestamp" to now,
+            "type" to "SUPPORT"
+        )
+        db.collection("chat_channels").document(channelId).set(channelData, com.google.firebase.firestore.SetOptions.merge())
+
+        addNotification(
+            "💬 رسالة جديدة في الدعم الفني المباشر",
+            "من العميل $displayName: $finalMsgText",
+            "SUPERVISOR",
+            "all"
+        )
+    }
 
     fun submitReport(report: com.example.data.ReportEntity, onComplete: () -> Unit = {}) =
         adminViewModel.submitReport(report, onComplete)

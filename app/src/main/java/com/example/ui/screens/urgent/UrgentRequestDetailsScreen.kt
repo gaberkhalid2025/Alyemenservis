@@ -26,7 +26,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.dialogs.MultiDimensionRatingDialog
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
-import com.example.ui.viewmodels.UrgentViewModel
+import com.example.ui.viewmodels.InstantRequestViewModel
 
 /**
  * 🚨 UrgentRequestDetailsScreen
@@ -37,7 +37,7 @@ import com.example.ui.viewmodels.UrgentViewModel
 fun UrgentRequestDetailsScreen(
     requestId: String,
     viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = viewModel(),
     themeColors: VisualThemePalette? = null,
     onNavigateBack: () -> Unit = {},
     onNavigateToOfferSelection: (offerId: String) -> Unit = {},
@@ -52,8 +52,8 @@ fun UrgentRequestDetailsScreen(
     val currentUserId by viewModel.currentUserId.collectAsState()
     val isProvider = viewModel.isProviderUser
 
-    val request by urgentViewModel.selectedRequest.collectAsState()
-    val offers by urgentViewModel.offersForRequest.collectAsState()
+    val request by instantViewModel.selectedRequest.collectAsState()
+    val offers by instantViewModel.requestOffers.collectAsState()
 
     var showCancelDialog by remember { mutableStateOf(false) }
     var showRatingDialog by remember { mutableStateOf(false) }
@@ -61,7 +61,7 @@ fun UrgentRequestDetailsScreen(
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
-            urgentViewModel.observeRequestDetails(requestId)
+            instantViewModel.observeRequestDetails(requestId)
         }
     }
 
@@ -88,7 +88,7 @@ fun UrgentRequestDetailsScreen(
                     }
                 },
                 actions = {
-                    if (request?.status == "WAITING_FOR_OFFERS" || request?.status == "REVIEWING_OFFERS") {
+                    if (request?.status == "WAITING_FOR_OFFERS" || request?.status == "REVIEWING_OFFERS" || request?.status == "PENDING") {
                         IconButton(onClick = { showCancelDialog = true }) {
                             Icon(Icons.Default.Close, contentDescription = "إلغاء الطلب", tint = Color(0xFFD32F2F))
                         }
@@ -117,7 +117,7 @@ fun UrgentRequestDetailsScreen(
                     offers = offers,
                     isOwner = req.userId == currentUserId,
                     onAcceptOffer = { offer ->
-                        urgentViewModel.acceptOffer(req.id, offer.id, offer.technicianPhone) { success, msg ->
+                        instantViewModel.acceptOffer(req.id, offer.id, offer.technicianPhone) { success, msg ->
                             if (success) {
                                 onNavigateToOfferSelection(offer.id)
                             }
@@ -133,7 +133,7 @@ fun UrgentRequestDetailsScreen(
                     }
                 )
 
-                if (isProvider && (req.status == "WAITING_FOR_OFFERS" || req.status == "REVIEWING_OFFERS")) {
+                if (isProvider && (req.status == "WAITING_FOR_OFFERS" || req.status == "REVIEWING_OFFERS" || req.status == "PENDING")) {
                     Button(
                         onClick = { onNavigateToUrgentOfferSubmission(req.id) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
@@ -195,7 +195,7 @@ fun UrgentRequestDetailsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        urgentViewModel.cancelUrgentRequest(request!!.id, enteredPin, context) { success, msg ->
+                        instantViewModel.cancelInstantRequest(request!!.id, enteredPin, context) { success, _ ->
                             showCancelDialog = false
                             if (success) {
                                 onNavigateBack()

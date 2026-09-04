@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
-import com.example.ui.viewmodels.UrgentViewModel
+import com.example.ui.viewmodels.InstantRequestViewModel
 
 /**
  * ⚡ UrgentRequestsListScreen
@@ -28,7 +28,7 @@ import com.example.ui.viewmodels.UrgentViewModel
 @Composable
 fun UrgentRequestsListScreen(
     viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = viewModel(),
     themeColors: VisualThemePalette,
     onNavigateBack: () -> Unit = {},
     onNavigateToDetails: (requestId: String) -> Unit = {},
@@ -41,13 +41,13 @@ fun UrgentRequestsListScreen(
     val currentUserId by viewModel.currentUserId.collectAsState()
     val isProvider = viewModel.isProviderUser
 
-    val requestsList by urgentViewModel.urgentRequests.collectAsState()
+    val requestsList by instantViewModel.instantRequests.collectAsState()
 
     var onlyUnder10MinFilter by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(currentUserId, isProvider) {
-        urgentViewModel.observeUrgentRequests(currentUserId, isProvider)
+        instantViewModel.observeInstantRequests(currentUserId, isProvider)
     }
 
     val now = System.currentTimeMillis()

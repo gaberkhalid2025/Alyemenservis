@@ -125,7 +125,7 @@ class StatusRepositoryImpl(
     override fun getSystemBookingsFlow(): Flow<List<BookingEntity>> = getSystemBookings()
 
     override fun getInstantRequests(): Flow<List<InstantRequestEntity>> = callbackFlow {
-        val listener = firestore.collection("urgent_requests")
+        val listener = firestore.collection("instant_requests")
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())

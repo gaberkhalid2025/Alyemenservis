@@ -23,8 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
-import com.example.ui.viewmodels.UrgentUiState
-import com.example.ui.viewmodels.UrgentViewModel
+import com.example.ui.viewmodels.InstantRequestViewModel
+import com.example.ui.viewmodels.InstantUiState
 import kotlinx.coroutines.launch
 
 import com.example.ui.screens.urgent.components.UrgentFormFields
@@ -32,13 +32,13 @@ import com.example.ui.screens.urgent.components.UrgentFormFields
 /**
  * 🚨 UrgentRequestScreen
  * شاشة طلب خدمة عاجلة خلال 30 دقيقة مع مؤقت فوري وتنبيهات أولوية قصوى.
- * تستخدم النمط المعماري MVVM مع UrgentViewModel وعرض الملاحظات عبر Snackbar.
+ * تستخدم النمط المعماري MVVM مع InstantRequestViewModel وعرض الملاحظات عبر Snackbar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UrgentRequestScreen(
     viewModel: MainViewModel,
-    urgentViewModel: UrgentViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToUrgentList: () -> Unit = {}
 ) {
@@ -46,7 +46,7 @@ fun UrgentRequestScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
-    val uiState by urgentViewModel.uiState.collectAsState()
+    val uiState by instantViewModel.uiState.collectAsState()
 
     var customerPhone by remember { mutableStateOf("") }
     var customerName by remember { mutableStateOf("") }
@@ -73,7 +73,7 @@ fun UrgentRequestScreen(
 
     LaunchedEffect(uiState) {
         when (val state = uiState) {
-            is UrgentUiState.Error -> {
+            is InstantUiState.Error -> {
                 scope.launch {
                     snackbarHostState.showSnackbar(state.message)
                 }
@@ -89,12 +89,7 @@ fun UrgentRequestScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFD32F2F))
-                        Text(
-                            text = "طلب عاجل - 30 دقيقة",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = Color(0xFFD32F2F)
-                        )
+                        Text("طلب صيانة طارئة (30 دقيقة)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }
                 },
                 navigationIcon = {
@@ -102,39 +97,38 @@ fun UrgentRequestScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFFFEBEE),
-                    titleContentColor = Color(0xFFB71C1C)
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
-    ) { paddingValues ->
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // شريط تنبيه 30 دقيقة فوري
+            // كارد تنبيه الطوارئ
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
-                border = BorderStroke(1.5.dp, Color(0xFFE53935))
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFD32F2F), modifier = Modifier.size(32.dp))
-                    Column {
-                        Text("خدمة الاستجابة السريعة (30 دقيقة)", fontWeight = FontWeight.Bold, color = Color(0xFFB71C1C), fontSize = 15.sp)
-                        Text("يتم إرسال إشعار فوري عالي الأولوية للفنيين الأقرب لموقعك لاستلام العروض خلال 30 دقيقة فقط.", fontSize = 12.sp, color = Color(0xFFC62828))
-                    }
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFD32F2F))
+                    Text(
+                        "🚨 سيتم إشعار جميع الفنيين المتاحين فوراً في نطاق منطقتك وتقديم عروض خلال 30 دقيقة كحد أقصى.",
+                        fontSize = 13.sp,
+                        color = Color(0xFFB71C1C),
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
 
-            // بيانات التواصل والموقع
-            Text("بيانات التواصل والموقع", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             UrgentFormFields(
                 customerName = customerName,
                 onCustomerNameChange = { customerName = it },
@@ -146,80 +140,49 @@ fun UrgentRequestScreen(
                 onAreaChange = { selectedArea = it }
             )
 
-            HorizontalDivider()
-
-            // القسم والتخصص
-            Text("قسم الخدمة العاجلة", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                UrgentConstants.departments.forEach { dept ->
-                    FilterChip(
-                        selected = selectedDepartment == dept,
-                        onClick = { selectedDepartment = dept },
-                        label = { Text(dept, fontSize = 12.sp) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = selectedCategory,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("التخصص الطارئ*") },
-                    trailingIcon = {
-                        IconButton(onClick = { expandedCategoryDropdown = true }) {
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().testTag("urgent_category")
-                )
-                DropdownMenu(expanded = expandedCategoryDropdown, onDismissRequest = { expandedCategoryDropdown = false }) {
-                    subCategories.forEach { cat ->
-                        DropdownMenuItem(text = { Text(cat) }, onClick = { selectedCategory = cat; expandedCategoryDropdown = false })
-                    }
-                }
-            }
-
-            // تفاصيل المشكلة العاجلة
             OutlinedTextField(
                 value = serviceTitle,
                 onValueChange = { serviceTitle = it },
-                label = { Text("عنوان الحالة الطارئة (مثال: عطل كهربائي مفاجئ)*") },
-                modifier = Modifier.fillMaxWidth().testTag("urgent_title"),
+                label = { Text("عنوان الخدمة الطارئة *") },
+                placeholder = { Text("مثال: تسرب مياه طارئ في المطبخ") },
+                modifier = Modifier.fillMaxWidth().testTag("urgent_service_title"),
                 singleLine = true
             )
 
             OutlinedTextField(
                 value = serviceDetails,
                 onValueChange = { serviceDetails = it },
-                label = { Text("وصف الحالة الطارئة والمطلوب بالتفصيل*") },
-                modifier = Modifier.fillMaxWidth().height(100.dp).testTag("urgent_details"),
-                maxLines = 3
+                label = { Text("تفاصيل المشكلة والخدمة المطلوب تنفيذها *") },
+                placeholder = { Text("اكتب وصفاً توضيحياً للمشكلة لتمكين الفنيين من تقييم العمل وتقديم العرض المناسب...") },
+                modifier = Modifier.fillMaxWidth().height(100.dp).testTag("urgent_service_details"),
+                maxLines = 4
             )
 
-            // رمز PIN للحماية
-            Text("رمز PIN للحماية (4 أرقام)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            // رمز PIN للأمان والإلغاء
             OutlinedTextField(
                 value = pinCode,
-                onValueChange = { if (it.length <= 4 && it.all { char -> char.isDigit() }) pinCode = it },
-                label = { Text("رمز PIN سري (4 أرقام)*") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                onValueChange = { if (it.length <= 6) pinCode = it },
+                label = { Text("رمز PIN سري خاص بك للتحكم بالطلب *") },
+                placeholder = { Text("مثال: 1234 (لحفظ أمان طلبك وإلغائه)") },
+                modifier = Modifier.fillMaxWidth().testTag("urgent_pin_input"),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                visualTransformation = if (isPinVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     IconButton(onClick = { isPinVisible = !isPinVisible }) {
-                        Icon(imageVector = if (isPinVisible) Icons.Default.Check else Icons.Default.Lock, contentDescription = null)
+                        Icon(
+                            imageVector = if (isPinVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = "تبديل الرؤية"
+                        )
                     }
                 },
-                visualTransformation = if (isPinVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                modifier = Modifier.fillMaxWidth().testTag("urgent_pin_code"),
+                shape = RoundedCornerShape(12.dp),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // زر إرسال الطلب العاجل
-            val isLoading = uiState is UrgentUiState.Loading
+            val isLoading = uiState is InstantUiState.Loading
             Button(
                 onClick = {
                     if (customerPhone.isBlank() || serviceTitle.isBlank() || serviceDetails.isBlank() || selectedArea.isBlank()) {
@@ -231,23 +194,24 @@ fun UrgentRequestScreen(
                         return@Button
                     }
 
-                    urgentViewModel.createUrgentRequest(
-                        customerName = customerName,
-                        customerPhone = customerPhone,
-                        selectedCity = selectedCity,
-                        selectedArea = selectedArea,
-                        selectedDepartment = selectedDepartment,
-                        selectedCategory = selectedCategory,
+                    instantViewModel.createInstantRequest(
+                        userId = currentUserId,
+                        userName = customerName,
+                        userPhone = customerPhone,
+                        userCity = selectedCity,
+                        userNeighborhood = selectedArea,
+                        categoryId = selectedDepartment,
+                        categoryName = selectedCategory,
                         serviceTitle = serviceTitle,
-                        serviceDetails = serviceDetails,
-                        pinCode = pinCode,
-                        currentUserId = currentUserId,
-                        onSuccess = { code ->
-                            createdRequestCode = code
-                            showSuccessDialog = true
-                        },
-                        onError = { err ->
-                            scope.launch { snackbarHostState.showSnackbar(err) }
+                        description = serviceDetails,
+                        customPin = pinCode,
+                        onResult = { success, msg, _ ->
+                            if (success) {
+                                createdRequestCode = "URG-${(1000..9999).random()}"
+                                showSuccessDialog = true
+                            } else {
+                                scope.launch { snackbarHostState.showSnackbar(msg) }
+                            }
                         }
                     )
                 },
@@ -286,17 +250,9 @@ fun UrgentRequestScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("تم تعميم طلبك الطارئ على جميع الفنيين المتواجدين في منطقتك.")
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("كود الطلب العاجل", fontSize = 12.sp, color = Color(0xFFB71C1C))
-                            Text(createdRequestCode ?: "", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color(0xFFD32F2F))
-                            Text("المهلة المحددة: 30 دقيقة لاستقبال العروض", fontSize = 12.sp, color = Color(0xFFC62828))
-                        }
-                    }
+                    Text("تم تعميم طلبك على الفنيين المتاحين فوراً.")
+                    Text("رمز الطلب: ${createdRequestCode ?: "URG-XXXX"}", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+                    Text("⏳ ستبدأ العروض بالظهور خلال 30 دقيقة عبر قائمة الطلبات العاجلة.", fontSize = 13.sp)
                 }
             },
             confirmButton = {
@@ -307,7 +263,7 @@ fun UrgentRequestScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                 ) {
-                    Text("متابعة الطلب العاجل الآن")
+                    Text("متابعة العروض الآن")
                 }
             }
         )
