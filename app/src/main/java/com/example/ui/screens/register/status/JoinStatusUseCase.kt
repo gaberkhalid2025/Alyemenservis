@@ -10,6 +10,8 @@ sealed class JoinStatus {
     data class ActiveStore(val store: StoreEntity, val businessType: String) : JoinStatus()
     data class ActiveProperty(val property: PropertyEntity) : JoinStatus()
     data class ApprovedTechnician(val provider: ProviderEntity, val categoryName: String) : JoinStatus()
+    data class ActiveJobPoster(val job: JobEntity) : JoinStatus()
+    data class ActiveClient(val userMap: Map<String, Any>) : JoinStatus()
     data class Rejected(val reason: String) : JoinStatus()
     data class PendingStore(val store: StoreEntity) : JoinStatus()
     data class PendingProperty(val property: PropertyEntity) : JoinStatus()
@@ -38,7 +40,9 @@ class JoinStatusUseCase {
         stores: List<StoreEntity>,
         properties: List<PropertyEntity>,
         categories: List<CategoryEntity>,
-        notifications: List<NotificationEntity>
+        notifications: List<NotificationEntity>,
+        jobs: List<JobEntity> = emptyList(),
+        registeredUsersList: List<Map<String, Any>> = emptyList()
     ): JoinStatus {
         val cleanPhone = joinPhone.trim().replace(" ", "").replace("+", "")
         if (cleanPhone.isEmpty()) {
@@ -75,7 +79,24 @@ class JoinStatusUseCase {
             return JoinStatus.ApprovedTechnician(matchingApproved, catName)
         }
 
-        // 4. Check Rejection Notifications or Pending Provider Rejection Status
+        // 4. Check Active Job Poster
+        val matchingJob = jobs.find {
+            it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone && it.isActive
+        }
+        if (matchingJob != null) {
+            return JoinStatus.ActiveJobPoster(matchingJob)
+        }
+
+        // 5. Check Active Client
+        val matchingClient = registeredUsersList.find {
+            val p = (it["phone"] as? String)?.trim()?.replace(" ", "")?.replace("+", "") ?: ""
+            p == cleanPhone && (it["isApproved"] == true || it["status"] == "APPROVED")
+        }
+        if (matchingClient != null) {
+            return JoinStatus.ActiveClient(matchingClient)
+        }
+
+        // 6. Check Rejection Notifications or Pending Provider Rejection Status
         val matchingPending = pendingProviders.find { 
             it.phone.trim().replace(" ", "").replace("+", "").replace("-", "") == cleanPhone 
         }
@@ -91,7 +112,7 @@ class JoinStatusUseCase {
             return JoinStatus.Rejected(rejectionNotif.message)
         }
 
-        // 5. Check Pending entities
+        // 7. Check Pending entities
         if (matchingStore != null && !matchingStore.isActive) {
             return JoinStatus.PendingStore(matchingStore)
         }

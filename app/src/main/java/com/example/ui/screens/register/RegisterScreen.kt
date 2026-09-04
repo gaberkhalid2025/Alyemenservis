@@ -192,7 +192,7 @@ fun RegisterScreen(
                 )
             }
             RegistrationType.MEDICAL -> {
-                val centerName = (data["centerName"] as? String) ?: (data["clinicName"] as? String) ?: "مركز طبي"
+                val centerName = (data["medicalCenterName"] as? String) ?: (data["centerName"] as? String) ?: (data["clinicName"] as? String) ?: "مركز طبي"
                 val specialty = (data["medicalSpecialties"] as? String) ?: "عيادات ومراكز طبية"
                 viewModel.submitJoinForm(
                     context = context,
@@ -274,48 +274,46 @@ fun RegisterScreen(
     // واجهة التسجيل (اختيار النوع أو تعبئة الاستمارة)
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = if (selectedType != null) "📝 استمارة تسجيل: ${selectedType?.title}" else "📝 التسجيل والانضمام",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = if (selectedType != null) "يرجى تعبئة الحقول كاملة لاعتماد وتفعيل الحساب" else "منصتك الشاملة للخدمات والأنشطة في اليمن",
-                            fontSize = 10.5.sp,
-                            color = themeColors.accent
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (selectedType != null) {
-                                selectedType = null
-                            } else {
+            if (selectedType == null) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = "📝 التسجيل والانضمام",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "منصتك الشاملة للخدمات والأنشطة في اليمن",
+                                fontSize = 10.5.sp,
+                                color = themeColors.accent
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
                                 onBackClick()
                             }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "رجوع",
+                                tint = Color.White
+                            )
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "رجوع",
-                            tint = Color.White
-                        )
-                    }
-                },
-                actions = {
-                    if (currentStatus !is JoinStatus.NoRequest) {
-                        TextButton(onClick = { forceShowForm = false }) {
-                            Text("حالة طلبي ⏳", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    },
+                    actions = {
+                        if (currentStatus !is JoinStatus.NoRequest) {
+                            TextButton(onClick = { forceShowForm = false }) {
+                                Text("حالة طلبي ⏳", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
+                )
+            }
         },
         containerColor = Color(0xFF0F172A),
         modifier = modifier.fillMaxSize()
@@ -333,55 +331,23 @@ fun RegisterScreen(
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 🌟 Welcome Banner
+                    // 🌟 Simple Title Header
                     item {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                            border = BorderStroke(1.5.dp, themeColors.accent),
-                            modifier = Modifier.fillMaxWidth()
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(bottom = 4.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(Color(0xFF1E293B), Color(0xFF0F172A))
-                                        )
-                                    )
-                                    .padding(18.dp)
-                            ) {
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(54.dp)
-                                            .clip(CircleShape)
-                                            .background(themeColors.accent.copy(alpha = 0.2f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("🇾🇪", fontSize = 28.sp)
-                                    }
-
-                                    Text(
-                                        text = "مرحباً بك في بوابتك الأولى للخدمات والأنشطة باليمن",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        textAlign = TextAlign.Center
-                                    )
-
-                                    Text(
-                                        text = "اختر القسم المناسب لك لتعبئة استمارة الانضمام واستقبال طلبات العملاء أو تصفح الخدمات:",
-                                        fontSize = 11.sp,
-                                        color = Color.LightGray,
-                                        textAlign = TextAlign.Center,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            }
+                            Text(
+                                text = "📝 منصة الانضمام والتسجيل",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "اختر القسم المناسب لك لتعبئة طلبك المباشر والبدء بالعمل:",
+                                fontSize = 11.sp,
+                                color = Color.LightGray
+                            )
                         }
                     }
 
@@ -542,39 +508,41 @@ fun RegisterScreen(
                         .fillMaxSize()
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    // شريط معلومات القسم المختار
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(12.dp),
+                    // شريط معلومات القسم المختار - مبسط جداً وموفر للمساحة
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp)
+                            .padding(bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(selectedType?.icon ?: "📋", fontSize = 24.sp)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "استمارة انضمام: ${selectedType?.title}",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = selectedType?.description ?: "",
-                                    fontSize = 10.sp,
-                                    color = Color.LightGray
+                            IconButton(
+                                onClick = { selectedType = null },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "رجوع",
+                                    tint = Color.White
                                 )
                             }
-                            TextButton(onClick = { selectedType = null }) {
-                                Text("تغيير 🔁", color = themeColors.accent, fontSize = 11.sp)
-                            }
+                            Text(selectedType?.icon ?: "📋", fontSize = 18.sp)
+                            Text(
+                                text = "استمارة: ${selectedType?.title}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        TextButton(
+                            onClick = { selectedType = null },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("تغيير 🔁", color = themeColors.accent, fontSize = 11.sp)
                         }
                     }
 

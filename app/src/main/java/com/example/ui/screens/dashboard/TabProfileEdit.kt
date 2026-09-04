@@ -27,8 +27,8 @@ fun TabProfileEdit(
     var ownerName by remember { mutableStateOf(account.ownerName) }
     var workingHours by remember { mutableStateOf(account.workingHours) }
     var neighborhood by remember { mutableStateOf(account.neighborhood) }
-    var logoImage by remember { mutableStateOf(account.rawStore?.logoImage ?: "") }
-    var coverImage by remember { mutableStateOf(account.rawStore?.coverImage ?: "") }
+    var logoImage by remember { mutableStateOf(account.logoImage) }
+    var coverImage by remember { mutableStateOf(account.coverImage) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -37,13 +37,19 @@ fun TabProfileEdit(
     ) {
         item {
             UnifiedImagePicker(
-                label = "🖼️ شعار المنشأة / لوجو الحساب",
+                label = "🖼️ شعار المنشأة / لوجو الحساب الشخصي (لتعزيز التفاعل والوصول للعملاء)",
                 imageUrl = logoImage,
                 onImageSelected = { uri ->
-                    logoImage = uri.toString()
+                    val uriStr = uri.toString()
+                    logoImage = uriStr
                     if (account.rawStore != null) {
-                        viewModel.saveStore(account.rawStore.copy(logoImage = uri.toString()))
+                        viewModel.saveStore(account.rawStore.copy(logoImage = uriStr))
+                    } else if (account.rawProvider != null) {
+                        viewModel.updateProviderEntity(account.rawProvider.copy(profileImage = uriStr))
+                    } else if (account.rawProperty != null) {
+                        // Properties usually don't have separate logo, but we can set it if needed
                     }
+                    Toast.makeText(context, "✅ تم حفظ شعار الحساب فورياً سحابياً!", Toast.LENGTH_SHORT).show()
                 },
                 themeColors = themeColors
             )
@@ -51,13 +57,25 @@ fun TabProfileEdit(
 
         item {
             UnifiedImagePicker(
-                label = "🌄 صورة غلاف المنشأة / الخلفية الرئيسية",
+                label = "🌄 صورة الغلاف الرئيسية / واجهة العرض (لجذب العملاء والترويج)",
                 imageUrl = coverImage,
                 onImageSelected = { uri ->
-                    coverImage = uri.toString()
+                    val uriStr = uri.toString()
+                    coverImage = uriStr
                     if (account.rawStore != null) {
-                        viewModel.saveStore(account.rawStore.copy(coverImage = uri.toString()))
+                        viewModel.saveStore(account.rawStore.copy(coverImage = uriStr))
+                    } else if (account.rawProvider != null) {
+                        viewModel.updateProviderEntity(account.rawProvider.copy(coverImage = uriStr))
+                    } else if (account.rawProperty != null) {
+                        val currentImages = account.rawProperty.images.toMutableList()
+                        if (currentImages.isEmpty()) {
+                            currentImages.add(uriStr)
+                        } else {
+                            currentImages[0] = uriStr
+                        }
+                        viewModel.saveProperty(account.rawProperty.copy(images = currentImages))
                     }
+                    Toast.makeText(context, "✅ تم تحديث وحفظ صورة الغلاف فورياً سحابياً!", Toast.LENGTH_SHORT).show()
                 },
                 themeColors = themeColors
             )
@@ -65,7 +83,7 @@ fun TabProfileEdit(
 
         item {
             val fields = listOf<Triple<String, String, (String) -> Unit>>(
-                Triple("الاسم التجاري للمنشأة", name) { name = it },
+                Triple("الاسم التجاري للمنشأة / مقدم الخدمة", name) { name = it },
                 Triple("اسم المدير / مالك الحساب", ownerName) { ownerName = it },
                 Triple("رقم الهاتف والتواصل الفوري", phone) { phone = it },
                 Triple("تفاصيل العنوان والحي المعتمد", neighborhood) { neighborhood = it },
@@ -85,7 +103,9 @@ fun TabProfileEdit(
                                 phone = phone,
                                 ownerName = ownerName,
                                 workingHours = workingHours,
-                                localNeighborhood = neighborhood
+                                localNeighborhood = neighborhood,
+                                logoImage = logoImage,
+                                coverImage = coverImage
                             )
                             viewModel.saveStore(updated)
                         } else if (account.rawProvider != null) {
@@ -93,7 +113,9 @@ fun TabProfileEdit(
                                 name = name,
                                 phone = phone,
                                 localNeighborhood = neighborhood,
-                                profession = description
+                                profession = description,
+                                profileImage = logoImage,
+                                coverImage = coverImage
                             )
                             viewModel.updateProviderEntity(updated)
                         } else if (account.rawProperty != null) {
@@ -102,7 +124,8 @@ fun TabProfileEdit(
                                 description = description,
                                 phone = phone,
                                 ownerName = ownerName,
-                                localNeighborhood = neighborhood
+                                localNeighborhood = neighborhood,
+                                images = if (coverImage.isNotEmpty()) listOf(coverImage) else emptyList()
                             )
                             viewModel.saveProperty(updated)
                         }

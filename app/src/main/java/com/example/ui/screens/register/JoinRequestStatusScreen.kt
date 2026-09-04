@@ -40,10 +40,12 @@ fun JoinRequestStatusScreen(
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val jobs by viewModel.jobs.collectAsState()
+    val registeredUsersList by viewModel.registeredUsersList.collectAsState()
 
     var activeChatChannel by remember { mutableStateOf<ChatChannelEntity?>(null) }
 
-    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications) {
+    val currentStatus = remember(joinPhone, pendingProviders, providers, stores, properties, categories, notifications, jobs, registeredUsersList) {
         useCase.determineStatus(
             joinPhone = joinPhone,
             pendingProviders = pendingProviders,
@@ -51,12 +53,19 @@ fun JoinRequestStatusScreen(
             stores = stores,
             properties = properties,
             categories = categories,
-            notifications = notifications
+            notifications = notifications,
+            jobs = jobs,
+            registeredUsersList = registeredUsersList
         )
     }
 
-    // Active Store / Property Routing
-    if (currentStatus is JoinStatus.ActiveStore || currentStatus is JoinStatus.ActiveProperty) {
+    // Active Dashboards Routing
+    if (currentStatus is JoinStatus.ActiveStore || 
+        currentStatus is JoinStatus.ActiveProperty || 
+        currentStatus is JoinStatus.ApprovedTechnician || 
+        currentStatus is JoinStatus.ActiveJobPoster || 
+        currentStatus is JoinStatus.ActiveClient
+    ) {
         JoinStatusRouter.RouteToDashboard(
             status = currentStatus,
             viewModel = viewModel,
@@ -66,71 +75,6 @@ fun JoinRequestStatusScreen(
             snackbarHostState = snackbarHostState,
             onOpenChat = { activeChatChannel = it }
         )
-        return
-    }
-
-    // Approved Technician View
-    if (currentStatus is JoinStatus.ApprovedTechnician) {
-        val approved = currentStatus.provider
-        val myBookings = remember(bookings, approved.id) {
-            bookings.filter { it.providerId == approved.id }
-        }
-        val myNotifications = remember(notifications, approved.phone) {
-            notifications.filter { it.targetValue == approved.phone || it.targetType == "ALL" }
-        }
-
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            containerColor = themeColors.surface
-        ) { padding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                ApprovedTechnicianView(
-                    provider = approved,
-                    categoryName = currentStatus.categoryName,
-                    bookings = myBookings,
-                    notifications = myNotifications,
-                    onToggleAvailability = {
-                        viewModel.updateProviderEntity(approved.copy(isAvailable = !approved.isAvailable))
-                        scope.launch { snackbarHostState.showSnackbar("تم تحديث حالة التوافر") }
-                    },
-                    onAcceptBooking = { bookingId ->
-                        viewModel.updateBookingStatus(bookingId, "IN_PROGRESS")
-                        scope.launch { snackbarHostState.showSnackbar("✅ تم قبول طلب الحجز") }
-                    },
-                    onRejectBooking = { bookingId ->
-                        viewModel.updateBookingStatus(bookingId, "REJECTED", "اعتذر الفني لإنشغاله")
-                        scope.launch { snackbarHostState.showSnackbar("❌ تم الاعتذار عن الطلب") }
-                    },
-                    onOpenChatWithCustomer = { custPhone, custName ->
-                        viewModel.getOrCreateChatChannel(approved.id, approved.name, custPhone, custName)
-                        activeChatChannel = ChatChannelEntity(
-                            id = "chat_p_${approved.id}_u_$custPhone",
-                            userName = custName,
-                            lastMessage = "",
-                            messages = emptyList()
-                        )
-                    },
-                    themeColors = themeColors
-                )
-            }
-        }
-
-        activeChatChannel?.let { channel ->
-            StatusChatDialog(
-                chatChannel = channel,
-                currentUserId = approved.id,
-                onSendMessage = { msg ->
-                    viewModel.replyToChatChannel(channel.id, approved.id, msg, approved.name)
-                },
-                onDismiss = { activeChatChannel = null },
-                themeColors = themeColors
-            )
-        }
         return
     }
 

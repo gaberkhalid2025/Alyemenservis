@@ -278,8 +278,14 @@ fun approveRequest(request: PendingProviderEntity) {
             "updatedAt" to now
         ))
 
-        if (request.profession == "STORE_OWNER") {
+        if (request.profession == "STORE_OWNER" || request.categoryId.uppercase() == "STORE" || request.categoryId.uppercase() == "RESTAURANT" || request.categoryId.uppercase() == "MEDICAL") {
             val storeId = "store_" + cleanPhone
+            val resolvedCategory = when (request.categoryId.uppercase()) {
+                "RESTAURANT" -> "مطاعم وكافيهات"
+                "MEDICAL" -> "مراكز طبية وعيادات"
+                else -> "محلات ومراكز تجارية"
+            }
+            val resolvedSectionId = if (request.categoryId.uppercase() == "RESTAURANT") "restaurants" else if (request.categoryId.uppercase() == "MEDICAL") "medical" else "stores"
             val newStore = com.example.data.StoreEntity(
                 id = storeId,
                 name = request.name,
@@ -289,6 +295,8 @@ fun approveRequest(request: PendingProviderEntity) {
                 phone = request.phone,
                 localNeighborhood = request.localNeighborhood,
                 cityId = finalCityId,
+                sectionId = resolvedSectionId,
+                categoryId = resolvedCategory,
                 isActive = true,
                 isApproved = true,
                 isPinned = false,
@@ -308,7 +316,7 @@ fun approveRequest(request: PendingProviderEntity) {
                 targetValue = request.phone
             )
             mainViewModel.triggerNotification("✅ تم تفعيل متجر ${request.name}")
-        } else if (request.profession == "PROPERTY_OWNER") {
+        } else if (request.profession == "PROPERTY_OWNER" || request.categoryId.uppercase() == "PROPERTY") {
             val propId = "prop_" + cleanPhone
             val propPrice = try { request.chatRecipientId.toDouble() } catch(e: Exception) { 0.0 }
             val newProp = com.example.data.PropertyEntity(
@@ -338,6 +346,49 @@ fun approveRequest(request: PendingProviderEntity) {
                 targetValue = request.phone
             )
             mainViewModel.triggerNotification("✅ تم تفعيل عقار ${request.name}")
+        } else if (request.profession == "JOB_POSTER" || request.categoryId.uppercase() == "JOB") {
+            val jobId = "job_" + cleanPhone
+            val newJob = com.example.data.JobEntity(
+                id = jobId,
+                title = request.customCategoryName.ifBlank { "وظيفة - " + request.name },
+                companyName = request.name,
+                phone = request.phone,
+                cityId = finalCityId,
+                address = request.localNeighborhood,
+                description = request.specialization.ifBlank { "إعلان وظيفة معتمد وموثق" },
+                isActive = true,
+                isApproved = true
+            )
+            db.collection("jobs").document(jobId).set(newJob)
+            
+            // Instant Local Sync for jobs
+            _jobs.value = _jobs.value.filter { it.id != jobId && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newJob
+
+            mainViewModel.addNotification(
+                title = "🎉 تهانينا! تم تفعيل إعلان وظيفتك بنجاح",
+                message = "مرحباً بك، لقد تم مراجعة ونشر إعلان وظيفتك '${request.name}' بنجاح! يمكنك إدارتها الآن مباشرة من شاشة الانضمام.",
+                targetType = "USER",
+                targetValue = request.phone
+            )
+            mainViewModel.triggerNotification("✅ تم تفعيل إعلان وظيفة ${request.name}")
+        } else if (request.profession == "CLIENT" || request.categoryId.uppercase() == "CLIENT") {
+            val userMap = mapOf(
+                "id" to request.id,
+                "name" to request.name,
+                "phone" to cleanPhone,
+                "residence" to request.area,
+                "isApproved" to true,
+                "createdAt" to System.currentTimeMillis()
+            )
+            db.collection("users").document(request.id).set(userMap)
+            
+            mainViewModel.addNotification(
+                title = "🎉 تهانينا! تم تفعيل حسابك بنجاح",
+                message = "مرحباً بك يا غالي، تم تفعيل حسابك كعميل مسجل بنجاح!",
+                targetType = "USER",
+                targetValue = request.phone
+            )
+            mainViewModel.triggerNotification("✅ تم تفعيل حساب المستخدم ${request.name}")
         } else {
             val providerId = "prov_" + cleanPhone
             val approvedProvider = ProviderEntity(
@@ -2431,12 +2482,34 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
     val systemStats: StateFlow<SystemStats> = _systemStats.asStateFlow()
 
     fun loadPendingRequests() {
-        db.collection("registration_requests")
+        db.collection("join_requests")
             .get()
             .addOnSuccessListener { snap ->
                 val list = snap.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(PendingRequest::class.java)?.copy(id = doc.id)
+                        val req = doc.toObject(com.example.data.models.JoinRequestEntity::class.java)
+                        if (req != null) {
+                            val sectionName = when (req.type.uppercase()) {
+                                "PROVIDER" -> "فني / مهني"
+                                "STORE" -> "متجر / معرض"
+                                "RESTAURANT" -> "مطعم / كافيه"
+                                "MEDICAL" -> "مركز طبي / عيادة"
+                                "PROPERTY" -> "عقار / أرض"
+                                "JOB" -> "وظيفة / شاغر"
+                                "CLIENT" -> "مستخدم عادي"
+                                else -> req.type
+                            }
+                            PendingRequest(
+                                id = req.id,
+                                name = req.fullName,
+                                phone = req.phone,
+                                section = sectionName,
+                                city = req.city,
+                                details = "الفئة: ${req.categoryName} • الحي: ${req.neighborhood}",
+                                status = req.status,
+                                createdAt = req.submittedAt
+                            )
+                        } else null
                     } catch (e: Exception) {
                         null
                     }
@@ -2462,56 +2535,54 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
     }
 
     fun approveProviderRequest(requestId: String, onResult: ((Boolean) -> Unit)? = null) {
-        db.collection("registration_requests").document(requestId).get().addOnSuccessListener { snapshot ->
-            val applicantPhone = snapshot.getString("phone") ?: ""
-            val applicantName = snapshot.getString("name") ?: "المتقدم"
-
-            db.collection("registration_requests").document(requestId).update("status", "APPROVED")
-                .addOnSuccessListener {
-                    recordAuditLog("APPROVE_REQUEST", "تمت الموافقة على طلب الانضمام $requestId")
-                    loadPendingRequests()
-                    mainViewModel.triggerNotification("✅ تمت الموافقة على طلب الانضمام بنجاح!")
-                    if (applicantPhone.isNotBlank()) {
-                        mainViewModel.addNotification(
-                            title = "🎉 تهانينا! تمت الموافقة على طلب انضمامك",
-                            message = "عزيزي $applicantName، يسعدنا إعلامك بأنه تم قبول طلب انضمامك واعتماد حسابك كـ فني معتمد في دليل خدمات اليمن.",
-                            targetType = "USER",
-                            targetValue = applicantPhone
-                        )
-                    }
-                    onResult?.invoke(true)
+        db.collection("join_requests").document(requestId).get().addOnSuccessListener { snapshot ->
+            val req = snapshot.toObject(com.example.data.models.JoinRequestEntity::class.java)
+            if (req != null) {
+                val requestProfession = when (req.type.uppercase()) {
+                    "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
+                    "PROPERTY" -> "PROPERTY_OWNER"
+                    "JOB" -> "JOB_POSTER"
+                    "CLIENT" -> "CLIENT"
+                    else -> "PROVIDER"
                 }
-                .addOnFailureListener {
-                    onResult?.invoke(false)
-                }
+                val pendingProvider = PendingProviderEntity(
+                    id = req.id,
+                    name = req.fullName,
+                    phone = req.phone,
+                    categoryId = req.categoryId,
+                    area = req.city,
+                    localNeighborhood = req.neighborhood,
+                    status = "APPROVED",
+                    idPhotoBase64 = req.idCardImage,
+                    selfiePhotoBase64 = req.profileImage,
+                    workPhotosBase64 = req.workImages,
+                    customCategoryName = req.categoryName,
+                    profession = requestProfession,
+                    password = req.passwordHash,
+                    providerType = requestProfession
+                )
+                approveRequest(pendingProvider)
+                loadPendingRequests()
+                onResult?.invoke(true)
+            } else {
+                onResult?.invoke(false)
+            }
         }.addOnFailureListener {
             onResult?.invoke(false)
         }
     }
 
     fun rejectProviderRequest(requestId: String, reason: String = "", onResult: ((Boolean) -> Unit)? = null) {
-        db.collection("registration_requests").document(requestId).get().addOnSuccessListener { snapshot ->
-            val applicantPhone = snapshot.getString("phone") ?: ""
-            val applicantName = snapshot.getString("name") ?: "المتقدم"
-
-            db.collection("registration_requests").document(requestId).update(mapOf("status" to "REJECTED", "rejectionReason" to reason))
-                .addOnSuccessListener {
-                    recordAuditLog("REJECT_REQUEST", "تم رفض طلب الانضمام $requestId. السبب: $reason")
-                    loadPendingRequests()
-                    mainViewModel.triggerNotification("🚫 تم رفض طلب الانضمام.")
-                    if (applicantPhone.isNotBlank()) {
-                        mainViewModel.addNotification(
-                            title = "🚫 تحديث بخصوص طلب الانضمام",
-                            message = "عزيزي $applicantName، نعتذر منك، تم عدم قبول طلب الانضمام حالياً." + (if (reason.isNotBlank()) " السبب: $reason" else ""),
-                            targetType = "USER",
-                            targetValue = applicantPhone
-                        )
-                    }
-                    onResult?.invoke(true)
-                }
-                .addOnFailureListener {
-                    onResult?.invoke(false)
-                }
+        db.collection("join_requests").document(requestId).update(mapOf(
+            "status" to "REJECTED",
+            "approvalStatus" to "REJECTED",
+            "rejectionReason" to reason
+        )).addOnSuccessListener {
+            db.collection("pending_providers").document(requestId).delete()
+            recordAuditLog("REJECT_REQUEST", "تم رفض طلب الانضمام $requestId. السبب: $reason")
+            loadPendingRequests()
+            mainViewModel.triggerNotification("🚫 تم رفض طلب الانضمام.")
+            onResult?.invoke(true)
         }.addOnFailureListener {
             onResult?.invoke(false)
         }

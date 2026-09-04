@@ -231,6 +231,7 @@ class MainViewModel : BaseViewModel() {
     var selectedProvider: com.example.data.ProviderEntity? = null
     var selectedStore: com.example.data.StoreEntity? = null
     var selectedProperty: com.example.data.PropertyEntity? = null
+    var selectedJob: com.example.data.JobEntity? = null
     var selectedOfferId by androidx.compose.runtime.mutableStateOf("")
     var selectedRequestId by androidx.compose.runtime.mutableStateOf("")
     var showQuickServiceDialog by androidx.compose.runtime.mutableStateOf(false)
@@ -1806,6 +1807,23 @@ fun submitJoinForm(
                 }
             }
 
+            val requestType = when (catId.uppercase()) {
+                "STORE" -> "STORE"
+                "RESTAURANT" -> "RESTAURANT"
+                "MEDICAL" -> "MEDICAL"
+                "PROPERTY" -> "PROPERTY"
+                "JOB" -> "JOB"
+                "CLIENT" -> "CLIENT"
+                else -> "PROVIDER"
+            }
+            val requestProfession = when (requestType) {
+                "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
+                "PROPERTY" -> "PROPERTY_OWNER"
+                "JOB" -> "JOB_POSTER"
+                "CLIENT" -> "CLIENT"
+                else -> "PROVIDER"
+            }
+
             val requestDocId = cleanPhone
             val newRequest = PendingProviderEntity(
                 id = requestDocId,
@@ -1820,20 +1838,12 @@ fun submitJoinForm(
                 workPhotosBase64 = finalWorkPhotos,
                 customCategoryName = customCategoryName,
                 password = password,
-                productAttachmentsJson = productAttachmentsJson
+                productAttachmentsJson = productAttachmentsJson,
+                profession = requestProfession,
+                providerType = requestProfession
             )
             // Push to Cloud with robust listeners
             db.collection("pending_providers").document(requestDocId).set(newRequest)
-            
-            val requestType = when (catId.uppercase()) {
-                "STORE" -> "STORE"
-                "RESTAURANT" -> "RESTAURANT"
-                "MEDICAL" -> "MEDICAL"
-                "PROPERTY" -> "PROPERTY"
-                "JOB" -> "JOB"
-                "CLIENT" -> "CLIENT"
-                else -> "PROVIDER"
-            }
 
             val unifiedJoinRequest = com.example.data.models.JoinRequestEntity(
                 id = requestDocId,
@@ -1867,6 +1877,11 @@ fun submitJoinForm(
                         when (requestType.uppercase()) {
                             "STORE", "RESTAURANT", "MEDICAL" -> {
                                 val secId = if (requestType == "RESTAURANT") "restaurants" else if (requestType == "MEDICAL") "medical" else "stores"
+                                val catName = when (requestType) {
+                                    "RESTAURANT" -> "مطاعم وكافيهات"
+                                    "MEDICAL" -> "مراكز طبية وعيادات"
+                                    else -> "محلات ومراكز تجارية"
+                                }
                                 val newStore = com.example.data.StoreEntity(
                                     id = requestDocId,
                                     name = name,
@@ -1876,7 +1891,10 @@ fun submitJoinForm(
                                     cityId = area,
                                     localNeighborhood = neighborhood,
                                     sectionId = secId,
-                                    isActive = false
+                                    categoryId = catName,
+                                    isActive = false,
+                                    isApproved = false,
+                                    password = password
                                 )
                                 db.collection("stores").document(requestDocId).set(newStore)
                                 val sList = _stores.value.toMutableList()
@@ -1892,7 +1910,9 @@ fun submitJoinForm(
                                     ownerId = cleanPhone,
                                     cityId = area,
                                     localNeighborhood = neighborhood,
-                                    isActive = false
+                                    isActive = false,
+                                    isApproved = false,
+                                    password = password
                                 )
                                 db.collection("properties").document(requestDocId).set(newProp)
                                 val pList = _properties.value.toMutableList()
@@ -1907,7 +1927,8 @@ fun submitJoinForm(
                                     companyName = name,
                                     phone = cleanPhone,
                                     cityId = area,
-                                    isActive = false
+                                    isActive = false,
+                                    isApproved = false
                                 )
                                 db.collection("jobs").document(requestDocId).set(newJob)
                                 val jList = _jobs.value.toMutableList()
@@ -2438,6 +2459,15 @@ fun addNotification(
             "resolvedAt" to System.currentTimeMillis()
         )
         db.collection("password_recovery_requests").document(cleanPhone).update(updates).addOnSuccessListener {
+            // Also update the password_resets collection so the user's dialog updates immediately
+            db.collection("password_resets").document(cleanPhone).update(
+                mapOf(
+                    "status" to "APPROVED",
+                    "newPassword" to newPassword,
+                    "tempPassword" to newPassword
+                )
+            )
+
             db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
                 for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
             }

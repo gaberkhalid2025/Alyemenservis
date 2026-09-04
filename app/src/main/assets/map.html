@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>دليل خدمات اليمن - الخريطة المباشرة</title>
     
-    <!-- Primary CDN Leaflet CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" crossorigin="" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" crossorigin="" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" crossorigin="" />
+    <!-- Local Leaflet and MarkerCluster CSS -->
+    <link rel="stylesheet" href="leaflet.css" />
+    <link rel="stylesheet" href="MarkerCluster.css" />
+    <link rel="stylesheet" href="MarkerCluster.Default.css" />
     
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -91,9 +91,9 @@
         .fallback-btn-sec { background: rgba(255,255,255,0.1); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.2); padding: 9px 14px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; flex: 1; }
     </style>
     
-    <!-- Primary CDN Leaflet JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin=""></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js" crossorigin=""></script>
+    <!-- Local Leaflet and MarkerCluster JS -->
+    <script src="leaflet.js"></script>
+    <script src="leaflet.markercluster.js"></script>
 </head>
 <body>
     <div id="map"></div>
@@ -108,8 +108,22 @@
     </div>
 
     <script>
-        var userLat = _USER_LAT_;
-        var userLng = _USER_LNG_;
+        var userLat = 15.3694;
+        var userLng = 44.1910;
+        try {
+            if (window.AndroidBridge && window.AndroidBridge.getUserLat) {
+                userLat = parseFloat(window.AndroidBridge.getUserLat());
+            } else {
+                userLat = parseFloat("_USER_LAT_");
+            }
+            if (window.AndroidBridge && window.AndroidBridge.getUserLng) {
+                userLng = parseFloat(window.AndroidBridge.getUserLng());
+            } else {
+                userLng = parseFloat("_USER_LNG_");
+            }
+        } catch(e) {
+            console.error("Coordinate retrieval failed: " + e);
+        }
         var map = null;
         var clusterGroup = null;
 
@@ -155,32 +169,37 @@
 
                 map = L.map('map', { zoomControl: false, attributionControl: false }).setView([userLat, userLng], 14);
 
-                // Multiple tile servers failover
-                var tileUrls = [
-                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
-                ];
-                var currentTileIdx = 0;
+                // Try Google Maps first (unblocked and cached locally via Google Global Cache in Yemen)
+                var googleLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                    attribution: 'Google Maps'
+                });
 
-                function loadTileServer(idx) {
-                    if (idx >= tileUrls.length) return;
-                    var tileLayer = L.tileLayer(tileUrls[idx], {
+                googleLayer.on('tileerror', function() {
+                    console.warn("Google Maps tile server failed. Trying OSM CartoDB fallback...");
+                    map.removeLayer(googleLayer);
+                    
+                    // Fallback to CartoDB
+                    var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                         maxZoom: 19,
                         subdomains: 'abcd'
                     });
-                    tileLayer.on('tileerror', function() {
-                        console.warn("Tile server failed: " + tileUrls[idx]);
-                        if (currentTileIdx === idx && idx + 1 < tileUrls.length) {
-                            currentTileIdx++;
-                            map.removeLayer(tileLayer);
-                            loadTileServer(currentTileIdx);
-                        }
+                    
+                    cartoLayer.on('tileerror', function() {
+                        console.warn("CartoDB tile server failed. Trying Standard OSM fallback...");
+                        map.removeLayer(cartoLayer);
+                        
+                        // Fallback to Standard OSM
+                        var osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19
+                        });
+                        osmLayer.addTo(map);
                     });
-                    tileLayer.addTo(map);
-                }
-
-                loadTileServer(0);
+                    cartoLayer.addTo(map);
+                });
+                
+                googleLayer.addTo(map);
 
                 var userIcon = L.divIcon({
                     className: 'user-marker-container',
@@ -247,7 +266,25 @@
                     console.log("Leaflet map markers updated successfully: " + rawMarkers.length);
                 };
 
-                var initialMarkers = _MARKERS_JSON_;
+                window.updateMapCenter = function(lat, lng) {
+                    if (map) {
+                        map.setView([lat, lng], map.getZoom() || 14);
+                    }
+                };
+
+                var initialMarkers = [];
+                try {
+                    if (window.AndroidBridge && window.AndroidBridge.getMarkersJson) {
+                        var mJson = window.AndroidBridge.getMarkersJson();
+                        if (mJson) {
+                            initialMarkers = JSON.parse(mJson);
+                        }
+                    } else {
+                        initialMarkers = _MARKERS_JSON_;
+                    }
+                } catch(e) {
+                    console.error("Markers retrieval failed: " + e);
+                }
                 if (initialMarkers && Array.isArray(initialMarkers)) {
                     window.updateMapMarkers(initialMarkers);
                 }
@@ -260,25 +297,8 @@
             }
         }
 
-        // Secondary CDN Fallback Loader if primary CDN failed
-        if (typeof L === 'undefined') {
-            console.warn("Primary Leaflet CDN failed. Attempting secondary unpkg CDN...");
-            var secScript = document.createElement('script');
-            secScript.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-            secScript.onload = function() {
-                var secCluster = document.createElement('script');
-                secCluster.src = "https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js";
-                secCluster.onload = function() { initMapEngine(); };
-                secCluster.onerror = function() { initMapEngine(); };
-                document.head.appendChild(secCluster);
-            };
-            secScript.onerror = function() {
-                showFallbackUI("Secondary Leaflet CDN failed");
-            };
-            document.head.appendChild(secScript);
-        } else {
-            initMapEngine();
-        }
+        // Call initMapEngine directly since Leaflet is bundled locally
+        initMapEngine();
     </script>
 </body>
 </html>

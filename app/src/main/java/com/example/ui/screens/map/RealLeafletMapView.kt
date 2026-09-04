@@ -84,17 +84,11 @@ fun RealLeafletMapView(
         }
     }
 
-    // HTML base template - loaded once per coordinate anchor change
-    val htmlContent = remember(safeUserLat, safeUserLng) {
-        try {
-            val template = context.assets.open("map.html").bufferedReader().use { it.readText() }
-            template
-                .replace("_USER_LAT_", safeUserLat.toString())
-                .replace("_USER_LNG_", safeUserLng.toString())
-                .replace("_MARKERS_JSON_", markersJsonArray)
-        } catch (e: Exception) {
-            Log.e("RealLeafletMapView", "Error reading map.html asset", e)
-            ""
+    // Dynamic map center update via JavaScript
+    LaunchedEffect(safeUserLat, safeUserLng) {
+        webViewRef?.let { webView ->
+            Log.d("RealLeafletMapView", "Updating map center via evaluateJavascript: $safeUserLat, $safeUserLng")
+            webView.evaluateJavascript("if (window.updateMapCenter) { window.updateMapCenter($safeUserLat, $safeUserLng); }", null)
         }
     }
 
@@ -205,17 +199,22 @@ fun RealLeafletMapView(
                                 }
                             }
                         }
+
+                        @android.webkit.JavascriptInterface
+                        fun getUserLat(): Double = safeUserLat
+
+                        @android.webkit.JavascriptInterface
+                        fun getUserLng(): Double = safeUserLng
+
+                        @android.webkit.JavascriptInterface
+                        fun getMarkersJson(): String = markersJsonArray
                     }, "AndroidBridge")
 
-                    tag = htmlContent
-                    loadDataWithBaseURL("https://openstreetmap.org/", htmlContent, "text/html", "UTF-8", null)
+                    loadUrl("file:///android_asset/map.html")
                 }
             },
             update = { webView ->
-                if (webView.tag != htmlContent) {
-                    webView.tag = htmlContent
-                    webView.loadDataWithBaseURL("https://openstreetmap.org/", htmlContent, "text/html", "UTF-8", null)
-                }
+                // Maintain page and avoid reload
             }
         )
 

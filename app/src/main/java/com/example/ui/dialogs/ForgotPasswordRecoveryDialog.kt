@@ -37,12 +37,24 @@ fun ForgotPasswordRecoveryDialog(
     onOpenChatWithAdmin: (channelId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val sharedPrefs = remember { context.getSharedPreferences("yemen_service_recovery_prefs", Context.MODE_PRIVATE) }
     var phoneInput by remember { mutableStateOf("") }
     var selectedChannel by remember { mutableStateOf("IN_APP_CHAT") } // IN_APP_CHAT, WHATSAPP, TELEGRAM
     var noteInput by remember { mutableStateOf("") }
     var isSubmitted by remember { mutableStateOf(false) }
     var resetStatus by remember { mutableStateOf("PENDING") } // PENDING, APPROVED, REJECTED
     var tempPassword by remember { mutableStateOf("") }
+    var submittedTime by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(Unit) {
+        val savedPhone = sharedPrefs.getString("pending_recovery_phone", "") ?: ""
+        val savedTime = sharedPrefs.getLong("pending_recovery_time", 0L)
+        if (savedPhone.isNotBlank()) {
+            phoneInput = savedPhone
+            submittedTime = savedTime
+            isSubmitted = true
+        }
+    }
 
     if (isSubmitted) {
         LaunchedEffect(phoneInput) {
@@ -55,6 +67,10 @@ fun ForgotPasswordRecoveryDialog(
                             resetStatus = status
                             if (status == "APPROVED") {
                                 tempPassword = doc.getString("tempPassword") ?: doc.getString("newPassword") ?: ""
+                                // Once approved and password is shown, we can clear it so subsequent opens allow new requests
+                                sharedPrefs.edit().clear().apply()
+                            } else if (status == "REJECTED") {
+                                sharedPrefs.edit().clear().apply()
                             }
                         }
                     }
@@ -160,6 +176,7 @@ fun ForgotPasswordRecoveryDialog(
                         onClick = {
                             if (phoneInput.trim().length >= 7) {
                                 val cleanPhone = phoneInput.trim()
+                                val currentTime = System.currentTimeMillis()
 
                                 // Register reset request in Firestore
                                 val resetRequest = mapOf(
@@ -167,9 +184,28 @@ fun ForgotPasswordRecoveryDialog(
                                     "channel" to selectedChannel,
                                     "note" to noteInput,
                                     "status" to "PENDING",
-                                    "createdAt" to System.currentTimeMillis()
+                                    "createdAt" to currentTime
                                 )
                                 viewModel.db.collection("password_resets").document(cleanPhone).set(resetRequest)
+
+                                // Register recovery request for admin dashboard
+                                val adminRecoveryRequest = mapOf(
+                                    "id" to cleanPhone,
+                                    "phone" to cleanPhone,
+                                    "name" to "طلب استعادة ($cleanPhone)",
+                                    "accountType" to "مسترجع",
+                                    "status" to "PENDING",
+                                    "timestamp" to currentTime,
+                                    "newPassword" to "",
+                                    "adminNotes" to "القناة: $selectedChannel | ملاحظة: $noteInput"
+                                )
+                                viewModel.db.collection("password_recovery_requests").document(cleanPhone).set(adminRecoveryRequest)
+
+                                sharedPrefs.edit()
+                                    .putString("pending_recovery_phone", cleanPhone)
+                                    .putLong("pending_recovery_time", currentTime)
+                                    .apply()
+                                submittedTime = currentTime
 
                                 when (selectedChannel) {
                                     "WHATSAPP" -> {
@@ -218,6 +254,35 @@ fun ForgotPasswordRecoveryDialog(
                                     fontSize = 14.sp,
                                     color = themeColors.accent
                                 )
+                                
+                                val sdf = remember { java.text.SimpleDateFormat("yyyy-MM-dd hh:mm a", java.util.Locale.getDefault()) }
+                                val formattedTime = if (submittedTime > 0L) sdf.format(java.util.Date(submittedTime)) else "الآن"
+                                
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),
+                                    border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "🔢 رقم الطلب: REC-${phoneInput.takeLast(6)}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "⏰ وقت التقديم: $formattedTime",
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 11.sp,
+                                            color = Color.LightGray
+                                        )
+                                    }
+                                }
+
                                 Text(
                                     text = "لقد تم إرسال طلبك. نرجو عدم إغلاق هذه الصفحة، حيث يتم التحقق من طلبك الآن تلقائياً وتحديث الصفحة فور تعيين كلمة المرور الجديدة من قِبل المشرف.",
                                     fontSize = 11.sp,

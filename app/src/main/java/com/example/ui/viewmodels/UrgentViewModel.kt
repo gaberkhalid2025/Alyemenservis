@@ -245,17 +245,68 @@ class UrgentViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = UrgentUiState.Loading
             try {
-                firestore.collection("urgent_requests").document(requestId).update(
-                    mapOf(
-                        "status" to "ACCEPTED",
-                        "acceptedOfferId" to offerId,
-                        "acceptedTechnicianPhone" to providerPhone
-                    )
-                ).await()
+                val requestSnapshot = firestore.collection("urgent_requests").document(requestId).get().await()
+                val req = requestSnapshot.toObject(com.example.data.UrgentRequestEntity::class.java)
 
-                firestore.collection("urgent_requests").document(requestId)
-                    .collection("offers").document(offerId)
-                    .update("status", "ACCEPTED").await()
+                val offerSnapshot = firestore.collection("urgent_requests").document(requestId)
+                    .collection("offers").document(offerId).get().await()
+                val offer = offerSnapshot.toObject(RequestOfferEntity::class.java)
+
+                if (req != null && offer != null) {
+                    firestore.collection("urgent_requests").document(requestId).update(
+                        mapOf(
+                            "status" to "ACCEPTED",
+                            "acceptedOfferId" to offerId,
+                            "acceptedTechnicianPhone" to providerPhone,
+                            "winningProviderId" to offer.technicianId,
+                            "winningOfferId" to offerId,
+                            "winningProviderName" to offer.technicianName,
+                            "winningProviderPhone" to providerPhone,
+                            "agreedPrice" to offer.price
+                        )
+                    ).await()
+
+                    firestore.collection("urgent_requests").document(requestId)
+                        .collection("offers").document(offerId)
+                        .update("status", "ACCEPTED").await()
+
+                    val channelId = "chat_p_${offer.technicianId}_u_${req.customerId}"
+                    val dispCustomerName = req.customerName.ifEmpty { "عميل" }
+                    val displayName = "دردشة: ${offer.technicianName} مع $dispCustomerName"
+                    val chatChannel = com.example.data.ChatChannelEntity(
+                        id = channelId,
+                        userName = displayName,
+                        targetId = offer.technicianId,
+                        targetName = offer.technicianName,
+                        customerId = req.customerId,
+                        customerName = dispCustomerName,
+                        lastMessage = "مرحباً! تم قبول عرضك للطلب العاجل رقم ${req.id.take(6)}. تم فتح هذه المحادثة لتنسيق العمل.",
+                        timestamp = System.currentTimeMillis(),
+                        isProvider = false,
+                        messages = listOf(
+                            com.example.data.ChatMessageEntity(
+                                id = java.util.UUID.randomUUID().toString(),
+                                senderId = "system",
+                                message = "مرحباً! تم قبول عرضك للطلب العاجل رقم ${req.id.take(6)}. تم فتح هذه المحادثة لتنسيق العمل.",
+                                timestamp = System.currentTimeMillis(),
+                                senderName = "النظام"
+                            )
+                        )
+                    )
+                    firestore.collection("chat_channels").document(channelId).set(chatChannel).await()
+                } else {
+                    firestore.collection("urgent_requests").document(requestId).update(
+                        mapOf(
+                            "status" to "ACCEPTED",
+                            "acceptedOfferId" to offerId,
+                            "acceptedTechnicianPhone" to providerPhone
+                        )
+                    ).await()
+
+                    firestore.collection("urgent_requests").document(requestId)
+                        .collection("offers").document(offerId)
+                        .update("status", "ACCEPTED").await()
+                }
 
                 _uiState.value = UrgentUiState.Success("تم قبول العرض بنجاح!")
                 onResult(true, "تم قبول العرض بنجاح")

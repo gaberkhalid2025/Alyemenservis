@@ -130,7 +130,7 @@ fun RestaurantsScreen(
         emptyMessage = "لا توجد مطاعم مطابقة للبحث",
         extraHeaderContent = {
             Button(
-                onClick = { showCreateRestaurantDialog = true },
+                onClick = { viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.REGISTER_FORM) },
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth().height(38.dp)

@@ -15,7 +15,7 @@ object BookingSecurityHelper {
     private const val KEY_ATTEMPTS_PREFIX = "attempts_"
     private const val KEY_LOCKOUT_PREFIX = "lockout_"
     private const val MAX_ATTEMPTS = 3
-    private const val LOCKOUT_DURATION_MS = 5 * 60 * 1000L // 5 minutes lockout
+    private const val LOCKOUT_DURATION_MS = 8 * 60 * 60 * 1000L // 8 hours lockout
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

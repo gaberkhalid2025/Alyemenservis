@@ -404,6 +404,20 @@ fun BookingCardItem(
                     }
 
                     if (!isTerminalState) {
+                        if (booking.status == "IN_PROGRESS") {
+                            Button(
+                                onClick = { onStatusChange(booking, "COMPLETED") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                modifier = Modifier.weight(1.2f),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("تأكيد إكمال", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
                         Button(
                             onClick = { onEditClick(booking) },
                             enabled = canModifyOrCancel,

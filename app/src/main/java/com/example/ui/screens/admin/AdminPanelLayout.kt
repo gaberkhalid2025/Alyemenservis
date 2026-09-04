@@ -2020,8 +2020,18 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     Text("📨 طلبات الانضمام والاعتماد المعلقة بانتظار موافقة الأدمن:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(modifier = Modifier.height(6.dp))
 
+                    val activeServicesCount = pendingProviders.count {
+                        (it.status == "PENDING" || it.status.isEmpty()) &&
+                        it.categoryId != "STORE" &&
+                        it.categoryId != "RESTAURANT" &&
+                        it.categoryId != "MEDICAL" &&
+                        it.categoryId != "PROPERTY" &&
+                        it.categoryId != "JOB" &&
+                        it.categoryId != "CLIENT"
+                    }
+
                     val subTabs = listOf(
-                        Triple("SERVICES", "🔧 الخدمات والمهن", pendingProviders.size),
+                        Triple("SERVICES", "🔧 الخدمات والمهن", activeServicesCount),
                         Triple("USERS", "👤 إدارة المستخدمين والعملاء", registeredUsersList.size),
                         Triple("PROPERTIES", "🏠 العقارات", pendingPropertiesCount),
                         Triple("STORES", "🏪 المراكز والمحلات", pendingStoresCount),
@@ -2050,7 +2060,15 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
 
                 if (adminReqSubTab == "SERVICES") {
-                    val activePendingProviders = pendingProviders.filter { it.status == "PENDING" || it.status.isEmpty() }
+                    val activePendingProviders = pendingProviders.filter { 
+                        (it.status == "PENDING" || it.status.isEmpty()) &&
+                        it.categoryId != "STORE" &&
+                        it.categoryId != "RESTAURANT" &&
+                        it.categoryId != "MEDICAL" &&
+                        it.categoryId != "PROPERTY" &&
+                        it.categoryId != "JOB" &&
+                        it.categoryId != "CLIENT"
+                    }
                     if (activePendingProviders.isEmpty()) {
                         item {
                             Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {

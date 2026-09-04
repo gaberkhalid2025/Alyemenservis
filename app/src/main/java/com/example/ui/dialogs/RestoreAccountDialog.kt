@@ -153,6 +153,10 @@ fun RestoreAccountDialog(
                                         viewModel.selectedStore = null
                                         viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.DYNAMIC_PROFILE)
                                     } else {
+                                        viewModel.selectedProvider = null
+                                        viewModel.selectedStore = null
+                                        viewModel.selectedProperty = null
+                                        viewModel.selectedJob = null
                                         viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.USER_BROWSE)
                                     }
 

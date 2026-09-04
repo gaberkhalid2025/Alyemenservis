@@ -1,6 +1,6 @@
 package com.example.ui.screens.register.forms
 
-import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,244 +15,281 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 
 /**
- * 🛍️ StoreForm (استمارة تسجيل المتجر والمورد)
- * تشمل الحقول المطلوبة: السجل التجاري، رقم الضريبة، وسائل التواصل، ساعات العمل، سياسة الاسترجاع
+ * 🛍️ StoreForm (استمارة تسجيل المتجر والمورد المحدثة والمبسطة)
+ * نموذج صفحة واحدة مدمج مع التحقق الفوري للمتطلبات الإجبارية.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StoreForm(
     themeColors: VisualThemePalette,
     onSubmit: (Map<String, Any>) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var step by remember { mutableIntStateOf(1) }
-
-    // Step 1: Store & Owner identity
+    // Mandatory fields
     var storeName by remember { mutableStateOf("") }
     var ownerName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-
-    // Step 2: Commercial & Legal Info
-    var commercialRegister by remember { mutableStateOf("") }
-    var taxNumber by remember { mutableStateOf("") }
-    var storeCategory by remember { mutableStateOf("إلكترونيات / أجهزة") }
     var city by remember { mutableStateOf("صنعاء") }
 
-    // Step 3: Social, Working Hours & Policies
+    // Optional fields
+    var commercialRegister by remember { mutableStateOf("") }
+    var taxNumber by remember { mutableStateOf("") }
+    var storeCategory by remember { mutableStateOf("عام / متجر تجاري") }
     var socialWhatsapp by remember { mutableStateOf("") }
     var socialFacebook by remember { mutableStateOf("") }
-    var socialInstagram by remember { mutableStateOf("") }
-    var workingHours by remember { mutableStateOf("9:00 ص - 10:00 م") }
-    var returnPolicy by remember { mutableStateOf("استرجاع واستبدال خلال 3 أيام مع الفاتورة") }
+    var workingHours by remember { mutableStateOf("") }
+    var returnPolicy by remember { mutableStateOf("") }
 
-    val isStep1Valid = storeName.isNotBlank() && phone.length >= 9 && password.length >= 6 && password == confirmPassword
-    val isStep2Valid = commercialRegister.isNotBlank() || taxNumber.isNotBlank()
-    val isStep3Valid = workingHours.isNotBlank()
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    // Validation logic (Store Name, Triple Owner Name, Phone >= 9, matching password >= 6, and city)
+    val ownerNamePartsCount = ownerName.trim().split(" ").filter { it.isNotBlank() }.size
+    val isFormValid = storeName.isNotBlank() &&
+            ownerNamePartsCount >= 3 &&
+            phone.trim().length >= 9 &&
+            password.length >= 6 &&
+            password == confirmPassword &&
+            city.isNotBlank()
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(10.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "تسجيل متجر أو نشاط تجاري",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFF10B981).copy(alpha = 0.2f)
-                ) {
-                    Text(
-                        text = "المرحلة $step من 3",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF10B981),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            LinearProgressIndicator(
-                progress = { step / 3f },
-                modifier = Modifier.fillMaxWidth().height(4.dp),
-                color = Color(0xFF10B981),
-                trackColor = Color(0xFF334155)
+            Text(
+                text = "يرجى ملء البيانات (الحقول بعلامة * إجبارية):",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = themeColors.accent
             )
 
-            AnimatedContent(targetState = step, label = "store_wizard") { targetStep ->
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    when (targetStep) {
-                        1 -> {
-                            OutlinedTextField(
-                                value = storeName,
-                                onValueChange = { storeName = it },
-                                label = { Text("اسم المتجر / النشاط التجاري") },
-                                leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = ownerName,
-                                onValueChange = { ownerName = it },
-                                label = { Text("اسم المالك أو المدير المسؤول") },
-                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = phone,
-                                onValueChange = { phone = it },
-                                label = { Text("رقم هاتف المتجر المعتمد") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it },
-                                label = { Text("كلمة المرور") },
-                                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = confirmPassword,
-                                onValueChange = { confirmPassword = it },
-                                label = { Text("تأكيد كلمة المرور") },
-                                isError = confirmPassword.isNotEmpty() && confirmPassword != password,
-                                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+            // 1. Store/Shop Name
+            OutlinedTextField(
+                value = storeName,
+                onValueChange = { storeName = it },
+                label = { Text("اسم المحل / المتجر / النشاط التجاري *") },
+                placeholder = { Text("مثال: متجر النخبة للإلكترونيات") },
+                leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
 
-                        2 -> {
-                            OutlinedTextField(
-                                value = commercialRegister,
-                                onValueChange = { commercialRegister = it },
-                                label = { Text("رقم السجل التجاري") },
-                                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = taxNumber,
-                                onValueChange = { taxNumber = it },
-                                label = { Text("الرقم الضريبي (إن وجد)") },
-                                leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = storeCategory,
-                                onValueChange = { storeCategory = it },
-                                label = { Text("تصنيف المتجر والبضائع") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = city,
-                                onValueChange = { city = it },
-                                label = { Text("المدينة والمقر الرئيسي") },
-                                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+            // 2. Owner Name (Triple)
+            OutlinedTextField(
+                value = ownerName,
+                onValueChange = { ownerName = it },
+                label = { Text("اسم المالك أو المسؤول المعتمد * (ثلاثي)") },
+                placeholder = { Text("مثال: محمد عبدالله المحسن") },
+                isError = ownerName.isNotEmpty() && ownerNamePartsCount < 3,
+                supportingText = {
+                    if (ownerName.isNotEmpty() && ownerNamePartsCount < 3) {
+                        Text("يجب إدخال الاسم ثلاثياً على الأقل", color = Color.Red, fontSize = 10.sp)
+                    }
+                },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
 
-                        3 -> {
-                            OutlinedTextField(
-                                value = socialWhatsapp,
-                                onValueChange = { socialWhatsapp = it },
-                                label = { Text("واتساب خدمة العملاء والطلبات") },
-                                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = socialFacebook,
-                                onValueChange = { socialFacebook = it },
-                                label = { Text("رابط صفحة فيسبوك أو إنستغرام") },
-                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = workingHours,
-                                onValueChange = { workingHours = it },
-                                label = { Text("ساعات العمل وأيام الفتح") },
-                                leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = returnPolicy,
-                                onValueChange = { returnPolicy = it },
-                                label = { Text("سياسة الاسترجاع والضمان") },
-                                leadingIcon = { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 2
-                            )
-                        }
+            // 3. Phone Number
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it },
+                label = { Text("رقم الهاتف المعتمد للمحل * (9 أرقام)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                isError = phone.isNotEmpty() && phone.trim().length < 9,
+                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            // 4. Password
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("كلمة المرور * (6 خانات على الأقل)") },
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            // 5. Confirm Password
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
+                label = { Text("تأكيد كلمة المرور *") },
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError = confirmPassword.isNotEmpty() && confirmPassword != password,
+                supportingText = {
+                    if (confirmPassword.isNotEmpty() && confirmPassword != password) {
+                        Text("كلمتا المرور غير متطابقتين", color = Color.Red, fontSize = 10.sp)
+                    }
+                },
+                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
+                trailingIcon = {
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(
+                            imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            // 6. City Dropdown
+            val cities = listOf("صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت")
+            var expandedCity by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = expandedCity,
+                onExpandedChange = { expandedCity = !expandedCity }
+            ) {
+                OutlinedTextField(
+                    value = city,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("المدينة / المقر الرئيسي *") },
+                    leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(16.dp)) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                )
+                ExposedDropdownMenu(
+                    expanded = expandedCity,
+                    onDismissRequest = { expandedCity = false }
+                ) {
+                    cities.forEach { c ->
+                        DropdownMenuItem(
+                            text = { Text(c, fontSize = 12.sp) },
+                            onClick = {
+                                city = c
+                                expandedCity = false
+                            }
+                        )
                     }
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                if (step > 1) {
-                    OutlinedButton(onClick = { step-- }, shape = RoundedCornerShape(10.dp)) {
-                        Text("السابق", color = Color.White)
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(10.dp))
-                }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
 
-                Button(
-                    onClick = {
-                        if (step < 3) {
-                            step++
-                        } else {
-                            val data = mapOf(
-                                "storeName" to storeName,
-                                "ownerName" to ownerName,
-                                "phone" to phone,
-                                "password" to password,
-                                "commercialRegister" to commercialRegister,
-                                "taxNumber" to taxNumber,
-                                "storeCategory" to storeCategory,
-                                "city" to city,
-                                "socialWhatsapp" to socialWhatsapp,
-                                "socialFacebook" to socialFacebook,
-                                "workingHours" to workingHours,
-                                "returnPolicy" to returnPolicy,
-                                "role" to "STORE"
-                            )
-                            onSubmit(data)
-                        }
-                    },
-                    enabled = when (step) {
-                        1 -> isStep1Valid
-                        2 -> isStep2Valid
-                        3 -> isStep3Valid
-                        else -> false
-                    },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.White)
-                ) {
-                    Text(text = if (step == 3) "إتمام تسجيل المتجر" else "التالي", fontWeight = FontWeight.Bold)
-                }
+            Text(
+                text = "بيانات تجارية اختيارية:",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.LightGray
+            )
+
+            // 7. Store Category (Optional)
+            OutlinedTextField(
+                value = storeCategory,
+                onValueChange = { storeCategory = it },
+                label = { Text("تصنيف المتجر والبضائع (اختياري)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            // 8. Commercial Register (Optional)
+            OutlinedTextField(
+                value = commercialRegister,
+                onValueChange = { commercialRegister = it },
+                label = { Text("رقم السجل التجاري (اختياري)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            // 9. Tax Number (Optional)
+            OutlinedTextField(
+                value = taxNumber,
+                onValueChange = { taxNumber = it },
+                label = { Text("الرقم الضريبي إن وجد (اختياري)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            // 10. Working Hours (Optional)
+            OutlinedTextField(
+                value = workingHours,
+                onValueChange = { workingHours = it },
+                label = { Text("أوقات الفتح والإغلاق (اختياري)") },
+                placeholder = { Text("مثال: 9:00 ص - 10:00 م") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            // 11. Return Policy (Optional)
+            OutlinedTextField(
+                value = returnPolicy,
+                onValueChange = { returnPolicy = it },
+                label = { Text("ضمان وسياسة الاستبدال / الاسترجاع (اختياري)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+            )
+
+            Button(
+                onClick = {
+                    val data = mapOf(
+                        "storeName" to storeName,
+                        "ownerName" to ownerName,
+                        "phone" to phone,
+                        "password" to password,
+                        "commercialRegister" to commercialRegister,
+                        "taxNumber" to taxNumber,
+                        "storeCategory" to storeCategory.ifBlank { "متجر عام" },
+                        "city" to city,
+                        "socialWhatsapp" to socialWhatsapp,
+                        "socialFacebook" to socialFacebook,
+                        "workingHours" to workingHours.ifBlank { "9:00 ص - 10:00 م" },
+                        "returnPolicy" to returnPolicy.ifBlank { "استرجاع واستبدال طبيعي" },
+                        "role" to "STORE"
+                    )
+                    onSubmit(data)
+                },
+                enabled = isFormValid,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.Black)
+            ) {
+                Text("إرسال طلب تسجيل المتجر 🚀", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
     }

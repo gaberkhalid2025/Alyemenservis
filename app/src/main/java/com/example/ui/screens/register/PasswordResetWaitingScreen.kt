@@ -237,6 +237,10 @@ fun PasswordResetWaitingScreen(
                                             viewModel.selectedStore = null
                                             viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
                                         } else {
+                                            viewModel.selectedProvider = null
+                                            viewModel.selectedStore = null
+                                            viewModel.selectedProperty = null
+                                            viewModel.selectedJob = null
                                             viewModel.navigateToScreen(AppScreens.USER_BROWSE)
                                         }
                                         Toast.makeText(context, "🔓 أهلاً بك، تم تسجيل الدخول إلى حسابك!", Toast.LENGTH_LONG).show()
