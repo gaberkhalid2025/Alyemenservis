@@ -223,13 +223,17 @@ open class BookingViewModel : BaseViewModel() {
 
         // Retrieve provider details to ensure accuracy
         val providersList = getProviders?.invoke() ?: emptyList()
-        val prov = providersList.find { it.id == providerId }
+        val prov = providersList.find { it.id == providerId || (providerId.isBlank() && it.name.trim() == providerName.trim()) }
         val basePrice = prov?.previewPrice ?: 0.0
         finalPrice = if (discountPercent > 0.0) {
             basePrice * (1.0 - (discountPercent / 100.0))
         } else {
             basePrice
         }
+
+        val effectiveProviderPhone = prov?.phone?.trim()?.ifBlank {
+            providersList.find { it.name.trim() == providerName.trim() }?.phone?.trim() ?: ""
+        } ?: ""
 
         val finalBookingId = if (customBookingId.isNotBlank()) customBookingId else java.util.UUID.randomUUID().toString()
         val finalBookingNumber = "B-${(100000..999999).random()}"
@@ -243,7 +247,7 @@ open class BookingViewModel : BaseViewModel() {
             serviceType = serviceType,
             providerId = providerId,
             providerName = providerName,
-            providerPhone = prov?.phone ?: "",
+            providerPhone = effectiveProviderPhone,
             dateString = dateString,
             timeString = timeString,
             status = "PENDING",
@@ -281,7 +285,7 @@ open class BookingViewModel : BaseViewModel() {
                         setCurrentUserResidence?.invoke(area)
                     }
 
-                    // Notify the customer (user) that their booking was successfully submitted with booking number and password
+                    // 1. Notify the customer (user) with booking number and password
                     onAddNotification?.invoke(
                         "📅 تم تسجيل طلب حجزك رقم $finalBookingNumber",
                         "مرحباً بك $cleanName، تم استقبال طلب الحجز لدى الفني $providerName بنجاح. رقم الحجز السري هو: $finalBookingNumber ورمز المرور لإلغاء وتعديل الحجز هو: $generatedPass. يرجى الاحتفاظ بهما للتحكم بالحجز وإثبات الهوية عند إنجاز الخدمة.",
@@ -289,15 +293,16 @@ open class BookingViewModel : BaseViewModel() {
                         cleanPhone
                     )
 
-                    // Compile a highly detailed notification containing customer's name, phone, and area of residence
+                    // 2. Notify the Technician (PROVIDER) with actual phone or ID
+                    val technicianTarget = effectiveProviderPhone.ifBlank { providerId.ifBlank { "PROVIDER" } }
                     onAddNotification?.invoke(
                         "⚡ حجز عاجل جديد رقم $finalBookingNumber",
                         "العميل $cleanName ($cleanPhone) من ($area) حجز خدمة ($serviceType) لدى الفني $providerName بموعد $dateString $timeString. السعر المتوقع: $finalPrice ريال يمني.",
                         "PROVIDER",
-                        prov?.phone ?: ""
+                        technicianTarget
                     )
 
-                    // 1. Always notify the Admin/Supervisor
+                    // 3. Always notify the Admin/Supervisor
                     onAddNotification?.invoke(
                         "📢 حجز جديد مسجل في النظام",
                         "العميل $cleanName حجز لدى $providerName في مدينة $area. رقم الحجز: $finalBookingNumber والرمز السري: $generatedPass.",
@@ -363,6 +368,28 @@ open class BookingViewModel : BaseViewModel() {
                     "عزيزي العميل، تم $arabicStatusMsg للخدمة المقدمة من ${b.providerName}.",
                     "USER",
                     b.customerPhone.ifBlank { b.clientPhone }
+                )
+
+                // Also notify the technician (provider)
+                val provTarget = b.providerPhone.ifBlank {
+                    val provObj = getProviders?.invoke()?.find { it.id == b.providerId || it.name.trim() == b.providerName.trim() }
+                    provObj?.phone?.trim()?.ifBlank { b.providerId } ?: b.providerId
+                }
+                if (provTarget.isNotBlank()) {
+                    onAddNotification?.invoke(
+                        "📅 تحديث حالة الحجز (رقم ${b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }})",
+                        "تم تغيير حالة الحجز للعميل ${b.customerName} إلى: $arabicStatusMsg",
+                        "PROVIDER",
+                        provTarget
+                    )
+                }
+
+                // Notify admin
+                onAddNotification?.invoke(
+                    "📢 تحديث حالة حجز",
+                    "تم تحديث حالة الحجز رقم ${b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }} إلى $arabicStatusMsg للعميل ${b.customerName} والفني ${b.providerName}.",
+                    "ADMIN_ONLY",
+                    ""
                 )
             }
         }
@@ -457,13 +484,19 @@ open class BookingViewModel : BaseViewModel() {
                     )
                     
                     // 2. Notify Provider
-                    if (b != null && b.providerPhone.isNotBlank()) {
-                        onAddNotification?.invoke(
-                            "❌ إلغاء حجز من العميل",
-                            "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName).",
-                            "PROVIDER",
-                            b.providerPhone
-                        )
+                    if (b != null) {
+                        val provPhone = b.providerPhone.ifBlank {
+                            val provObj = getProviders?.invoke()?.find { it.id == b.providerId || it.name.trim() == b.providerName.trim() }
+                            provObj?.phone?.trim()?.ifBlank { b.providerId } ?: b.providerId
+                        }
+                        if (provPhone.isNotBlank()) {
+                            onAddNotification?.invoke(
+                                "❌ إلغاء حجز من العميل",
+                                "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName).",
+                                "PROVIDER",
+                                provPhone
+                            )
+                        }
                     }
                 }
                 .addOnFailureListener {

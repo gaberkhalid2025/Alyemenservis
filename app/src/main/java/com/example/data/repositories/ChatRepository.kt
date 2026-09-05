@@ -42,6 +42,7 @@ class ChatRepository(
     // 1. CHANNELS MANAGEMENT (OFFLINE-FIRST)
     // =========================================================================
 
+
     override suspend fun getOrCreateChannel(
         currentUserId: String,
         currentUserName: String,
@@ -55,35 +56,34 @@ class ChatRepository(
     ): AppResult<ChatChannel> = withContext(Dispatchers.IO) {
         try {
             val cleanCurrent = currentUserId.trim()
-            val cleanOther = otherUserId.trim()
+            val cleanOther = if (type == ChannelType.SUPPORT) "ADMIN" else otherUserId.trim()
+            val finalOtherName = if (type == ChannelType.SUPPORT) "الدعم الفني" else otherUserName
+            
             if (cleanCurrent.isBlank()) {
                 return@withContext AppResult.Error(AppError.ValidationError("currentUserId", "معرف المستخدم الحالي فارغ"))
             }
 
             val sortedParticipants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() }.sorted()
-            val isSupportType = type == ChannelType.SUPPORT || 
-                cleanOther.equals("admin_support", ignoreCase = true) || 
-                cleanOther.equals("admin", ignoreCase = true) ||
-                cleanOther.contains("support", ignoreCase = true)
-
+            
             var customChannelId = when {
-                isSupportType -> "support_${cleanCurrent}"
+                type == ChannelType.SUPPORT -> channelsCollection.document().id
                 type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
                 relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
                 else -> channelsCollection.document().id
             }
 
-            // For support chats, search existing channel for current user first
-            if (isSupportType) {
+            if (type == ChannelType.SUPPORT) {
                 try {
                     val existingSupportQuery = channelsCollection
                         .whereArrayContains("participants", cleanCurrent)
                         .get().await()
+                    
                     val existingSupportDoc = existingSupportQuery.documents.find { doc ->
                         val docType = doc.getString("type") ?: ""
                         val docId = doc.id
                         docType.equals("SUPPORT", ignoreCase = true) || docId.startsWith("support_")
                     }
+                    
                     if (existingSupportDoc != null) {
                         customChannelId = existingSupportDoc.id
                     }
@@ -92,83 +92,57 @@ class ChatRepository(
                 }
             }
 
-            // 1. Check local cache first
-            val cached = local?.getChannelById(customChannelId)
-            if (cached != null) {
-                // Update names/photos locally and launch background remote check
-                local?.saveOrUpdateChannel(cached)
-            }
-
-            // 2. Fetch or create in Firebase
             val docRef = channelsCollection.document(customChannelId)
             val snapshot = docRef.get().await()
 
             val channelToReturn = if (snapshot.exists()) {
-                val existing = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id) ?: cached ?: ChatChannel(id = customChannelId)
+                val existing = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id) ?: ChatChannel(id = customChannelId)
                 val updatedNames = existing.participantNames.toMutableMap().apply {
                     put(cleanCurrent, currentUserName)
-                    if (cleanOther.isNotBlank() && otherUserName.isNotBlank()) put(cleanOther, otherUserName)
+                    if (cleanOther.isNotBlank() && finalOtherName.isNotBlank()) put(cleanOther, finalOtherName)
                 }
                 val updatedPhotos = existing.participantPhotos.toMutableMap().apply {
                     put(cleanCurrent, currentUserPhoto)
                     if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
                 }
-                val updated = existing.copy(
-                    participantNames = updatedNames,
-                    participantPhotos = updatedPhotos,
-                    updatedAt = System.currentTimeMillis()
-                )
-                docRef.update(
-                    mapOf(
-                        "participantNames" to updatedNames,
-                        "participantPhotos" to updatedPhotos,
-                        "updatedAt" to updated.updatedAt
-                    )
-                )
-                updated
+                
+                val finalChannel = existing.copy(participantNames = updatedNames, participantPhotos = updatedPhotos)
+                
+                if (updatedNames != existing.participantNames || updatedPhotos != existing.participantPhotos) {
+                    docRef.update(
+                        mapOf(
+                            "participantNames" to updatedNames,
+                            "participantPhotos" to updatedPhotos
+                        )
+                    ).await()
+                }
+                local?.saveOrUpdateChannel(finalChannel)
+                finalChannel
             } else {
                 val newChannel = ChatChannel(
                     id = customChannelId,
-                    participants = sortedParticipants,
-                    participantNames = mapOf(
-                        cleanCurrent to currentUserName,
-                        cleanOther to otherUserName
-                    ),
-                    participantPhotos = mapOf(
-                        cleanCurrent to currentUserPhoto,
-                        cleanOther to otherUserPhoto
-                    ),
+                    participants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() },
+                    participantNames = mutableMapOf(cleanCurrent to currentUserName).apply {
+                        if (cleanOther.isNotBlank() && finalOtherName.isNotBlank()) put(cleanOther, finalOtherName)
+                    },
+                    participantPhotos = mutableMapOf(cleanCurrent to currentUserPhoto).apply {
+                        if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
+                    },
                     type = type,
+                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else "",
                     relatedEntityId = relatedEntityId,
                     relatedEntityType = relatedEntityType,
-                    lastMessage = "محادثة جديدة",
-                    lastMessageTime = System.currentTimeMillis(),
-                    lastMessageSenderId = cleanCurrent,
-                    unreadCount = mapOf(
-                        cleanCurrent to 0,
-                        cleanOther to 0
-                    ),
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
+                    lastMessageTime = System.currentTimeMillis()
                 )
                 docRef.set(newChannel).await()
+                local?.saveOrUpdateChannel(newChannel)
                 newChannel
             }
-
-            // Cache locally
-            local?.saveOrUpdateChannel(channelToReturn)
             AppResult.Success(channelToReturn)
         } catch (e: Exception) {
-            Log.e("ChatRepository", "getOrCreateChannel failed: ${e.message}", e)
-            val fallback = local?.getChannelById("channel_${listOf(currentUserId, otherUserId).sorted().joinToString("_")}")
-            if (fallback != null) {
-                AppResult.Success(fallback)
-            } else {
-                AppResult.Error(AppError.NetworkError(e))
-            }
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
-
     override suspend fun getChannelById(channelId: String): AppResult<ChatChannel?> = withContext(Dispatchers.IO) {
         if (channelId.isBlank()) return@withContext AppResult.Success(null)
         try {

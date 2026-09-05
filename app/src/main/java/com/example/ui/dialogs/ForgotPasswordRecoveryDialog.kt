@@ -221,10 +221,10 @@ fun ForgotPasswordRecoveryDialog(
                                         isSubmitted = true
                                     }
                                     else -> {
-                                        // Open in-app support chat channel
-                                        val supportChannelId = "support_$cleanPhone"
+                                        // Open unified in-app support chat channel
                                         viewModel.sendMessageInChat("مرحباً، أطلب استعادة كلمة المرور لرقم الحساب المسجل: $cleanPhone. $noteInput")
-                                        onOpenChatWithAdmin(supportChannelId)
+                                        viewModel.openSupportChat()
+                                        onDismiss()
                                         isSubmitted = true
                                     }
                                 }

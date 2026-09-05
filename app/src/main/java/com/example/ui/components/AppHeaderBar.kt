@@ -60,7 +60,8 @@ fun AppHeaderBar(
         } else {
             chatChannels.filter { ch ->
                 val isMySupport = (cleanUserId.isNotEmpty() && ch.id == "support_$cleanUserId") ||
-                                  (cleanUserPhone.isNotEmpty() && ch.id == "support_$cleanUserPhone")
+                                  (cleanUserPhone.isNotEmpty() && ch.id == "support_$cleanUserPhone") ||
+                                  (ch.channelType == "SUPPORT" && ((cleanUserId.isNotEmpty() && (ch.customerId == cleanUserId || ch.clientId == cleanUserId)) || (cleanUserPhone.isNotEmpty() && ch.customerPhone == cleanUserPhone)))
                 val isMyUser = (cleanUserId.isNotEmpty() && ch.id.contains(cleanUserId)) ||
                                (cleanUserPhone.isNotEmpty() && ch.id.contains(cleanUserPhone)) ||
                                (cleanUserId.isNotEmpty() && ch.customerId == cleanUserId) ||
@@ -89,9 +90,9 @@ fun AppHeaderBar(
             }
 
             when (notif.targetType) {
-                "ALL" -> true
+                "ALL" -> notif.targetAudience != "ADMIN_ONLY"
                 "USER", "PROVIDER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
-                "SUPERVISOR" -> adminRoleState != "GUEST"
+                "SUPERVISOR", "ADMIN_ONLY" -> adminRoleState != "GUEST"
                 else -> true
             }
         }

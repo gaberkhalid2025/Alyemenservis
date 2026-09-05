@@ -73,6 +73,8 @@ fun UserNotificationsBottomSheet(
         derivedStateOf {
             val cleanPhone = userPhone.trim().replace(" ", "").replace("+", "")
             val cleanUserId = userId.trim()
+            val provPhone = viewModel.selectedProvider?.phone?.trim()?.replace(" ", "")?.replace("+", "") ?: ""
+            val provId = viewModel.selectedProvider?.id ?: ""
             val isAdmin = adminRole == "OWNER" || adminRole == "SUPER_ADMIN" || adminRole == "ADMIN" || adminRole == "SUPERVISOR"
             val seenKeys = mutableSetOf<String>()
 
@@ -89,7 +91,9 @@ fun UserNotificationsBottomSheet(
                                   notif.title.contains("استعادة") || notif.title.contains("رمز التحقق")
                 if (isSensitive) {
                     val isMyTarget = (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)) ||
-                                     (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId))
+                                     (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId)) ||
+                                     (provPhone.isNotEmpty() && notif.targetValue.contains(provPhone)) ||
+                                     (provId.isNotEmpty() && notif.targetValue.contains(provId))
                     if (!isAdmin && !isMyTarget) return@filter false
                 }
 
@@ -119,7 +123,9 @@ fun UserNotificationsBottomSheet(
                     }
                     "SPECIFIC_USERS", "SPECIFIC_USER" -> {
                         (cleanPhone.isNotEmpty() && (notif.targetValue.contains(cleanPhone) || notif.targetUserIds.contains(cleanPhone))) ||
-                        (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId))
+                        (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId)) ||
+                        (provPhone.isNotEmpty() && notif.targetValue.contains(provPhone)) ||
+                        (provId.isNotEmpty() && notif.targetValue.contains(provId))
                     }
                     "REGION" -> {
                         val currentRes = notifViewModel.currentUserResidence.value
@@ -128,11 +134,13 @@ fun UserNotificationsBottomSheet(
                     "CATEGORY" -> true
                     "ALL" -> {
                         when (notif.targetType) {
-                            "ALL" -> true
+                            "ALL" -> notif.targetAudience != "ADMIN_ONLY"
                             "USER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
                             "PROVIDER" -> (cleanPhone.isNotEmpty() && (notif.targetValue.contains(cleanPhone) || notif.targetUserIds.contains(cleanPhone))) ||
-                                          (cleanUserId.isNotEmpty() && (notif.targetValue.contains(cleanUserId) || notif.targetUserIds.contains(cleanUserId)))
-                            "SUPERVISOR" -> false
+                                          (cleanUserId.isNotEmpty() && (notif.targetValue.contains(cleanUserId) || notif.targetUserIds.contains(cleanUserId))) ||
+                                          (provPhone.isNotEmpty() && (notif.targetValue.contains(provPhone) || notif.targetUserIds.contains(provPhone))) ||
+                                          (provId.isNotEmpty() && (notif.targetValue.contains(provId) || notif.targetUserIds.contains(provId)))
+                            "SUPERVISOR", "ADMIN_ONLY" -> false
                             else -> true
                         }
                     }
