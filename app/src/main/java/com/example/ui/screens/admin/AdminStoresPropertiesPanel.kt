@@ -33,7 +33,8 @@ fun AdminStoresPropertiesPanel(
     onBack: () -> Unit = {},
     viewModel: MainViewModel = viewModel(),
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialSector: String = "STORES"
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -41,7 +42,7 @@ fun AdminStoresPropertiesPanel(
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
 
-    var selectedSection by remember { mutableStateOf("المتاجر") }
+    var selectedSection by remember { mutableStateOf(if (initialSector == "PROPERTIES") "العقارات" else "المتاجر") }
     val sections = listOf("المتاجر", "العقارات")
 
     Column(
