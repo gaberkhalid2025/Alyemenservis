@@ -1,110 +1,105 @@
 package com.example.ui.screens.dashboard.components
 
-import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
-/**
- * 🛒 Unified Products / Services Section Component
- */
 @Composable
 fun UnifiedProductsServicesSection(
-    account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
-    themeColors: VisualThemePalette
+    title: String,
+    description: String = "",
+    price: String = "",
+    imageUrl: String = "",
+    isAvailable: Boolean = true,
+    themeColors: VisualThemePalette,
+    onEditClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null,
+    onToggleAvailability: ((Boolean) -> Unit)? = null
 ) {
-    val context = LocalContext.current
-    var showAddDialog by remember { mutableStateOf(false) }
-    var prodName by remember { mutableStateOf("") }
-    var prodPrice by remember { mutableStateOf("") }
-    var prodDesc by remember { mutableStateOf("") }
-
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("🛒 قائمة المنتجات / الخدمات / الأطباق", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-            Button(
-                onClick = { showAddDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.2f))
+                    .border(1.dp, themeColors.accent.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
             ) {
-                Text("إضافة جديدة ➕", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                if (imageUrl.isNotBlank()) {
+                    SmartAsyncImage(
+                        model = imageUrl,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(text = "📦", fontSize = 24.sp)
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = themeColors.textPrimary
+                )
+                if (description.isNotBlank()) {
+                    Text(
+                        text = description,
+                        fontSize = 11.sp,
+                        color = themeColors.textSecondary,
+                        maxLines = 2
+                    )
+                }
+                if (price.isNotBlank()) {
+                    Text(
+                        text = "$price ريال يمني",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.accent
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (onEditClick != null) {
+                    IconButton(onClick = onEditClick) {
+                        Text(text = "✏️", fontSize = 14.sp)
+                    }
+                }
+                if (onDeleteClick != null) {
+                    IconButton(onClick = onDeleteClick) {
+                        Text(text = "🗑️", fontSize = 14.sp)
+                    }
+                }
             }
         }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("لا توجد منتجات مسجلة حالياً بهذا الحساب.", fontSize = 11.sp, color = Color.LightGray)
-                Text("اضغط على زر (إضافة جديدة) لإدراج قائمة منتجاتك أو خدماتك بالأسعار والصور.", fontSize = 10.sp, color = themeColors.textSecondary)
-            }
-        }
-    }
-
-    if (showAddDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("إضافة عنصر جديد 🛒", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = prodName,
-                        onValueChange = { prodName = it },
-                        label = { Text("اسم المنتج / الخدمة / الطبق", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = prodPrice,
-                        onValueChange = { prodPrice = it },
-                        label = { Text("السعر (بالريال اليمني YER)", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = prodDesc,
-                        onValueChange = { prodDesc = it },
-                        label = { Text("التفاصيل والوصف", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (prodName.isNotBlank()) {
-                            Toast.makeText(context, "✅ تم إضافة العنصر بنجاح!", Toast.LENGTH_SHORT).show()
-                            showAddDialog = false
-                            prodName = ""
-                            prodPrice = ""
-                            prodDesc = ""
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
-                ) {
-                    Text("حفظ وإضافة 💾", fontSize = 11.sp, color = Color.Black)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("إلغاء", fontSize = 11.sp, color = Color.LightGray)
-                }
-            }
-        )
     }
 }

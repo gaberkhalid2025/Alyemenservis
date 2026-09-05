@@ -4,6 +4,7 @@ package com.example.ui.screens.admin
 import com.example.ui.*
 import com.example.ui.navigation.AppScreens
 import com.example.utils.*
+import com.example.data.*
 
 
 import android.content.Intent
@@ -4678,7 +4679,92 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     }
                 }
 
-                // 4. Archive actions
+                // 4. Direct Live Support & Password Recovery Chat Inspector
+                item {
+                    val supportChannels = remember(chatChannels) {
+                        chatChannels.filter { ch ->
+                            ch.channelType == "SUPPORT" ||
+                            ch.channelType == "ADMIN" ||
+                            ch.id.startsWith("support_") ||
+                            ch.targetName.contains("دعم", ignoreCase = true) ||
+                            ch.relatedEntityType == "SUPPORT"
+                        }.sortedByDescending { if (it.lastMessageTime > 0) it.lastMessageTime else it.timestamp }
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("💬 محادثات الدعم الفني واستعادة كلمة المرور المباشرة (${supportChannels.size})", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E5FF))
+                                Button(
+                                    onClick = { viewModel.navigateTo("CHAT_LIST") },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("عرض كل المحادثات 💬", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            if (supportChannels.isEmpty()) {
+                                Text("لا توجد طلبات دعم أو استعادة كلمة مرور معلقة حالياً.", fontSize = 11.sp, color = Color.Gray)
+                            } else {
+                                supportChannels.take(8).forEach { ch ->
+                                    val titleStr = ch.targetName.ifBlank { ch.userName.ifBlank { "طلب دعم: ${ch.id.removePrefix("support_")}" } }
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = titleStr,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                                if (ch.lastMessage.isNotBlank()) {
+                                                    Text(
+                                                        text = ch.lastMessage,
+                                                        fontSize = 11.sp,
+                                                        color = Color(0xFFCBD5E1),
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    viewModel.openChatChannel(ch)
+                                                    viewModel.navigateTo("CHAT_DIRECT")
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text("رد الآن 💬", fontSize = 10.sp, color = Color.White)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. Archive actions
                 item {
                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(

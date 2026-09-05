@@ -54,6 +54,13 @@ fun AppNavigator(
     var showRequestServiceModal by remember { mutableStateOf(false) }
     var showRestoreAccountDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(currentScreen) {
+        showRequestServiceModal = false
+        showNotificationsDialog = false
+        showAssistantDialog = false
+        showRestoreAccountDialog = false
+    }
+
     val providers by viewModel.providers.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedCategory by viewModel.selectedCategoryId.collectAsState()

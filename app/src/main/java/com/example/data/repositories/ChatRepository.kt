@@ -61,10 +61,35 @@ class ChatRepository(
             }
 
             val sortedParticipants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() }.sorted()
-            val customChannelId = when {
+            val isSupportType = type == ChannelType.SUPPORT || 
+                cleanOther.equals("admin_support", ignoreCase = true) || 
+                cleanOther.equals("admin", ignoreCase = true) ||
+                cleanOther.contains("support", ignoreCase = true)
+
+            var customChannelId = when {
+                isSupportType -> "support_${cleanCurrent}"
                 type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
                 relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
                 else -> channelsCollection.document().id
+            }
+
+            // For support chats, search existing channel for current user first
+            if (isSupportType) {
+                try {
+                    val existingSupportQuery = channelsCollection
+                        .whereArrayContains("participants", cleanCurrent)
+                        .get().await()
+                    val existingSupportDoc = existingSupportQuery.documents.find { doc ->
+                        val docType = doc.getString("type") ?: ""
+                        val docId = doc.id
+                        docType.equals("SUPPORT", ignoreCase = true) || docId.startsWith("support_")
+                    }
+                    if (existingSupportDoc != null) {
+                        customChannelId = existingSupportDoc.id
+                    }
+                } catch (e: Exception) {
+                    Log.w("ChatRepository", "Error searching existing support channel: ${e.message}")
+                }
             }
 
             // 1. Check local cache first

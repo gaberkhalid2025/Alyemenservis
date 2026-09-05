@@ -130,7 +130,8 @@ fun UserNotificationsBottomSheet(
                         when (notif.targetType) {
                             "ALL" -> true
                             "USER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
-                            "PROVIDER" -> cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)
+                            "PROVIDER" -> (cleanPhone.isNotEmpty() && (notif.targetValue.contains(cleanPhone) || notif.targetUserIds.contains(cleanPhone))) ||
+                                          (cleanUserId.isNotEmpty() && (notif.targetValue.contains(cleanUserId) || notif.targetUserIds.contains(cleanUserId)))
                             "SUPERVISOR" -> false
                             else -> true
                         }

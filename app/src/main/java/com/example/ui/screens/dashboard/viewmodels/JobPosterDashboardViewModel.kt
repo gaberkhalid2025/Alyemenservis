@@ -3,67 +3,82 @@ package com.example.ui.screens.dashboard.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.repositories.IDashboardRepository
+import com.example.data.repositories.IProductsRepository
+import com.example.domain.entities.ProductItemEntity
 import com.example.ui.screens.dashboard.DashboardEvent
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class JobPostItem(
     val id: String = "",
-    val title: String,
-    val salaryYer: Double,
-    val location: String,
+    val title: String = "",
+    val companyName: String = "",
+    val salary: String = "",
+    val requirements: String = "",
     val applicantsCount: Int = 0
 )
 
-/**
- * 🧠 JobPosterDashboardViewModel - إدارة الشواغر الوظيفية والمتقدمين
- */
 class JobPosterDashboardViewModel(
-    private val posterId: String,
-    private val dashboardRepository: IDashboardRepository
+    private val ownerId: String,
+    private val dashboardRepository: IDashboardRepository,
+    private val productsRepository: IProductsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
-    private val _eventFlow = MutableSharedFlow<DashboardEvent>()
-    val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
-
     private val _jobs = MutableStateFlow<List<JobPostItem>>(emptyList())
     val jobs: StateFlow<List<JobPostItem>> = _jobs.asStateFlow()
 
+    private val _eventFlow = MutableSharedFlow<DashboardEvent>()
+    val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
+
     init {
+        loadDashboardData()
+    }
+
+    fun selectTab(tabIndex: Int) {
+        _uiState.value = _uiState.value.copy(activeTab = tabIndex)
+    }
+
+    fun loadDashboardData() {
         viewModelScope.launch {
-            dashboardRepository.getDashboardStats(posterId, "JOB").collect { stats ->
-                _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            launch {
+                dashboardRepository.getDashboardStats(ownerId, "JOB").collect { stats ->
+                    _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+                }
+            }
+
+            launch {
+                productsRepository.getOwnerProducts(ownerId).collect { prods ->
+                    _uiState.value = _uiState.value.copy(products = prods)
+                }
             }
         }
     }
 
-    fun addJob(title: String, salaryYer: Double, location: String) {
+    fun postJob(title: String, company: String, salary: String, requirements: String) {
         if (title.isBlank()) return
-        val newJob = JobPostItem(
+        val item = JobPostItem(
             id = System.currentTimeMillis().toString(),
             title = title,
-            salaryYer = salaryYer,
-            location = location,
+            companyName = company,
+            salary = salary,
+            requirements = requirements,
             applicantsCount = 0
         )
-        _jobs.value = _jobs.value + newJob
+        _jobs.value = _jobs.value + item
         viewModelScope.launch {
-            _eventFlow.emit(DashboardEvent.ShowToast("✅ تم نشر الشاغر الوظيفي بنجاح!"))
+            _eventFlow.emit(DashboardEvent.ShowToast("تم نشر الشاغر الوظيفي بنجاح 💼"))
         }
     }
 
     fun deleteJob(id: String) {
         _jobs.value = _jobs.value.filter { it.id != id }
         viewModelScope.launch {
-            _eventFlow.emit(DashboardEvent.ShowToast("🗑️ تم حذف الشاغر الوظيفي"))
+            _eventFlow.emit(DashboardEvent.ShowToast("تم حذف إعلان الوظيفة 🗑️"))
         }
     }
 }

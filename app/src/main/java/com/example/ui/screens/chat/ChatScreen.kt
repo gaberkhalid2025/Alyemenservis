@@ -46,14 +46,9 @@ fun ChatScreen(
     chatViewModel: ChatViewModel = viewModel(),
     onBackClick: () -> Unit
 ) {
-    if (currentUserId.isBlank() || currentUserId == "guest") {
+    if (currentUserId.isBlank()) {
         Box(modifier = Modifier.fillMaxSize().background(themeColors.background), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("⚠️ يرجى تسجيل الدخول أولاً للتمكن من المحادثة", fontSize = 16.sp, color = Color.Red, textAlign = TextAlign.Center)
-                Button(onClick = onBackClick, colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)) {
-                    Text("رجوع", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
-            }
+            CircularProgressIndicator(color = themeColors.accent)
         }
         return
     }
@@ -154,7 +149,14 @@ fun ChatScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(themeColors.background)
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF0F172A),
+                            Color(0xFF1E293B)
+                        )
+                    )
+                )
         ) {
         // Header
         ChatHeaderBar(

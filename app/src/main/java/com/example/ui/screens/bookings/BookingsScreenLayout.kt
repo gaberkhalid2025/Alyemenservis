@@ -45,10 +45,16 @@ fun BookingsScreenLayout(
         if (isAdmin) {
             bookings.sortedByDescending { it.createdAt }
         } else {
-            val phone = currentUserPhone.trim()
+            val phoneClean = currentUserPhone.filter { it.isDigit() }.takeLast(9)
+            val joinPhoneClean = viewModel.joinRequestPhone.value.filter { it.isDigit() }.takeLast(9)
             val uid = currentUserId.trim()
             bookings.filter { bk ->
-                (phone.isNotEmpty() && (bk.clientPhone.trim() == phone || bk.customerPhone.trim() == phone || bk.providerPhone.trim() == phone)) ||
+                val bClientP = bk.clientPhone.filter { it.isDigit() }.takeLast(9)
+                val bCustP = bk.customerPhone.filter { it.isDigit() }.takeLast(9)
+                val bProvP = bk.providerPhone.filter { it.isDigit() }.takeLast(9)
+
+                (phoneClean.isNotEmpty() && (bClientP == phoneClean || bCustP == phoneClean || bProvP == phoneClean)) ||
+                (joinPhoneClean.isNotEmpty() && (bClientP == joinPhoneClean || bCustP == joinPhoneClean || bProvP == joinPhoneClean)) ||
                 (uid.isNotEmpty() && (bk.clientId.trim() == uid || bk.providerId.trim() == uid))
             }.sortedByDescending { it.createdAt }
         }

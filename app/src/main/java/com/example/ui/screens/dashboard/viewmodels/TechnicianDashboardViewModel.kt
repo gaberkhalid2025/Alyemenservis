@@ -8,17 +8,9 @@ import com.example.data.repositories.IProductsRepository
 import com.example.data.repositories.IRatingsRepository
 import com.example.domain.entities.ProductItemEntity
 import com.example.ui.screens.dashboard.DashboardEvent
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-/**
- * 🧠 TechnicianDashboardViewModel - إدارة بيانات وإحصائيات الفنيين والمستقلين
- */
 class TechnicianDashboardViewModel(
     private val ownerId: String,
     private val dashboardRepository: IDashboardRepository,
@@ -41,7 +33,7 @@ class TechnicianDashboardViewModel(
         _uiState.value = _uiState.value.copy(activeTab = tabIndex)
     }
 
-    private fun loadDashboardData() {
+    fun loadDashboardData() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
@@ -71,21 +63,23 @@ class TechnicianDashboardViewModel(
         }
     }
 
-    fun addNewProductService(title: String, priceYer: Double, category: String) {
+    fun addNewProductService(title: String, priceYer: Double, description: String = "", imageUrl: String = "") {
         viewModelScope.launch {
             if (title.isBlank()) {
-                _eventFlow.emit(DashboardEvent.ShowToast("يرجى كتابة عنوان الخدمة أو المنتج"))
+                _eventFlow.emit(DashboardEvent.ShowToast("يرجى إدخال اسم الخدمة"))
                 return@launch
             }
             val newProduct = ProductItemEntity(
                 ownerId = ownerId,
                 title = title,
                 priceYer = priceYer,
-                category = category
+                description = description,
+                imageUrl = imageUrl,
+                category = "TECHNICIAN"
             )
             val res = productsRepository.addProduct(newProduct)
             res.onSuccess {
-                _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الخدمة بنجاح"))
+                _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الخدمة بنجاح ✅"))
             }.onFailure {
                 _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء الإضافة"))
             }
@@ -95,7 +89,7 @@ class TechnicianDashboardViewModel(
     fun deleteProduct(id: String) {
         viewModelScope.launch {
             productsRepository.deleteProduct(id).onSuccess {
-                _eventFlow.emit(DashboardEvent.ShowToast("تم الحذف بنجاح"))
+                _eventFlow.emit(DashboardEvent.ShowToast("تم حذف الخدمة بنجاح 🗑️"))
             }
         }
     }

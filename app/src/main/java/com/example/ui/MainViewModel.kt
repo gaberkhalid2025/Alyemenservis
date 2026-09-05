@@ -2733,8 +2733,8 @@ fun addNotification(
     var targetChatChannelId by mutableStateOf<String?>(null)
 
     fun openSupportChat() {
-        val currentUserId = authViewModel.currentUserId.value.ifBlank { return }
-        val currentUserName = authViewModel.currentUserName.value ?: "العميل"
+        val currentUserId = authViewModel.getOrGenerateUserId()
+        val currentUserName = authViewModel.currentUserName.value.ifBlank { "العميل" }
         val currentUserPhoto = ""
         
         viewModelScope.launch {
@@ -2758,8 +2758,8 @@ fun addNotification(
 
     fun openChatChannel(channel: ChatChannelEntity?) {
         if (channel == null) return
-        val currentUserId = authViewModel.currentUserId.value.ifBlank { return }
-        val currentUserName = authViewModel.currentUserName.value ?: ""
+        val currentUserId = authViewModel.getOrGenerateUserId()
+        val currentUserName = authViewModel.currentUserName.value.ifBlank { "العميل" }
         val currentUserPhoto = ""
         
         val otherUserId = if (channel.customerId == currentUserId) channel.targetId else channel.customerId
@@ -2886,8 +2886,8 @@ fun addNotification(
         relatedEntityType: String = "",
         onCreated: (ChatChannelEntity?) -> Unit
     ) {
-        val currentUserId = authViewModel.currentUserId.value.ifBlank { return }
-        val currentUserName = authViewModel.currentUserName.value ?: "العميل"
+        val currentUserId = authViewModel.getOrGenerateUserId()
+        val currentUserName = authViewModel.currentUserName.value.ifBlank { "العميل" }
         val currentUserPhoto = ""
         
         viewModelScope.launch {

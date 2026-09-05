@@ -1014,7 +1014,8 @@ fun requestPasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
             "status" to "PENDING",
             "requestedAt" to System.currentTimeMillis()
         )
-        db.collection("password_reset_requests").document(cleanPhone).set(request)
+        db.collection("password_recovery_requests").document(cleanPhone).set(request)
+        db.collection("password_resets").document(cleanPhone).set(request)
             .addOnSuccessListener {
                 requestAdminPasswordReset(cleanPhone)
                 onResult(true, "تم إرسال طلب إعادة التعيين للإدارة بنجاح")
@@ -1026,7 +1027,8 @@ fun requestPasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
 
 fun approvePasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
         val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
-        db.collection("password_reset_requests").document(cleanPhone).update("status", "APPROVED")
+        db.collection("password_recovery_requests").document(cleanPhone).update("status", "APPROVED")
+        db.collection("password_resets").document(cleanPhone).update("status", "APPROVED")
         
         // Generate temporary password
         val chars = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

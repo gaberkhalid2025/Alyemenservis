@@ -70,7 +70,7 @@ fun ChatListScreen(
     }
 
     val filteredChannels = remember(channels, selectedFilter, searchQuery, currentUserId) {
-        channels.filter { channel ->
+        val list = channels.filter { channel ->
             val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
             val otherName = channel.participantNames[otherUserId] ?: ""
             val matchesSearch = searchQuery.isBlank() ||
@@ -98,6 +98,12 @@ fun ChatListScreen(
             }
 
             matchesSearch && matchesFilter
+        }
+        
+        // Deduplicate support channels if user has multiple legacy ones
+        list.distinctBy { ch ->
+            if (ch.type == ChannelType.SUPPORT || ch.id.startsWith("support_") || ch.title.contains("الدعم الفني")) "SUPPORT_MAIN_CHANNEL"
+            else ch.id
         }
     }
 

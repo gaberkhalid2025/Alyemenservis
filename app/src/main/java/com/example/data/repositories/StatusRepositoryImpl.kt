@@ -276,6 +276,31 @@ class StatusRepositoryImpl(
                 }
             }
 
+            // Update/Create User profile and Registered Users document
+            val userRef = firestore.collection("users").document(request.id)
+            batch.set(userRef, mapOf(
+                "id" to request.id,
+                "name" to request.name,
+                "phone" to cleanPhone,
+                "role" to type.uppercase(),
+                "accountType" to type.uppercase(),
+                "status" to "APPROVED",
+                "isApproved" to true,
+                "updatedAt" to now
+            ), com.google.firebase.firestore.SetOptions.merge())
+
+            val regUserRef = firestore.collection("registered_users").document(cleanPhone)
+            batch.set(regUserRef, mapOf(
+                "id" to request.id,
+                "name" to request.name,
+                "phone" to cleanPhone,
+                "role" to type.uppercase(),
+                "accountType" to type.uppercase(),
+                "status" to "APPROVED",
+                "isApproved" to true,
+                "updatedAt" to now
+            ), com.google.firebase.firestore.SetOptions.merge())
+
             // Create notification for user
             val notifId = java.util.UUID.randomUUID().toString()
             val notifRef = firestore.collection("notifications").document(notifId)

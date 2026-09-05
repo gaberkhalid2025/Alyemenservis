@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.data.BookingEntity
 import com.example.data.LocalAppCacheManager
 import com.example.security.BookingSecurityHelper
+import com.example.utils.BookingNotificationManager
 import com.example.utils.BookingUtils
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -175,18 +176,28 @@ class BookingRepository(private val context: Context) {
                     )
                     firestore.collection("notifications").document(userNotifId).set(userNotif)
 
-                    if (finalBooking.providerPhone.isNotBlank()) {
+                    val targetPhones = setOf(
+                        finalBooking.providerPhone,
+                        finalBooking.providerPhone.filter { it.isDigit() }.takeLast(9),
+                        finalBooking.providerId
+                    ).filter { it.isNotBlank() }
+
+                    targetPhones.forEach { targetVal ->
                         val providerNotifId = UUID.randomUUID().toString()
                         val providerNotif = mapOf(
                             "id" to providerNotifId,
                             "title" to "🔔 طلب حجز جديد",
-                            "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName}.",
+                            "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName.ifEmpty { finalBooking.clientName }}.",
                             "targetType" to "PROVIDER",
-                            "targetValue" to finalBooking.providerPhone,
+                            "targetValue" to targetVal,
                             "timestamp" to System.currentTimeMillis()
                         )
                         firestore.collection("notifications").document(providerNotifId).set(providerNotif)
                     }
+
+                    try {
+                        BookingNotificationManager(context).notifyBookingCreated(finalBooking)
+                    } catch (e: Exception) {}
 
                     val adminNotifId = UUID.randomUUID().toString()
                     val adminNotif = mapOf(

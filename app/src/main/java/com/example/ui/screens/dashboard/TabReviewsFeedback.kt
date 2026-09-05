@@ -1,50 +1,63 @@
 package com.example.ui.screens.dashboard
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.runtime.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+import androidx.compose.ui.unit.sp
+import com.example.domain.entities.RatingReviewEntity
+import com.example.ui.screens.dashboard.components.UnifiedEmptyState
+import com.example.ui.screens.dashboard.components.UnifiedReviewsSection
 import com.example.utils.VisualThemePalette
 
-/**
- * 💬 Modular Tab: Ratings & Customer Feedback (إدارة التقييمات والردود الحية)
- */
 @Composable
 fun TabReviewsFeedback(
-    account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
-    themeColors: VisualThemePalette
+    reviews: List<RatingReviewEntity>,
+    themeColors: VisualThemePalette,
+    onReplySubmit: (reviewId: String, replyText: String) -> Unit
 ) {
-    val context = LocalContext.current
-    val allRatings by viewModel.ratings.collectAsState()
-    
-    val myReviews = remember(allRatings, account.id, account.phone) {
-        allRatings.filter { r ->
-            r.targetId == account.id || r.targetId == account.phone
-        }
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            UnifiedReviewsSection(
-                rating = account.rating.toDouble(),
-                numReviews = myReviews.size,
-                reviews = myReviews,
-                onReplySubmit = { ratingId, replyText ->
-                    viewModel.addRatingReply(ratingId, replyText)
-                    Toast.makeText(context, "✅ تم نشر ردك على تقييم العميل بنجاح!", Toast.LENGTH_SHORT).show()
-                },
+        Text(
+            text = "⭐ آراء وتقييمات العملاء (${reviews.size})",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = themeColors.textPrimary
+        )
+
+        if (reviews.isEmpty()) {
+            UnifiedEmptyState(
+                title = "لا توجد تقييمات مسجلة حالياً",
+                description = "ستظهر تقييمات العملاء وتعليقاتهم هنا بعد إتمام الخدمات.",
+                iconText = "⭐",
                 themeColors = themeColors
             )
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(reviews, key = { it.id }) { rev ->
+                    UnifiedReviewsSection(
+                        userName = rev.authorName.ifBlank { "عميل" },
+                        rating = rev.rating,
+                        comment = rev.comment,
+                        ownerReply = "",
+                        themeColors = themeColors,
+                        onReplySubmit = { replyText ->
+                            onReplySubmit(rev.id, replyText)
+                        }
+                    )
+                }
+            }
         }
     }
 }

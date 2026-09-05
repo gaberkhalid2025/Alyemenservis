@@ -1,136 +1,125 @@
 package com.example.ui.screens.dashboard.components
 
-import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 
-/**
- * 📋 Unified Profile Section Component
- */
 @Composable
 fun UnifiedProfileSection(
-    account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    title: String,
+    subtitle: String = "",
+    phone: String = "",
+    cityArea: String = "",
+    photoUrl: String = "",
+    coverUrl: String = "",
+    rating: Double = 5.0,
+    reviewCount: Int = 0,
+    isAvailable: Boolean = true,
     themeColors: VisualThemePalette
 ) {
-    val context = LocalContext.current
-    var name by remember { mutableStateOf(account.name) }
-    var description by remember { mutableStateOf(account.description) }
-    var phone by remember { mutableStateOf(account.phone) }
-    var ownerName by remember { mutableStateOf(account.ownerName) }
-    var workingHours by remember { mutableStateOf(account.workingHours) }
-    var neighborhood by remember { mutableStateOf(account.neighborhood) }
-
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
-                modifier = Modifier.fillMaxWidth()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(110.dp)
+                    .background(Color.Black.copy(alpha = 0.3f))
             ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("📝 البيانات الشخصية والمعلومات العامة", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("الاسم التجاري / اسم المنشأة", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
+                if (coverUrl.isNotBlank()) {
+                    SmartAsyncImage(
+                        model = coverUrl,
+                        contentDescription = "Cover",
+                        modifier = Modifier.fillMaxSize()
                     )
+                }
 
-                    OutlinedTextField(
-                        value = ownerName,
-                        onValueChange = { ownerName = it },
-                        label = { Text("اسم صاحب العمل / المدير المسجل", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
-                    )
-
-                    OutlinedTextField(
-                        value = phone,
-                        onValueChange = { phone = it },
-                        label = { Text("رقم الهاتف والواتساب للتواصل", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
-                    )
-
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text("نبذة وتفاصيل وصفية كاملة عن الخدمة/المكان", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
-                    )
-
-                    OutlinedTextField(
-                        value = workingHours,
-                        onValueChange = { workingHours = it },
-                        label = { Text("أوقات وساعات العمل والدوام (مثال: 8:00 AM - 10:00 PM)", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
-                    )
-
-                    OutlinedTextField(
-                        value = neighborhood,
-                        onValueChange = { neighborhood = it },
-                        label = { Text("العنوان والحي والمنطقة التفصيلية", fontSize = 10.sp) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
-                    )
-
-                    Button(
-                        onClick = {
-                            if (name.isNotBlank() && phone.isNotBlank()) {
-                                if (account.rawStore != null) {
-                                    val updated = account.rawStore.copy(
-                                        name = name,
-                                        description = description,
-                                        phone = phone,
-                                        ownerName = ownerName,
-                                        workingHours = workingHours,
-                                        localNeighborhood = neighborhood
-                                    )
-                                    viewModel.saveStore(updated)
-                                } else if (account.rawProvider != null) {
-                                    val updated = account.rawProvider.copy(
-                                        name = name,
-                                        phone = phone,
-                                        localNeighborhood = neighborhood,
-                                        profession = description
-                                    )
-                                    viewModel.updateProviderEntity(updated)
-                                }
-                                Toast.makeText(context, "✅ تم حفظ التعديلات سحابياً بنجاح!", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "⚠️ يرجى تعبئة الحقول الأساسية", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("حفظ وتحديث البيانات الشخصية 💾", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = 8.dp)
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, themeColors.accent, CircleShape)
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (photoUrl.isNotBlank()) {
+                        SmartAsyncImage(
+                            model = photoUrl,
+                            contentDescription = "Profile Photo",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Text(text = "👤", fontSize = 28.sp)
                     }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColors.textPrimary
+                    )
+
+                    Surface(
+                        color = if (isAvailable) Color(0xFF10B981) else Color(0xFFEF4444),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = if (isAvailable) "متاح الآن 🟢" else "مشغول / مغلق 🔴",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                if (subtitle.isNotBlank()) {
+                    Text(text = subtitle, fontSize = 12.sp, color = themeColors.textSecondary)
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (phone.isNotBlank()) {
+                        Text(text = "📞 $phone", fontSize = 11.sp, color = themeColors.accent)
+                    }
+                    if (cityArea.isNotBlank()) {
+                        Text(text = "📍 $cityArea", fontSize = 11.sp, color = themeColors.textSecondary)
+                    }
+                    Text(text = "⭐ %.1f ($reviewCount تقييم)".format(rating, reviewCount), fontSize = 11.sp, color = Color(0xFFFFA000))
                 }
             }
         }

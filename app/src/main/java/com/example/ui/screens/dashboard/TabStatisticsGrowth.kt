@@ -1,188 +1,88 @@
 package com.example.ui.screens.dashboard
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.UnifiedBusinessAccount
-import com.example.ui.MainViewModel
+import com.example.domain.entities.DashboardStatsEntity
 import com.example.utils.VisualThemePalette
 
-/**
- * 📈 Modular Tab: Business Statistics, Analytics & Growth (الإحصائيات والتحليلات ونمو المنشأة)
- */
 @Composable
 fun TabStatisticsGrowth(
-    account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
+    stats: DashboardStatsEntity,
     themeColors: VisualThemePalette
 ) {
-    val allProducts by viewModel.products.collectAsState()
-    val allBookings by viewModel.bookings.collectAsState()
-    val allRatings by viewModel.ratings.collectAsState()
-
-    val myProducts = remember(allProducts, account.id) {
-        allProducts.filter { (it.storeId == account.id || it.storeId == account.phone) && !it.isDeleted }
-    }
-    val myBookings = remember(allBookings, account.id, account.phone) {
-        allBookings.filter { b -> b.providerId == account.id || b.providerId == account.phone }
-    }
-    val myReviews = remember(allRatings, account.id, account.phone) {
-        allRatings.filter { r -> r.targetId == account.id || r.targetId == account.phone }
-    }
-
-    val completedBookings = remember(myBookings) { myBookings.filter { it.status == "COMPLETED" }.size }
-    val pendingBookings = remember(myBookings) { myBookings.filter { it.status == "PENDING" }.size }
-
-    LazyColumn(
+    Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(4.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item {
-            Text(
-                text = "📊 إحصائيات الأداء ونمو المنشأة",
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.accent
-            )
+        Text(text = "📊 إحصائيات النشاط والنمو", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCard("الطلبات النشطة 📋", "${stats.activeBookingsCount} طلب", Color(0xFF3B82F6), themeColors, Modifier.weight(1f))
+            StatCard("الطلبات المكتملة 🏁", "${stats.completedBookingsCount} طلب", Color(0xFF10B981), themeColors, Modifier.weight(1f))
         }
 
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Card 1: Views/Visits
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("👀 المشاهدات والزيارات", fontSize = 10.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("${account.numReviews * 15 + 47}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    }
-                }
-
-                // Card 2: Rating
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("⭐ متوسط التقييم", fontSize = 10.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "⭐ " + String.format("%.1f", account.rating),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFFB300)
-                        )
-                    }
-                }
-            }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatCard("متوسط التقييمات ⭐", "%.1f من 5".format(stats.averageRating), Color(0xFFFFA000), themeColors, Modifier.weight(1f))
+            StatCard("مشاهدات الملف 👁️", "${stats.totalViews} مشاهدة", Color(0xFF8B5CF6), themeColors, Modifier.weight(1f))
         }
 
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+            shape = RoundedCornerShape(14.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Card 3: Total Products/Services
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("🛒 المنتجات / الخدمات", fontSize = 10.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("${myProducts.size}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
-
-                // Card 4: Bookings
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("📅 إجمالي الحجوزات", fontSize = 10.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("${myBookings.size}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
+                Text(text = "💰 الإيرادات التقديرية", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
+                Text(text = "${stats.totalRevenueYer} ريال يمني", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "يتم احتساب الإيرادات التقديرية بناءً على الطلبات المكتملة بنجاح.", fontSize = 11.sp, color = themeColors.textSecondary)
             }
         }
+    }
+}
 
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.15f)),
-                modifier = Modifier.fillMaxWidth()
+@Composable
+private fun StatCard(
+    title: String,
+    value: String,
+    badgeColor: Color,
+    themeColors: VisualThemePalette,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+        shape = RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(badgeColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("💡 تحليلات الأداء والنمو", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("الحجوزات المكتملة بنجاح 🎉", fontSize = 11.sp, color = Color.LightGray)
-                        Text("$completedBookings حجز", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("الحجوزات قيد المعالجة والانتظار ⏳", fontSize = 11.sp, color = Color.LightGray)
-                        Text("$pendingBookings حجز", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("التقييمات والآراء المكتوبة ⭐", fontSize = 11.sp, color = Color.LightGray)
-                        Text("${myReviews.size} تعليق", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
+                Text(text = title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = badgeColor)
             }
+            Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
         }
     }
 }

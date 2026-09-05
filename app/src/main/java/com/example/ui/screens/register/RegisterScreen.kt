@@ -77,63 +77,13 @@ fun RegisterScreen(
         )
     }
 
-    // إذا كان للمستخدم طلب قيد الانتظار أو تم اعتماده، نعرض شاشة الانتظار أو الملف الشخصي المعتمد
+    // إذا كان للمستخدم طلب قيد الانتظار أو تم اعتماده، نعرض شاشة الانتظار أو الملف الشخصي المعتمد مباشرة
     if (currentStatus !is JoinStatus.NoRequest && !forceShowForm) {
-        Box(modifier = modifier.fillMaxSize()) {
-            JoinRequestStatusScreen(
-                viewModel = viewModel,
-                themeColors = themeColors
-            )
-
-            // زر علوي للرجوع أو تقديم طلب جديد إن رغب المستخدم
-            Surface(
-                color = Color(0xFF0F172A).copy(alpha = 0.95f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "رجوع",
-                            tint = Color.White
-                        )
-                    }
-
-                    Text(
-                        text = if (currentStatus is JoinStatus.ApprovedTechnician || currentStatus is JoinStatus.ActiveStore || currentStatus is JoinStatus.ActiveProperty)
-                            "👤 الملف الشخصي والأنشطة"
-                        else
-                            "⏳ متابعة حالة الطلب",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-
-                    TextButton(
-                        onClick = {
-                            forceShowForm = true
-                            selectedType = null
-                        }
-                    ) {
-                        Text(
-                            text = "طلب جديد ➕",
-                            color = themeColors.accent,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
+        JoinRequestStatusScreen(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            modifier = modifier
+        )
         return
     }
 

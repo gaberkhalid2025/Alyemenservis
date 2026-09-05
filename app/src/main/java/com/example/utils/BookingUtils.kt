@@ -59,8 +59,9 @@ object BookingUtils {
         if (scheduledMs <= 0) return true // If no valid date/time, allow by default
         val now = System.currentTimeMillis()
         val diffMs = scheduledMs - now
-        val eightHoursMs = 8 * 60 * 60 * 1000L
-        return diffMs > eightHoursMs
+        // Allow modification/cancellation anytime prior to 1 hour before scheduled time
+        val oneHourMs = 60 * 60 * 1000L
+        return diffMs > oneHourMs || scheduledAtTimestamp <= 0
     }
 
     /**

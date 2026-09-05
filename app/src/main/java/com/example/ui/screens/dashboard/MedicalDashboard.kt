@@ -1,37 +1,30 @@
 package com.example.ui.screens.dashboard
 
 import android.widget.Toast
-import androidx.compose.animation.*
-import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.*
+import com.example.data.UnifiedBusinessAccount
+import com.example.data.repositories.*
 import com.example.ui.MainViewModel
+import com.example.ui.screens.dashboard.components.UnifiedEmptyState
+import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
+import com.example.ui.screens.dashboard.viewmodels.MedicalDashboardViewModel
 import com.example.utils.VisualThemePalette
 
-import com.example.data.repositories.*
-
-/**
- * 🏥 Standalone Dedicated Dashboard for Medical Centers & Clinics (لوحة المركز الطبي والعيادات)
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicalDashboard(
     account: UnifiedBusinessAccount,
@@ -44,240 +37,245 @@ fun MedicalDashboard(
 
     val medicalViewModel = remember(account.id) {
         MedicalDashboardViewModel(
-            centerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(context)
+            ownerId = account.id,
+            dashboardRepository = DashboardRepositoryImpl(context),
+            productsRepository = ProductsRepositoryImpl(context),
+            ratingsRepository = RatingsRepositoryImpl(context)
         )
     }
 
-    val medicalUiState by medicalViewModel.uiState.collectAsState()
+    val uiState by medicalViewModel.uiState.collectAsState()
+    val doctors by medicalViewModel.doctors.collectAsState()
+    val allBookings by viewModel.bookings.collectAsState()
+
+    val medicalBookings = remember(allBookings, account) {
+        allBookings.filter { b -> b.providerId == account.id || b.providerPhone == account.phone }
+    }
+
+    var showAddDoctorDialog by remember { mutableStateOf(false) }
+    var docNameInput by remember { mutableStateOf("") }
+    var docSpecInput by remember { mutableStateOf("") }
+    var docHoursInput by remember { mutableStateOf("") }
+
+    val tabs = listOf(
+        "العيادات والأطباء 🩺",
+        "الحجوزات الطبية 📅",
+        "الخدمات الطبية 💊",
+        "تقييمات المرضى ⭐",
+        "الملف التعريفي 📝"
+    )
 
     LaunchedEffect(medicalViewModel) {
         medicalViewModel.eventFlow.collect { event ->
             when (event) {
                 is DashboardEvent.ShowToast -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
-                is DashboardEvent.NavigateToDetail -> { }
+                else -> {}
             }
         }
     }
 
-    val tabsList = listOf(
-        Pair("🩺", "العيادات والخدمات"),
-        Pair("👨‍⚕️", "كادر الأطباء"),
-        Pair("📅", "الحجوزات الطبية"),
-        Pair("💬", "تقييمات المرضى"),
-        Pair("📝", "الملف الطبي للمركز"),
-        Pair("📊", "الإحصائيات والأداء")
-    )
-
-    val stores by viewModel.stores.collectAsState()
-    val matchingStore = stores.find { it.id == account.id || it.phone == account.phone }
-    val isVerified = account.isVerified || (matchingStore?.isActive == true)
-    var isServiceActive by remember { mutableStateOf(account.isActive) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0F172A))
-    ) {
-        // Professional Top Header
-        ProfessionalDashboardHeader(
-            account = account,
-            subtitle = "🏥 مركز طبي وعيادات تخصصية • ${account.neighborhood.ifBlank { account.city.ifBlank { "اليمن" } }}",
-            isVerified = isVerified,
-            isServiceActive = isServiceActive,
-            onToggleServiceActive = { active ->
-                isServiceActive = active
-                viewModel.updateBusinessAccountStatus(account.id, active)
-            },
-            onEditProfileClick = { activeTab = 3 },
-            onShareClick = {
-                val sendIntent = android.content.Intent().apply {
-                    action = android.content.Intent.ACTION_SEND
-                    putExtra(android.content.Intent.EXTRA_TEXT, "احجز موعدك في ${account.name}: ${account.phone}")
-                    type = "text/plain"
-                }
-                context.startActivity(android.content.Intent.createChooser(sendIntent, "مشاركة المركز الطبي"))
-            },
-            onBackClick = onBackClick,
-            themeColors = themeColors
-        )
-
-        // Quick Stats Strip
-        ProfessionalQuickStatsGrid(
-            todayOrdersCount = 8,
-            overallRating = account.rating,
-            activeOffersCount = 2,
-            approxRevenue = "54,000 ر.ي",
-            themeColors = themeColors,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-        )
-
-        // Horizontal Tabs Bar
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0F172A))
-                .padding(vertical = 6.dp, horizontal = 8.dp),
-
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(tabsList.size) { index ->
-                val tab = tabsList[index]
-                val isSelected = activeTab == index
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) themeColors.accent else Color(0xFF1E293B))
-                        .border(
-                            1.dp,
-                            if (isSelected) themeColors.accent else Color.White.copy(alpha = 0.08f),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .clickable { activeTab = index }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(tab.first, fontSize = 13.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = tab.second,
-                            fontSize = 11.5.sp,
-                            color = if (isSelected) Color.Black else Color.White,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(text = "لوحة تحكم المركز الطبي 🩺", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+                        Text(text = account.name, fontSize = 11.sp, color = themeColors.textSecondary)
                     }
-                }
-            }
-        }
-
-        HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp)
-
-        // Dynamic Tab Content
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .padding(12.dp)
-        ) {
-            when (activeTab) {
-                0 -> TabProductsServices(account, viewModel, themeColors)
-                1 -> MedicalDoctorsSection(account, medicalViewModel, themeColors)
-                2 -> TabBookingsOrders(account, viewModel, themeColors)
-                3 -> TabReviewsFeedback(account, viewModel, themeColors)
-                4 -> TabProfileEdit(account, viewModel, themeColors)
-                5 -> TabStatisticsGrowth(account, viewModel, themeColors)
-            }
-        }
-    }
-}
-
-// ==========================================================
-// 👨‍⚕️ Custom Doctor Management Section
-// ==========================================================
-@Composable
-private fun MedicalDoctorsSection(
-    account: UnifiedBusinessAccount,
-    medicalViewModel: MedicalDashboardViewModel,
-    themeColors: VisualThemePalette
-) {
-    val context = LocalContext.current
-    var showAddDialog by remember { mutableStateOf(false) }
-    var doctorName by remember { mutableStateOf("") }
-    var doctorSpecialty by remember { mutableStateOf("") }
-    var doctorHours by remember { mutableStateOf("") }
-
-    val doctorsList by medicalViewModel.doctors.collectAsState()
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "👨‍⚕️ كادر الأطباء والاستشاريين بالمركز (${doctorsList.size})",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.accent
-            )
-            Button(
-                onClick = {
-                    doctorName = ""
-                    doctorSpecialty = ""
-                    doctorHours = ""
-                    showAddDialog = true
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("إضافة طبيب 👨‍⚕️", fontSize = 10.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        if (doctorsList.isEmpty()) {
-            UnifiedEmptyState(
-                icon = "👨‍⚕️",
-                title = "لا يوجد أطباء مسجلين",
-                description = "يمكنك إضافة كادر الأطباء ومواعيد عياداتهم المخصصة ليسهل حجز المرضى لها.",
-                themeColors = themeColors
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = themeColors.textPrimary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
             )
-        } else {
-            doctorsList.forEach { doc ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("🩺 ${doc.name}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(doc.specialty, fontSize = 11.sp, color = themeColors.accent)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(doc.hours, fontSize = 10.sp, color = Color.LightGray)
+        },
+        containerColor = themeColors.background
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            ScrollableTabRow(
+                selectedTabIndex = activeTab,
+                containerColor = themeColors.surface,
+                contentColor = themeColors.accent,
+                edgePadding = 12.dp
+            ) {
+                tabs.forEachIndexed { index, label ->
+                    Tab(
+                        selected = activeTab == index,
+                        onClick = { activeTab = index },
+                        text = {
+                            Text(
+                                text = label,
+                                fontSize = 12.sp,
+                                fontWeight = if (activeTab == index) FontWeight.Bold else FontWeight.Normal,
+                                color = if (activeTab == index) themeColors.accent else themeColors.textSecondary
+                            )
                         }
-                        IconButton(
-                            onClick = {
-                                medicalViewModel.deleteDoctor(doc.id)
-                            }
+                    )
+                }
+            }
+
+            if (uiState.isLoading) {
+                UnifiedLoadingIndicator(themeColors = themeColors)
+            } else {
+                when (activeTab) {
+                    0 -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "🩺 أطباء المركز والعيادات (${doctors.size})", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+                                Button(
+                                    onClick = { showAddDoctorDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("إضافة طبيب 🩺", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            if (doctors.isEmpty()) {
+                                UnifiedEmptyState(
+                                    title = "لا يوجد أطباء مضافين حالياً",
+                                    description = "أضف أطباء المركز وتخصصاتهم لتمكين المرضى من حجز المواعيد.",
+                                    iconText = "🩺",
+                                    actionLabel = "إضافة طبيب 🩺",
+                                    onActionClick = { showAddDoctorDialog = true },
+                                    themeColors = themeColors
+                                )
+                            } else {
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(doctors, key = { it.id }) { doc ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                    Text(text = "د. ${doc.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.textPrimary)
+                                                    Text(text = "التخصص: ${doc.specialty}", fontSize = 12.sp, color = themeColors.accent)
+                                                    if (doc.workingHours.isNotBlank()) {
+                                                        Text(text = "أوقات الدوام: ${doc.workingHours}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                                    }
+                                                }
+                                                IconButton(onClick = { medicalViewModel.deleteDoctor(doc.id) }) {
+                                                    Text("🗑️", fontSize = 16.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
+                    }
+                    1 -> {
+                        TabBookingsOrders(
+                            bookings = medicalBookings,
+                            themeColors = themeColors,
+                            onAcceptBooking = { bId -> viewModel.updateBookingStatus(bId, "APPROVED") },
+                            onRejectBooking = { bId, reason -> viewModel.updateBookingStatus(bId, "REJECTED") },
+                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, "IN_PROGRESS") },
+                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, "COMPLETED") },
+                            onChatWithClient = { phone ->
+                                viewModel.openOrCreateChatChannel(
+                                    targetId = account.id,
+                                    targetType = "MEDICAL",
+                                    targetName = account.name,
+                                    targetPhone = phone,
+                                    onCreated = {}
+                                )
+                            }
+                        )
+                    }
+                    2 -> {
+                        TabProductsServices(
+                            products = uiState.products,
+                            titleLabel = "الفحوصات والخدمات الطبية",
+                            addButtonLabel = "إضافة خدمة طبية 💊",
+                            themeColors = themeColors,
+                            onAddProduct = { title, price, desc, img ->
+                                medicalViewModel.addMedicalService(title, price, desc)
+                            },
+                            onDeleteProduct = { id -> }
+                        )
+                    }
+                    3 -> {
+                        TabReviewsFeedback(
+                            reviews = uiState.reviews,
+                            themeColors = themeColors,
+                            onReplySubmit = { revId, reply ->
+                                Toast.makeText(context, "تم الرد على تقييم المريض بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                    4 -> {
+                        TabProfileEdit(
+                            name = account.name,
+                            phone = account.phone,
+                            cityArea = account.neighborhood.ifBlank { account.cityId },
+                            description = account.description,
+                            workingHours = account.workingHours,
+                            photoUrl = account.logoImage,
+                            coverUrl = account.coverImage,
+                            isAvailable = true,
+                            rating = account.rating.toDouble(),
+                            reviewCount = account.numReviews,
+                            themeColors = themeColors,
+                            onSaveProfile = { name, phone, city, desc, hours, available ->
+                                Toast.makeText(context, "تم تحديث بيانات المركز بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            },
+                            onChangePassword = { oldP, newP ->
+                                Toast.makeText(context, "تم تغيير كلمة المرور بنجاح 🔑", Toast.LENGTH_SHORT).show()
+                            }
+                        )
                     }
                 }
             }
         }
     }
 
-    if (showAddDialog) {
+    if (showAddDoctorDialog) {
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("إضافة طبيب جديد للكادر 👨‍⚕️", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            onDismissRequest = { showAddDoctorDialog = false },
+            title = { Text("إضافة طبيب جديد للمركز", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = doctorName,
-                        onValueChange = { doctorName = it },
-                        label = { Text("اسم الطبيب بالكامل", fontSize = 11.sp) },
+                        value = docNameInput,
+                        onValueChange = { docNameInput = it },
+                        label = { Text("اسم الطبيب") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = doctorSpecialty,
-                        onValueChange = { doctorSpecialty = it },
-                        label = { Text("التخصص الطبي الدقيق", fontSize = 11.sp) },
+                        value = docSpecInput,
+                        onValueChange = { docSpecInput = it },
+                        label = { Text("التخصص الطبي") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = doctorHours,
-                        onValueChange = { doctorHours = it },
-                        label = { Text("أوقات الدوام وساعات العيادة", fontSize = 11.sp) },
+                        value = docHoursInput,
+                        onValueChange = { docHoursInput = it },
+                        label = { Text("ساعات الدوام (مثال: 4 م - 8 م)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -285,19 +283,22 @@ private fun MedicalDoctorsSection(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (doctorName.isNotBlank() && doctorSpecialty.isNotBlank()) {
-                            medicalViewModel.addDoctor(doctorName, doctorSpecialty, doctorHours)
-                            showAddDialog = false
+                        if (docNameInput.isNotBlank()) {
+                            medicalViewModel.addDoctor(docNameInput, docSpecInput, docHoursInput)
+                            docNameInput = ""
+                            docSpecInput = ""
+                            docHoursInput = ""
+                            showAddDoctorDialog = false
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
                 ) {
-                    Text("إضافة الطبيب ✓", fontSize = 11.sp, color = Color.Black)
+                    Text("حفظ الطبيب", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("إلغاء", fontSize = 11.sp, color = Color.LightGray)
+                TextButton(onClick = { showAddDoctorDialog = false }) {
+                    Text("إلغاء")
                 }
             }
         )

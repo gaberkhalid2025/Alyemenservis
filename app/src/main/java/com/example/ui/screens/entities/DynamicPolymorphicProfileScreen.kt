@@ -1,6 +1,5 @@
 package com.example.ui.screens.entities
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -8,26 +7,20 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,9 +57,7 @@ fun DynamicPolymorphicProfileScreen(
     val categories by viewModel.categories.collectAsState()
     val products by viewModel.products.collectAsState()
     val ratings by viewModel.ratings.collectAsState()
-    val bookings by viewModel.bookings.collectAsState()
 
-    // Current user authentication states
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
@@ -113,9 +104,8 @@ fun DynamicPolymorphicProfileScreen(
         ?: property?.description
         ?: job?.description ?: "لا يوجد وصف متاح."
 
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var showRatingDialog by remember { mutableStateOf(false) }
-    var showReportDialog by remember { mutableStateOf(false) }
 
     val entityId = provider?.id ?: store?.id ?: property?.id ?: job?.id ?: ""
     val favoriteIds by viewModel.favoriteIds.collectAsState()
@@ -124,50 +114,25 @@ fun DynamicPolymorphicProfileScreen(
         ratings.filter { it.targetId == entityId }
     }
 
-    // Ownership logic: check if logged-in user is the provider/owner
+    // Ownership logic: check if logged-in user is the owner
     val isOwner = remember(currentUserId, currentUserPhone, provider, store, property, adminRole) {
-        val phoneClean = currentUserPhone.trim()
+        val phoneClean = currentUserPhone.filter { it.isDigit() }.takeLast(9)
         val uidClean = currentUserId.trim()
-        val provPhone = provider?.phone?.trim() ?: ""
-        val storePhone = store?.phone?.trim() ?: ""
+        val provPhone = (provider?.phone ?: "").filter { it.isDigit() }.takeLast(9)
+        val storePhone = (store?.phone ?: "").filter { it.isDigit() }.takeLast(9)
         val storeOwner = store?.ownerId?.trim() ?: ""
-        val propPhone = property?.phone?.trim() ?: ""
+        val propPhone = (property?.phone ?: "").filter { it.isDigit() }.takeLast(9)
         val propOwner = property?.ownerId?.trim() ?: ""
+        val joinPhone = viewModel.joinRequestPhone.value.filter { it.isDigit() }.takeLast(9)
         val isAdmin = adminRole != "GUEST"
-        
-        isAdmin || (uidClean.isNotEmpty() && (uidClean == storeOwner || uidClean == propOwner)) ||
-        (phoneClean.isNotEmpty() && (phoneClean == provPhone || phoneClean == storePhone || phoneClean == propPhone))
-    }
 
-    // Dynamic stats calculations
-    val bookingsCount = remember(bookings, entityId) {
-        bookings.count { it.providerId == entityId }
-    }
-    val completedRevenue = remember(bookings, entityId) {
-        bookings.filter { it.providerId == entityId && (it.status == "COMPLETED" || it.status == "APPROVED") }
-            .sumOf { it.totalAmount }
-    }
+        val provId = provider?.id?.trim() ?: ""
+        val storeId = store?.id?.trim() ?: ""
+        val propId = property?.id?.trim() ?: ""
 
-    if (showRatingDialog) {
-        com.example.ui.dialogs.MultiDimensionRatingDialog(
-            targetId = entityId,
-            targetName = entityName,
-            targetType = entityType.name,
-            viewModel = viewModel,
-            themeColors = themeColors,
-            onDismiss = { showRatingDialog = false }
-        )
-    }
-
-    if (showReportDialog) {
-        com.example.ui.dialogs.SubmitReportDialog(
-            targetId = entityId,
-            targetName = entityName,
-            targetType = entityType.name,
-            viewModel = viewModel,
-            themeColors = themeColors,
-            onDismiss = { showReportDialog = false }
-        )
+        (uidClean.isNotEmpty() && (uidClean == provId || uidClean == storeId || uidClean == propId || uidClean == storeOwner || uidClean == propOwner)) ||
+        (phoneClean.isNotEmpty() && (phoneClean == provPhone || phoneClean == storePhone || phoneClean == propPhone)) ||
+        (joinPhone.isNotEmpty() && (joinPhone == provPhone || joinPhone == storePhone || joinPhone == propPhone))
     }
 
     Scaffold(
@@ -208,13 +173,6 @@ fun DynamicPolymorphicProfileScreen(
                             tint = if (isFav) Color(0xFFEF4444) else Color.White
                         )
                     }
-                    IconButton(onClick = { showReportDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "إبلاغ",
-                            tint = Color(0xFFEF4444)
-                        )
-                    }
                     if (entityPhone.isNotBlank()) {
                         IconButton(onClick = {
                             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$entityPhone"))
@@ -234,9 +192,7 @@ fun DynamicPolymorphicProfileScreen(
                         Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة", tint = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = themeColors.surface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = themeColors.surface)
             )
         },
         bottomBar = {
@@ -265,7 +221,7 @@ fun DynamicPolymorphicProfileScreen(
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 🌟 1. HERO BANNER, AVATAR & BUSINESS METRICS
+            // 1. HERO BANNER & PROFILE HEADER
             item {
                 ProfileHeader(
                     entityName = entityName,
@@ -278,13 +234,62 @@ fun DynamicPolymorphicProfileScreen(
                     isVerified = provider?.isVerified ?: store?.isVerified ?: property?.isVerified ?: true,
                     isVip = provider?.isVip ?: store?.isVip ?: property?.isVip ?: false,
                     isOwner = isOwner,
-                    bookingsCount = bookingsCount,
-                    completedRevenue = completedRevenue,
+                    bookingsCount = 0,
+                    completedRevenue = 0.0,
                     themeColors = themeColors
                 )
             }
 
-            // 🌟 OWNER & ADMIN DASHBOARD CONTROLS (Customized for each role)
+            // 2. PROMINENT DASHBOARD BUTTON FOR OWNER
+            if (isOwner) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, themeColors.accent)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "👑 مرحباً بك يا صاحب المنشأة / الفني!",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = themeColors.accent
+                            )
+                            Button(
+                                onClick = {
+                                    val destination = when (entityType) {
+                                        ProfileEntityType.TECHNICIAN -> "TECHNICIAN_DASHBOARD"
+                                        ProfileEntityType.STORE -> "STORE_DASHBOARD"
+                                        ProfileEntityType.RESTAURANT -> "RESTAURANT_DASHBOARD"
+                                        ProfileEntityType.MEDICAL -> "MEDICAL_DASHBOARD"
+                                        ProfileEntityType.REAL_ESTATE -> "PROPERTY_DASHBOARD"
+                                        ProfileEntityType.JOB -> "JOB_POSTER_DASHBOARD"
+                                        else -> "TECHNICIAN_DASHBOARD"
+                                    }
+                                    viewModel.navigateTo(destination)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "الدخول لوحة التحكم الرئيسية ⚙️",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. OWNER CONTROL BAR
             if (isOwner || adminRole != "GUEST") {
                 item {
                     ProfileOwnerAdminControlBar(
@@ -302,7 +307,7 @@ fun DynamicPolymorphicProfileScreen(
                 }
             }
 
-            // 🌟 2. POLYMORPHIC STRUCTURED DATA (Tailored Fields per category)
+            // 4. SPECS & DETAILS
             item {
                 ProfileSpecs(
                     entityType = entityType,
@@ -315,7 +320,7 @@ fun DynamicPolymorphicProfileScreen(
                 )
             }
 
-            // 🌟 3. TABS (معرض الأعمال / المنتجات / التقييمات / تفاصيل إضافية)
+            // 5. TABS & CONTENT
             item {
                 ProfileTabs(
                     selectedTab = selectedTab,
@@ -325,7 +330,6 @@ fun DynamicPolymorphicProfileScreen(
                 )
             }
 
-            // 🌟 4. TAB CONTENTS
             item {
                 ProfileTabContent(
                     selectedTab = selectedTab,
@@ -338,11 +342,10 @@ fun DynamicPolymorphicProfileScreen(
                     entityReviews = entityReviews,
                     entityDescription = entityDescription,
                     themeColors = themeColors,
+                    isOwner = isOwner,
                     onAddReviewClick = { showRatingDialog = true }
                 )
             }
         }
     }
 }
-
-

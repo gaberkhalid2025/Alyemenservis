@@ -44,6 +44,7 @@ fun ProfileTabContent(
     entityReviews: List<RatingEntity>,
     entityDescription: String,
     themeColors: VisualThemePalette,
+    isOwner: Boolean = false,
     onAddReviewClick: () -> Unit
 ) {
     when (selectedTab) {
@@ -115,13 +116,15 @@ fun ProfileTabContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("التقييمات وآراء العملاء ⭐", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                    Button(
-                        onClick = onAddReviewClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA000)),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text("أضف تقييمك ⭐", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                    if (!isOwner) {
+                        Button(
+                            onClick = onAddReviewClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA000)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("أضف تقييمك ⭐", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

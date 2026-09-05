@@ -52,6 +52,15 @@ open class AuthViewModel : BaseViewModel() {
     private var clickCount = 0
     private var lastBackdoorClickTime = 0L
 
+    fun getOrGenerateUserId(): String {
+        var current = _currentUserId.value
+        if (current.isBlank() || current == "guest") {
+            current = "USR_GUEST_" + (100000..999999).random().toString()
+            _currentUserId.value = current
+        }
+        return current
+    }
+
     fun setPasswordRecoveryWaitingPhone(phone: String) {
         _passwordRecoveryWaitingPhone.value = phone
     }
@@ -74,8 +83,21 @@ open class AuthViewModel : BaseViewModel() {
         val savedPhone = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_phone", "") ?: "")
         val savedResidence = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_residence", "") ?: "")
 
-        if ((savedId == "guest" || savedId.isEmpty()) && savedPhone.isNotEmpty()) {
-            savedId = "USR-" + (if (savedPhone.length >= 6) savedPhone.takeLast(6) else (100000..999999).random().toString())
+        if (savedId == "guest" || savedId.isEmpty()) {
+            if (savedPhone.isNotEmpty()) {
+                val cleanP = savedPhone.filter { it.isDigit() }
+                savedId = "USR-" + (if (cleanP.length >= 6) cleanP.takeLast(6) else (100000..999999).random().toString())
+            } else {
+                val persistentGuest = sp.getString("persistent_guest_id", "") ?: ""
+                if (persistentGuest.isNotEmpty()) {
+                    savedId = com.example.utils.SecurityCryptoUtils.decrypt(persistentGuest)
+                }
+                if (savedId.isEmpty() || savedId == "guest") {
+                    savedId = "USR_GUEST_" + (100000..999999).random().toString()
+                    val enc = com.example.utils.SecurityCryptoUtils.encrypt(savedId)
+                    sp.edit().putString("persistent_guest_id", enc).apply()
+                }
+            }
             sp.edit().putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(savedId)).apply()
         }
 

@@ -4,34 +4,81 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.repositories.IDashboardRepository
 import com.example.data.repositories.IProductsRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import com.example.data.repositories.IRatingsRepository
+import com.example.domain.entities.ProductItemEntity
+import com.example.ui.screens.dashboard.DashboardEvent
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-/**
- * 🧠 RestaurantDashboardViewModel - إدارة بيانات لوحة تحكم المطاعم والكافيهات
- */
 class RestaurantDashboardViewModel(
-    private val restaurantId: String,
+    private val ownerId: String,
     private val dashboardRepository: IDashboardRepository,
-    private val productsRepository: IProductsRepository
+    private val productsRepository: IProductsRepository,
+    private val ratingsRepository: IRatingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    private val _eventFlow = MutableSharedFlow<DashboardEvent>()
+    val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
+
     init {
+        loadDashboardData()
+    }
+
+    fun selectTab(tabIndex: Int) {
+        _uiState.value = _uiState.value.copy(activeTab = tabIndex)
+    }
+
+    fun loadDashboardData() {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
             launch {
-                dashboardRepository.getDashboardStats(restaurantId, "RESTAURANT").collect { stats ->
+                dashboardRepository.getDashboardStats(ownerId, "RESTAURANT").collect { stats ->
                     _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
                 }
             }
+
             launch {
-                productsRepository.getOwnerProducts(restaurantId).collect { menu ->
-                    _uiState.value = _uiState.value.copy(products = menu)
+                productsRepository.getOwnerProducts(ownerId).collect { prods ->
+                    _uiState.value = _uiState.value.copy(products = prods)
                 }
+            }
+
+            launch {
+                ratingsRepository.getTargetRatings(ownerId).collect { revs ->
+                    _uiState.value = _uiState.value.copy(reviews = revs)
+                }
+            }
+        }
+    }
+
+    fun addMeal(title: String, priceYer: Double, description: String = "", imageUrl: String = "") {
+        viewModelScope.launch {
+            if (title.isBlank()) {
+                _eventFlow.emit(DashboardEvent.ShowToast("يرجى إدخال اسم الوجبة"))
+                return@launch
+            }
+            val meal = ProductItemEntity(
+                ownerId = ownerId,
+                title = title,
+                priceYer = priceYer,
+                description = description,
+                imageUrl = imageUrl,
+                category = "RESTAURANT"
+            )
+            productsRepository.addProduct(meal).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الوجبة لقائمة الطعام 🍽️"))
+            }
+        }
+    }
+
+    fun deleteMeal(id: String) {
+        viewModelScope.launch {
+            productsRepository.deleteProduct(id).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم حذف الوجبة 🗑️"))
             }
         }
     }
