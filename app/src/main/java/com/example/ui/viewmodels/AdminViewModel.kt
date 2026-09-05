@@ -132,6 +132,8 @@ data class SystemLog(
 )
 
 class AdminViewModel : BaseViewModel() {
+    val crud = AdminCrudOperations(db)
+
     // --- Callback/Lambda Properties for decoupling ---
     var getHomeViewModel: (() -> HomeViewModel)? = null
     var getSettingsViewModel: (() -> SettingsViewModel)? = null

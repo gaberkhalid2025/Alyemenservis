@@ -464,10 +464,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         return@Button
                     }
 
-                    val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedUser == "WAM2026") &&
-                            (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.ownerPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
-                    val isAdmin = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
-                            (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.adminPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
+                    val isOwner = com.example.utils.AdminSecurityManager.isOwner(trimmedUser, trimmedPass, settingsState)
+                    val isAdmin = com.example.utils.AdminSecurityManager.isAdmin(trimmedUser, trimmedPass, settingsState)
 
                     if (isOwner) {
                         isAuthorized = true
@@ -516,10 +514,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                             return@Button
                         }
 
-                        val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) || trimmedUser == "WAM2026") &&
-                                (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.ownerPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
-                        val isAdmin = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) || trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) || trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
-                                (trimmedPass == "Maher@@--@@736462##" || trimmedPass == settingsState.adminPassword || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) || com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
+                        val isOwner = com.example.utils.AdminSecurityManager.isOwner(trimmedUser, trimmedPass, settingsState)
+                        val isAdmin = com.example.utils.AdminSecurityManager.isAdmin(trimmedUser, trimmedPass, settingsState)
 
                         if (isOwner) {
                             isAuthorized = true

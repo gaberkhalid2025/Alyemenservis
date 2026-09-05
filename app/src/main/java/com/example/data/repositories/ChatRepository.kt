@@ -65,12 +65,7 @@ class ChatRepository(
 
             val sortedParticipants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() }.sorted()
             
-            var customChannelId = when {
-                type == ChannelType.SUPPORT -> channelsCollection.document().id
-                type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
-                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
-                else -> channelsCollection.document().id
-            }
+            var customChannelId: String? = null
 
             if (type == ChannelType.SUPPORT) {
                 try {
@@ -80,8 +75,11 @@ class ChatRepository(
                     
                     val existingSupportDoc = existingSupportQuery.documents.find { doc ->
                         val docType = doc.getString("type") ?: ""
+                        val docTitle = doc.getString("title") ?: ""
                         val docId = doc.id
-                        docType.equals("SUPPORT", ignoreCase = true) || docId.startsWith("support_")
+                        docType.equals("SUPPORT", ignoreCase = true) || 
+                            docTitle == "الدعم الفني" || 
+                            docId.startsWith("support_")
                     }
                     
                     if (existingSupportDoc != null) {
@@ -92,11 +90,18 @@ class ChatRepository(
                 }
             }
 
-            val docRef = channelsCollection.document(customChannelId)
+            val finalChannelId = customChannelId ?: when {
+                type == ChannelType.SUPPORT -> channelsCollection.document().id
+                type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
+                relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
+                else -> channelsCollection.document().id
+            }
+
+            val docRef = channelsCollection.document(finalChannelId)
             val snapshot = docRef.get().await()
 
             val channelToReturn = if (snapshot.exists()) {
-                val existing = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id) ?: ChatChannel(id = customChannelId)
+                val existing = snapshot.toObject(ChatChannel::class.java)?.copy(id = snapshot.id) ?: ChatChannel(id = finalChannelId)
                 val updatedNames = existing.participantNames.toMutableMap().apply {
                     put(cleanCurrent, currentUserName)
                     if (cleanOther.isNotBlank() && finalOtherName.isNotBlank()) put(cleanOther, finalOtherName)
@@ -106,13 +111,20 @@ class ChatRepository(
                     if (cleanOther.isNotBlank() && otherUserPhoto.isNotBlank()) put(cleanOther, otherUserPhoto)
                 }
                 
-                val finalChannel = existing.copy(participantNames = updatedNames, participantPhotos = updatedPhotos)
+                val finalChannel = existing.copy(
+                    participantNames = updatedNames, 
+                    participantPhotos = updatedPhotos,
+                    type = if (type == ChannelType.SUPPORT) ChannelType.SUPPORT else existing.type,
+                    title = if (type == ChannelType.SUPPORT) "الدعم الفني" else existing.title
+                )
                 
                 if (updatedNames != existing.participantNames || updatedPhotos != existing.participantPhotos) {
                     docRef.update(
                         mapOf(
                             "participantNames" to updatedNames,
-                            "participantPhotos" to updatedPhotos
+                            "participantPhotos" to updatedPhotos,
+                            "type" to finalChannel.type.name,
+                            "title" to finalChannel.title
                         )
                     ).await()
                 }
@@ -120,7 +132,7 @@ class ChatRepository(
                 finalChannel
             } else {
                 val newChannel = ChatChannel(
-                    id = customChannelId,
+                    id = finalChannelId,
                     participants = listOf(cleanCurrent, cleanOther).filter { it.isNotBlank() },
                     participantNames = mutableMapOf(cleanCurrent to currentUserName).apply {
                         if (cleanOther.isNotBlank() && finalOtherName.isNotBlank()) put(cleanOther, finalOtherName)
@@ -195,9 +207,19 @@ class ChatRepository(
                     return@addSnapshotListener
                 }
 
-                val remoteChannels = snapshot?.documents?.mapNotNull { doc ->
+                val allRemoteChannels = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(ChatChannel::class.java)?.copy(id = doc.id)
                 }?.sortedByDescending { it.lastMessageTime } ?: emptyList()
+
+                // Deduplicate SUPPORT channels: keep only the newest one
+                val supportChannels = allRemoteChannels.filter { 
+                    it.type == ChannelType.SUPPORT || it.title == "الدعم الفني" || it.id.startsWith("support_") 
+                }
+                val otherChannels = allRemoteChannels.filter { 
+                    it.type != ChannelType.SUPPORT && it.title != "الدعم الفني" && !it.id.startsWith("support_") 
+                }
+                val latestSupport = supportChannels.maxByOrNull { it.lastMessageTime }
+                val remoteChannels = (otherChannels + listOfNotNull(latestSupport)).sortedByDescending { it.lastMessageTime }
 
                 // Save to local cache & emit
                 CoroutineScope(Dispatchers.IO).launch {

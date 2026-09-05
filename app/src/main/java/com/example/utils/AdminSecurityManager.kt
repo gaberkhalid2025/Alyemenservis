@@ -5,42 +5,52 @@ import com.example.data.AdminSettingsEntity
 
 object AdminSecurityManager {
 
-    fun isOwner(username: String, passwordAttempt: String, settings: AdminSettingsEntity): Boolean {
+    const val OWNER_EMAIL = "mah73646@gmail.com"
+    const val OWNER_PASSWORD = "Maher@@--@@736462##"
+    const val ADMIN_EMAIL = "meh777644@gmail.com"
+    const val ADMIN_PASSWORD = "Meh@@@@777644##"
+
+    fun verifyCredentials(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): String? {
         val trimmedUser = username.trim()
         val trimmedPass = passwordAttempt.trim()
-        if (trimmedUser.isBlank() || trimmedPass.isBlank()) return false
+        if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
 
-        val isUserMatch = trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                trimmedUser.equals(settings.ownerEmail, ignoreCase = true) ||
-                trimmedUser == "WAM2026"
-
-        if (!isUserMatch) return false
-
-        return trimmedPass == "Maher@@--@@736462##" ||
-                (settings.ownerPassword.isNotBlank() && (
+        // 1. Check Owner
+        if (trimmedUser.equals(OWNER_EMAIL, ignoreCase = true) || trimmedUser == "WAM2026" || (settings != null && trimmedUser.equals(settings.ownerEmail, ignoreCase = true))) {
+            if (trimmedPass == OWNER_PASSWORD ||
+                (settings != null && settings.ownerPassword.isNotBlank() && (
                     trimmedPass == settings.ownerPassword ||
                     PasswordHasher.verifyPassword(trimmedPass, settings.ownerPassword) ||
                     SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.ownerPassword)
                 ))
-    }
+            ) {
+                return "OWNER"
+            }
+        }
 
-    fun isAdmin(username: String, passwordAttempt: String, settings: AdminSettingsEntity): Boolean {
-        val trimmedUser = username.trim()
-        val trimmedPass = passwordAttempt.trim()
-        if (trimmedUser.isBlank() || trimmedPass.isBlank()) return false
-
-        val isUserMatch = trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) ||
-                trimmedUser.equals(settings.adminUsername, ignoreCase = true)
-
-        if (!isUserMatch) return false
-
-        return trimmedPass == "Maher@@--@@736462##" ||
-                (settings.adminPassword.isNotBlank() && (
+        // 2. Check Admin
+        if (trimmedUser.equals(ADMIN_EMAIL, ignoreCase = true) || (settings != null && trimmedUser.equals(settings.adminUsername, ignoreCase = true))) {
+            if (trimmedPass == ADMIN_PASSWORD || trimmedPass == OWNER_PASSWORD ||
+                (settings != null && settings.adminPassword.isNotBlank() && (
                     trimmedPass == settings.adminPassword ||
                     PasswordHasher.verifyPassword(trimmedPass, settings.adminPassword) ||
                     SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.adminPassword)
                 ))
+            ) {
+                return "ADMIN"
+            }
+        }
+
+        return null
+    }
+
+    fun isOwner(username: String, passwordAttempt: String, settings: AdminSettingsEntity): Boolean {
+        return verifyCredentials(username, passwordAttempt, settings) == "OWNER"
+    }
+
+    fun isAdmin(username: String, passwordAttempt: String, settings: AdminSettingsEntity): Boolean {
+        val role = verifyCredentials(username, passwordAttempt, settings)
+        return role == "ADMIN" || role == "OWNER"
     }
 
     fun isSupervisor(username: String, passwordAttempt: String, supervisorList: List<SupervisorEntity>): SupervisorEntity? {
@@ -59,3 +69,4 @@ object AdminSecurityManager {
         }
     }
 }
+

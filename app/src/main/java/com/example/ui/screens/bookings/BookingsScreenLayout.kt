@@ -36,10 +36,6 @@ fun BookingsScreenLayout(
 
     val isAdmin = adminRole != "GUEST" && adminRole != "SUPERVISOR"
 
-    LaunchedEffect(Unit) {
-        viewModel.refreshData()
-    }
-
     // Filter relevant bookings for the user or admin
     val relevantBookings = remember(bookings, currentUserPhone, currentUserId, isAdmin) {
         if (isAdmin) {
@@ -84,7 +80,7 @@ fun BookingsScreenLayout(
                 isAdmin = isAdmin,
                 isProvider = viewModel.isProviderUser,
                 isRefreshing = isRefreshing,
-                onRefresh = { viewModel.refreshData() },
+                onRefresh = { viewModel.refreshData(showNotification = true) },
                 onBackClick = { viewModel.navigateTo("USER_BROWSE") },
                 onCreateNewBookingClick = { isCreatingNewBooking = true },
                 onUpdateBooking = { updatedBooking ->

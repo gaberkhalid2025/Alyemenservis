@@ -248,7 +248,7 @@ fun startLocationUpdates() {
             }
         }
     }
-fun refreshData() {
+fun refreshData(showNotification: Boolean = false) {
         viewModelScope.launch {
             _isRefreshing.value = true
             _uiErrorMessage.value = null
@@ -256,7 +256,9 @@ fun refreshData() {
                 firestoreListeners.forEach { it.remove() }
                 firestoreListeners.clear()
                 setupRealtimeFirestoreListeners()
-                triggerNotification("🔄 تم تحديث البيانات بنجاح!")
+                if (showNotification) {
+                    triggerNotification("🔄 تم تحديث البيانات بنجاح!")
+                }
             } catch (e: Exception) {
                 _uiErrorMessage.value = "تعذر تحديث البيانات: ${e.localizedMessage}"
             } finally {

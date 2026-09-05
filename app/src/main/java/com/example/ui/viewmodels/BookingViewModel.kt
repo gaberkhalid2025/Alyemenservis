@@ -108,12 +108,38 @@ open class BookingViewModel : BaseViewModel() {
             db.collection("bookings").document(bId).set(finalized)
                 .addOnSuccessListener {
                     _bookings.value = _bookings.value + finalized
+                    val custPhone = finalized.customerPhone.ifEmpty { finalized.clientPhone }
+                    val custName = finalized.customerName.ifEmpty { finalized.clientName.ifEmpty { "العميل" } }
+                    val provPhone = finalized.providerPhone.ifEmpty {
+                        getProviders?.invoke()?.find { it.id == finalized.providerId || it.name.trim() == finalized.providerName.trim() }?.phone?.trim() ?: finalized.providerId
+                    }
+                    
+                    // 1. User notification
                     onAddNotification?.invoke(
                         "📅 حجز جديد رقم $bNum",
-                        "تم تسجيل طلب حجز موعد لدى ${finalized.providerName} بتاريخ ${finalized.dateString} الساعة ${finalized.timeString}.",
+                        "تم تسجيل طلب حجز موعد لدى ${finalized.providerName} بنجاح. رقم الحجز: $bNum ورمز المرور: $bPass.",
                         "USER",
-                        finalized.customerPhone.ifEmpty { finalized.clientPhone }
+                        custPhone
                     )
+                    
+                    // 2. Provider notification
+                    if (provPhone.isNotBlank()) {
+                        onAddNotification?.invoke(
+                            "⚡ حجز جديد وارد رقم $bNum",
+                            "العميل $custName ($custPhone) قام بحجز خدمة (${finalized.serviceType}) لديك.",
+                            "PROVIDER",
+                            provPhone
+                        )
+                    }
+                    
+                    // 3. Admin notification
+                    onAddNotification?.invoke(
+                        "📢 حجز جديد مسجل في النظام",
+                        "نوع العملية: (إنشاء حجز) | رقم الحجز: $bNum | العميل: $custName ($custPhone) لدى: ${finalized.providerName}",
+                        "ADMIN_ONLY",
+                        ""
+                    )
+                    
                     onResult(true)
                 }
                 .addOnFailureListener {

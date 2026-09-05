@@ -190,23 +190,8 @@ fun BackdoorLoginDialog(
 
                             isAuthenticating = true
                             try {
-                                // Owner check
-                                val isOwner = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                                        trimmedUser.equals(settingsState.ownerEmail, ignoreCase = true) ||
-                                        trimmedUser == "WAM2026") &&
-                                        (trimmedPass == "Maher@@--@@736462##" ||
-                                                trimmedPass == settingsState.ownerPassword ||
-                                                com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.ownerPassword) ||
-                                                com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.ownerPassword))
-
-                                // Admin check
-                                val isAdmin = (trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                                        trimmedUser.equals("meh777644@gmail.com", ignoreCase = true) ||
-                                        trimmedUser.equals(settingsState.adminUsername, ignoreCase = true)) &&
-                                        (trimmedPass == "Maher@@--@@736462##" ||
-                                                trimmedPass == settingsState.adminPassword ||
-                                                com.example.utils.PasswordHasher.verifyPassword(trimmedPass, settingsState.adminPassword) ||
-                                                com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settingsState.adminPassword))
+                                val isOwner = com.example.utils.AdminSecurityManager.isOwner(trimmedUser, trimmedPass, settingsState)
+                                val isAdmin = com.example.utils.AdminSecurityManager.isAdmin(trimmedUser, trimmedPass, settingsState)
 
                                 if (isOwner) {
                                     onDismiss()
@@ -218,10 +203,7 @@ fun BackdoorLoginDialog(
                                     viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
                                 } else {
                                     // Supervisor check
-                                    val matchingSup = supervisors.find {
-                                        (it.name.trim().equals(trimmedUser, ignoreCase = true) || it.id.equals(trimmedUser, ignoreCase = true)) &&
-                                                (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
-                                    }
+                                    val matchingSup = com.example.utils.AdminSecurityManager.isSupervisor(trimmedUser, trimmedPass, supervisors)
                                     if (matchingSup != null) {
                                         viewModel.setSupervisorSession(matchingSup)
                                         if (rememberMe) {

@@ -203,7 +203,7 @@ fun AppHeaderBar(
 
                 val isRefreshingHeader by viewModel.isRefreshing.collectAsState()
                 IconButton(
-                    onClick = { viewModel.refreshData() },
+                    onClick = { viewModel.refreshData(showNotification = true) },
                     modifier = Modifier
                         .background(Color.White.copy(alpha = 0.2f), CircleShape)
                         .size(24.dp)
