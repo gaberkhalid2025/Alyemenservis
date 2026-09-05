@@ -190,31 +190,34 @@ fun BackdoorLoginDialog(
 
                             isAuthenticating = true
                             try {
-                                val isOwner = com.example.utils.AdminSecurityManager.isOwner(trimmedUser, trimmedPass, settingsState)
-                                val isAdmin = com.example.utils.AdminSecurityManager.isAdmin(trimmedUser, trimmedPass, settingsState)
+                                val result = com.example.utils.AdminSecurityManager.verifyCredentials(trimmedUser, trimmedPass, settingsState)
 
-                                if (isOwner) {
-                                    onDismiss()
-                                    viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                                    viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك!")
-                                } else if (isAdmin) {
-                                    onDismiss()
-                                    viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                                    viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
-                                } else {
-                                    // Supervisor check
-                                    val matchingSup = com.example.utils.AdminSecurityManager.isSupervisor(trimmedUser, trimmedPass, supervisors)
-                                    if (matchingSup != null) {
-                                        viewModel.setSupervisorSession(matchingSup)
-                                        if (rememberMe) {
-                                            val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                            sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
-                                        }
+                                when (result) {
+                                    "OWNER" -> {
                                         onDismiss()
-                                        viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
-                                        viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
-                                    } else {
-                                        viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
+                                        viewModel.authenticateAdmin(context, "OWNER", rememberMe)
+                                        viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك!")
+                                    }
+                                    "ADMIN" -> {
+                                        onDismiss()
+                                        viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
+                                        viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
+                                    }
+                                    else -> {
+                                        // Supervisor check
+                                        val matchingSup = com.example.utils.AdminSecurityManager.getSupervisor(trimmedUser, trimmedPass, supervisors)
+                                        if (matchingSup != null) {
+                                            viewModel.setSupervisorSession(matchingSup)
+                                            if (rememberMe) {
+                                                val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                                sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
+                                            }
+                                            onDismiss()
+                                            viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
+                                            viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                        } else {
+                                            viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
+                                        }
                                     }
                                 }
                             } catch (e: Throwable) {

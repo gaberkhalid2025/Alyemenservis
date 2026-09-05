@@ -264,15 +264,27 @@ fun ProviderCard(
                     }
                 }
 
-                // 3. Action Buttons Row: [التفاصيل] [التقييمات] [حجز / اتصال]
+                // 3. Action Buttons Row: [محادثة] [التفاصيل] [حجز] [الآراء]
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-4).dp)
                         .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // زر المحادثة الفورية
+                    Button(
+                        onClick = { onChatOpen(provider.phone.ifBlank { provider.id }) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                    ) {
+                        Text("محادثة 💬", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+
+                    // زر التفاصيل (شاشة كاملة)
                     Button(
                         onClick = { showDetailsDialog = true },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
@@ -283,17 +295,7 @@ fun ProviderCard(
                         Text("التفاصيل 📋", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                     }
 
-                    OutlinedButton(
-                        onClick = { showReviewsListDialog = true },
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.6f)),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        modifier = Modifier.weight(1.1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
-                    ) {
-                        Text("الآراء والتجارب 💬", fontSize = 9.5.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-
+                    // زر حجز الموعد
                     Button(
                         onClick = {
                             if (currentUserIdState.isEmpty()) {
@@ -304,10 +306,22 @@ fun ProviderCard(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1.1f).height(32.dp),
+                        modifier = Modifier.weight(1f).height(32.dp),
                         contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                     ) {
                         Text("حجز 📅", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // زر الآراء والتقييمات
+                    OutlinedButton(
+                        onClick = { showReviewsListDialog = true },
+                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        modifier = Modifier.weight(0.9f).height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                    ) {
+                        Text("⭐", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -319,7 +333,15 @@ fun ProviderCard(
             provider = provider,
             themeColors = themeColors,
             viewModel = viewModel,
-            onDismiss = { showDetailsDialog = false }
+            onDismiss = { showDetailsDialog = false },
+            onChatOpen = onChatOpen,
+            onBookClick = {
+                if (currentUserIdState.isEmpty()) {
+                    showGuestRegisterDialogForBooking = true
+                } else {
+                    showBookingDialog = true
+                }
+            }
         )
     }
 

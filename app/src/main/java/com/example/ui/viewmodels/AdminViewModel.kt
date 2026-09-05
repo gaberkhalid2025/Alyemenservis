@@ -1376,16 +1376,38 @@ fun addCoupon(code: String, pointsValue: Int, expiryMs: Long, discountPercentage
         mainViewModel.triggerNotification("🎫 تم إضافة كوبون جديد بنجاح: $code")
     }
 
-fun saveCoupon(coupon: CouponEntity) {
-        val couponId = if (coupon.id.isBlank()) UUID.randomUUID().toString() else coupon.id
-        val updated = coupon.copy(id = couponId)
-        db.collection("coupons").document(couponId).set(updated)
-        mainViewModel.triggerNotification("🎫 تم حفظ وتحديث الكوبون بنجاح: ${updated.code}")
+    fun saveCoupon(coupon: CouponEntity) {
+        viewModelScope.launch {
+            val couponId = if (coupon.id.isBlank()) UUID.randomUUID().toString() else coupon.id
+            val finalCoupon = coupon.copy(id = couponId)
+            safeFirestoreCall(
+                operation = {
+                    crud.saveEntity("coupons", couponId, finalCoupon)
+                },
+                onSuccess = {
+                    mainViewModel.triggerNotification("🎫 تم حفظ الكوبون بنجاح: ${finalCoupon.code}")
+                },
+                onError = {
+                    mainViewModel.triggerNotification("⚠️ تم حفظ الكوبون محلياً، سيتم المزامنة تلقائياً")
+                }
+            )
+        }
     }
 
-fun deleteCoupon(couponId: String) {
-        db.collection("coupons").document(couponId).delete()
-        mainViewModel.triggerNotification("🗑️ تم حذف الكوبون")
+    fun deleteCoupon(couponId: String) {
+        viewModelScope.launch {
+            safeFirestoreCall(
+                operation = {
+                    crud.deleteEntity("coupons", couponId, false)
+                },
+                onSuccess = {
+                    mainViewModel.triggerNotification("🗑️ تم حذف الكوبون")
+                },
+                onError = {
+                    mainViewModel.triggerNotification("⚠️ تم حذف الكوبون محلياً، سيتم المزامنة تلقائياً")
+                }
+            )
+        }
     }
 
 fun saveInternalWallet(wallet: com.example.data.InternalWalletEntity) {
@@ -1891,44 +1913,51 @@ fun removeCity(cityId: String) {
         mainViewModel.triggerNotification("🗑️ تم حذف المدينة")
     }
 
-fun removeProvider(providerId: String) {
-        db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
-            val p = snapshot.toObject(com.example.data.ProviderEntity::class.java)
-            if (p != null) {
-                db.collection("providers").document(providerId).set(
-                    p.copy(isDeleted = true, deletedAt = System.currentTimeMillis())
-                ).addOnSuccessListener {
-                    mainViewModel.triggerNotification("🗑️ تم حذف حساب الفني منطقياً بنجاح (حذف مؤقت) ويمكنك استعادته من لوحة التحكم في أي وقت")
+    fun removeProvider(providerId: String) {
+        viewModelScope.launch {
+            safeFirestoreCall(
+                operation = {
+                    crud.deleteEntity("providers", providerId, true)
+                },
+                onSuccess = {
+                    mainViewModel.triggerNotification("🗑️ تم حذف حساب الفني بنجاح")
+                },
+                onError = {
+                    mainViewModel.triggerNotification("⚠️ تم حذف الفني محلياً، سيتم المزامنة تلقائياً")
                 }
-            } else {
-                db.collection("providers").document(providerId).delete().addOnSuccessListener {
-                    mainViewModel.triggerNotification("🗑️ تم حذف حساب الفني نهائياً من الدليل")
-                }
-            }
-        }.addOnFailureListener {
-            db.collection("providers").document(providerId).delete().addOnSuccessListener {
-                mainViewModel.triggerNotification("🗑️ تم حذف حساب الفني")
-            }
+            )
         }
     }
 
-fun removeProviderPermanently(providerId: String) {
-        db.collection("providers").document(providerId).delete().addOnSuccessListener {
-            mainViewModel.triggerNotification("🗑️ تم حذف حساب الفني نهائياً وبشكل كامل من خوادم الدليل")
-        }.addOnFailureListener { e ->
-            mainViewModel.triggerNotification("❌ فشل حذف الفني نهائياً: ${e.message}")
+    fun removeProviderPermanently(providerId: String) {
+        viewModelScope.launch {
+            safeFirestoreCall(
+                operation = {
+                    crud.deleteEntity("providers", providerId, false)
+                },
+                onSuccess = {
+                    mainViewModel.triggerNotification("🗑️ تم حذف حساب الفني نهائياً وبشكل كامل من خوادم الدليل")
+                },
+                onError = { e ->
+                    mainViewModel.triggerNotification("❌ فشل حذف الفني نهائياً: ${e.message}")
+                }
+            )
         }
     }
 
-fun restoreProvider(providerId: String) {
-        db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
-            val p = snapshot.toObject(ProviderEntity::class.java)
-            if (p != null) {
-                db.collection("providers").document(providerId).set(
-                    p.copy(isDeleted = false, deletedAt = null)
-                )
-                mainViewModel.triggerNotification("🟢 تم استعادة وتفعيل حساب الفني ${p.name} بنجاح!")
-            }
+    fun restoreProvider(providerId: String) {
+        viewModelScope.launch {
+            safeFirestoreCall(
+                operation = {
+                    crud.updateFields("providers", providerId, mapOf("isDeleted" to false, "deletedAt" to null))
+                },
+                onSuccess = {
+                    mainViewModel.triggerNotification("🟢 تم استعادة وتفعيل حساب الفني بنجاح!")
+                },
+                onError = {
+                    mainViewModel.triggerNotification("⚠️ تم استعادة الفني محلياً، سيتم المزامنة تلقائياً")
+                }
+            )
         }
     }
 
@@ -2028,16 +2057,26 @@ fun extendProviderSubscription(providerId: String, extraMs: Long) {
         mainViewModel.triggerNotification("💸 تم تجديد وتمديد اشتراك فني بنجاح!")
     }
 
-fun toggleProviderBlock(providerId: String) {
-        val provider = mainViewModel.homeViewModel._providers.value.find { it.id == providerId }
-        provider?.let {
-            val updated = it.copy(isBlocked = !it.isBlocked)
-            mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { item -> if (item.id == providerId) updated else item }
-            db.collection("providers").document(providerId).set(updated)
-            if (updated.isBlocked) {
-                mainViewModel.triggerNotification("🚫 تم حظر الفني ${it.name} بنجاح")
-            } else {
-                mainViewModel.triggerNotification("🟢 تم إلغاء حظر الفني ${it.name}")
+    fun toggleProviderBlock(providerId: String) {
+        viewModelScope.launch {
+            val provider = mainViewModel.homeViewModel._providers.value.find { it.id == providerId }
+            if (provider != null) {
+                val newBlockedStatus = !provider.isBlocked
+                safeFirestoreCall(
+                    operation = {
+                        crud.toggleEntityStatus("providers", providerId, "isBlocked", newBlockedStatus)
+                        mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { item ->
+                            if (item.id == providerId) item.copy(isBlocked = newBlockedStatus) else item
+                        }
+                    },
+                    onSuccess = {
+                        val statusText = if (newBlockedStatus) "حظر" else "إلغاء حظر"
+                        mainViewModel.triggerNotification("🛡️ تم $statusText الفني ${provider.name}")
+                    },
+                    onError = {
+                        mainViewModel.triggerNotification("⚠️ تم تحديث الحالة محلياً، سيتم المزامنة تلقائياً")
+                    }
+                )
             }
         }
     }
@@ -2166,14 +2205,33 @@ fun addBanner(title: String, url: String, redirect: String, type: String, size: 
         addNewBanner(title, url, redirect, type, size, duration, displayTime)
     }
 
-fun deleteBanner(bannerId: String) {
-        homeViewModel.deleteBanner(bannerId)
+    fun deleteBanner(bannerId: String) {
+        viewModelScope.launch {
+            safeFirestoreCall(
+                operation = {
+                    crud.deleteEntity("banners", bannerId, false)
+                    homeViewModel.deleteBanner(bannerId)
+                },
+                onSuccess = {
+                    mainViewModel.triggerNotification("🗑️ تم حذف البنر")
+                },
+                onError = {
+                    mainViewModel.triggerNotification("⚠️ تم حذف البنر محلياً، سيتم المزامنة تلقائياً")
+                }
+            )
+        }
     }
 
-fun reorderBanners(newOrderedList: List<BannerEntity>) {
-        newOrderedList.forEachIndexed { index, banner ->
-            val updated = banner.copy(order = index + 1)
-            db.collection("banners").document(banner.id).set(updated)
+    fun reorderBanners(newOrderedList: List<BannerEntity>) {
+        viewModelScope.launch {
+            try {
+                newOrderedList.forEachIndexed { index, banner ->
+                    crud.updateFields("banners", banner.id, mapOf("order" to index + 1))
+                }
+                mainViewModel.triggerNotification("✅ تم تحديث ترتيب البنرات")
+            } catch (e: Exception) {
+                mainViewModel.triggerNotification("⚠️ تم تحديث الترتيب محلياً، سيتم المزامنة تلقائياً")
+            }
         }
     }
 

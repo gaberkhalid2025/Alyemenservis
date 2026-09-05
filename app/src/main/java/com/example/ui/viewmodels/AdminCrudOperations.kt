@@ -60,7 +60,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
     suspend fun updateFields(
         collection: String,
         id: String,
-        fields: Map<String, Any>,
+        fields: Map<String, Any?>,
         onSuccess: () -> Unit = {},
         onError: (Exception) -> Unit = {}
     ) {

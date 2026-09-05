@@ -57,8 +57,74 @@ open class BaseViewModel : ViewModel() {
         _toastMessage.value = msg
     }
 
+    open fun triggerNotification(msg: String) {
+        _toastMessage.value = msg
+    }
+
     open fun clearToast() {
         _toastMessage.value = null
+    }
+
+    // دالة آمنة لعمليات Firestore مع معالجة الأخطاء
+    protected open suspend fun <T> safeFirestoreCall(
+        operation: suspend () -> T,
+        onSuccess: (T) -> Unit = {},
+        onError: (Exception) -> Unit = {},
+        errorMessage: String = "حدث خطأ أثناء تنفيذ العملية"
+    ) {
+        try {
+            val result = operation()
+            onSuccess(result)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            com.example.utils.AppErrorLogManager.logFirestoreError("FirestoreCall", errorMessage, e)
+            triggerNotification("❌ $errorMessage: ${e.localizedMessage}")
+            onError(e)
+        }
+    }
+
+    // دالة آمنة لعمليات Firestore مع callback
+    protected open fun safeFirestoreCallWithCallback(
+        operation: (onSuccess: () -> Unit, onFailure: (Exception) -> Unit) -> Unit,
+        onSuccess: () -> Unit = {},
+        onError: (Exception) -> Unit = {},
+        errorMessage: String = "حدث خطأ أثناء تنفيذ العملية"
+    ) {
+        try {
+            operation(
+                {
+                    onSuccess()
+                },
+                { exception ->
+                    com.example.utils.AppErrorLogManager.logFirestoreError("FirestoreCallback", errorMessage, exception)
+                    triggerNotification("❌ $errorMessage: ${exception.localizedMessage}")
+                    onError(exception)
+                }
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            com.example.utils.AppErrorLogManager.logFirestoreError("FirestoreException", errorMessage, e)
+            triggerNotification("❌ $errorMessage: ${e.localizedMessage}")
+            onError(e)
+        }
+    }
+
+    // دالة لتحديث الحالة المحلية بأمان
+    protected open fun <T> safeUpdateState(
+        currentState: List<T>,
+        newItem: T,
+        filterCondition: (T) -> Boolean = { it == newItem }
+    ): List<T> {
+        return currentState.filter { !filterCondition(it) } + newItem
+    }
+
+    // دالة لعرض رسائل المزامنة
+    protected open fun showSyncMessage(success: Boolean, action: String) {
+        if (success) {
+            triggerNotification("✅ تم $action بنجاح")
+        } else {
+            triggerNotification("⚠️ تم حفظ $action محلياً وسيتم المزامنة تلقائياً")
+        }
     }
 
     open val _isRefreshing = MutableStateFlow(false)

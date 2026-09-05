@@ -384,6 +384,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
         var inputPassword by remember { mutableStateOf("") }
         var isLoginPasswordVisible by remember { mutableStateOf(false) }
         var rememberMe by remember { mutableStateOf(false) }
+        var isLoading by remember { mutableStateOf(false) }
 
         Column(
             modifier = Modifier
@@ -453,87 +454,109 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
             }
             Spacer(modifier = Modifier.height(12.dp))
             
-            // 1. زر تسجيل دخول المشرف
+            // زر تسجيل دخول المشرف (الموحد)
             Button(
                 onClick = {
-                    val trimmedUser = inputUsername.trim()
-                    val trimmedPass = inputPassword.trim()
-                    
-                    if (trimmedUser.isBlank() || trimmedPass.isBlank()) {
+                    if (inputUsername.isBlank() || inputPassword.isBlank()) {
                         viewModel.triggerNotification("❌ يرجى إدخال البريد الإلكتروني وكلمة المرور!")
                         return@Button
                     }
-
-                    val isOwner = com.example.utils.AdminSecurityManager.isOwner(trimmedUser, trimmedPass, settingsState)
-                    val isAdmin = com.example.utils.AdminSecurityManager.isAdmin(trimmedUser, trimmedPass, settingsState)
-
-                    if (isOwner) {
-                        isAuthorized = true
-                        activeSubTab = "BACKDOOR"
-                        viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                    } else if (isAdmin) {
-                        isAuthorized = true
-                        activeSubTab = "REG_REQ"
-                        viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                    } else {
-                        // Dynamically check synced supervisors in real-time from Firestore!
-                        val matchingSup = viewModel.supervisors.value.find { 
-                            (it.name.trim().equals(trimmedUser, ignoreCase = true) || it.id.equals(trimmedUser, ignoreCase = true)) && 
-                            (it.passcode.isNotBlank() && (it.passcode.trim() == trimmedPass || com.example.utils.PasswordHasher.verifyPassword(trimmedPass, it.passcode)))
-                        }
-                        if (matchingSup != null) {
+                    
+                    isLoading = true
+                    
+                    // استخدام AdminSecurityManager للتحقق
+                    val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
+                    
+                    when (result) {
+                        "OWNER" -> {
                             isAuthorized = true
-                            viewModel.setSupervisorSession(matchingSup)
-                            if (rememberMe) {
-                                val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
+                            activeSubTab = "BACKDOOR"
+                            viewModel.authenticateAdmin(context, "OWNER", rememberMe)
+                            viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
+                            isLoading = false
+                        }
+                        "ADMIN" -> {
+                            isAuthorized = true
+                            activeSubTab = "REG_REQ"
+                            viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
+                            viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
+                            isLoading = false
+                        }
+                        else -> {
+                            // التحقق من المشرفين
+                            val matchingSup = com.example.utils.AdminSecurityManager.getSupervisor(
+                                inputUsername, 
+                                inputPassword, 
+                                viewModel.supervisors.value
+                            )
+                            if (matchingSup != null) {
+                                isAuthorized = true
+                                viewModel.setSupervisorSession(matchingSup)
+                                if (rememberMe) {
+                                    val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                    sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
+                                }
+                                viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                isLoading = false
+                            } else {
+                                viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
+                                isLoading = false
                             }
-                            viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
-                        } else {
-                            viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
                         }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading
             ) {
-                Text("تسجيل دخول المشرف", color = Color.White, fontWeight = FontWeight.Bold)
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                } else {
+                    Text("تسجيل دخول المشرف", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 2. زر دخول مالك التطبيق والإدارة (بديل مباشر للبوابة الخلفية قابل للإظهار والإخفاء)
+            // زر دخول مالك التطبيق والإدارة
             if (!settingsState.footerMessage.contains("hide_owner_direct_btn")) {
                 Button(
                     onClick = {
-                        val trimmedUser = inputUsername.trim()
-                        val trimmedPass = inputPassword.trim()
-                        
-                        if (trimmedUser.isBlank() || trimmedPass.isBlank()) {
+                        if (inputUsername.isBlank() || inputPassword.isBlank()) {
                             viewModel.triggerNotification("❌ يرجى إدخال اسم المستخدم وكلمة المرور الخاصة بالمالك/الإدارة!")
                             return@Button
                         }
-
-                        val isOwner = com.example.utils.AdminSecurityManager.isOwner(trimmedUser, trimmedPass, settingsState)
-                        val isAdmin = com.example.utils.AdminSecurityManager.isAdmin(trimmedUser, trimmedPass, settingsState)
-
-                        if (isOwner) {
-                            isAuthorized = true
-                            activeSubTab = "BACKDOOR"
-                            viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                            viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
-                        } else if (isAdmin) {
-                            isAuthorized = true
-                            activeSubTab = "REG_REQ"
-                            viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                            viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
-                        } else {
-                            viewModel.triggerNotification("❌ بيانات مالك التطبيق أو الإدارة غير صحيحة!")
+                        
+                        isLoading = true
+                        
+                        // استخدام AdminSecurityManager للتحقق من المالك/المدير
+                        val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
+                        
+                        when (result) {
+                            "OWNER" -> {
+                                isAuthorized = true
+                                activeSubTab = "BACKDOOR"
+                                viewModel.authenticateAdmin(context, "OWNER", rememberMe)
+                                viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
+                                isLoading = false
+                            }
+                            "ADMIN" -> {
+                                isAuthorized = true
+                                activeSubTab = "REG_REQ"
+                                viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
+                                viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
+                                isLoading = false
+                            }
+                            else -> {
+                                viewModel.triggerNotification("❌ بيانات مالك التطبيق أو الإدارة غير صحيحة!")
+                                isLoading = false
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

@@ -106,6 +106,18 @@ class AssistantViewModel : ViewModel() {
         }
     }
 
+    private val cachedResponses = mutableMapOf<String, AssistantMessage>()
+
+    fun getCachedResponse(query: String): AssistantMessage? {
+        val normalized = normalizeArabic(query)
+        return cachedResponses[normalized]
+    }
+
+    fun cacheResponse(query: String, response: AssistantMessage) {
+        val normalized = normalizeArabic(query)
+        cachedResponses[normalized] = response
+    }
+
     private fun queryGeminiApiOrFallback(
         prompt: String,
         providersList: List<ProviderEntity>,
@@ -114,6 +126,11 @@ class AssistantViewModel : ViewModel() {
         history: List<AssistantMessage>,
         mainViewModel: MainViewModel
     ): AssistantMessage {
+        val cached = getCachedResponse(prompt)
+        if (cached != null) {
+            return cached
+        }
+
         val qNormalized = normalizeArabic(prompt)
         val matched = providersList.filter { p ->
             val catName = categoriesList.find { it.id == p.categoryId }?.name ?: ""
@@ -192,16 +209,23 @@ class AssistantViewModel : ViewModel() {
                     val part = parts?.optJSONObject(0)
                     val textVal = part?.optString("text")
                     if (!textVal.isNullOrBlank()) {
-                        return AssistantMessage(text = textVal, isUser = false, matchedProviders = matched)
+                        val response = AssistantMessage(text = textVal, isUser = false, matchedProviders = matched)
+                        cacheResponse(prompt, response)
+                        return response
                     }
+                } else {
+                    com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "HTTP Error: ${apiResponse.code} - ${apiResponse.message}")
                 }
             }
         } catch (e: Exception) {
-            // Fallback
+            e.printStackTrace()
+            com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "فشل استدعاء Gemini API: ${e.localizedMessage}", e)
         }
 
         val (localText, localProvs) = generateLocalOfflineResponse(prompt, mainViewModel)
-        return AssistantMessage(text = localText, isUser = false, matchedProviders = localProvs)
+        val response = AssistantMessage(text = localText, isUser = false, matchedProviders = localProvs)
+        cacheResponse(prompt, response)
+        return response
     }
 
     fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): Pair<String, List<ProviderEntity>> {

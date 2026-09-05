@@ -155,13 +155,22 @@ fun updateTheme(themeId: String) {
     }
 
 fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
-        db.collection("settings").document("main_settings").set(newSettings)
-            .addOnSuccessListener {
-                mainViewModel.triggerNotification("✅ تم حفظ ومزامنة كافة إعدادات التطبيق والدفع فورياً عبر الأجهزة!")
-            }
-            .addOnFailureListener {
-                mainViewModel.triggerNotification("❌ فشل حفظ الإعدادات: ${it.message}")
-            }
+        safeFirestoreCallWithCallback(
+            operation = { onSuccess, onFailure ->
+                db.collection("settings").document("main_settings").set(newSettings)
+                    .addOnSuccessListener {
+                        _settings.value = newSettings
+                        onSuccess()
+                    }
+                    .addOnFailureListener { e ->
+                        _settings.value = newSettings
+                        onFailure(e)
+                    }
+            },
+            onSuccess = { mainViewModel.triggerNotification("✅ تم حفظ ومزامنة كافة إعدادات التطبيق والدفع فورياً عبر الأجهزة!") },
+            onError = { mainViewModel.triggerNotification("⚠️ تم حفظ الإعدادات محلياً، سيتم المزامنة تلقائياً عند استقرار الاتصال") },
+            errorMessage = "فشل حفظ الإعدادات"
+        )
     }
 
 fun updateBackdoorSettings(

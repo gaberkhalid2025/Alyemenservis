@@ -50,6 +50,16 @@ open class HomeViewModel : BaseViewModel() {
     internal val _maxKmRadius = MutableStateFlow(10)
     val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
 
+    private val cachedFilteredResults = mutableMapOf<String, List<ProviderEntity>>()
+
+    fun clearCache() {
+        cachedFilteredResults.clear()
+    }
+
+    private fun generateCacheKey(vararg params: Any?): String {
+        return params.joinToString("_")
+    }
+
     fun applyFilters(userResidence: String = "") {
         val allProviders = _providers.value
         val selectedCat = _selectedCategoryId.value
@@ -59,6 +69,25 @@ open class HomeViewModel : BaseViewModel() {
         val cityId = _filterCityId.value
         val neighborhood = _filterNeighborhoodName.value.trim().lowercase()
         val phoneName = _phoneOrNameFilter.value.trim().lowercase()
+        val currentCityOnly = _filterByCurrentCityOnly.value
+
+        val cacheKey = generateCacheKey(
+            allProviders.size,
+            selectedCat,
+            query,
+            vipOnly,
+            availOnly,
+            cityId,
+            neighborhood,
+            phoneName,
+            currentCityOnly,
+            userResidence
+        )
+
+        cachedFilteredResults[cacheKey]?.let {
+            _filteredProviders.value = it
+            return
+        }
 
         var filtered = allProviders
 
@@ -104,6 +133,7 @@ open class HomeViewModel : BaseViewModel() {
             }
         }
 
+        cachedFilteredResults[cacheKey] = filtered
         _filteredProviders.value = filtered
     }
 

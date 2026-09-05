@@ -104,52 +104,55 @@ open class BookingViewModel : BaseViewModel() {
             createdAt = if (booking.createdAt == 0L) System.currentTimeMillis() else booking.createdAt,
             updatedAt = System.currentTimeMillis()
         )
-        try {
-            db.collection("bookings").document(bId).set(finalized)
-                .addOnSuccessListener {
-                    _bookings.value = _bookings.value + finalized
-                    val custPhone = finalized.customerPhone.ifEmpty { finalized.clientPhone }
-                    val custName = finalized.customerName.ifEmpty { finalized.clientName.ifEmpty { "العميل" } }
-                    val provPhone = finalized.providerPhone.ifEmpty {
-                        getProviders?.invoke()?.find { it.id == finalized.providerId || it.name.trim() == finalized.providerName.trim() }?.phone?.trim() ?: finalized.providerId
-                    }
-                    
-                    // 1. User notification
-                    onAddNotification?.invoke(
-                        "📅 حجز جديد رقم $bNum",
-                        "تم تسجيل طلب حجز موعد لدى ${finalized.providerName} بنجاح. رقم الحجز: $bNum ورمز المرور: $bPass.",
-                        "USER",
-                        custPhone
-                    )
-                    
-                    // 2. Provider notification
-                    if (provPhone.isNotBlank()) {
+        safeFirestoreCallWithCallback(
+            operation = { onSuccess, onFailure ->
+                db.collection("bookings").document(bId).set(finalized)
+                    .addOnSuccessListener {
+                        _bookings.value = _bookings.value + finalized
+                        val custPhone = finalized.customerPhone.ifEmpty { finalized.clientPhone }
+                        val custName = finalized.customerName.ifEmpty { finalized.clientName.ifEmpty { "العميل" } }
+                        val provPhone = finalized.providerPhone.ifEmpty {
+                            getProviders?.invoke()?.find { it.id == finalized.providerId || it.name.trim() == finalized.providerName.trim() }?.phone?.trim() ?: finalized.providerId
+                        }
+                        
+                        // 1. User notification
                         onAddNotification?.invoke(
-                            "⚡ حجز جديد وارد رقم $bNum",
-                            "العميل $custName ($custPhone) قام بحجز خدمة (${finalized.serviceType}) لديك.",
-                            "PROVIDER",
-                            provPhone
+                            "📅 حجز جديد رقم $bNum",
+                            "تم تسجيل طلب حجز موعد لدى ${finalized.providerName} بنجاح. رقم الحجز: $bNum ورمز المرور: $bPass.",
+                            "USER",
+                            custPhone
                         )
+                        
+                        // 2. Provider notification
+                        if (provPhone.isNotBlank()) {
+                            onAddNotification?.invoke(
+                                "⚡ حجز جديد وارد رقم $bNum",
+                                "العميل $custName ($custPhone) قام بحجز خدمة (${finalized.serviceType}) لديك.",
+                                "PROVIDER",
+                                provPhone
+                            )
+                        }
+                        
+                        // 3. Admin notification
+                        onAddNotification?.invoke(
+                            "📢 حجز جديد مسجل في النظام",
+                            "نوع العملية: (إنشاء حجز) | رقم الحجز: $bNum | العميل: $custName ($custPhone) لدى: ${finalized.providerName}",
+                            "ADMIN_ONLY",
+                            ""
+                        )
+                        onSuccess()
+                        onResult(true)
                     }
-                    
-                    // 3. Admin notification
-                    onAddNotification?.invoke(
-                        "📢 حجز جديد مسجل في النظام",
-                        "نوع العملية: (إنشاء حجز) | رقم الحجز: $bNum | العميل: $custName ($custPhone) لدى: ${finalized.providerName}",
-                        "ADMIN_ONLY",
-                        ""
-                    )
-                    
-                    onResult(true)
-                }
-                .addOnFailureListener {
-                    _bookings.value = _bookings.value + finalized
-                    onResult(true)
-                }
-        } catch (e: Exception) {
-            _bookings.value = _bookings.value + finalized
-            onResult(true)
-        }
+                    .addOnFailureListener { e ->
+                        _bookings.value = _bookings.value + finalized
+                        onFailure(e)
+                        onResult(true)
+                    }
+            },
+            onSuccess = { triggerToast("✅ تم إنشاء الحجز بنجاح") },
+            onError = { triggerToast("⚠️ تم حفظ الحجز محلياً، سيتم المزامنة تلقائياً") },
+            errorMessage = "فشل إنشاء الحجز"
+        )
     }
 
     fun updateBookingFormFields(fields: BookingFormFields) {

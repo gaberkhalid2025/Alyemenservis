@@ -184,6 +184,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     var bannerDisplayStyle by remember { mutableStateOf(settingsState.bannerDisplayStyle) }
 
     val context = LocalContext.current
+    var showLogsDialog by remember { mutableStateOf(false) }
     val sp = remember { context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
     var rememberLoginInput by remember { mutableStateOf(sp.getString("saved_admin_role", "GUEST") != "GUEST") }
     var adminUsernameInput by remember { mutableStateOf(settingsState.adminUsername) }
@@ -248,6 +249,18 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             ) {
                 Text("إغلاق اللوحة", color = Color.White, fontSize = 10.sp)
             }
+        }
+
+        // 🛡️ زر استعراض سجل تشخيص أخطاء Firestore و API للمالك
+        Button(
+            onClick = { showLogsDialog = true },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("🔍 سجل تشخيص أخطاء السحابة والـ API (Logs)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
 
         OutlinedTextField(
@@ -1382,6 +1395,13 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text("🧹 حذف الفنيين والرسائل والإشعارات الوهمية", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        if (showLogsDialog) {
+            com.example.utils.ErrorLogsViewerDialog(
+                themeColors = themeColors,
+                onDismiss = { showLogsDialog = false }
+            )
         }
     }
 }
