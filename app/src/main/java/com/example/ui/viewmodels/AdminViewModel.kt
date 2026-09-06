@@ -1,6 +1,8 @@
 package com.example.ui.viewmodels
 
 import com.example.ui.MainViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
 import android.content.Context
 import androidx.annotation.Keep
@@ -131,7 +133,8 @@ data class SystemLog(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-class AdminViewModel : BaseViewModel() {
+@HiltViewModel
+class AdminViewModel @Inject constructor() : BaseViewModel() {
     val crud = AdminCrudOperations(db)
 
     // --- Callback/Lambda Properties for decoupling ---

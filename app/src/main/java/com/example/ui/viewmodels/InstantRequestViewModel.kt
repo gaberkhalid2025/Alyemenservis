@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
 /**
   * ⚡ InstantUiState
@@ -48,13 +50,17 @@ sealed class InstantEvent {
  * The unified official ViewModel for 30-minute instant / urgent requests.
  * Uses InstantRequestRepository and Firestore collection "instant_requests".
  */
+@HiltViewModel
+class InstantRequestViewModel @Inject constructor(
+    private val repository: InstantRequestRepository
+) : BaseViewModel() {
 
-class InstantRequestViewModel : BaseViewModel() {
+    constructor() : this(InstantRequestRepository(com.example.MyApplication.instance))
+
     var triggerNotification: ((String) -> Unit)? = null
     var addNotification: ((String, String, String, String) -> Unit)? = null
     var getOrCreateChatChannel: ((String, String, String, String) -> Unit)? = null
 
-    private val repository = InstantRequestRepository()
     private val chatRepo by lazy { ChatRepository() }
     private val firestore by lazy { FirebaseFirestore.getInstance() }
 

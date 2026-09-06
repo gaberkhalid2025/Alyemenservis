@@ -218,34 +218,41 @@ fun PasswordResetWaitingScreen(
                                             .putString("logged_account_id", match.provider?.id ?: match.store?.id ?: match.property?.id ?: "")
                                             .apply()
 
-                                        if (match.provider != null) {
+                                        val targetDest = if (match.provider != null) {
                                             if (match.provider.isDeleted) viewModel.restoreProvider(match.provider.id)
                                             viewModel.selectedProvider = match.provider
                                             viewModel.selectedStore = null
                                             viewModel.selectedProperty = null
-                                            viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                            AppScreens.DYNAMIC_PROFILE
                                         } else if (match.store != null) {
                                             if (match.store.isDeleted) viewModel.restoreStore(match.store.id)
                                             viewModel.selectedStore = match.store
                                             viewModel.selectedProvider = null
                                             viewModel.selectedProperty = null
-                                            viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                            AppScreens.DYNAMIC_PROFILE
                                         } else if (match.property != null) {
                                             if (match.property.isDeleted) viewModel.restoreProperty(match.property.id)
                                             viewModel.selectedProperty = match.property
                                             viewModel.selectedProvider = null
                                             viewModel.selectedStore = null
-                                            viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                            AppScreens.DYNAMIC_PROFILE
                                         } else {
                                             viewModel.selectedProvider = null
                                             viewModel.selectedStore = null
                                             viewModel.selectedProperty = null
                                             viewModel.selectedJob = null
-                                            viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                                            AppScreens.USER_BROWSE
                                         }
+                                        viewModel.navigateAndRemoveScreens(
+                                            targetScreen = targetDest,
+                                            screensToRemove = listOf(AppScreens.REGISTER_FORM, AppScreens.PASSWORD_RESET_WAITING, "REGISTER", "REGISTER_FORM", "PASSWORD_RESET_WAITING")
+                                        )
                                         Toast.makeText(context, "🔓 أهلاً بك، تم تسجيل الدخول إلى حسابك!", Toast.LENGTH_LONG).show()
                                     } else {
-                                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                                        viewModel.navigateAndRemoveScreens(
+                                            targetScreen = AppScreens.USER_BROWSE,
+                                            screensToRemove = listOf(AppScreens.REGISTER_FORM, AppScreens.PASSWORD_RESET_WAITING, "REGISTER", "REGISTER_FORM", "PASSWORD_RESET_WAITING")
+                                        )
                                     }
                                 }
                             },

@@ -13,8 +13,11 @@ import java.util.UUID
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class SettingsViewModel : BaseViewModel() {
+@HiltViewModel
+class SettingsViewModel @Inject constructor() : BaseViewModel() {
     // --- Callback/Lambda Properties for decoupling ---
     var getAuthViewModel: (() -> AuthViewModel)? = null
     var getHomeViewModel: (() -> HomeViewModel)? = null

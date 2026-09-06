@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.*
 import com.example.data.repositories.ChatRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -23,12 +25,12 @@ sealed class ChatEvent {
     data class MessageSent(val messageId: String) : ChatEvent()
 }
 
-class ChatViewModel : ViewModel() {
+@HiltViewModel
+class ChatViewModel @Inject constructor(
+    private val repository: ChatRepository
+) : ViewModel() {
 
-    private val _isPeerTyping = MutableStateFlow(false)
-    val isPeerTyping: StateFlow<Boolean> = _isPeerTyping.asStateFlow()
-
-    private val repository: ChatRepository = ChatRepository()
+    constructor() : this(ChatRepository())
 
     private val _eventFlow = MutableSharedFlow<ChatEvent>()
     val eventFlow = _eventFlow.asSharedFlow()

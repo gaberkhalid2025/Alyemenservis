@@ -7,10 +7,15 @@ import com.example.data.repositories.ChatRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class ChatListViewModel(
-    private val repository: ChatRepository = ChatRepository()
+@HiltViewModel
+class ChatListViewModel @Inject constructor(
+    private val repository: ChatRepository
 ) : ViewModel() {
+
+    constructor() : this(ChatRepository())
 
     private val _channels = MutableStateFlow<List<ChatChannel>>(emptyList())
     val channels: StateFlow<List<ChatChannel>> = _channels.asStateFlow()

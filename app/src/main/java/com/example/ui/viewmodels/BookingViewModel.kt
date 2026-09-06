@@ -7,7 +7,9 @@ import com.example.data.repositories.BookingRepository
 import com.example.data.*
 import com.example.data.models.*
 import com.example.utils.*
+import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,8 +46,12 @@ enum class BookingDistributionMode(val label: String) {
     ADMIN_ONLY("للأدمن أولاً")
 }
 
+@HiltViewModel
+open class BookingViewModel @Inject constructor(
+    private val injectedRepository: BookingRepository
+) : BaseViewModel() {
 
-open class BookingViewModel : BaseViewModel() {
+    constructor() : this(BookingRepository(com.example.MyApplication.instance ?: throw IllegalStateException("Context not initialized")))
 
     internal val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
     val bookings: StateFlow<List<BookingEntity>> = _bookings.asStateFlow()
@@ -59,9 +65,8 @@ open class BookingViewModel : BaseViewModel() {
     internal val _distributionMode = MutableStateFlow(BookingDistributionMode.ADMIN_ONLY)
     val distributionMode: StateFlow<BookingDistributionMode> = _distributionMode.asStateFlow()
 
-    val bookingRepository by lazy {
-        BookingRepository(appContext ?: throw IllegalStateException("App context not initialized"))
-    }
+    val bookingRepository: BookingRepository
+        get() = injectedRepository
 
     // --- Callback/Lambda Properties for decoupling ---
     var getCoupons: (() -> List<com.example.data.CouponEntity>)? = null
@@ -437,8 +442,14 @@ open class BookingViewModel : BaseViewModel() {
 
     fun deleteBookingImpl(bookingId: String) {
         val b = _bookings.value.find { it.id == bookingId }
+        val status = b?.status?.uppercase() ?: ""
+        if (b != null && status != "COMPLETED" && status != "CANCELLED") {
+            triggerNotificationCallback?.invoke("⚠️ لا يمكن حذف الحجز إلا إذا كان مكتملاً أو ملغياً")
+            return
+        }
         _bookings.value = _bookings.value.filter { it.id != bookingId }
         db.collection("bookings").document(bookingId).delete()
+        bookingRepository.deleteBooking(bookingId, {}, {})
         triggerNotificationCallback?.invoke("🗑️ تم حذف الحجز من السجلات")
 
         val bkCode = b?.bookingCode?.ifBlank { b.bookingNumber.ifBlank { bookingId } } ?: bookingId

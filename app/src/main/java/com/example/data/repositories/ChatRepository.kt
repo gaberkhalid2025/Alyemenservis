@@ -91,7 +91,7 @@ class ChatRepository(
             }
 
             val finalChannelId = customChannelId ?: when {
-                type == ChannelType.SUPPORT -> channelsCollection.document().id
+                type == ChannelType.SUPPORT -> "channel_support_${cleanCurrent}"
                 type == ChannelType.PRIVATE && sortedParticipants.size == 2 -> "channel_${sortedParticipants[0]}_${sortedParticipants[1]}"
                 relatedEntityId != null -> "channel_${type.name.lowercase()}_${relatedEntityId.trim()}"
                 else -> channelsCollection.document().id
@@ -211,15 +211,20 @@ class ChatRepository(
                     doc.toObject(ChatChannel::class.java)?.copy(id = doc.id)
                 }?.sortedByDescending { it.lastMessageTime } ?: emptyList()
 
-                // Deduplicate SUPPORT channels: keep only the newest one
-                val supportChannels = allRemoteChannels.filter { 
-                    it.type == ChannelType.SUPPORT || it.title == "الدعم الفني" || it.id.startsWith("support_") 
+                // For ADMIN: see all support channels from all users
+                // For Regular User: Deduplicate SUPPORT channels: keep only their own newest one
+                val remoteChannels = if (cleanUserId.equals("ADMIN", ignoreCase = true)) {
+                    allRemoteChannels
+                } else {
+                    val supportChannels = allRemoteChannels.filter { 
+                        it.type == ChannelType.SUPPORT || it.title == "الدعم الفني" || it.id.startsWith("support_") 
+                    }
+                    val otherChannels = allRemoteChannels.filter { 
+                        it.type != ChannelType.SUPPORT && it.title != "الدعم الفني" && !it.id.startsWith("support_") 
+                    }
+                    val latestSupport = supportChannels.maxByOrNull { it.lastMessageTime }
+                    (otherChannels + listOfNotNull(latestSupport)).sortedByDescending { it.lastMessageTime }
                 }
-                val otherChannels = allRemoteChannels.filter { 
-                    it.type != ChannelType.SUPPORT && it.title != "الدعم الفني" && !it.id.startsWith("support_") 
-                }
-                val latestSupport = supportChannels.maxByOrNull { it.lastMessageTime }
-                val remoteChannels = (otherChannels + listOfNotNull(latestSupport)).sortedByDescending { it.lastMessageTime }
 
                 // Save to local cache & emit
                 CoroutineScope(Dispatchers.IO).launch {

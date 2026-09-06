@@ -168,13 +168,34 @@ class BookingRepository(private val context: Context) {
                     val userNotifId = UUID.randomUUID().toString()
                     val userNotif = mapOf(
                         "id" to userNotifId,
-                        "title" to "📅 تم إنشاء حجزك بنجاح",
+                        "title" to "تم استلام طلب حجزك بنجاح",
                         "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} وهو قيد المراجعة.",
                         "targetType" to "USER",
                         "targetValue" to finalBooking.customerPhone,
                         "timestamp" to System.currentTimeMillis()
                     )
                     firestore.collection("notifications").document(userNotifId).set(userNotif)
+
+                    // Resolve provider phone if blank
+                    if (finalBooking.providerPhone.isBlank() && finalBooking.providerId.isNotBlank()) {
+                        firestore.collection("providers").document(finalBooking.providerId).get()
+                            .addOnSuccessListener { pDoc ->
+                                val pPhone = pDoc.getString("phone") ?: ""
+                                if (pPhone.isNotBlank()) {
+                                    firestore.collection("bookings").document(docId).update("providerPhone", pPhone)
+                                    val provNotifId = UUID.randomUUID().toString()
+                                    val provNotif = mapOf(
+                                        "id" to provNotifId,
+                                        "title" to "طلب حجز جديد برقم #${finalBooking.bookingNumber}",
+                                        "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName.ifEmpty { finalBooking.clientName }}.",
+                                        "targetType" to "PROVIDER",
+                                        "targetValue" to pPhone,
+                                        "timestamp" to System.currentTimeMillis()
+                                    )
+                                    firestore.collection("notifications").document(provNotifId).set(provNotif)
+                                }
+                            }
+                    }
 
                     val targetPhones = setOf(
                         finalBooking.providerPhone,
@@ -186,7 +207,7 @@ class BookingRepository(private val context: Context) {
                         val providerNotifId = UUID.randomUUID().toString()
                         val providerNotif = mapOf(
                             "id" to providerNotifId,
-                            "title" to "🔔 طلب حجز جديد",
+                            "title" to "طلب حجز جديد برقم #${finalBooking.bookingNumber}",
                             "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName.ifEmpty { finalBooking.clientName }}.",
                             "targetType" to "PROVIDER",
                             "targetValue" to targetVal,
@@ -202,9 +223,9 @@ class BookingRepository(private val context: Context) {
                     val adminNotifId = UUID.randomUUID().toString()
                     val adminNotif = mapOf(
                         "id" to adminNotifId,
-                        "title" to "🚨 حجز جديد في الدليل",
+                        "title" to "إشعار للإدارة بالحجز الجديد",
                         "message" to "تم إنشاء حجز جديد #${finalBooking.bookingNumber} للخدمة ${finalBooking.serviceName}.",
-                        "targetType" to "SUPERVISOR",
+                        "targetType" to "ADMIN_ONLY",
                         "targetValue" to "ALL",
                         "timestamp" to System.currentTimeMillis()
                     )
@@ -323,7 +344,42 @@ class BookingRepository(private val context: Context) {
 
         firestore.collection("bookings").document(booking.id)
             .update(updates)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener {
+                val notifTime = System.currentTimeMillis()
+                if (booking.customerPhone.isNotBlank()) {
+                    val uId = UUID.randomUUID().toString()
+                    firestore.collection("notifications").document(uId).set(mapOf(
+                        "id" to uId,
+                        "title" to "تم إلغاء الحجز",
+                        "message" to "تم إلغاء طلب الحجز #${booking.bookingNumber} بنجاح. السبب: $cancellationReason",
+                        "targetType" to "USER",
+                        "targetValue" to booking.customerPhone,
+                        "timestamp" to notifTime
+                    ))
+                }
+                val pTarget = booking.providerPhone.ifBlank { booking.providerId }
+                if (pTarget.isNotBlank()) {
+                    val pId = UUID.randomUUID().toString()
+                    firestore.collection("notifications").document(pId).set(mapOf(
+                        "id" to pId,
+                        "title" to "إلغاء حجز",
+                        "message" to "تم إلغاء الحجز #${booking.bookingNumber} من قبل $cancelledBy. السبب: $cancellationReason",
+                        "targetType" to "PROVIDER",
+                        "targetValue" to pTarget,
+                        "timestamp" to notifTime
+                    ))
+                }
+                val aId = UUID.randomUUID().toString()
+                firestore.collection("notifications").document(aId).set(mapOf(
+                    "id" to aId,
+                    "title" to "إشعار إداري: إلغاء حجز",
+                    "message" to "تم إلغاء الحجز #${booking.bookingNumber} - السبب: $cancellationReason",
+                    "targetType" to "ADMIN_ONLY",
+                    "targetValue" to "ALL",
+                    "timestamp" to notifTime
+                ))
+                onSuccess()
+            }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل إلغاء الحجز") }
     }
 

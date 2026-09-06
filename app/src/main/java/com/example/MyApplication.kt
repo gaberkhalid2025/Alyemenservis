@@ -20,7 +20,8 @@ class MyApplication : Application() {
     }
 
     companion object {
-        private var instance: MyApplication? = null
+        var instance: MyApplication? = null
+            private set
         private var firebaseAnalytics: FirebaseAnalytics? = null
 
         @JvmStatic

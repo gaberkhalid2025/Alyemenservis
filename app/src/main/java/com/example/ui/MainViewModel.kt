@@ -1425,6 +1425,18 @@ fun changeAdminCredentials(username: String, password: String) {
         navigateTo("USER_BROWSE")
     }
     fun navigateToScreen(screen: String) = navigateTo(screen)
+    fun navigateAndRemoveScreens(targetScreen: String, screensToRemove: List<String>) {
+        val updated = _screenBackStack.value.toMutableList()
+        updated.removeAll(screensToRemove.toSet())
+        if (targetScreen == "USER_BROWSE") {
+            updated.clear()
+            updated.add("USER_BROWSE")
+        } else if (!updated.contains(targetScreen)) {
+            updated.add(targetScreen)
+        }
+        _screenBackStack.value = updated
+        _currentScreen.value = targetScreen
+    }
     fun navigateTo(screen: String) {
         if (_currentScreen.value != screen) {
             val updated = _screenBackStack.value.toMutableList()

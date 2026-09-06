@@ -8,8 +8,11 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-open 
-class AuthViewModel : BaseViewModel() {
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+
+@HiltViewModel
+open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     internal val _currentUserId = MutableStateFlow("guest")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
