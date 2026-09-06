@@ -7,6 +7,18 @@ import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.tasks.await
+
+sealed class BaseUiState<out T> {
+    object Idle : BaseUiState<Nothing>()
+    object Loading : BaseUiState<Nothing>()
+    data class Success<T>(val data: T) : BaseUiState<T>()
+    data class Error(val message: String, val throwable: Throwable? = null) : BaseUiState<Nothing>()
+    
+    fun isLoading(): Boolean = this is Loading
+    fun isSuccess(): Boolean = this is Success
+    fun isError(): Boolean = this is Error
+}
 
 open class BaseViewModel : ViewModel() {
 
@@ -38,7 +50,21 @@ open class BaseViewModel : ViewModel() {
         }
     }
 
+    protected val _baseUiState = MutableStateFlow<BaseUiState<Any?>>(BaseUiState.Idle)
+    val baseUiState: StateFlow<BaseUiState<Any?>> = _baseUiState.asStateFlow()
     
+    protected fun setLoading() {
+        _baseUiState.value = BaseUiState.Loading
+    }
+    
+    protected fun setSuccess(data: Any? = null) {
+        _baseUiState.value = BaseUiState.Success(data)
+    }
+    
+    protected fun setError(message: String, throwable: Throwable? = null) {
+        _baseUiState.value = BaseUiState.Error(message, throwable)
+    }
+
     open fun com.google.firebase.firestore.Query.addSnapshotListenerReg(listener: (com.google.firebase.firestore.QuerySnapshot?, com.google.firebase.firestore.FirebaseFirestoreException?) -> Unit) {
         reg(this.addSnapshotListener(listener))
     }
@@ -187,3 +213,53 @@ open class BaseViewModel : ViewModel() {
     open fun getDefaultStoresList(): List<com.example.data.StoreEntity> = emptyList()
     open fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> = emptyList()
 }
+
+class FirestorePaginationHelper<T : Any>(
+    private val collection: String,
+    private val limit: Int = 20,
+    private val orderBy: String = "createdAt",
+    private val descending: Boolean = true
+) {
+    private var lastDocument: com.google.firebase.firestore.DocumentSnapshot? = null
+    private var hasMoreData = true
+    
+    suspend fun loadNextPage(
+        db: com.google.firebase.firestore.FirebaseFirestore,
+        mapper: (com.google.firebase.firestore.DocumentSnapshot) -> T?
+    ): List<T> {
+        if (!hasMoreData) return emptyList()
+        
+        try {
+            var query = db.collection(collection)
+                .orderBy(orderBy, if (descending) com.google.firebase.firestore.Query.Direction.DESCENDING else com.google.firebase.firestore.Query.Direction.ASCENDING)
+                .limit(limit.toLong())
+            
+            lastDocument?.let {
+                query = query.startAfter(it)
+            }
+            
+            val snapshot = query.get().await()
+            
+            if (snapshot.documents.isEmpty()) {
+                hasMoreData = false
+                return emptyList()
+            }
+            
+            val items = snapshot.documents.mapNotNull { mapper(it) }
+            lastDocument = snapshot.documents.lastOrNull()
+            hasMoreData = snapshot.documents.size == limit
+            
+            return items
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return emptyList()
+        }
+    }
+    
+    fun reset() {
+        lastDocument = null
+        hasMoreData = true
+    }
+}
+

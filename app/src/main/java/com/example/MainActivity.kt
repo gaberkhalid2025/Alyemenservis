@@ -48,6 +48,9 @@ import com.example.utils.*
 import com.example.utils.*
 import com.example.ui.viewmodels.*
 
+import dagger.hilt.android.AndroidEntryPoint
+
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var lastBackPressTime = 0L
     private var tts: android.speech.tts.TextToSpeech? = null

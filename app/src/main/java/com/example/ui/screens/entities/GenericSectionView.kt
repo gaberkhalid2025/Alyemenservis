@@ -17,8 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import com.example.data.CityEntity
 import com.example.ui.components.SkeletonCard
 import com.example.utils.VisualThemePalette
@@ -247,4 +250,138 @@ fun <T : Any> GenericSectionView(
         }
     }
 }
+
+/**
+ * 🏠 [UnifiedEntitySectionView] - مكون عام لعرض قوائم الكيانات
+ */
+@Composable
+fun <T : Any> UnifiedEntitySectionView(
+    title: String,
+    titleIcon: String,
+    items: List<T>,
+    isLoading: Boolean,
+    themeColors: com.example.utils.VisualThemePalette,
+    searchPlaceholder: String,
+    categories: List<String> = emptyList(),
+    cities: List<com.example.data.CityEntity> = emptyList(),
+    onItemClick: (T) -> Unit,
+    onAddClick: (() -> Unit)? = null,
+    onSearchQueryChanged: (String) -> Unit = {},
+    onCategorySelected: (String) -> Unit = {},
+    onCitySelected: (String) -> Unit = {},
+    emptyMessage: String = "لا توجد عناصر معروضة حالياً",
+    itemContent: @Composable (T) -> Unit
+) {
+    GenericSectionView(
+        themeColors = themeColors,
+        items = items,
+        isLoading = isLoading,
+        title = title,
+        titleIcon = titleIcon,
+        searchPlaceholder = searchPlaceholder,
+        categories = categories,
+        cities = cities,
+        onSearchQueryChanged = onSearchQueryChanged,
+        onCategorySelected = onCategorySelected,
+        onCitySelected = onCitySelected,
+        onMinRatingSelected = { /* تنفيذ التصفية حسب التقييم */ },
+        emptyMessage = emptyMessage,
+        extraHeaderContent = {
+            if (onAddClick != null) {
+                Button(
+                    onClick = onAddClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                ) {
+                    Text("➕ إضافة جديد", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                }
+            }
+        },
+        itemContent = itemContent
+    )
+}
+
+@Composable
+fun RetryableErrorContent(
+    errorMessage: String,
+    onRetry: () -> Unit,
+    themeColors: com.example.utils.VisualThemePalette,
+    maxRetries: Int = 3
+) {
+    var retryCount by remember { mutableStateOf(0) }
+    var isAutoRetrying by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(retryCount) {
+        if (retryCount < maxRetries && retryCount > 0) {
+            kotlinx.coroutines.delay(3000L)
+            isAutoRetrying = true
+            onRetry()
+            retryCount++
+        }
+    }
+    
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = Color(0xFFEF4444),
+                modifier = Modifier.size(56.dp)
+            )
+            
+            Text(
+                text = "⚠️ حدث خطأ",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            
+            Text(
+                text = errorMessage,
+                fontSize = 13.sp,
+                color = Color.LightGray,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            
+            Button(
+                onClick = {
+                    retryCount = 0
+                    isAutoRetrying = false
+                    onRetry()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                if (isAutoRetrying) {
+                    CircularProgressIndicator(
+                        color = Color.Black,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("جاري إعادة المحاولة...", color = Color.Black)
+                } else {
+                    Text("إعادة المحاولة 🔄", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+            
+            if (retryCount >= maxRetries) {
+                Text(
+                    text = "💡 تأكد من اتصالك بالإنترنت وحاول مرة أخرى",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}
+
 

@@ -44,6 +44,7 @@ enum class BookingDistributionMode(val label: String) {
     ADMIN_ONLY("للأدمن أولاً")
 }
 
+
 open class BookingViewModel : BaseViewModel() {
 
     internal val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())

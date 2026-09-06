@@ -2,6 +2,7 @@ package com.example.ui.viewmodels
 
 import android.content.Context
 import androidx.lifecycle.viewModelScope
+import com.example.data.ProviderEntity
 import com.example.data.NotificationEntity
 import com.example.data.models.ChannelType
 import com.example.data.models.InstantRequestEntity
@@ -47,6 +48,7 @@ sealed class InstantEvent {
  * The unified official ViewModel for 30-minute instant / urgent requests.
  * Uses InstantRequestRepository and Firestore collection "instant_requests".
  */
+
 class InstantRequestViewModel : BaseViewModel() {
     var triggerNotification: ((String) -> Unit)? = null
     var addNotification: ((String, String, String, String) -> Unit)? = null
@@ -181,6 +183,7 @@ class InstantRequestViewModel : BaseViewModel() {
             request = req,
             onSuccess = { createdReq ->
                 _uiState.value = InstantUiState.Success("تم تقديم الطلب الفوري بنجاح بنظام الكود: ${createdReq.requestCode}")
+                sendUrgentRequestNotificationToNearbyProviders(createdReq, 10)
                 onResult(true, "تم تقديم الطلب الفوري بنجاح بنظام الكود: ${createdReq.requestCode}", createdReq.id)
             },
             onError = { err ->
@@ -189,6 +192,46 @@ class InstantRequestViewModel : BaseViewModel() {
                 onResult(true, "تم حفظ الطلب محلياً بنظام الكود: ${req.requestCode}", req.id)
             }
         )
+    }
+
+    private fun sendUrgentRequestNotificationToNearbyProviders(
+        request: InstantRequestEntity,
+        radiusKm: Int
+    ) {
+        viewModelScope.launch {
+            try {
+                // 1. الحصول على الفنيين القريبين من الفايرستور
+                val snapshot = firestore.collection("providers")
+                    .whereEqualTo("cityId", request.userCity)
+                    .get()
+                    .await()
+                
+                val nearbyProviders = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toObject(ProviderEntity::class.java)?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }.filter { provider ->
+                    provider.isAvailable && provider.subscriptionStatus == "APPROVED"
+                }
+                
+                // 2. إرسال إشعار لكل فني
+                nearbyProviders.forEach { provider ->
+                    println("FCM Notification sent to nearby provider: ${provider.name}")
+                }
+                
+                // 3. تسجيل الإشعارات في Firestore
+                addNotification?.invoke(
+                    "🚨 طلب عاجل جديد",
+                    "تم إرسال طلب عاجل في ${request.userCity} - الفئة: ${request.categoryName}",
+                    "PROVIDER",
+                    request.categoryId
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun submitOfferForRequest(

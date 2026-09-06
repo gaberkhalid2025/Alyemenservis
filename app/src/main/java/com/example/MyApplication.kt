@@ -4,6 +4,9 @@ import android.app.Application
 import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
 
+import dagger.hilt.android.HiltAndroidApp
+
+@HiltAndroidApp
 class MyApplication : Application() {
 
     override fun onCreate() {

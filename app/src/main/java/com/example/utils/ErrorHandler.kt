@@ -13,4 +13,14 @@ object ErrorHandler {
         Toast.makeText(context, "⚠️ $defaultMessage: $message", Toast.LENGTH_SHORT).show()
         AppErrorLogManager.logFirestoreError("ErrorHandler", defaultMessage, throwable)
     }
+
+    fun handleError(
+        error: AppError,
+        onShowSnackbar: (String) -> Unit,
+        onLogError: (String) -> Unit = {}
+    ) {
+        val message = error.messageArabic
+        onShowSnackbar(message)
+        onLogError("[$error] $message - ${error.userActionArabic}")
+    }
 }

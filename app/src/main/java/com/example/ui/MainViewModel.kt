@@ -17,6 +17,15 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 class MainViewModel : BaseViewModel() {
+
+    val authViewModel = com.example.ui.viewmodels.AuthViewModel()
+    val homeViewModel = com.example.ui.viewmodels.HomeViewModel()
+    val bookingViewModel = com.example.ui.viewmodels.BookingViewModel()
+    val adminViewModel = com.example.ui.viewmodels.AdminViewModel()
+    val settingsViewModel = com.example.ui.viewmodels.SettingsViewModel()
+    val instantRequestViewModel = com.example.ui.viewmodels.InstantRequestViewModel()
+    val chatRepo = com.example.data.repositories.ChatRepository()
+
     override val db by lazy {
         val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
         try {
@@ -61,14 +70,7 @@ class MainViewModel : BaseViewModel() {
     private val _screenBackStack = MutableStateFlow<List<String>>(listOf("USER_BROWSE"))
     val screenBackStack: StateFlow<List<String>> = _screenBackStack.asStateFlow()
     // ------------------- ViewModels -------------------
-    val authViewModel = com.example.ui.viewmodels.AuthViewModel()
-    val homeViewModel = com.example.ui.viewmodels.HomeViewModel()
-    val bookingViewModel = com.example.ui.viewmodels.BookingViewModel()
-    val chatRepo = com.example.data.repositories.ChatRepository()
     val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)
-    val adminViewModel = com.example.ui.viewmodels.AdminViewModel()
-    val settingsViewModel = com.example.ui.viewmodels.SettingsViewModel()
-    val instantRequestViewModel = com.example.ui.viewmodels.InstantRequestViewModel()
     // ------------------- Delegated StateFlows -------------------
     // Auth
     val _currentUserId get() = authViewModel._currentUserId

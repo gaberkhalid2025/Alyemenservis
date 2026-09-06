@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-open class AuthViewModel : BaseViewModel() {
+open 
+class AuthViewModel : BaseViewModel() {
 
     internal val _currentUserId = MutableStateFlow("guest")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()

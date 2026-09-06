@@ -3013,30 +3013,15 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
                                             onClick = {
-                                                val chId = "support_" + b.customerPhone
-                                                val existing = chatChannels.find { it.id == chId }
-                                                if (existing != null) {
-                                                    showActiveChatChannelObj = existing
-                                                } else {
-                                                    val newCh = com.example.data.ChatChannelEntity(
-                                                        id = chId,
-                                                        userName = b.customerName,
-                                                        lastMessage = "بدء محادثة بخصوص الحجز رقم ${b.id}",
-                                                        isBlocked = false,
-                                                        isProvider = false,
-                                                        timestamp = System.currentTimeMillis(),
-                                                        messages = listOf(
-                                                            com.example.data.ChatMessageEntity(
-                                                                id = "c_init",
-                                                                senderId = "admin",
-                                                                message = "أهلاً بك عميلنا العزيز ${b.customerName}. نتواصل معك كإدارة/فني بخصوص حجز الخدمة رقم: ${b.id}.",
-                                                                timestamp = System.currentTimeMillis(),
-                                                                senderName = "الإدارة والدعم"
-                                                            )
-                                                        )
-                                                    )
-                                                    viewModel.replyToChatChannel(chId, "admin", "أهلاً بك عميلنا العزيز ${b.customerName}. نتواصل معك كإدارة/فني بخصوص حجز الخدمة رقم: ${b.id}.", "الإدارة والدعم")
-                                                    showActiveChatChannelObj = newCh
+                                                viewModel.openOrCreateChatChannel(
+                                                    targetId = b.clientId.takeIf { it.isNotBlank() } ?: "user_${b.customerPhone}",
+                                                    targetType = "CLIENT",
+                                                    targetName = b.customerName,
+                                                    targetPhone = b.customerPhone,
+                                                    relatedEntityId = b.id,
+                                                    relatedEntityType = "BOOKING"
+                                                ) { created ->
+                                                    created?.let { showActiveChatChannelObj = it }
                                                 }
                                             }
                                         ) {
