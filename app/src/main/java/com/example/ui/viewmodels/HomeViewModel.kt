@@ -10,10 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 
-import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
-@HiltViewModel
 open class HomeViewModel @Inject constructor() : BaseViewModel() {
 
     internal val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())

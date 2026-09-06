@@ -201,6 +201,17 @@ fun ForgotPasswordRecoveryDialog(
                                 )
                                 viewModel.db.collection("password_recovery_requests").document(cleanPhone).set(adminRecoveryRequest)
 
+                                val adminNotifId = java.util.UUID.randomUUID().toString()
+                                val adminNotif = mapOf(
+                                    "id" to adminNotifId,
+                                    "title" to "🔑 طلب استعادة حساب جديد",
+                                    "message" to "ورد طلب استعادة حساب للرقم: $cleanPhone عبر قناة $selectedChannel",
+                                    "targetType" to "ADMIN_ONLY",
+                                    "targetValue" to "ALL",
+                                    "timestamp" to currentTime
+                                )
+                                viewModel.db.collection("notifications").document(adminNotifId).set(adminNotif)
+
                                 sharedPrefs.edit()
                                     .putString("pending_recovery_phone", cleanPhone)
                                     .putLong("pending_recovery_time", currentTime)

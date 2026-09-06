@@ -50,18 +50,15 @@ sealed class InstantEvent {
  * The unified official ViewModel for 30-minute instant / urgent requests.
  * Uses InstantRequestRepository and Firestore collection "instant_requests".
  */
-@HiltViewModel
 class InstantRequestViewModel @Inject constructor(
-    private val repository: InstantRequestRepository
+    private val repository: InstantRequestRepository,
+    private val chatRepo: ChatRepository
 ) : BaseViewModel() {
-
-    constructor() : this(InstantRequestRepository(com.example.MyApplication.instance))
 
     var triggerNotification: ((String) -> Unit)? = null
     var addNotification: ((String, String, String, String) -> Unit)? = null
     var getOrCreateChatChannel: ((String, String, String, String) -> Unit)? = null
 
-    private val chatRepo by lazy { ChatRepository() }
     private val firestore by lazy { FirebaseFirestore.getInstance() }
 
     private val _uiState = MutableStateFlow<InstantUiState>(InstantUiState.Idle)
@@ -380,6 +377,20 @@ class InstantRequestViewModel @Inject constructor(
                     "تهانينا ${offer.technicianName}! اختار العميل ${req.userName} عرضك بسعر ${offer.price} ر.ي للطلب ${req.requestCode}. يمكنك البدء في التواصل والمباشرة الآن.",
                     "PROVIDER",
                     offer.technicianPhone
+                )
+                if (req.userPhone.isNotBlank()) {
+                    addNotification?.invoke(
+                        "🎉 تم قبول عرض الفني ${offer.technicianName}",
+                        "تم قبول العرض بنجاح وبدء المحادثة المباشرة مع الفني لتنسيق العمل للطلب ${req.requestCode}.",
+                        "USER",
+                        req.userPhone
+                    )
+                }
+                addNotification?.invoke(
+                    "📢 قبول عرض طلب عاجل",
+                    "تم قبول عرض الفني ${offer.technicianName} للطلب ${req.requestCode} بقيمة ${offer.price} ر.ي للعميل ${req.userName}.",
+                    "ADMIN_ONLY",
+                    "ALL"
                 )
             }
         }

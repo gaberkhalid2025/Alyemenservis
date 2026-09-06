@@ -133,7 +133,6 @@ data class SystemLog(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-@HiltViewModel
 class AdminViewModel @Inject constructor() : BaseViewModel() {
     val crud = AdminCrudOperations(db)
 

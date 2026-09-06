@@ -169,7 +169,7 @@ class BookingRepository(private val context: Context) {
                     val userNotif = mapOf(
                         "id" to userNotifId,
                         "title" to "تم استلام طلب حجزك بنجاح",
-                        "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} وهو قيد المراجعة.",
+                        "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} ورمز المرور: ${rawPin} وهو قيد المراجعة.",
                         "targetType" to "USER",
                         "targetValue" to finalBooking.customerPhone,
                         "timestamp" to System.currentTimeMillis()

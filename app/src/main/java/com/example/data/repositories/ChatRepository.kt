@@ -38,6 +38,11 @@ class ChatRepository(
     private val channelsCollection = firestore.collection("chat_channels")
     private val presenceCollection = firestore.collection("user_presence")
 
+    companion object {
+        const val SUPPORT_ADMIN_ID = "ADMIN"
+        const val SUPPORT_ADMIN_NAME = "الدعم الفني"
+    }
+
     // =========================================================================
     // 1. CHANNELS MANAGEMENT (OFFLINE-FIRST)
     // =========================================================================
@@ -56,8 +61,8 @@ class ChatRepository(
     ): AppResult<ChatChannel> = withContext(Dispatchers.IO) {
         try {
             val cleanCurrent = currentUserId.trim()
-            val cleanOther = if (type == ChannelType.SUPPORT) "ADMIN" else otherUserId.trim()
-            val finalOtherName = if (type == ChannelType.SUPPORT) "الدعم الفني" else otherUserName
+            val cleanOther = if (type == ChannelType.SUPPORT) SUPPORT_ADMIN_ID else otherUserId.trim()
+            val finalOtherName = if (type == ChannelType.SUPPORT) SUPPORT_ADMIN_NAME else otherUserName
             
             if (cleanCurrent.isBlank()) {
                 return@withContext AppResult.Error(AppError.ValidationError("currentUserId", "معرف المستخدم الحالي فارغ"))
@@ -78,8 +83,9 @@ class ChatRepository(
                         val docTitle = doc.getString("title") ?: ""
                         val docId = doc.id
                         docType.equals("SUPPORT", ignoreCase = true) || 
-                            docTitle == "الدعم الفني" || 
-                            docId.startsWith("support_")
+                            docTitle == SUPPORT_ADMIN_NAME || 
+                            docId.startsWith("support_") ||
+                            docId == "channel_support_${cleanCurrent}"
                     }
                     
                     if (existingSupportDoc != null) {

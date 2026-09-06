@@ -46,12 +46,9 @@ enum class BookingDistributionMode(val label: String) {
     ADMIN_ONLY("للأدمن أولاً")
 }
 
-@HiltViewModel
 open class BookingViewModel @Inject constructor(
     private val injectedRepository: BookingRepository
 ) : BaseViewModel() {
-
-    constructor() : this(BookingRepository(com.example.MyApplication.instance ?: throw IllegalStateException("Context not initialized")))
 
     internal val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
     val bookings: StateFlow<List<BookingEntity>> = _bookings.asStateFlow()

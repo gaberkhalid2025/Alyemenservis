@@ -2,6 +2,8 @@ package com.example.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import com.example.utils.*
 import com.example.ui.viewmodels.BaseViewModel
 import com.example.ui.viewmodels.BookingDistributionMode
@@ -16,15 +18,17 @@ import com.example.ui.viewmodels.SettingsViewModel.ChatParticipantType
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
-class MainViewModel : BaseViewModel() {
 
-    val authViewModel = com.example.ui.viewmodels.AuthViewModel()
-    val homeViewModel = com.example.ui.viewmodels.HomeViewModel()
-    val bookingViewModel = com.example.ui.viewmodels.BookingViewModel()
-    val adminViewModel = com.example.ui.viewmodels.AdminViewModel()
-    val settingsViewModel = com.example.ui.viewmodels.SettingsViewModel()
-    val instantRequestViewModel = com.example.ui.viewmodels.InstantRequestViewModel()
-    val chatRepo = com.example.data.repositories.ChatRepository()
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    val authViewModel: com.example.ui.viewmodels.AuthViewModel,
+    val homeViewModel: com.example.ui.viewmodels.HomeViewModel,
+    val bookingViewModel: com.example.ui.viewmodels.BookingViewModel,
+    val adminViewModel: com.example.ui.viewmodels.AdminViewModel,
+    val settingsViewModel: com.example.ui.viewmodels.SettingsViewModel,
+    val instantRequestViewModel: com.example.ui.viewmodels.InstantRequestViewModel,
+    val chatRepo: com.example.data.repositories.ChatRepository
+) : BaseViewModel() {
 
     override val db by lazy {
         val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -2404,7 +2408,7 @@ fun addNotification(
     fun removeSupervisor(id: String) = authViewModel.removeSupervisor(id)
     fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) {
         viewModelScope.launch {
-            com.example.data.repositories.ChatRepository().getOrCreateChannel(
+            chatRepo.getOrCreateChannel(
                 currentUserId = providerId,
                 currentUserName = providerName,
                 currentUserPhoto = "",
@@ -2490,12 +2494,12 @@ fun addNotification(
         val currentUserPhoto = ""
         
         viewModelScope.launch {
-            val result = com.example.data.repositories.ChatRepository().getOrCreateChannel(
+            val result = chatRepo.getOrCreateChannel(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,
-                otherUserId = "ADMIN",
-                otherUserName = "الدعم الفني",
+                otherUserId = com.example.data.repositories.ChatRepository.SUPPORT_ADMIN_ID,
+                otherUserName = com.example.data.repositories.ChatRepository.SUPPORT_ADMIN_NAME,
                 otherUserPhoto = "",
                 type = com.example.data.models.ChannelType.SUPPORT,
                 relatedEntityId = null,
@@ -2517,7 +2521,7 @@ fun addNotification(
         val otherUserName = if (channel.customerId == currentUserId) channel.targetName else channel.customerName
         
         viewModelScope.launch {
-            val result = com.example.data.repositories.ChatRepository().getOrCreateChannel(
+            val result = chatRepo.getOrCreateChannel(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,
@@ -2625,7 +2629,7 @@ fun addNotification(
         val currentUserPhoto = ""
         
         viewModelScope.launch {
-            val result = com.example.data.repositories.ChatRepository().getOrCreateChannel(
+            val result = chatRepo.getOrCreateChannel(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,

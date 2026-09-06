@@ -135,8 +135,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     var adminBannerSubTab by remember { mutableStateOf("SERVICES") }
     var adminPasswordSubTab by remember { mutableStateOf("REQUESTS") }
     val passwordRecoveryRequests = remember { mutableStateListOf<Map<String, Any>>() }
-    LaunchedEffect(Unit) {
-        try {
+    DisposableEffect(Unit) {
+        val listener = try {
             viewModel.db.collection("password_recovery_requests")
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .addSnapshotListener { snap, err ->
@@ -155,6 +155,10 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
         } catch (e: Throwable) {
             e.printStackTrace()
+            null
+        }
+        onDispose {
+            listener?.remove()
         }
     }
 

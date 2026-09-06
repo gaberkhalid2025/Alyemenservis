@@ -8,10 +8,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
-@HiltViewModel
 open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     internal val _currentUserId = MutableStateFlow("guest")
@@ -131,8 +129,9 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     private fun autoSyncProviderCredentials(context: Context, savedJoinPhone: String, savedId: String, sp: android.content.SharedPreferences) {
-        if (savedJoinPhone.isNotEmpty() && (savedId == "guest" || savedId.isEmpty())) {
-            db.collection("providers").whereEqualTo("phone", savedJoinPhone).get().addOnSuccessListener { snapshot ->
+        val phoneToLookup = savedJoinPhone.ifEmpty { _currentUserPhone.value }
+        if (phoneToLookup.isNotEmpty()) {
+            db.collection("providers").whereEqualTo("phone", phoneToLookup).get().addOnSuccessListener { snapshot ->
                 if (snapshot != null && !snapshot.isEmpty) {
                     val prov = snapshot.documents.first().toObject(ProviderEntity::class.java)
                     if (prov != null) {
@@ -140,32 +139,54 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                         _currentUserName.value = prov.name
                         _currentUserPhone.value = prov.phone
                         _currentUserResidence.value = prov.area
+                        _adminRole.value = "PROVIDER"
                         
                         sp.edit().apply {
                             putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(prov.id))
                             putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(prov.name))
                             putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(prov.phone))
                             putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(prov.area))
+                            putString("saved_admin_role", "PROVIDER")
                             apply()
                         }
                     }
                 } else {
-                    db.collection("pending_providers").whereEqualTo("phone", savedJoinPhone).get().addOnSuccessListener { pSnapshot ->
-                        if (pSnapshot != null && !pSnapshot.isEmpty) {
-                            val pend = pSnapshot.documents.first().toObject(PendingProviderEntity::class.java)
-                            if (pend != null) {
-                                val pendId = "user_" + pend.phone
-                                _currentUserId.value = pendId
-                                _currentUserName.value = pend.name
-                                _currentUserPhone.value = pend.phone
-                                _currentUserResidence.value = pend.area
-                                
+                    db.collection("stores").whereEqualTo("phone", phoneToLookup).get().addOnSuccessListener { sSnap ->
+                        if (sSnap != null && !sSnap.isEmpty) {
+                            val st = sSnap.documents.first().toObject(com.example.data.StoreEntity::class.java)
+                            if (st != null) {
+                                _currentUserId.value = st.id
+                                _currentUserName.value = st.name
+                                _currentUserPhone.value = st.phone
+                                _currentUserResidence.value = st.cityId
+                                _adminRole.value = "STORE_OWNER"
                                 sp.edit().apply {
-                                    putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(pendId))
-                                    putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(pend.name))
-                                    putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(pend.phone))
-                                    putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(pend.area))
+                                    putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(st.id))
+                                    putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(st.name))
+                                    putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(st.phone))
+                                    putString("saved_admin_role", "STORE_OWNER")
                                     apply()
+                                }
+                            }
+                        } else {
+                            db.collection("pending_providers").whereEqualTo("phone", phoneToLookup).get().addOnSuccessListener { pSnapshot ->
+                                if (pSnapshot != null && !pSnapshot.isEmpty) {
+                                    val pend = pSnapshot.documents.first().toObject(PendingProviderEntity::class.java)
+                                    if (pend != null) {
+                                        val pendId = "user_" + pend.phone
+                                        _currentUserId.value = pendId
+                                        _currentUserName.value = pend.name
+                                        _currentUserPhone.value = pend.phone
+                                        _currentUserResidence.value = pend.area
+                                        
+                                        sp.edit().apply {
+                                            putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(pendId))
+                                            putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(pend.name))
+                                            putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(pend.phone))
+                                            putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(pend.area))
+                                            apply()
+                                        }
+                                    }
                                 }
                             }
                         }
