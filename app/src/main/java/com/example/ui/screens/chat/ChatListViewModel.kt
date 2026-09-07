@@ -58,16 +58,16 @@ class ChatListViewModel @Inject constructor(
     }
 
     fun deleteChannel(channelId: String) {
+        _channels.value = _channels.value.filter { it.id != channelId }
         viewModelScope.launch {
             repository.deleteChannel(channelId)
-            _channels.value = _channels.value.filter { it.id != channelId }
         }
     }
 
     fun deleteAllChannels(channelsList: List<ChatChannel>) {
+        _channels.value = emptyList()
         viewModelScope.launch {
             repository.deleteAllChannels(channelsList)
-            _channels.value = emptyList()
         }
     }
 

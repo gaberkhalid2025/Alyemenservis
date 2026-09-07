@@ -448,21 +448,31 @@ class ChatRepository(
 
             // Remote update
             val channelRef = channelsCollection.document(channelId)
-            channelRef.update("unreadCount.$currentUserId", 0).await()
+            try {
+                channelRef.update("unreadCount.$currentUserId", 0).await()
+            } catch (e: Exception) {
+                // If field doesn't exist yet, ignore
+            }
 
-            // Update status of incoming messages
-            val unreadSnapshot = channelRef.collection("messages")
-                .whereNotEqualTo("senderId", currentUserId)
-                .get().await()
-
+            // Update status of incoming messages to READ
+            val unreadSnapshot = channelRef.collection("messages").get().await()
             val unreadDocs = unreadSnapshot.documents.filter { doc ->
-                doc.getString("status") != MessageStatus.READ.name
+                val senderId = doc.getString("senderId") ?: ""
+                val status = doc.getString("status") ?: ""
+                senderId != currentUserId && status != MessageStatus.READ.name
             }
 
             if (unreadDocs.isNotEmpty()) {
                 val batch = firestore.batch()
                 for (doc in unreadDocs) {
-                    batch.update(doc.reference, "status", MessageStatus.READ.name)
+                    batch.update(
+                        doc.reference,
+                        mapOf(
+                            "status" to MessageStatus.READ.name,
+                            "isRead" to true,
+                            "readAt" to System.currentTimeMillis()
+                        )
+                    )
                 }
                 batch.commit().await()
             }
@@ -492,6 +502,27 @@ class ChatRepository(
                 val updatedBlocked = cached.isBlocked.toMutableMap().apply { put(userIdToBlock, isBlocked) }
                 local?.saveOrUpdateChannel(cached.copy(isBlocked = updatedBlocked))
             }
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun editMessage(
+        channelId: String,
+        messageId: String,
+        newText: String
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || messageId.isBlank() || newText.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            msgRef.update(
+                mapOf(
+                    "message" to newText.trim(),
+                    "isEdited" to true,
+                    "editTimestamp" to System.currentTimeMillis()
+                )
+            ).await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))
@@ -558,9 +589,28 @@ class ChatRepository(
         if (channelId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
             local?.deleteChannel(channelId)
-            channelsCollection.document(channelId).delete().await()
+            val channelDocRef = channelsCollection.document(channelId)
+            // 1. Delete channel document directly first so it disappears from queries immediately
+            channelDocRef.delete().await()
+            
+            // 2. Safely delete messages in batch chunks
+            try {
+                val msgsSnapshot = channelDocRef.collection("messages").get().await()
+                if (!msgsSnapshot.isEmpty) {
+                    msgsSnapshot.documents.chunked(400).forEach { chunk ->
+                        val batch = firestore.batch()
+                        for (doc in chunk) {
+                            batch.delete(doc.reference)
+                        }
+                        batch.commit().await()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatRepository", "Subcollection messages deletion warning: ${e.message}")
+            }
             AppResult.Success(Unit)
         } catch (e: Exception) {
+            Log.e("ChatRepository", "deleteChannel error: ${e.message}")
             AppResult.Error(AppError.NetworkError(e))
         }
     }

@@ -91,10 +91,17 @@ fun AppNavigator(
                 )
             }
         },
+        contentWindowInsets = if (currentScreen == AppScreens.CHAT_DIRECT) {
+            WindowInsets(0, 0, 0, 0)
+        } else {
+            ScaffoldDefaults.contentWindowInsets
+        },
         containerColor = themeColors.background
     ) { innerPadding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(innerPadding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(if (currentScreen == AppScreens.CHAT_DIRECT) PaddingValues(0.dp) else innerPadding)
         ) {
             when (currentScreen) {
                 AppScreens.USER_BROWSE, AppScreens.HOME -> {

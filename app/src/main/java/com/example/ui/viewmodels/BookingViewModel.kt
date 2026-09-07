@@ -2,7 +2,6 @@ package com.example.ui.viewmodels
 
 import android.content.Context
 import androidx.lifecycle.viewModelScope
-import com.example.data.BookingEntity
 import com.example.data.repositories.BookingRepository
 import com.example.data.*
 import com.example.data.models.*
@@ -13,7 +12,9 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.domain.usecases.booking.BookingUseCases
 
 enum class BookingStatus(val label: String, val color: String) {
     PENDING("قيد الانتظار", "#FFC107"),
@@ -49,6 +50,27 @@ enum class BookingDistributionMode(val label: String) {
 open class BookingViewModel @Inject constructor(
     private val injectedRepository: BookingRepository
 ) : BaseViewModel() {
+
+    data class BookingState(
+        val bookings: List<BookingEntity> = emptyList(),
+        val isLoading: Boolean = false,
+        val isRefreshing: Boolean = false,
+        val error: String? = null,
+        val distributionMode: BookingDistributionMode = BookingDistributionMode.ADMIN_ONLY,
+        val bookingFormFields: BookingFormFields = BookingFormFields(),
+        val selectedBooking: BookingEntity? = null
+    )
+    
+    private val _state = MutableStateFlow(BookingState())
+    val state: StateFlow<BookingState> = _state.asStateFlow()
+
+    // Mock until fully integrated
+    private val bookingUseCases by lazy {
+        BookingUseCases(
+            com.example.domain.usecases.booking.BookingRepository(),
+            com.example.domain.usecases.booking.ProviderRepository()
+        )
+    }
 
     internal val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
     val bookings: StateFlow<List<BookingEntity>> = _bookings.asStateFlow()
@@ -160,6 +182,7 @@ open class BookingViewModel @Inject constructor(
 
     fun updateBookingFormFields(fields: BookingFormFields) {
         _bookingFormFields.value = fields
+        _state.update { it.copy(bookingFormFields = fields) }
         try {
             db.collection("settings").document("booking_fields").set(fields)
         } catch (e: Exception) {}
@@ -167,6 +190,7 @@ open class BookingViewModel @Inject constructor(
 
     fun updateDistributionMode(mode: BookingDistributionMode) {
         _distributionMode.value = mode
+        _state.update { it.copy(distributionMode = mode) }
         try {
             db.collection("settings").document("distribution_mode").set(mapOf("mode" to mode.name))
         } catch (e: Exception) {}

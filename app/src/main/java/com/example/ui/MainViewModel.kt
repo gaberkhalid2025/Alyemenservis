@@ -54,6 +54,11 @@ class MainViewModel @Inject constructor(
         }
     }
     private val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+    
+    // ===== NEW STATE MANAGEMENT (DO NOT REMOVE EXISTING) =====
+    private val _uiState = MutableStateFlow(MainViewModelState())
+    val uiState: StateFlow<MainViewModelState> = _uiState.asStateFlow()
+    
     // ------------------- Local StateFlows -------------------
     private val _currentLanguage = MutableStateFlow("ar")
     val currentLanguage: StateFlow<String> = _currentLanguage.asStateFlow()
@@ -118,17 +123,20 @@ class MainViewModel @Inject constructor(
     // Booking
     val _bookings get() = bookingViewModel._bookings
     val bookings get() = bookingViewModel.bookings
-    val _bookingFormFields = bookingViewModel._bookingFormFields
-    val bookingFormFields = bookingViewModel.bookingFormFields
-    val _distributionMode = bookingViewModel._distributionMode
-    val distributionMode = bookingViewModel.distributionMode
-    // Chat
-    internal val _chatMessages = MutableStateFlow<List<com.example.data.ChatMessageEntity>>(emptyList())
-    val chatMessages: StateFlow<List<com.example.data.ChatMessageEntity>> = _chatMessages.asStateFlow()
-    internal val _chatChannels = MutableStateFlow<List<com.example.data.ChatChannelEntity>>(emptyList())
-    val chatChannels: StateFlow<List<com.example.data.ChatChannelEntity>> = _chatChannels.asStateFlow()
-    internal val _activeChatChannel = MutableStateFlow<com.example.data.ChatChannelEntity?>(null)
-    val activeChatChannel: StateFlow<com.example.data.ChatChannelEntity?> = _activeChatChannel.asStateFlow()
+    val _bookingFormFields get() = bookingViewModel._bookingFormFields
+    val bookingFormFields get() = bookingViewModel.bookingFormFields
+    val _distributionMode get() = bookingViewModel._distributionMode
+    val distributionMode get() = bookingViewModel.distributionMode
+    // Chat (Delegated to ChatCoordinator)
+    val chatCoordinator: com.example.ui.viewmodels.chat.ChatCoordinator by lazy {
+        com.example.ui.viewmodels.chat.ChatCoordinator(chatRepo)
+    }
+    val _chatMessages get() = chatCoordinator._chatMessages
+    val chatMessages get() = chatCoordinator.chatMessages
+    val _chatChannels get() = chatCoordinator._chatChannels
+    val chatChannels get() = chatCoordinator.chatChannels
+    val _activeChatChannel get() = chatCoordinator._activeChatChannel
+    val activeChatChannel get() = chatCoordinator.activeChatChannel
     // Admin
     val _pendingProviders get() = adminViewModel._pendingProviders
     val pendingProviders get() = adminViewModel.pendingProviders
@@ -216,16 +224,16 @@ class MainViewModel @Inject constructor(
     val isGpsTrackingActive: StateFlow<Boolean> = _isGpsTrackingActive.asStateFlow()
     internal val _isProvidersLoading = MutableStateFlow(true)
     val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
-    internal val _isChatChannelsLoading = MutableStateFlow(true)
-    val isChatChannelsLoading: StateFlow<Boolean> = _isChatChannelsLoading.asStateFlow()
-    internal val _cities = MutableStateFlow<List<CityEntity>>(emptyList())
-    val cities: StateFlow<List<CityEntity>> = _cities.asStateFlow()
-    internal val _deletedProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
-    val deletedProviders: StateFlow<List<ProviderEntity>> = _deletedProviders.asStateFlow()
+    val _isChatChannelsLoading get() = chatCoordinator._isChatChannelsLoading
+    val isChatChannelsLoading get() = chatCoordinator.isChatChannelsLoading
+    val _cities get() = homeViewModel._cities
+    val cities get() = homeViewModel.cities
+    val _deletedProviders get() = homeViewModel._deletedProviders
+    val deletedProviders get() = homeViewModel.deletedProviders
     internal val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
-    internal val _maxKmRadius = MutableStateFlow(10)
-    val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
+    val _maxKmRadius get() = homeViewModel._maxKmRadius
+    val maxKmRadius get() = homeViewModel.maxKmRadius
     init {
         _stores.value = getDefaultStoresList()
         _properties.value = getDefaultPropertiesList()
@@ -2406,24 +2414,30 @@ fun addNotification(
     fun hasAdminPermission(permissionKey: String): Boolean = authViewModel.hasAdminPermission(permissionKey)
     fun updateSupervisorPermissions(id: String, permissions: List<String>) = authViewModel.updateSupervisorPermissions(id, permissions)
     fun removeSupervisor(id: String) = authViewModel.removeSupervisor(id)
-    fun getOrCreateChatChannel(providerId: String, providerName: String, customerId: String, customerName: String) {
-        viewModelScope.launch {
-            chatRepo.getOrCreateChannel(
-                currentUserId = providerId,
-                currentUserName = providerName,
-                currentUserPhoto = "",
-                otherUserId = customerId,
-                otherUserName = customerName,
-                otherUserPhoto = "",
-                type = com.example.data.models.ChannelType.PRIVATE,
-                relatedEntityId = null,
-                relatedEntityType = null
-            )
-        }
+    fun getOrCreateChatChannel(
+        providerId: String,
+        providerName: String,
+        customerId: String,
+        customerName: String
+    ) {
+        chatCoordinator.openOrCreateChannel(
+            targetId = customerId,
+            targetName = customerName,
+            targetType = "PROVIDER",
+            currentUserId = providerId,
+            currentUserName = providerName,
+            currentUserPhone = "",
+            onCreated = {}
+        )
     }
     fun deleteChatChannel(channelId: String) {
         viewModelScope.launch {
-            chatRepo.deleteChannel(channelId)
+            chatCoordinator.deleteChannel(channelId)
+            try {
+                db.collection("chat_channels").document(channelId).delete()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             triggerToast("تم حذف المحادثة")
         }
     }
@@ -2434,8 +2448,8 @@ fun addNotification(
         }
     }
     fun blockChatChannel(channelId: String, blocked: Boolean) {
+        chatCoordinator.blockChannel(channelId, blocked)
         db.collection("chat_channels").document(channelId).update("isBlocked", blocked)
-        _activeChatChannel.value = _activeChatChannel.value?.copy(isBlocked = blocked)
     }
     fun wipeOldChatChannels(days: Int) {
         triggerToast("🧹 تم تصفية وحذف سجل المحادثات الأقدم من $days أيام بنجاح!")
@@ -2805,4 +2819,33 @@ fun addNotification(
         bookingViewModel.updateBooking(booking)
     fun submitRating(ratingEntity: com.example.data.RatingEntity, onComplete: () -> Unit = {}) =
         adminViewModel.submitRating(ratingEntity, onComplete)
+
+    // ===== NEW HELPER FUNCTIONS (DO NOT REMOVE OR MODIFY EXISTING FUNCTIONS) =====
+    
+    fun updateState(block: MainViewModelState.() -> MainViewModelState) {
+        _uiState.update { it.block() }
+    }
+    
+    fun getState(): MainViewModelState = _uiState.value
+    
+    // ===== NEW DELEGATION FUNCTIONS (NON-BREAKING) =====
+    // هذه الدوال الجديدة تستخدم الحالة الجديدة ولكن لا تؤثر على الدوال القديمة
+    
+    fun navigateToScreenNew(screen: String) {
+        updateState { 
+            val updatedStack = screenBackStack.toMutableList()
+            updatedStack.add(screen)
+            copy(currentScreen = screen, screenBackStack = updatedStack)
+        }
+    }
+    
+    fun goBackNew(): Boolean {
+        val stack = getState().screenBackStack.toMutableList()
+        return if (stack.size > 1) {
+            stack.removeAt(stack.size - 1)
+            val prev = stack.last()
+            updateState { copy(currentScreen = prev, screenBackStack = stack) }
+            true
+        } else false
+    }
 }

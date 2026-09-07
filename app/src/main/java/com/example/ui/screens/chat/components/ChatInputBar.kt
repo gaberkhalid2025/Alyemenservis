@@ -1,7 +1,10 @@
 package com.example.ui.screens.chat.components
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import android.media.MediaRecorder
 import android.net.Uri
 import android.widget.Toast
@@ -45,10 +48,13 @@ import java.io.File
 @Composable
 fun ChatInputBar(
     channelId: String = "direct_chat",
-    replyingTo: ChatMessage?,
-    onCancelReply: () -> Unit,
+    replyingTo: ChatMessage? = null,
+    editingMessage: ChatMessage? = null,
+    onCancelReply: () -> Unit = {},
+    onCancelEdit: () -> Unit = {},
     onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit,
-    onTyping: (String) -> Unit,
+    onEditMessage: ((messageId: String, newText: String) -> Unit)? = null,
+    onTyping: (String) -> Unit = {},
     themeColors: VisualThemePalette? = null
 ) {
     val context = LocalContext.current
@@ -59,6 +65,13 @@ fun ChatInputBar(
     var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var audioFile by remember { mutableStateOf<File?>(null) }
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
+    var showAttachmentMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editingMessage) {
+        if (editingMessage != null) {
+            textInput = editingMessage.message
+        }
+    }
 
     val primaryColor = themeColors?.primary ?: Color(0xFF1E88E5)
     val surfaceColor = themeColors?.surface ?: Color(0xFF142030)
@@ -117,6 +130,19 @@ fun ChatInputBar(
                     Toast.makeText(context, "فشل الرفع: ${exception.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    // Permission launcher for Location
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fineGranted || coarseGranted) {
+            sendCurrentLocation(context, onSendMessage)
+        } else {
+            Toast.makeText(context, "⚠️ يلزم منح إذن الموقع لمشاركة موقعك الحالي", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -224,7 +250,6 @@ fun ChatInputBar(
                 }.onFailure { exception ->
                     Toast.makeText(context, "فشل الرفع: ${exception.message}", Toast.LENGTH_SHORT).show()
                 }
-                // Cleanup temporary audio file from cache
                 file.delete()
             }
         } else {
@@ -253,18 +278,56 @@ fun ChatInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(surfaceColor)
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .border(1.dp, borderColor)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         // Upload Progress Indicator
         if (uploadProgress != null) {
             LinearProgressIndicator(
-                progress = uploadProgress ?: 0f,
+                progress = { uploadProgress ?: 0f },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp)),
                 color = primaryColor,
-                trackColor = borderColor
+                trackColor = Color.White.copy(alpha = 0.1f)
             )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // Edit banner
+        if (editingMessage != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp)
+                    .background(primaryColor.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                    .border(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "✏️ تعديل الرسالة...",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor
+                    )
+                    Text(
+                        text = editingMessage.message,
+                        fontSize = 12.sp,
+                        color = textSecondary,
+                        maxLines = 1
+                    )
+                }
+                IconButton(onClick = {
+                    onCancelEdit()
+                    textInput = ""
+                }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "إلغاء التعديل", tint = textSecondary, modifier = Modifier.size(16.dp))
+                }
+            }
         }
 
         // Reply banner
@@ -357,14 +420,48 @@ fun ChatInputBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Attachment Button
-                IconButton(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(textPrimary.copy(alpha = 0.08f), CircleShape)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "إرفاق صورة", tint = textPrimary, modifier = Modifier.size(20.dp))
+                // Attachment Button with Dropdown Menu
+                Box {
+                    IconButton(
+                        onClick = { showAttachmentMenu = true },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(textPrimary.copy(alpha = 0.08f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "إرفاق", tint = textPrimary, modifier = Modifier.size(20.dp))
+                    }
+
+                    DropdownMenu(
+                        expanded = showAttachmentMenu,
+                        onDismissRequest = { showAttachmentMenu = false },
+                        modifier = Modifier.background(surfaceColor)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("🖼️ إرفاق صورة", color = textPrimary, fontSize = 13.sp) },
+                            onClick = {
+                                showAttachmentMenu = false
+                                imagePickerLauncher.launch("image/*")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("📍 مشاركة موقعي الحالي", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold) },
+                            onClick = {
+                                showAttachmentMenu = false
+                                val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                if (hasFine || hasCoarse) {
+                                    sendCurrentLocation(context, onSendMessage)
+                                } else {
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            }
+                        )
+                    }
                 }
 
                 // Text field (Restricted to 500 characters max)
@@ -392,7 +489,12 @@ fun ChatInputBar(
                     keyboardActions = KeyboardActions(onSend = {
                         val trimmed = textInput.trim()
                         if (trimmed.isNotBlank()) {
-                            onSendMessage(trimmed, MediaType.TEXT, "")
+                            if (editingMessage != null && onEditMessage != null) {
+                                onEditMessage(editingMessage.id, trimmed)
+                                onCancelEdit()
+                            } else {
+                                onSendMessage(trimmed, MediaType.TEXT, "")
+                            }
                             textInput = ""
                         }
                     })
@@ -404,7 +506,12 @@ fun ChatInputBar(
                         onClick = {
                             val trimmed = textInput.trim()
                             if (trimmed.isNotBlank()) {
-                                onSendMessage(trimmed, MediaType.TEXT, "")
+                                if (editingMessage != null && onEditMessage != null) {
+                                    onEditMessage(editingMessage.id, trimmed)
+                                    onCancelEdit()
+                                } else {
+                                    onSendMessage(trimmed, MediaType.TEXT, "")
+                                }
                                 textInput = ""
                             }
                         },
@@ -427,5 +534,47 @@ fun ChatInputBar(
                 }
             }
         }
+    }
+}
+
+private fun sendCurrentLocation(
+    context: Context,
+    onSendMessage: (text: String, mediaType: MediaType, mediaUrl: String) -> Unit
+) {
+    try {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        if (locationManager == null) {
+            Toast.makeText(context, "خدمة تحديد الموقع غير متوفرة", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        var location: Location? = null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        ) {
+            val providers = locationManager.getProviders(true)
+            for (provider in providers) {
+                val l = locationManager.getLastKnownLocation(provider) ?: continue
+                if (location == null || l.accuracy < location.accuracy) {
+                    location = l
+                }
+            }
+        }
+
+        if (location != null) {
+            val lat = location.latitude
+            val lng = location.longitude
+            onSendMessage("📍 موقعي الجغرافي", MediaType.LOCATION, "https://maps.google.com/?q=$lat,$lng")
+            Toast.makeText(context, "تم إرسال موقعك بنجاح", Toast.LENGTH_SHORT).show()
+        } else {
+            // Default Sana'a coordinates
+            val lat = 15.3694
+            val lng = 44.1910
+            onSendMessage("📍 موقعي الجغرافي", MediaType.LOCATION, "https://maps.google.com/?q=$lat,$lng")
+            Toast.makeText(context, "تم إرسال الموقع الجغرافي", Toast.LENGTH_SHORT).show()
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        Toast.makeText(context, "تعذر مشاركة الموقع: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }

@@ -287,6 +287,25 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun editMessage(channelId: String, messageId: String, newText: String) {
+        viewModelScope.launch {
+            repository.editMessage(channelId, messageId, newText)
+        }
+    }
+
+    fun editMessage(messageId: String, newText: String) {
+        val channel = _currentChannel.value ?: return
+        viewModelScope.launch {
+            repository.editMessage(channel.id, messageId, newText)
+        }
+    }
+
+    fun deleteMessage(channelId: String, messageId: String) {
+        viewModelScope.launch {
+            repository.deleteMessage(channelId, messageId, true, activeUserId)
+        }
+    }
+
     fun deleteMessage(messageId: String, forEveryone: Boolean, currentUserId: String) {
         val channel = _currentChannel.value ?: return
         viewModelScope.launch {

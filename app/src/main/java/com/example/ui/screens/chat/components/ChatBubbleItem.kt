@@ -1,5 +1,8 @@
 package com.example.ui.screens.chat.components
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -221,6 +225,87 @@ fun ChatBubbleItem(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                 }
+                MediaType.LOCATION -> {
+                    val context = LocalContext.current
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .clickable {
+                                try {
+                                    val uri = if (message.mediaUrl.startsWith("geo:") || message.mediaUrl.startsWith("http")) {
+                                        Uri.parse(message.mediaUrl)
+                                    } else {
+                                        Uri.parse("https://maps.google.com/?q=${message.mediaUrl}")
+                                    }
+                                    val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+                                    mapIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(mapIntent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "تعذر فتح تطبيق الخرائط", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(Color(0xFF1E3A8A), Color(0xFF0F172A))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = "موقع جغرافي",
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "موقع جغرافي مباشر 📍",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "اضغط لعرض المكان على خرائط Google",
+                                        color = Color(0xFF93C5FD),
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "🗺️ فتح الموقع بالخريطة",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF60A5FA)
+                                )
+                                Text(
+                                    text = "Google Maps ↗",
+                                    fontSize = 10.sp,
+                                    color = Color.LightGray
+                                )
+                            }
+                        }
+                    }
+                }
                 MediaType.FILE -> {
                     Text("📎 ${message.message.ifBlank { "ملف مرفق" }}", color = Color(0xFF90CAF9), fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -229,7 +314,7 @@ fun ChatBubbleItem(
             }
 
             // Message text
-            if (message.message.isNotBlank() && message.mediaType != MediaType.FILE) {
+            if (message.message.isNotBlank() && message.mediaType != MediaType.FILE && message.mediaType != MediaType.LOCATION) {
                 Text(
                     text = message.message,
                     color = textColor,
@@ -246,6 +331,15 @@ fun ChatBubbleItem(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                if (message.isEdited) {
+                    Text(
+                        text = "معدلة",
+                        fontSize = 9.sp,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Light
+                    )
+                }
+
                 Text(
                     text = formattedTime,
                     fontSize = 10.sp,
@@ -253,56 +347,9 @@ fun ChatBubbleItem(
                 )
 
                 if (isMe) {
-                    when (message.status) {
-                        MessageStatus.PENDING, MessageStatus.SENDING -> {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "قيد الإرسال",
-                                tint = Color.White.copy(alpha = 0.6f),
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
-                        MessageStatus.SENT -> {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "تم الإرسال",
-                                tint = Color.White.copy(alpha = 0.6f),
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
-                        MessageStatus.DELIVERED -> {
-                            Row(horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "تم الاستلام",
-                                    tint = Color.White.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "تم الاستلام",
-                                    tint = Color.White.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                            }
-                        }
-                        MessageStatus.READ -> {
-                            Row(horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "تمت القراءة",
-                                    tint = Color(0xFF64FFDA),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "تمت القراءة",
-                                    tint = Color(0xFF64FFDA),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                            }
-                        }
-                        MessageStatus.FAILED -> {
+                    val isRead = message.status == MessageStatus.READ
+                    when {
+                        message.status == MessageStatus.FAILED -> {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.clickable { onRetryClick?.invoke(message.id) }
@@ -321,6 +368,54 @@ fun ChatBubbleItem(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+                        }
+                        message.status == MessageStatus.PENDING || message.status == MessageStatus.SENDING -> {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "قيد الإرسال",
+                                tint = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                        isRead -> {
+                            Row(horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "تمت القراءة",
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "تمت القراءة",
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        message.status == MessageStatus.DELIVERED -> {
+                            Row(horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "تم الاستلام",
+                                    tint = Color.White.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "تم الاستلام",
+                                    tint = Color.White.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+                        else -> {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "تم الإرسال",
+                                tint = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(13.dp)
+                            )
                         }
                     }
                 }

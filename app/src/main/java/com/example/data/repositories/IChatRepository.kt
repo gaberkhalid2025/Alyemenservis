@@ -76,6 +76,11 @@ interface IChatRepository {
     suspend fun toggleBlockUser(channelId: String, userIdToBlock: String, isBlocked: Boolean): AppResult<Unit>
 
     /**
+     * تعديل نص رسالة سابقة
+     */
+    suspend fun editMessage(channelId: String, messageId: String, newText: String): AppResult<Unit>
+
+    /**
      * حذف رسالة (للجميع أو للمستخدم فقط)
      */
     suspend fun deleteMessage(channelId: String, messageId: String, forEveryone: Boolean, currentUserId: String): AppResult<Unit>
