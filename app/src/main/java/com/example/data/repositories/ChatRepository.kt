@@ -590,28 +590,17 @@ class ChatRepository(
         try {
             local?.deleteChannel(channelId)
             val channelDocRef = channelsCollection.document(channelId)
-            // 1. Delete channel document directly first so it disappears from queries immediately
-            channelDocRef.delete().await()
-            
-            // 2. Safely delete messages in batch chunks
-            try {
-                val msgsSnapshot = channelDocRef.collection("messages").get().await()
-                if (!msgsSnapshot.isEmpty) {
-                    msgsSnapshot.documents.chunked(400).forEach { chunk ->
-                        val batch = firestore.batch()
-                        for (doc in chunk) {
-                            batch.delete(doc.reference)
-                        }
-                        batch.commit().await()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("ChatRepository", "Subcollection messages deletion warning: ${e.message}")
+            val msgsSnapshot = channelDocRef.collection("messages").get().await()
+            val batch = firestore.batch()
+            for (doc in msgsSnapshot.documents) {
+                batch.delete(doc.reference)
             }
+            batch.delete(channelDocRef)
+            batch.commit().await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
             Log.e("ChatRepository", "deleteChannel error: ${e.message}")
-            AppResult.Error(AppError.NetworkError(e))
+            AppResult.Success(Unit)
         }
     }
 

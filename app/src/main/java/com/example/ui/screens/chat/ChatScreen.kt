@@ -137,7 +137,7 @@ fun ChatScreen(
     // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size)
+            listState.animateScrollToItem(messages.size - 1)
         }
     }
 
@@ -291,25 +291,19 @@ fun ChatScreen(
 
                         itemsIndexed(filteredMessages, key = { _, msg -> msg.id }) { index, msg ->
                             val showDateSeparator = index == 0 || !isSameDay(filteredMessages[index - 1].timestamp, msg.timestamp)
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                if (showDateSeparator && msg.timestamp > 0) {
-                                    DateSeparatorChip(dateMillis = msg.timestamp)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                }
-
-                                val isMe = msg.senderId == currentUserId
-                                ChatBubbleItem(
-                                    message = msg,
-                                    isMe = isMe,
-                                    onReplyClick = { chatViewModel.setReplyingTo(msg) },
-                                    onLongClick = { selectedMessageForAction = msg },
-                                    onRetryClick = { chatViewModel.resendMessage(msg.id) },
-                                    themeColors = themeColors
-                                )
+                            if (showDateSeparator && msg.timestamp > 0) {
+                                DateSeparatorChip(dateMillis = msg.timestamp)
                             }
+
+                            val isMe = msg.senderId == currentUserId
+                            ChatBubbleItem(
+                                message = msg,
+                                isMe = isMe,
+                                onReplyClick = { chatViewModel.setReplyingTo(msg) },
+                                onLongClick = { selectedMessageForAction = msg },
+                                onRetryClick = { chatViewModel.resendMessage(msg.id) },
+                                themeColors = themeColors
+                            )
                         }
                     }
                 }
@@ -327,7 +321,7 @@ fun ChatScreen(
                         onClick = {
                             scope.launch {
                                 if (filteredMessages.isNotEmpty()) {
-                                    listState.animateScrollToItem(filteredMessages.size)
+                                    listState.animateScrollToItem(filteredMessages.size - 1)
                                 }
                             }
                         },

@@ -1,51 +1,18 @@
 package com.example.ui.viewmodels
 
 import androidx.lifecycle.viewModelScope
-import com.example.data.*
+import com.example.data.BannerEntity
+import com.example.data.CategoryEntity
+import com.example.data.ProviderEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import java.util.UUID
 
 
 import javax.inject.Inject
-import com.example.domain.usecases.home.HomeUseCases
 
 open class HomeViewModel @Inject constructor() : BaseViewModel() {
-
-    data class HomeState(
-        val categories: List<CategoryEntity> = emptyList(),
-        val providers: List<ProviderEntity> = emptyList(),
-        val filteredProviders: List<ProviderEntity> = emptyList(),
-        val deletedProviders: List<ProviderEntity> = emptyList(),
-        val banners: List<BannerEntity> = emptyList(),
-        val selectedCategoryId: String? = null,
-        val searchQuery: String = "",
-        val filterVipOnly: Boolean = false,
-        val filterAvailableOnly: Boolean = false,
-        val filterByCurrentCityOnly: Boolean = false,
-        val filterCityId: String? = null,
-        val filterNeighborhoodName: String = "",
-        val phoneOrNameFilter: String = "",
-        val maxKmRadius: Int = 10,
-        val isLoading: Boolean = false,
-        val isRefreshing: Boolean = false,
-        val error: String? = null
-    )
-    
-    private val _state = MutableStateFlow(HomeState())
-    val state: StateFlow<HomeState> = _state.asStateFlow()
-
-    // Using mock until fully integrated, passing nulls since we handle flows locally for now
-    private val homeUseCases by lazy {
-        HomeUseCases(
-            com.example.domain.usecases.home.ProviderRepository(),
-            com.example.domain.usecases.home.CategoryRepository(),
-            com.example.domain.usecases.home.StoreRepository(),
-            com.example.domain.usecases.home.PropertyRepository()
-        )
-    }
 
     internal val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
@@ -58,12 +25,6 @@ open class HomeViewModel @Inject constructor() : BaseViewModel() {
 
     internal val _banners = MutableStateFlow<List<BannerEntity>>(emptyList())
     val banners: StateFlow<List<BannerEntity>> = _banners.asStateFlow()
-
-    internal val _cities = MutableStateFlow<List<CityEntity>>(emptyList())
-    val cities: StateFlow<List<CityEntity>> = _cities.asStateFlow()
-
-    internal val _deletedProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
-    val deletedProviders: StateFlow<List<ProviderEntity>> = _deletedProviders.asStateFlow()
 
     internal val _selectedCategoryId = MutableStateFlow<String?>(null)
     val selectedCategoryId: StateFlow<String?> = _selectedCategoryId.asStateFlow()
@@ -357,12 +318,5 @@ open class HomeViewModel @Inject constructor() : BaseViewModel() {
             val fallbackUri = android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$destLat,$destLng")
             context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, fallbackUri))
         }
-    }
-
-    // ===== NEW HOME USECASES PROXY FUNCTIONS =====
-
-    fun refresh() {
-        // Will be implemented properly when repos are injected
-        _state.update { it.copy(isRefreshing = false) }
     }
 }

@@ -134,7 +134,6 @@ data class SystemLog(
 )
 
 class AdminViewModel @Inject constructor() : BaseViewModel() {
-    val adminUseCases by lazy { com.example.domain.usecases.admin.AdminUseCases() }
     val crud = AdminCrudOperations(db)
 
     // --- Callback/Lambda Properties for decoupling ---
