@@ -125,7 +125,7 @@ fun MainViewModel.setLanguage(lang: String) {
         val newSettings = _settings.value.copy(appLanguage = lang)
         _settings.value = newSettings
         try {
-            db.collection("settings").document("main_settings").update("appLanguage", lang)
+            settingsViewModel.updateAppLanguage(lang)
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "Error: ", e)
         }
@@ -153,7 +153,7 @@ fun MainViewModel.triggerNotification(
         currentList.add(0, newNotif)
         _notifications.value = currentList
         try {
-            db.collection("notifications").document(newNotif.id).set(newNotif)
+            viewModelScope.launch { notificationRepository.saveNotification(newNotif) }
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "Error: ", e)
         }
@@ -395,7 +395,7 @@ fun MainViewModel.addNotification(
         )
         _notifications.value = listOf(newNotif) + _notifications.value.filter { it.id != newNotif.id }
         try {
-            db.collection("notifications").document(newNotif.id).set(newNotif)
+            viewModelScope.launch { notificationRepository.saveNotification(newNotif) }
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "Error: ", e)
         }
@@ -522,22 +522,22 @@ fun MainViewModel.addNotification(
     fun MainViewModel.toggleProviderRecommendation(providerId: String) = adminViewModel.toggleProviderRecommendation(providerId)
     fun MainViewModel.updateProviderEntity(provider: ProviderEntity) = adminViewModel.updateProviderEntity(provider)
     fun MainViewModel.updateStoreEntity(store: StoreEntity) {
-        db.collection("stores").document(store.id).set(store)
+        viewModelScope.launch { adminViewModel.crud.saveEntity("stores", store.id, store) }
         triggerNotification("✅ تم تحديث بيانات المتجر بنجاح")
     }
     fun MainViewModel.updatePropertyEntity(property: PropertyEntity) {
-        db.collection("properties").document(property.id).set(property)
+        viewModelScope.launch { adminViewModel.crud.saveEntity("properties", property.id, property) }
         triggerNotification("✅ تم تحديث بيانات العقار بنجاح")
     }
     fun MainViewModel.updateBusinessAccountStatus(accountId: String, isActive: Boolean) {
         viewModelScope.launch {
             try {
-                db.collection("stores").document(accountId).update("isActive", isActive)
+                adminViewModel.crud.updateFields("stores", accountId, mapOf("isActive" to isActive))
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Error: ", e)
             }
             try {
-                db.collection("providers").document(accountId).update("isAvailable", isActive)
+                adminViewModel.crud.updateFields("providers", accountId, mapOf("isAvailable" to isActive))
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Error: ", e)
             }
@@ -553,7 +553,7 @@ fun MainViewModel.addNotification(
             updates["coverImage"] = coverImg
         }
         if (updates.isNotEmpty()) {
-            db.collection(collection).document(id).update(updates)
+            viewModelScope.launch { adminViewModel.crud.updateFields(collection, id, updates) }
             triggerNotification("📸 تم تحديث الصور بنجاح")
         }
     }
@@ -695,11 +695,16 @@ fun MainViewModel.addNotification(
         auth.signInWithEmailAndPassword(email, password)
             .addOnSuccessListener { authResult ->
                 val userId = authResult.user?.uid ?: ""
-                db.collection("users").document(userId).update("isDeleted", false)
-                db.collection("providers").document(phone).update("isDeleted", false)
-                db.collection("stores").document(phone).update("isDeleted", false)
-                db.collection("properties").document(phone).update("isDeleted", false)
-                onResult(true, "تم استعادة الحساب بنجاح!")
+                viewModelScope.launch {
+                    adminViewModel.crud.updateFields("users", userId, mapOf("isDeleted" to false))
+                    adminViewModel.crud.updateFields("providers", phone, mapOf("isDeleted" to false))
+                    adminViewModel.crud.updateFields("stores", phone, mapOf("isDeleted" to false))
+                    adminViewModel.crud.updateFields("properties", phone, mapOf("isDeleted" to false))
+                    onResult(true, "تم استعادة الحساب بنجاح!")
+                }
+            }
+            .addOnFailureListener { e ->
+                onResult(false, e.message ?: "فشل في تسجيل الدخول")
             }
             .addOnFailureListener { e ->
                 onResult(false, e.message ?: "فشل في تسجيل الدخول")
@@ -743,7 +748,7 @@ fun MainViewModel.addNotification(
         }
     }
     fun MainViewModel.blockChatChannel(channelId: String, blocked: Boolean) {
-        db.collection("chat_channels").document(channelId).update("isBlocked", blocked)
+        viewModelScope.launch { adminViewModel.crud.updateFields("chat_channels", channelId, mapOf("isBlocked" to blocked)) }
         _activeChatChannel.value = _activeChatChannel.value?.copy(isBlocked = blocked)
     }
     fun MainViewModel.wipeOldChatChannels(days: Int) {
@@ -769,7 +774,7 @@ fun MainViewModel.addNotification(
         _readNotificationIds.value = allIds
     }
     fun MainViewModel.deleteNotification(notifId: String) {
-        db.collection("notifications").document(notifId).delete()
+        viewModelScope.launch { notificationRepository.deleteNotification(notifId) }
         _notifications.value = _notifications.value.filter { it.id != notifId }
         val currentRead = _readNotificationIds.value.toMutableSet()
         currentRead.remove(notifId)
@@ -780,7 +785,7 @@ fun MainViewModel.addNotification(
         _notifications.value = emptyList()
         _readNotificationIds.value = emptySet()
         allNotifs.forEach { notif ->
-            db.collection("notifications").document(notif.id).delete()
+            viewModelScope.launch { notificationRepository.deleteNotification(notif.id) }
         }
     }
     fun MainViewModel.clearAllNotifications() {

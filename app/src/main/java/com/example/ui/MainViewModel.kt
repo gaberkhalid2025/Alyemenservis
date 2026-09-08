@@ -33,6 +33,7 @@ class MainViewModel @Inject constructor(
 ) : BaseViewModel() {
 
     val preferenceHelper = com.example.ui.helpers.AppPreferenceHelper()
+    val notificationRepository = com.example.data.repositories.NotificationRepository()
     val firestoreSeedHelper by lazy { com.example.ui.helpers.FirestoreSeedHelper(db) }
     val realtimeSyncHelper by lazy { com.example.ui.helpers.RealtimeSyncHelper(db) }
     val registrationHelper by lazy { com.example.ui.helpers.RegistrationHelper(db, auth, preferenceHelper) }
@@ -262,41 +263,6 @@ class MainViewModel @Inject constructor(
             }
         }
     }
-    fun updateUserFcmToken(userId: String, token: String) {
-        if (userId.isEmpty() || userId == "guest") return
-        try {
-            db.collection("registered_users").document(userId).update("fcmToken", token)
-            val cleanPhone = _currentUserPhone.value.trim().replace(" ", "").replace("+", "")
-            if (cleanPhone.isNotEmpty()) {
-                db.collection("providers").document(cleanPhone).update("fcmToken", token)
-                db.collection("stores").document(cleanPhone).update("fcmToken", token)
-                db.collection("properties").document(cleanPhone).update("fcmToken", token)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "Error: ", e)
-        }
-    }
-    fun initializeFirestoreCollections() {
-        val collections = listOf(
-            "users", "pending_providers", "providers", "stores",
-            "restaurants", "medical", "properties", "jobs",
-            "bookings", "instant_requests", "instant_offers",
-            "notifications", "password_reset_requests", "join_requests", "fcm_tokens"
-        )
-        viewModelScope.launch {
-            collections.forEach { collection ->
-                try {
-                    db.collection(collection).document("_init_")
-                        .set(mapOf("initialized" to true))
-                        .addOnSuccessListener {
-                            db.collection(collection).document("_init_").delete()
-                        }
-                } catch (e: Exception) {
-                    android.util.Log.e("MainViewModel", "Error: ", e)
-                }
-            }
-        }
-    }
     fun initializeUserIdentity(context: android.content.Context) {
         appContext = context.applicationContext
         authViewModel.appContext = appContext
@@ -314,10 +280,22 @@ class MainViewModel @Inject constructor(
         bookingViewModel.setCurrentUserName = { _currentUserName.value = it }
         bookingViewModel.setCurrentUserResidence = { _currentUserResidence.value = it }
         bookingViewModel.onAddNotification = { title, message, targetType, targetValue ->
+            addNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
         }
         bookingViewModel.triggerNotificationCallback = { msg ->
+            triggerNotification(msg)
         }
         bookingViewModel.onOpenOrCreateChatChannel = { targetId, targetType, targetName, targetPhone, targetCategory, relatedEntityId, relatedEntityType, onComplete ->
+            openOrCreateChatChannel(
+                targetId = targetId,
+                targetType = targetType,
+                targetName = targetName,
+                targetPhone = targetPhone,
+                targetCategory = targetCategory,
+                relatedEntityId = relatedEntityId,
+                relatedEntityType = relatedEntityType,
+                onCreated = onComplete
+            )
         }
         adminViewModel.getHomeViewModel = { homeViewModel }
         adminViewModel.getSettingsViewModel = { settingsViewModel }
@@ -325,10 +303,13 @@ class MainViewModel @Inject constructor(
         adminViewModel.getInstantRequestViewModel = { instantRequestViewModel }
         adminViewModel.getNotifications = { _notifications }
         adminViewModel.onAddNotification = { title, message, targetType, targetValue ->
+            addNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
         }
         adminViewModel.onTriggerNotificationFull = { title, message, targetType, targetValue ->
+            triggerNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
         }
         adminViewModel.onTriggerNotification = { msg ->
+            triggerNotification(msg)
         }
         adminViewModel.onApplyFilters = {  }
         settingsViewModel.getAuthViewModel = { authViewModel }
@@ -341,16 +322,33 @@ class MainViewModel @Inject constructor(
         settingsViewModel.getStores = { _stores }
         settingsViewModel.getProperties = { _properties }
         settingsViewModel.getPasswordRecoveryWaitingPhone = { _passwordRecoveryWaitingPhone }
-        settingsViewModel.setPasswordRecoveryWaitingPhone = {  }
-        settingsViewModel.verifyAdminOrOwnerPassword = { true }
-        settingsViewModel.triggerNotification = {  }
-        instantRequestViewModel.triggerNotification = {  }
+        settingsViewModel.setPasswordRecoveryWaitingPhone = { _passwordRecoveryWaitingPhone.value = it }
+        settingsViewModel.verifyAdminOrOwnerPassword = { password ->
+            verifyAdminOrOwnerPassword(password)
+        }
+        settingsViewModel.triggerNotification = { msg ->
+            triggerNotification(msg)
+        }
+        instantRequestViewModel.triggerNotification = { msg ->
+            triggerNotification(msg)
+        }
         instantRequestViewModel.addNotification = { title, message, targetType, targetValue ->
+            addNotification(title = title, message = message, targetType = targetType, targetValue = targetValue)
         }
         instantRequestViewModel.getOrCreateChatChannel = { providerId, providerName, customerPhone, customerName ->
+            openOrCreateChatChannel(
+                targetId = providerId,
+                targetType = "INSTANT_REQUEST",
+                targetName = providerName,
+                targetPhone = customerPhone,
+                targetCategory = "",
+                relatedEntityId = "",
+                relatedEntityType = "INSTANT_REQUEST",
+                onCreated = { }
+            )
         }
         try {
-            initializeFirestoreCollections()
+            com.example.ui.helpers.FirestoreSeedHelper(db).seedFirestoreIfEmpty()
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "❌ Error in initializeFirestoreCollections", e)
         }

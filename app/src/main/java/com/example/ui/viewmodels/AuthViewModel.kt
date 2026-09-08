@@ -13,6 +13,23 @@ import javax.inject.Inject
 
 open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
+    fun updateUserFcmToken(userId: String, token: String, currentUserPhone: String) {
+        if (userId.isEmpty() || userId == "guest") return
+        viewModelScope.launch {
+            try {
+                db.collection("registered_users").document(userId).update("fcmToken", token)
+                val cleanPhone = currentUserPhone.trim().replace(" ", "").replace("+", "")
+                if (cleanPhone.isNotEmpty()) {
+                    db.collection("providers").document(cleanPhone).update("fcmToken", token)
+                    db.collection("stores").document(cleanPhone).update("fcmToken", token)
+                    db.collection("properties").document(cleanPhone).update("fcmToken", token)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AuthViewModel", "Error updating fcmToken: ", e)
+            }
+        }
+    }
+
     internal val _currentUserId = MutableStateFlow("guest")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
 

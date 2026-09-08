@@ -17,6 +17,15 @@ import com.google.firebase.firestore.SetOptions
 import javax.inject.Inject
 
 class SettingsViewModel @Inject constructor() : BaseViewModel() {
+    fun updateAppLanguage(lang: String) {
+        val updated = _settings.value.copy(appLanguage = lang)
+        _settings.value = updated
+        try {
+            db.collection("settings").document("main_settings").update("appLanguage", lang)
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsViewModel", "Error: ", e)
+        }
+    }
     // --- Callback/Lambda Properties for decoupling ---
     var getAuthViewModel: (() -> AuthViewModel)? = null
     var getHomeViewModel: (() -> HomeViewModel)? = null
