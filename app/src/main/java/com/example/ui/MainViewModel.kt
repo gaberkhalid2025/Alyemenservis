@@ -43,10 +43,17 @@ class MainViewModel @Inject constructor(
         }
         firestore
     }
+    val preferenceHelper = com.example.ui.helpers.AppPreferenceHelper()
+    val firestoreSeedHelper by lazy { com.example.ui.helpers.FirestoreSeedHelper(db) }
+    val realtimeSyncHelper by lazy { com.example.ui.helpers.RealtimeSyncHelper(db) }
+    val registrationHelper by lazy { com.example.ui.helpers.RegistrationHelper(db, auth, preferenceHelper) }
+    val accountRecoveryHelper by lazy { com.example.ui.helpers.AccountRecoveryHelper(db, preferenceHelper) }
+
     override val firestoreListeners = mutableListOf<com.google.firebase.firestore.ListenerRegistration>()
     override fun onCleared() {
         super.onCleared()
         try {
+            realtimeSyncHelper.clearListeners()
             firestoreListeners.forEach { it.remove() }
             firestoreListeners.clear()
         } catch (e: Exception) {
@@ -459,930 +466,23 @@ fun initializeUserIdentity(context: android.content.Context) {
             android.util.Log.d("MainViewModel", "✅ [FINISH] App initialized successfully, _isInitialized = true")
         }
     }
-private fun setupRealtimeFirestoreListeners() {
-        // 1. Settings (Document main_settings)
-        db.collection("settings").document("main_settings").addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                _isInitialized.value = true
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null && snapshot.exists()) {
-                try {
-                    snapshot.toObject(AdminSettingsEntity::class.java)?.let {
-                        _settings.value = it
-                        _maxKmRadius.value = it.maxSearchRadiusKm
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            } else {
-                _settings.value = AdminSettingsEntity()
-            }
-            _isInitialized.value = true
-        }
-        // 1b. Booking Form Fields Listener
-        db.collection("settings").document("booking_fields").addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null && snapshot.exists()) {
-                try {
-                    snapshot.toObject(BookingFormFields::class.java)?.let {
-                        _bookingFormFields.value = it
-                    }
-                } catch (e: Exception) { e.printStackTrace() }
-            }
-        }
-        // 1c. Booking Distribution Mode Listener
-        db.collection("settings").document("distribution_mode").addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null && snapshot.exists()) {
-                val modeStr = snapshot.getString("mode")
-                if (!modeStr.isNullOrEmpty()) {
-                    try {
-                        _distributionMode.value = BookingDistributionMode.valueOf(modeStr)
-                    } catch (e: Exception) { e.printStackTrace() }
-                }
-            }
-        }
-        // 2. Categories
-        db.collection("categories").addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val obj = doc.toObject(com.example.data.CategoryEntity::class.java)
-                        if (obj != null && obj.id.isEmpty()) {
-                            obj.copy(id = doc.id)
-                        } else {
-                            obj
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }.distinctBy { it.id }.sortedWith(compareByDescending<com.example.data.CategoryEntity> { it.isPinned }.thenBy { it.order })
-                _categories.value = fetched
-            }
-        }
-        // Custom Profile Tabs
-        db.collection("custom_profile_tabs").addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.toObjects(com.example.data.CustomProfileTabEntity::class.java)
-                _customProfileTabs.value = fetched.sortedBy { it.displayOrder }
-            }
-        }
-        // 3. Cities
-        db.collection("cities").addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(CityEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _cities.value = fetched
-            }
-        }
-        // 3b. Registered Users count listener
-        db.collection("registered_users").addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                _registeredUsersCount.value = snapshot.size()
-                val list = snapshot.documents.mapNotNull { doc ->
-                    val data = doc.data?.toMutableMap() ?: mutableMapOf()
-                    data["id"] = doc.id
-                    data
-                }
-                _registeredUsersList.value = list
-            }
-        }
-        // 3c. Internal Wallets Listener
-        db.collection("internal_wallets").addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                _internalWallets.value = snapshot.documents.mapNotNull { it.toObject(com.example.data.InternalWalletEntity::class.java) }
-            }
-        }
-        // 3d. Wallet Transactions Listener
-        db.collection("wallet_transactions").addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                _walletTransactions.value = snapshot.documents.mapNotNull { it.toObject(com.example.data.WalletTransactionEntity::class.java) }.sortedByDescending { it.timestamp }
-            }
-        }
-        // 4. Banners
-        db.collection("banners").addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(BannerEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _banners.value = fetched.sortedBy { it.order }
-            } else {
-                _banners.value = emptyList()
-            }
-        }
-        // 5. Providers (Full limit & safe parsing for complete Map & listing coverage)
-        db.collection("providers").limit(250).addSnapshotListenerReg { snapshot, error ->
-            _isProvidersLoading.value = false
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val allList = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val parsed = doc.toObject(ProviderEntity::class.java)
-                        parsed?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        try {
-                            ProviderEntity(
-                                id = doc.id,
-                                name = doc.getString("name") ?: "",
-                                phone = doc.getString("phone") ?: "",
-                                categoryId = doc.getString("categoryId") ?: "",
-                                area = doc.getString("area") ?: doc.getString("localArea") ?: "",
-                                isVip = doc.getBoolean("isVip") ?: doc.getBoolean("vip") ?: false,
-                                subscriptionStatus = doc.getString("subscriptionStatus") ?: "APPROVED",
-                                isAvailable = doc.getBoolean("isAvailable") ?: doc.getBoolean("available") ?: true,
-                                cityId = doc.getString("cityId") ?: "",
-                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
-                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
-                                points = (doc.getLong("points") ?: 0L).toInt(),
-                                isVerified = doc.getBoolean("isVerified") ?: doc.getBoolean("verified") ?: true,
-                                isRecommended = doc.getBoolean("isRecommended") ?: doc.getBoolean("recommended") ?: true,
-                                numReviews = (doc.getLong("numReviews") ?: 0L).toInt(),
-                                coverImage = doc.getString("coverImage") ?: "",
-                                profileImage = doc.getString("profileImage") ?: "",
-                                previewPrice = doc.getDouble("previewPrice") ?: 1500.0,
-                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
-                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
-                                customCategoryName = doc.getString("customCategoryName") ?: "",
-                                profession = doc.getString("profession") ?: "",
-                                specialization = doc.getString("specialization") ?: "",
-                                isBlocked = doc.getBoolean("isBlocked") ?: doc.getBoolean("blocked") ?: false,
-                                isChatDisabled = doc.getBoolean("isChatDisabled") ?: doc.getBoolean("chatDisabled") ?: false,
-                                isDeleted = doc.getBoolean("isDeleted") ?: doc.getBoolean("deleted") ?: false,
-                                providerType = doc.getString("providerType") ?: ""
-                            )
-                        } catch (ex: Exception) {
-                            ex.printStackTrace()
-                            null
-                        }
-                    }
-                }.filter { !it.name.contains("ماهر") && it.id != "p_maher" }
-                
-                val activeList = allList.filter { !it.isDeleted }
-                val deletedList = allList.filter { it.isDeleted }
-                
-                _providers.value = activeList
-                _deletedProviders.value = deletedList
-                applyFilters()
-            }
-        }
-        // 6. Pending Providers (Full limit & safe parsing)
-        db.collection("pending_providers").limit(200).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val parsed = doc.toObject(PendingProviderEntity::class.java)
-                        parsed?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        try {
-                            PendingProviderEntity(
-                                id = doc.id,
-                                name = doc.getString("name") ?: "",
-                                phone = doc.getString("phone") ?: "",
-                                categoryId = doc.getString("categoryId") ?: "",
-                                area = doc.getString("area") ?: doc.getString("localArea") ?: "",
-                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
-                                status = doc.getString("status") ?: "PENDING",
-                                reason = doc.getString("reason") ?: "",
-                                idPhotoBase64 = doc.getString("idPhotoBase64") ?: "",
-                                selfiePhotoBase64 = doc.getString("selfiePhotoBase64") ?: "",
-                                workPhotosBase64 = (doc.get("workPhotosBase64") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
-                            )
-                        } catch (e2: java.lang.Exception) {
-                            e2.printStackTrace()
-                            null
-                        }
-                    }
-                }
-                _pendingProviders.value = fetched
-            }
-        }
-        // 7. Bookings (Paginated / limited to 20)
-        db.collection("bookings").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(BookingEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _bookings.value = fetched
-            }
-        }
-        // 8. Notifications (Paginated / limited to 20 with strict validation & deduplication)
-        db.collection("notifications").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val obj = doc.toObject(NotificationEntity::class.java)
-                        val finalObj = if (obj != null && obj.id.isEmpty()) {
-                            obj.copy(id = doc.id)
-                        } else {
-                            obj
-                        }
-                        if (finalObj != null && finalObj.isValid()) finalObj else null
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }.sortedByDescending { it.timestamp }
-                _notifications.value = fetched
-            }
-        }
-        // 9. Chat Channels (Paginated / limited to 20)
-        db.collection("chat_channels").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            _isChatChannelsLoading.value = false
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(ChatChannelEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }.sortedByDescending { it.timestamp }
-                _chatChannels.value = fetched
-            }
-        }
-        // 10. General Support Chat Messages are handled dynamically based on currentUserId
-        // 11. Reports (Paginated / limited to 20)
-        db.collection("reports").limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(ReportEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _reports.value = fetched
-            }
-        }
-        // 12. Supervisors (Instantly synced)
-        db.collection("supervisors").limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(SupervisorEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _supervisors.value = fetched
-            }
-        }
-        // 13. Color Palettes (Instantly synced)
-        db.collection("color_themes").addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(ColorPaletteEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _colorPalettes.value = fetched
-            }
-        }
-        // 14. Calls Log (Paginated / limited to 20)
-        db.collection("calls").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(CallEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }.sortedByDescending { it.timestamp }
-                _callsLog.value = fetched
-            }
-        }
-        // 15. Coupons
-        db.collection("coupons").limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(CouponEntity::class.java)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _coupons.value = fetched
-            }
-        }
-        // 16. Payment Wallets
-        db.collection("payment_wallets").limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(PaymentWalletEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }.sortedBy { it.displayOrder }
-                _paymentWallets.value = fetched
-            }
-        }
-        // 17. Payments (Paginated / limited to 20)
-        db.collection("payments").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error != null) {
-                error.printStackTrace()
-                return@addSnapshotListenerReg
-            }
-            if (snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(PaymentEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }.sortedByDescending { it.createdAt }
-                _payments.value = fetched
-            }
-        }
-        // 18. Stores (Full limit & safe parsing for Maps & directory coverage)
-        db.collection("stores").limit(250).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val obj = doc.toObject(com.example.data.StoreEntity::class.java)
-                        if (obj != null) {
-                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
-                            val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
-                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: act
-                            val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
-                            val vip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true
-                            val rec = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true
-                            val ver = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true
-                            val blk = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
-                            val chatDis = doc.getBoolean("isChatDisabled") == true || doc.getBoolean("chatDisabled") == true
-                            obj.copy(
-                                id = doc.id,
-                                isDeleted = isDel,
-                                isActive = act,
-                                isApproved = appr,
-                                isPinned = pin,
-                                isVip = vip,
-                                isRecommended = rec,
-                                isVerified = ver,
-                                isBlocked = blk,
-                                isChatDisabled = chatDis
-                            )
-                        } else null
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        try {
-                            com.example.data.StoreEntity(
-                                id = doc.id,
-                                sectionId = doc.getString("sectionId") ?: "stores",
-                                name = doc.getString("name") ?: "",
-                                description = doc.getString("description") ?: "",
-                                phone = doc.getString("phone") ?: "",
-                                categoryId = doc.getString("categoryId") ?: "",
-                                cityId = doc.getString("cityId") ?: "",
-                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
-                                coverImage = doc.getString("coverImage") ?: "",
-                                logoImage = doc.getString("logoImage") ?: "",
-                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
-                                numReviews = (doc.getLong("numReviews") ?: 0L).toInt(),
-                                isActive = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true,
-                                isPinned = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true,
-                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
-                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
-                                isDeleted = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true,
-                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: true,
-                                isVip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true,
-                                isVerified = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true,
-                                isRecommended = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true,
-                                isBlocked = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true,
-                                medicalLicenseNo = doc.getString("medicalLicenseNo") ?: "",
-                                commercialRegisterNo = doc.getString("commercialRegisterNo") ?: "",
-                                providerType = doc.getString("providerType") ?: ""
-                            )
-                        } catch (ex: Exception) {
-                            ex.printStackTrace()
-                            null
-                        }
-                    }
-                }
-                _stores.value = fetched.filter { !it.isDeleted }
-            }
-        }
-        // 19. Products (Full limit & safe parsing)
-        db.collection("products").limit(250).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val obj = doc.toObject(com.example.data.ProductEntity::class.java)
-                        if (obj != null) {
-                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
-                            obj.copy(id = doc.id, isDeleted = isDel)
-                        } else null
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _products.value = fetched.filter { !it.isDeleted }
-            }
-        }
-        // 20. Properties (Full limit & safe parsing for Maps & real estate coverage)
-        db.collection("properties").limit(250).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val obj = doc.toObject(com.example.data.PropertyEntity::class.java)
-                        if (obj != null) {
-                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
-                            val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
-                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: act
-                            val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
-                            val vip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true
-                            val rec = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true
-                            val ver = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true
-                            val blk = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
-                            obj.copy(
-                                id = doc.id,
-                                isDeleted = isDel,
-                                isActive = act,
-                                isApproved = appr,
-                                isPinned = pin,
-                                isVip = vip,
-                                isRecommended = rec,
-                                isVerified = ver,
-                                isBlocked = blk
-                            )
-                        } else null
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        try {
-                            com.example.data.PropertyEntity(
-                                id = doc.id,
-                                sectionId = doc.getString("sectionId") ?: "properties",
-                                title = doc.getString("title") ?: "",
-                                description = doc.getString("description") ?: "",
-                                price = doc.getDouble("price") ?: doc.getLong("price")?.toDouble() ?: 0.0,
-                                currency = doc.getString("currency") ?: "YER",
-                                type = doc.getString("type") ?: "rent",
-                                propertyType = doc.getString("propertyType") ?: "apartment",
-                                phone = doc.getString("phone") ?: "",
-                                cityId = doc.getString("cityId") ?: "",
-                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
-                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
-                                numReviews = (doc.getLong("numReviews") ?: 0L).toInt(),
-                                isActive = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true,
-                                isPinned = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true,
-                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
-                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
-                                isDeleted = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true,
-                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: true,
-                                isVip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true,
-                                isVerified = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true,
-                                isRecommended = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true,
-                                isBlocked = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
-                            )
-                        } catch (ex: Exception) {
-                            ex.printStackTrace()
-                            null
-                        }
-                    }
-                }
-                _properties.value = fetched.filter { !it.isDeleted }
-            }
-        }
-        // 20.1 Jobs (Paginated / limited to 20)
-        db.collection("jobs").limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val obj = doc.toObject(com.example.data.JobEntity::class.java)
-                        if (obj != null) {
-                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
-                            val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
-                            val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
-                            obj.copy(id = doc.id, isDeleted = isDel, isActive = act, isPinned = pin)
-                        } else null
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _jobs.value = fetched
-            }
-        }
-        // 20.2 Job Applications (Paginated / limited to 20)
-        db.collection("job_applications").limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(com.example.data.JobApplicationEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _jobApplications.value = fetched
-            }
-        }
-        // 21. Ratings (Paginated / limited to 20)
-        db.collection("ratings").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(com.example.data.RatingEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _ratings.value = fetched
-            }
-        }
-        // 22. Orders (Paginated / limited to 20)
-        db.collection("orders").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(com.example.data.OrderEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _orders.value = fetched
-            }
-        }
-        // 22.1 Offers & Instant Pricing (Real-time synchronization)
-        db.collection("offers").limit(50).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        val obj = doc.toObject(com.example.data.models.Offer::class.java)
-                        obj?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-                _offers.value = fetched
-            }
-        }
-        // 23. Activity Logs (Paginated / limited to 20)
-        db.collection("activity_logs").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(com.example.data.ActivityLogEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }.sortedByDescending { it.timestamp }
-                _activityLogs.value = fetched
-            }
-        }
-        // 24. Instant Requests (Paginated / limited to 20)
-        db.collection("instant_requests").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(com.example.data.models.InstantRequestEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                // Auto-expire requests past expiresAt
-                val now = System.currentTimeMillis()
-                val processed = fetched.map { req ->
-                    if ((req.status == "WAITING_FOR_OFFERS" || req.status == "REVIEWING_OFFERS") && now > req.expiresAt) {
-                        req.copy(status = "EXPIRED")
-                    } else req
-                }
-                _instantRequests.value = processed
-            }
-        }
-        // 25. Request Offers (Paginated / limited to 20)
-        db.collection("request_offers").orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            if (error == null && snapshot != null) {
-                val fetched = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(com.example.data.models.RequestOfferEntity::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
-                }
-                _requestOffers.value = fetched
-            }
-        }
+    fun setupRealtimeFirestoreListeners() {
+        realtimeSyncHelper.clearListeners()
+        realtimeSyncHelper.setupRealtimeFirestoreListeners(this)
     }
-fun seedFirestoreIfEmpty() {
-        // Check and seed default configurations ONLY if the document genuinely does not exist in Firestore
-        db.collection("settings").document("main_settings").get().addOnSuccessListener { doc ->
-            if (doc == null || !doc.exists()) {
-                db.collection("settings").document("main_settings").set(AdminSettingsEntity())
-            }
-        }
-        db.collection("categories").get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultCategories()
-                }
-            } else {
-                try { writeDefaultCategories() } catch (e: Exception) {}
-            }
-        }
-        db.collection("cities").get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultCities()
-                }
-            } else {
-                try { writeDefaultCities() } catch (e: Exception) {}
-            }
-        }
-        db.collection("banners").get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultBanners()
-                }
-            } else {
-                try { writeDefaultBanners() } catch (e: Exception) {}
-            }
-        }
-        db.collection("supervisors").get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultSupervisors()
-                }
-            } else {
-                try { writeDefaultSupervisors() } catch (e: Exception) {}
-            }
-        }
-        db.collection("color_themes").get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultColorPalettes()
-                }
-            } else {
-                try { writeDefaultColorPalettes() } catch (e: Exception) {}
-            }
-        }
-        db.collection("providers").get().addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val sn = task.result
-                if (sn == null || sn.isEmpty) {
-                    writeDefaultProviders()
-                }
-            } else {
-                try { writeDefaultProviders() } catch (e: Exception) {}
-            }
-        }
-        try { writeDefaultStores() } catch (e: Exception) { e.printStackTrace() }
-        try { writeDefaultProperties() } catch (e: Exception) { e.printStackTrace() }
-        try { writeDefaultJobs() } catch (e: Exception) { e.printStackTrace() }
+
+    fun seedFirestoreIfEmpty() {
+        firestoreSeedHelper.seedFirestoreIfEmpty()
     }
-private fun writeDefaultSupervisors() {
-        val crypto = com.example.utils.SecurityCryptoUtils
-        val fbSupervisors = listOf(
-            com.example.data.SupervisorEntity(
-                "owner_1", 
-                crypto.decodeObfuscatedString("340405525d655144360e0e043a094d110a19"), 
-                "OWNER", 
-                crypto.decodeObfuscatedString("140405001c13255f5b29235260535744575768"), 
-                listOf("ALL")
-            ),
-            com.example.data.SupervisorEntity(
-                "admin_1", 
-                crypto.decodeObfuscatedString("340005525964534642290408320c0f5c061b26"), 
-                "ADMIN", 
-                crypto.decodeObfuscatedString("140005252e132545415e5551674640"), 
-                listOf("ALL")
-            )
-        )
-        fbSupervisors.forEach { sup ->
-            db.collection("supervisors").document(sup.id).set(sup)
-        }
-        // Delete dummy supervisors
-        listOf("2", "3", "4").forEach { id ->
-            db.collection("supervisors").document(id).delete()
-        }
-    }
-private fun writeDefaultColorPalettes() {
-        val fbPalettes = listOf(
-            ColorPaletteEntity("palette_preset_1", "🦅 اليمن الأحمر", "#CE1126", "#FFD700", "#0D1B1E", "#162A2D"),
-            ColorPaletteEntity("palette_preset_2", "🔵 الأزرق الملكي", "#0D47A1", "#00E5FF", "#0A192F", "#172A45"),
-            ColorPaletteEntity("palette_preset_3", "🌌 كوزميك سيلفر", "#9E9E9E", "#E0E0E0", "#121212", "#1C1C1C"),
-            ColorPaletteEntity("palette_preset_4", "✨ ذهبي فاخر", "#D4AF37", "#FFD700", "#1A1A1A", "#2D2D2D"),
-            ColorPaletteEntity("palette_preset_5", "🟢 زمردي راقي", "#004B49", "#50C878", "#0C1814", "#152A20"),
-            ColorPaletteEntity("palette_preset_6", "⚫ الأسود الدخاني", "#121212", "#333333", "#080808", "#101010")
-        )
-        fbPalettes.forEach { pal ->
-            db.collection("color_themes").document(pal.id).set(pal)
-        }
-    }
-private fun writeDefaultCategories() {
-        val fbCategories = listOf(
-            CategoryEntity("1", "صيانة وخدمات مهنية", "🔧", 1, isMainCategory = true),
-            CategoryEntity("sub_1_1", "سباكة وأنابيب", "🚰", 2, parentId = "1", isMainCategory = false),
-            CategoryEntity("sub_1_2", "كهرباء ومولدات", "⚡", 3, parentId = "1", isMainCategory = false),
-            CategoryEntity("sub_1_3", "تكييف وتبريد", "❄️", 4, parentId = "1", isMainCategory = false),
-            CategoryEntity("sub_1_4", "نجارة وأثاث", "و", 5, parentId = "1", isMainCategory = false),
-            CategoryEntity("sub_1_5", "صيانة أجهزة منزلية", "🧺", 6, parentId = "1", isMainCategory = false),
-            CategoryEntity("2", "طب ورعاية صحية", "🏥", 7, isMainCategory = true),
-            CategoryEntity("sub_2_1", "عيادات وأطباء", "🩺", 8, parentId = "2", isMainCategory = false),
-            CategoryEntity("sub_2_2", "صيدليات ومستلزمات", "💊", 9, parentId = "2", isMainCategory = false),
-            CategoryEntity("sub_2_3", "مختبرات تحاليل", "🔬", 10, parentId = "2", isMainCategory = false),
-            CategoryEntity("sub_2_4", "مراكز علاج طبيعي", "🧘", 11, parentId = "2", isMainCategory = false),
-            CategoryEntity("law", "محاماة واستشارات قانونية", "⚖️", 12, isMainCategory = true),
-            CategoryEntity("eng", "هندسة وإنشاءات", "🏗️", 13, isMainCategory = true),
-            CategoryEntity("cleaning", "تنظيف وتطهير", "🧹", 14, isMainCategory = true),
-            CategoryEntity("3", "تعليم وتدريس خصوصي", "📚", 15, isMainCategory = true),
-            CategoryEntity("4", "نقل ومواصلات لوجستية", "🚗", 16, isMainCategory = true),
-            CategoryEntity("realestate", "عقارات وأراضي", "🏠", 17, isMainCategory = true),
-            CategoryEntity("stores", "محلات ومعارض تجارية", "🏪", 18, isMainCategory = true),
-            CategoryEntity("restaurants", "مطاعم وكافيهات", "🍔", 19, isMainCategory = true),
-            CategoryEntity("beauty", "تجميل وعناية شخصية", "✂️", 20, isMainCategory = true),
-            CategoryEntity("centers", "مراكز تخصصية وخدمية", "🏢", 21, isMainCategory = true),
-            CategoryEntity("5", "تقنية وبرمجيات ذكية", "💻", 22, isMainCategory = true),
-            CategoryEntity("other", "أخرى / خدمات عامة", "✏️", 23, isMainCategory = true),
-            // Restaurants Subcategories
-            CategoryEntity("sub_rest_1", "مطاعم يمنية وشرقية", "🍲", 24, parentId = "restaurants", isMainCategory = false),
-            CategoryEntity("sub_rest_2", "وجبات سريعة وبرجر", "🍔", 25, parentId = "restaurants", isMainCategory = false),
-            CategoryEntity("sub_rest_3", "كافيهات ومشروبات", "☕", 26, parentId = "restaurants", isMainCategory = false),
-            CategoryEntity("sub_rest_4", "حلويات ومخابز", "🍰", 27, parentId = "restaurants", isMainCategory = false),
-            CategoryEntity("sub_rest_5", "مشويات وأسماك", "🥩", 28, parentId = "restaurants", isMainCategory = false),
-            // Stores Subcategories
-            CategoryEntity("sub_store_1", "ملابس وأزياء", "👔", 29, parentId = "stores", isMainCategory = false),
-            CategoryEntity("sub_store_2", "إلكترونيات وهواتف", "📱", 30, parentId = "stores", isMainCategory = false),
-            CategoryEntity("sub_store_3", "أجهزة منزلية وكهربائية", "📺", 31, parentId = "stores", isMainCategory = false),
-            CategoryEntity("sub_store_4", "سوبرماركت ومواد غذائية", "🛒", 32, parentId = "stores", isMainCategory = false),
-            CategoryEntity("sub_store_5", "عطور ومستحضرات تجميل", "💄", 33, parentId = "stores", isMainCategory = false),
-            // Centers Subcategories
-            CategoryEntity("sub_center_1", "مراكز تجميل وصالونات", "✂️", 34, parentId = "centers", isMainCategory = false),
-            CategoryEntity("sub_center_2", "مراكز طبية وتخصصية", "🏥", 35, parentId = "centers", isMainCategory = false),
-            CategoryEntity("sub_center_3", "مراكز تعليم وتدريب", "🎓", 36, parentId = "centers", isMainCategory = false),
-            CategoryEntity("sub_center_4", "أندية وصالات رياضية", "🏋️", 37, parentId = "centers", isMainCategory = false),
-            // Real Estate Subcategories
-            CategoryEntity("sub_prop_1", "شقق للإيجار والبيع", "🏢", 38, parentId = "realestate", isMainCategory = false),
-            CategoryEntity("sub_prop_2", "فلل وقصور", "🏰", 39, parentId = "realestate", isMainCategory = false),
-            CategoryEntity("sub_prop_3", "أراضي ومخططات", "🏞️", 40, parentId = "realestate", isMainCategory = false),
-            CategoryEntity("sub_prop_4", "مكاتب ومحلات تجارية", "🏪", 41, parentId = "realestate", isMainCategory = false),
-            CategoryEntity("sub_prop_5", "شاليهات واستراحات", "🏊", 42, parentId = "realestate", isMainCategory = false)
-        )
-        fbCategories.forEach { cat ->
-            db.collection("categories").document(cat.id).set(cat)
-        }
-    }
-private fun writeDefaultCities() {
-        val defaultCities = listOf(
-            CityEntity("ye_sana_cap", "أمانة العاصمة", "Sanaa Secretariat"),
-            CityEntity("ye_san", "صنعاء", "Sanaa"),
-            CityEntity("ye_ade", "عدن", "Aden"),
-            CityEntity("ye_tai", "تعز", "Taiz"),
-            CityEntity("ye_hod", "الحديدة", "Hodeidah"),
-            CityEntity("ye_ibb", "إب", "Ibb"),
-            CityEntity("ye_dha", "ذمار", "Dhamar"),
-            CityEntity("ye_had", "حضرموت", "Hadramout"),
-            CityEntity("ye_mar", "مأرب", "Marib"),
-            CityEntity("ye_saa", "صعدة", "Saada"),
-            CityEntity("ye_haj", "حجة", "Hajjah"),
-            CityEntity("ye_mah", "المهرة", "Al Mahrah"),
-            CityEntity("ye_soc", "سقطرى", "Socotra"),
-            CityEntity("ye_sha", "شبوة", "Shabwah"),
-            CityEntity("ye_aby", "أبين", "Abyan"),
-            CityEntity("ye_bay", "البيضاء", "Al Bayda"),
-            CityEntity("ye_amr", "عمران", "Amran"),
-            CityEntity("ye_ray", "ريمة", "Raymah"),
-            CityEntity("ye_jaw", "الجوف", "Al Jawf"),
-            CityEntity("ye_lah", "لحج", "Lahj"),
-            CityEntity("ye_dal", "الضالع", "Ad Dali"),
-            CityEntity("ye_mhw", "المحويت", "Al Mahwit")
-        )
-        defaultCities.forEach { city ->
-            db.collection("cities").document(city.id).set(city)
-        }
-    }
-private fun writeDefaultBanners() {
-        // No fake default banners written automatically
-    }
-private fun writeDefaultProviders() {
-        val aminProvider = ProviderEntity(
-            id = "p_amin",
-            name = "امين الغرباني",
-            phone = "777703195",
-            area = "صنعاء - منطقة الدائري جوار مدرسة أسماء للبنات",
-            localNeighborhood = "منطقة الدائري جوار مدرسة أسماء للبنات",
-            cityId = "ye_san",
-            categoryId = "c_elec",
-            profession = "صيانة وشبكات متكاملة",
-            specialization = "خدمات تقنية وفنية معتمدة",
-            isAvailable = true,
-            subscriptionStatus = "APPROVED",
-            isVerified = true,
-            rating = 5.0f
-        )
-        db.collection("providers").document("p_amin").set(aminProvider)
-    }
-override fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
+
+    override fun getDefaultStoresList(): List<com.example.data.StoreEntity> {
         return emptyList()
     }
-override fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> {
+
+    override fun getDefaultPropertiesList(): List<com.example.data.PropertyEntity> {
         return emptyList()
     }
-private fun writeDefaultStores() {
-        // Empty - No fake mock stores
-    }
-private fun writeDefaultProperties() {
-        // Empty - No fake mock properties
-    }
-private fun writeDefaultJobs() {
-        // Empty - No fake mock jobs
-    }
-private fun writeDefaultProducts() {
-        // Empty - No fake mock products
-    }
+
 fun applyFilters() {
         homeViewModel.applyFilters(_currentUserResidence.value)
     }
@@ -1602,38 +702,16 @@ fun clearSmartAssistantChatHistory() {
         _currentUserPoints.value = 0
         triggerNotification("🧹 تم تصفية وحذف سجل المحادثة الذكية بنجاح!")
     }
-override suspend fun uploadImageStringOrUri(
+    override suspend fun uploadImageStringOrUri(
         context: android.content.Context,
         input: String,
         storagePath: String,
         maxSizeBytes: Long
     ): String {
-        if (input.isBlank()) return ""
-        if (input.startsWith("http://") || input.startsWith("https://")) return input
-        return try {
-            if (input.startsWith("content://") || input.startsWith("file://")) {
-                val uri = android.net.Uri.parse(input)
-                val res = com.example.utils.FirebaseStorageUploader.uploadImageUri(
-                    context, uri, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
-                )
-                res.getOrDefault(input)
-            } else {
-                val cleanBase64 = if (input.contains(",")) input.substringAfter(",") else input
-                val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
-                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                if (bitmap != null) {
-                    val res = com.example.utils.FirebaseStorageUploader.uploadBitmap(
-                        bitmap, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
-                    )
-                    res.getOrDefault(input)
-                } else input
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            input
-        }
+        return registrationHelper.uploadImageStringOrUri(context, input, storagePath, maxSizeBytes)
     }
-fun submitJoinForm(
+
+    fun submitJoinForm(
         context: android.content.Context,
         name: String, phone: String, catId: String, area: String,
         neighborhood: String, photoPath: String, idCardPath: String, gpsCoords: String,
@@ -1642,283 +720,97 @@ fun submitJoinForm(
         password: String = "",
         productAttachmentsJson: String = ""
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
-        val duplicateType = checkAndGetDuplicateAccountType(cleanPhone, "")
-        if (duplicateType != null) {
-            triggerNotification("❌ عذراً! رقم الهاتف ($phone) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
-            logAdminActivity("محاولة تسجيل فني مكرر محجوبة لرقم: $cleanPhone - نوع التكرار: $duplicateType")
-            return
-        }
-        viewModelScope.launch {
-            try {
-                // Async duplicate check in join_requests
-                val existingSnap = db.collection("join_requests").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
-                    if (!qs.isEmpty) {
-                        triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة لرقم الهاتف هذا")
-                        return@addOnSuccessListener
-                    }
-                }
-            } catch (e: Exception) {}
-            triggerNotification("⏳ جاري ضغط الصور وحفظ الملفات في سحابة التخزين...")
-            val finalSelfie = uploadImageStringOrUri(
-                context, photoPath,
-                com.example.utils.FirebaseStorageUploader.getProviderProfilePath(cleanPhone),
-                maxSizeBytes = 150 * 1024L
-            )
-            val finalIdCard = uploadImageStringOrUri(
-                context, idCardPath,
-                com.example.utils.FirebaseStorageUploader.getProviderIdCardPath(cleanPhone),
-                maxSizeBytes = 150 * 1024L
-            )
-            val finalWorkPhotos = workPhotos.mapIndexed { idx, p ->
-                uploadImageStringOrUri(
-                    context, p,
-                    com.example.utils.FirebaseStorageUploader.getProviderWorkPhotoPath(cleanPhone, idx),
-                    maxSizeBytes = 300 * 1024L
+        registrationHelper.submitJoinForm(
+            context = context,
+            scope = viewModelScope,
+            name = name,
+            phone = phone,
+            catId = catId,
+            area = area,
+            neighborhood = neighborhood,
+            photoPath = photoPath,
+            idCardPath = idCardPath,
+            gpsCoords = gpsCoords,
+            workPhotos = workPhotos,
+            customCategoryName = customCategoryName,
+            password = password,
+            productAttachmentsJson = productAttachmentsJson,
+            checkDuplicate = { checkAndGetDuplicateAccountType(it, "") },
+            logAdminActivity = { logAdminActivity(it) },
+            triggerNotification = { triggerNotification(it) },
+            addApplicantNotification = { title, msg, type, targetVal ->
+                addNotification(
+                    title = title,
+                    message = msg,
+                    targetType = type,
+                    targetValue = targetVal
                 )
-            }
-            val encSelfie = if (finalSelfie.isNotEmpty()) com.example.utils.SecurityCryptoUtils.encrypt(finalSelfie) else ""
-            val encIdCard = if (finalIdCard.isNotEmpty()) com.example.utils.SecurityCryptoUtils.encrypt(finalIdCard) else ""
-            if (password.isNotEmpty()) {
-                val valResult = com.example.utils.SecurityCryptoUtils.validatePasswordPolicy(password)
-                if (valResult.first) {
-                    val authEmail = getAuthEmailForPhone(cleanPhone)
-                    auth.createUserWithEmailAndPassword(authEmail, password.trim())
-                        .addOnFailureListener { /* Account might already exist */ }
-                }
-            }
-            val requestType = when (catId.uppercase()) {
-                "STORE" -> "STORE"
-                "RESTAURANT" -> "RESTAURANT"
-                "MEDICAL" -> "MEDICAL"
-                "PROPERTY" -> "PROPERTY"
-                "JOB" -> "JOB"
-                "CLIENT" -> "CLIENT"
-                else -> "PROVIDER"
-            }
-            val requestProfession = when (requestType) {
-                "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
-                "PROPERTY" -> "PROPERTY_OWNER"
-                "JOB" -> "JOB_POSTER"
-                "CLIENT" -> "CLIENT"
-                else -> "PROVIDER"
-            }
-            val requestDocId = cleanPhone
-            val newRequest = PendingProviderEntity(
-                id = requestDocId,
-                name = name,
-                phone = phone,
-                categoryId = catId,
-                area = area,
-                localNeighborhood = neighborhood,
-                status = "PENDING",
-                selfiePhotoBase64 = encSelfie,
-                idPhotoBase64 = encIdCard,
-                workPhotosBase64 = finalWorkPhotos,
-                customCategoryName = customCategoryName,
-                password = password,
-                productAttachmentsJson = productAttachmentsJson,
-                profession = requestProfession,
-                providerType = requestProfession
-            )
-            // Push to Cloud with robust listeners
-            db.collection("pending_providers").document(requestDocId).set(newRequest)
-            val unifiedJoinRequest = com.example.data.models.JoinRequestEntity(
-                id = requestDocId,
-                type = requestType,
-                status = "PENDING",
-                fullName = name,
-                phone = cleanPhone,
-                passwordHash = password,
-                city = area,
-                area = neighborhood,
-                neighborhood = neighborhood,
-                categoryId = catId,
-                categoryName = customCategoryName.ifBlank { catId },
-                businessName = if (requestType == "STORE" || requestType == "RESTAURANT" || requestType == "MEDICAL") name else "",
-                ownerName = name,
-                propertyTitle = if (requestType == "PROPERTY") name else "",
-                jobTitle = if (requestType == "JOB") customCategoryName.ifBlank { name } else "",
-                companyName = if (requestType == "JOB") name else "",
-                profileImage = finalSelfie,
-                idCardImage = finalIdCard,
-                workImages = finalWorkPhotos,
-                approvalStatus = "PENDING",
-                submittedAt = System.currentTimeMillis(),
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
-            )
-            db.collection("join_requests").document(requestDocId).set(unifiedJoinRequest)
-                .addOnSuccessListener {
-                    // Route to section collection for immediate admin visibility
-                    try {
-                        when (requestType.uppercase()) {
-                            "STORE", "RESTAURANT", "MEDICAL" -> {
-                                val secId = if (requestType == "RESTAURANT") "restaurants" else if (requestType == "MEDICAL") "medical" else "stores"
-                                val catName = when (requestType) {
-                                    "RESTAURANT" -> "مطاعم وكافيهات"
-                                    "MEDICAL" -> "مراكز طبية وعيادات"
-                                    else -> "محلات ومراكز تجارية"
-                                }
-                                val newStore = com.example.data.StoreEntity(
-                                    id = requestDocId,
-                                    name = name,
-                                    phone = cleanPhone,
-                                    ownerId = cleanPhone,
-                                    ownerName = name,
-                                    cityId = area,
-                                    localNeighborhood = neighborhood,
-                                    sectionId = secId,
-                                    categoryId = catName,
-                                    isActive = false,
-                                    isApproved = false,
-                                    password = password
-                                )
-                                db.collection("stores").document(requestDocId).set(newStore)
-                                val sList = _stores.value.toMutableList()
-                                sList.removeAll { it.id == requestDocId }
-                                sList.add(newStore)
-                                _stores.value = sList
-                            }
-                            "PROPERTY" -> {
-                                val newProp = com.example.data.PropertyEntity(
-                                    id = requestDocId,
-                                    title = if (customCategoryName.isNotBlank()) customCategoryName else "عقار معروض - $name",
-                                    phone = cleanPhone,
-                                    ownerId = cleanPhone,
-                                    cityId = area,
-                                    localNeighborhood = neighborhood,
-                                    isActive = false,
-                                    isApproved = false,
-                                    password = password
-                                )
-                                db.collection("properties").document(requestDocId).set(newProp)
-                                val pList = _properties.value.toMutableList()
-                                pList.removeAll { it.id == requestDocId }
-                                pList.add(newProp)
-                                _properties.value = pList
-                            }
-                            "JOB" -> {
-                                val newJob = com.example.data.JobEntity(
-                                    id = requestDocId,
-                                    title = if (customCategoryName.isNotBlank()) customCategoryName else "وظيفة - $name",
-                                    companyName = name,
-                                    phone = cleanPhone,
-                                    cityId = area,
-                                    isActive = false,
-                                    isApproved = false
-                                )
-                                db.collection("jobs").document(requestDocId).set(newJob)
-                                val jList = _jobs.value.toMutableList()
-                                jList.removeAll { it.id == requestDocId }
-                                jList.add(newJob)
-                                _jobs.value = jList
-                            }
-                            "CLIENT" -> {
-                                val userMap = mapOf(
-                                    "id" to requestDocId,
-                                    "name" to name,
-                                    "phone" to cleanPhone,
-                                    "residence" to area,
-                                    "isApproved" to false,
-                                    "createdAt" to System.currentTimeMillis()
-                                )
-                                db.collection("users").document(requestDocId).set(userMap)
-                                val uList = _registeredUsersList.value.toMutableList()
-                                uList.removeAll { it["phone"] == cleanPhone }
-                                uList.add(userMap)
-                                _registeredUsersList.value = uList
-                            }
-                        }
-                    } catch (e: Exception) {}
-                    // Send a notification to Admin/Supervisors
-                    val adminNotif = NotificationEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "👷 طلب انضمام جديد للدليل",
-                        message = "قدم ${name} طلب انضمام جديد في قسم ${if (customCategoryName.isNullOrBlank()) catId else customCategoryName} بمنطقة ${area}.",
-                        targetType = "SUPERVISOR",
-                        targetValue = "ALL",
-                        timestamp = System.currentTimeMillis()
-                    )
-                    try {
-                        db.collection("notifications").document(adminNotif.id).set(adminNotif)
-                    } catch (e: Exception) {}
-                    
-                    triggerNotification("📨 تم تقديم طلبك ورفع المستندات بنجاح، جاري المراجعة من الإدارة")
-                }
-                .addOnFailureListener { e ->
-                    val errorMsg = e.localizedMessage ?: "تأكد من صغر حجم الصور واتصالك بالإنترنت"
-                    triggerNotification("❌ فشل تقديم الطلب: $errorMsg")
-                }
-            
-            // Instant Local Sync
-            val currentPending = _pendingProviders.value.filter { it.id != requestDocId }.toMutableList()
-            currentPending.add(newRequest)
-            _pendingProviders.value = currentPending
-            val currentTechs = _pendingTechnicians.value.filter { it.id != requestDocId }.toMutableList()
-            currentTechs.add(newRequest)
-            _pendingTechnicians.value = currentTechs
-            
-            val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-            sp.edit().putString("join_request_phone", phone).apply()
-            _joinRequestPhone.value = phone
-            
-            // Add applicant notification!
-            addNotification(
-                title = "📨 تم استلام طلب انضمامك بنجاح",
-                message = "مرحباً يا غالي، تم استلام طلبك وجاري مراجعته والتحقق من التخصص والخبرة من قبل إدارة الدليل. نسعد بانضمامك وسنبلغك فور التنشيط!",
-                targetType = "USER",
-                targetValue = phone
-            )
-            
-            triggerNotification("📨 تم تقديم طلبك بنجاح، سيتم مراجعته من قبل الإدارة")
-            _currentScreen.value = "JOIN_REQUEST_STATUS"
-        }
-    }
-    fun registerClientUser(name: String, phone: String, residence: String, password: String = "") {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
-        val userMap = mapOf(
-            "id" to cleanPhone,
-            "name" to name,
-            "phone" to cleanPhone,
-            "residence" to residence,
-            "password" to password,
-            "isApproved" to false,
-            "createdAt" to System.currentTimeMillis()
+            },
+            onPendingAdded = { newReq ->
+                val currentPending = _pendingProviders.value.filter { it.id != newReq.id }.toMutableList()
+                currentPending.add(newReq)
+                _pendingProviders.value = currentPending
+                val currentTechs = _pendingTechnicians.value.filter { it.id != newReq.id }.toMutableList()
+                currentTechs.add(newReq)
+                _pendingTechnicians.value = currentTechs
+            },
+            onStoreAdded = { newStore ->
+                val sList = _stores.value.toMutableList()
+                sList.removeAll { it.id == newStore.id }
+                sList.add(newStore)
+                _stores.value = sList
+            },
+            onPropertyAdded = { newProp ->
+                val pList = _properties.value.toMutableList()
+                pList.removeAll { it.id == newProp.id }
+                pList.add(newProp)
+                _properties.value = pList
+            },
+            onJobAdded = { newJob ->
+                val jList = _jobs.value.toMutableList()
+                jList.removeAll { it.id == newJob.id }
+                jList.add(newJob)
+                _jobs.value = jList
+            },
+            onClientAdded = { userMap ->
+                val uList = _registeredUsersList.value.toMutableList()
+                uList.removeAll { it["phone"] == userMap["phone"] }
+                uList.add(userMap)
+                _registeredUsersList.value = uList
+            },
+            onJoinRequestPhoneUpdated = { _joinRequestPhone.value = it },
+            onNavigateToScreen = { _currentScreen.value = it }
         )
-        try {
-            db.collection("registered_users").document(cleanPhone).set(userMap)
-            db.collection("users").document(cleanPhone).set(userMap)
-        } catch (e: Exception) {}
-        val uList = _registeredUsersList.value.toMutableList()
-        uList.removeAll { it["phone"] == cleanPhone }
-        uList.add(userMap)
-        _registeredUsersList.value = uList
     }
-fun cancelOrResetJoinRequest(context: android.content.Context) {
-        val phone = _joinRequestPhone.value
-        if (phone.isNotEmpty()) {
-            val matching = _pendingProviders.value.find { it.phone == phone }
-            matching?.let {
-                _pendingProviders.value = _pendingProviders.value.filter { item -> item.id != it.id }
-                try {
-                    db.collection("pending_providers").document(it.id).delete()
-                } catch (e: Exception) {}
-            }
-            try {
-                db.collection("join_requests").document(phone).delete()
-            } catch (e: Exception) {}
+
+    fun registerClientUser(name: String, phone: String, residence: String, password: String = "") {
+        registrationHelper.registerClientUser(name, phone, residence, password) { userMap ->
+            val uList = _registeredUsersList.value.toMutableList()
+            uList.removeAll { it["phone"] == userMap["phone"] }
+            uList.add(userMap)
+            _registeredUsersList.value = uList
         }
-        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-        sp.edit().remove("join_request_phone").apply()
-        _joinRequestPhone.value = ""
-        goBack()
     }
-fun setJoinRequestPhone(context: android.content.Context, phone: String) {
-        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-        sp.edit().putString("join_request_phone", phone).apply()
-        _joinRequestPhone.value = phone
+
+    fun cancelOrResetJoinRequest(context: android.content.Context) {
+        registrationHelper.cancelOrResetJoinRequest(
+            context = context,
+            phone = _joinRequestPhone.value,
+            pendingProviders = _pendingProviders.value,
+            onPendingRemoved = { id ->
+                _pendingProviders.value = _pendingProviders.value.filter { it.id != id }
+            },
+            onPhoneCleared = { _joinRequestPhone.value = "" },
+            onGoBack = { goBack() }
+        )
     }
+
+    fun setJoinRequestPhone(context: android.content.Context, phone: String) {
+        registrationHelper.setJoinRequestPhone(context, phone) {
+            _joinRequestPhone.value = it
+        }
+    }
+
 fun addNotification(
         title: String,
         message: String,
@@ -2234,61 +1126,11 @@ fun addNotification(
         val property: PropertyEntity? = null,
         val savedPassword: String = ""
     )
+
     fun searchAccountForRestore(cleanPhone: String, onResult: (RestoreAccountMatch?) -> Unit) {
-        db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { providerSnap ->
-            val pDoc = providerSnap.documents.firstOrNull()
-            val provider = pDoc?.toObject(ProviderEntity::class.java)
-            if (provider != null) {
-                val pass = pDoc.getString("password") ?: pDoc.getString("passwordHash") ?: ""
-                onResult(RestoreAccountMatch("PROVIDER", provider.name, provider = provider, savedPassword = pass))
-                return@addOnSuccessListener
-            }
-            
-            db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { storeSnap ->
-                val sDoc = storeSnap.documents.firstOrNull()
-                val store = sDoc?.toObject(StoreEntity::class.java)
-                if (store != null) {
-                    val pass = sDoc.getString("password") ?: sDoc.getString("passwordHash") ?: ""
-                    onResult(RestoreAccountMatch("STORE", store.name, store = store, savedPassword = pass))
-                    return@addOnSuccessListener
-                }
-                
-                db.collection("properties").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { propSnap ->
-                    val prDoc = propSnap.documents.firstOrNull()
-                    val property = prDoc?.toObject(PropertyEntity::class.java)
-                    if (property != null) {
-                        val pass = prDoc.getString("password") ?: prDoc.getString("passwordHash") ?: ""
-                        onResult(RestoreAccountMatch("PROPERTY", property.title, property = property, savedPassword = pass))
-                        return@addOnSuccessListener
-                    }
-                    
-                    db.collection("users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { userSnap ->
-                        val uDoc = userSnap.documents.firstOrNull()
-                        if (uDoc != null) {
-                            val uName = uDoc.getString("name") ?: "مستخدم مسجل"
-                            val pass = uDoc.getString("password") ?: ""
-                            onResult(RestoreAccountMatch("CLIENT", uName, savedPassword = pass))
-                            return@addOnSuccessListener
-                        }
-                        
-                        db.collection("join_requests").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { reqSnap ->
-                            val rDoc = reqSnap.documents.firstOrNull()
-                            if (rDoc != null) {
-                                val rName = rDoc.getString("name") ?: "حساب مسجل"
-                                val rType = rDoc.getString("type") ?: "CLIENT"
-                                val pass = rDoc.getString("password") ?: ""
-                                onResult(RestoreAccountMatch(rType, rName, savedPassword = pass))
-                                return@addOnSuccessListener
-                            }
-                            onResult(null)
-                        }.addOnFailureListener { onResult(null) }
-                    }.addOnFailureListener { onResult(null) }
-                }.addOnFailureListener { onResult(null) }
-            }.addOnFailureListener { onResult(null) }
-        }.addOnFailureListener {
-            onResult(null)
-        }
+        accountRecoveryHelper.searchAccountForRestore(cleanPhone, onResult)
     }
+
     fun requestPasswordReset(
         context: android.content.Context,
         phone: String,
@@ -2296,82 +1138,33 @@ fun addNotification(
         accountType: String,
         onResult: (Boolean) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "")
-        val reqData = mapOf(
-            "id" to cleanPhone,
-            "phone" to cleanPhone,
-            "name" to name,
-            "accountType" to accountType,
-            "status" to "PENDING",
-            "requestedAt" to System.currentTimeMillis(),
-            "newPassword" to "",
-            "adminNotes" to ""
+        accountRecoveryHelper.requestPasswordReset(
+            context = context,
+            phone = phone,
+            name = name,
+            accountType = accountType,
+            onPasswordWaitingPhoneSet = { setPasswordRecoveryWaitingPhone(it) },
+            triggerNotification = { triggerNotification(it) },
+            onResult = onResult
         )
-        db.collection("password_recovery_requests").document(cleanPhone).set(reqData).addOnSuccessListener {
-            setPasswordRecoveryWaitingPhone(cleanPhone)
-            val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-            sp.edit().putString("password_recovery_waiting_phone", cleanPhone).apply()
-            triggerNotification("🔑 طلب استعادة كلمة مرور جديد من: $name ($cleanPhone)")
-            onResult(true)
-        }.addOnFailureListener {
-            onResult(false)
-        }
     }
+
     fun adminResolvePasswordReset(
         context: android.content.Context,
         phone: String,
         newPassword: String,
         onResult: (Boolean) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "")
-        val updates = mapOf(
-            "status" to "RESOLVED",
-            "newPassword" to newPassword,
-            "resolvedAt" to System.currentTimeMillis()
+        accountRecoveryHelper.adminResolvePasswordReset(
+            context = context,
+            phone = phone,
+            newPassword = newPassword,
+            onResult = onResult
         )
-        db.collection("password_recovery_requests").document(cleanPhone).update(updates).addOnSuccessListener {
-            // Also update the password_resets collection so the user's dialog updates immediately
-            db.collection("password_resets").document(cleanPhone).update(
-                mapOf(
-                    "status" to "APPROVED",
-                    "newPassword" to newPassword,
-                    "tempPassword" to newPassword
-                )
-            )
-            db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("properties").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("registered_users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("join_requests").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            val notif = mapOf(
-                "id" to "notif_pwd_${System.currentTimeMillis()}",
-                "title" to "🔑 تم إعادة تعيين كلمة المرور",
-                "message" to "تم إعادة تعيين كلمة المرور الخاصة بك بنجاح. كلمة المرور الجديدة: $newPassword",
-                "targetPhone" to cleanPhone,
-                "timestamp" to System.currentTimeMillis()
-            )
-            db.collection("notifications").add(notif)
-            onResult(true)
-        }.addOnFailureListener {
-            onResult(false)
-        }
     }
+
     fun isUserLoggedIn(context: android.content.Context): Boolean {
-        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-        val isLoggedIn = sp.getBoolean("is_account_logged_in", false)
+        val isLoggedIn = preferenceHelper.isAccountLoggedIn(context)
         val phone = currentUserPhone.value
         return isLoggedIn || (phone.isNotBlank() && currentUserId.value != "guest" && currentUserId.value.isNotBlank())
     }
@@ -2447,22 +1240,17 @@ fun addNotification(
     fun getBookingStatusLabel(status: String): String = bookingViewModel.getBookingStatusLabel(status)
     fun getBookingProgress(status: String): Float = bookingViewModel.getBookingProgress(status)
     fun markNotificationAsRead(context: android.content.Context, notifId: String) {
-        val sharedPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
         val currentRead = _readNotificationIds.value.toMutableSet()
-        currentRead.add(notifId)
-        _readNotificationIds.value = currentRead
-        sharedPrefs.edit().putStringSet("read_notifications", currentRead).apply()
+        val updated = preferenceHelper.markNotificationAsRead(context, notifId, currentRead)
+        _readNotificationIds.value = updated
     }
     fun loadReadNotifications(context: android.content.Context) {
-        val sharedPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
-        val readIds = sharedPrefs.getStringSet("read_notifications", emptySet()) ?: emptySet()
-        _readNotificationIds.value = readIds
+        _readNotificationIds.value = preferenceHelper.getReadNotificationIds(context)
     }
     fun markAllNotificationsAsRead(context: android.content.Context) {
-        val sharedPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
         val allIds = _notifications.value.map { it.id }.toSet()
+        preferenceHelper.markAllNotificationsAsRead(context, allIds)
         _readNotificationIds.value = allIds
-        sharedPrefs.edit().putStringSet("read_notifications", allIds).apply()
     }
     fun deleteNotification(notifId: String) {
         db.collection("notifications").document(notifId).delete()

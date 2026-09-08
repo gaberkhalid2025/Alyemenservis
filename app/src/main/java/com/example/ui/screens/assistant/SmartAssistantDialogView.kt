@@ -91,35 +91,37 @@ fun SmartAssistantDialogView(
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            color = themeColors.background,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Header Bar
-                    AssistantHeader(
-                        isOnline = isOnline,
-                        themeColors = themeColors,
-                        onClearChat = {
-                            assistantViewModel.clearChat(settings.welcomeMessage)
-                            coroutineScope.launch { snackbarHostState.showSnackbar("🧹 تم مسح سجل المحادثة") }
-                        },
-                        onDismiss = onDismiss
-                    )
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
 
-                    // Navigation Chips
-                    AssistantChipsRow(
-                        viewModel = viewModel,
-                        themeColors = themeColors,
-                        onRequestQuickService = onRequestQuickService,
-                        onNavigateToMap = onNavigateToMap,
-                        onDismiss = onDismiss
-                    )
+    Surface(
+        color = themeColors.background,
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding()
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header Bar
+                AssistantHeader(
+                    isOnline = isOnline,
+                    themeColors = themeColors,
+                    onClearChat = {
+                        assistantViewModel.clearChat(settings.welcomeMessage)
+                        coroutineScope.launch { snackbarHostState.showSnackbar("🧹 تم مسح سجل المحادثة") }
+                    },
+                    onDismiss = onDismiss
+                )
+
+                // Navigation Chips
+                AssistantChipsRow(
+                    viewModel = viewModel,
+                    themeColors = themeColors,
+                    onRequestQuickService = onRequestQuickService,
+                    onNavigateToMap = onNavigateToMap,
+                    onDismiss = onDismiss
+                )
 
                     // Voice Recognition Banner
                     Card(
@@ -290,4 +292,3 @@ fun SmartAssistantDialogView(
             }
         }
     }
-}

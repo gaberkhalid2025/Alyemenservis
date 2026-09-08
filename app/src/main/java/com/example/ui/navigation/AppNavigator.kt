@@ -72,7 +72,7 @@ fun AppNavigator(
 
     Scaffold(
         topBar = {
-            if (ScreenRoutes.showTopBar(currentScreen, adminRole)) {
+            if (ScreenRoutes.showTopBar(currentScreen, adminRole) && !showAssistantDialog) {
                 AppHeaderBar(
                     viewModel = viewModel,
                     themeColors = themeColors,
@@ -83,7 +83,7 @@ fun AppNavigator(
             }
         },
         bottomBar = {
-            if (ScreenRoutes.showBottomBar(currentScreen, adminRole)) {
+            if (ScreenRoutes.showBottomBar(currentScreen, adminRole) && !showAssistantDialog) {
                 AppFooterBar(
                     viewModel = viewModel,
                     themeColors = themeColors,
@@ -91,7 +91,7 @@ fun AppNavigator(
                 )
             }
         },
-        contentWindowInsets = if (currentScreen == AppScreens.CHAT_DIRECT) {
+        contentWindowInsets = if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW || showAssistantDialog) {
             WindowInsets(0, 0, 0, 0)
         } else {
             ScaffoldDefaults.contentWindowInsets
@@ -101,7 +101,7 @@ fun AppNavigator(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (currentScreen == AppScreens.CHAT_DIRECT) PaddingValues(0.dp) else innerPadding)
+                .padding(if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW || showAssistantDialog) PaddingValues(0.dp) else innerPadding)
         ) {
             when (currentScreen) {
                 AppScreens.USER_BROWSE, AppScreens.HOME -> {

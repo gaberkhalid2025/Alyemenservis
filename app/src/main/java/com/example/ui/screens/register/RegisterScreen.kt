@@ -285,26 +285,6 @@ fun RegisterScreen(
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 🌟 Simple Title Header
-                    item {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        ) {
-                            Text(
-                                text = "📝 منصة الانضمام والتسجيل",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "اختر القسم المناسب لك لتعبئة طلبك المباشر والبدء بالعمل:",
-                                fontSize = 11.sp,
-                                color = Color.LightGray
-                            )
-                        }
-                    }
-
                     // 🎯 Section Header
                     item {
                         Row(

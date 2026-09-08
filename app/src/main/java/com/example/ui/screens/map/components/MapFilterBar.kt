@@ -69,7 +69,7 @@ fun MapFilterBar(
                 placeholder = { 
                     Text(
                         text = "بحث عن خدمة، فني، مركز أو متجر...", 
-                        fontSize = 14.sp, 
+                        fontSize = 12.5.sp, 
                         fontWeight = FontWeight.Normal,
                         color = Color(0xFF94A3B8)
                     ) 
@@ -96,8 +96,8 @@ fun MapFilterBar(
                 },
                 textStyle = androidx.compose.ui.text.TextStyle(
                     color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold
                 ),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -114,7 +114,6 @@ fun MapFilterBar(
                 ),
                 modifier = Modifier
                     .weight(1f)
-                    .height(52.dp)
                     .testTag("map_search_input")
             )
 

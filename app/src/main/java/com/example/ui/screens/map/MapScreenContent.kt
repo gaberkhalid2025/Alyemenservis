@@ -163,6 +163,7 @@ fun MapScreenContent(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    .statusBarsPadding()
             ) {
                 // Top Bar with Back Button
                 Surface(
@@ -261,6 +262,7 @@ fun MapScreenContent(
                 themeColors = themeColors,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
+                    .navigationBarsPadding()
                     .padding(bottom = if (state.selectedEntity != null) 200.dp else 20.dp)
             )
 
@@ -282,7 +284,9 @@ fun MapScreenContent(
                         }
                     },
                     themeColors = themeColors,
-                    modifier = Modifier.align(Alignment.BottomCenter)
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                 )
             }
         }
