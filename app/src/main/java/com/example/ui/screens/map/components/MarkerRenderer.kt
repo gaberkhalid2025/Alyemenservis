@@ -1,6 +1,7 @@
 package com.example.ui.screens.map.components
 
 import androidx.compose.ui.geometry.Offset
+import com.example.ui.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke

@@ -1,6 +1,7 @@
 package com.example.ui.screens.admin
 
 import androidx.compose.foundation.BorderStroke
+import com.example.ui.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

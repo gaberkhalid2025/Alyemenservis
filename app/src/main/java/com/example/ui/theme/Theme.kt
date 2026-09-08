@@ -1,6 +1,7 @@
 package com.example.ui.theme
 
 import com.example.utils.*
+import com.example.ui.*
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

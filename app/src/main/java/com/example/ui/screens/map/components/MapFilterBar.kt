@@ -1,6 +1,7 @@
 package com.example.ui.screens.map.components
 
 import androidx.compose.foundation.BorderStroke
+import com.example.ui.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*

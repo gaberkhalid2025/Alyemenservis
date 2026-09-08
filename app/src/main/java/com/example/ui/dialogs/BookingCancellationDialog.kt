@@ -1,6 +1,7 @@
 package com.example.ui.dialogs
 
 import androidx.compose.animation.AnimatedVisibility
+import com.example.ui.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape

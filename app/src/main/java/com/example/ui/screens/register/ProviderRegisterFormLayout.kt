@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.register
+import com.example.ui.*
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

@@ -1,6 +1,7 @@
 package com.example.ui
 
 import com.example.utils.*
+import com.example.ui.*
 
 import android.content.Context
 import androidx.compose.runtime.Composable

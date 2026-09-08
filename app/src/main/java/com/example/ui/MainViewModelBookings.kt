@@ -1,6 +1,7 @@
 package com.example.ui
 
 import com.example.data.*
+import com.example.ui.*
 import com.example.data.models.*
 
 fun MainViewModel.addBookingImpl(

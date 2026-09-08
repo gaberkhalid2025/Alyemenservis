@@ -1,9 +1,13 @@
 package com.example.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
+import com.example.ui.*
+import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,15 +42,48 @@ open class BaseViewModel : ViewModel() {
         firestore
     }
 
-    open val firestoreListeners = mutableListOf<ListenerRegistration>()
+    open val firestoreListeners = java.util.concurrent.CopyOnWriteArrayList<ListenerRegistration>()
+
+    val coroutineExceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
+        throwable.printStackTrace()
+        com.example.utils.AppErrorLogManager.logFirestoreError(
+            "CoroutineUncaught",
+            throwable.localizedMessage ?: "Unhandled Coroutine Exception",
+            Exception(throwable)
+        )
+    }
 
     override fun onCleared() {
         super.onCleared()
         try {
-            firestoreListeners.forEach { it.remove() }
+            val iterator = firestoreListeners.iterator()
+            while (iterator.hasNext()) {
+                try {
+                    iterator.next().remove()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             firestoreListeners.clear()
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun launchSafe(
+        onError: ((Throwable) -> Unit)? = null,
+        block: suspend CoroutineScope.() -> Unit
+    ): kotlinx.coroutines.Job = viewModelScope.launch(coroutineExceptionHandler) {
+        try {
+            block()
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            com.example.utils.AppErrorLogManager.logFirestoreError(
+                "LaunchSafe",
+                e.localizedMessage ?: "Error in launchSafe",
+                Exception(e)
+            )
+            onError?.invoke(e)
         }
     }
 

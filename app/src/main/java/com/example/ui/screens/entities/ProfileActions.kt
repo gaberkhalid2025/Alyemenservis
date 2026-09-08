@@ -1,6 +1,7 @@
 package com.example.ui.screens.entities
 
 import android.content.Context
+import com.example.ui.*
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke

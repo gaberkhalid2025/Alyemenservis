@@ -1,6 +1,7 @@
 package com.example.ui
 
 import com.example.utils.*
+import com.example.ui.*
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween

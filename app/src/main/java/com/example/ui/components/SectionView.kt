@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.clickable
+import com.example.ui.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons

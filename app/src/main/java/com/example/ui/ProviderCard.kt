@@ -1,6 +1,7 @@
 package com.example.ui
 
 import androidx.compose.runtime.Composable
+import com.example.ui.*
 import com.example.data.ProviderEntity
 import com.example.ui.components.ProviderCard as ComponentProviderCard
 import com.example.utils.VisualThemePalette

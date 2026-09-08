@@ -1,6 +1,7 @@
 package com.example.ui.screens.register
 
 import android.content.ClipData
+import com.example.ui.*
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent

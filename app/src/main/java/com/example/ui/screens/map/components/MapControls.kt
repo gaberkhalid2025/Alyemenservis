@@ -1,6 +1,7 @@
 package com.example.ui.screens.map.components
 
 import androidx.compose.animation.AnimatedVisibility
+import com.example.ui.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background

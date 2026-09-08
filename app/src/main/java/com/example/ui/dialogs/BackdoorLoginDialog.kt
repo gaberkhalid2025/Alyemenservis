@@ -1,6 +1,7 @@
 package com.example.ui.dialogs
 
 import androidx.compose.foundation.BorderStroke
+import com.example.ui.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import android.graphics.BitmapFactory
+import com.example.ui.*
 import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

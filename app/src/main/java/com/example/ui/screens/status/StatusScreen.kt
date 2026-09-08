@@ -1,6 +1,7 @@
 package com.example.ui.screens.status
 
 import androidx.compose.foundation.background
+import com.example.ui.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*

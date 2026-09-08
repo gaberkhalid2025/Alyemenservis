@@ -1,6 +1,7 @@
 package com.example.ui.screens.map
 
 import android.annotation.SuppressLint
+import com.example.ui.*
 import android.content.Context
 import android.content.Intent
 import android.net.Uri

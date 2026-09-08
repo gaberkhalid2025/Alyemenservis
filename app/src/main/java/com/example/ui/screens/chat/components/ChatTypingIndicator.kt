@@ -1,6 +1,7 @@
 package com.example.ui.screens.chat.components
 
 import androidx.compose.animation.*
+import com.example.ui.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

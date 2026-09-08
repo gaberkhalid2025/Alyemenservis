@@ -1,6 +1,7 @@
 package com.example.ui.helpers
 
 import android.content.Context
+import com.example.ui.*
 import com.example.data.NotificationEntity
 import com.example.data.PendingProviderEntity
 import com.example.data.StoreEntity
@@ -99,9 +100,12 @@ class RegistrationHelper(
                         triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة لرقم الهاتف هذا")
                     }
                 }
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
 
-            triggerNotification("⏳ جاري ضغط الصور وحفظ الملفات في سحابة التخزين...")
+            try {
+                triggerNotification("⏳ جاري ضغط الصور وحفظ الملفات في سحابة التخزين...")
             val finalSelfie = uploadImageStringOrUri(
                 context, photoPath,
                 FirebaseStorageUploader.getProviderProfilePath(cleanPhone),
@@ -293,6 +297,11 @@ class RegistrationHelper(
 
             triggerNotification("📨 تم تقديم طلبك بنجاح، سيتم مراجعته من قبل الإدارة")
             onNavigateToScreen("JOIN_REQUEST_STATUS")
+            } catch (e: Exception) {
+                e.printStackTrace()
+                com.example.utils.AppErrorLogManager.logFirestoreError("RegistrationHelper", "Error in submitJoinForm", e)
+                triggerNotification("❌ حدث خطأ أثناء إرسال الطلب: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
+            }
         }
     }
 

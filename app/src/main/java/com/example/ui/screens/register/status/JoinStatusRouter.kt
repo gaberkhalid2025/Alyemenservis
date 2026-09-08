@@ -1,6 +1,7 @@
 package com.example.ui.screens.register.status
 
 import android.content.Context
+import com.example.ui.*
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState

@@ -1,6 +1,7 @@
 package com.example.ui.screens.register.status
 
 import android.net.Uri
+import com.example.ui.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke

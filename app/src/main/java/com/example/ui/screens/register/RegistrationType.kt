@@ -1,6 +1,7 @@
 package com.example.ui.screens.register
 
 /**
+import com.example.ui.*
  * 🏷️ أنواع الحسابات المتاحة للتسجيل في منصة دليل خدمات اليمن
  */
 enum class RegistrationType(

@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.utils.*
+import com.example.ui.*
 
 import com.example.ui.ProductAttachmentsSection
 import com.example.ui.SpecialOffersSection

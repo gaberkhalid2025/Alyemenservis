@@ -1,6 +1,7 @@
 package com.example.ui.screens.map
 
 import androidx.lifecycle.ViewModel
+import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity

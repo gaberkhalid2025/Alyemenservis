@@ -1,6 +1,7 @@
 package com.example.ui.screens.dashboard.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import com.example.ui.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

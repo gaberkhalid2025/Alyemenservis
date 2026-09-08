@@ -1,6 +1,7 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.ui.*
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text

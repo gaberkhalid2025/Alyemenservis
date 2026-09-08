@@ -1,6 +1,7 @@
 package com.example.ui.screens.register.status
 
 import android.content.Context
+import com.example.ui.*
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke

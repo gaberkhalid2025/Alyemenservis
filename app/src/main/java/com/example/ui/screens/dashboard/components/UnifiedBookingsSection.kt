@@ -1,6 +1,7 @@
 package com.example.ui.screens.dashboard.components
 
 import androidx.compose.foundation.background
+import com.example.ui.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*

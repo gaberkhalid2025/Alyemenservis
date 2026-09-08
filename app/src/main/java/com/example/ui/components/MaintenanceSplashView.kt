@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.layout.*
+import com.example.ui.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button

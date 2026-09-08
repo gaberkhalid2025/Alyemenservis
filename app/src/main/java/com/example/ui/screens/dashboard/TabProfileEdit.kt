@@ -1,6 +1,7 @@
 package com.example.ui.screens.dashboard
 
 import androidx.compose.foundation.layout.*
+import com.example.ui.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable

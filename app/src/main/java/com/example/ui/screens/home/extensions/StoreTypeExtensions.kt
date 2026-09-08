@@ -1,6 +1,7 @@
 package com.example.ui.screens.home.extensions
 
 import com.example.data.StoreEntity
+import com.example.ui.*
 
 /**
  * 🏷️ Classifications helpers to ensure absolute separation between categories

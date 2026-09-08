@@ -1,6 +1,7 @@
 package com.example.ui.screens.notifications.components
 
 import androidx.compose.foundation.background
+import com.example.ui.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*

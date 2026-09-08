@@ -1,6 +1,7 @@
 package com.example.ui.screens.admin
 
 import androidx.compose.foundation.layout.*
+import com.example.ui.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel

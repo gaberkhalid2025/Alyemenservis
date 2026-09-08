@@ -1,6 +1,7 @@
 package com.example.ui.screens.map.components
 
 import android.content.Intent
+import com.example.ui.*
 import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke

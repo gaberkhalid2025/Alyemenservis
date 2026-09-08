@@ -1,6 +1,7 @@
 package com.example.ui.screens.map.components
 
 import androidx.compose.animation.core.*
+import com.example.ui.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures

@@ -1,6 +1,7 @@
 package com.example.ui.helpers
 
 import com.example.data.*
+import com.example.ui.*
 import com.example.data.models.*
 import com.example.ui.MainViewModel
 import com.example.ui.viewmodels.BookingDistributionMode
@@ -13,23 +14,42 @@ import com.google.firebase.firestore.*
  */
 class RealtimeSyncHelper(private val db: FirebaseFirestore) {
 
-    val firestoreListeners = mutableListOf<ListenerRegistration>()
+    val firestoreListeners = java.util.concurrent.CopyOnWriteArrayList<ListenerRegistration>()
 
-    private fun Query.addSnapshotListenerReg(listener: EventListener<QuerySnapshot>): ListenerRegistration {
-        val reg = this.addSnapshotListener(listener)
-        firestoreListeners.add(reg)
-        return reg
+    private fun Query.addSnapshotListenerReg(listener: EventListener<QuerySnapshot>): ListenerRegistration? {
+        return try {
+            val reg = this.addSnapshotListener(listener)
+            firestoreListeners.add(reg)
+            reg
+        } catch (e: Exception) {
+            e.printStackTrace()
+            com.example.utils.AppErrorLogManager.logFirestoreError("RealtimeSyncHelper", "Failed to add Query listener", e)
+            null
+        }
     }
 
-    private fun DocumentReference.addSnapshotListenerReg(listener: EventListener<DocumentSnapshot>): ListenerRegistration {
-        val reg = this.addSnapshotListener(listener)
-        firestoreListeners.add(reg)
-        return reg
+    private fun DocumentReference.addSnapshotListenerReg(listener: EventListener<DocumentSnapshot>): ListenerRegistration? {
+        return try {
+            val reg = this.addSnapshotListener(listener)
+            firestoreListeners.add(reg)
+            reg
+        } catch (e: Exception) {
+            e.printStackTrace()
+            com.example.utils.AppErrorLogManager.logFirestoreError("RealtimeSyncHelper", "Failed to add Document listener", e)
+            null
+        }
     }
 
     fun clearListeners() {
         try {
-            firestoreListeners.forEach { it.remove() }
+            val iterator = firestoreListeners.iterator()
+            while (iterator.hasNext()) {
+                try {
+                    iterator.next().remove()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             firestoreListeners.clear()
         } catch (e: Exception) {
             e.printStackTrace()

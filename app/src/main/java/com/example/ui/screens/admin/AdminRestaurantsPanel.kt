@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.admin
+import com.example.ui.*
 
 import android.widget.Toast
 import androidx.compose.foundation.*

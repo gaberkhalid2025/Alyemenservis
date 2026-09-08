@@ -1,6 +1,7 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.runtime.Composable
+import com.example.ui.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import com.example.data.StoreEntity

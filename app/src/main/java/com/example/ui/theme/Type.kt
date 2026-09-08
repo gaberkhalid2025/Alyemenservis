@@ -1,6 +1,7 @@
 package com.example.ui.theme
 
 import com.example.utils.*
+import com.example.ui.*
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

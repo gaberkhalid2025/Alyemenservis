@@ -1,6 +1,7 @@
 package com.example.ui.screens.register.components
 
 import android.content.Context
+import com.example.ui.*
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri

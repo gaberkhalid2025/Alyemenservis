@@ -1,10 +1,8 @@
 package com.example.ui
 
 import android.content.Context
+import com.example.ui.*
 
-fun MainViewModel.navigateToScreen(screen: String) {
-    this.navigateTo(screen)
-}
 
 fun MainViewModel.navigateBack(): Boolean {
     return this.goBack()

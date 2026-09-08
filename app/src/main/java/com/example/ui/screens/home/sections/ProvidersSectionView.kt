@@ -1,6 +1,7 @@
 package com.example.ui.screens.home.sections
 
 import androidx.compose.foundation.BorderStroke
+import com.example.ui.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

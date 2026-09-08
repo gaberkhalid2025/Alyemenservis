@@ -1,6 +1,7 @@
 package com.example.ui.dialogs
 
 import androidx.compose.runtime.Composable
+import com.example.ui.*
 import com.example.data.PropertyEntity
 import com.example.ui.MainViewModel
 import com.example.PropertyCreateEditDialog

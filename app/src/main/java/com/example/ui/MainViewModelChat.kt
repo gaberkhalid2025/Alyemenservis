@@ -1,6 +1,7 @@
 package com.example.ui
 
 import com.example.data.models.ChatChannel
+import com.example.ui.*
 import com.example.data.models.ChannelType
 
 fun MainViewModel.openUnifiedSupportChat() {

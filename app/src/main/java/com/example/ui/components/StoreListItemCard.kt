@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.runtime.*
+import com.example.ui.*
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
 import com.example.StoreListItemCard

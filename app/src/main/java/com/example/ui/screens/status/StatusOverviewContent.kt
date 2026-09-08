@@ -1,6 +1,7 @@
 package com.example.ui.screens.status
 
 import androidx.compose.foundation.layout.*
+import com.example.ui.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable

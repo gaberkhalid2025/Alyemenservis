@@ -1,6 +1,7 @@
 package com.example.ui.screens.dashboard.viewmodels
 
 import androidx.lifecycle.ViewModel
+import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.repositories.IDashboardRepository
 import com.example.data.repositories.IGalleryRepository

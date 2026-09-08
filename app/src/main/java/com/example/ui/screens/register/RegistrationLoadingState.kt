@@ -1,6 +1,7 @@
 package com.example.ui.screens.register
 
 /**
+import com.example.ui.*
  * ⏳ حالة التحميل والعمليات لشاشات التسجيل
  */
 sealed class RegistrationLoadingState {

@@ -1,6 +1,7 @@
 package com.example.ui.screens.chat.components
 
 import android.content.Intent
+import com.example.ui.*
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background

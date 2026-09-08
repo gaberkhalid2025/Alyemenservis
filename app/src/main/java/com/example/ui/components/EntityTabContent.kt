@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.runtime.Composable
+import com.example.ui.*
 import com.example.data.EntityType
 import com.example.data.StoreEntity
 import com.example.data.PropertyEntity

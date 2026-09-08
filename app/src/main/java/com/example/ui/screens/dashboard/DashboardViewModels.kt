@@ -1,6 +1,7 @@
 package com.example.ui.screens.dashboard
 
 import com.example.ui.screens.dashboard.viewmodels.*
+import com.example.ui.*
 
 sealed class DashboardEvent {
     data class ShowToast(val message: String) : DashboardEvent()

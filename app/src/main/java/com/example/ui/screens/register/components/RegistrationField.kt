@@ -1,6 +1,7 @@
 package com.example.ui.screens.register.components
 
 import android.app.Activity
+import com.example.ui.*
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.widget.Toast

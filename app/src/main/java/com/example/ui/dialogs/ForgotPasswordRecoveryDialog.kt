@@ -1,6 +1,7 @@
 package com.example.ui.dialogs
 
 import android.content.Context
+import com.example.ui.*
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast

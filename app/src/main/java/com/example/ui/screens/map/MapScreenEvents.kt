@@ -1,6 +1,7 @@
 package com.example.ui.screens.map
 
 import com.example.data.PropertyEntity
+import com.example.ui.*
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 
