@@ -251,6 +251,11 @@ fun RealLeafletMapView(
 
         if (hasLoadError) {
             MapErrorOverlay(
+                onRetry = {
+                    hasLoadError = false
+                    isMapLoading = true
+                    webViewRef?.reload()
+                },
                 onSwitchToRadar = onSwitchToRadar,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

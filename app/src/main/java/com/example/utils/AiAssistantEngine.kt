@@ -243,6 +243,11 @@ class AiAssistantEngine(private val context: Context) {
     ) {
         val queryLower = prompt.trim().lowercase(Locale.getDefault())
 
+        if (queryCache.size > 100) {
+            val keysToRemove = queryCache.keys.take(queryCache.size - 100)
+            keysToRemove.forEach { queryCache.remove(it) }
+        }
+
         if (queryLower.isBlank()) {
             onResult(
                 AiResponse(

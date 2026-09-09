@@ -75,8 +75,13 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
                 return Result.failure(IllegalArgumentException("طريقة الدفع غير مدعومة: ${payment.method}"))
             }
 
-            if (payment.amount <= 0) {
-                return Result.failure(IllegalArgumentException("المبلغ يجب أن يكون أكبر من الصفر"))
+            val secRes = PaymentSecurityGuard.validateTransaction(
+                amount = payment.amount,
+                receiptNumber = payment.transferId,
+                beneficiary = payment.accountName
+            )
+            if (secRes.isFailure) {
+                return Result.failure(secRes.exceptionOrNull() ?: IllegalArgumentException("فشل فحص أمان العملية المالية"))
             }
 
             val transactionId = if (payment.id.isNotBlank()) payment.id else "TXN-${UUID.randomUUID().toString().take(8).uppercase()}"

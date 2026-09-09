@@ -1,5 +1,6 @@
 package com.example.utils
 
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -13,6 +14,7 @@ import java.util.Locale
 object HolidayManager {
 
     private val customProviderHolidays = mutableMapOf<String, MutableSet<String>>() // providerId -> Set of "yyyy-MM-dd"
+    private var firestoreHolidays = mutableMapOf<String, String>()
 
     // Official Fixed & Common Yemeni Holidays
     private val fixedHolidays = mapOf(
@@ -23,6 +25,24 @@ object HolidayManager {
         "11-30" to "عيد الاستقلال 30 نوفمبر 🇾🇪",
         "01-01" to "رأس السنة الميلادية 🎆"
     )
+
+    suspend fun loadHolidaysFromFirestore() {
+        try {
+            val snapshot = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("settings")
+                .document("holidays")
+                .get()
+                .await()
+            @Suppress("UNCHECKED_CAST")
+            val holidays = snapshot.get("holidays") as? Map<String, String> ?: emptyMap()
+            if (holidays.isNotEmpty()) {
+                firestoreHolidays.clear()
+                firestoreHolidays.putAll(holidays)
+            }
+        } catch (e: Exception) {
+            // keep default
+        }
+    }
 
     /**
      * التحقق مما إذا كان التاريخ عطلة رسمية أو يوم جمعة أو إجازة فني
@@ -38,10 +58,14 @@ object HolidayManager {
                 return Pair(true, "يوم الجمعة (عطلة أسبوعية) 🕌")
             }
 
-            // 2. فحص العطلات الرسمية الثابتة
+            // 2. فحص العطلات الرسمية الثابتة والديناميكية
+            val allHolidays = fixedHolidays + firestoreHolidays
             val monthDay = String.format(Locale.US, "%02d-%02d", cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
-            if (fixedHolidays.containsKey(monthDay)) {
-                return Pair(true, fixedHolidays[monthDay])
+            if (allHolidays.containsKey(monthDay)) {
+                return Pair(true, allHolidays[monthDay])
+            }
+            if (allHolidays.containsKey(dateString)) {
+                return Pair(true, allHolidays[dateString])
             }
 
             // 3. فحص إجازات الفني الخاصة

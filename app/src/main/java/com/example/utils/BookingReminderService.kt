@@ -138,6 +138,28 @@ object BookingReminderService {
         manager.notify(notifId, notification)
     }
 
+    fun cancelBookingReminders(context: Context, bookingId: String) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+
+        val intent24h = Intent(context, BookingReminderReceiver::class.java)
+        val pendingIntent24h = PendingIntent.getBroadcast(
+            context,
+            (bookingId.hashCode() + 24),
+            intent24h,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent24h)
+
+        val intent1h = Intent(context, BookingReminderReceiver::class.java)
+        val pendingIntent1h = PendingIntent.getBroadcast(
+            context,
+            (bookingId.hashCode() + 1),
+            intent1h,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent1h)
+    }
+
     private fun parseDateTimeToMillis(dateStr: String, timeStr: String): Long? {
         return try {
             val sdfDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)

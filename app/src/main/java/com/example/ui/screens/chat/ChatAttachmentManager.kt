@@ -20,6 +20,27 @@ class ChatAttachmentManager(private val context: Context) {
         uri: Uri,
         type: String
     ): Result<String> {
+        // ✅ التحقق من نوع الملف
+        val mimeType = context.contentResolver.getType(uri)
+        if (mimeType != null) {
+            val allowedMimes = listOf(
+                "image/jpeg", "image/png", "image/gif", "image/webp",
+                "audio/mpeg", "audio/mp3", "audio/aac", "audio/amr", "audio/wav", "audio/ogg", "audio/3gpp",
+                "video/mp4", "video/3gpp"
+            )
+            if (mimeType !in allowedMimes) {
+                return Result.failure(Exception("نوع الملف غير مدعوم"))
+            }
+        }
+
+        // منع الملفات التنفيذية
+        val fileNameSegment = uri.lastPathSegment ?: ""
+        val extension = fileNameSegment.substringAfterLast('.', "").lowercase()
+        val blockedExtensions = listOf("exe", "bat", "sh", "apk", "vbs", "cmd", "msi", "dll", "so")
+        if (extension in blockedExtensions) {
+            return Result.failure(Exception("نوع الملف غير مسموح به"))
+        }
+
         val validation = ChatValidationUtils.validateFile(uri, context)
         if (!validation.isValid) {
             return Result.failure(Exception(validation.message))

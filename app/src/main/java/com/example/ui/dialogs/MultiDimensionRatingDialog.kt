@@ -145,25 +145,44 @@ fun MultiDimensionRatingDialog(
                     Button(
                         onClick = {
                             if (commentInput.isNotBlank()) {
-                                val ratingEntity = RatingEntity(
-                                    id = "rate_${UUID.randomUUID().toString().take(8)}",
-                                    targetId = targetId,
-                                    targetType = targetType,
-                                    userId = currentUserPhone.ifEmpty { "user" },
-                                    userName = currentUserName.ifEmpty { "عميل موثق" },
-                                    userPhone = currentUserPhone,
-                                    bookingId = bookingId,
-                                    rating = overallRating,
-                                    qualityRating = qualityRating,
-                                    speedRating = speedRating,
-                                    professionalismRating = professionalismRating,
-                                    priceFairnessRating = priceRating,
-                                    comment = commentInput,
-                                    isApproved = true,
-                                    timestamp = System.currentTimeMillis()
-                                )
-                                viewModel.submitRating(ratingEntity) {
-                                    isSubmitted = true
+                                val doSubmit = {
+                                    val ratingEntity = RatingEntity(
+                                        id = "rate_${UUID.randomUUID().toString().take(8)}",
+                                        targetId = targetId,
+                                        targetType = targetType,
+                                        userId = currentUserPhone.ifEmpty { "user" },
+                                        userName = currentUserName.ifEmpty { "عميل موثق" },
+                                        userPhone = currentUserPhone,
+                                        bookingId = bookingId,
+                                        rating = overallRating,
+                                        qualityRating = qualityRating,
+                                        speedRating = speedRating,
+                                        professionalismRating = professionalismRating,
+                                        priceFairnessRating = priceRating,
+                                        comment = commentInput,
+                                        isApproved = true,
+                                        timestamp = System.currentTimeMillis()
+                                    )
+                                    viewModel.submitRating(ratingEntity) {
+                                        isSubmitted = true
+                                    }
+                                }
+
+                                if (bookingId.isNotEmpty()) {
+                                    viewModel.db.collection("bookings").document(bookingId).get()
+                                        .addOnSuccessListener { doc ->
+                                            val status = doc.getString("status") ?: ""
+                                            if (status != "COMPLETED" && status != "FINISHED") {
+                                                Toast.makeText(context, "لا يمكن التقييم إلا بعد اكتمال الخدمة", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                doSubmit()
+                                            }
+                                        }
+                                        .addOnFailureListener {
+                                            doSubmit()
+                                        }
+                                } else {
+                                    doSubmit()
                                 }
                             } else {
                                 Toast.makeText(context, "⚠️ يرجى كتابة تعليق لوصف الخدمة", Toast.LENGTH_SHORT).show()

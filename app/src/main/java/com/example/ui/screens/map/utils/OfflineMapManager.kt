@@ -83,21 +83,22 @@ object OfflineMapManager {
             if (!dir.exists()) return@withContext
 
             val now = System.currentTimeMillis()
-            val files = dir.listFiles() ?: return@withContext
+            val allFiles = getAllFilesRecursive(dir)
 
             // 1. Delete files older than 7 days
-            for (file in files) {
+            for (file in allFiles) {
                 if (now - file.lastModified() > CACHE_TTL_MILLIS) {
                     file.delete()
                 }
             }
 
-            // 2. Check remaining size; if > 45MB, remove oldest files until < 35MB
+            // 2. Check remaining size; if > 45MB, remove oldest files until <= 35MB
             var currentSize = getDirectorySize(dir)
             if (currentSize > PURGE_THRESHOLD_BYTES) {
-                val sortedFiles = files.filter { it.exists() }.sortedBy { it.lastModified() }
-                for (file in sortedFiles) {
-                    if (currentSize <= 35 * 1024 * 1024L) break
+                val remainingFiles = getAllFilesRecursive(dir).sortedBy { it.lastModified() }
+                val targetSize = 35 * 1024 * 1024L // 35 MB
+                for (file in remainingFiles) {
+                    if (currentSize <= targetSize) break
                     val len = file.length()
                     if (file.delete()) {
                         currentSize -= len
@@ -108,6 +109,19 @@ object OfflineMapManager {
         } catch (e: Exception) {
             Log.e(TAG, "Error purging offline map cache", e)
         }
+    }
+
+    private fun getAllFilesRecursive(dir: File): List<File> {
+        val fileList = mutableListOf<File>()
+        val files = dir.listFiles() ?: return fileList
+        for (f in files) {
+            if (f.isDirectory) {
+                fileList.addAll(getAllFilesRecursive(f))
+            } else {
+                fileList.add(f)
+            }
+        }
+        return fileList
     }
 
     private fun getDirectorySize(dir: File): Long {

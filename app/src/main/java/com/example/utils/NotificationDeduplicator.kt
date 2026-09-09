@@ -15,6 +15,10 @@ class NotificationDeduplicator(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("notification_dedup_prefs", Context.MODE_PRIVATE)
 
+    init {
+        cleanOldNotifications()
+    }
+
     companion object {
         private const val TAG = "NotificationDedup"
         private const val KEY_SENT_IDS = "sent_notification_ids"
@@ -57,6 +61,10 @@ class NotificationDeduplicator(private val context: Context) {
         if (!list.contains(key)) {
             list.add(key)
             saveSentNotifications(list)
+
+            val timestamps = getNotificationTimestamps().toMutableMap()
+            timestamps[key] = System.currentTimeMillis()
+            saveNotificationTimestamps(timestamps)
         }
     }
 

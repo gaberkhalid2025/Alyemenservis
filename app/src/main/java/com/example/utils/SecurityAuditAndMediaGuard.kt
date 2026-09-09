@@ -103,6 +103,52 @@ object PaymentSecurityGuard {
         val errorMessage: String? = null
     )
 
+    fun validateAmount(amount: Double): Result<Boolean> {
+        if (amount <= 0.0) {
+            return Result.failure(IllegalArgumentException("المبلغ المالي يجب أن يكون أكبر من الصفر"))
+        }
+        if (amount > 10_000_000.0) {
+            return Result.failure(IllegalArgumentException("المبلغ يتجاوز الحد الأقصى المسموح به (10 مليون ريال)"))
+        }
+        return Result.success(true)
+    }
+
+    fun validateReceiptNumber(receiptNumber: String): Result<Boolean> {
+        val clean = SecurityCryptoUtils.sanitizeInput(receiptNumber)
+        if (clean.length < 4) {
+            return Result.failure(IllegalArgumentException("عفواً، يجب إدخال رقم إشعار أو حوالة صحيحة لا تقل عن 4 أرقام."))
+        }
+        return Result.success(true)
+    }
+
+    fun validateBeneficiary(beneficiary: String): Result<Boolean> {
+        if (beneficiary.isBlank()) {
+            return Result.failure(IllegalArgumentException("عفواً، هُوية المستفيد غير محددة."))
+        }
+        return Result.success(true)
+    }
+
+    fun validateTransaction(
+        amount: Double,
+        receiptNumber: String = "",
+        beneficiary: String = ""
+    ): Result<Boolean> {
+        val amountRes = validateAmount(amount)
+        if (amountRes.isFailure) return amountRes
+
+        if (receiptNumber.isNotBlank()) {
+            val receiptRes = validateReceiptNumber(receiptNumber)
+            if (receiptRes.isFailure) return receiptRes
+        }
+
+        if (beneficiary.isNotBlank()) {
+            val benRes = validateBeneficiary(beneficiary)
+            if (benRes.isFailure) return benRes
+        }
+
+        return Result.success(true)
+    }
+
     fun verifyTransactionDetails(
         bookingId: String,
         amount: Double,
@@ -112,17 +158,10 @@ object PaymentSecurityGuard {
         if (bookingId.isBlank()) {
             return PaymentVerificationResult(false, "عفواً، رقم الحجز غير صالح أو مفقود.")
         }
-        if (amount <= 0) {
-            return PaymentVerificationResult(false, "عفواً، مبلغ المعاملة يجب أن يكون أكبر من الصفر.")
+        val txRes = validateTransaction(amount, receiptNumber, beneficiaryId)
+        if (txRes.isFailure) {
+            return PaymentVerificationResult(false, txRes.exceptionOrNull()?.message ?: "خطأ في بيانات المعاملة المالية")
         }
-        if (beneficiaryId.isBlank()) {
-            return PaymentVerificationResult(false, "عفواً، هُوية المستفيد غير المحددة.")
-        }
-        val cleanReceipt = SecurityCryptoUtils.sanitizeInput(receiptNumber)
-        if (cleanReceipt.length < 4) {
-            return PaymentVerificationResult(false, "عفواً، يجب إدخال رقم إشعار أو حوالة صحيحة لا تقل عن 4 أرقام.")
-        }
-
         return PaymentVerificationResult(true)
     }
 }

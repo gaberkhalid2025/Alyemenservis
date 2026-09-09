@@ -1,8 +1,10 @@
 package com.example.ui.screens.map.components
 
 import androidx.compose.foundation.layout.*
-import com.example.ui.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 fun MapErrorOverlay(
+    onRetry: (() -> Unit)? = null,
     onSwitchToRadar: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -26,37 +29,66 @@ fun MapErrorOverlay(
             .padding(16.dp)
             .fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(8.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "تحذير",
+                    tint = Color(0xFFFFD700),
+                    modifier = Modifier.size(24.dp)
+                )
                 Text(
-                    text = "📡 تعذر الاتصال بخرائط الإنترنت",
-                    color = Color(0xFFFFD700),
-                    fontSize = 12.sp,
+                    text = "⚠️ تعذر تحميل الخريطة، يرجى التحقق من الاتصال بالإنترنت",
+                    color = Color.White,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = "يمكنك التبديل إلى الرادار المحلي التفاعلي لاستعراض الخدمات بدون إنترنت.",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 10.sp
-                )
             }
-            if (onSwitchToRadar != null) {
-                Button(
-                    onClick = onSwitchToRadar,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text("الرادار المحلي", color = Color(0xFF0F172A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "تعذر الاتصال بقمة خريطة OpenStreetMap، يمكنك إعادة المحاولة أو التبديل للرادار المحلي.",
+                color = Color(0xFF94A3B8),
+                fontSize = 11.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+            ) {
+                if (onRetry != null) {
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            tint = Color(0xFF0F172A),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("إعادة المحاولة", color = Color(0xFF0F172A), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (onSwitchToRadar != null) {
+                    OutlinedButton(
+                        onClick = onSwitchToRadar,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("الرادار المحلي", color = Color(0xFF00E5FF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
     }
 }
+

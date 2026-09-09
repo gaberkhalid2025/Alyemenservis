@@ -34,31 +34,30 @@ class StatusRepositoryImpl(
 
                 val pendingCount = snapshot?.size() ?: 0
 
-                firestore.collection("users").get().addOnSuccessListener { usersSnap ->
-                    val providersCount = usersSnap.documents.count { it.getString("role") == "PROVIDER" }
-                    val instantRequestsCount = usersSnap.documents.sumOf { (it.getLong("instantRequestsCount") ?: 0L).toInt() }
+                com.google.android.gms.tasks.Tasks.whenAllSuccess<Any>(
+                    firestore.collection("users").whereEqualTo("role", "PROVIDER").get(),
+                    firestore.collection("stores").get(),
+                    firestore.collection("properties").get(),
+                    firestore.collection("bookings").get()
+                ).addOnSuccessListener { results ->
+                    val providersCount = (results[0] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
+                    val storesCount = (results[1] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
+                    val propertiesCount = (results[2] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
+                    val bookingsCount = (results[3] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
 
-                    firestore.collection("stores").get().addOnSuccessListener { storesSnap ->
-                        val storesCount = storesSnap.size()
-                        firestore.collection("properties").get().addOnSuccessListener { propsSnap ->
-                            val propertiesCount = propsSnap.size()
-                            firestore.collection("bookings").get().addOnSuccessListener { bookingsSnap ->
-                                val bookingsCount = bookingsSnap.size()
-
-                                trySend(
-                                    SystemStatusMetrics(
-                                        providersCount = providersCount,
-                                        storesCount = storesCount,
-                                        propertiesCount = propertiesCount,
-                                        instantRequestsCount = instantRequestsCount,
-                                        bookingsCount = bookingsCount,
-                                        pendingJoinRequestsCount = pendingCount,
-                                        lastUpdatedTimestamp = System.currentTimeMillis()
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    trySend(
+                        SystemStatusMetrics(
+                            providersCount = providersCount,
+                            storesCount = storesCount,
+                            propertiesCount = propertiesCount,
+                            instantRequestsCount = 0,
+                            bookingsCount = bookingsCount,
+                            pendingJoinRequestsCount = pendingCount,
+                            lastUpdatedTimestamp = System.currentTimeMillis()
+                        )
+                    )
+                }.addOnFailureListener {
+                    trySend(SystemStatusMetrics(pendingJoinRequestsCount = pendingCount, lastUpdatedTimestamp = System.currentTimeMillis()))
                 }
             }
 

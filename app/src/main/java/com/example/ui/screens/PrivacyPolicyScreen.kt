@@ -14,7 +14,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -114,6 +114,55 @@ fun PrivacyPolicyScreen(
                         title = "2. سرية وحماية المدفوعات",
                         desc = "كافة عمليات التحويل والسندات المالية يتم التحقق منها بصورة مشفرة ومؤمنة تماماً."
                     )
+                }
+            }
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var hasAgreed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = cardBg)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = hasAgreed,
+                            onCheckedChange = { hasAgreed = it }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "أوافق على جميع بنود سياسة الخصوصية والشروط",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textColor
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            if (hasAgreed) {
+                                val sp = context.getSharedPreferences("privacy_prefs", android.content.Context.MODE_PRIVATE)
+                                sp.edit().putBoolean("privacy_agreed", true).apply()
+                                onBack()
+                            } else {
+                                android.widget.Toast.makeText(context, "يرجى الموافقة على سياسة الخصوصية أولاً", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        enabled = hasAgreed,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("موافق ومتابعة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
                 }
             }
         }

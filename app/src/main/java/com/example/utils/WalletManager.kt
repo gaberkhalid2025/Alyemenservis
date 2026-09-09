@@ -240,6 +240,10 @@ class WalletManager(private val context: Context? = null) {
         return try {
             if (amount <= 0) return Result.failure(IllegalArgumentException("مبلغ السحب يجب أن يكون أكبر من الصفر"))
 
+            if (amount % 1 != 0.0 && currency.uppercase() == "YER") {
+                return Result.failure(IllegalArgumentException("الريال اليمني لا يدعم الكسور"))
+            }
+
             val current = getOrCreateWallet(walletId)
             if (current.status == "FROZEN") {
                 return Result.failure(IllegalStateException("المحفظة مجمدة ولا يمكن السحب منها"))

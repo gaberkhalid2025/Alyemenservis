@@ -214,6 +214,20 @@ class MainViewModel @Inject constructor(
     val cities: StateFlow<List<CityEntity>> = _cities.asStateFlow()
     internal val _deletedProviders get() = appState._deletedProviders
     val deletedProviders: StateFlow<List<ProviderEntity>> = _deletedProviders.asStateFlow()
+    private val _showNotificationsDialog = MutableStateFlow(false)
+    val showNotificationsDialog: StateFlow<Boolean> = _showNotificationsDialog.asStateFlow()
+
+    private val _showRestoreAccountDialog = MutableStateFlow(false)
+    val showRestoreAccountDialog: StateFlow<Boolean> = _showRestoreAccountDialog.asStateFlow()
+
+    fun toggleNotificationsDialog(show: Boolean) {
+        _showNotificationsDialog.value = show
+    }
+
+    fun toggleRestoreAccountDialog(show: Boolean) {
+        _showRestoreAccountDialog.value = show
+    }
+
     private var isSettingsLoaded = false
     private var isCategoriesLoaded = false
     private var isCitiesLoaded = false

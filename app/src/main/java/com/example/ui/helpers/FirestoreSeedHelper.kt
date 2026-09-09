@@ -10,7 +10,12 @@ import com.google.firebase.firestore.FirebaseFirestore
  */
 class FirestoreSeedHelper(private val db: FirebaseFirestore) {
 
+    private var isSeeded = false
+
     fun seedFirestoreIfEmpty() {
+        if (isSeeded) return
+        isSeeded = true
+
         // Check and seed default configurations ONLY if the document genuinely does not exist in Firestore
         db.collection("settings").document("main_settings").get().addOnSuccessListener { doc ->
             if (doc == null || !doc.exists()) {

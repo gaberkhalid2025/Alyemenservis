@@ -34,7 +34,10 @@ object AudioPlayerManager {
     private val _playbackProgress = MutableStateFlow(0f)
     val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
 
+    private var lastContext: Context? = null
+
     fun play(messageId: String, audioSource: String, context: Context) {
+        lastContext = context.applicationContext
         if (_currentPlayingId.value == messageId && _isPlaying.value) {
             pause()
             return
@@ -150,6 +153,18 @@ object AudioPlayerManager {
             _currentPlayingId.value = null
             _isPlaying.value = false
             _playbackProgress.value = 0f
+
+            // 🧹 حذف الملفات المؤقتة
+            try {
+                val cacheDir = lastContext?.cacheDir
+                cacheDir?.listFiles()?.forEach { file ->
+                    if (file.name.startsWith("temp_voice_") && file.exists()) {
+                        file.delete()
+                    }
+                }
+            } catch (e: Exception) {
+                // تجاهل
+            }
         }
     }
 

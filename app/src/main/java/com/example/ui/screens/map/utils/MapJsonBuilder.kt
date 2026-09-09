@@ -51,7 +51,7 @@ object MapJsonBuilder {
             var rawLat = baseCoords.first + walkOffset.first
             var rawLng = baseCoords.second + walkOffset.second
 
-            val isApproximate = (rawLat == 0.0 && rawLng == 0.0)
+            val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
             if (isApproximate) {
                 rawLat = safeUserLat + ((idx % 5) * 0.003 - 0.006)
                 rawLng = safeUserLng + (((idx / 5) % 5) * 0.003 - 0.006)
@@ -105,7 +105,7 @@ object MapJsonBuilder {
 
             var rawLat = coords.first
             var rawLng = coords.second
-            val isApproximate = (rawLat == 0.0 && rawLng == 0.0)
+            val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
             if (isApproximate) {
                 rawLat = safeUserLat + (((idx + 2) % 6) * 0.0035 - 0.007)
                 rawLng = safeUserLng + ((((idx + 2) / 6) % 6) * 0.0035 - 0.007)
@@ -142,7 +142,7 @@ object MapJsonBuilder {
             val coords = getPropertyCoords(pr)
             var rawLat = coords.first
             var rawLng = coords.second
-            val isApproximate = (rawLat == 0.0 && rawLng == 0.0)
+            val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
             if (isApproximate) {
                 rawLat = safeUserLat + (((idx + 4) % 5) * 0.004 - 0.008)
                 rawLng = safeUserLng + ((((idx + 4) / 5) % 5) * 0.004 - 0.008)

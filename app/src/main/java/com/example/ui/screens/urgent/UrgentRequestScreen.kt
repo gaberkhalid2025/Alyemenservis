@@ -252,6 +252,12 @@ fun UrgentRequestScreen(
                         scope.launch { snackbarHostState.showSnackbar("يرجى تعبئة كافة الحقول الإجبارية (*)") }
                         return@Button
                     }
+                    val cleanPhone = customerPhone.trim().replace(" ", "").replace("+", "")
+                    val isValidPhone = cleanPhone.length == 9 && listOf("77", "73", "71", "70", "78").any { cleanPhone.startsWith(it) }
+                    if (!isValidPhone) {
+                        scope.launch { snackbarHostState.showSnackbar("رقم الهاتف غير صحيح! يجب أن يكون 9 أرقام ويبدأ بـ 77/73/71/70/78") }
+                        return@Button
+                    }
                     if (pinCode.length < 4) {
                         scope.launch { snackbarHostState.showSnackbar("يرجى كتابة رمز PIN مكون من 4 أرقام") }
                         return@Button

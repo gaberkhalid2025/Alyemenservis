@@ -50,13 +50,8 @@ fun AppNavigator(
     val currentUserName by viewModel.currentUserName.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
 
-    var showNotificationsDialog by remember { mutableStateOf(false) }
-    var showRestoreAccountDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(currentScreen) {
-        showNotificationsDialog = false
-        showRestoreAccountDialog = false
-    }
+    val showNotificationsDialog by viewModel.showNotificationsDialog.collectAsState()
+    val showRestoreAccountDialog by viewModel.showRestoreAccountDialog.collectAsState()
 
     val providers by viewModel.providers.collectAsState()
     val categories by viewModel.categories.collectAsState()
@@ -75,7 +70,7 @@ fun AppNavigator(
                     themeColors = themeColors,
                     onNotificationsClick = { viewModel.navigateToScreen(AppScreens.NOTIFICATIONS_VIEW) },
                     onChatsClick = { viewModel.navigateToScreen(AppScreens.CHAT_LIST) },
-                    onMenuClick = { showRestoreAccountDialog = true }
+                    onMenuClick = { viewModel.toggleRestoreAccountDialog(true) }
                 )
             }
         },
@@ -254,10 +249,10 @@ fun AppNavigator(
             }
 
             if (showRestoreAccountDialog) {
-                RestoreAccountDialog(viewModel = viewModel, themeColors = themeColors, onDismiss = { showRestoreAccountDialog = false })
+                RestoreAccountDialog(viewModel = viewModel, themeColors = themeColors, onDismiss = { viewModel.toggleRestoreAccountDialog(false) })
             }
             if (showNotificationsDialog) {
-                UserNotificationsDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { showNotificationsDialog = false })
+                UserNotificationsDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { viewModel.toggleNotificationsDialog(false) })
             }
         }
     }
