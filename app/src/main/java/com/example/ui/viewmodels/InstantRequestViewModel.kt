@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import com.example.ui.helpers.AppState
 
 import android.content.Context
 import com.example.ui.*
@@ -51,9 +52,11 @@ sealed class InstantEvent {
  * The unified official ViewModel for 30-minute instant / urgent requests.
  * Uses InstantRequestRepository and Firestore collection "instant_requests".
  */
+
 class InstantRequestViewModel @Inject constructor(
     private val repository: InstantRequestRepository,
-    private val chatRepo: ChatRepository
+    private val chatRepo: ChatRepository,
+    val appState: AppState
 ) : BaseViewModel() {
 
     var triggerNotification: ((String) -> Unit)? = null
@@ -68,16 +71,16 @@ class InstantRequestViewModel @Inject constructor(
     private val _eventFlow = MutableSharedFlow<InstantEvent>()
     val eventFlow: SharedFlow<InstantEvent> = _eventFlow.asSharedFlow()
 
-    internal val _instantRequests = MutableStateFlow<List<InstantRequestEntity>>(emptyList())
+    internal val _instantRequests get() = appState._instantRequests
     val instantRequests: StateFlow<List<InstantRequestEntity>> = _instantRequests.asStateFlow()
 
     private val _selectedRequest = MutableStateFlow<InstantRequestEntity?>(null)
     val selectedRequest: StateFlow<InstantRequestEntity?> = _selectedRequest.asStateFlow()
 
-    internal val _requestOffers = MutableStateFlow<List<RequestOfferEntity>>(emptyList())
+    internal val _requestOffers get() = appState._requestOffers
     val requestOffers: StateFlow<List<RequestOfferEntity>> = _requestOffers.asStateFlow()
 
-    internal val _offers = MutableStateFlow<List<Offer>>(emptyList())
+    internal val _offers get() = appState._offers
     val offers: StateFlow<List<Offer>> = _offers.asStateFlow()
 
     private var requestsListener: ListenerRegistration? = null

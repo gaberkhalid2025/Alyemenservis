@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import com.example.ui.helpers.AppState
 
 import android.content.Context
 import com.example.ui.*
@@ -47,20 +48,22 @@ enum class BookingDistributionMode(val label: String) {
     ADMIN_ONLY("للأدمن أولاً")
 }
 
+
 open class BookingViewModel @Inject constructor(
-    private val injectedRepository: BookingRepository
+    private val injectedRepository: BookingRepository,
+    val appState: AppState
 ) : BaseViewModel() {
 
-    internal val _bookings = MutableStateFlow<List<BookingEntity>>(emptyList())
+    internal val _bookings get() = appState._bookings
     val bookings: StateFlow<List<BookingEntity>> = _bookings.asStateFlow()
 
     internal val _createBookingStatus = MutableStateFlow<Result<BookingEntity>?>(null)
     val createBookingStatus: StateFlow<Result<BookingEntity>?> = _createBookingStatus.asStateFlow()
 
-    internal val _bookingFormFields = MutableStateFlow(BookingFormFields())
+    internal val _bookingFormFields get() = appState._bookingFormFields
     val bookingFormFields: StateFlow<BookingFormFields> = _bookingFormFields.asStateFlow()
 
-    internal val _distributionMode = MutableStateFlow(BookingDistributionMode.ADMIN_ONLY)
+    internal val _distributionMode get() = appState._distributionMode
     val distributionMode: StateFlow<BookingDistributionMode> = _distributionMode.asStateFlow()
 
     val bookingRepository: BookingRepository
@@ -495,313 +498,32 @@ open class BookingViewModel @Inject constructor(
         )
     }
 
-    fun cancelBookingByUser(bookingId: String) = cancelBookingByUserImpl(bookingId)
 
-    fun cancelBookingByUserImpl(bookingId: String) {
+
+
+    fun attemptCancelBooking(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", cancelledByParam: String = "USER", onResult: (Boolean, String) -> Unit) =
+        attemptCancelBookingImpl(bookingId, input, reason, cancelledByParam, onResult)
+
+        fun attemptCancelBookingImpl(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", cancelledByParam: String = "USER", onResult: (Boolean, String) -> Unit) {
         val b = _bookings.value.find { it.id == bookingId }
-        _bookings.value = _bookings.value.map { booking ->
-            if (booking.id == bookingId) {
-                booking.copy(status = "CANCELLED")
-            } else booking
+        if (b == null) {
+            onResult(false, "❌ الحجز غير موجود")
+            return
         }
-        try {
-            db.collection("bookings").document(bookingId).update("status", "CANCELLED")
-                .addOnSuccessListener {
-                    triggerNotificationCallback?.invoke("✅ تم إلغاء الحجز وإرسال إشعار للإدارة والفني")
-                    val bkCode = b?.bookingCode?.ifBlank { b?.bookingNumber?.ifBlank { bookingId } } ?: bookingId
-                    val custName = b?.fullName?.ifBlank { b.clientName.ifBlank { b.customerName.ifBlank { "العميل" } } } ?: "العميل"
-                    val custPhone = b?.customerPhone?.ifBlank { b.clientPhone } ?: ""
-                    val provName = b?.providerName ?: ""
-                    val srvName = b?.serviceType?.ifBlank { "خدمة" } ?: "خدمة"
-                    
-                    // 1. Notify Admin
-                    onAddNotification?.invoke(
-                        "❌ إشعار إداري: إلغاء حجز",
-                        "نوع العملية: (إلغاء) | رقم الحجز: $bkCode | اسم العميل: $custName ($custPhone) | الخدمة: $srvName لدى $provName",
-                        "ADMIN_ONLY",
-                        ""
-                    )
-                    
-                    // 2. Notify Provider
-                    if (b != null) {
-                        val provPhone = b.providerPhone.ifBlank {
-                            val provObj = getProviders?.invoke()?.find { it.id == b.providerId || it.name.trim() == b.providerName.trim() }
-                            provObj?.phone?.trim()?.ifBlank { b.providerId } ?: b.providerId
-                        }
-                        if (provPhone.isNotBlank()) {
-                            onAddNotification?.invoke(
-                                "❌ إلغاء حجز من العميل",
-                                "قام $custName ($custPhone) بإلغاء حجز الخدمة ($srvName).",
-                                "PROVIDER",
-                                provPhone
-                            )
-                        }
-                    }
-                }
-                .addOnFailureListener {
-                    triggerNotificationCallback?.invoke("❌ فشل إلغاء الحجز، حاول مجدداً")
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    fun attemptCancelBooking(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", onResult: (Boolean, String) -> Unit) =
-        attemptCancelBookingImpl(bookingId, input, reason, onResult)
-
-    fun attemptCancelBookingImpl(bookingId: String, input: String, reason: String = "ملغي بطلب العميل", onResult: (Boolean, String) -> Unit) {
-        db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
-            val b = snapshot.toObject(BookingEntity::class.java)
-            if (b == null) {
-                onResult(false, "❌ الحجز غير موجود في قاعدة البيانات")
-                return@addOnSuccessListener
+        
+        injectedRepository.cancelBookingWithSecurity(
+            booking = b,
+            inputPinOrPassword = input,
+            cancellationReason = reason,
+            cancelledBy = cancelledByParam,
+            onSuccess = {
+                onResult(true, "✅ تم إلغاء الحجز بنجاح")
+                triggerNotificationCallback?.invoke("✅ تم إلغاء الحجز بنجاح")
+            },
+            onError = { msg ->
+                onResult(false, msg)
             }
-
-            // Check if locked
-            if (b.isLocked) {
-                val until = b.lockedUntil ?: 0L
-                if (System.currentTimeMillis() < until) {
-                    val remainingSeconds = (until - System.currentTimeMillis()) / 1000
-                    onResult(false, "🔒 هذا الحجز مقفل حالياً ومحمي بسبب تكرار المحاولات الخاطئة. يرجى المحاولة مجدداً بعد $remainingSeconds ثانية أو التواصل مع الإدارة.")
-                    return@addOnSuccessListener
-                }
-            }
-
-            // Check 8-hour cancellation restriction rule
-            val canCancel = com.example.utils.BookingUtils.canModifyOrCancelBooking(
-                scheduledAtTimestamp = b.scheduledAt,
-                dateString = b.dateString.ifBlank { b.date },
-                timeString = b.timeString.ifBlank { b.time }
-            )
-            if (!canCancel) {
-                onResult(false, "⚠️ لا يمكن إلغاء الحجز؛ التعديل والإلغاء مسموح فقط قبل 8 ساعات من الموعد المحدد حرصاً على وقت مقدم الخدمة.")
-                return@addOnSuccessListener
-            }
-
-            val cleanInput = input.trim()
-            val isPassCorrect = cleanInput == b.bookingPassword && b.bookingPassword.isNotEmpty()
-            val isNumCorrect = cleanInput == b.bookingNumber && b.bookingNumber.isNotEmpty()
-            val isPinCorrect = cleanInput == b.pinCode && b.pinCode.isNotEmpty()
-
-            if (isPassCorrect || isNumCorrect || isPinCorrect) {
-                // Correct input! Do the cancellation
-                val updated = b.copy(
-                    status = "CANCELLED",
-                    cancellationReason = reason,
-                    cancelledAt = System.currentTimeMillis(),
-                    cancelledBy = "USER",
-                    cancellationAttempts = 0,
-                    isLocked = false,
-                    lockedUntil = 0L,
-                    updatedAt = System.currentTimeMillis()
-                )
-                val bkCode = b.bookingCode.ifBlank { b.bookingNumber.ifBlank { b.id } }
-                val custName = b.fullName.ifBlank { b.clientName.ifBlank { b.customerName.ifBlank { "العميل" } } }
-
-                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
-                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
-                    
-                    // Trigger in-app notifications
-                    onAddNotification?.invoke(
-                        "❌ تم إلغاء حجزك بنجاح",
-                        "عزيزي العميل، تم إلغاء حجز الخدمة بنجاح بطلب منك. رقم الحجز: $bkCode",
-                        "USER",
-                        b.customerPhone.ifBlank { b.clientPhone }
-                    )
-                    
-                    if (b.providerId.isNotEmpty()) {
-                        onAddNotification?.invoke(
-                            "❌ تم إلغاء حجز قائم لديك",
-                            "الفني العزيز ${b.providerName}، نود إبلاغك بأن العميل قد ألغى الحجز رقم $bkCode والمحدد في تاريخ ${b.dateString} ${b.timeString}.",
-                            "PROVIDER",
-                            b.providerPhone.ifEmpty { b.customerPhone }
-                        )
-                    }
-
-                    // Add Admin notification containing: booking code, customer name, and operation type (إلغاء)
-                    onAddNotification?.invoke(
-                        "❌ إشعار إداري: إلغاء حجز",
-                        "نوع العملية: (إلغاء) | رقم الحجز: $bkCode | اسم العميل: $custName | السبب: $reason",
-                        "ADMIN_ONLY",
-                        ""
-                    )
-                    onResult(true, "✅ تم إلغاء الحجز بنجاح")
-                }.addOnFailureListener {
-                    onResult(false, "❌ فشل تحديث حالة الحجز في الخادم")
-                }
-            } else {
-                // Wrong input!
-                val newAttempts = b.cancellationAttempts + 1
-                val maxAttempts = 3
-                val shouldLock = newAttempts >= maxAttempts
-                val lockTime = if (shouldLock) System.currentTimeMillis() + 5 * 60 * 1000 else 0L // 5 minutes lock
-                
-                val updated = b.copy(
-                    cancellationAttempts = newAttempts,
-                    isLocked = shouldLock,
-                    lockedUntil = if (shouldLock) lockTime else null
-                )
-                
-                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
-                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
-                    if (shouldLock) {
-                        onResult(false, "🔒 تم قفل عمليات إلغاء هذا الحجز مؤقتاً لمدة 5 دقائق لحماية مقدم الخدمة من الإلغاءات غير المصرح بها.")
-                    } else {
-                        onResult(false, "❌ كلمة المرور أو رقم الحجز غير صحيح! المحاولات المتبقية: ${maxAttempts - newAttempts}")
-                    }
-                }.addOnFailureListener {
-                    onResult(false, "❌ إدخال خاطئ وفشل حفظ محاولة التحقق")
-                }
-            }
-        }.addOnFailureListener {
-            onResult(false, "❌ فشل الاتصال بقاعدة البيانات")
-        }
-    }
-
-    fun cancelBookingByTechnician(bookingId: String, reason: String, onComplete: () -> Unit = {}) =
-        cancelBookingByTechnicianImpl(bookingId, reason, onComplete)
-
-    fun cancelBookingByTechnicianImpl(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
-        db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
-            val b = snapshot.toObject(BookingEntity::class.java)
-            if (b != null) {
-                val updated = b.copy(
-                    status = "CANCELLED",
-                    cancellationReason = "إلغاء من قبل الفني: $reason",
-                    cancelledAt = System.currentTimeMillis(),
-                    cancelledBy = "PROVIDER",
-                    updatedAt = System.currentTimeMillis()
-                )
-                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
-                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
-                    
-                    // Notify Customer
-                    onAddNotification?.invoke(
-                        "🚫 قام الفني بإلغاء حجزك",
-                        "عزيزي العميل، اعتذر الفني ${b.providerName} عن إتمام الحجز رقم ${b.bookingNumber.ifEmpty { b.id }}. السبب: $reason",
-                        "USER",
-                        b.customerPhone
-                    )
-                    
-                    // Notify Admin
-                    onAddNotification?.invoke(
-                        "🚨 قام الفني بإلغاء حجز",
-                        "قام الفني ${b.providerName} بإلغاء حجز العميل ${b.customerName} (${b.customerPhone}). السبب: $reason",
-                        "ADMIN_ONLY",
-                        ""
-                    )
-                    triggerNotificationCallback?.invoke("❌ تم إلغاء الحجز وإشعار العميل والإدارة")
-                    onComplete()
-                }
-            }
-        }
-    }
-
-    fun cancelBookingByAdmin(bookingId: String, reason: String, onComplete: () -> Unit = {}) =
-        cancelBookingByAdminImpl(bookingId, reason, onComplete)
-
-    fun cancelBookingByAdminImpl(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
-        db.collection("bookings").document(bookingId).get().addOnSuccessListener { snapshot ->
-            val b = snapshot.toObject(BookingEntity::class.java)
-            if (b != null) {
-                val updated = b.copy(
-                    status = "CANCELLED",
-                    cancellationReason = "إلغاء من قبل الإدارة: $reason",
-                    cancelledAt = System.currentTimeMillis(),
-                    cancelledBy = "ADMIN",
-                    updatedAt = System.currentTimeMillis()
-                )
-                db.collection("bookings").document(bookingId).set(updated).addOnSuccessListener {
-                    _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
-                    
-                    // Notify Customer
-                    onAddNotification?.invoke(
-                        "🚫 تم إلغاء حجزك من قبل الإدارة",
-                        "عزيزي العميل، تم إلغاء حجزك رقم ${b.bookingNumber.ifEmpty { b.id }} بواسطة إدارة المنصة. السبب: $reason",
-                        "USER",
-                        b.customerPhone
-                    )
-                    
-                    // Notify Technician
-                    if (b.providerPhone.isNotBlank()) {
-                        onAddNotification?.invoke(
-                            "🚫 تم إلغاء حجزك من قبل الإدارة",
-                            "الفني العزيز ${b.providerName}، تم إلغاء حجز العميل ${b.customerName} من قبل الإدارة. السبب: $reason",
-                            "PROVIDER",
-                            b.providerPhone
-                        )
-                    }
-                    triggerNotificationCallback?.invoke("❌ تم إلغاء الحجز وإشعار جميع الأطراف")
-                    onComplete()
-                }
-            }
-        }
-    }
-
-    fun getBookingStatusColor(status: String): String = getBookingStatusColorImpl(status)
-
-    fun getBookingStatusColorImpl(status: String): String {
-        return when (status.uppercase()) {
-            "PENDING", "UNDER_REVIEW" -> "#F97316" // Orange
-            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> "#3B82F6" // Blue
-            "COMPLETED" -> "#10B981" // Green
-            "REJECTED", "CANCELLED" -> "#EF4444" // Red
-            else -> "#9E9E9E"
-        }
-    }
-
-    fun getBookingStatusLabel(status: String): String = getBookingStatusLabelImpl(status)
-
-    fun getBookingStatusLabelImpl(status: String): String {
-        return when (status.uppercase()) {
-            "PENDING", "UNDER_REVIEW" -> "🔍 قيد المراجعة والتدقيق (33%)"
-            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> "⚡ جاري تنفيذ الخدمة (66%)"
-            "COMPLETED" -> "🎉 مكتملة بنجاح (100%)"
-            "REJECTED" -> "❌ مرفوضة من الإدارة"
-            "CANCELLED" -> "❌ ملغية"
-            else -> status
-        }
-    }
-
-    fun getBookingProgress(status: String): Float = getBookingProgressImpl(status)
-
-    fun getBookingProgressImpl(status: String): Float {
-        return when (status.uppercase()) {
-            "PENDING", "UNDER_REVIEW" -> 0.33f
-            "IN_PROGRESS", "ACCEPTED", "APPROVED" -> 0.66f
-            "COMPLETED" -> 1.00f
-            else -> 0.0f
-        }
-    }
-
-    fun createBookingDirectly(
-        provider: ProviderEntity,
-        notes: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val custName = getCurrentUserName?.invoke()?.ifBlank { "عميل التطبيق" } ?: "عميل التطبيق"
-        val custPhone = getCurrentUserPhone?.invoke()?.ifBlank { "770000000" } ?: "770000000"
-        val newBooking = BookingEntity(
-            id = java.util.UUID.randomUUID().toString(),
-            customerName = custName,
-            customerPhone = custPhone,
-            clientName = custName,
-            clientPhone = custPhone,
-            customerArea = getCurrentUserResidence?.invoke()?.ifBlank { provider.area } ?: provider.area,
-            serviceType = provider.profession,
-            providerId = provider.id,
-            providerName = provider.name,
-            providerPhone = provider.phone,
-            serviceDetails = notes,
-            dateString = "2026-08-25",
-            timeString = "12:00 م",
-            status = "PENDING",
-            bookingNumber = "MAP-${(10000..99999).random()}"
         )
-        createBooking(newBooking) { success ->
-            if (success) onSuccess() else onError("تعذر إتمام الحجز")
-        }
     }
 
     fun editBookingByUser(bookingId: String, newDate: String, newTime: String, newServiceType: String, providerId: String = "", providerName: String = "") {
@@ -836,5 +558,42 @@ open class BookingViewModel @Inject constructor(
             .addOnSuccessListener {
                 triggerToast("✅ تم تعديل الحجز بنجاح!")
             }
+    }
+
+    fun getBookingStatusColor(status: String): String {
+        return when (status) {
+            "PENDING" -> "#FF9800" // Orange
+            "APPROVED" -> "#2196F3" // Blue
+            "IN_PROGRESS" -> "#9C27B0" // Purple
+            "COMPLETED" -> "#4CAF50" // Green
+            "CANCELLED" -> "#F44336" // Red
+            else -> "#757575" // Grey
+        }
+    }
+
+    fun getBookingStatusLabel(status: String): String {
+        return when (status) {
+            "PENDING" -> "قيد الانتظار"
+            "APPROVED" -> "مقبول"
+            "IN_PROGRESS" -> "جاري التنفيذ"
+            "COMPLETED" -> "مكتمل"
+            "CANCELLED" -> "ملغي"
+            else -> "غير معروف"
+        }
+    }
+
+    fun getBookingProgress(status: String): Float {
+        return when (status) {
+            "PENDING" -> 0.25f
+            "APPROVED" -> 0.50f
+            "IN_PROGRESS" -> 0.75f
+            "COMPLETED" -> 1.0f
+            "CANCELLED" -> 1.0f
+            else -> 0.0f
+        }
+    }
+    
+    fun createBookingDirectly(provider: com.example.data.ProviderEntity, notes: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        onError("Not implemented")
     }
 }

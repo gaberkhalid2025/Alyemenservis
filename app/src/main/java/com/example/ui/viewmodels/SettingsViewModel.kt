@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import com.example.ui.helpers.AppState
 
 import com.example.ui.MainViewModel
 import com.example.ui.*
@@ -16,7 +17,10 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import javax.inject.Inject
 
-class SettingsViewModel @Inject constructor() : BaseViewModel() {
+
+class SettingsViewModel @Inject constructor(
+    val appState: AppState
+) : BaseViewModel() {
     fun updateAppLanguage(lang: String) {
         val updated = _settings.value.copy(appLanguage = lang)
         _settings.value = updated
@@ -123,7 +127,7 @@ enum class ChatParticipantType {
         ALL         // الجميع
     }
 
-    internal val _settings = MutableStateFlow(AdminSettingsEntity())
+    internal val _settings get() = appState._settings
     val settings: StateFlow<AdminSettingsEntity> = _settings.asStateFlow()
     internal val _colorScheme = MutableStateFlow(com.example.data.ColorSchemeEntity())
     val colorScheme: StateFlow<com.example.data.ColorSchemeEntity> = _colorScheme.asStateFlow()

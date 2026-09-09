@@ -111,10 +111,12 @@ fun BookingsScreenLayout(
                     Toast.makeText(context, "تم تحديث حالة الحجز إلى: $newStatus", Toast.LENGTH_SHORT).show()
                 },
                 onCancelBooking = { booking, reason, password ->
+                    val cancelledByStr = if (isAdmin) "ADMIN" else if (viewModel.isProviderUser) "PROVIDER" else "USER"
                     viewModel.attemptCancelBookingImpl(
                         bookingId = booking.id,
                         input = password,
-                        reason = reason
+                        reason = reason,
+                        cancelledByParam = cancelledByStr
                     ) { success, msg ->
                         Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                     }

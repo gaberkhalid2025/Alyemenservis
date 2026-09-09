@@ -756,7 +756,6 @@ fun MainViewModel.addNotification(
     }
     fun MainViewModel.updateBookingFormFields(fields: BookingFormFields) = bookingViewModel.updateBookingFormFields(fields)
     fun MainViewModel.updateDistributionMode(mode: BookingDistributionMode) = bookingViewModel.updateDistributionMode(mode)
-    fun MainViewModel.cancelBookingByUser(bookingId: String) = bookingViewModel.cancelBookingByUser(bookingId)
     fun MainViewModel.getBookingStatusColor(status: String): String = bookingViewModel.getBookingStatusColor(status)
     fun MainViewModel.getBookingStatusLabel(status: String): String = bookingViewModel.getBookingStatusLabel(status)
     fun MainViewModel.getBookingProgress(status: String): Float = bookingViewModel.getBookingProgress(status)

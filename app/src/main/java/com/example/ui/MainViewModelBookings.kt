@@ -50,37 +50,24 @@ fun MainViewModel.updateBookingImpl(booking: BookingEntity) {
     bookingViewModel.updateBookingImpl(booking)
 }
 
-fun MainViewModel.cancelBookingByUserImpl(bookingId: String) {
-    bookingViewModel.cancelBookingByUserImpl(bookingId)
-}
 
-fun MainViewModel.attemptCancelBookingImpl(
-    bookingId: String, 
-    input: String, 
-    reason: String = "ملغي بطلب العميل", 
-    onResult: (Boolean, String) -> Unit
-) {
-    bookingViewModel.attemptCancelBookingImpl(bookingId, input, reason, onResult)
-}
 
-fun MainViewModel.cancelBookingByTechnicianImpl(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
-    bookingViewModel.cancelBookingByTechnicianImpl(bookingId, reason, onComplete)
-}
 
-fun MainViewModel.cancelBookingByAdminImpl(bookingId: String, reason: String, onComplete: () -> Unit = {}) {
-    bookingViewModel.cancelBookingByAdminImpl(bookingId, reason, onComplete)
-}
+
+
+
+
 
 fun MainViewModel.getBookingStatusColorImpl(status: String): String {
-    return bookingViewModel.getBookingStatusColorImpl(status)
+    return bookingViewModel.getBookingStatusColor(status)
 }
 
 fun MainViewModel.getBookingStatusLabelImpl(status: String): String {
-    return bookingViewModel.getBookingStatusLabelImpl(status)
+    return bookingViewModel.getBookingStatusLabel(status)
 }
 
 fun MainViewModel.getBookingProgressImpl(status: String): Float {
-    return bookingViewModel.getBookingProgressImpl(status)
+    return bookingViewModel.getBookingProgress(status)
 }
 
 fun MainViewModel.createBooking(booking: BookingEntity, onResult: (Boolean) -> Unit = {}) {
@@ -94,4 +81,14 @@ fun MainViewModel.createBookingDirectly(
     onError: (String) -> Unit
 ) {
     bookingViewModel.createBookingDirectly(provider, notes, onSuccess, onError)
+}
+
+fun MainViewModel.attemptCancelBookingImpl(
+    bookingId: String, 
+    input: String, 
+    reason: String = "ملغي بطلب العميل", 
+    cancelledByParam: String = "USER",
+    onResult: (Boolean, String) -> Unit
+) {
+    bookingViewModel.attemptCancelBookingImpl(bookingId, input, reason, cancelledByParam, onResult)
 }

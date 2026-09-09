@@ -346,34 +346,59 @@ class BookingRepository(private val context: Context) {
             .update(updates)
             .addOnSuccessListener {
                 val notifTime = System.currentTimeMillis()
+                
+                val userTitle = when(cancelledBy) {
+                    "USER" -> "تم إلغاء حجزك بنجاح"
+                    "PROVIDER" -> "اعتذر الفني عن الحجز"
+                    else -> "تم إلغاء حجزك من قبل الإدارة"
+                }
+                val userMsg = when(cancelledBy) {
+                    "USER" -> "تم إلغاء طلب الحجز #${booking.bookingNumber} بناءً على طلبك. السبب: $cancellationReason"
+                    "PROVIDER" -> "قام الفني بإلغاء الحجز #${booking.bookingNumber}. السبب: $cancellationReason"
+                    else -> "قامت الإدارة بإلغاء الحجز #${booking.bookingNumber}. السبب: $cancellationReason"
+                }
+
                 if (booking.customerPhone.isNotBlank()) {
                     val uId = UUID.randomUUID().toString()
                     firestore.collection("notifications").document(uId).set(mapOf(
                         "id" to uId,
-                        "title" to "تم إلغاء الحجز",
-                        "message" to "تم إلغاء طلب الحجز #${booking.bookingNumber} بنجاح. السبب: $cancellationReason",
+                        "title" to userTitle,
+                        "message" to userMsg,
                         "targetType" to "USER",
                         "targetValue" to booking.customerPhone,
                         "timestamp" to notifTime
                     ))
                 }
+
+                val providerTitle = when(cancelledBy) {
+                    "USER" -> "قام العميل بإلغاء الحجز"
+                    "PROVIDER" -> "تم إلغاء الحجز بنجاح"
+                    else -> "قامت الإدارة بإلغاء الحجز"
+                }
+                val providerMsg = when(cancelledBy) {
+                    "USER" -> "قام العميل بإلغاء الحجز #${booking.bookingNumber}. السبب: $cancellationReason"
+                    "PROVIDER" -> "تم إلغاء الحجز #${booking.bookingNumber} بناءً على طلبك. السبب: $cancellationReason"
+                    else -> "قامت الإدارة بإلغاء الحجز #${booking.bookingNumber}. السبب: $cancellationReason"
+                }
+
                 val pTarget = booking.providerPhone.ifBlank { booking.providerId }
                 if (pTarget.isNotBlank()) {
                     val pId = UUID.randomUUID().toString()
                     firestore.collection("notifications").document(pId).set(mapOf(
                         "id" to pId,
-                        "title" to "إلغاء حجز",
-                        "message" to "تم إلغاء الحجز #${booking.bookingNumber} من قبل $cancelledBy. السبب: $cancellationReason",
+                        "title" to providerTitle,
+                        "message" to providerMsg,
                         "targetType" to "PROVIDER",
                         "targetValue" to pTarget,
                         "timestamp" to notifTime
                     ))
                 }
+
                 val aId = UUID.randomUUID().toString()
                 firestore.collection("notifications").document(aId).set(mapOf(
                     "id" to aId,
                     "title" to "إشعار إداري: إلغاء حجز",
-                    "message" to "تم إلغاء الحجز #${booking.bookingNumber} - السبب: $cancellationReason",
+                    "message" to "تم إلغاء الحجز #${booking.bookingNumber} من قبل $cancelledBy. السبب: $cancellationReason",
                     "targetType" to "ADMIN_ONLY",
                     "targetValue" to "ALL",
                     "timestamp" to notifTime

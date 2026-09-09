@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import com.example.ui.helpers.AppState
 
 import androidx.lifecycle.viewModelScope
 import com.example.ui.*
@@ -13,12 +14,15 @@ import java.util.UUID
 
 import javax.inject.Inject
 
-open class HomeViewModel @Inject constructor() : BaseViewModel() {
 
-    internal val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
+open class HomeViewModel @Inject constructor(
+    val appState: AppState
+) : BaseViewModel() {
+
+    internal val _categories get() = appState._categories
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
 
-    internal val _providers = MutableStateFlow<List<ProviderEntity>>(emptyList())
+    internal val _providers get() = appState._providers
     val providers: StateFlow<List<ProviderEntity>> = _providers.asStateFlow()
 
     internal val _filteredProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())

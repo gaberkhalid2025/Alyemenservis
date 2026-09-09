@@ -56,27 +56,27 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    fun setupRealtimeFirestoreListeners(vm: MainViewModel) {
+    fun setupRealtimeFirestoreListeners(appState: com.example.ui.helpers.AppState) {
         // 1. Settings (Document main_settings)
         db.collection("settings").document("main_settings").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                vm._isInitialized.value = true
+                appState._isInitialized.value = true
                 return@addSnapshotListenerReg
             }
             if (snapshot != null && snapshot.exists()) {
                 try {
                     snapshot.toObject(AdminSettingsEntity::class.java)?.let {
-                        vm._settings.value = it
-                        vm._maxKmRadius.value = it.maxSearchRadiusKm
+                        appState._settings.value = it
+                        appState._maxKmRadius.value = it.maxSearchRadiusKm
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
             } else {
-                vm._settings.value = AdminSettingsEntity()
+                appState._settings.value = AdminSettingsEntity()
             }
-            vm._isInitialized.value = true
+            appState._isInitialized.value = true
         }
 
         // 1b. Booking Form Fields Listener
@@ -84,7 +84,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             if (error == null && snapshot != null && snapshot.exists()) {
                 try {
                     snapshot.toObject(BookingFormFields::class.java)?.let {
-                        vm._bookingFormFields.value = it
+                        appState._bookingFormFields.value = it
                     }
                 } catch (e: Exception) { e.printStackTrace() }
             }
@@ -96,7 +96,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                 val modeStr = snapshot.getString("mode")
                 if (!modeStr.isNullOrEmpty()) {
                     try {
-                        vm._distributionMode.value = BookingDistributionMode.valueOf(modeStr)
+                        appState._distributionMode.value = BookingDistributionMode.valueOf(modeStr)
                     } catch (e: Exception) { e.printStackTrace() }
                 }
             }
@@ -122,7 +122,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }.distinctBy { it.id }.sortedWith(compareByDescending<CategoryEntity> { it.isPinned }.thenBy { it.order })
-                vm._categories.value = fetched
+                appState._categories.value = fetched
             }
         }
 
@@ -130,7 +130,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         db.collection("custom_profile_tabs").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.toObjects(CustomProfileTabEntity::class.java)
-                vm._customProfileTabs.value = fetched.sortedBy { it.displayOrder }
+                appState._customProfileTabs.value = fetched.sortedBy { it.displayOrder }
             }
         }
 
@@ -149,34 +149,34 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._cities.value = fetched
+                appState._cities.value = fetched
             }
         }
 
         // 3b. Registered Users count listener
         db.collection("registered_users").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
-                vm._registeredUsersCount.value = snapshot.size()
+                appState._registeredUsersCount.value = snapshot.size()
                 val list = snapshot.documents.mapNotNull { doc ->
                     val data = doc.data?.toMutableMap() ?: mutableMapOf()
                     data["id"] = doc.id
                     data
                 }
-                vm._registeredUsersList.value = list
+                appState._registeredUsersList.value = list
             }
         }
 
         // 3c. Internal Wallets Listener
         db.collection("internal_wallets").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
-                vm._internalWallets.value = snapshot.documents.mapNotNull { it.toObject(InternalWalletEntity::class.java) }
+                appState._internalWallets.value = snapshot.documents.mapNotNull { it.toObject(InternalWalletEntity::class.java) }
             }
         }
 
         // 3d. Wallet Transactions Listener
         db.collection("wallet_transactions").addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
-                vm._walletTransactions.value = snapshot.documents.mapNotNull { it.toObject(WalletTransactionEntity::class.java) }.sortedByDescending { it.timestamp }
+                appState._walletTransactions.value = snapshot.documents.mapNotNull { it.toObject(WalletTransactionEntity::class.java) }.sortedByDescending { it.timestamp }
             }
         }
 
@@ -195,15 +195,15 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._banners.value = fetched.sortedBy { it.order }
+                appState._banners.value = fetched.sortedBy { it.order }
             } else {
-                vm._banners.value = emptyList()
+                appState._banners.value = emptyList()
             }
         }
 
         // 5. Providers (Full limit & safe parsing for complete Map & listing coverage)
         db.collection("providers").limit(250).addSnapshotListenerReg { snapshot, error ->
-            vm._isProvidersLoading.value = false
+            appState._isProvidersLoading.value = false
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListenerReg
@@ -255,9 +255,9 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                 val activeList = allList.filter { !it.isDeleted }
                 val deletedList = allList.filter { it.isDeleted }
 
-                vm._providers.value = activeList
-                vm._deletedProviders.value = deletedList
-                vm.applyFilters()
+                appState._providers.value = activeList
+                appState._deletedProviders.value = deletedList
+                // appState._providers updated
             }
         }
 
@@ -294,7 +294,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         }
                     }
                 }
-                vm._pendingProviders.value = fetched
+                appState._pendingProviders.value = fetched
             }
         }
 
@@ -313,7 +313,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._bookings.value = fetched
+                appState._bookings.value = fetched
             }
         }
 
@@ -338,13 +338,13 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }.sortedByDescending { it.timestamp }
-                vm._notifications.value = fetched
+                appState._notifications.value = fetched
             }
         }
 
         // 9. Chat Channels (Paginated / limited to 20)
         db.collection("chat_channels").orderBy("timestamp", Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
-            vm._isChatChannelsLoading.value = false
+            appState._isChatChannelsLoading.value = false
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListenerReg
@@ -358,7 +358,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }.sortedByDescending { it.timestamp }
-                vm._chatChannels.value = fetched
+                appState._chatChannels.value = fetched
             }
         }
 
@@ -377,7 +377,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._reports.value = fetched
+                appState._reports.value = fetched
             }
         }
 
@@ -396,7 +396,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._supervisors.value = fetched
+                appState._supervisors.value = fetched
             }
         }
 
@@ -415,7 +415,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._colorPalettes.value = fetched
+                appState._colorPalettes.value = fetched
             }
         }
 
@@ -434,7 +434,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }.sortedByDescending { it.timestamp }
-                vm._callsLog.value = fetched
+                appState._callsLog.value = fetched
             }
         }
 
@@ -453,7 +453,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._coupons.value = fetched
+                appState._coupons.value = fetched
             }
         }
 
@@ -472,7 +472,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }.sortedBy { it.displayOrder }
-                vm._paymentWallets.value = fetched
+                appState._paymentWallets.value = fetched
             }
         }
 
@@ -491,7 +491,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }.sortedByDescending { it.createdAt }
-                vm._payments.value = fetched
+                appState._payments.value = fetched
             }
         }
 
@@ -560,7 +560,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         }
                     }
                 }
-                vm._stores.value = fetched.filter { !it.isDeleted }
+                appState._stores.value = fetched.filter { !it.isDeleted }
             }
         }
 
@@ -579,7 +579,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._products.value = fetched.filter { !it.isDeleted }
+                appState._products.value = fetched.filter { !it.isDeleted }
             }
         }
 
@@ -644,7 +644,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         }
                     }
                 }
-                vm._properties.value = fetched.filter { !it.isDeleted }
+                appState._properties.value = fetched.filter { !it.isDeleted }
             }
         }
 
@@ -665,7 +665,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._jobs.value = fetched
+                appState._jobs.value = fetched
             }
         }
 
@@ -680,7 +680,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._jobApplications.value = fetched
+                appState._jobApplications.value = fetched
             }
         }
 
@@ -695,7 +695,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._ratings.value = fetched
+                appState._ratings.value = fetched
             }
         }
 
@@ -710,7 +710,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._orders.value = fetched
+                appState._orders.value = fetched
             }
         }
 
@@ -725,7 +725,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._offers.value = fetched
+                appState._offers.value = fetched
             }
         }
 
@@ -739,7 +739,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }.sortedByDescending { it.timestamp }
-                vm._activityLogs.value = fetched
+                appState._activityLogs.value = fetched
             }
         }
 
@@ -761,7 +761,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         req.copy(status = "EXPIRED")
                     } else req
                 }
-                vm._instantRequests.value = processed
+                appState._instantRequests.value = processed
             }
         }
 
@@ -776,7 +776,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         null
                     }
                 }
-                vm._requestOffers.value = fetched
+                appState._requestOffers.value = fetched
             }
         }
     }

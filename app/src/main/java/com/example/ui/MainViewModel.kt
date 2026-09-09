@@ -29,7 +29,8 @@ class MainViewModel @Inject constructor(
     val adminViewModel: com.example.ui.viewmodels.AdminViewModel,
     val settingsViewModel: com.example.ui.viewmodels.SettingsViewModel,
     val instantRequestViewModel: com.example.ui.viewmodels.InstantRequestViewModel,
-    val chatRepo: com.example.data.repositories.ChatRepository
+    val chatRepo: com.example.data.repositories.ChatRepository,
+    val appState: com.example.ui.helpers.AppState
 ) : BaseViewModel() {
 
     val preferenceHelper = com.example.ui.helpers.AppPreferenceHelper()
@@ -52,13 +53,13 @@ class MainViewModel @Inject constructor(
     val currentLanguage: StateFlow<String> = _currentLanguage.asStateFlow()
     internal val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
     val favoriteIds: StateFlow<Set<String>> = _favoriteIds.asStateFlow()
-    internal val _notifications = MutableStateFlow<List<NotificationEntity>>(emptyList())
+    internal val _notifications get() = appState._notifications
     val notifications: StateFlow<List<NotificationEntity>> = _notifications.asStateFlow()
     internal val _readNotificationIds = MutableStateFlow<Set<String>>(emptySet())
     val readNotificationIds: StateFlow<Set<String>> = _readNotificationIds.asStateFlow()
-    internal val _supervisors = MutableStateFlow<List<SupervisorEntity>>(emptyList())
+    internal val _supervisors get() = appState._supervisors
     val supervisors: StateFlow<List<SupervisorEntity>> = _supervisors.asStateFlow()
-    internal val _colorPalettes = MutableStateFlow<List<ColorPaletteEntity>>(emptyList())
+    internal val _colorPalettes get() = appState._colorPalettes
     val colorPalettes: StateFlow<List<ColorPaletteEntity>> = _colorPalettes.asStateFlow()
     internal val _isOnline = MutableStateFlow(true)
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
@@ -116,12 +117,14 @@ class MainViewModel @Inject constructor(
     val bookingFormFields = bookingViewModel.bookingFormFields
     val _distributionMode = bookingViewModel._distributionMode
     val distributionMode = bookingViewModel.distributionMode
-    internal val _chatMessages = MutableStateFlow<List<com.example.data.ChatMessageEntity>>(emptyList())
-    val chatMessages: StateFlow<List<com.example.data.ChatMessageEntity>> = _chatMessages.asStateFlow()
-    internal val _chatChannels = MutableStateFlow<List<com.example.data.ChatChannelEntity>>(emptyList())
-    val chatChannels: StateFlow<List<com.example.data.ChatChannelEntity>> = _chatChannels.asStateFlow()
-    internal val _activeChatChannel = MutableStateFlow<com.example.data.ChatChannelEntity?>(null)
-    val activeChatChannel: StateFlow<com.example.data.ChatChannelEntity?> = _activeChatChannel.asStateFlow()
+    val chatCoordinator = com.example.ui.helpers.ChatCoordinator()
+
+    val _chatMessages get() = chatCoordinator._chatMessages
+    val chatMessages get() = chatCoordinator.chatMessages
+    val _chatChannels get() = chatCoordinator._chatChannels
+    val chatChannels get() = chatCoordinator.chatChannels
+    val _activeChatChannel get() = chatCoordinator._activeChatChannel
+    val activeChatChannel get() = chatCoordinator.activeChatChannel
     val _pendingProviders get() = adminViewModel._pendingProviders
     val pendingProviders get() = adminViewModel.pendingProviders
     val _pendingTechnicians get() = adminViewModel._pendingTechnicians
@@ -203,17 +206,17 @@ class MainViewModel @Inject constructor(
     val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
     internal val _isGpsTrackingActive = MutableStateFlow(false)
     val isGpsTrackingActive: StateFlow<Boolean> = _isGpsTrackingActive.asStateFlow()
-    internal val _isProvidersLoading = MutableStateFlow(true)
+    internal val _isProvidersLoading get() = appState._isProvidersLoading
     val isProvidersLoading: StateFlow<Boolean> = _isProvidersLoading.asStateFlow()
-    internal val _isChatChannelsLoading = MutableStateFlow(true)
+    internal val _isChatChannelsLoading get() = appState._isChatChannelsLoading
     val isChatChannelsLoading: StateFlow<Boolean> = _isChatChannelsLoading.asStateFlow()
-    internal val _cities = MutableStateFlow<List<CityEntity>>(emptyList())
+    internal val _cities get() = appState._cities
     val cities: StateFlow<List<CityEntity>> = _cities.asStateFlow()
-    internal val _deletedProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
+    internal val _deletedProviders get() = appState._deletedProviders
     val deletedProviders: StateFlow<List<ProviderEntity>> = _deletedProviders.asStateFlow()
-    internal val _isInitialized = MutableStateFlow(false)
+    internal val _isInitialized get() = appState._isInitialized
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
-    internal val _maxKmRadius = MutableStateFlow(10)
+    internal val _maxKmRadius get() = appState._maxKmRadius
     val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
     init {
         _stores.value = getDefaultStoresList()
@@ -393,7 +396,7 @@ class MainViewModel @Inject constructor(
     }
     fun setupRealtimeFirestoreListeners() {
         realtimeSyncHelper.clearListeners()
-        realtimeSyncHelper.setupRealtimeFirestoreListeners(this)
+        realtimeSyncHelper.setupRealtimeFirestoreListeners(appState)
     }
     fun seedFirestoreIfEmpty() {
         firestoreSeedHelper.seedFirestoreIfEmpty()

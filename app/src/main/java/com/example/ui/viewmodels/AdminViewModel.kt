@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import com.example.ui.helpers.AppState
 
 import com.example.ui.MainViewModel
 import com.example.ui.*
@@ -134,7 +135,10 @@ data class SystemLog(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-class AdminViewModel @Inject constructor() : BaseViewModel() {
+
+class AdminViewModel @Inject constructor(
+    val appState: AppState
+) : BaseViewModel() {
     val crud = AdminCrudOperations(db)
 
     // --- Callback/Lambda Properties for decoupling ---
@@ -205,45 +209,45 @@ class AdminViewModel @Inject constructor() : BaseViewModel() {
         mainViewModel.bookingViewModel.updateBooking(booking)
     }
 
-    internal val _pendingProviders = MutableStateFlow<List<PendingProviderEntity>>(emptyList())
+    internal val _pendingProviders get() = appState._pendingProviders
     val pendingProviders: StateFlow<List<PendingProviderEntity>> = _pendingProviders.asStateFlow()
-    internal val _pendingTechnicians = MutableStateFlow<List<PendingProviderEntity>>(emptyList())
+    internal val _pendingTechnicians get() = appState._pendingTechnicians
     val pendingTechnicians: StateFlow<List<PendingProviderEntity>> = _pendingTechnicians.asStateFlow()
-    internal val _registeredUsersList = MutableStateFlow<List<Map<String, Any>>>(emptyList())
+    internal val _registeredUsersList get() = appState._registeredUsersList
     val registeredUsersList: StateFlow<List<Map<String, Any>>> = _registeredUsersList.asStateFlow()
-    internal val _registeredUsersCount = MutableStateFlow(0)
+    internal val _registeredUsersCount get() = appState._registeredUsersCount
     val registeredUsersCount: StateFlow<Int> = _registeredUsersCount.asStateFlow()
-    internal val _reports = MutableStateFlow<List<ReportEntity>>(emptyList())
+    internal val _reports get() = appState._reports
     val reports: StateFlow<List<ReportEntity>> = _reports.asStateFlow()
-    internal val _activityLogs = MutableStateFlow<List<ActivityLogEntity>>(emptyList())
+    internal val _activityLogs get() = appState._activityLogs
     val activityLogs: StateFlow<List<ActivityLogEntity>> = _activityLogs.asStateFlow()
-    internal val _callsLog = MutableStateFlow<List<CallEntity>>(emptyList())
+    internal val _callsLog get() = appState._callsLog
     val callsLog: StateFlow<List<CallEntity>> = _callsLog.asStateFlow()
-    internal val _coupons = MutableStateFlow<List<CouponEntity>>(emptyList())
+    internal val _coupons get() = appState._coupons
     val coupons: StateFlow<List<CouponEntity>> = _coupons.asStateFlow()
-    internal val _internalWallets = MutableStateFlow<List<com.example.data.InternalWalletEntity>>(emptyList())
+    internal val _internalWallets get() = appState._internalWallets
     val internalWallets: StateFlow<List<com.example.data.InternalWalletEntity>> = _internalWallets.asStateFlow()
-    internal val _walletTransactions = MutableStateFlow<List<com.example.data.WalletTransactionEntity>>(emptyList())
+    internal val _walletTransactions get() = appState._walletTransactions
     val walletTransactions: StateFlow<List<com.example.data.WalletTransactionEntity>> = _walletTransactions.asStateFlow()
-    internal val _paymentWallets = MutableStateFlow<List<PaymentWalletEntity>>(emptyList())
+    internal val _paymentWallets get() = appState._paymentWallets
     val paymentWallets: StateFlow<List<PaymentWalletEntity>> = _paymentWallets.asStateFlow()
-    internal val _payments = MutableStateFlow<List<PaymentEntity>>(emptyList())
+    internal val _payments get() = appState._payments
     val payments: StateFlow<List<PaymentEntity>> = _payments.asStateFlow()
-    internal val _orders = MutableStateFlow<List<com.example.data.OrderEntity>>(emptyList())
+    internal val _orders get() = appState._orders
     val orders: StateFlow<List<com.example.data.OrderEntity>> = _orders.asStateFlow()
-    internal val _ratings = MutableStateFlow<List<com.example.data.RatingEntity>>(emptyList())
+    internal val _ratings get() = appState._ratings
     val ratings: StateFlow<List<com.example.data.RatingEntity>> = _ratings.asStateFlow()
-    internal val _customProfileTabs = MutableStateFlow<List<com.example.data.CustomProfileTabEntity>>(emptyList())
+    internal val _customProfileTabs get() = appState._customProfileTabs
     val customProfileTabs: StateFlow<List<com.example.data.CustomProfileTabEntity>> = _customProfileTabs.asStateFlow()
-    internal val _stores = MutableStateFlow<List<com.example.data.StoreEntity>>(getDefaultStoresList())
+    internal val _stores get() = appState._stores
     val stores: StateFlow<List<com.example.data.StoreEntity>> = _stores.asStateFlow()
-    internal val _products = MutableStateFlow<List<com.example.data.ProductEntity>>(emptyList())
+    internal val _products get() = appState._products
     val products: StateFlow<List<com.example.data.ProductEntity>> = _products.asStateFlow()
-    internal val _properties = MutableStateFlow<List<com.example.data.PropertyEntity>>(getDefaultPropertiesList())
+    internal val _properties get() = appState._properties
     val properties: StateFlow<List<com.example.data.PropertyEntity>> = _properties.asStateFlow()
-    internal val _jobs = MutableStateFlow<List<com.example.data.JobEntity>>(emptyList())
+    internal val _jobs get() = appState._jobs
     val jobs: StateFlow<List<com.example.data.JobEntity>> = _jobs.asStateFlow()
-    internal val _jobApplications = MutableStateFlow<List<com.example.data.JobApplicationEntity>>(emptyList())
+    internal val _jobApplications get() = appState._jobApplications
     val jobApplications: StateFlow<List<com.example.data.JobApplicationEntity>> = _jobApplications.asStateFlow()
 
 fun approveRequest(request: PendingProviderEntity) {
