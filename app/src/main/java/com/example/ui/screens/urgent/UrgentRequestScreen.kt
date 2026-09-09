@@ -122,7 +122,7 @@ fun UrgentRequestScreen(
                 ) {
                     Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFD32F2F))
                     Text(
-                        "🚨 سيتم إشعار جميع الفنيين المتاحين فوراً في نطاق منطقتك وتقديم عروض خلال 30 دقيقة كحد أقصى.",
+                        "🚨 سيتم إشعار جميع مقدمي الخدمة والمحلات والمراكز المختصة فوراً في نطاق منطقتك لتقديم عروضهم خلال 30 دقيقة.",
                         fontSize = 13.sp,
                         color = Color(0xFFB71C1C),
                         fontWeight = FontWeight.Medium
@@ -140,6 +140,68 @@ fun UrgentRequestScreen(
                 selectedArea = selectedArea,
                 onAreaChange = { selectedArea = it }
             )
+
+            // اختيار القسم الرئيسي والفرعي (فنيين، محلات وتجارة، مطاعم، مراكز طبية، عقارات)
+            var expandedDeptDropdown by remember { mutableStateOf(false) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(modifier = Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = selectedDepartment,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("القسم الرئيسي *") },
+                        trailingIcon = {
+                            IconButton(onClick = { expandedDeptDropdown = true }) {
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("urgent_department_selector")
+                    )
+                    DropdownMenu(
+                        expanded = expandedDeptDropdown,
+                        onDismissRequest = { expandedDeptDropdown = false }
+                    ) {
+                        UrgentConstants.departments.forEach { dept ->
+                            DropdownMenuItem(
+                                text = { Text(dept, fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    selectedDepartment = dept
+                                    expandedDeptDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.weight(1.2f)) {
+                    OutlinedTextField(
+                        value = selectedCategory,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("النوع الفرعي *") },
+                        trailingIcon = {
+                            IconButton(onClick = { expandedCategoryDropdown = true }) {
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("urgent_subcategory_selector")
+                    )
+                    DropdownMenu(
+                        expanded = expandedCategoryDropdown,
+                        onDismissRequest = { expandedCategoryDropdown = false }
+                    ) {
+                        subCategories.forEach { sub ->
+                            DropdownMenuItem(
+                                text = { Text(sub) },
+                                onClick = {
+                                    selectedCategory = sub
+                                    expandedCategoryDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = serviceTitle,

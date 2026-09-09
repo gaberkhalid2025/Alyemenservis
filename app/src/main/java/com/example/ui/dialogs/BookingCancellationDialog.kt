@@ -235,6 +235,18 @@ fun BookingCancellationDialog(
                                     attemptsLeft--
                                     if (attemptsLeft <= 0) {
                                         errorMessage = "تم قفل الحجز بعد 3 محاولات خاطئة!"
+                                        try {
+                                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                                .collection("bookings").document(booking.id)
+                                                .update(
+                                                    mapOf(
+                                                        "isLocked" to true,
+                                                        "lockedUntil" to System.currentTimeMillis() + (8 * 60 * 60 * 1000L)
+                                                    )
+                                                )
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
                                     } else {
                                         errorMessage = "كلمة المرور غير صحيحة! متبقي $attemptsLeft محاولات."
                                     }

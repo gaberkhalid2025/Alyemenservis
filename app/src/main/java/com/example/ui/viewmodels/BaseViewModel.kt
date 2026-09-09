@@ -146,6 +146,26 @@ open class BaseViewModel : ViewModel() {
         }
     }
 
+    // دالة آمنة لعمليات Firestore مع Coroutine Context (Dispatchers.IO)
+    protected open suspend fun <T> safeFirestoreCallWithCallback(
+        operation: suspend () -> T,
+        onSuccess: (T) -> Unit = {},
+        onError: (Exception) -> Unit = {},
+        errorMessage: String = "حدث خطأ أثناء تنفيذ العملية"
+    ) {
+        try {
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                operation()
+            }
+            onSuccess(result)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            com.example.utils.AppErrorLogManager.logFirestoreError("FirestoreCoroutineException", errorMessage, e)
+            triggerNotification("❌ $errorMessage: ${e.localizedMessage}")
+            onError(e)
+        }
+    }
+
     // دالة آمنة لعمليات Firestore مع callback
     protected open fun safeFirestoreCallWithCallback(
         operation: (onSuccess: () -> Unit, onFailure: (Exception) -> Unit) -> Unit,

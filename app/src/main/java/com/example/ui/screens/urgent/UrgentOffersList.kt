@@ -56,7 +56,7 @@ fun UrgentOffersList(
                     strokeWidth = 2.5.dp
                 )
                 Text(
-                    text = "⏳ جاري البحث عن عروض الفنيين المتاحة بالمنطقة...",
+                    text = "⏳ جاري البحث عن عروض مقدمي الخدمة والمحلات والمراكز المتاحة بالمنطقة...",
                     fontSize = 13.sp,
                     color = Color.Gray
                 )

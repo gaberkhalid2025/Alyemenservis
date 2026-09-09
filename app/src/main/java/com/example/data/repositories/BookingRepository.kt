@@ -47,6 +47,20 @@ class BookingRepository(private val context: Context) {
                 val type = Types.newParameterizedType(List::class.java, BookingEntity::class.java)
                 val adapter = moshi.adapter<List<BookingEntity>>(type)
                 val list = adapter.fromJson(raw) ?: emptyList()
+                
+                // فحص انتهاء مدة قفل الحجوزات
+                val now = System.currentTimeMillis()
+                list.forEach { booking ->
+                    if (booking.isLocked && booking.lockedUntil != null && now > booking.lockedUntil) {
+                        try {
+                            firestore.collection("bookings").document(booking.id)
+                                .update("isLocked", false, "lockedUntil", null)
+                        } catch (e: Exception) {
+                            // تجاهل
+                        }
+                    }
+                }
+
                 _cachedBookings.value = list
                 list
             } else {

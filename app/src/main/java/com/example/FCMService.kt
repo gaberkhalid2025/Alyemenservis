@@ -8,7 +8,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
+import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -67,33 +71,101 @@ class FCMService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
+        
+        // الخطوة 1: حفظ التوكن في SharedPreferences فوراً (آمن 100%)
         try {
             val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-            val rawUserId = sp.getString("user_id", "") ?: ""
-            val userId = if (rawUserId.isNotEmpty() && rawUserId != "guest") com.example.utils.SecurityCryptoUtils.decrypt(rawUserId) else rawUserId
-            val rawPhone = sp.getString("user_phone", "") ?: ""
-            val phone = if (rawPhone.isNotEmpty()) com.example.utils.SecurityCryptoUtils.decrypt(rawPhone) else ""
-            if (userId.isNotEmpty() && userId != "guest") {
-                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                val tokenData = mapOf(
-                    "token" to token,
-                    "phone" to phone,
-                    "role" to "CLIENT",
-                    "updatedAt" to System.currentTimeMillis()
-                )
-                db.collection("fcm_tokens").document(userId).set(tokenData)
-                db.collection("registered_users").document(userId).update("fcmToken", token)
-                val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
-                if (cleanPhone.isNotEmpty()) {
-                    db.collection("fcm_tokens").document(cleanPhone).set(tokenData)
-                    db.collection("providers").document(cleanPhone).update("fcmToken", token)
-                    db.collection("stores").document(cleanPhone).update("fcmToken", token)
-                    db.collection("properties").document(cleanPhone).update("fcmToken", token)
-                }
-            }
+            sp.edit().putString("fcm_token_backup", token).apply()
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        
+        // الخطوة 2: مزامنة مع Firestore بعد تأخير (لضمان تهيئة Firebase)
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                // التحقق من تهيئة Firebase
+                if (FirebaseApp.getApps(this).isEmpty()) {
+                    try {
+                        FirebaseApp.initializeApp(this)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        return@postDelayed
+                    }
+                }
+                
+                val db = FirebaseFirestore.getInstance()
+                val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+                
+                // جلب بيانات المستخدم
+                val rawUserId = sp.getString("user_id", "") ?: ""
+                val userId = if (rawUserId.isNotEmpty() && rawUserId != "guest") {
+                    try { SecurityCryptoUtils.decrypt(rawUserId) } catch (e: Exception) { rawUserId }
+                } else rawUserId
+                
+                if (userId.isEmpty() || userId == "guest") {
+                    return@postDelayed
+                }
+                
+                val rawPhone = sp.getString("user_phone", "") ?: ""
+                val phone = if (rawPhone.isNotEmpty()) {
+                    try { SecurityCryptoUtils.decrypt(rawPhone) } catch (e: Exception) { rawPhone }
+                } else rawPhone
+                val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+                
+                // إنشاء المعاملة
+                val batch = db.batch()
+                val now = System.currentTimeMillis()
+                
+                // 1. تحديث fcm_tokens
+                val tokenData = mapOf(
+                    "token" to token,
+                    "phone" to cleanPhone,
+                    "role" to "CLIENT",
+                    "updatedAt" to now
+                )
+                val tokenRef = db.collection("fcm_tokens").document(userId)
+                batch.set(tokenRef, tokenData)
+                
+                // 2. تحديث registered_users
+                try {
+                    val userRef = db.collection("registered_users").document(userId)
+                    batch.update(userRef, "fcmToken", token)
+                } catch (e: Exception) {
+                    // قد لا يكون المستند موجوداً، نتجاوز
+                }
+                
+                // 3. تحديث providers, stores, properties (إذا كان الرقم موجوداً)
+                if (cleanPhone.isNotEmpty() && cleanPhone.length >= 7) {
+                    try {
+                        val providerRef = db.collection("providers").document(cleanPhone)
+                        batch.update(providerRef, "fcmToken", token)
+                    } catch (e: Exception) { /* تجاهل */ }
+                    
+                    try {
+                        val storeRef = db.collection("stores").document(cleanPhone)
+                        batch.update(storeRef, "fcmToken", token)
+                    } catch (e: Exception) { /* تجاهل */ }
+                    
+                    try {
+                        val propRef = db.collection("properties").document(cleanPhone)
+                        batch.update(propRef, "fcmToken", token)
+                    } catch (e: Exception) { /* تجاهل */ }
+                }
+                
+                // تنفيذ المعاملة مع معالجة الأخطاء
+                batch.commit()
+                    .addOnSuccessListener {
+                        // نجاح المزامنة
+                    }
+                    .addOnFailureListener { e ->
+                        // فشل المزامنة - سنحاول مرة أخرى في المرة القادمة
+                        e.printStackTrace()
+                    }
+                    
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }, 3000) // تأخير 3 ثواني لضمان تهيئة Firebase بالكامل
     }
 
     private fun sendLocalNotification(title: String, body: String, targetScreen: String = "MAIN") {

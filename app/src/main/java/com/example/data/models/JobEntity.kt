@@ -38,5 +38,6 @@ data class JobApplicationEntity(
     val applicantQuals: String = "",
     val cvBase64: String = "",
     val status: String = "PENDING",
+    val rejectionReason: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )

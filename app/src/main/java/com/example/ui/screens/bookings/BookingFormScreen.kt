@@ -72,7 +72,38 @@ fun BookingFormScreen(
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
     val yemeniCities = listOf("صنعاء", "عدن", "تعز", "إب", "حضرموت", "الحديدة", "ذمار", "مأرب")
-    val defaultCategories = listOf("صيانة عامة", "كهرباء", "سباكة", "تكييف وتبريد", "إلكترونيات", "نظافة وتنظيف", "خدمات عقارية", "خدمات طبية")
+    
+    val bookingDepartments = listOf(
+        "خدمات وفنيين",
+        "محلات ومراكز تجارية",
+        "مطاعم وكافيهات",
+        "مراكز وعيادات طبية",
+        "عقارات وشقق"
+    )
+
+    fun getBookingSubCategories(dept: String): List<String> {
+        return when (dept) {
+            "خدمات وفنيين" -> listOf("صيانة عامة", "كهرباء وطاقة شمسية", "سباكة ومياه", "تكييف وتبريد", "إلكترونيات وهواتف", "نجارة وأبواب", "أعمال دهان وديكور")
+            "محلات ومراكز تجارية" -> listOf("تسوق مواد غذائية", "طلب قطع غيار", "أدوات ومواد بناء", "أجهزة كهربائية ومنزلية", "ملابس ومستلزمات")
+            "مطاعم وكافيهات" -> listOf("حجز طاولة وضيافة", "طلب وجبات مسبقة", "بوفيه ومناسبات", "مشروبات ومخبوزات")
+            "مراكز وعيادات طبية" -> listOf("كشف طبي عام", "عيادة أسنان", "فحص مختبري وتحاليل", "علاج طبيعي وتمريض", "استشارة طبية متخصصة")
+            "عقارات وشقق" -> listOf("معاينة شقة للإيجار", "معاينة عقار للبيع", "حجز شقة مفروشة", "معاينة أراضي ومحلات")
+            else -> listOf("صيانة عامة")
+        }
+    }
+
+    var selectedDepartment by remember { mutableStateOf("خدمات وفنيين") }
+    var showDeptDropdown by remember { mutableStateOf(false) }
+
+    val currentSubCategories = remember(selectedDepartment) {
+        getBookingSubCategories(selectedDepartment)
+    }
+
+    LaunchedEffect(selectedDepartment) {
+        if (preselectedCategory.isEmpty()) {
+            category = currentSubCategories.firstOrNull() ?: "صيانة عامة"
+        }
+    }
 
     val calendar = Calendar.getInstance()
     val datePickerDialog = DatePickerDialog(
@@ -244,44 +275,86 @@ fun BookingFormScreen(
                 )
             }
 
-            // Category Selection
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = { category = it },
-                    label = { Text("قسم / نوع الخدمة *") },
-                    leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingIcon = {
-                        IconButton(onClick = { showCategoryDropdown = true }) {
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().clickable { showCategoryDropdown = true },
-                    shape = RoundedCornerShape(14.dp)
-                )
-
-                DropdownMenu(
-                    expanded = showCategoryDropdown,
-                    onDismissRequest = { showCategoryDropdown = false }
-                ) {
-                    defaultCategories.forEach { cat ->
-                        DropdownMenuItem(
-                            text = { Text(cat) },
-                            onClick = {
-                                category = cat
-                                showCategoryDropdown = false
+            // Category & Department Selection
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = selectedDepartment,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("القسم الرئيسي *") },
+                        trailingIcon = {
+                            IconButton(onClick = { showDeptDropdown = true }) {
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                             }
-                        )
+                        },
+                        modifier = Modifier.fillMaxWidth().clickable { showDeptDropdown = true },
+                        shape = RoundedCornerShape(14.dp)
+                    )
+
+                    DropdownMenu(
+                        expanded = showDeptDropdown,
+                        onDismissRequest = { showDeptDropdown = false }
+                    ) {
+                        bookingDepartments.forEach { dept ->
+                            DropdownMenuItem(
+                                text = { Text(dept, fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    selectedDepartment = dept
+                                    showDeptDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.weight(1.2f)) {
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = { category = it },
+                        label = { Text("نوع الخدمة الفرعية *") },
+                        trailingIcon = {
+                            IconButton(onClick = { showCategoryDropdown = true }) {
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().clickable { showCategoryDropdown = true },
+                        shape = RoundedCornerShape(14.dp)
+                    )
+
+                    DropdownMenu(
+                        expanded = showCategoryDropdown,
+                        onDismissRequest = { showCategoryDropdown = false }
+                    ) {
+                        currentSubCategories.forEach { cat ->
+                            DropdownMenuItem(
+                                text = { Text(cat) },
+                                onClick = {
+                                    category = cat
+                                    showCategoryDropdown = false
+                                }
+                            )
+                        }
                     }
                 }
             }
 
-            // 4. Date and Time Selection
+            // 4. Date and Time Selection (تحديد التاريخ والوقت بوضوح تام)
+            Text(
+                text = "📅 تحديد موعد الحجز (التاريخ والوقت) *",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedCard(
                     onClick = { datePickerDialog.show() },
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.weight(1f).height(60.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.outlinedCardColors(
+                        containerColor = if (selectedDate.isNotEmpty()) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
+                    )
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -289,30 +362,41 @@ fun BookingFormScreen(
                     ) {
                         Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = selectedDate.ifEmpty { "تحديد التاريخ *" },
-                            fontSize = 13.sp,
-                            fontWeight = if (selectedDate.isNotEmpty()) FontWeight.Bold else FontWeight.Normal
-                        )
+                        Column {
+                            Text("التاريخ", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                            Text(
+                                text = selectedDate.ifEmpty { "اختر التاريخ" },
+                                fontSize = 13.sp,
+                                fontWeight = if (selectedDate.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedDate.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
 
                 OutlinedCard(
                     onClick = { timePickerDialog.show() },
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.weight(1f).height(60.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.outlinedCardColors(
+                        containerColor = if (selectedTime.isNotEmpty()) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
+                    )
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = selectedTime.ifEmpty { "تحديد الوقت *" },
-                            fontSize = 13.sp,
-                            fontWeight = if (selectedTime.isNotEmpty()) FontWeight.Bold else FontWeight.Normal
-                        )
+                        Column {
+                            Text("الوقت", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                            Text(
+                                text = selectedTime.ifEmpty { "اختر الوقت" },
+                                fontSize = 13.sp,
+                                fontWeight = if (selectedTime.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTime.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }

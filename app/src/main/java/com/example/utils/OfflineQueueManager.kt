@@ -42,6 +42,7 @@ class OfflineQueueManager(private val context: Context) {
         private const val TAG = "OfflineQueueManager"
         private const val KEY_QUEUE = "key_offline_requests_queue_json"
         private const val MAX_RETRIES = 5
+        private const val RETRY_DELAY_MS = 5000L
     }
 
     init {
@@ -167,6 +168,7 @@ class OfflineQueueManager(private val context: Context) {
                     val nextRetry = req.retryCount + 1
                     if (nextRetry < MAX_RETRIES) {
                         remainingList.add(req.copy(retryCount = nextRetry, status = "FAILED"))
+                        delay(RETRY_DELAY_MS)
                     } else {
                         Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
                     }

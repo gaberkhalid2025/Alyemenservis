@@ -64,9 +64,9 @@ class AppPreferenceHelper {
     }
 
     fun markNotificationAsRead(context: Context, notifId: String, currentRead: MutableSet<String>): Set<String> {
-        currentRead.add(notifId)
-        getAppPrefs(context).edit().putStringSet(KEY_READ_NOTIFICATIONS, currentRead).apply()
-        return currentRead
+        val updated = currentRead.toMutableSet().apply { add(notifId) }
+        getAppPrefs(context).edit().putStringSet(KEY_READ_NOTIFICATIONS, updated).apply()
+        return updated
     }
 
     fun markAllNotificationsAsRead(context: Context, allIds: Set<String>): Set<String> {

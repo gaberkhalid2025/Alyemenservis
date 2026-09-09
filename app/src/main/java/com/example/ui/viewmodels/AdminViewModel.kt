@@ -265,6 +265,7 @@ fun approveRequest(request: PendingProviderEntity) {
         val clearPendingFromDbAndState = {
             db.collection("pending_providers").document(request.id).delete()
             if (cleanPhone.isNotEmpty()) {
+                db.collection("pending_providers").document(cleanPhone).delete()
                 db.collection("pending_providers").whereEqualTo("phone", request.phone).get().addOnSuccessListener { qs ->
                     qs?.documents?.forEach { doc ->
                         db.collection("pending_providers").document(doc.id).delete()
@@ -272,20 +273,24 @@ fun approveRequest(request: PendingProviderEntity) {
                 }
             }
             _pendingProviders.value = _pendingProviders.value.filter { 
-                it.id != request.id && (cleanPhone.isEmpty() || it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone)
+                it.id != request.id && it.id != cleanPhone && (cleanPhone.isEmpty() || it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone)
             }
         }
 
         clearPendingFromDbAndState()
 
         val now = System.currentTimeMillis()
-        db.collection("join_requests").document(request.id).update(mapOf(
+        val joinReqUpdates = mapOf(
             "status" to "APPROVED",
             "approvalStatus" to "APPROVED",
             "isActive" to true,
             "approvedAt" to now,
             "updatedAt" to now
-        ))
+        )
+        db.collection("join_requests").document(request.id).update(joinReqUpdates)
+        if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+            db.collection("join_requests").document(cleanPhone).update(joinReqUpdates)
+        }
 
         if (request.profession == "STORE_OWNER" || request.categoryId.uppercase() == "STORE" || request.categoryId.uppercase() == "RESTAURANT" || request.categoryId.uppercase() == "MEDICAL") {
             val storeId = "store_" + cleanPhone
@@ -313,10 +318,16 @@ fun approveRequest(request: PendingProviderEntity) {
                 password = request.password,
                 pdfFileBase64 = request.idPhotoBase64
             )
+            if (request.id != storeId) {
+                db.collection("stores").document(request.id).delete()
+            }
+            if (cleanPhone.isNotEmpty() && cleanPhone != storeId) {
+                db.collection("stores").document(cleanPhone).delete()
+            }
             db.collection("stores").document(storeId).set(newStore)
             
             // Instant Local Sync for stores
-            _stores.value = _stores.value.filter { it.id != storeId && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newStore
+            _stores.value = _stores.value.filter { it.id != storeId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newStore
 
             mainViewModel.addNotification(
                 title = "🎉 تهانينا! تم تفعيل متجرك بنجاح",
@@ -343,10 +354,16 @@ fun approveRequest(request: PendingProviderEntity) {
                 price = propPrice,
                 pdfFileBase64 = request.idPhotoBase64
             )
+            if (request.id != propId) {
+                db.collection("properties").document(request.id).delete()
+            }
+            if (cleanPhone.isNotEmpty() && cleanPhone != propId) {
+                db.collection("properties").document(cleanPhone).delete()
+            }
             db.collection("properties").document(propId).set(newProp)
             
             // Instant Local Sync for properties
-            _properties.value = _properties.value.filter { it.id != propId && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newProp
+            _properties.value = _properties.value.filter { it.id != propId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newProp
 
             mainViewModel.addNotification(
                 title = "🎉 تهانينا! تم تفعيل إعلان عقارك بنجاح",
@@ -368,10 +385,16 @@ fun approveRequest(request: PendingProviderEntity) {
                 isActive = true,
                 isApproved = true
             )
+            if (request.id != jobId) {
+                db.collection("jobs").document(request.id).delete()
+            }
+            if (cleanPhone.isNotEmpty() && cleanPhone != jobId) {
+                db.collection("jobs").document(cleanPhone).delete()
+            }
             db.collection("jobs").document(jobId).set(newJob)
             
-            // Instant Local Sync for jobs
-            _jobs.value = _jobs.value.filter { it.id != jobId && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newJob
+            // Instant Local Sync for jobs: clean up unapproved version and set approved job
+            _jobs.value = _jobs.value.filter { it.id != jobId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newJob
 
             mainViewModel.addNotification(
                 title = "🎉 تهانينا! تم تفعيل إعلان وظيفتك بنجاح",
@@ -1272,6 +1295,13 @@ fun setJobApproved(jobId: String, isApproved: Boolean) {
             .addOnSuccessListener {
                 mainViewModel.triggerNotification(if (isApproved) "✅ تم قبول ونشر إعلان الوظيفة بنجاح!" else "❌ تم رفض إعلان الوظيفة")
             }
+        // Also remove from pending_providers and update join_requests
+        db.collection("pending_providers").document(jobId).delete()
+        db.collection("join_requests").document(jobId).update(mapOf(
+            "status" to if (isApproved) "APPROVED" else "REJECTED",
+            "approvalStatus" to if (isApproved) "APPROVED" else "REJECTED"
+        ))
+        _pendingProviders.value = _pendingProviders.value.filter { it.id != jobId }
     }
 
 fun setJobBlocked(jobId: String, isBlocked: Boolean, reason: String = "") {
@@ -1309,6 +1339,7 @@ fun setJobChatDisabled(jobId: String, isDisabled: Boolean) {
 fun submitJobApplication(application: com.example.data.JobApplicationEntity) {
         val targetId = db.collection("job_applications").document().id
         val finalApp = application.copy(id = targetId)
+        _jobApplications.value = _jobApplications.value + finalApp
         db.collection("job_applications").document(targetId).set(finalApp)
             .addOnSuccessListener {
                 mainViewModel.triggerNotification("📨 تم إرسال طلب التقديم على الوظيفة بنجاح!")
@@ -1318,10 +1349,22 @@ fun submitJobApplication(application: com.example.data.JobApplicationEntity) {
             }
     }
 
-fun updateJobApplicationStatus(appId: String, status: String) {
-        db.collection("job_applications").document(appId).update("status", status)
+fun updateJobApplicationStatus(appId: String, status: String, reason: String = "") {
+        _jobApplications.value = _jobApplications.value.map {
+            if (it.id == appId) it.copy(status = status, rejectionReason = reason) else it
+        }
+        val updates = mutableMapOf<String, Any>(
+            "status" to status
+        )
+        if (reason.isNotEmpty()) {
+            updates["rejectionReason"] = reason
+        }
+        db.collection("job_applications").document(appId).update(updates)
             .addOnSuccessListener {
                 mainViewModel.triggerNotification("✅ تم تحديث حالة طلب التقديم إلى: $status")
+            }
+            .addOnFailureListener {
+                db.collection("job_applications").document(appId).set(updates, com.google.firebase.firestore.SetOptions.merge())
             }
     }
 
@@ -1330,13 +1373,11 @@ fun acceptJobApplication(appId: String) {
     }
 
 fun rejectJobApplication(appId: String, reason: String) {
-        db.collection("job_applications").document(appId).update("status", "REJECTED", "rejectionReason", reason)
-            .addOnSuccessListener {
-                mainViewModel.triggerNotification("❌ تم رفض طلب التقديم للوظيفة مع إرسال السبب: $reason")
-            }
+        updateJobApplicationStatus(appId, "REJECTED", reason)
     }
 
 fun deleteJobApplication(appId: String) {
+        _jobApplications.value = _jobApplications.value.filter { it.id != appId }
         db.collection("job_applications").document(appId).delete()
             .addOnSuccessListener {
                 mainViewModel.triggerNotification("🗑️ تم حذف طلب التقديم من النظام بنجاح")

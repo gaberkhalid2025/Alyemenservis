@@ -54,6 +54,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private var locationCallback: com.google.android.gms.location.LocationCallback? = null
     private var lastBackPressTime = 0L
     private var tts: android.speech.tts.TextToSpeech? = null
     
@@ -154,7 +155,7 @@ class MainActivity : ComponentActivity() {
                     com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 5000L
                 ).setMinUpdateIntervalMillis(3000L).build()
                 
-                val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+                locationCallback = object : com.google.android.gms.location.LocationCallback() {
                     override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
                         for (loc in result.locations) {
                             viewModel.updateUserLocation(loc.latitude, loc.longitude)
@@ -162,11 +163,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                fusedLocationClient.requestLocationUpdates(
-                    locationRequest,
-                    locationCallback,
-                    android.os.Looper.getMainLooper()
-                )
+                locationCallback?.let { callback ->
+                    fusedLocationClient.requestLocationUpdates(
+                        locationRequest,
+                        callback,
+                        android.os.Looper.getMainLooper()
+                    )
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -175,9 +178,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         try {
-            tts?.stop()
-            tts?.shutdown()
-        } catch(e: Exception) {
+            // إلغاء تسجيل تحديثات الموقع
+            locationCallback?.let { callback ->
+                try {
+                    val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(applicationContext)
+                    fusedLocationClient.removeLocationUpdates(callback)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            locationCallback = null
+            
+            // تحرير TextToSpeech
+            try {
+                tts?.stop()
+                tts?.shutdown()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            tts = null
+        } catch (e: Exception) {
             e.printStackTrace()
         }
         super.onDestroy()
@@ -480,5 +500,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // لا تفعل شيئاً - منع إعادة الإنشاء
     }
 }

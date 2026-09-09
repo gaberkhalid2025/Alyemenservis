@@ -214,6 +214,16 @@ class MainViewModel @Inject constructor(
     val cities: StateFlow<List<CityEntity>> = _cities.asStateFlow()
     internal val _deletedProviders get() = appState._deletedProviders
     val deletedProviders: StateFlow<List<ProviderEntity>> = _deletedProviders.asStateFlow()
+    private var isSettingsLoaded = false
+    private var isCategoriesLoaded = false
+    private var isCitiesLoaded = false
+
+    private fun checkInitializationComplete() {
+        if (isSettingsLoaded && isCategoriesLoaded && isCitiesLoaded) {
+            _isInitialized.value = true
+        }
+    }
+
     internal val _isInitialized get() = appState._isInitialized
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
     internal val _maxKmRadius get() = appState._maxKmRadius
@@ -389,9 +399,35 @@ class MainViewModel @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "❌ Error in seedFirestoreIfEmpty", e)
         }
+        // راقب اكتمال تحميل البيانات الأساسية
         viewModelScope.launch {
-            kotlinx.coroutines.delay(2200)
-            _isInitialized.value = true
+            settings.collect {
+                isSettingsLoaded = true
+                checkInitializationComplete()
+            }
+        }
+        viewModelScope.launch {
+            categories.collect { cats ->
+                if (cats.isNotEmpty()) {
+                    isCategoriesLoaded = true
+                    checkInitializationComplete()
+                }
+            }
+        }
+        viewModelScope.launch {
+            cities.collect { cityList ->
+                if (cityList.isNotEmpty()) {
+                    isCitiesLoaded = true
+                    checkInitializationComplete()
+                }
+            }
+        }
+        // مهلة أمان (fallback) في حالة فشل تحميل البيانات
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(5000)
+            if (!_isInitialized.value) {
+                _isInitialized.value = true
+            }
         }
     }
     fun setupRealtimeFirestoreListeners() {

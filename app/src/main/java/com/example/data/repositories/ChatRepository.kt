@@ -240,7 +240,11 @@ class ChatRepository(
             }
 
         awaitClose {
-            listener.remove()
+            try {
+                listener.remove()
+            } catch (e: Exception) {
+                // تجاهل
+            }
         }
     }.flowOn(Dispatchers.IO)
 
@@ -302,7 +306,11 @@ class ChatRepository(
             }
 
         awaitClose {
-            listener.remove()
+            try {
+                listener.remove()
+            } catch (e: Exception) {
+                // تجاهل
+            }
         }
     }.flowOn(Dispatchers.IO)
 
@@ -665,7 +673,13 @@ class ChatRepository(
             trySend(presence)
         }
 
-        awaitClose { listener.remove() }
+        awaitClose {
+            try {
+                listener.remove()
+            } catch (e: Exception) {
+                // تجاهل
+            }
+        }
     }.flowOn(Dispatchers.IO)
 
     // =========================================================================
