@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 
 /**
- * ⌨️ AssistantInputBar - Bottom input field and send button in Assistant Dialog
+ * ⌨️ AssistantInputBar - Bottom input field and send button in Assistant Screen
  */
 @Composable
 fun AssistantInputBar(
@@ -42,7 +42,7 @@ fun AssistantInputBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -53,15 +53,18 @@ fun AssistantInputBar(
                     Text(
                         text = "اكتب سؤالك أو اطلب خدمة هنا...",
                         fontSize = 12.sp,
-                        color = themeColors.textSecondary
+                        color = themeColors.textSecondary,
+                        maxLines = 1
                     )
                 },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 46.dp),
+                shape = RoundedCornerShape(24.dp),
                 singleLine = true,
                 textStyle = TextStyle(
                     color = themeColors.textPrimary,
-                    fontSize = 13.5.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -89,13 +92,13 @@ fun AssistantInputBar(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(if (typedText.isNotBlank()) themeColors.accent else themeColors.border.copy(alpha = 0.4f))
+                    .background(if (typedText.isNotBlank()) themeColors.accent else themeColors.border.copy(alpha = 0.35f))
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "إرسال",
                     tint = if (typedText.isNotBlank()) Color.Black else themeColors.textSecondary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

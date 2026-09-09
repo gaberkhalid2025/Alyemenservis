@@ -64,6 +64,12 @@ class MainViewModel @Inject constructor(
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
     internal val _currentUserPoints = MutableStateFlow(0)
     val currentUserPoints: StateFlow<Int> = _currentUserPoints.asStateFlow()
+    internal val _targetRegistrationType = MutableStateFlow<String?>(null)
+    val targetRegistrationType: StateFlow<String?> = _targetRegistrationType.asStateFlow()
+
+    fun setTargetRegistrationType(type: String?) {
+        _targetRegistrationType.value = type
+    }
     internal val _screenBackStack = MutableStateFlow<List<String>>(listOf("USER_BROWSE"))
     val screenBackStack: StateFlow<List<String>> = _screenBackStack.asStateFlow()
     val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)

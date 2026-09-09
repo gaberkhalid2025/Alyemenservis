@@ -74,17 +74,17 @@ fun MainViewModel.changeAdminCredentials(username: String, password: String) {
         _currentScreen.value = targetScreen
     }
     fun MainViewModel.navigateTo(screen: String) {
-        if (_currentScreen.value != screen) {
-            val updated = _screenBackStack.value.toMutableList()
-            if (screen == "USER_BROWSE") {
-                updated.clear()
-                updated.add("USER_BROWSE")
-            } else {
+        val updated = _screenBackStack.value.toMutableList()
+        if (screen == "USER_BROWSE") {
+            updated.clear()
+            updated.add("USER_BROWSE")
+        } else {
+            if (updated.lastOrNull() != screen) {
                 updated.add(screen)
             }
-            _screenBackStack.value = updated
-            _currentScreen.value = screen
         }
+        _screenBackStack.value = updated
+        _currentScreen.value = screen
     }
 fun MainViewModel.goBack(): Boolean {
         val stack = _screenBackStack.value.toMutableList()

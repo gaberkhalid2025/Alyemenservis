@@ -2,6 +2,8 @@ package com.example.utils
 
 import android.content.Context
 import androidx.annotation.Keep
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import java.util.Locale
 import kotlin.math.min
@@ -47,6 +49,23 @@ class AiAssistantEngine(private val context: Context) {
     init {
         loadOfflineData()
         loadBuiltInYemeniGuides()
+    }
+
+    suspend fun refreshGuidesFromFirestore() {
+        try {
+            val snapshot = FirebaseFirestore.getInstance().collection("ai_guides").get().await()
+            val newGuides = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(TroubleshootingGuide::class.java)
+            }
+            if (newGuides.isNotEmpty()) {
+                synchronized(guidesList) {
+                    guidesList.clear()
+                    guidesList.addAll(newGuides)
+                }
+            }
+        } catch (e: Exception) {
+            // Keep existing offline & built-in guides
+        }
     }
 
     private fun loadOfflineData() {

@@ -281,18 +281,16 @@ fun AppHeaderBar(
             )
 
             // 4. الإشعارات
+            val isNotifScreen = currentScreen == AppScreens.NOTIFICATIONS_VIEW
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
                 vectorIcon = Icons.Default.Notifications,
                 label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = unreadNotifCount > 0,
+                isSelected = isNotifScreen || unreadNotifCount > 0,
                 badgeCount = unreadNotifCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
                 onClick = {
-                    val allIds = filteredNotifs.map { it.id }.toSet()
-                    headerSp.edit().putStringSet("read_notif_ids", allIds).apply()
-                    headerReadIds = allIds
                     onNotificationsClick()
                 }
             )

@@ -183,7 +183,7 @@ class RegistrationHelper(
                 categoryName = customCategoryName.ifBlank { catId },
                 businessName = if (requestType == "STORE" || requestType == "RESTAURANT" || requestType == "MEDICAL") name else "",
                 ownerName = name,
-                propertyTitle = if (requestType == "PROPERTY") name else "",
+                propertyTitle = if (requestType == "PROPERTY") (if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب/عقار ($name)") else "",
                 jobTitle = if (requestType == "JOB") customCategoryName.ifBlank { name } else "",
                 companyName = if (requestType == "JOB") name else "",
                 profileImage = finalSelfie,
@@ -225,7 +225,7 @@ class RegistrationHelper(
                             "PROPERTY" -> {
                                 val newProp = PropertyEntity(
                                     id = requestDocId,
-                                    title = if (customCategoryName.isNotBlank()) customCategoryName else "عقار معروض - $name",
+                                    title = if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب عقاري - $name",
                                     phone = cleanPhone,
                                     ownerId = cleanPhone,
                                     cityId = area,

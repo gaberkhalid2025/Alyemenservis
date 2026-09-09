@@ -140,25 +140,25 @@ fun RestoreAccountDialog(
                                         viewModel.selectedProvider = match.provider
                                         viewModel.selectedStore = null
                                         viewModel.selectedProperty = null
-                                        viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.DYNAMIC_PROFILE)
+                                        viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
                                     } else if (match?.store != null) {
                                         if (match.store.isDeleted) viewModel.restoreStore(match.store.id)
                                         viewModel.selectedStore = match.store
                                         viewModel.selectedProvider = null
                                         viewModel.selectedProperty = null
-                                        viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.DYNAMIC_PROFILE)
+                                        viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
                                     } else if (match?.property != null) {
                                         if (match.property.isDeleted) viewModel.restoreProperty(match.property.id)
                                         viewModel.selectedProperty = match.property
                                         viewModel.selectedProvider = null
                                         viewModel.selectedStore = null
-                                        viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.DYNAMIC_PROFILE)
+                                        viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
                                     } else {
                                         viewModel.selectedProvider = null
                                         viewModel.selectedStore = null
                                         viewModel.selectedProperty = null
                                         viewModel.selectedJob = null
-                                        viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.USER_BROWSE)
+                                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
                                     }
 
                                     Toast.makeText(context, "🔓 تم تسجيل الدخول بنجاح! مرحباً بك $provName", Toast.LENGTH_LONG).show()
@@ -183,7 +183,7 @@ fun RestoreAccountDialog(
                             viewModel.requestPasswordReset(context, cleanPhone, provName, match?.type ?: "USER") { success ->
                                 if (success) {
                                     Toast.makeText(context, "⏳ تم إرسال طلب استعادة كلمة المرور للإدارة بنجاح!", Toast.LENGTH_LONG).show()
-                                    viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.PASSWORD_RESET_WAITING)
+                                    viewModel.navigateToScreen(AppScreens.PASSWORD_RESET_WAITING)
                                     onDismiss()
                                 } else {
                                     Toast.makeText(context, "❌ حدث خطأ، يرجى المحاولة لاحقاً", Toast.LENGTH_SHORT).show()

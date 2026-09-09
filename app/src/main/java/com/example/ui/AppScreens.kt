@@ -1,4 +1,4 @@
-package com.example.ui.navigation
+package com.example.ui
 
 object AppScreens {
     const val HOME = "USER_BROWSE"
@@ -37,4 +37,7 @@ object AppScreens {
     const val CREATE_BOOKING = "CREATE_BOOKING"
     const val BOOKING_CALENDAR = "BOOKING_CALENDAR"
     const val PASSWORD_RESET_WAITING = "PASSWORD_RESET_WAITING"
+    const val NOTIFICATIONS_VIEW = "NOTIFICATIONS_VIEW"
+    const val SMART_ASSISTANT = "SMART_ASSISTANT"
+    const val QUICK_SERVICE_REQUEST = "QUICK_SERVICE_REQUEST"
 }

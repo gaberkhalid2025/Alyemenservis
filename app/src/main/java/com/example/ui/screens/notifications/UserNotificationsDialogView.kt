@@ -42,12 +42,12 @@ import kotlinx.coroutines.launch
  * batch read operations, snackbars, and category chips.
  */
 @Composable
-fun UserNotificationsBottomSheet(
+fun UserNotificationsContent(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -178,186 +178,172 @@ fun UserNotificationsBottomSheet(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color(0xFF0F172A).copy(alpha = 0.95f),
-        dragHandle = {
-            BottomSheetDefaults.DragHandle(color = themeColors.accent.copy(alpha = 0.6f))
-        },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            snackbarHost = {
-                SnackbarHost(hostState = snackbarHostState) { data ->
-                    Snackbar(
-                        snackbarData = data,
-                        containerColor = Color(0xFF1E293B),
-                        contentColor = Color.White,
-                        actionColor = themeColors.accent,
-                        shape = RoundedCornerShape(10.dp)
-                    )
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header Bar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "رجوع إلى الشاشة الرئيسية",
+                            tint = Color.White
+                        )
+                    }
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🔔", fontSize = 18.sp)
+                            Text(
+                                "مركز الإشعارات والتنبيهات",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                        }
+                        if (unreadCount > 0) {
+                            Text(
+                                "$unreadCount إشعار غير مقروء",
+                                fontSize = 11.sp,
+                                color = Color(0xFF10B981),
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            Text(
+                                "جميع الإشعارات مقروءة ومحدثة",
+                                fontSize = 10.5.sp,
+                                color = Color.LightGray
+                            )
+                        }
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Mark All as Read Button
+                    if (unreadCount > 0) {
+                        FilledTonalButton(
+                            onClick = {
+                                notifViewModel.markAllAsRead(context, validAndFilteredNotifs)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("تم تحديد جميع الإشعارات كمقروءة بنجاح ✓")
+                                }
+                            },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = themeColors.accent.copy(alpha = 0.15f),
+                                contentColor = themeColors.accent
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("mark_all_read_btn")
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("تحديد الكل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Clear All Button
+                    if (validAndFilteredNotifs.isNotEmpty()) {
+                        IconButton(
+                            onClick = { showClearAllConfirmDialog = true },
+                            modifier = Modifier.testTag("clear_all_notifs_btn")
+                        ) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "مسح الكل",
+                                tint = Color(0xFFEF4444)
+                            )
+                        }
+                    }
                 }
             }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.88f)
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Header Bar
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "رجوع إلى الشاشة الرئيسية",
-                                tint = Color.White
-                            )
-                        }
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("🔔", fontSize = 18.sp)
-                                Text(
-                                    "مركز الإشعارات الذكية",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White
-                                )
-                            }
-                            if (unreadCount > 0) {
-                                Text(
-                                    "$unreadCount إشعار غير مقروء",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF10B981),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        // Mark All as Read Button
-                        if (unreadCount > 0) {
-                            FilledTonalButton(
-                                onClick = {
-                                    notifViewModel.markAllAsRead(context, validAndFilteredNotifs)
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("تم تحديد جميع الإشعارات كمقروءة بنجاح ✓")
-                                    }
-                                },
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = themeColors.accent.copy(alpha = 0.15f),
-                                    contentColor = themeColors.accent
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.testTag("mark_all_read_btn")
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("تحديد الكل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-                        // Clear All Button
-                        if (validAndFilteredNotifs.isNotEmpty()) {
-                            IconButton(
-                                onClick = { showClearAllConfirmDialog = true },
-                                modifier = Modifier.testTag("clear_all_notifs_btn")
-                            ) {
-                                Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "مسح الكل",
-                                    tint = Color(0xFFEF4444)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-
-                // Tabs & Category Filter Chips
-                val tabCounts = remember(validAndFilteredNotifs.size, unreadCount) {
-                    listOf(
-                        Triple("ALL", "الكل", validAndFilteredNotifs.size),
-                        Triple("UNREAD", "غير مقروءة", unreadCount),
-                        Triple("IMPORTANT", "الهامة ⭐", validAndFilteredNotifs.count { it.notificationType == "BOOKING" || it.title.contains("عاجل") }),
-                        Triple("READ", "مقروءة", validAndFilteredNotifs.size - unreadCount)
-                    )
-                }
-
-                NotificationFilterTabs(
-                    activeTab = activeTab,
-                    onTabSelected = { notifViewModel.setActiveTab(it) },
-                    tabCounts = tabCounts,
-                    selectedTypeFilter = selectedTypeFilter,
-                    onTypeFilterSelected = { notifViewModel.setSelectedTypeFilter(it) },
-                    themeColors = themeColors
+            // Tabs & Category Filter Chips
+            val tabCounts = remember(validAndFilteredNotifs.size, unreadCount) {
+                listOf(
+                    Triple("ALL", "الكل", validAndFilteredNotifs.size),
+                    Triple("UNREAD", "غير مقروءة", unreadCount),
+                    Triple("IMPORTANT", "الهامة ⭐", validAndFilteredNotifs.count { it.notificationType == "BOOKING" || it.title.contains("عاجل") }),
+                    Triple("READ", "مقروءة", validAndFilteredNotifs.size - unreadCount)
                 )
+            }
 
-                // Main List or Empty State
-                if (finalNotifs.isEmpty()) {
-                    NotificationEmptyState(
-                        activeTab = activeTab,
-                        themeColors = themeColors,
-                        modifier = Modifier.weight(1f)
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
-                    ) {
-                        items(
-                            items = finalNotifs,
-                            key = { it.id.ifBlank { "${it.title}_${it.timestamp}" } }
-                        ) { notif ->
-                            NotificationItemCard(
-                                notification = notif,
-                                isUnread = !readIds.contains(notif.id),
-                                onCardClick = {
-                                    notifViewModel.markNotificationAsRead(context, notif.id)
-                                },
-                                onDeleteClick = {
-                                    notifViewModel.deleteNotification(notif.id)
-                                    coroutineScope.launch {
-                                        val res = snackbarHostState.showSnackbar(
-                                            message = "تم حذف الإشعار",
-                                            actionLabel = "تراجع"
+            NotificationFilterTabs(
+                activeTab = activeTab,
+                onTabSelected = { notifViewModel.setActiveTab(it) },
+                tabCounts = tabCounts,
+                selectedTypeFilter = selectedTypeFilter,
+                onTypeFilterSelected = { notifViewModel.setSelectedTypeFilter(it) },
+                themeColors = themeColors
+            )
+
+            // Main List or Empty State
+            if (finalNotifs.isEmpty()) {
+                NotificationEmptyState(
+                    activeTab = activeTab,
+                    themeColors = themeColors,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(
+                        items = finalNotifs,
+                        key = { it.id.ifBlank { "${it.title}_${it.timestamp}" } }
+                    ) { notif ->
+                        NotificationItemCard(
+                            notification = notif,
+                            isUnread = !readIds.contains(notif.id),
+                            onCardClick = {
+                                notifViewModel.markNotificationAsRead(context, notif.id)
+                            },
+                            onDeleteClick = {
+                                notifViewModel.deleteNotification(notif.id)
+                                coroutineScope.launch {
+                                    val res = snackbarHostState.showSnackbar(
+                                        message = "تم حذف الإشعار",
+                                        actionLabel = "تراجع"
+                                    )
+                                    if (res == SnackbarResult.ActionPerformed) {
+                                        notifViewModel.addNotification(
+                                            title = notif.title,
+                                            message = notif.message,
+                                            targetType = notif.targetType,
+                                            targetValue = notif.targetValue,
+                                            targetAudience = notif.targetAudience,
+                                            targetRoles = notif.targetRoles,
+                                            targetUserIds = notif.targetUserIds,
+                                            notificationType = notif.notificationType
                                         )
-                                        if (res == SnackbarResult.ActionPerformed) {
-                                            notifViewModel.addNotification(
-                                                title = notif.title,
-                                                message = notif.message,
-                                                targetType = notif.targetType,
-                                                targetValue = notif.targetValue,
-                                                targetAudience = notif.targetAudience,
-                                                targetRoles = notif.targetRoles,
-                                                targetUserIds = notif.targetUserIds,
-                                                notificationType = notif.notificationType
-                                            )
-                                        }
                                     }
-                                },
-                                themeColors = themeColors
-                            )
-                        }
+                                }
+                            },
+                            themeColors = themeColors
+                        )
                     }
                 }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     // Confirmation Dialog for Clearing All Notifications
@@ -376,6 +362,35 @@ fun UserNotificationsBottomSheet(
         },
         onDismiss = { showClearAllConfirmDialog = false }
     )
+}
+
+/**
+ * 🔔 UserNotificationsBottomSheet
+ */
+@Composable
+fun UserNotificationsBottomSheet(
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF0F172A).copy(alpha = 0.95f),
+        dragHandle = {
+            BottomSheetDefaults.DragHandle(color = themeColors.accent.copy(alpha = 0.6f))
+        },
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        UserNotificationsContent(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = onDismiss,
+            modifier = Modifier.fillMaxHeight(0.88f)
+        )
+    }
 }
 
 /**
@@ -403,9 +418,14 @@ fun UserNotificationsScreen(
     themeColors: VisualThemePalette,
     onBack: () -> Unit
 ) {
-    UserNotificationsBottomSheet(
-        viewModel = viewModel,
-        themeColors = themeColors,
-        onDismiss = onBack
-    )
+    Surface(
+        color = themeColors.background,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        UserNotificationsContent(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = onBack
+        )
+    }
 }

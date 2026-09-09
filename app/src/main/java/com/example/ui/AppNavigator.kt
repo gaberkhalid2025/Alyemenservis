@@ -1,4 +1,4 @@
-package com.example.ui.navigation
+package com.example.ui
 
 import androidx.activity.result.ActivityResultLauncher
 import com.example.ui.*
@@ -51,14 +51,10 @@ fun AppNavigator(
     val adminRole by viewModel.adminRole.collectAsState()
 
     var showNotificationsDialog by remember { mutableStateOf(false) }
-    var showAssistantDialog by remember { mutableStateOf(false) }
-    var showRequestServiceModal by remember { mutableStateOf(false) }
     var showRestoreAccountDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentScreen) {
-        showRequestServiceModal = false
         showNotificationsDialog = false
-        showAssistantDialog = false
         showRestoreAccountDialog = false
     }
 
@@ -73,18 +69,18 @@ fun AppNavigator(
 
     Scaffold(
         topBar = {
-            if (ScreenRoutes.showTopBar(currentScreen, adminRole) && !showAssistantDialog) {
+            if (ScreenRoutes.showTopBar(currentScreen, adminRole)) {
                 AppHeaderBar(
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onNotificationsClick = { showNotificationsDialog = true },
+                    onNotificationsClick = { viewModel.navigateToScreen(AppScreens.NOTIFICATIONS_VIEW) },
                     onChatsClick = { viewModel.navigateToScreen(AppScreens.CHAT_LIST) },
                     onMenuClick = { showRestoreAccountDialog = true }
                 )
             }
         },
         bottomBar = {
-            if (ScreenRoutes.showBottomBar(currentScreen, adminRole) && !showAssistantDialog) {
+            if (ScreenRoutes.showBottomBar(currentScreen, adminRole)) {
                 AppFooterBar(
                     viewModel = viewModel,
                     themeColors = themeColors,
@@ -92,7 +88,7 @@ fun AppNavigator(
                 )
             }
         },
-        contentWindowInsets = if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW || showAssistantDialog) {
+        contentWindowInsets = if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW) {
             WindowInsets(0, 0, 0, 0)
         } else {
             ScaffoldDefaults.contentWindowInsets
@@ -102,7 +98,7 @@ fun AppNavigator(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW || showAssistantDialog) PaddingValues(0.dp) else innerPadding)
+                .padding(if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW) PaddingValues(0.dp) else innerPadding)
         ) {
             when (currentScreen) {
                 AppScreens.USER_BROWSE, AppScreens.HOME -> {
@@ -131,10 +127,10 @@ fun AppNavigator(
                 )
                 AppScreens.STATUS_VIEW -> StatusScreen(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.CATEGORIES_VIEW -> CategoriesScreen(viewModel = viewModel, themeColors = themeColors, onCategoryClick = { cat -> viewModel.selectCategory(cat); viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
-                AppScreens.STORES_VIEW -> StoresScreen(viewModel = viewModel, themeColors = themeColors, onStoreClick = {}, onChatClick = { viewModel.openSupportChat() }, onRequestServiceClick = { showRequestServiceModal = true })
-                AppScreens.MEDICAL_VIEW -> MedicalCentersScreen(viewModel = viewModel, themeColors = themeColors, onMedicalCenterClick = {}, onChatClick = { viewModel.openSupportChat() }, onBookAppointmentClick = { showRequestServiceModal = true })
-                AppScreens.RESTAURANTS_VIEW -> RestaurantsScreen(viewModel = viewModel, themeColors = themeColors, onRestaurantClick = {}, onChatClick = { viewModel.openSupportChat() }, onOrderMealClick = { showRequestServiceModal = true })
-                AppScreens.PROPERTIES_VIEW -> PropertiesScreen(viewModel = viewModel, themeColors = themeColors, onPropertyClick = {}, onChatClick = { viewModel.openSupportChat() }, onRequestInspectionClick = { showRequestServiceModal = true })
+                AppScreens.STORES_VIEW -> StoresScreen(viewModel = viewModel, themeColors = themeColors, onStoreClick = {}, onChatClick = { viewModel.openSupportChat() }, onRequestServiceClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
+                AppScreens.MEDICAL_VIEW -> MedicalCentersScreen(viewModel = viewModel, themeColors = themeColors, onMedicalCenterClick = {}, onChatClick = { viewModel.openSupportChat() }, onBookAppointmentClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
+                AppScreens.RESTAURANTS_VIEW -> RestaurantsScreen(viewModel = viewModel, themeColors = themeColors, onRestaurantClick = {}, onChatClick = { viewModel.openSupportChat() }, onOrderMealClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
+                AppScreens.PROPERTIES_VIEW -> PropertiesScreen(viewModel = viewModel, themeColors = themeColors, onPropertyClick = {}, onChatClick = { viewModel.openSupportChat() }, onRequestInspectionClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
                 AppScreens.CHAT_LIST -> ChatListScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, onChannelClick = { ch -> viewModel.targetChatChannelId = ch.id; viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
                 AppScreens.CHAT_DIRECT -> ChatScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, channelId = viewModel.targetChatChannelId, onBackClick = { viewModel.targetChatChannelId = null; viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
                 AppScreens.CREATE_BOOKING -> CreateBookingScreen(onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }, onBookingCreated = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
@@ -149,7 +145,7 @@ fun AppNavigator(
                 )
                 AppScreens.BOOKINGS_VIEW -> BookingsScreenLayout(viewModel = viewModel, themeColors = themeColors)
                 AppScreens.INSTANT_REQUESTS_VIEW -> InstantRequestsScreen(viewModel = viewModel, themeColors = themeColors)
-                AppScreens.ORDERS_VIEW -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { showRequestServiceModal = true })
+                AppScreens.ORDERS_VIEW -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
                 AppScreens.MAP_VIEW -> MapScreenLayout(
                     viewModel = viewModel,
                     onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
@@ -182,7 +178,7 @@ fun AppNavigator(
                         }
                     }
                 )
-                AppScreens.REGISTER_FORM, AppScreens.JOIN_REQUEST_STATUS -> {
+                AppScreens.REGISTER_FORM, AppScreens.JOIN_REQUEST_STATUS, "TECHNICIAN_DASHBOARD", "STORE_DASHBOARD", "RESTAURANT_DASHBOARD", "MEDICAL_DASHBOARD", "PROPERTY_DASHBOARD", "JOB_POSTER_DASHBOARD", "CLIENT_DASHBOARD", "DASHBOARD" -> {
                     RegisterScreen(
                         viewModel = viewModel,
                         themeColors = themeColors,
@@ -200,6 +196,36 @@ fun AppNavigator(
                     com.example.ui.screens.about.AboutAppScreenContent(
                         viewModel = viewModel,
                         themeColors = themeColors
+                    )
+                }
+                AppScreens.NOTIFICATIONS_VIEW -> {
+                    com.example.ui.screens.notifications.UserNotificationsScreen(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                    )
+                }
+                AppScreens.SMART_ASSISTANT -> {
+                    SmartAssistantDialogView(
+                        viewModel = viewModel,
+                        settings = settingsState,
+                        themeColors = themeColors,
+                        onDismiss = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                        onChatOpen = { viewModel.openSupportChat() },
+                        onRequestQuickService = {
+                            viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
+                        },
+                        onNavigateToMap = {
+                            viewModel.navigateToScreen(AppScreens.MAP_VIEW)
+                        }
+                    )
+                }
+                AppScreens.QUICK_SERVICE_REQUEST -> {
+                    QuickServiceRequestDialog(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onDismiss = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                        onRequestCreated = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                     )
                 }
                 else -> {
@@ -222,8 +248,8 @@ fun AppNavigator(
                 FloatingIconsOverlay(
                     settings = settingsState,
                     themeColors = themeColors,
-                    onAssistantClick = { showAssistantDialog = true },
-                    onRequestServiceClick = { showRequestServiceModal = true }
+                    onAssistantClick = { viewModel.navigateToScreen(AppScreens.SMART_ASSISTANT) },
+                    onRequestServiceClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) }
                 )
             }
 
@@ -232,23 +258,6 @@ fun AppNavigator(
             }
             if (showNotificationsDialog) {
                 UserNotificationsDialogView(viewModel = viewModel, themeColors = themeColors, onDismiss = { showNotificationsDialog = false })
-            }
-            if (showAssistantDialog) {
-                SmartAssistantDialogView(
-                    viewModel = viewModel,
-                    settings = settingsState,
-                    themeColors = themeColors,
-                    onDismiss = { showAssistantDialog = false },
-                    onChatOpen = { viewModel.openSupportChat() }
-                )
-            }
-            if (showRequestServiceModal) {
-                QuickServiceRequestDialog(
-                    viewModel = viewModel,
-                    themeColors = themeColors,
-                    onDismiss = { showRequestServiceModal = false },
-                    onRequestCreated = { showRequestServiceModal = false }
-                )
             }
         }
     }

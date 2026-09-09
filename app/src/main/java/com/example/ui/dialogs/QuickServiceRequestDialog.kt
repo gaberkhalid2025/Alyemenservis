@@ -129,9 +129,13 @@ fun QuickServiceRequestScreen(
 
     Surface(
         color = Color(0xFF0F172A),
-        modifier = Modifier.fillMaxSize().statusBarsPadding()
+        modifier = Modifier.fillMaxSize()
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+        ) {
             // Header Bar
             Surface(
                 color = Color(0xFF1E293B),

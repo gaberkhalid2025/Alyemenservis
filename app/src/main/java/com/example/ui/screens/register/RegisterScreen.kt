@@ -50,8 +50,13 @@ fun RegisterScreen(
 ) {
     val context = LocalContext.current
     var showRestoreDialog by remember { mutableStateOf(false) }
-    var selectedType by remember { mutableStateOf<RegistrationType?>(null) }
-    var forceShowForm by remember { mutableStateOf(false) }
+    val targetTypeStr by viewModel.targetRegistrationType.collectAsState()
+    var selectedType by remember(targetTypeStr) {
+        mutableStateOf(if (!targetTypeStr.isNullOrBlank()) RegistrationType.fromId(targetTypeStr!!) else null)
+    }
+    var forceShowForm by remember(targetTypeStr) {
+        mutableStateOf(!targetTypeStr.isNullOrBlank())
+    }
 
     val joinPhone by viewModel.joinRequestPhone.collectAsState()
     val pendingProviders by viewModel.pendingProviders.collectAsState()

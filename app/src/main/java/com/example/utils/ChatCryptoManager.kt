@@ -27,19 +27,21 @@ object ChatCryptoManager {
     }
 
     /**
-     * تشفير النص العادي إلى Base64
+     * تشفير النص العادي إلى Base64 باستخدام IV عشوائي 16 بايت
      */
     fun encrypt(plainText: String, roomKey: String = DEFAULT_SECRET_SEED): String {
         if (plainText.isBlank()) return plainText
         return try {
             val keySpec = generateKey(roomKey)
             val cipher = Cipher.getInstance(ALGORITHM)
-            val iv = ByteArray(16) { 0 }
+            val iv = ByteArray(16)
+            java.security.SecureRandom().nextBytes(iv)
             val ivSpec = IvParameterSpec(iv)
 
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-            "enc::" + Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
+            val combined = iv + encryptedBytes
+            "enc::" + Base64.encodeToString(combined, Base64.NO_WRAP)
         } catch (e: Exception) {
             e.printStackTrace()
             plainText
@@ -47,21 +49,39 @@ object ChatCryptoManager {
     }
 
     /**
-     * فك تشفير النص المشفر Base64
+     * فك تشفير النص المشفر Base64 مع دعم IV العشوائي والنصوص المشفرة القديمة
      */
     fun decrypt(cipherText: String, roomKey: String = DEFAULT_SECRET_SEED): String {
         if (!cipherText.startsWith("enc::")) return cipherText
         return try {
             val cleanCipher = cipherText.removePrefix("enc::")
+            val combined = Base64.decode(cleanCipher, Base64.NO_WRAP)
             val keySpec = generateKey(roomKey)
             val cipher = Cipher.getInstance(ALGORITHM)
-            val iv = ByteArray(16) { 0 }
-            val ivSpec = IvParameterSpec(iv)
 
-            cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
-            val decodedBytes = Base64.decode(cleanCipher, Base64.NO_WRAP)
-            val decryptedBytes = cipher.doFinal(decodedBytes)
-            String(decryptedBytes, Charsets.UTF_8)
+            if (combined.size > 16) {
+                try {
+                    val iv = combined.copyOfRange(0, 16)
+                    val encrypted = combined.copyOfRange(16, combined.size)
+                    val ivSpec = IvParameterSpec(iv)
+                    cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+                    val decryptedBytes = cipher.doFinal(encrypted)
+                    String(decryptedBytes, Charsets.UTF_8)
+                } catch (ex: Exception) {
+                    // Fallback to legacy static 16-zero IV
+                    val iv = ByteArray(16) { 0 }
+                    val ivSpec = IvParameterSpec(iv)
+                    cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+                    val decryptedBytes = cipher.doFinal(combined)
+                    String(decryptedBytes, Charsets.UTF_8)
+                }
+            } else {
+                val iv = ByteArray(16) { 0 }
+                val ivSpec = IvParameterSpec(iv)
+                cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+                val decryptedBytes = cipher.doFinal(combined)
+                String(decryptedBytes, Charsets.UTF_8)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             cipherText

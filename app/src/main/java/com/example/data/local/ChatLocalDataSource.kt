@@ -3,6 +3,7 @@ package com.example.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.data.models.*
+import com.example.utils.ChatCryptoManager
 import com.example.utils.SecurityCryptoUtils
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -143,8 +144,8 @@ class ChatLocalDataSource(
         // Sort and decrypt if needed
         val sorted = messages.sortedBy { it.timestamp }
         val json = messagesListAdapter.toJson(sorted)
-        // Store encrypted payload
-        val encrypted = SecurityCryptoUtils.encrypt(json)
+        // Store encrypted payload with randomized IV
+        val encrypted = ChatCryptoManager.encrypt(json, "ChatLocalKey_$channelId")
         prefs.edit().putString(KEY_PREFIX_MESSAGES + channelId, encrypted).apply()
 
         // Update in-memory stream
@@ -196,7 +197,11 @@ class ChatLocalDataSource(
     private fun getCachedMessagesInternal(channelId: String): List<ChatMessage> {
         val rawEncrypted = prefs.getString(KEY_PREFIX_MESSAGES + channelId, null) ?: return emptyList()
         return try {
-            val decrypted = SecurityCryptoUtils.decrypt(rawEncrypted)
+            val decrypted = if (rawEncrypted.startsWith("enc::")) {
+                ChatCryptoManager.decrypt(rawEncrypted, "ChatLocalKey_$channelId")
+            } else {
+                SecurityCryptoUtils.decrypt(rawEncrypted)
+            }
             if (decrypted.isNotBlank() && decrypted != "[]") {
                 messagesListAdapter.fromJson(decrypted) ?: emptyList()
             } else {

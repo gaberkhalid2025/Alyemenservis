@@ -32,6 +32,9 @@ import kotlin.math.min
  */
 object LevenshteinMatcher {
 
+    private val searchCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Boolean>>()
+    private const val CACHE_TTL = 30_000L // 30 seconds
+
     fun calculateDistance(s1: String, s2: String): Int {
         val str1 = s1.lowercase().trim()
         val str2 = s2.lowercase().trim()
@@ -58,7 +61,22 @@ object LevenshteinMatcher {
         val q = query.lowercase().trim()
         val t = target.lowercase().trim()
 
-        if (t.contains(q)) return true
+        val cacheKey = "$q::$t::$maxDistance"
+        val cached = searchCache[cacheKey]
+        if (cached != null && System.currentTimeMillis() - cached.first < CACHE_TTL) {
+            return cached.second
+        }
+
+        if (t.contains(q)) {
+            searchCache[cacheKey] = Pair(System.currentTimeMillis(), true)
+            return true
+        }
+
+        if (t.length > 100) {
+            val result = t.contains(q)
+            searchCache[cacheKey] = Pair(System.currentTimeMillis(), result)
+            return result
+        }
 
         val queryWords = q.split("\\s+".toRegex())
         val targetWords = t.split("\\s+".toRegex())
@@ -71,10 +89,12 @@ object LevenshteinMatcher {
                     else -> maxDistance
                 }
                 if (calculateDistance(qw, tw) <= allowedDist) {
+                    searchCache[cacheKey] = Pair(System.currentTimeMillis(), true)
                     return true
                 }
             }
         }
+        searchCache[cacheKey] = Pair(System.currentTimeMillis(), false)
         return false
     }
 }

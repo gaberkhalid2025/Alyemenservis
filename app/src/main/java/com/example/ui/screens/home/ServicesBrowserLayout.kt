@@ -187,7 +187,8 @@ fun ServicesBrowserLayout(
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateStoreClick = {
-                            showCreateStoreModalSection = "stores"
+                            viewModel.setTargetRegistrationType("store")
+                            viewModel.navigateTo(AppScreens.REGISTER_FORM)
                         }
                     )
                 }
@@ -200,7 +201,8 @@ fun ServicesBrowserLayout(
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateRestaurantClick = {
-                            showCreateStoreModalSection = "restaurants"
+                            viewModel.setTargetRegistrationType("restaurant")
+                            viewModel.navigateTo(AppScreens.REGISTER_FORM)
                         }
                     )
                 }
@@ -213,7 +215,8 @@ fun ServicesBrowserLayout(
                             viewModel.navigateTo("STORE_DETAILS")
                         },
                         onCreateMedicalClick = {
-                            showCreateStoreModalSection = "medical"
+                            viewModel.setTargetRegistrationType("medical")
+                            viewModel.navigateTo(AppScreens.REGISTER_FORM)
                         }
                     )
                 }
@@ -223,7 +226,8 @@ fun ServicesBrowserLayout(
                         themeColors = themeColors,
                         onPropertyClick = { selectedPropertyForDetails = it },
                         onCreatePropertyClick = {
-                            showCreateStoreModalSection = "realestate"
+                            viewModel.setTargetRegistrationType("property")
+                            viewModel.navigateTo(AppScreens.REGISTER_FORM)
                         }
                     )
                 }
@@ -233,7 +237,8 @@ fun ServicesBrowserLayout(
                         themeColors = themeColors,
                         onJobClick = { selectedJobForDetails = it },
                         onCreateJobClick = {
-                            viewModel.navigateTo("REGISTER")
+                            viewModel.setTargetRegistrationType("job")
+                            viewModel.navigateTo(AppScreens.REGISTER_FORM)
                         }
                     )
                 }

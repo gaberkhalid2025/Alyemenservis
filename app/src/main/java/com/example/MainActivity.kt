@@ -35,7 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.data.*
 import com.example.data.models.*
 import com.example.ui.MainViewModel
-import com.example.ui.navigation.AppNavigator
+import com.example.ui.AppNavigator
 import com.example.ui.components.*
 import com.example.ui.dialogs.*
 import com.example.ui.screens.home.*

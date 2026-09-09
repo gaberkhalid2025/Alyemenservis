@@ -27,6 +27,7 @@ import com.example.utils.VisualThemePalette
 fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onInfoClick: () -> Unit) {
     val settingsState by viewModel.settings.collectAsState()
     val currentLang by viewModel.currentLanguage.collectAsState()
+    val currentScreen by viewModel.currentScreen.collectAsState()
     val isEn = currentLang == "en"
 
     val footerBg = remember(settingsState.footerBgColorHex, themeColors.secondary) {
@@ -75,11 +76,12 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 
             // 1. Info Icon ("عن التطبيق")
             if (settingsState.showInfoIcon) {
+                val isAbout = currentScreen == AppScreens.ABOUT_APP
                 Luxury3DNavIcon(
                     emojiIcon = settingsState.bottomInfoIcon.ifEmpty { "ℹ️" },
                     vectorIcon = Icons.Default.Info,
                     label = if (isEn) "About" else "عن التطبيق",
-                    isSelected = false,
+                    isSelected = isAbout,
                     iconSizeDp = settingsState.navIconSizeDp,
                     iconStyle = settingsState.topNavIconStyle,
                     onClick = { onInfoClick() }
@@ -88,11 +90,12 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 
             // 2. Bookings Icon ("الحجوزات")
             if (settingsState.showBookingsIcon) {
+                val isBookings = currentScreen == AppScreens.BOOKINGS_VIEW
                 Luxury3DNavIcon(
                     emojiIcon = settingsState.bottomBookingsIcon.ifEmpty { "📅" },
                     vectorIcon = Icons.Default.DateRange,
                     label = if (isEn) "Bookings" else "الحجوزات",
-                    isSelected = false,
+                    isSelected = isBookings,
                     badgeCount = unreadCount,
                     iconSizeDp = settingsState.navIconSizeDp,
                     iconStyle = settingsState.topNavIconStyle,
@@ -139,11 +142,12 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
 
             // 5. Admin Lock Icon ("الإدارة")
             if (settingsState.showAdminIcon) {
+                val isAdmin = currentScreen == AppScreens.ADMIN_PANEL
                 Luxury3DNavIcon(
                     emojiIcon = settingsState.bottomAdminIcon.ifEmpty { "🔒" },
                     vectorIcon = Icons.Default.Lock,
                     label = if (isEn) "Admin" else "الإدارة",
-                    isSelected = false,
+                    isSelected = isAdmin,
                     iconSizeDp = settingsState.navIconSizeDp,
                     iconStyle = settingsState.topNavIconStyle,
                     onClick = { viewModel.navigateTo("ADMIN_PANEL") }

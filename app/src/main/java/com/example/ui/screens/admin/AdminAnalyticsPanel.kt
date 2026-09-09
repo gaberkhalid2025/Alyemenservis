@@ -1,10 +1,9 @@
 package com.example.ui.screens.admin
 
 import android.widget.Toast
-import com.example.ui.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -47,227 +46,237 @@ fun AdminAnalyticsPanel(
     val categoryStats = adminViewModel.getCategoryStats()
     val cityStats = adminViewModel.getCityStats()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text("لوحة التحليلات والإحصائيات", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        adminViewModel.loadSystemStats()
-                        Toast.makeText(context, "تم تحديث البيانات والإحصائيات", Toast.LENGTH_SHORT).show()
-                    }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color(0xFF00668B))
-                    }
-                    IconButton(onClick = {
-                        val report = adminViewModel.exportReport("الإحصائيات والتحليلات")
-                        Toast.makeText(context, "تم تصدير التقرير التحليلي بنجاح", Toast.LENGTH_LONG).show()
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "تصدير", tint = Color(0xFF00668B))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color(0xFFF8FAFC)),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Header Row
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // شريط الفترات الزمنية
-            item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val periods = listOf(
-                        "TODAY" to "اليوم",
-                        "WEEK" to "هذا الأسبوع",
-                        "MONTH" to "هذا الشهر",
-                        "YEAR" to "هذا العام"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(Color(0xFFF59E0B).copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text("📊 لوحة الإحصائيات ومؤشرات الأداء", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
+                        Text("متابعة حية للنمو، القطاعات، والعمليات في كافة المحافظات", fontSize = 10.5.sp, color = Color.Gray)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(
+                        onClick = {
+                            adminViewModel.loadSystemStats()
+                            Toast.makeText(context, "تم تحديث البيانات والإحصائيات 🔄", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color(0xFFF59E0B))
+                    }
+                    IconButton(
+                        onClick = {
+                            adminViewModel.exportReport("الإحصائيات والتحليلات")
+                            Toast.makeText(context, "تم تصدير التقرير التحليلي بنجاح 📋", Toast.LENGTH_LONG).show()
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "تصدير", tint = Color(0xFFF59E0B))
+                    }
+                }
+            }
+        }
+
+        // شريط الفترات الزمنية
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val periods = listOf(
+                "TODAY" to "اليوم",
+                "WEEK" to "هذا الأسبوع",
+                "MONTH" to "هذا الشهر",
+                "YEAR" to "هذا العام"
+            )
+            items(periods) { (key, label) ->
+                val isSelected = selectedPeriod == key
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { selectedPeriod = key },
+                    label = { Text(label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFF59E0B),
+                        selectedLabelColor = Color.Black,
+                        containerColor = Color(0xFF1E293B),
+                        labelColor = Color.White
                     )
-                    items(periods) { (key, label) ->
-                        val isSelected = selectedPeriod == key
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { selectedPeriod = key },
-                            label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF00668B),
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
+                )
+            }
+        }
+
+        // بطاقات الأرقام القياسية الرئيسية (Grid of Stats)
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // إجمالي المستخدمين
+                StatMetricCard(
+                    title = "إجمالي المستخدمين",
+                    value = "${stats.totalUsers + 1280}",
+                    trend = "+14.2%",
+                    icon = Icons.Default.Person,
+                    bgColor = Color(0xFFE0F2FE),
+                    iconColor = Color(0xFF0288D1),
+                    modifier = Modifier.weight(1f)
+                )
+                // الفنيين المعتمدين
+                StatMetricCard(
+                    title = "الفنيين المعتمدين",
+                    value = "${stats.totalProviders + 340}",
+                    trend = "+8.5%",
+                    icon = Icons.Default.CheckCircle,
+                    bgColor = Color(0xFFE8F5E9),
+                    iconColor = Color(0xFF2E7D32),
+                    modifier = Modifier.weight(1f)
+                )
             }
 
-            // بطاقات الأرقام القياسية الرئيسية (Grid of Stats)
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // إجمالي المستخدمين
-                        StatMetricCard(
-                            title = "إجمالي المستخدمين",
-                            value = "${stats.totalUsers + 1280}",
-                            trend = "+14.2%",
-                            icon = Icons.Default.Person,
-                            bgColor = Color(0xFFE0F2FE),
-                            iconColor = Color(0xFF0288D1),
-                            modifier = Modifier.weight(1f)
-                        )
-                        // الفنيين المعتمدين
-                        StatMetricCard(
-                            title = "الفنيين المعتمدين",
-                            value = "${stats.totalProviders + 340}",
-                            trend = "+8.5%",
-                            icon = Icons.Default.CheckCircle,
-                            bgColor = Color(0xFFE8F5E9),
-                            iconColor = Color(0xFF2E7D32),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // إجمالي الحجوزات والطلبات
-                        StatMetricCard(
-                            title = "إجمالي الحجوزات",
-                            value = "${bookingStats.total + 5120}",
-                            trend = "+22.4%",
-                            icon = Icons.Default.List,
-                            bgColor = Color(0xFFFFF3E0),
-                            iconColor = Color(0xFFE65100),
-                            modifier = Modifier.weight(1f)
-                        )
-                        // الإيرادات والعمولات
-                        StatMetricCard(
-                            title = "إجمالي الإيرادات",
-                            value = "${numberFormat.format(revenueStats.totalRevenue + 4500000)} ر.ي",
-                            trend = "+18.0%",
-                            icon = Icons.Default.Star,
-                            bgColor = Color(0xFFF3E5F5),
-                            iconColor = Color(0xFF7B1FA2),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // إجمالي الحجوزات والطلبات
+                StatMetricCard(
+                    title = "إجمالي الحجوزات",
+                    value = "${bookingStats.total + 5120}",
+                    trend = "+22.4%",
+                    icon = Icons.Default.List,
+                    bgColor = Color(0xFFFFF3E0),
+                    iconColor = Color(0xFFE65100),
+                    modifier = Modifier.weight(1f)
+                )
+                // الإيرادات والعمولات
+                StatMetricCard(
+                    title = "إجمالي الإيرادات",
+                    value = "${numberFormat.format(revenueStats.totalRevenue + 4500000)} ر.ي",
+                    trend = "+18.0%",
+                    icon = Icons.Default.Star,
+                    bgColor = Color(0xFFF3E5F5),
+                    iconColor = Color(0xFF7B1FA2),
+                    modifier = Modifier.weight(1f)
+                )
             }
+        }
 
-            // مخطط التوزيع حسب المحافظات اليمنية
-            item {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
-                    modifier = Modifier.fillMaxWidth()
+        // مخطط التوزيع حسب المحافظات اليمنية
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "📍 التوزيع الجغرافي (المحافظات)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp,
+                        color = Color.White
+                    )
+                    Text("النشاط الأعلى", fontSize = 11.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val governorates = listOf(
+                    Triple("أمانة العاصمة / صنعاء", 0.42f, "42%"),
+                    Triple("عدن", 0.24f, "24%"),
+                    Triple("تعز", 0.16f, "16%"),
+                    Triple("إب", 0.10f, "10%"),
+                    Triple("حضرموت (المكلا / سيئون)", 0.08f, "8%")
+                )
+
+                governorates.forEach { (city, progress, percent) ->
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                "📍 التوزيع الجغرافي (المحافظات)",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = Color(0xFF1E293B)
-                            )
-                            Text("النشاط الأعلى", fontSize = 11.sp, color = Color(0xFF00668B), fontWeight = FontWeight.SemiBold)
+                            Text(city, fontSize = 12.sp, color = Color.LightGray, fontWeight = FontWeight.Medium)
+                            Text(percent, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
                         }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        val governorates = listOf(
-                            Triple("أمانة العاصمة / صنعاء", 0.42f, "42%"),
-                            Triple("عدن", 0.24f, "24%"),
-                            Triple("تعز", 0.16f, "16%"),
-                            Triple("إب", 0.10f, "10%"),
-                            Triple("حضرموت (المكلا / سيئون)", 0.08f, "8%")
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(CircleShape),
+                            color = Color(0xFFF59E0B),
+                            trackColor = Color.DarkGray
                         )
-
-                        governorates.forEach { (city, progress, percent) ->
-                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(city, fontSize = 13.sp, color = Color(0xFF334155), fontWeight = FontWeight.Medium)
-                                    Text(percent, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00668B))
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                LinearProgressIndicator(
-                                    progress = { progress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(CircleShape),
-                                    color = Color(0xFF00668B),
-                                    trackColor = Color(0xFFE2E8F0)
-                                )
-                            }
-                        }
                     }
                 }
             }
+        }
 
-            // مخطط توزيع القطاعات والخدمات
-            item {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "🔧 التوزيع حسب القطاعات والخدمات",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color(0xFF1E293B)
-                        )
+        // مخطط توزيع القطاعات والخدمات
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    "🔧 التوزيع حسب القطاعات والخدمات",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.5.sp,
+                    color = Color.White
+                )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                        val categories = listOf(
-                            Triple("خدمات الصيانة والكهرباء ⚡", 0.35f, Color(0xFF00668B)),
-                            Triple("المتاجر وقطع الغيار 🛍️", 0.25f, Color(0xFF2E7D32)),
-                            Triple("المطاعم وتوصيل الوجبات 🍽️", 0.22f, Color(0xFFE65100)),
-                            Triple("الرعاية الصحية والمراكز 🏥", 0.18f, Color(0xFFD32F2F))
-                        )
+                val categories = listOf(
+                    Triple("خدمات الصيانة والكهرباء ⚡", 0.35f, Color(0xFF38BDF8)),
+                    Triple("المتاجر وقطع الغيار 🛍️", 0.25f, Color(0xFF4ADE80)),
+                    Triple("المطاعم وتوصيل الوجبات 🍽️", 0.22f, Color(0xFFFB923C)),
+                    Triple("الرعاية الصحية والمراكز 🏥", 0.18f, Color(0xFFF87171))
+                )
 
-                        categories.forEach { (cat, progress, color) ->
-                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(cat, fontSize = 13.sp, color = Color(0xFF334155), fontWeight = FontWeight.Medium)
-                                    Text("${(progress * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                LinearProgressIndicator(
-                                    progress = { progress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(CircleShape),
-                                    color = color,
-                                    trackColor = color.copy(alpha = 0.15f)
-                                )
-                            }
+                categories.forEach { (cat, progress, color) ->
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(cat, fontSize = 12.sp, color = Color.LightGray, fontWeight = FontWeight.Medium)
+                            Text("${(progress * 100).toInt()}%", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = color)
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(CircleShape),
+                            color = color,
+                            trackColor = color.copy(alpha = 0.2f)
+                        )
                     }
                 }
             }
@@ -287,11 +296,11 @@ private fun StatMetricCard(
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
         modifier = modifier
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -299,11 +308,11 @@ private fun StatMetricCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .background(bgColor, CircleShape),
+                        .size(32.dp)
+                        .background(bgColor.copy(alpha = 0.2f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
                 }
 
                 Row(
@@ -313,17 +322,17 @@ private fun StatMetricCard(
                     Icon(
                         Icons.Default.Star,
                         contentDescription = null,
-                        tint = Color(0xFF2E7D32),
-                        modifier = Modifier.size(14.dp)
+                        tint = Color(0xFF4ADE80),
+                        modifier = Modifier.size(12.dp)
                     )
-                    Text(trend, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                    Text(trend, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4ADE80))
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Spacer(modifier = Modifier.height(2.dp))
-            Text(title, fontSize = 11.sp, color = Color(0xFF64748B))
+            Text(title, fontSize = 10.5.sp, color = Color.Gray)
         }
     }
 }

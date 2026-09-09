@@ -43,19 +43,19 @@ object JoinStatusRouter {
                         account = acc,
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                     )
                     "medical" -> MedicalDashboard(
                         account = acc,
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                     )
                     else -> StoreDashboard(
                         account = acc,
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                     )
                 }
             }
@@ -65,7 +65,7 @@ object JoinStatusRouter {
                     account = acc,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                 )
             }
             is JoinStatus.ApprovedTechnician -> {
@@ -74,7 +74,7 @@ object JoinStatusRouter {
                     account = acc,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                 )
             }
             is JoinStatus.ActiveJobPoster -> {
@@ -83,7 +83,7 @@ object JoinStatusRouter {
                     account = acc,
                     viewModel = viewModel,
                     themeColors = themeColors,
-                    onBackClick = { viewModel.cancelOrResetJoinRequest(context) }
+                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                 )
             }
             is JoinStatus.ActiveClient -> {

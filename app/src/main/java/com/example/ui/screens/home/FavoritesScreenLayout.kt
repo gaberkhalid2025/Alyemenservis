@@ -85,8 +85,7 @@ fun FavoritesScreenLayout(
         modifier = Modifier
             .fillMaxSize()
             .background(themeColors.background)
-            .padding(12.dp)
-            .verticalScroll(rememberScrollState()),
+            .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // 1. Header Banner Card (شريط المفضلة العلوي الفاخر)
@@ -335,8 +334,12 @@ fun FavoritesScreenLayout(
                             onRemoveFavorite = { viewModel.toggleFavorite(store.id) },
                             onCall = {
                                 if (store.phone.isNotEmpty()) {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
-                                    context.startActivity(intent)
+                                    try {
+                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${store.phone}"))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(context, "تعذر الاتصال", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         )
@@ -360,8 +363,12 @@ fun FavoritesScreenLayout(
                             onRemoveFavorite = { viewModel.toggleFavorite(property.id) },
                             onCall = {
                                 if (property.phone.isNotEmpty()) {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${property.phone}"))
-                                    context.startActivity(intent)
+                                    try {
+                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${property.phone}"))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(context, "تعذر الاتصال", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         )

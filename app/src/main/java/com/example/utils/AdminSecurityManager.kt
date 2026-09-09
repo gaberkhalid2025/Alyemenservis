@@ -11,6 +11,14 @@ object AdminSecurityManager {
     const val ADMIN_EMAIL = "meh777644@gmail.com"
     const val ADMIN_PASSWORD = "Meh@@@@777644##"
 
+    fun getOwnerPassword(): String {
+        return OWNER_PASSWORD
+    }
+
+    fun getAdminPassword(): String {
+        return ADMIN_PASSWORD
+    }
+
     // ========== دوال التحقق ==========
     fun verifyCredentials(
         username: String,
@@ -21,12 +29,16 @@ object AdminSecurityManager {
         val trimmedPass = passwordAttempt.trim()
         if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
 
+        val currentOwnerPass = getOwnerPassword()
+        val currentAdminPass = getAdminPassword()
+
         // 1. التحقق من المالك (OWNER)
         if (trimmedUser.equals(OWNER_EMAIL, ignoreCase = true) ||
             trimmedUser == "WAM2026" ||
             (settings != null && trimmedUser.equals(settings.ownerEmail, ignoreCase = true))
         ) {
-            if (trimmedPass == OWNER_PASSWORD ||
+            if (trimmedPass == currentOwnerPass ||
+                trimmedPass == OWNER_PASSWORD ||
                 (settings != null && settings.ownerPassword.isNotBlank() && (
                     trimmedPass == settings.ownerPassword ||
                     PasswordHasher.verifyPassword(trimmedPass, settings.ownerPassword) ||
@@ -43,7 +55,9 @@ object AdminSecurityManager {
         if (trimmedUser.equals(ADMIN_EMAIL, ignoreCase = true) ||
             (settings != null && trimmedUser.equals(settings.adminUsername, ignoreCase = true))
         ) {
-            if (trimmedPass == ADMIN_PASSWORD ||
+            if (trimmedPass == currentAdminPass ||
+                trimmedPass == ADMIN_PASSWORD ||
+                trimmedPass == currentOwnerPass ||
                 trimmedPass == OWNER_PASSWORD ||
                 (settings != null && settings.adminPassword.isNotBlank() && (
                     trimmedPass == settings.adminPassword ||

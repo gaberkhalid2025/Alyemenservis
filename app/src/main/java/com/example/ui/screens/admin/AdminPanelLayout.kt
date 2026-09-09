@@ -2,7 +2,6 @@
 package com.example.ui.screens.admin
 
 import com.example.ui.*
-import com.example.ui.navigation.AppScreens
 import com.example.utils.*
 import com.example.data.*
 
@@ -1481,7 +1480,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                 }
             } else if (activeSubTab == "JOBS" || activeSubTab == "APPLICANTS") {
                 item {
-                    AdminJobsPanel(viewModel = viewModel, themeColors = themeColors)
+                    AdminJobsPanel(viewModel = viewModel, themeColors = themeColors, initialTab = activeSubTab)
                 }
             } else if (activeSubTab == "STATS") {
                 item {

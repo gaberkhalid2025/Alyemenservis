@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -143,7 +144,7 @@ fun AdminUserManager(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(filteredUsers, key = { it["id"] as? String ?: it["phone"] as? String ?: UUID.randomUUID().toString() }) { userMap ->
+                    itemsIndexed(filteredUsers, key = { index, userMap -> (userMap["id"] as? String)?.ifBlank { null } ?: (userMap["phone"] as? String)?.ifBlank { null } ?: "user_$index" }) { _, userMap ->
                         val userId = userMap["id"] as? String ?: ""
                         val name = userMap["name"] as? String ?: "مستخدم"
                         val phone = userMap["phone"] as? String ?: ""

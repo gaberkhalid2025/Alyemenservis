@@ -129,7 +129,7 @@ fun PropertiesScreen(
         extraHeaderContent = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { viewModel.navigateToScreen(com.example.ui.navigation.AppScreens.REGISTER_FORM) },
+                    onClick = { viewModel.navigateToScreen(AppScreens.REGISTER_FORM) },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().height(38.dp)

@@ -48,9 +48,10 @@ fun AdminRequestsPanel(
     var rejectionReason by remember { mutableStateOf("") }
 
     val pendingPropertiesCount = properties.count { !it.isApproved && !it.isDeleted }
-    val pendingMedicalCount = stores.count { !it.isApproved && !it.isDeleted && (it.categoryId.contains("طبي") || it.categoryId.contains("عياد")) }
-    val pendingRestaurantsCount = stores.count { !it.isApproved && !it.isDeleted && (it.categoryId.contains("مطعم") || it.categoryId.contains("كافيه")) }
-    val pendingStoresCount = stores.count { !it.isApproved && !it.isDeleted && !it.categoryId.contains("طبي") && !it.categoryId.contains("عياد") && !it.categoryId.contains("مطعم") && !it.categoryId.contains("كافيه") }
+    val pendingMedicalCount = stores.count { !it.isApproved && !it.isDeleted && (it.sectionId == "medical" || it.categoryId.contains("طبي") || it.categoryId.contains("عياد") || it.categoryId.equals("MEDICAL", ignoreCase = true)) } +
+            pendingProviders.count { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "MEDICAL" || it.categoryId.equals("medical", ignoreCase = true) || it.categoryId.contains("طبي") || it.categoryId.contains("عياد")) }
+    val pendingRestaurantsCount = stores.count { !it.isApproved && !it.isDeleted && (it.sectionId == "restaurants" || it.categoryId.contains("مطعم") || it.categoryId.contains("كافيه") || it.categoryId.equals("RESTAURANT", ignoreCase = true)) }
+    val pendingStoresCount = stores.count { !it.isApproved && !it.isDeleted && it.sectionId != "medical" && it.sectionId != "restaurants" && !it.categoryId.contains("طبي") && !it.categoryId.contains("عياد") && !it.categoryId.contains("مطعم") && !it.categoryId.contains("كافيه") && !it.categoryId.equals("MEDICAL", ignoreCase = true) && !it.categoryId.equals("RESTAURANT", ignoreCase = true) }
     val pendingJobsCount = jobs.count { !it.isApproved && !it.isDeleted }
 
     val activeServicesCount = pendingProviders.count {
@@ -201,9 +202,9 @@ fun AdminRequestsPanel(
             "STORES", "MEDICAL", "RESTAURANTS" -> {
                 val filteredStores = stores.filter { s ->
                     !s.isApproved && !s.isDeleted && when (selectedTab) {
-                        "MEDICAL" -> s.categoryId.contains("طبي") || s.categoryId.contains("عياد")
-                        "RESTAURANTS" -> s.categoryId.contains("مطعم") || s.categoryId.contains("كافيه")
-                        else -> !s.categoryId.contains("طبي") && !s.categoryId.contains("عياد") && !s.categoryId.contains("مطعم") && !s.categoryId.contains("كافيه")
+                        "MEDICAL" -> s.sectionId == "medical" || s.categoryId.contains("طبي") || s.categoryId.contains("عياد") || s.categoryId.equals("MEDICAL", ignoreCase = true)
+                        "RESTAURANTS" -> s.sectionId == "restaurants" || s.categoryId.contains("مطعم") || s.categoryId.contains("كافيه") || s.categoryId.equals("RESTAURANT", ignoreCase = true)
+                        else -> s.sectionId != "medical" && s.sectionId != "restaurants" && !s.categoryId.contains("طبي") && !s.categoryId.contains("عياد") && !s.categoryId.contains("مطعم") && !s.categoryId.contains("كافيه") && !s.categoryId.equals("MEDICAL", ignoreCase = true) && !s.categoryId.equals("RESTAURANT", ignoreCase = true)
                     }
                 }
                 if (filteredStores.isEmpty()) {

@@ -10,6 +10,7 @@ import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
@@ -37,70 +38,72 @@ object FirebaseStorageUploader {
         maxDimension: Int = 800,
         maxSizeBytes: Long = 300 * 1024L
     ): ByteArray? = withContext(Dispatchers.IO) {
-        try {
-            var inputStream: InputStream? = context.contentResolver.openInputStream(imageUri)
-                ?: return@withContext null
+        withTimeoutOrNull(10000L) {
+            try {
+                var inputStream: InputStream? = context.contentResolver.openInputStream(imageUri)
+                    ?: return@withTimeoutOrNull null
 
-            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeStream(inputStream, null, boundsOptions)
-            inputStream?.close()
+                val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeStream(inputStream, null, boundsOptions)
+                inputStream?.close()
 
-            val origWidth = boundsOptions.outWidth
-            val origHeight = boundsOptions.outHeight
-            if (origWidth <= 0 || origHeight <= 0) return@withContext null
+                val origWidth = boundsOptions.outWidth
+                val origHeight = boundsOptions.outHeight
+                if (origWidth <= 0 || origHeight <= 0) return@withTimeoutOrNull null
 
-            // Calculate sample size
-            var sampleSize = 1
-            while (origWidth / sampleSize > maxDimension * 1.5 || origHeight / sampleSize > maxDimension * 1.5) {
-                sampleSize *= 2
-            }
-
-            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            val nextStream = context.contentResolver.openInputStream(imageUri) ?: return@withContext null
-            val decodedBitmap = BitmapFactory.decodeStream(nextStream, null, decodeOptions)
-            nextStream.close()
-
-            if (decodedBitmap == null) return@withContext null
-
-            // Exact scale if larger than maxDimension
-            val finalBitmap = if (decodedBitmap.width > maxDimension || decodedBitmap.height > maxDimension) {
-                val ratio = Math.min(
-                    maxDimension.toFloat() / decodedBitmap.width,
-                    maxDimension.toFloat() / decodedBitmap.height
-                )
-                val newW = (decodedBitmap.width * ratio).toInt().coerceAtLeast(1)
-                val newH = (decodedBitmap.height * ratio).toInt().coerceAtLeast(1)
-                Bitmap.createScaledBitmap(decodedBitmap, newW, newH, true)
-            } else {
-                decodedBitmap
-            }
-
-            // Compress to WebP (or JPEG fallback)
-            var quality = 80
-            var outputBytes: ByteArray
-            do {
-                val bos = ByteArrayOutputStream()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    finalBitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, quality, bos)
-                } else {
-                    @Suppress("DEPRECATION")
-                    finalBitmap.compress(Bitmap.CompressFormat.WEBP, quality, bos)
+                // Calculate sample size
+                var sampleSize = 1
+                while (origWidth / sampleSize > maxDimension * 1.5 || origHeight / sampleSize > maxDimension * 1.5) {
+                    sampleSize *= 2
                 }
-                outputBytes = bos.toByteArray()
-                quality -= 15
-            } while (outputBytes.size > maxSizeBytes && quality >= 30)
 
-            // If still too large, try JPEG with high compression
-            if (outputBytes.size > maxSizeBytes) {
-                val bos = ByteArrayOutputStream()
-                finalBitmap.compress(Bitmap.CompressFormat.JPEG, 55, bos)
-                outputBytes = bos.toByteArray()
+                val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                val nextStream = context.contentResolver.openInputStream(imageUri) ?: return@withTimeoutOrNull null
+                val decodedBitmap = BitmapFactory.decodeStream(nextStream, null, decodeOptions)
+                nextStream.close()
+
+                if (decodedBitmap == null) return@withTimeoutOrNull null
+
+                // Exact scale if larger than maxDimension
+                val finalBitmap = if (decodedBitmap.width > maxDimension || decodedBitmap.height > maxDimension) {
+                    val ratio = Math.min(
+                        maxDimension.toFloat() / decodedBitmap.width,
+                        maxDimension.toFloat() / decodedBitmap.height
+                    )
+                    val newW = (decodedBitmap.width * ratio).toInt().coerceAtLeast(1)
+                    val newH = (decodedBitmap.height * ratio).toInt().coerceAtLeast(1)
+                    Bitmap.createScaledBitmap(decodedBitmap, newW, newH, true)
+                } else {
+                    decodedBitmap
+                }
+
+                // Compress to WebP (or JPEG fallback)
+                var quality = 80
+                var outputBytes: ByteArray
+                do {
+                    val bos = ByteArrayOutputStream()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        finalBitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, quality, bos)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        finalBitmap.compress(Bitmap.CompressFormat.WEBP, quality, bos)
+                    }
+                    outputBytes = bos.toByteArray()
+                    quality -= 15
+                } while (outputBytes.size > maxSizeBytes && quality >= 30)
+
+                // If still too large, try JPEG with high compression
+                if (outputBytes.size > maxSizeBytes) {
+                    val bos = ByteArrayOutputStream()
+                    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 55, bos)
+                    outputBytes = bos.toByteArray()
+                }
+
+                outputBytes
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
             }
-
-            outputBytes
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
         }
     }
 

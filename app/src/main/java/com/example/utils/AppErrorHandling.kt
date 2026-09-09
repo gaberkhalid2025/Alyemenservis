@@ -160,10 +160,18 @@ suspend fun <T> withExponentialBackoffRetry(
     return AppResult.Error(finalError)
 }
 
+data class CriticalError(
+    val error: AppError,
+    val context: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 /**
  * 📱 Crashlytics & Diagnostic Event Logging Manager
  */
 object CrashlyticsDiagnosticLogger {
+    private val criticalErrorsList = mutableListOf<CriticalError>()
+
     fun logEvent(tag: String, message: String, userRole: String = "USER") {
         val deviceInfo = "Device: ${Build.MANUFACTURER} ${Build.MODEL}, API: ${Build.VERSION.SDK_INT}"
         android.util.Log.d("AppDiagnostics", "[$tag] Role: $userRole | $message | $deviceInfo")
@@ -174,7 +182,25 @@ object CrashlyticsDiagnosticLogger {
             "AppDiagnostics",
             "❌ EXCEPTION LOGGED [$contextInfo]: ${error.messageArabic} (Cause: ${error.cause?.message})"
         )
+        try {
+            val crashlyticsClass = Class.forName("com.google.firebase.crashlytics.FirebaseCrashlytics")
+            val getInstanceMethod = crashlyticsClass.getMethod("getInstance")
+            val instance = getInstanceMethod.invoke(null)
+            val recordExceptionMethod = crashlyticsClass.getMethod("recordException", Throwable::class.java)
+            recordExceptionMethod.invoke(instance, error.cause ?: Exception(error.messageArabic))
+        } catch (e: Throwable) {
+            // Fallback if Crashlytics not available in runtime
+        }
+
+        if (error is AppError.NetworkError || error is AppError.UnauthorizedError) {
+            synchronized(criticalErrorsList) {
+                if (criticalErrorsList.size >= 50) criticalErrorsList.removeAt(0)
+                criticalErrorsList.add(CriticalError(error, contextInfo))
+            }
+        }
     }
+
+    fun getCriticalErrors(): List<CriticalError> = synchronized(criticalErrorsList) { criticalErrorsList.toList() }
 
     fun toastError(context: Context, error: AppError) {
         Toast.makeText(context, "⚠️ ${error.messageArabic}", Toast.LENGTH_LONG).show()

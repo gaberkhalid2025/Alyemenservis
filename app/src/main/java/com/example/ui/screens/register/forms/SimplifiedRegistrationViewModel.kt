@@ -123,7 +123,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
     }
 
     private fun validateManagerName(name: String) {
-        val error = if (name.trim().isEmpty()) "اسم المسؤول مطلوب" else null
+        val error = if (currentRole != "CLIENT" && name.trim().isEmpty()) "اسم المسؤول مطلوب" else null
         _state.update { it.copy(managerNameError = error) }
     }
 
@@ -161,8 +161,9 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
 
     private fun checkOverallValidity() {
         val st = _state.value
+        val isClient = currentRole == "CLIENT"
         val isValid = st.entityNameError == null && 
-                      st.managerNameError == null && 
+                      (isClient || st.managerNameError == null) && 
                       st.phoneError == null && 
                       st.passwordError == null && 
                       st.confirmPasswordError == null &&

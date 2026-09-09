@@ -88,7 +88,7 @@ object PermissionGuard {
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {

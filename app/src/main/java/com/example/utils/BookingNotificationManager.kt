@@ -201,7 +201,17 @@ class BookingNotificationManager(private val context: Context) {
      */
     fun notifyBookingCancelled(booking: BookingEntity, by: String, reason: String) {
         val title = "⚠️ تم إلغاء الحجز"
-        val body = "تم إلغاء الحجز من قِبل ($by). السبب: ${reason.ifEmpty { "تم الإلغاء بناء على رغبة العميل" }}."
+        val defaultReason = when (by.uppercase()) {
+            "PROVIDER", "TECHNICIAN", "فني" -> "تم الإلغاء من قبل الفني"
+            "ADMIN", "إدارة" -> "تم الإلغاء من قبل الإدارة"
+            else -> "تم الإلغاء بناء على رغبة العميل"
+        }
+        val displayBy = when (by.uppercase()) {
+            "PROVIDER", "TECHNICIAN" -> "الفني"
+            "ADMIN" -> "الإدارة"
+            else -> "العميل"
+        }
+        val body = "تم إلغاء الحجز رقم #${booking.bookingNumber.ifEmpty { booking.id.take(8) }} من قبل ($displayBy). السبب: ${reason.ifBlank { defaultReason }}."
 
         showLocalNotification(title, body)
         persistNotificationToCloud(booking.clientId.ifEmpty { booking.customerPhone }, "CLIENT", title, body, booking.id, "BOOKING_CANCELLED")
