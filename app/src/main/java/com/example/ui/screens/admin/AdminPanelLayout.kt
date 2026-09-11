@@ -467,42 +467,41 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     
                     isLoading = true
                     
-                    // استخدام AdminSecurityManager للتحقق
-                    val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
-                    
-                    when (result) {
-                        "OWNER" -> {
-                            isAuthorized = true
-                            activeSubTab = "BACKDOOR"
-                            viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                            viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
-                            isLoading = false
-                        }
-                        "ADMIN" -> {
-                            isAuthorized = true
-                            activeSubTab = "REG_REQ"
-                            viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                            viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
-                            isLoading = false
-                        }
-                        else -> {
-                            // التحقق من المشرفين
-                            val matchingSup = com.example.utils.AdminSecurityManager.getSupervisor(
-                                inputUsername, 
-                                inputPassword, 
-                                viewModel.supervisors.value
-                            )
-                            if (matchingSup != null) {
+                                        // التحقق السحابي الآمن
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
+                        when (result) {
+                            "OWNER" -> {
                                 isAuthorized = true
-                                viewModel.setSupervisorSession(matchingSup)
-                                if (rememberMe) {
-                                    val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                    sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
-                                }
-                                viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                activeSubTab = "BACKDOOR"
+                                viewModel.authenticateAdmin(context, "OWNER", rememberMe)
+                                viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
                                 isLoading = false
-                            } else {
-                                viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
+                            }
+                            "ADMIN" -> {
+                                isAuthorized = true
+                                activeSubTab = "REG_REQ"
+                                viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
+                                viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
+                                isLoading = false
+                            }
+                            "SUPERVISOR" -> {
+                                val matchingSup = viewModel.supervisors.value.find { it.id == inputUsername || it.name.trim().equals(inputUsername.trim(), ignoreCase = true) }
+                                if (matchingSup != null) {
+                                    isAuthorized = true
+                                    viewModel.setSupervisorSession(matchingSup)
+                                    if (rememberMe) {
+                                        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                        sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
+                                    }
+                                    viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                } else {
+                                    viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
+                                }
+                                isLoading = false
+                            }
+                            else -> {
+                                viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
                                 isLoading = false
                             }
                         }
@@ -533,7 +532,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         isLoading = true
                         
                         // استخدام AdminSecurityManager للتحقق من المالك/المدير
-                        val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
                         
                         when (result) {
                             "OWNER" -> {
@@ -554,6 +554,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                 viewModel.triggerNotification("❌ بيانات مالك التطبيق أو الإدارة غير صحيحة!")
                                 isLoading = false
                             }
+                        }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),

@@ -31,7 +31,6 @@ class ChatViewModel @Inject constructor(
     private val repository: ChatRepository
 ) : ViewModel() {
 
-    constructor() : this(ChatRepository())
 
     private val _eventFlow = MutableSharedFlow<ChatEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
@@ -282,9 +281,19 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private var markAsReadJob: kotlinx.coroutines.Job? = null
+
     fun markAsRead(channelId: String, currentUserId: String) {
-        viewModelScope.launch {
-            repository.markChannelAsRead(channelId, currentUserId)
+        // تجميع عمليات markAsRead لمدة 5 ثواني لمنع حرق حصة Firebase
+        markAsReadJob?.cancel()
+        markAsReadJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5000)
+            val currentMsgs = _messages.value
+            // تحقق إذا كان هناك أي رسائل غير مقروءة قبل الإرسال
+            val hasUnread = currentMsgs.any { it.senderId != currentUserId && it.status != MessageStatus.READ }
+            if (hasUnread) {
+                repository.markChannelAsRead(channelId, currentUserId)
+            }
         }
     }
 

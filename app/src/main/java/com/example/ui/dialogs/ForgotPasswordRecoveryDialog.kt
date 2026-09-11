@@ -1,4 +1,6 @@
 package com.example.ui.dialogs
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 import android.content.Context
 import com.example.ui.*
@@ -57,29 +59,37 @@ fun ForgotPasswordRecoveryDialog(
         }
     }
 
-    if (isSubmitted) {
-        LaunchedEffect(phoneInput) {
+        DisposableEffect(phoneInput) {
             val cleanPhone = phoneInput.trim().replace(" ", "")
-            while (true) {
-                viewModel.db.collection("password_resets").document(cleanPhone).get()
-                    .addOnSuccessListener { doc ->
-                        if (doc.exists()) {
-                            val status = doc.getString("status") ?: "PENDING"
-                            resetStatus = status
-                            if (status == "APPROVED") {
-                                tempPassword = doc.getString("tempPassword") ?: doc.getString("newPassword") ?: ""
-                                // Once approved and password is shown, we can clear it so subsequent opens allow new requests
-                                sharedPrefs.edit().clear().apply()
-                            } else if (status == "REJECTED") {
-                                sharedPrefs.edit().clear().apply()
-                            }
+            val listener = viewModel.db.collection("password_resets").document(cleanPhone)
+                .addSnapshotListener { snapshot, e ->
+                    if (e != null) return@addSnapshotListener
+                    if (snapshot != null && snapshot.exists()) {
+                        val status = snapshot.getString("status") ?: "PENDING"
+                        resetStatus = status
+                        if (status == "APPROVED") {
+                            tempPassword = snapshot.getString("tempPassword") ?: snapshot.getString("newPassword") ?: ""
+                            sharedPrefs.edit().clear().apply()
+                        } else if (status == "REJECTED") {
+                            sharedPrefs.edit().clear().apply()
                         }
                     }
-                kotlinx.coroutines.delay(3000)
+                }
+            
+            // Timeout logic
+            val timeoutJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                kotlinx.coroutines.delay(5 * 60 * 1000) // 5 minutes timeout
+                if (resetStatus == "PENDING") {
+                    resetStatus = "TIMEOUT"
+                    sharedPrefs.edit().clear().apply()
+                }
+            }
+
+            onDispose {
+                listener.remove()
+                timeoutJob.cancel()
             }
         }
-    }
-
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -258,6 +268,29 @@ fun ForgotPasswordRecoveryDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         when (resetStatus) {
+                            "TIMEOUT" -> {
+                                Icon(Icons.Default.Schedule, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
+                                Text(
+                                    text = "⏳ جارٍ المراجعة...",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "يمكنك إغلاق هذه الشاشة والمتابعة لاحقاً، سيتم تنبيهك عند قبول الطلب.",
+                                    fontSize = 12.sp,
+                                    color = Color.LightGray,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = onDismiss,
+                                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.surface)
+                                ) {
+                                    Text("حسناً، إغلاق", color = Color.White)
+                                }
+                            }
                             "PENDING" -> {
                                 CircularProgressIndicator(color = themeColors.accent, modifier = Modifier.size(36.dp))
                                 Text(

@@ -46,7 +46,7 @@ fun AboutContentRenderer(
     val appVersion = settingsState.appVersion.ifBlank { "v2.5.0 Gold Edition" }
     val supportPhone = settingsState.supportPhone.ifBlank { "777644" }
     val supportWhatsapp = settingsState.supportWhatsapp.ifBlank { "777644" }
-    val supportEmail = settingsState.supportEmail.ifBlank { "mah73646@gmail.com" }
+    val supportEmail = settingsState.supportEmail.ifBlank { "" }
 
     val openUrl = { url: String ->
         if (url.isNotBlank()) {

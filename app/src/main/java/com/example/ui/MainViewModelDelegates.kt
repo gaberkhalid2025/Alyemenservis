@@ -844,7 +844,9 @@ fun MainViewModel.addNotification(
         }
     }
     fun MainViewModel.verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
-        return authViewModel.verifyAdminOrOwnerPassword(password, adminPass, ownerPass)
+        val effectiveAdmin = adminPass.ifEmpty { settings.value.adminPassword }
+        val effectiveOwner = ownerPass.ifEmpty { settings.value.ownerPassword }
+        return authViewModel.verifyAdminOrOwnerPassword(password, effectiveAdmin, effectiveOwner)
     }
     fun MainViewModel.setUserSessionDetails(context: android.content.Context, name: String, phone: String, residence: String = "اليمن") {
         authViewModel.setUserSessionDetails(context, name, phone, residence)
@@ -1049,8 +1051,8 @@ fun MainViewModel.addNotification(
         bookingLabelPhone: String = "رقم هاتف العميل للتواصل (مثال: 777000111)",
         bookingLabelArea: String = "المنطقة والحي السكني",
         bookingLabelService: String = "تفاصيل ونوع الخدمة المطلوبة",
-        adminUsername: String = "mah73646@gmail.com",
-        adminPassword: String = "Maher@@--@@736462##",
+        adminUsername: String = "",
+        adminPassword: String = "",
         customPrimaryHex: String = "#059669",
         customSecondaryHex: String = "#115E59",
         customBackgroundHex: String = "#0A0F0D",

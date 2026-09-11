@@ -1,4 +1,6 @@
 package com.example.ui.screens.admin
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.foundation.BorderStroke
 import com.example.ui.*
@@ -122,10 +124,11 @@ fun AdminPermissionsSelectorView(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 280.dp),
+                    .heightIn(max = 280.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                filteredPerms.take(60).forEach { perm ->
+                filteredPerms.forEach { perm ->
                     val isChecked = selectedPermissions.contains(perm.key)
                     Row(
                         modifier = Modifier

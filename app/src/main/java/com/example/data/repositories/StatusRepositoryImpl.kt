@@ -33,32 +33,27 @@ class StatusRepositoryImpl(
                 }
 
                 val pendingCount = snapshot?.size() ?: 0
-
-                com.google.android.gms.tasks.Tasks.whenAllSuccess<Any>(
-                    firestore.collection("users").whereEqualTo("role", "PROVIDER").get(),
-                    firestore.collection("stores").get(),
-                    firestore.collection("properties").get(),
-                    firestore.collection("bookings").get()
-                ).addOnSuccessListener { results ->
-                    val providersCount = (results[0] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
-                    val storesCount = (results[1] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
-                    val propertiesCount = (results[2] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
-                    val bookingsCount = (results[3] as? com.google.firebase.firestore.QuerySnapshot)?.size() ?: 0
-
-                    trySend(
-                        SystemStatusMetrics(
-                            providersCount = providersCount,
-                            storesCount = storesCount,
-                            propertiesCount = propertiesCount,
-                            instantRequestsCount = 0,
-                            bookingsCount = bookingsCount,
-                            pendingJoinRequestsCount = pendingCount,
-                            lastUpdatedTimestamp = System.currentTimeMillis()
-                        )
-                    )
-                }.addOnFailureListener {
-                    trySend(SystemStatusMetrics(pendingJoinRequestsCount = pendingCount, lastUpdatedTimestamp = System.currentTimeMillis()))
-                }
+                
+                firestore.collection("system_stats").document("system_counters").get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            trySend(
+                                SystemStatusMetrics(
+                                    providersCount = doc.getLong("providersCount")?.toInt() ?: 0,
+                                    storesCount = doc.getLong("storesCount")?.toInt() ?: 0,
+                                    propertiesCount = doc.getLong("propertiesCount")?.toInt() ?: 0,
+                                    instantRequestsCount = doc.getLong("instantRequestsCount")?.toInt() ?: 0,
+                                    bookingsCount = doc.getLong("bookingsCount")?.toInt() ?: 0,
+                                    pendingJoinRequestsCount = pendingCount,
+                                    lastUpdatedTimestamp = System.currentTimeMillis()
+                                )
+                            )
+                        } else {
+                            trySend(SystemStatusMetrics(pendingJoinRequestsCount = pendingCount, lastUpdatedTimestamp = System.currentTimeMillis()))
+                        }
+                    }.addOnFailureListener {
+                        trySend(SystemStatusMetrics(pendingJoinRequestsCount = pendingCount, lastUpdatedTimestamp = System.currentTimeMillis()))
+                    }
             }
 
         awaitClose { listener.remove() }

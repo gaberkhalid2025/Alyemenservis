@@ -4,6 +4,7 @@ plugins {
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.hilt.android)
+  alias(libs.plugins.firebase.crashlytics)
   id("com.google.gms.google-services")
 }
 
@@ -133,6 +134,7 @@ dependencies {
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.storage)
   implementation(libs.firebase.messaging)
+  implementation(libs.firebase.crashlytics)
   implementation("com.google.firebase:firebase-analytics")
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)

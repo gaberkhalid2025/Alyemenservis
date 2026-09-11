@@ -208,12 +208,7 @@ class ChatLocalDataSource(
                 emptyList()
             }
         } catch (e: Exception) {
-            // Fallback plain parse if not encrypted
-            try {
-                messagesListAdapter.fromJson(rawEncrypted) ?: emptyList()
-            } catch (ex: Exception) {
-                emptyList()
-            }
+            emptyList()
         }
     }
 
@@ -230,7 +225,8 @@ class ChatLocalDataSource(
             pending.add(message)
         }
         val json = messagesListAdapter.toJson(pending)
-        prefs.edit().putString(KEY_OFFLINE_PENDING_MSGS, json).apply()
+        val encrypted = ChatCryptoManager.encrypt(json, "ChatLocalKey_PENDING")
+        prefs.edit().putString(KEY_OFFLINE_PENDING_MSGS, encrypted).apply()
 
         // Also add to local channel messages as PENDING
         insertOrUpdateMessage(message.copy(status = MessageStatus.PENDING, syncStatus = SyncStatus.PENDING_UPLOAD))
@@ -243,13 +239,23 @@ class ChatLocalDataSource(
     suspend fun removePendingMessage(messageId: String) = withContext(ioDispatcher) {
         val pending = getPendingMessagesInternal().filter { it.id != messageId }
         val json = messagesListAdapter.toJson(pending)
-        prefs.edit().putString(KEY_OFFLINE_PENDING_MSGS, json).apply()
+        val encrypted = ChatCryptoManager.encrypt(json, "ChatLocalKey_PENDING")
+        prefs.edit().putString(KEY_OFFLINE_PENDING_MSGS, encrypted).apply()
     }
 
     private fun getPendingMessagesInternal(): List<ChatMessage> {
-        val raw = prefs.getString(KEY_OFFLINE_PENDING_MSGS, null) ?: return emptyList()
+        val rawEncrypted = prefs.getString(KEY_OFFLINE_PENDING_MSGS, null) ?: return emptyList()
         return try {
-            messagesListAdapter.fromJson(raw) ?: emptyList()
+            val decrypted = if (rawEncrypted.startsWith("enc::")) {
+                ChatCryptoManager.decrypt(rawEncrypted, "ChatLocalKey_PENDING")
+            } else {
+                SecurityCryptoUtils.decrypt(rawEncrypted)
+            }
+            if (decrypted.isNotBlank() && decrypted != "[]") {
+                messagesListAdapter.fromJson(decrypted) ?: emptyList()
+            } else {
+                emptyList()
+            }
         } catch (e: Exception) {
             emptyList()
         }

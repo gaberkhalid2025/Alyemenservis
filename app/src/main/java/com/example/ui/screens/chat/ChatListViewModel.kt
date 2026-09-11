@@ -16,7 +16,6 @@ class ChatListViewModel @Inject constructor(
     private val repository: ChatRepository
 ) : ViewModel() {
 
-    constructor() : this(ChatRepository())
 
     private val _channels = MutableStateFlow<List<ChatChannel>>(emptyList())
     val channels: StateFlow<List<ChatChannel>> = _channels.asStateFlow()

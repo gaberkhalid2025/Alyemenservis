@@ -35,11 +35,11 @@ data class AdminSettingsEntity(
     val isSpeechSearchEnabled: Boolean = true,
     val supportPhone: String = "777644",
     val supportWhatsapp: String = "777644",
-    val supportEmail: String = "mah73646@gmail.com",
-    val adminUsername: String = "mah73646@gmail.com",
-    val adminPassword: String = "Maher@@--@@736462##",
-    val ownerEmail: String = "mah73646@gmail.com",
-    val ownerPassword: String = "Maher@@--@@736462##",
+    val supportEmail: String = "",
+    val adminUsername: String = "",
+    val adminPassword: String = "",
+    val ownerEmail: String = "",
+    val ownerPassword: String = "",
     
     // Notifications control
     val isNotificationsEnabled: Boolean = true,

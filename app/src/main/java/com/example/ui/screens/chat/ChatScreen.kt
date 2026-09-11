@@ -127,11 +127,16 @@ fun ChatScreen(
 
     val activeChannel = currentChannel
 
-    // Automatically mark channel as read whenever messages arrive
-    LaunchedEffect(messages, activeChannel) {
+    // Mark as read only when opening or closing the chat, not on every single message
+    DisposableEffect(activeChannel) {
         val chId = activeChannel?.id ?: channelId
         if (!chId.isNullOrBlank()) {
             chatViewModel.markAsRead(chId, currentUserId)
+        }
+        onDispose {
+            if (!chId.isNullOrBlank()) {
+                chatViewModel.markAsRead(chId, currentUserId)
+            }
         }
     }
 

@@ -88,26 +88,6 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
     }
 
     fun writeDefaultSupervisors() {
-        val crypto = SecurityCryptoUtils
-        val fbSupervisors = listOf(
-            SupervisorEntity(
-                "owner_1", 
-                crypto.decodeObfuscatedString("340405525d655144360e0e043a094d110a19"), 
-                "OWNER", 
-                crypto.decodeObfuscatedString("140405001c13255f5b29235260535744575768"), 
-                listOf("ALL")
-            ),
-            SupervisorEntity(
-                "admin_1", 
-                crypto.decodeObfuscatedString("340005525964534642290408320c0f5c061b26"), 
-                "ADMIN", 
-                crypto.decodeObfuscatedString("140005252e132545415e5551674640"), 
-                listOf("ALL")
-            )
-        )
-        fbSupervisors.forEach { sup ->
-            db.collection("supervisors").document(sup.id).set(sup)
-        }
         // Delete dummy supervisors
         listOf("2", "3", "4").forEach { id ->
             db.collection("supervisors").document(id).delete()

@@ -68,6 +68,22 @@ fun ChatInputBar(
     var uploadProgress by remember { mutableStateOf<Float?>(null) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
 
+    // إصلاح تسريب MediaRecorder
+    DisposableEffect(Unit) {
+        onDispose {
+            if (isRecording) {
+                try {
+                    mediaRecorder?.stop()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                mediaRecorder?.release()
+                mediaRecorder = null
+                audioFile?.delete()
+            }
+        }
+    }
+
     LaunchedEffect(editingMessage) {
         if (editingMessage != null) {
             textInput = editingMessage.message

@@ -239,7 +239,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
             ) {
                 items(paginatedOrders) { order ->
                     val deleteCode = remember(order.id) { 
-                        (order.id.hashCode().coerceAtLeast(0) % 9000 + 1000).toString() 
+                        (order.id.hashCode().let { kotlin.math.abs(it) } % 9000 + 1000).toString()
                     }
 
                     Card(
@@ -389,7 +389,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
     // 🔒 Confirm Individual Order Deletion Code Dialog
     if (selectedOrderForDeletion != null) {
         val order = selectedOrderForDeletion!!
-        val correctCode = (order.id.hashCode().coerceAtLeast(0) % 9000 + 1000).toString()
+        val correctCode = (order.id.hashCode().let { kotlin.math.abs(it) } % 9000 + 1000).toString()
 
         Dialog(onDismissRequest = { selectedOrderForDeletion = null }) {
             Card(

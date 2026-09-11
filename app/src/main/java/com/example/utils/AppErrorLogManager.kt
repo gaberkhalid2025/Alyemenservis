@@ -1,5 +1,6 @@
 package com.example.utils
 
+import com.example.MyApplication
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -60,6 +61,11 @@ object AppErrorLogManager {
                 type = "FIRESTORE"
             )
         )
+        try {
+            MyApplication.instance?.recordExceptionSafely(
+                throwable ?: Exception("$tag: $message")
+            )
+        } catch (e: Exception) { /* تجاهل */ }
     }
 
     fun logApiError(tag: String, message: String, throwable: Throwable? = null) {
@@ -72,6 +78,11 @@ object AppErrorLogManager {
                 type = "API"
             )
         )
+        try {
+            MyApplication.instance?.recordExceptionSafely(
+                throwable ?: Exception("$tag: $message")
+            )
+        } catch (e: Exception) { /* تجاهل */ }
     }
 
     fun logGenericError(tag: String, message: String, throwable: Throwable? = null) {
@@ -84,6 +95,11 @@ object AppErrorLogManager {
                 type = "GENERAL"
             )
         )
+        try {
+            MyApplication.instance?.recordExceptionSafely(
+                throwable ?: Exception("$tag: $message")
+            )
+        } catch (e: Exception) { /* تجاهل */ }
     }
 
     private fun addLog(item: ErrorLogItem) {

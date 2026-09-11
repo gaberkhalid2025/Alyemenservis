@@ -1,4 +1,7 @@
 package com.example.ui.dialogs
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 
 import androidx.compose.foundation.BorderStroke
 import com.example.ui.*
@@ -95,7 +98,7 @@ fun BackdoorLoginDialog(
                     value = emailInput,
                     onValueChange = { emailInput = it },
                     label = { Text("البريد الإلكتروني للإدارة", fontSize = 12.sp) },
-                    placeholder = { Text("mah73646@gmail.com", fontSize = 12.sp, color = Color.Gray) },
+                    placeholder = { Text("admin@example.com", fontSize = 12.sp, color = Color.Gray) },
                     leadingIcon = {
                         Icon(Icons.Default.Email, contentDescription = null, tint = themeColors.accent)
                     },
@@ -190,42 +193,45 @@ fun BackdoorLoginDialog(
                             }
 
                             isAuthenticating = true
-                            try {
-                                val result = com.example.utils.AdminSecurityManager.verifyCredentials(trimmedUser, trimmedPass, settingsState)
-
-                                when (result) {
-                                    "OWNER" -> {
-                                        onDismiss()
-                                        viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                                        viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك!")
-                                    }
-                                    "ADMIN" -> {
-                                        onDismiss()
-                                        viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                                        viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
-                                    }
-                                    else -> {
-                                        // Supervisor check
-                                        val matchingSup = com.example.utils.AdminSecurityManager.getSupervisor(trimmedUser, trimmedPass, supervisors)
-                                        if (matchingSup != null) {
-                                            viewModel.setSupervisorSession(matchingSup)
-                                            if (rememberMe) {
-                                                val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                                sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
-                                            }
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                try {
+                                    val result = com.example.utils.AdminSecurityManager.verifyCredentials(trimmedUser, trimmedPass, settingsState)
+                                    when (result) {
+                                        "OWNER" -> {
                                             onDismiss()
-                                            viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
-                                            viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
-                                        } else {
-                                            viewModel.triggerNotification("❌ البريد الإلكتروني أو كلمة المرور غير صحيحة!")
+                                            viewModel.authenticateAdmin(context, "OWNER", rememberMe)
+                                            viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك!")
+                                        }
+                                        "ADMIN" -> {
+                                            onDismiss()
+                                            viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
+                                            viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
+                                        }
+                                        "SUPERVISOR" -> {
+                                            val matchingSup = supervisors.find { it.id == trimmedUser || it.name.trim().equals(trimmedUser, ignoreCase = true) }
+                                            if (matchingSup != null) {
+                                                viewModel.setSupervisorSession(matchingSup)
+                                                if (rememberMe) {
+                                                    val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                                    sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
+                                                }
+                                                onDismiss()
+                                                viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
+                                                viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                            } else {
+                                                viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
+                                            }
+                                        }
+                                        else -> {
+                                            viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
                                         }
                                     }
+                                } catch (e: Throwable) {
+                                    e.printStackTrace()
+                                    viewModel.triggerNotification("❌ حدث خطأ غير متوقع. حاول مرة أخرى.")
+                                } finally {
+                                    isAuthenticating = false
                                 }
-                            } catch (e: Throwable) {
-                                e.printStackTrace()
-                                viewModel.triggerNotification("❌ حدث خطأ أثناء التحقق: ${e.localizedMessage ?: "يرجى المحاولة مجدداً"}")
-                            } finally {
-                                isAuthenticating = false
                             }
                         },
                         shape = RoundedCornerShape(10.dp),

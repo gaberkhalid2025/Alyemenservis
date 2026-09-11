@@ -1,7 +1,5 @@
 package com.example.utils
 
-import com.example.utils.*
-
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -19,7 +17,6 @@ import javax.crypto.spec.SecretKeySpec
  * are securely hashed and encrypted before being persisted using AndroidKeyStore.
  */
 object SecurityCryptoUtils {
-
     private const val KEYSTORE_ALIAS = "WAM_Services_AndroidKeyStore_MasterKey_2026"
 
     private fun getDerivedKey(): SecretKey {
@@ -76,26 +73,6 @@ object SecurityCryptoUtils {
      * Verifies provided input against stored password hash using PasswordHasher.
      * Enforces salt:hash verification with zero plain-text fallbacks or hardcoded seeds.
      */
-    fun decodeObfuscatedString(hex: String, key: String = "YemenServiceSecretKey2026"): String {
-        return try {
-            val bytes = ByteArray(hex.length / 2)
-            for (i in bytes.indices) {
-                bytes[i] = hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
-            }
-            val keyBytes = key.toByteArray()
-            for (i in bytes.indices) {
-                bytes[i] = (bytes[i].toInt() xor keyBytes[i % keyBytes.size].toInt()).toByte()
-            }
-            String(bytes)
-        } catch (e: Exception) {
-            ""
-        }
-    }
-
-    /**
-     * Verifies provided input against stored password hash using PasswordHasher.
-     * Enforces salt:hash verification with zero plain-text fallbacks or hardcoded seeds.
-     */
     fun verifyAdminPassword(input: String, storedHashOrPass: String? = null): Boolean {
         if (input.isBlank() || storedHashOrPass.isNullOrBlank()) return false
         val trimmedInput = input.trim()
@@ -115,7 +92,7 @@ object SecurityCryptoUtils {
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             cipher.init(Cipher.ENCRYPT_MODE, key, getIv())
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-            java.util.Base64.getEncoder().encodeToString(encryptedBytes)
+            Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
         } catch (e: Exception) {
             plainText
         }
@@ -130,7 +107,7 @@ object SecurityCryptoUtils {
             val key = createFallbackKey()
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             cipher.init(Cipher.DECRYPT_MODE, key, getIv())
-            val decodedBytes = java.util.Base64.getDecoder().decode(encryptedText)
+            val decodedBytes = Base64.decode(encryptedText, Base64.DEFAULT)
             val decryptedBytes = cipher.doFinal(decodedBytes)
             String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
@@ -168,7 +145,7 @@ object SecurityCryptoUtils {
             return Pair(false, "عفواً، يجب أن تكون كلمة المرور مكونة من 8 خانات (أحرف أو أرقام) على الأقل لضمان قوة حماية حسابك.")
         }
         val weakPasswords = listOf(
-            "123456", "12345678", "000000", "00000000", "111111", "11111111", 
+            "123456", "12345678", "000000", "00000000", "111111", "11111111",
             "112233", "123123", "password", "yemen123", "yemen2026", "77777777"
         )
         if (cleanPass.lowercase() in weakPasswords) {
@@ -177,4 +154,3 @@ object SecurityCryptoUtils {
         return Pair(true, null)
     }
 }
-

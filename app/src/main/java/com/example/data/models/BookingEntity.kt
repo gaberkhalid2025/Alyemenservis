@@ -56,6 +56,7 @@ data class BookingEntity(
     val completedAt: Long? = null,
     val isRated: Boolean = false,
     val isRecurring: Boolean = false,
+    val parentId: String = "",
     val recurrenceRule: String = "NONE", // NONE, WEEKLY, MONTHLY, BIWEEKLY
     val recurrenceDays: List<Int> = emptyList(),
     val currency: String = "YER", // YER, USD, SAR

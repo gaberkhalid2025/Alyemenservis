@@ -2,25 +2,17 @@ package com.example.utils
 
 import com.example.data.AdminSettingsEntity
 import com.example.data.SupervisorEntity
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 object AdminSecurityManager {
-    // ========== الحسابات الثابتة ==========
-    const val OWNER_EMAIL = "mah73646@gmail.com"
-    const val OWNER_PASSWORD = "Maher@@--@@736462##"
 
-    const val ADMIN_EMAIL = "meh777644@gmail.com"
-    const val ADMIN_PASSWORD = "Meh@@@@777644##"
-
-    fun getOwnerPassword(): String {
-        return OWNER_PASSWORD
-    }
-
-    fun getAdminPassword(): String {
-        return ADMIN_PASSWORD
-    }
-
-    // ========== دوال التحقق ==========
-    fun verifyCredentials(
+    /**
+     * يتحقق من صحة بيانات الدخول (المالك، المدير، أو المشرف)
+     * باستخدام التشفير الآمن والتحقق السحابي عبر Firestore
+     * دون أي كلمات مرور ثابتة أو أبواب خلفية.
+     */
+    suspend fun verifyCredentials(
         username: String,
         passwordAttempt: String,
         settings: AdminSettingsEntity? = null
@@ -28,91 +20,70 @@ object AdminSecurityManager {
         val trimmedUser = username.trim()
         val trimmedPass = passwordAttempt.trim()
         if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
-
-        val currentOwnerPass = getOwnerPassword()
-        val currentAdminPass = getAdminPassword()
-
-        // 1. التحقق من المالك (OWNER)
-        if (trimmedUser.equals(OWNER_EMAIL, ignoreCase = true) ||
-            trimmedUser == "WAM2026" ||
-            (settings != null && trimmedUser.equals(settings.ownerEmail, ignoreCase = true))
-        ) {
-            if (trimmedPass == currentOwnerPass ||
-                trimmedPass == OWNER_PASSWORD ||
-                (settings != null && settings.ownerPassword.isNotBlank() && (
-                    trimmedPass == settings.ownerPassword ||
-                    PasswordHasher.verifyPassword(trimmedPass, settings.ownerPassword) ||
-                    SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.ownerPassword)
-                )) ||
-                SecurityCryptoUtils.verifyAdminPassword(trimmedPass, hashOwnerPassword()) ||
-                PasswordHasher.verifyPassword(trimmedPass, hashOwnerPassword())
-            ) {
-                return "OWNER"
+        
+        // 1. التحقق من إعدادات المالك والمدير الممررة
+        if (settings != null) {
+            // المالك
+            if (settings.ownerEmail.isNotBlank() && trimmedUser.equals(settings.ownerEmail.trim(), ignoreCase = true)) {
+                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.ownerPassword)) {
+                    return "OWNER"
+                }
+            }
+            // المدير
+            if (settings.adminUsername.isNotBlank() && trimmedUser.equals(settings.adminUsername.trim(), ignoreCase = true)) {
+                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.adminPassword)) {
+                    return "ADMIN"
+                }
             }
         }
-
-        // 2. التحقق من المدير (ADMIN)
-        if (trimmedUser.equals(ADMIN_EMAIL, ignoreCase = true) ||
-            (settings != null && trimmedUser.equals(settings.adminUsername, ignoreCase = true))
-        ) {
-            if (trimmedPass == currentAdminPass ||
-                trimmedPass == ADMIN_PASSWORD ||
-                trimmedPass == currentOwnerPass ||
-                trimmedPass == OWNER_PASSWORD ||
-                (settings != null && settings.adminPassword.isNotBlank() && (
-                    trimmedPass == settings.adminPassword ||
-                    PasswordHasher.verifyPassword(trimmedPass, settings.adminPassword) ||
-                    SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.adminPassword)
-                )) ||
-                SecurityCryptoUtils.verifyAdminPassword(trimmedPass, hashAdminPassword()) ||
-                PasswordHasher.verifyPassword(trimmedPass, hashAdminPassword())
-            ) {
-                return "ADMIN"
+        
+        // 2. التحقق السحابي المباشر من Firestore
+        return try {
+            val db = FirebaseFirestore.getInstance()
+            
+            // تحقق من المشرفين
+            val supDoc = db.collection("supervisors").document(trimmedUser).get().await()
+            if (supDoc.exists()) {
+                val storedPass = supDoc.getString("passcode") ?: ""
+                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                    return supDoc.getString("role") ?: "SUPERVISOR"
+                }
             }
+            
+            // تحقق من admin_users
+            val adminQuery = db.collection("admin_users")
+                .whereEqualTo("email", trimmedUser)
+                .limit(1)
+                .get()
+                .await()
+            if (!adminQuery.isEmpty) {
+                val doc = adminQuery.documents[0]
+                val storedPass = doc.getString("passwordHash") ?: doc.getString("password") ?: ""
+                val role = doc.getString("role") ?: "ADMIN"
+                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                    return role
+                }
+            }
+            null
+        } catch (e: Exception) {
+            null
         }
-
-        return null
     }
 
-    fun isOwner(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
+    suspend fun isOwner(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
         return verifyCredentials(username, passwordAttempt, settings) == "OWNER"
     }
 
-    fun isAdmin(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
+    suspend fun isAdmin(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
         val role = verifyCredentials(username, passwordAttempt, settings)
         return role == "ADMIN" || role == "OWNER"
     }
 
-    fun isSupervisor(username: String, passwordAttempt: String, supervisors: List<SupervisorEntity>): Boolean {
-        return getSupervisor(username, passwordAttempt, supervisors) != null
+    suspend fun isSupervisor(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
+        val role = verifyCredentials(username, passwordAttempt, settings)
+        return role == "SUPERVISOR" || role == "ADMIN" || role == "OWNER"
     }
 
-    fun getSupervisor(username: String, passwordAttempt: String, supervisors: List<SupervisorEntity>): SupervisorEntity? {
-        val trimmedUser = username.trim()
-        val trimmedPass = passwordAttempt.trim()
-        if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
-
-        return supervisors.find { sup ->
-            val matchUser = sup.name.trim().equals(trimmedUser, ignoreCase = true) || sup.id.equals(trimmedUser, ignoreCase = true)
-            val matchPass = sup.passcode.isNotBlank() && (
-                sup.passcode.trim() == trimmedPass ||
-                PasswordHasher.verifyPassword(trimmedPass, sup.passcode) ||
-                SecurityCryptoUtils.verifyAdminPassword(trimmedPass, sup.passcode)
-            )
-            matchUser && matchPass
-        }
-    }
-
-    // ========== دوال التجزئة ==========
-    private fun hashOwnerPassword(): String {
-        return SecurityCryptoUtils.hashPassword(OWNER_PASSWORD)
-    }
-
-    private fun hashAdminPassword(): String {
-        return SecurityCryptoUtils.hashPassword(ADMIN_PASSWORD)
-    }
-
-    // ========== دوال التحقق من الصلاحيات ==========
     fun hasOwnerPermission(role: String): Boolean {
         return role == "OWNER"
     }

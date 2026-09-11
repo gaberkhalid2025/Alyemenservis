@@ -307,20 +307,36 @@ private fun AdminMapEntityItem(
             if (hasGps) {
                 IconButton(
                     onClick = {
+                        val provider = "GOOGLE_MAPS"
                         try {
-                            val uri = Uri.parse("google.navigation:q=$lat,$lng")
-                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                                setPackage("com.google.android.apps.maps")
+                            when (provider) {
+                                "MAPBOX" -> {
+                                    val uri = android.net.Uri.parse("mapbox://directions/profile/mapbox/driving/$lng,$lat")
+                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+                                    android.widget.Toast.makeText(context, "تم فتح Mapbox", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                "MAPLIBRE" -> {
+                                    val uri = android.net.Uri.parse("geo:$lat,$lng?q=$lat,$lng")
+                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+                                    android.widget.Toast.makeText(context, "تم فتح MapLibre / الخريطة الافتراضية", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                else -> {
+                                    val uri = android.net.Uri.parse("google.navigation:q=$lat,$lng")
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                        setPackage("com.google.android.apps.maps")
+                                    }
+                                    context.startActivity(intent)
+                                    android.widget.Toast.makeText(context, "تم فتح خرائط جوجل", android.widget.Toast.LENGTH_SHORT).show()
+                                }
                             }
-                            context.startActivity(intent)
                         } catch (e: Exception) {
-                            val fallbackUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng")
-                            context.startActivity(Intent(Intent.ACTION_VIEW, fallbackUri))
+                            val fallbackUri = android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng")
+                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, fallbackUri))
                         }
                     },
-                    modifier = Modifier.size(32.dp)
+                    modifier = androidx.compose.ui.Modifier.size(32.dp)
                 ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = "فتح في خرائط جوجل", tint = Color(0xFF00E5FF))
+                    Icon(Icons.Default.LocationOn, contentDescription = "توجيه", tint = Color(0xFF00E5FF))
                 }
             }
         }

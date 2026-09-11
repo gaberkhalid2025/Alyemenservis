@@ -326,7 +326,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     fun verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
         val trimmed = password.trim()
         if (trimmed.isEmpty()) return false
-        if (trimmed == "Maher@@--@@736462##") return true
+        
         if (trimmed == adminPass ||
             trimmed == ownerPass ||
             com.example.utils.SecurityCryptoUtils.hashPassword(trimmed) == adminPass ||
