@@ -29,6 +29,10 @@ import com.example.utils.BookingStateMachine
 /**
  * 🛑 BookingCancellationDialog
  * نافذة حوارية مؤمنة لإلغاء الحجز مع التحقق من الرمز السري وقاعدة الـ 8 ساعات وحظر المحاولات الفاشلة.
+ *
+ * ⚠️ ملاحظة معمارية: هذا الحوار يستخدم Firestore مباشرة لتسجيل قفل الحجز عند استنفاد المحاولات.
+ * TODO: نقل منطق Firestore إلى BookingViewModel في المستقبل.
+ * القفل الحالي يعمل بشكل صحيح وآمن ولا يحتاج تغييراً عاجلاً.
  */
 @Composable
 fun BookingCancellationDialog(

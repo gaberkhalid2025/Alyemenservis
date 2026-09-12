@@ -6,6 +6,9 @@ import java.util.Locale
 import kotlin.random.Random
 
 object BookingUtils {
+    private const val CANCELLATION_HOURS = 8
+    private val CANCELLATION_WINDOW_MS = CANCELLATION_HOURS * 60 * 60 * 1000L
+
     fun generateBookingNumber(prefix: String = "BK"): String {
         val sdf = SimpleDateFormat("yyMMddHHmmss", Locale.US)
         val datePart = sdf.format(Date())
@@ -60,9 +63,8 @@ object BookingUtils {
         if (scheduledMs <= 0) return true // If no valid date/time, allow by default
         val now = System.currentTimeMillis()
         val diffMs = scheduledMs - now
-        // Allow modification/cancellation anytime prior to 1 hour before scheduled time
-        val oneHourMs = 60 * 60 * 1000L
-        return diffMs > oneHourMs || scheduledAtTimestamp <= 0
+        // Allow modification/cancellation anytime prior to 8 hours before scheduled time
+        return diffMs > CANCELLATION_WINDOW_MS || scheduledAtTimestamp <= 0
     }
 
     /**
@@ -72,8 +74,7 @@ object BookingUtils {
     fun getRemainingCancellationWindowMs(scheduledAtTimestamp: Long, dateString: String = "", timeString: String = ""): Long {
         val scheduledMs = if (scheduledAtTimestamp > 0) scheduledAtTimestamp else parseScheduledTimestamp(dateString, timeString)
         if (scheduledMs <= 0) return Long.MAX_VALUE
-        val eightHoursMs = 8 * 60 * 60 * 1000L
-        val cancellationDeadline = scheduledMs - eightHoursMs
+        val cancellationDeadline = scheduledMs - CANCELLATION_WINDOW_MS
         val diff = cancellationDeadline - System.currentTimeMillis()
         return if (diff > 0) diff else 0L
     }

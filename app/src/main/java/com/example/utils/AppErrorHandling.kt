@@ -272,6 +272,23 @@ fun AppErrorBoundary(
 ) {
     var caughtError by remember { mutableStateOf<Throwable?>(null) }
 
+    DisposableEffect(Unit) {
+        val originalHandler = Thread.getDefaultUncaughtExceptionHandler()
+        val customHandler = Thread.UncaughtExceptionHandler { thread, throwable ->
+            caughtError = throwable
+            val appError = AppError.UnknownError(
+                detailMessage = throwable.message ?: "حدث خطأ أثناء عرض واجهة المستخدم",
+                cause = throwable
+            )
+            CrashlyticsDiagnosticLogger.logException(appError, "AppErrorBoundary")
+            originalHandler?.uncaughtException(thread, throwable)
+        }
+        Thread.setDefaultUncaughtExceptionHandler(customHandler)
+        onDispose {
+            Thread.setDefaultUncaughtExceptionHandler(originalHandler)
+        }
+    }
+
     if (caughtError != null) {
         Box(
             modifier = Modifier

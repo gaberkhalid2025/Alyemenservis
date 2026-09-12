@@ -29,10 +29,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.ui.viewmodels.InstantRequestViewModel
+import com.example.ui.viewmodels.InstantUiState
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,21 +49,21 @@ import java.util.Locale
 fun RequestDetailsScreen(
     requestId: String,
     viewModel: MainViewModel,
+    instantViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToOfferSubmission: (requestId: String) -> Unit = {},
     onNavigateToOfferSelection: (offerId: String) -> Unit = {},
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
     val isProvider = viewModel.isProviderUser
 
-    var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
-    var offersList by remember { mutableStateOf<List<RequestOfferEntity>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val selectedRequest by instantViewModel.selectedRequest.collectAsState()
+    val offersList by instantViewModel.requestOffers.collectAsState()
+    val uiState by instantViewModel.uiState.collectAsState()
+    val isLoading = selectedRequest == null && uiState is InstantUiState.Loading
 
     // حوار الإلغاء برمز PIN
     var showCancelDialog by remember { mutableStateOf(false) }
@@ -70,21 +72,7 @@ fun RequestDetailsScreen(
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
-            firestore.collection("instant_requests").document(requestId)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null && snapshot.exists()) {
-                        request = snapshot.toObject(InstantRequestEntity::class.java)
-                    }
-                    isLoading = false
-                }
-
-            firestore.collection("instant_offers")
-                .whereEqualTo("requestId", requestId)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null) {
-                        offersList = snapshot.documents.mapNotNull { it.toObject(RequestOfferEntity::class.java) }
-                    }
-                }
+            instantViewModel.observeRequestDetails(requestId)
         }
     }
 
@@ -93,7 +81,7 @@ fun RequestDetailsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = request?.requestCode?.ifBlank { "تفاصيل الطلب" } ?: "تفاصيل الطلب",
+                        text = selectedRequest?.requestCode?.ifBlank { "تفاصيل الطلب" } ?: "تفاصيل الطلب",
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -103,7 +91,7 @@ fun RequestDetailsScreen(
                     }
                 },
                 actions = {
-                    val status = request?.status
+                    val status = selectedRequest?.status
                     if (status == "WAITING_FOR_OFFERS" || status == "REVIEWING_OFFERS") {
                         IconButton(onClick = { showCancelDialog = true }) {
                             Icon(Icons.Default.Close, contentDescription = "إلغاء الطلب", tint = MaterialTheme.colorScheme.error)
@@ -121,7 +109,7 @@ fun RequestDetailsScreen(
             return@Scaffold
         }
 
-        val currentRequest = request
+        val currentRequest = selectedRequest
         if (currentRequest == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 Text("الطلب غير موجود.")
@@ -324,7 +312,7 @@ fun RequestDetailsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val expectedPin = (request?.secretPin ?: request?.cancellationPassword ?: "").trim()
+                        val expectedPin = (selectedRequest?.secretPin ?: selectedRequest?.cancellationPassword ?: "").trim()
                         if (expectedPin.isBlank()) {
                             Toast.makeText(context, "الرمز السري للطلب غير متوفر، الرجاء التواصل مع الدعم.", Toast.LENGTH_SHORT).show()
                             return@Button
@@ -335,22 +323,17 @@ fun RequestDetailsScreen(
                         }
 
                         isCancelling = true
-                        scope.launch {
-                            try {
-                                firestore.collection("instant_requests").document(requestId)
-                                    .update("status", "CANCELLED")
-                                    .addOnSuccessListener {
-                                        isCancelling = false
-                                        showCancelDialog = false
-                                        Toast.makeText(context, "تم إلغاء الطلب بنجاح", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .addOnFailureListener { e ->
-                                        isCancelling = false
-                                        Toast.makeText(context, "فشل الإلغاء: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                    }
-                            } catch (e: Exception) {
-                                isCancelling = false
-                                Toast.makeText(context, "خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        instantViewModel.cancelInstantRequest(
+                            requestId = requestId,
+                            userPin = cancelPinInput.trim(),
+                            context = context
+                        ) { success, msg ->
+                            isCancelling = false
+                            showCancelDialog = false
+                            if (success) {
+                                Toast.makeText(context, "تم إلغاء الطلب بنجاح", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, msg ?: "فشل الإلغاء", Toast.LENGTH_SHORT).show()
                             }
                         }
                     },

@@ -29,17 +29,7 @@ open class BaseViewModel : ViewModel() {
     open var appContext: android.content.Context? = null
 
     open val db: FirebaseFirestore by lazy {
-        val firestore = FirebaseFirestore.getInstance()
-        try {
-            val settings = FirebaseFirestoreSettings.Builder()
-                .setPersistenceEnabled(true)
-                .setCacheSizeBytes(104857600L) // 100 MB cache size for ultra-fast local offline caching
-                .build()
-            firestore.firestoreSettings = settings
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        firestore
+        FirebaseFirestore.getInstance()
     }
 
     open val firestoreListeners = java.util.concurrent.CopyOnWriteArrayList<ListenerRegistration>()

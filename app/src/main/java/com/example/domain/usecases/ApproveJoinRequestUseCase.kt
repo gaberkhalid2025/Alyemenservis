@@ -1,12 +1,15 @@
 package com.example.domain.usecases
 
 import com.example.data.PendingProviderEntity
-import com.example.ui.viewmodels.AdminViewModel
+import com.example.data.repositories.IStatusRepository
 import javax.inject.Inject
 
-class ApproveJoinRequestUseCase @Inject constructor() {
+class ApproveJoinRequestUseCase @Inject constructor(
+    private val statusRepository: IStatusRepository
+) {
 
-    fun execute(adminViewModel: AdminViewModel, request: PendingProviderEntity) {
-        adminViewModel.approveRequest(request)
+    suspend operator fun invoke(request: PendingProviderEntity): Result<Unit> {
+        return statusRepository.approveJoinRequest(request)
     }
 }
+

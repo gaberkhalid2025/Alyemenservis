@@ -25,6 +25,10 @@ import kotlinx.coroutines.delay
 /**
  * 🎙️ VoiceSearch (واجهة البحث الصوتي الذكي)
  * تدعم التعرف على الصوت باللغة العربية مع موجات صوتية متحركة واقتراحات فورية.
+ *
+ * ⚠️ PLACEHOLDER: هذه محاكاة للعرض التوضيحي
+ * TODO: استبدالها بـ VoiceManager الحقيقي
+ * لا تحذف هذه الدالة — قد تُستخدم في المستقبل
  */
 @Composable
 fun VoiceSearchDialog(

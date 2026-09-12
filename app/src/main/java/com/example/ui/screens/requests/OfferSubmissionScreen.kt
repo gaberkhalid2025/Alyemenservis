@@ -21,14 +21,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.NotificationEntity
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.models.InstantRequestEntity
-import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.ui.viewmodels.InstantRequestViewModel
+import com.example.ui.viewmodels.InstantUiState
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 /**
  * 💼 OfferSubmissionScreen
@@ -39,18 +37,16 @@ import java.util.UUID
 fun OfferSubmissionScreen(
     requestId: String,
     viewModel: MainViewModel,
+    instantViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onOfferSubmitted: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
-
     val currentUserId by viewModel.currentUserId.collectAsState()
-    val isProvider = viewModel.isProviderUser
 
-    var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
-    var isLoadingRequest by remember { mutableStateOf(true) }
+    val selectedRequest by instantViewModel.selectedRequest.collectAsState()
+    val uiState by instantViewModel.uiState.collectAsState()
+    val isLoadingRequest = selectedRequest == null && uiState is InstantUiState.Loading
 
     var priceText by remember { mutableStateOf("") }
     var estimatedArrivalTime by remember { mutableStateOf("خلال 30 دقيقة") }
@@ -63,15 +59,7 @@ fun OfferSubmissionScreen(
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
-            firestore.collection("instant_requests").document(requestId)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    request = snapshot.toObject(InstantRequestEntity::class.java)
-                    isLoadingRequest = false
-                }
-                .addOnFailureListener {
-                    isLoadingRequest = false
-                }
+            instantViewModel.observeRequestDetails(requestId)
         }
     }
 
@@ -95,7 +83,7 @@ fun OfferSubmissionScreen(
             return@Scaffold
         }
 
-        val currentReq = request
+        val currentReq = selectedRequest
         if (currentReq == null) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 Text("الطلب غير موجود أو تم إغلاقه.")
@@ -203,54 +191,22 @@ fun OfferSubmissionScreen(
                     }
 
                     isSubmitting = true
-                    scope.launch {
-                        val offerId = UUID.randomUUID().toString()
-                        val newOffer = RequestOfferEntity(
-                            id = offerId,
-                            requestId = currentReq.id,
-                            requestCode = currentReq.requestCode,
-                            technicianId = currentUserId,
-                            technicianName = "فني معتمد",
-                            technicianPhone = currentUserId,
-                            technicianAvatar = "",
-                            technicianRating = 4.9f,
-                            price = price,
-                            estimatedArrivalTime = estimatedArrivalTime,
-                            estimatedDuration = estimatedDuration,
-                            notes = notesText,
-                            status = "PENDING",
-                            createdAt = System.currentTimeMillis()
-                        )
-
-                        firestore.collection("instant_offers").document(offerId).set(newOffer)
-                            .addOnSuccessListener {
-                                // تحديث عداد العروض في الطلب
-                                firestore.collection("instant_requests").document(currentReq.id)
-                                    .update("offersCount", FieldValue.increment(1))
-
-                                // إرسال إشعار للعميل
-                                val notifId = UUID.randomUUID().toString()
-                                val notif = NotificationEntity(
-                                    id = notifId,
-                                    title = "وصلك عرض جديد لطلب ${currentReq.requestCode}",
-                                    message = "قدم لك فني عرضاً بسعر ${newOffer.price} ر.ي ووقت وصول ${newOffer.estimatedArrivalTime}",
-                                    customerPhone = currentReq.userPhone,
-                                    targetType = "USER",
-                                    targetValue = currentReq.userPhone,
-                                    notificationType = "NEW_OFFER",
-                                    timestamp = System.currentTimeMillis()
-                                )
-                                firestore.collection("notifications").document(notifId).set(notif)
-
-                                isSubmitting = false
-                                Toast.makeText(context, "تم تقديم عرضك بنجاح!", Toast.LENGTH_SHORT).show()
-                                onOfferSubmitted()
-                            }
-                            .addOnFailureListener { e ->
-                                isSubmitting = false
-                                Toast.makeText(context, "فشل إرسال العرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                            }
-                    }
+                    instantViewModel.submitOfferForRequest(
+                        requestId = currentReq.id,
+                        requestCode = currentReq.requestCode,
+                        technicianId = currentUserId,
+                        technicianName = "فني معتمد",
+                        technicianPhone = currentUserId,
+                        technicianAvatar = "",
+                        technicianRating = 4.9f,
+                        price = price,
+                        estimatedArrivalTime = estimatedArrivalTime,
+                        estimatedDuration = estimatedDuration,
+                        notes = notesText
+                    )
+                    Toast.makeText(context, "تم تقديم عرضك بنجاح!", Toast.LENGTH_SHORT).show()
+                    isSubmitting = false
+                    onOfferSubmitted()
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_offer_btn"),
                 shape = RoundedCornerShape(12.dp),

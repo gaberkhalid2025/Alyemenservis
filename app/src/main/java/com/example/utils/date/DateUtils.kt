@@ -10,21 +10,25 @@ import java.util.Locale
  */
 object DateUtils {
 
-    fun formatTimestamp(timestamp: Long, pattern: String = "yyyy-MM-dd HH:mm"): String {
+    fun formatTimestamp(
+        timestamp: Long,
+        pattern: String = "yyyy-MM-dd HH:mm",
+        locale: Locale = Locale.getDefault()
+    ): String {
         if (timestamp <= 0L) return ""
         return try {
-            val sdf = SimpleDateFormat(pattern, Locale("ar"))
+            val sdf = SimpleDateFormat(pattern, locale)
             sdf.format(Date(timestamp))
         } catch (e: Exception) {
             ""
         }
     }
 
-    fun formatDateOnly(timestamp: Long): String {
-        return formatTimestamp(timestamp, "yyyy-MM-dd")
+    fun formatDateOnly(timestamp: Long, locale: Locale = Locale.getDefault()): String {
+        return formatTimestamp(timestamp, "yyyy-MM-dd", locale)
     }
 
-    fun formatTimeOnly(timestamp: Long): String {
-        return formatTimestamp(timestamp, "hh:mm a")
+    fun formatTimeOnly(timestamp: Long, locale: Locale = Locale.getDefault()): String {
+        return formatTimestamp(timestamp, "hh:mm a", locale)
     }
 }

@@ -16,17 +16,7 @@ object FirebaseModule {
     @Provides
     @Singleton
     fun provideFirebaseFirestore(): FirebaseFirestore {
-        val firestore = FirebaseFirestore.getInstance()
-        try {
-            val settings = FirebaseFirestoreSettings.Builder()
-                .setPersistenceEnabled(true)
-                .setCacheSizeBytes(104857600L)
-                .build()
-            firestore.firestoreSettings = settings
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return firestore
+        return FirebaseFirestore.getInstance()
     }
 
     @Provides

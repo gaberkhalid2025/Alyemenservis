@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import com.example.ui.*
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import javax.inject.Inject
 
 data class InstantRequestUiState(
     val selectedTab: Int = 0,
@@ -19,7 +21,8 @@ data class InstantRequestUiState(
     val complaintTarget: String? = null // For Complaint dialog
 )
 
-class InstantRequestViewModel : ViewModel() {
+@HiltViewModel
+class InstantRequestScreenViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(InstantRequestUiState())
     val uiState: StateFlow<InstantRequestUiState> = _uiState.asStateFlow()
 

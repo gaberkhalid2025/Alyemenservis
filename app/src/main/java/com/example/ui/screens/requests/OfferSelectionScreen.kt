@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
 import com.example.data.models.ChannelType
@@ -34,7 +35,7 @@ import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.data.repositories.ChatRepository
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.ui.viewmodels.InstantRequestViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -51,6 +52,7 @@ import kotlin.random.Random
 fun OfferSelectionScreen(
     offerId: String,
     viewModel: MainViewModel,
+    instantViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onBookingConfirmed: (bookingId: String) -> Unit = {},
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> },
@@ -58,8 +60,7 @@ fun OfferSelectionScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
-    val chatRepository = remember { ChatRepository(context = context, firestore = firestore) }
+    val chatRepository = remember { ChatRepository(context = context) }
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
@@ -82,53 +83,17 @@ fun OfferSelectionScreen(
     var createdBookingNumber by remember { mutableStateOf("") }
     var newlyCreatedChannel by remember { mutableStateOf<ChatChannel?>(null) }
 
-    fun loadOfferAndRequestData() {
+    LaunchedEffect(offerId) {
         if (offerId.isNotBlank()) {
             isLoading = true
-            try {
-                firestore.collection("instant_offers").document(offerId).get()
-                    .addOnSuccessListener { offerSnap ->
-                        try {
-                            val o = offerSnap.toObject(RequestOfferEntity::class.java)
-                            offer = o
-                            if (o != null) {
-                                firestore.collection("instant_requests").document(o.requestId).get()
-                                    .addOnSuccessListener { reqSnap ->
-                                        try {
-                                            request = reqSnap.toObject(InstantRequestEntity::class.java)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "خطأ في قراءة بيانات الطلب: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                        } finally {
-                                            isLoading = false
-                                        }
-                                    }
-                                    .addOnFailureListener {
-                                        isLoading = false
-                                        Toast.makeText(context, "فشل جلب الطلب: ${it.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                    }
-                            } else {
-                                isLoading = false
-                            }
-                        } catch (e: Exception) {
-                            isLoading = false
-                            Toast.makeText(context, "خطأ في قراءة العرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    .addOnFailureListener {
-                        isLoading = false
-                        Toast.makeText(context, "فشل جلب العرض: ${it.localizedMessage}", Toast.LENGTH_SHORT).show()
-                    }
-            } catch (e: Exception) {
+            instantViewModel.loadOfferAndRequest(offerId) { o, r ->
+                offer = o
+                request = r
                 isLoading = false
-                Toast.makeText(context, "خطأ غير متوقع: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         } else {
             isLoading = false
         }
-    }
-
-    LaunchedEffect(offerId) {
-        loadOfferAndRequestData()
     }
 
     Scaffold(
@@ -158,7 +123,16 @@ fun OfferSelectionScreen(
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("العرض أو الطلب غير موجود.", color = MaterialTheme.colorScheme.error)
-                    Button(onClick = { loadOfferAndRequestData() }) {
+                    Button(onClick = {
+                        if (offerId.isNotBlank()) {
+                            isLoading = true
+                            instantViewModel.loadOfferAndRequest(offerId) { o, r ->
+                                offer = o
+                                request = r
+                                isLoading = false
+                            }
+                        }
+                    }) {
                         Icon(Icons.Default.Refresh, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("إعادة المحاولة")
@@ -299,116 +273,86 @@ fun OfferSelectionScreen(
                     }
 
                     isSubmitting = true
-                    scope.launch {
-                        try {
-                            val bookingId = UUID.randomUUID().toString()
-                            val bNum = "BK-${SimpleDateFormat("yyMMddHHmm", Locale.getDefault()).format(Date())}-${Random.nextInt(1000, 9999)}"
+                    val bookingId = UUID.randomUUID().toString()
+                    val bNum = "BK-${SimpleDateFormat("yyMMddHHmm", Locale.getDefault()).format(Date())}-${Random.nextInt(1000, 9999)}"
 
-                        val newBooking = BookingEntity(
-                            id = bookingId,
-                            bookingNumber = bNum,
-                            bookingPassword = userPin,
-                            clientId = curReq.userId,
-                            clientName = curReq.userName,
-                            clientPhone = curReq.userPhone,
-                            clientAddress = "${curReq.userCity} - ${curReq.userNeighborhood}",
-                            customerName = curReq.userName,
-                            customerPhone = curReq.userPhone,
-                            customerArea = "${curReq.userCity} - ${curReq.userNeighborhood}",
-                            serviceType = curReq.serviceTitle,
-                            providerId = curOffer.technicianId,
-                            providerName = curOffer.technicianName,
-                            providerPhone = curOffer.technicianPhone,
-                            dateString = selectedDate,
-                            timeString = selectedTime,
-                            date = selectedDate,
-                            time = selectedTime,
-                            category = curReq.categoryId,
-                            subCategory = curReq.categoryName,
-                            serviceDetails = "${curReq.description}\nملاحظات: $userNotes",
-                            totalAmount = curOffer.price,
-                            status = "APPROVED",
-                            pinCode = userPin,
-                            createdAt = System.currentTimeMillis()
-                        )
+                    val newBooking = BookingEntity(
+                        id = bookingId,
+                        bookingNumber = bNum,
+                        bookingPassword = userPin,
+                        clientId = curReq.userId,
+                        clientName = curReq.userName,
+                        clientPhone = curReq.userPhone,
+                        clientAddress = "${curReq.userCity} - ${curReq.userNeighborhood}",
+                        customerName = curReq.userName,
+                        customerPhone = curReq.userPhone,
+                        customerArea = "${curReq.userCity} - ${curReq.userNeighborhood}",
+                        serviceType = curReq.serviceTitle,
+                        providerId = curOffer.technicianId,
+                        providerName = curOffer.technicianName,
+                        providerPhone = curOffer.technicianPhone,
+                        dateString = selectedDate,
+                        timeString = selectedTime,
+                        date = selectedDate,
+                        time = selectedTime,
+                        category = curReq.categoryId,
+                        subCategory = curReq.categoryName,
+                        serviceDetails = "${curReq.description}\nملاحظات: $userNotes",
+                        totalAmount = curOffer.price,
+                        status = "APPROVED",
+                        pinCode = userPin,
+                        createdAt = System.currentTimeMillis()
+                    )
 
-                        // 1. حفظ الحجز في Firestore
-                        firestore.collection("bookings").document(bookingId).set(newBooking)
-                            .addOnSuccessListener {
-                                // 2. تحديث حالة العرض المختار إلى ACCEPTED
-                                firestore.collection("instant_offers").document(curOffer.id).update("status", "ACCEPTED")
-
-                                // 3. تحديث حالة الطلب إلى COMPLETED
-                                firestore.collection("instant_requests").document(curReq.id).update(
-                                    mapOf(
-                                        "status" to "COMPLETED",
-                                        "selectedOfferId" to curOffer.id
+                    instantViewModel.confirmOfferSelection(
+                        booking = newBooking,
+                        curOffer = curOffer,
+                        curReq = curReq,
+                        onSuccess = {
+                            // إنشاء قناة المحادثة فوراً وربطها بالطلب العاجل
+                            scope.launch {
+                                try {
+                                    val effectiveUserId = currentUserId.ifBlank { currentUserPhone.ifBlank { "client_${System.currentTimeMillis()}" } }
+                                    val effectiveUserName = currentUserName.ifBlank { "العميل" }
+                                    val targetTechId = curOffer.technicianId.ifBlank { curOffer.technicianPhone }
+                                    val channelResult = chatRepository.getOrCreateChannel(
+                                        currentUserId = effectiveUserId,
+                                        currentUserName = effectiveUserName,
+                                        currentUserPhoto = "",
+                                        otherUserId = targetTechId,
+                                        otherUserName = curOffer.technicianName,
+                                        otherUserPhoto = curOffer.technicianAvatar,
+                                        type = ChannelType.PRIVATE,
+                                        relatedEntityId = curReq.id,
+                                        relatedEntityType = "URGENT_REQUEST"
                                     )
-                                )
-
-                                // 4. إنشاء قناة المحادثة فوراً وربطها بالطلب العاجل
-                                scope.launch {
-                                    try {
-                                        val effectiveUserId = currentUserId.ifBlank { currentUserPhone.ifBlank { "client_${System.currentTimeMillis()}" } }
-                                        val effectiveUserName = currentUserName.ifBlank { "العميل" }
-                                        val targetTechId = curOffer.technicianId.ifBlank { curOffer.technicianPhone }
-                                        val channelResult = chatRepository.getOrCreateChannel(
-                                            currentUserId = effectiveUserId,
-                                            currentUserName = effectiveUserName,
-                                            currentUserPhoto = "",
-                                            otherUserId = targetTechId,
-                                            otherUserName = curOffer.technicianName,
-                                            otherUserPhoto = curOffer.technicianAvatar,
-                                            type = ChannelType.PRIVATE,
-                                            relatedEntityId = curReq.id,
-                                            relatedEntityType = "URGENT_REQUEST"
-                                        )
-                                        val createdChannel = channelResult.getOrNull()
-                                        if (createdChannel != null) {
-                                            newlyCreatedChannel = createdChannel
-                                            viewModel.openChatChannel(
-                                                com.example.data.ChatChannelEntity(
-                                                    id = createdChannel.id,
-                                                    targetId = targetTechId,
-                                                    targetName = curOffer.technicianName,
-                                                    targetPhone = curOffer.technicianPhone,
-                                                    providerId = targetTechId,
-                                                    providerName = curOffer.technicianName
-                                                )
+                                    val createdChannel = channelResult.getOrNull()
+                                    if (createdChannel != null) {
+                                        newlyCreatedChannel = createdChannel
+                                        viewModel.openChatChannel(
+                                            com.example.data.ChatChannelEntity(
+                                                id = createdChannel.id,
+                                                targetId = targetTechId,
+                                                targetName = curOffer.technicianName,
+                                                targetPhone = curOffer.technicianPhone,
+                                                providerId = targetTechId,
+                                                providerName = curOffer.technicianName
                                             )
-                                        }
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("OfferSelection", "Error creating chat channel: ${e.message}")
+                                        )
                                     }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("OfferSelection", "Error creating chat channel: ${e.message}")
                                 }
-
-                                // 5. إشعار للفني بتأكيد الحجز
-                                val notifId = UUID.randomUUID().toString()
-                                val notif = NotificationEntity(
-                                    id = notifId,
-                                    title = "🎉 تم اختيار عرضك وتأكيد الحجز!",
-                                    message = "تم قبول عرضك لطلب ${curReq.requestCode} بمبلغ ${curOffer.price} ر.ي. رقم الحجز: $bNum",
-                                    customerPhone = curOffer.technicianPhone,
-                                    targetType = "PROVIDER",
-                                    targetValue = curOffer.technicianPhone,
-                                    notificationType = "OFFER_ACCEPTED",
-                                    timestamp = System.currentTimeMillis()
-                                )
-                                firestore.collection("notifications").document(notifId).set(notif)
-
-                                isSubmitting = false
-                                createdBookingNumber = bNum
-                                showConfirmationSuccessDialog = true
                             }
-                            .addOnFailureListener { e ->
-                                isSubmitting = false
-                                Toast.makeText(context, "فشل تأكيد الحجز: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                            }
-                        } catch (e: Exception) {
                             isSubmitting = false
-                            Toast.makeText(context, "خطأ غير متوقع: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                            createdBookingNumber = bNum
+                            showConfirmationSuccessDialog = true
+                        },
+                        onError = { err ->
+                            isSubmitting = false
+                            Toast.makeText(context, "فشل تأكيد الحجز: $err", Toast.LENGTH_SHORT).show()
                         }
-                    }
+                    )
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("confirm_booking_btn"),
                 shape = RoundedCornerShape(12.dp),

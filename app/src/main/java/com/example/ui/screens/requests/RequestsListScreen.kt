@@ -19,10 +19,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.models.InstantRequestEntity
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
+import com.example.ui.viewmodels.InstantRequestViewModel
+import com.example.ui.viewmodels.InstantUiState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,59 +36,32 @@ import java.util.Locale
 @Composable
 fun RequestsListScreen(
     viewModel: MainViewModel,
+    instantViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToDetails: (requestId: String) -> Unit = {},
     onNavigateToNewRequest: () -> Unit = {},
     onNavigateToOffersList: (requestId: String) -> Unit = {},
     onNavigateToSubmitOffer: (requestId: String) -> Unit = {}
 ) {
-    val firestore = remember { FirebaseFirestore.getInstance() }
     val currentUserId by viewModel.currentUserId.collectAsState()
     val isProvider = viewModel.isProviderUser
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: الكل / النشطة, 1: المكتملة, 2: الملغية
-    var requestsList by remember { mutableStateOf<List<InstantRequestEntity>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val requestsList by instantViewModel.instantRequests.collectAsState()
     var isRefreshing by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     val tabs = listOf("النشطة", "المكتملة", "الملغية")
 
-    fun refreshRequests() {
-        isRefreshing = true
-        var query: Query = firestore.collection("instant_requests")
-        if (!isProvider && currentUserId.isNotBlank() && currentUserId != "guest") {
-            query = query.whereEqualTo("userId", currentUserId)
-        }
-        query.orderBy("createdAt", Query.Direction.DESCENDING).get()
-            .addOnSuccessListener { snapshot ->
-                if (snapshot != null) {
-                    requestsList = snapshot.documents.mapNotNull { it.toObject(InstantRequestEntity::class.java) }
-                }
-                isRefreshing = false
-                isLoading = false
-            }
-            .addOnFailureListener {
-                isRefreshing = false
-                isLoading = false
-            }
-    }
+    val uiState by instantViewModel.uiState.collectAsState()
+    val isLoading = uiState is InstantUiState.Loading
 
     LaunchedEffect(currentUserId, isProvider) {
-        isLoading = true
-        var query: Query = firestore.collection("instant_requests")
+        instantViewModel.observeInstantRequests(currentUserId, isProvider)
+    }
 
-        if (!isProvider && currentUserId.isNotBlank() && currentUserId != "guest") {
-            query = query.whereEqualTo("userId", currentUserId)
-        }
-
-        query.orderBy("createdAt", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    requestsList = snapshot.documents.mapNotNull { it.toObject(InstantRequestEntity::class.java) }
-                }
-                isLoading = false
-            }
+    fun refreshRequests() {
+        instantViewModel.observeInstantRequests(currentUserId, isProvider)
     }
 
     val filteredList = requestsList.filter { req ->

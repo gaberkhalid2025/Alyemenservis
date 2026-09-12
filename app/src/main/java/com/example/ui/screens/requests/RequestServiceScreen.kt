@@ -23,10 +23,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.NotificationEntity
 import com.example.data.models.InstantRequestEntity
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.ui.viewmodels.InstantRequestViewModel
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.random.Random
@@ -39,12 +40,12 @@ import kotlin.random.Random
 @Composable
 fun RequestServiceScreen(
     viewModel: MainViewModel,
+    instantViewModel: InstantRequestViewModel = viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToMyRequests: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val firestore = remember { FirebaseFirestore.getInstance() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
 
@@ -291,45 +292,25 @@ fun RequestServiceScreen(
                     }
 
                     isSubmitting = true
-                    scope.launch {
-                        try {
-                            val uniqueCode = "REQ-${Random.nextInt(100000, 999999)}"
-                            val reqId = UUID.randomUUID().toString()
-                            val now = System.currentTimeMillis()
-                            val hashedPin = com.example.utils.PinHasher.hashPin(pinCode)
-                            val request = InstantRequestEntity(
-                                id = reqId,
-                                requestCode = uniqueCode,
-                                secretPin = hashedPin,
-                                cancellationPassword = hashedPin,
-                                userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
-                                userName = customerName.ifBlank { "عميل" },
-                                userPhone = customerPhone,
-                                userCity = selectedCity,
-                                userNeighborhood = selectedArea,
-                                categoryId = selectedDepartment,
-                                categoryName = selectedCategory,
-                                serviceTitle = serviceTitle,
-                                description = serviceDetails,
-                                status = "WAITING_FOR_OFFERS",
-                                urgencyTime = urgencyTime,
-                                createdAt = now,
-                                expiresAt = now + 24 * 60 * 60 * 1000L
-                            )
-
-                            firestore.collection("instant_requests").document(reqId).set(request)
-                                .addOnSuccessListener {
-                                    isSubmitting = false
-                                    createdRequestCode = uniqueCode
-                                    showSuccessDialog = true
-                                }
-                                .addOnFailureListener { e ->
-                                    isSubmitting = false
-                                    Toast.makeText(context, "فشل إرسال الطلب: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                }
-                        } catch (e: Exception) {
-                            isSubmitting = false
-                            Toast.makeText(context, "حدث خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    instantViewModel.createInstantRequest(
+                        userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
+                        userName = customerName.ifBlank { "عميل" },
+                        userPhone = customerPhone,
+                        userCity = selectedCity,
+                        userNeighborhood = selectedArea,
+                        categoryId = selectedDepartment,
+                        categoryName = selectedCategory,
+                        serviceTitle = serviceTitle,
+                        description = serviceDetails,
+                        urgencyTime = urgencyTime,
+                        customPin = com.example.utils.PinHasher.hashPin(pinCode)
+                    ) { success, msg, _ ->
+                        isSubmitting = false
+                        if (success) {
+                            createdRequestCode = msg.substringAfter("الكود: ").ifBlank { "REQ-${Random.nextInt(100000, 999999)}" }
+                            showSuccessDialog = true
+                        } else {
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         }
                     }
                 },

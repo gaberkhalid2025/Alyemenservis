@@ -25,7 +25,7 @@ fun InstantRequestsScreen(
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit = {}
 ) {
-    val instantReqViewModel: InstantRequestViewModel = viewModel()
+    val instantReqViewModel: InstantRequestScreenViewModel = viewModel()
     val uiState by instantReqViewModel.uiState.collectAsState()
 
     val instantRequests by viewModel.instantRequests.collectAsState()

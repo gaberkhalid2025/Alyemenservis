@@ -8,6 +8,8 @@ import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -39,6 +41,20 @@ class MyApplication : Application() {
             Log.d("MyApplication", "✅ Firebase initialized successfully")
         } catch (e: Exception) {
             Log.e("MyApplication", "❌ Firebase initialization failed: ${e.message}")
+            e.printStackTrace()
+        }
+
+        // ===================== تهيئة Firestore الموحدة =====================
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            val settings = FirebaseFirestoreSettings.Builder()
+                .setPersistenceEnabled(true)
+                .setCacheSizeBytes(104857600L)
+                .build()
+            firestore.firestoreSettings = settings
+            Log.d("MyApplication", "✅ FirebaseFirestore settings initialized successfully")
+        } catch (e: Exception) {
+            // تجاهل — قد تكون مهيأة مسبقاً
             e.printStackTrace()
         }
 

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.data.BookingEntity
 import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
@@ -56,7 +57,7 @@ fun BookingCalendarScreen(
     provider: ProviderEntity,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    calendarViewModel: BookingCalendarViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    calendarViewModel: BookingCalendarViewModel = hiltViewModel(),
     onBack: () -> Unit,
     onBookingSuccess: (BookingEntity) -> Unit
 ) {

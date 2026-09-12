@@ -5,6 +5,7 @@ import android.content.Context
 import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.ProviderEntity
+import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
 import com.example.data.models.ChannelType
 import com.example.data.models.InstantRequestEntity
@@ -19,6 +20,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -76,6 +78,9 @@ class InstantRequestViewModel @Inject constructor(
 
     private val _selectedRequest = MutableStateFlow<InstantRequestEntity?>(null)
     val selectedRequest: StateFlow<InstantRequestEntity?> = _selectedRequest.asStateFlow()
+
+    private val _selectedOffer = MutableStateFlow<RequestOfferEntity?>(null)
+    val selectedOffer: StateFlow<RequestOfferEntity?> = _selectedOffer.asStateFlow()
 
     internal val _requestOffers get() = appState._requestOffers
     val requestOffers: StateFlow<List<RequestOfferEntity>> = _requestOffers.asStateFlow()
@@ -441,6 +446,80 @@ class InstantRequestViewModel @Inject constructor(
                 onResult(false, err)
             }
         )
+    }
+
+    fun loadOfferAndRequest(
+        offerId: String,
+        onResult: (RequestOfferEntity?, InstantRequestEntity?) -> Unit = { _, _ -> }
+    ) {
+        if (offerId.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var fetchedOffer: RequestOfferEntity? = null
+                var fetchedReq: InstantRequestEntity? = null
+                val offerSnap = firestore.collection("instant_offers").document(offerId).get().await()
+                if (offerSnap.exists()) {
+                    fetchedOffer = offerSnap.toObject(RequestOfferEntity::class.java)?.copy(id = offerSnap.id)
+                }
+                if (fetchedOffer != null) {
+                    val reqSnap = firestore.collection("instant_requests").document(fetchedOffer.requestId).get().await()
+                    if (reqSnap.exists()) {
+                        fetchedReq = reqSnap.toObject(InstantRequestEntity::class.java)?.copy(id = reqSnap.id)
+                    }
+                }
+                _selectedOffer.value = fetchedOffer
+                _selectedRequest.value = fetchedReq
+                withContext(Dispatchers.Main) {
+                    onResult(fetchedOffer, fetchedReq)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onResult(null, null)
+                }
+            }
+        }
+    }
+
+    fun confirmOfferSelection(
+        booking: BookingEntity,
+        curOffer: RequestOfferEntity,
+        curReq: InstantRequestEntity,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                firestore.collection("bookings").document(booking.id).set(booking).await()
+                firestore.collection("instant_offers").document(curOffer.id).update("status", "ACCEPTED").await()
+                firestore.collection("instant_requests").document(curReq.id).update(
+                    mapOf(
+                        "status" to "COMPLETED",
+                        "selectedOfferId" to curOffer.id
+                    )
+                ).await()
+
+                val notifId = UUID.randomUUID().toString()
+                val notif = NotificationEntity(
+                    id = notifId,
+                    title = "🎉 تم اختيار عرضك وتأكيد الحجز!",
+                    message = "تم قبول عرضك لطلب ${curReq.requestCode} بمبلغ ${curOffer.price} ر.ي. رقم الحجز: ${booking.bookingNumber}",
+                    customerPhone = curOffer.technicianPhone,
+                    targetType = "PROVIDER",
+                    targetValue = curOffer.technicianPhone,
+                    notificationType = "OFFER_ACCEPTED",
+                    timestamp = System.currentTimeMillis()
+                )
+                firestore.collection("notifications").document(notifId).set(notif).await()
+
+                withContext(Dispatchers.Main) {
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onError(e.localizedMessage ?: "فشل تأكيد الحجز")
+                }
+            }
+        }
     }
 
     fun clearUiState() {

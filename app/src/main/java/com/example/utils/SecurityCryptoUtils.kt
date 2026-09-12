@@ -5,21 +5,28 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
  * Client-Side Encryption & Hashing Utility for Protecting Sensitive Data
- * Ensures sensitive user details, admin passwords, FCM tokens, and internal credentials
- * are securely hashed and encrypted before being persisted using AndroidKeyStore.
+ * Ensures sensitive user details, FCM tokens, and internal credentials
+ * are securely encrypted using AndroidKeyStore with randomized IVs and PBKDF2 key derivation.
  */
 object SecurityCryptoUtils {
     private const val KEYSTORE_ALIAS = "WAM_Services_AndroidKeyStore_MasterKey_2026"
+    private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
+    private const val PBKDF2_ITERATIONS = 10000
+    private const val KEY_SIZE_BITS = 256
+    private const val CIPHER_TRANSFORMATION = "AES/CBC/PKCS5Padding"
 
-    private fun getDerivedKey(): SecretKey {
+    private fun getSecretKey(): SecretKey {
         return try {
             val keyStore = KeyStore.getInstance("AndroidKeyStore")
             keyStore.load(null)
@@ -32,32 +39,34 @@ object SecurityCryptoUtils {
                     )
                         .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
                         .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
-                        .setRandomizedEncryptionRequired(false)
+                        .setKeySize(KEY_SIZE_BITS)
                         .build()
                 )
                 keyGenerator.generateKey()
             } else {
                 val entry = keyStore.getEntry(KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
-                entry?.secretKey ?: createFallbackKey()
+                entry?.secretKey ?: deriveFallbackKey()
             }
         } catch (e: Exception) {
-            createFallbackKey()
+            deriveFallbackKey()
         }
     }
 
-    private fun createFallbackKey(): SecretKeySpec {
-        val appSpecificSalt = "WAM_SERVICES_SECURE_VAULT_SALT_2026_YEMEN_APP_PROTECTION".toByteArray(Charsets.UTF_8)
-        val internalAppSeed = ("INTERNAL_APP_CRYPTO_VAULT_SEED_" + android.os.Build.BRAND + "_" + android.os.Build.MODEL).toByteArray(Charsets.UTF_8)
-        val combined = appSpecificSalt + internalAppSeed
-        val sha256 = MessageDigest.getInstance("SHA-256")
-        return SecretKeySpec(sha256.digest(combined), "AES")
-    }
-
-    private fun getIv(): IvParameterSpec {
-        val ivSeed = ("WAM_IV_SEED_" + android.os.Build.MANUFACTURER + "_" + android.os.Build.MODEL).toByteArray(Charsets.UTF_8)
-        val md5 = MessageDigest.getInstance("MD5")
-        val ivBytes = md5.digest(ivSeed)
-        return IvParameterSpec(ivBytes)
+    /**
+     * اشتقاق مفتاح احتياطي باستخدام PBKDF2WithHmacSHA256
+     */
+    private fun deriveFallbackKey(): SecretKeySpec {
+        return try {
+            val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
+            val salt = "YemenServices_Vault_KeyDerivation_2026".toByteArray(Charsets.UTF_8)
+            val pass = "YemenServicesVaultMasterKey".toCharArray()
+            val spec = PBEKeySpec(pass, salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
+            val secret = factory.generateSecret(spec)
+            SecretKeySpec(secret.encoded, "AES")
+        } catch (e: Exception) {
+            val digest = MessageDigest.getInstance("SHA-256")
+            SecretKeySpec(digest.digest("YemenServices_Fallback".toByteArray(Charsets.UTF_8)), "AES")
+        }
     }
 
     /**
@@ -100,15 +109,20 @@ object SecurityCryptoUtils {
 
     /**
      * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES cipher text.
+     * Generates a unique, cryptographically secure 16-byte random IV for each operation and prefixes it to the ciphertext.
      */
     fun encrypt(plainText: String?): String {
         if (plainText.isNullOrEmpty()) return ""
         return try {
-            val key = createFallbackKey()
-            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-            cipher.init(Cipher.ENCRYPT_MODE, key, getIv())
+            val key = getSecretKey()
+            val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+            val iv = ByteArray(16)
+            SecureRandom().nextBytes(iv)
+            val ivSpec = IvParameterSpec(iv)
+            cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec)
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-            base64Encode(encryptedBytes)
+            val combined = iv + encryptedBytes
+            base64Encode(combined)
         } catch (e: Exception) {
             plainText
         }
@@ -116,15 +130,20 @@ object SecurityCryptoUtils {
 
     /**
      * Decrypts Base64 encoded AES cipher text back to plain text.
+     * Extracts the 16-byte IV stored at the beginning of the payload.
      */
     fun decrypt(encryptedText: String?): String {
         if (encryptedText.isNullOrEmpty()) return ""
         return try {
-            val key = createFallbackKey()
-            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-            cipher.init(Cipher.DECRYPT_MODE, key, getIv())
             val decodedBytes = base64Decode(encryptedText)
-            val decryptedBytes = cipher.doFinal(decodedBytes)
+            if (decodedBytes.size <= 16) return encryptedText
+            val iv = decodedBytes.copyOfRange(0, 16)
+            val encrypted = decodedBytes.copyOfRange(16, decodedBytes.size)
+            val key = getSecretKey()
+            val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+            val ivSpec = IvParameterSpec(iv)
+            cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
+            val decryptedBytes = cipher.doFinal(encrypted)
             String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
             encryptedText

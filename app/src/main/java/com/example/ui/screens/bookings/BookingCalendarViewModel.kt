@@ -6,11 +6,13 @@ import com.example.data.BookingEntity
 import com.example.data.ProviderEntity
 import com.example.utils.HolidayManager
 import com.example.utils.ScheduleManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.*
+import javax.inject.Inject
 
 data class BookingCalendarUiState(
     val calendarMonthOffset: Int = 0,
@@ -23,7 +25,8 @@ data class BookingCalendarUiState(
     val errorMessage: String? = null
 )
 
-class BookingCalendarViewModel : ViewModel() {
+@HiltViewModel
+class BookingCalendarViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(BookingCalendarUiState())
     val uiState: StateFlow<BookingCalendarUiState> = _uiState.asStateFlow()
 

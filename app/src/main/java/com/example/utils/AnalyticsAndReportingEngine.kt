@@ -13,11 +13,17 @@ import java.util.Locale
  * 📊 Problem 15 Solution: Advanced Analytics, Reporting & Export Engine
  * Interactive Admin Analytics Dashboard, Business Owner Performance Metrics, Multi-format report export (PDF/CSV/Excel),
  * User journey behavioral event tracking, Anomaly detection alerts, and Predictive trend forecasting.
+ *
+ * ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
+ * TODO: استبدالها ببيانات حقيقية من Firestore في المستقبل
+ * لا تحذف هذا الملف — قد يُستخدم في المستقبل
  */
 object AnalyticsAndReportingEngine {
 
     private val db = FirebaseFirestore.getInstance()
 
+    // ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
+    // TODO: استبدالها بمؤشرات حقيقية مستعلمة من Firestore في المستقبل
     // 1. Admin Platform Overview Metrics Model
     data class AdminPlatformMetrics(
         val activeUsersToday: Int = 1450,
@@ -29,6 +35,8 @@ object AnalyticsAndReportingEngine {
         val pendingModerationsCount: Int = 5
     )
 
+    // ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
+    // TODO: استبدالها بمؤشرات أداء حقيقية للمزود مستعلمة من Firestore في المستقبل
     // 2. Business Owner Performance Metrics Model
     data class BusinessOwnerMetrics(
         val providerId: String = "",
