@@ -118,6 +118,10 @@ object PaymentSecurityGuard {
         if (clean.length < 4) {
             return Result.failure(IllegalArgumentException("عفواً، يجب إدخال رقم إشعار أو حوالة صحيحة لا تقل عن 4 أرقام."))
         }
+        val regex = Regex("^[A-Za-z0-9_-]{4,32}\$")
+        if (!regex.matches(clean)) {
+            return Result.failure(IllegalArgumentException("عفواً، رقم الإشعار يحتوي على رموز غير مسموح بها."))
+        }
         return Result.success(true)
     }
 

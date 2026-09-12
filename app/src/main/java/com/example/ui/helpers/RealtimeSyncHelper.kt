@@ -61,7 +61,6 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         db.collection("settings").document("main_settings").addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
-                appState._isInitialized.value = true
                 return@addSnapshotListenerReg
             }
             if (snapshot != null && snapshot.exists()) {
@@ -76,7 +75,6 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             } else {
                 appState._settings.value = AdminSettingsEntity()
             }
-            appState._isInitialized.value = true
         }
 
         // 1b. Booking Form Fields Listener
@@ -154,7 +152,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 3b. Registered Users count listener
-        db.collection("registered_users").addSnapshotListenerReg { snapshot, error ->
+        db.collection("registered_users").limit(200).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 appState._registeredUsersCount.value = snapshot.size()
                 val list = snapshot.documents.mapNotNull { doc ->
@@ -167,14 +165,14 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 3c. Internal Wallets Listener
-        db.collection("internal_wallets").addSnapshotListenerReg { snapshot, error ->
+        db.collection("internal_wallets").limit(100).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 appState._internalWallets.value = snapshot.documents.mapNotNull { it.toObject(InternalWalletEntity::class.java) }
             }
         }
 
         // 3d. Wallet Transactions Listener
-        db.collection("wallet_transactions").addSnapshotListenerReg { snapshot, error ->
+        db.collection("wallet_transactions").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 appState._walletTransactions.value = snapshot.documents.mapNotNull { it.toObject(WalletTransactionEntity::class.java) }.sortedByDescending { it.timestamp }
             }

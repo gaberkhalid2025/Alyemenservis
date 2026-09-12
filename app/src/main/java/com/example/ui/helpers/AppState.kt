@@ -27,7 +27,7 @@ class AppState @Inject constructor() {
     val _internalWallets = MutableStateFlow<List<InternalWalletEntity>>(emptyList())
     val _isChatChannelsLoading = MutableStateFlow(false)
     val _isInitialized = MutableStateFlow(false)
-    val _isProvidersLoading = MutableStateFlow(false)
+    val _isProvidersLoading = MutableStateFlow(true)
     val _jobApplications = MutableStateFlow<List<JobApplicationEntity>>(emptyList())
     val _jobs = MutableStateFlow<List<JobEntity>>(emptyList())
     val _maxKmRadius = MutableStateFlow(50)

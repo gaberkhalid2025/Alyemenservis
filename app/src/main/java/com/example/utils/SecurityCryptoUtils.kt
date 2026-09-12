@@ -82,6 +82,22 @@ object SecurityCryptoUtils {
         return PasswordHasher.verifyPassword(trimmedInput, trimmedStored)
     }
 
+    private fun base64Encode(bytes: ByteArray): String {
+        return try {
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
+        } catch (e: Throwable) {
+            java.util.Base64.getEncoder().encodeToString(bytes)
+        }
+    }
+
+    private fun base64Decode(str: String): ByteArray {
+        return try {
+            Base64.decode(str, Base64.DEFAULT)
+        } catch (e: Throwable) {
+            java.util.Base64.getDecoder().decode(str)
+        }
+    }
+
     /**
      * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES cipher text.
      */
@@ -92,7 +108,7 @@ object SecurityCryptoUtils {
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             cipher.init(Cipher.ENCRYPT_MODE, key, getIv())
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-            Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
+            base64Encode(encryptedBytes)
         } catch (e: Exception) {
             plainText
         }
@@ -107,7 +123,7 @@ object SecurityCryptoUtils {
             val key = createFallbackKey()
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             cipher.init(Cipher.DECRYPT_MODE, key, getIv())
-            val decodedBytes = Base64.decode(encryptedText, Base64.DEFAULT)
+            val decodedBytes = base64Decode(encryptedText)
             val decryptedBytes = cipher.doFinal(decodedBytes)
             String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {

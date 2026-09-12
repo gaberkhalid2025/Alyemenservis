@@ -1,8 +1,8 @@
 package com.example
 
-import com.example.util.BookingStateEngine
-import com.example.util.PaymentSecurityGuard
-import com.example.util.SecurityCryptoUtils
+import com.example.utils.BookingStateEngine
+import com.example.utils.PaymentSecurityGuard
+import com.example.utils.SecurityCryptoUtils
 import org.junit.Assert.*
 import org.junit.Test
 

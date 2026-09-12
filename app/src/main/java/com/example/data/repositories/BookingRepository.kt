@@ -3,6 +3,7 @@ package com.example.data.repositories
 import android.content.Context
 import android.util.Log
 import com.example.data.BookingEntity
+import com.example.data.BookingCache
 import com.example.data.LocalAppCacheManager
 import com.example.security.BookingSecurityHelper
 import com.example.utils.BookingNotificationManager
@@ -27,7 +28,10 @@ import java.util.UUID
  * Synchronizes with Firestore while caching locally via LocalAppCacheManager and Moshi.
  * Enforces security validations, 8-hour countdown rule, and SHA-256 PIN hashing.
  */
-class BookingRepository(private val context: Context) {
+class BookingRepository(
+    private val context: Context,
+    private val memoryCache: BookingCache = BookingCache()
+) {
 
     private val firestore = FirebaseFirestore.getInstance()
     private val cacheManager = LocalAppCacheManager(context)
@@ -98,6 +102,11 @@ class BookingRepository(private val context: Context) {
      * Realtime flow of all bookings for a user or provider with offline fallback.
      */
     fun getBookingsFlow(userId: String, isProvider: Boolean = false): Flow<List<BookingEntity>> = callbackFlow {
+        val cacheKey = if (userId.isNotBlank()) "${if (isProvider) "provider" else "user"}_$userId" else "all_bookings"
+        val inMemory = memoryCache.getBookings(cacheKey)
+        if (inMemory != null && inMemory.isNotEmpty()) {
+            trySend(inMemory)
+        }
         // Emit cache immediately for instant offline rendering
         val local = loadFromCache()
         if (local.isNotEmpty()) {
@@ -130,6 +139,7 @@ class BookingRepository(private val context: Context) {
                         null
                     }
                 }
+                memoryCache.putBookings(cacheKey, list)
                 saveToCache(list)
                 trySend(list)
             }

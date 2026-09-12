@@ -90,13 +90,21 @@ object NotificationScheduler {
         )
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent)
+                } else {
+                    alarmManager.setWindow(AlarmManager.RTC_WAKEUP, reminderTime, 10 * 60 * 1000L, pendingIntent)
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent)
             } else {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent)
             }
         } catch (e: SecurityException) {
-            alarmManager.set(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent)
+            try {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent)
+            } catch (ignored: Exception) {}
         }
     }
 

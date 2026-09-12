@@ -89,22 +89,29 @@ fun ServicesBrowserMainContent(
         }
 
         // Providers List Section
+        val searchQuery by viewModel.searchQuery.collectAsState()
+        val hasActiveFilter = searchQuery.trim().isNotEmpty() || (!selectedCategoryId.isNullOrBlank() && selectedCategoryId != "ALL" && selectedCategoryId != "الكل")
+
         if (isProvidersLoading) {
             ProviderListSkeleton()
         } else if (displayProviders.isEmpty()) {
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+            if (hasActiveFilter) {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
                 ) {
-                    Text("🔍 لا توجد نتائج مطابقة لبحثك", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("جرب تغيير معايير البحث أو اختيار قسم آخر لعرض المتاحين باليمن.", fontSize = 10.5.sp, color = Color.LightGray, textAlign = TextAlign.Center)
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("🔍 لا توجد نتائج مطابقة لبحثك", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("جرب تغيير معايير البحث أو اختيار قسم آخر لعرض المتاحين باليمن.", fontSize = 10.5.sp, color = Color.LightGray, textAlign = TextAlign.Center)
+                    }
                 }
+            } else {
+                ProviderListSkeleton()
             }
         } else {
             val limitedProviders = displayProviders.take(providersLimit)

@@ -150,6 +150,7 @@ class RegistrationHelper(
                 else -> "PROVIDER"
             }
             val requestDocId = cleanPhone
+            val securedPasswordHash = if (password.isNotBlank()) com.example.utils.PasswordHasher.hash(password.trim()) else ""
             val newRequest = PendingProviderEntity(
                 id = requestDocId,
                 name = name,
@@ -162,7 +163,7 @@ class RegistrationHelper(
                 idPhotoBase64 = encIdCard,
                 workPhotosBase64 = finalWorkPhotos,
                 customCategoryName = customCategoryName,
-                password = password,
+                password = securedPasswordHash,
                 productAttachmentsJson = productAttachmentsJson,
                 profession = requestProfession,
                 providerType = requestProfession
@@ -175,7 +176,7 @@ class RegistrationHelper(
                 status = "PENDING",
                 fullName = name,
                 phone = cleanPhone,
-                passwordHash = password,
+                passwordHash = securedPasswordHash,
                 city = area,
                 area = neighborhood,
                 neighborhood = neighborhood,

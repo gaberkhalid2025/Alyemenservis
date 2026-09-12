@@ -2,9 +2,9 @@ package com.example
 
 import com.example.domain.entities.RegistrationEntity
 import com.example.domain.usecases.*
-import com.example.util.PermissionManager
+import com.example.utils.PermissionManager
 import com.example.utils.BookingUtils
-import com.example.util.SecurityCryptoUtils
+import com.example.utils.SecurityCryptoUtils
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test

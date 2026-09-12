@@ -1,23 +1,23 @@
 package com.example.ui.screens.chat
 
 import androidx.lifecycle.ViewModel
-import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.models.*
 import com.example.data.repositories.ChatRepository
+import com.example.ui.screens.chat.managers.ChatEditManager
+import com.example.ui.screens.chat.managers.ChatMessagesManager
+import com.example.ui.screens.chat.managers.ChatPresenceManager
+import com.example.ui.screens.chat.managers.ChatTypingManager
+import com.example.utils.AppResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-/**
- * 💬 Chat Error Handling State Hierarchy
- */
 sealed class ChatError(open val messageArabic: String) {
-    object NetworkError : ChatError("فشل الاتصال بالشبكة أثناء إرسال الرسالة")
-    object StorageError : ChatError("تعذر رفع المرفق إلى السحابة (Firebase Storage)")
+    data class NetworkError(override val messageArabic: String = "خطأ في الاتصال بالشبكة") : ChatError(messageArabic)
+    data class PermissionDenied(override val messageArabic: String = "تم رفض الإذن المطلوب") : ChatError(messageArabic)
     data class UnknownError(val details: String) : ChatError(details)
 }
 
@@ -31,59 +31,50 @@ class ChatViewModel @Inject constructor(
     private val repository: ChatRepository
 ) : ViewModel() {
 
+    // --- Specialized Sub-Managers ---
+    val messagesManager = ChatMessagesManager(repository, viewModelScope)
+    val typingManager = ChatTypingManager(repository, viewModelScope)
+    val presenceManager = ChatPresenceManager(repository, viewModelScope)
+    val editManager = ChatEditManager(repository, viewModelScope)
 
+    // --- Events & Global States ---
     private val _eventFlow = MutableSharedFlow<ChatEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
 
     private val _currentChannel = MutableStateFlow<ChatChannel?>(null)
     val currentChannel: StateFlow<ChatChannel?> = _currentChannel.asStateFlow()
 
-    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+    val messages: StateFlow<List<ChatMessage>> = messagesManager.messages
+    val isSending: StateFlow<Boolean> = messagesManager.isSending
 
-    private val _otherUserPresence = MutableStateFlow<UserPresence?>(null)
-    val otherUserPresence: StateFlow<UserPresence?> = _otherUserPresence.asStateFlow()
-
-    private val _isTypingOther = MutableStateFlow(false)
-    val isTypingOther: StateFlow<Boolean> = _isTypingOther.asStateFlow()
-
-    private val _replyingToMessage = MutableStateFlow<ChatMessage?>(null)
-    val replyingToMessage: StateFlow<ChatMessage?> = _replyingToMessage.asStateFlow()
+    val otherUserPresence: StateFlow<UserPresence?> = presenceManager.otherUserPresence
+    val isTypingOther: StateFlow<Boolean> = typingManager.isTypingOther
+    val replyingToMessage: StateFlow<ChatMessage?> = editManager.replyingToMessage
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _isSending = MutableStateFlow(false)
-    val isSending: StateFlow<Boolean> = _isSending.asStateFlow()
-
     private var messagesJob: Job? = null
-    private var presenceJob: Job? = null
-    private var typingJob: Job? = null
-
-    /**
-     * Initialize conversation with channel.
-     */
+    private var markAsReadJob: Job? = null
     private var activeUserId: String = ""
+    private var currentLimit = 25
 
     fun openChannel(channel: ChatChannel, currentUserId: String) {
+        resetState()
         _currentChannel.value = channel
         activeUserId = currentUserId
-        markAsRead(channel.id, currentUserId)
-        listenToMessages(channel.id, currentUserId)
+        currentLimit = 25
 
         val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
-        if (otherUserId.isNotBlank()) {
-            listenToPresence(otherUserId)
-        }
+        listenToMessages(channel.id, currentUserId)
+        presenceManager.listenToPresence(otherUserId)
+        markAsRead(channel.id, currentUserId)
     }
 
-    /**
-     * Open channel by channel ID or fallback to target user ID.
-     */
     fun openChannelById(
         channelId: String,
         currentUserId: String,
-        currentUserName: String = "",
+        currentUserName: String = "المستخدم",
         fallbackTargetUserId: String? = null,
         fallbackUserName: String? = null
     ) {
@@ -94,30 +85,33 @@ class ChatViewModel @Inject constructor(
                 openChannel(channel, currentUserId)
             } else {
                 val targetId = fallbackTargetUserId ?: channelId
-                if (targetId.isNotBlank()) {
-                    startDirectChat(
-                        currentUserId = currentUserId,
-                        currentUserName = currentUserName,
-                        currentUserPhoto = "",
-                        otherUserId = targetId,
-                        otherUserName = fallbackUserName ?: "مستخدم",
-                        otherUserPhoto = ""
-                    )
+                val targetName = fallbackUserName ?: "المستخدم"
+                val res = repository.getOrCreateChannel(
+                    currentUserId = currentUserId,
+                    currentUserName = currentUserName,
+                    currentUserPhoto = "",
+                    otherUserId = targetId,
+                    otherUserName = targetName,
+                    otherUserPhoto = "",
+                    type = ChannelType.PRIVATE,
+                    relatedEntityId = null,
+                    relatedEntityType = null
+                )
+                when (res) {
+                    is AppResult.Success -> openChannel(res.data, currentUserId)
+                    is AppResult.Error -> _eventFlow.emit(ChatEvent.ShowError(res.error.messageArabic))
                 }
             }
         }
     }
 
-    /**
-     * Initialize or find channel between two users.
-     */
     fun startDirectChat(
         currentUserId: String,
         currentUserName: String,
-        currentUserPhoto: String,
+        currentUserPhoto: String = "",
         otherUserId: String,
         otherUserName: String,
-        otherUserPhoto: String,
+        otherUserPhoto: String = "",
         relatedEntityId: String? = null,
         relatedEntityType: String? = null
     ) {
@@ -133,121 +127,88 @@ class ChatViewModel @Inject constructor(
                 relatedEntityId = relatedEntityId,
                 relatedEntityType = relatedEntityType
             )
-            val channel = channelResult.getOrNull()
-            if (channel != null) {
-                openChannel(channel, currentUserId)
+            when (channelResult) {
+                is AppResult.Success -> openChannel(channelResult.data, currentUserId)
+                is AppResult.Error -> _eventFlow.emit(ChatEvent.ShowError(channelResult.error.messageArabic))
             }
         }
     }
 
-    private var currentLimit = 25
-
     private fun listenToMessages(channelId: String, currentUserId: String) {
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
-            repository.getChannelMessages(channelId, currentUserId, limit = currentLimit).collect { msgList ->
-                _messages.value = msgList
+            repository.getChannelMessages(channelId, currentUserId, limit = currentLimit).collect { msgs ->
+                messagesManager.updateMessagesList(msgs)
+                markAsRead(channelId, currentUserId)
             }
         }
     }
 
     fun loadMoreMessages() {
         val channel = _currentChannel.value ?: return
-        if (activeUserId.isBlank()) return
         currentLimit += 25
         listenToMessages(channel.id, activeUserId)
     }
 
-    private fun listenToPresence(otherUserId: String) {
-        presenceJob?.cancel()
-        presenceJob = viewModelScope.launch {
-            repository.getUserPresence(otherUserId).collect { presence ->
-                _otherUserPresence.value = presence
-            }
-        }
-    }
-
     fun sendMessage(
-        senderId: String,
-        senderName: String,
+        senderId: String = activeUserId,
+        senderName: String = "أنا",
         text: String,
         mediaType: MediaType = MediaType.TEXT,
-        mediaUrl: String = ""
+        mediaUrl: String = "",
+        attachment: ChatAttachment? = null
     ) {
         val channel = _currentChannel.value ?: return
-        if (text.isBlank() && mediaUrl.isBlank()) return
+        if (text.isBlank() && mediaUrl.isBlank() && attachment == null) return
 
-        val replyTo = _replyingToMessage.value
-        _isSending.value = true
+        val replyTo = editManager.replyingToMessage.value
+        editManager.setReplyingTo(null)
 
-        viewModelScope.launch {
-            try {
-                val result = repository.sendMessage(
-                    channelId = channel.id,
-                    senderId = senderId,
-                    senderName = senderName,
-                    messageText = text.trim(),
-                    mediaType = mediaType,
-                    mediaUrl = mediaUrl,
-                    replyToId = replyTo?.id,
-                    replyToText = replyTo?.message
-                )
-                _isSending.value = false
-                if (result.isSuccess) {
-                    _replyingToMessage.value = null
-                    sendTypingStatus(senderId, false)
-                    val sentMsg = result.getOrNull()
-                    if (sentMsg != null) {
-                        _eventFlow.emit(ChatEvent.MessageSent(sentMsg.id))
-                    }
-                } else {
-                    _eventFlow.emit(ChatEvent.ShowError("فشل إرسال الرسالة"))
+        messagesManager.sendMessage(
+            channelId = channel.id,
+            senderId = senderId.ifBlank { activeUserId },
+            senderName = senderName,
+            text = text.trim(),
+            mediaType = mediaType,
+            mediaUrl = mediaUrl,
+            replyTo = replyTo,
+            attachment = attachment,
+            onSuccess = { sentMsg ->
+                viewModelScope.launch {
+                    _eventFlow.emit(ChatEvent.MessageSent(sentMsg.id))
                 }
-            } catch (e: Exception) {
-                _isSending.value = false
-                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل الإرسال"))
+            },
+            onError = { errMsg ->
+                viewModelScope.launch {
+                    _eventFlow.emit(ChatEvent.ShowError(errMsg))
+                }
             }
-        }
+        )
     }
 
-    private fun updateMessageStatus(messageId: String, status: MessageStatus) {
-        _messages.value = _messages.value.map {
-            if (it.id == messageId) it.copy(status = status) else it
-        }
+    fun updateMessageStatus(messageId: String, status: MessageStatus) {
+        messagesManager.updateMessageStatus(messageId, status)
     }
 
-    /**
-     * Resend a failed message by ID.
-     */
     fun resendMessage(messageId: String) {
         val channel = _currentChannel.value ?: return
-        val targetMsg = _messages.value.find { it.id == messageId } ?: return
+        val targetMsg = messages.value.find { it.id == messageId } ?: return
 
-        viewModelScope.launch {
-            updateMessageStatus(messageId, MessageStatus.SENDING)
-            try {
-                val result = repository.sendMessage(
-                    channelId = channel.id,
-                    senderId = targetMsg.senderId,
-                    senderName = targetMsg.senderName,
-                    messageText = targetMsg.message,
-                    mediaType = targetMsg.mediaType,
-                    mediaUrl = targetMsg.mediaUrl,
-                    replyToId = targetMsg.replyToId,
-                    replyToText = targetMsg.replyToText
-                )
-                if (result.isSuccess) {
-                    updateMessageStatus(messageId, MessageStatus.SENT)
-                    _eventFlow.emit(ChatEvent.MessageSent(messageId))
-                } else {
-                    updateMessageStatus(messageId, MessageStatus.FAILED)
-                    _eventFlow.emit(ChatEvent.ShowError("فشل إعادة الإرسال"))
+        messagesManager.resendMessage(
+            channelId = channel.id,
+            currentUserId = activeUserId,
+            targetMsg = targetMsg,
+            onSuccess = { sentMsg ->
+                viewModelScope.launch {
+                    _eventFlow.emit(ChatEvent.MessageSent(sentMsg.id))
                 }
-            } catch (e: Exception) {
-                updateMessageStatus(messageId, MessageStatus.FAILED)
-                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل إعادة الإرسال"))
+            },
+            onError = { errMsg ->
+                viewModelScope.launch {
+                    _eventFlow.emit(ChatEvent.ShowError(errMsg))
+                }
             }
-        }
+        )
     }
 
     fun resendMessage(messageId: String, senderId: String, senderName: String) {
@@ -255,7 +216,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun setReplyingTo(message: ChatMessage?) {
-        _replyingToMessage.value = message
+        editManager.setReplyingTo(message)
     }
 
     fun setSearchQuery(query: String) {
@@ -264,101 +225,80 @@ class ChatViewModel @Inject constructor(
 
     fun onUserTyping(senderId: String, text: String) {
         val channel = _currentChannel.value ?: return
-        typingJob?.cancel()
-        typingJob = viewModelScope.launch {
-            repository.setTyping(channel.id, senderId, text.isNotBlank())
-            if (text.isNotBlank()) {
-                delay(3000)
-                repository.setTyping(channel.id, senderId, false)
-            }
-        }
+        typingManager.onUserTyping(channel.id, senderId, text)
     }
-
-    private fun sendTypingStatus(senderId: String, isTyping: Boolean) {
-        val channel = _currentChannel.value ?: return
-        viewModelScope.launch {
-            repository.setTyping(channel.id, senderId, isTyping)
-        }
-    }
-
-    private var markAsReadJob: kotlinx.coroutines.Job? = null
 
     fun markAsRead(channelId: String, currentUserId: String) {
-        // تجميع عمليات markAsRead لمدة 5 ثواني لمنع حرق حصة Firebase
         markAsReadJob?.cancel()
         markAsReadJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(5000)
-            val currentMsgs = _messages.value
-            // تحقق إذا كان هناك أي رسائل غير مقروءة قبل الإرسال
-            val hasUnread = currentMsgs.any { it.senderId != currentUserId && it.status != MessageStatus.READ }
-            if (hasUnread) {
+            try {
                 repository.markChannelAsRead(channelId, currentUserId)
-            }
+            } catch (_: Exception) {}
         }
     }
 
     fun editMessage(channelId: String, messageId: String, newText: String) {
-        viewModelScope.launch {
-            repository.editMessage(channelId, messageId, newText)
-        }
+        editManager.editMessage(channelId, messageId, newText,
+            onError = { viewModelScope.launch { _eventFlow.emit(ChatEvent.ShowError(it)) } }
+        )
     }
 
     fun editMessage(messageId: String, newText: String) {
         val channel = _currentChannel.value ?: return
-        viewModelScope.launch {
-            repository.editMessage(channel.id, messageId, newText)
-        }
+        editMessage(channel.id, messageId, newText)
     }
 
     fun deleteMessage(channelId: String, messageId: String) {
-        viewModelScope.launch {
-            repository.deleteMessage(channelId, messageId, true, activeUserId)
-        }
+        editManager.deleteMessage(channelId, messageId, forEveryone = true, currentUserId = activeUserId,
+            onError = { viewModelScope.launch { _eventFlow.emit(ChatEvent.ShowError(it)) } }
+        )
     }
 
     fun deleteMessage(messageId: String, forEveryone: Boolean, currentUserId: String) {
         val channel = _currentChannel.value ?: return
-        viewModelScope.launch {
-            repository.deleteMessage(channel.id, messageId, forEveryone, currentUserId)
-        }
+        editManager.deleteMessage(channel.id, messageId, forEveryone, currentUserId,
+            onError = { viewModelScope.launch { _eventFlow.emit(ChatEvent.ShowError(it)) } }
+        )
     }
 
     fun toggleBlock(otherUserId: String, block: Boolean) {
         val channel = _currentChannel.value ?: return
         viewModelScope.launch {
-            repository.toggleBlockUser(channel.id, otherUserId, block)
-            _currentChannel.value = _currentChannel.value?.copy(
-                isBlocked = _currentChannel.value?.isBlocked?.toMutableMap()?.apply {
-                    put(otherUserId, block)
-                } ?: mapOf(otherUserId to block)
-            )
+            try {
+                val res = repository.toggleBlockUser(channel.id, otherUserId, block)
+                if (res is AppResult.Error) {
+                    _eventFlow.emit(ChatEvent.ShowError(res.error.messageArabic))
+                }
+            } catch (e: Exception) {
+                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل تغيير حالة الحظر"))
+            }
         }
     }
 
     fun deleteCurrentChannel(onDeleted: () -> Unit) {
         val channel = _currentChannel.value ?: return
         viewModelScope.launch {
-            repository.deleteChannel(channel.id)
-            _currentChannel.value = null
-            _messages.value = emptyList()
-            onDeleted()
+            try {
+                repository.deleteChannel(channel.id)
+                onDeleted()
+            } catch (e: Exception) {
+                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل حذف المحادثة"))
+            }
         }
     }
 
     fun resetState() {
+        messagesJob?.cancel()
+        presenceManager.clear()
+        typingManager.clear()
+        editManager.clear()
         _currentChannel.value = null
-        _messages.value = emptyList()
-        _replyingToMessage.value = null
+        messagesManager.updateMessagesList(emptyList())
         _searchQuery.value = ""
     }
 
     override fun onCleared() {
         super.onCleared()
-        messagesJob?.cancel()
-        messagesJob = null
-        presenceJob?.cancel()
-        presenceJob = null
-        typingJob?.cancel()
-        typingJob = null
+        resetState()
     }
 }

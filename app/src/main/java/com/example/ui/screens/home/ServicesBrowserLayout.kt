@@ -52,6 +52,7 @@ fun ServicesBrowserLayout(
 
     val browserUiState by browserViewModel.uiState.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val allProviders by viewModel.providers.collectAsState()
     val filteredProviders by viewModel.filteredProviders.collectAsState()
     val isProvidersLoading by viewModel.isProvidersLoading.collectAsState()
     val selectedCategory by viewModel.selectedCategoryId.collectAsState()
@@ -268,10 +269,18 @@ fun ServicesBrowserLayout(
                         }
                     } else emptyList()
 
+                    val effectiveDisplayProviders = if (filteredProviders.isNotEmpty()) {
+                        filteredProviders
+                    } else if (searchQuery.isBlank() && (selectedCategory.isNullOrBlank() || selectedCategory == "ALL" || selectedCategory == "الكل")) {
+                        allProviders
+                    } else {
+                        filteredProviders
+                    }
+
                     ServicesBrowserMainContent(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        displayProviders = filteredProviders,
+                        displayProviders = effectiveDisplayProviders,
                         displayStores = displayStores,
                         displayProperties = displayProperties,
                         isProvidersLoading = isProvidersLoading,

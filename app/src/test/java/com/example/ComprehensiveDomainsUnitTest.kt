@@ -1,7 +1,7 @@
 package com.example
 
 import com.example.data.ProviderEntity
-import com.example.util.SecurityCryptoUtils
+import com.example.utils.SecurityCryptoUtils
 import com.example.utils.BookingUtils
 import org.junit.Assert.*
 import org.junit.Test

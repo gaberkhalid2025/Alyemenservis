@@ -2,6 +2,7 @@ package com.example.ui.viewmodels
 import com.example.ui.helpers.AppState
 
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import com.example.ui.*
 import com.example.data.BannerEntity
 import com.example.data.CategoryEntity

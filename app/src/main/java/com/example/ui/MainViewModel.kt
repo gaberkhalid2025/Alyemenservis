@@ -30,7 +30,11 @@ class MainViewModel @Inject constructor(
     val settingsViewModel: com.example.ui.viewmodels.SettingsViewModel,
     val instantRequestViewModel: com.example.ui.viewmodels.InstantRequestViewModel,
     val chatRepo: com.example.data.repositories.ChatRepository,
-    val appState: com.example.ui.helpers.AppState
+    val appState: com.example.ui.helpers.AppState,
+    val storeManagementViewModel: com.example.ui.viewmodels.StoreManagementViewModel = com.example.ui.viewmodels.StoreManagementViewModel(appState),
+    val propertyManagementViewModel: com.example.ui.viewmodels.PropertyManagementViewModel = com.example.ui.viewmodels.PropertyManagementViewModel(appState),
+    val jobManagementViewModel: com.example.ui.viewmodels.JobManagementViewModel = com.example.ui.viewmodels.JobManagementViewModel(appState),
+    val paymentManagementViewModel: com.example.ui.viewmodels.PaymentManagementViewModel = com.example.ui.viewmodels.PaymentManagementViewModel(appState)
 ) : BaseViewModel() {
 
     val preferenceHelper = com.example.ui.helpers.AppPreferenceHelper()
@@ -231,10 +235,14 @@ class MainViewModel @Inject constructor(
     private var isSettingsLoaded = false
     private var isCategoriesLoaded = false
     private var isCitiesLoaded = false
+    private var isProvidersLoaded = false
 
     private fun checkInitializationComplete() {
-        if (isSettingsLoaded && isCategoriesLoaded && isCitiesLoaded) {
-            _isInitialized.value = true
+        if (isSettingsLoaded && isCategoriesLoaded && isCitiesLoaded && isProvidersLoaded) {
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(1000)
+                _isInitialized.value = true
+            }
         }
     }
 
@@ -345,6 +353,10 @@ class MainViewModel @Inject constructor(
             triggerNotification(msg)
         }
         adminViewModel.onApplyFilters = {  }
+        storeManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
+        propertyManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
+        jobManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
+        paymentManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
         settingsViewModel.getAuthViewModel = { authViewModel }
         settingsViewModel.getHomeViewModel = { homeViewModel }
         settingsViewModel.getBookingViewModel = { bookingViewModel }
@@ -436,9 +448,17 @@ class MainViewModel @Inject constructor(
                 }
             }
         }
-        // مهلة أمان (fallback) في حالة فشل تحميل البيانات
         viewModelScope.launch {
-            kotlinx.coroutines.delay(5000)
+            providers.collect { provList ->
+                if (provList.isNotEmpty()) {
+                    isProvidersLoaded = true
+                    checkInitializationComplete()
+                }
+            }
+        }
+        // مهلة أمان قصوى (fallback) للشاشة الترحيبية في حالة ضعف الاتصال
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2800)
             if (!_isInitialized.value) {
                 _isInitialized.value = true
             }

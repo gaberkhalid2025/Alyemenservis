@@ -79,6 +79,16 @@ class FirestoreLocalBackupWorker(
                 fos.write(encryptedData.toByteArray(Charsets.UTF_8))
             }
 
+            // Prune old backups to keep only the 7 most recent
+            val existingBackups = backupDir.listFiles { _, name -> name.startsWith("wam_firestore_backup_") && name.endsWith(".enc") }
+            if (existingBackups != null && existingBackups.size > 7) {
+                existingBackups.sortBy { it.lastModified() }
+                val toDeleteCount = existingBackups.size - 7
+                for (i in 0 until toDeleteCount) {
+                    existingBackups[i].delete()
+                }
+            }
+
             Log.d(TAG, "Daily encrypted backup created successfully: ${backupFile.absolutePath}, size=${backupFile.length()} bytes")
             Result.success()
         } catch (e: Exception) {

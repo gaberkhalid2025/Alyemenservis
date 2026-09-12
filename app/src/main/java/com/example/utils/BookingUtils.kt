@@ -18,9 +18,10 @@ object BookingUtils {
     }
 
     fun generateBookingPassword(length: Int = 4): String {
+        val secureRandom = java.security.SecureRandom()
         val builder = StringBuilder()
         for (i in 0 until length) {
-            builder.append(Random.nextInt(0, 10))
+            builder.append(secureRandom.nextInt(10))
         }
         return builder.toString()
     }

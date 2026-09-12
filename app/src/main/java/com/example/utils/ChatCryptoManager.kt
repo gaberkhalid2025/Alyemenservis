@@ -26,6 +26,22 @@ object ChatCryptoManager {
         return SecretKeySpec(keyBytes, "AES")
     }
 
+    private fun base64Encode(bytes: ByteArray): String {
+        return try {
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
+        } catch (e: Throwable) {
+            java.util.Base64.getEncoder().encodeToString(bytes)
+        }
+    }
+
+    private fun base64Decode(str: String): ByteArray {
+        return try {
+            Base64.decode(str, Base64.NO_WRAP)
+        } catch (e: Throwable) {
+            java.util.Base64.getDecoder().decode(str)
+        }
+    }
+
     /**
      * تشفير النص العادي إلى Base64 باستخدام IV عشوائي 16 بايت
      */
@@ -41,7 +57,7 @@ object ChatCryptoManager {
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec)
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
             val combined = iv + encryptedBytes
-            "enc::" + Base64.encodeToString(combined, Base64.NO_WRAP)
+            "enc::" + base64Encode(combined)
         } catch (e: Exception) {
             e.printStackTrace()
             plainText
@@ -55,7 +71,7 @@ object ChatCryptoManager {
         if (!cipherText.startsWith("enc::")) return cipherText
         return try {
             val cleanCipher = cipherText.removePrefix("enc::")
-            val combined = Base64.decode(cleanCipher, Base64.NO_WRAP)
+            val combined = base64Decode(cleanCipher)
             val keySpec = generateKey(roomKey)
             val cipher = Cipher.getInstance(ALGORITHM)
 
