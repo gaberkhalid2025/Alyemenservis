@@ -77,8 +77,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
-import com.example.data.*
-import com.example.utils.*
 import com.example.ui.MainViewModel
 import com.example.ui.components.*
 import com.example.ui.dialogs.*

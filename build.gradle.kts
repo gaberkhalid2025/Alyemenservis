@@ -24,18 +24,6 @@ tasks.register<Copy>("copyApk") {
             }
             into(file(".build-outputs"))
         }
-        copy {
-            from("app/build/outputs/apk/release") {
-                include("app-release.apk")
-            }
-            into(file("assets"))
-        }
-        copy {
-            from("app/build/outputs/apk/release") {
-                include("app-release.apk")
-            }
-            into(file("app/src/main/assets"))
-        }
     }
 }
 

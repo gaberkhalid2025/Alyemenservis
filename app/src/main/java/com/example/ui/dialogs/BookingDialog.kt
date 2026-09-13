@@ -49,18 +49,52 @@ fun BookingDialog(
     var bookingPinCodeInput by remember { mutableStateOf("") }
     var bookingCustomIdInput by remember { mutableStateOf("") }
 
-    var selectedServiceDropdown by remember { mutableStateOf("صيانة أعطال عامة") }
-    var serviceDropdownExpanded by remember { mutableStateOf(false) }
     var showBookingConfirmDialog by remember { mutableStateOf(false) }
     var bookingFormSubmittedOnce by remember { mutableStateOf(false) }
     var bookingFormMissingFields by remember { mutableStateOf<List<String>>(emptyList()) }
 
+    val currentCalendar = remember { java.util.Calendar.getInstance() }
+
+    val datePickerDialog = remember {
+        android.app.DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val cal = java.util.Calendar.getInstance()
+                cal.set(year, month, dayOfMonth)
+                val dayName = java.text.SimpleDateFormat("EEEE", java.util.Locale("ar")).format(cal.time)
+                val monthFormatted = String.format("%02d", month + 1)
+                val dayFormatted = String.format("%02d", dayOfMonth)
+                bookingDateInput = "$dayName $year/$monthFormatted/$dayFormatted"
+            },
+            currentCalendar.get(java.util.Calendar.YEAR),
+            currentCalendar.get(java.util.Calendar.MONTH),
+            currentCalendar.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    val timePickerDialog = remember {
+        android.app.TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                val amPm = if (hourOfDay < 12) "ص" else "م"
+                val hour = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
+                val formattedMin = String.format("%02d", minute)
+                bookingTimeInput = "$hour:$formattedMin $amPm"
+            },
+            currentCalendar.get(java.util.Calendar.HOUR_OF_DAY),
+            currentCalendar.get(java.util.Calendar.MINUTE),
+            false
+        )
+    }
+
     LaunchedEffect(Unit) {
-        val currentCalendar = java.util.Calendar.getInstance()
         val year = currentCalendar.get(java.util.Calendar.YEAR)
         val month = currentCalendar.get(java.util.Calendar.MONTH) + 1
         val day = currentCalendar.get(java.util.Calendar.DAY_OF_MONTH)
-        bookingDateInput = "$year/$month/$day"
+        val dayName = java.text.SimpleDateFormat("EEEE", java.util.Locale("ar")).format(currentCalendar.time)
+        val monthFormatted = String.format("%02d", month)
+        val dayFormatted = String.format("%02d", day)
+        bookingDateInput = "$dayName $year/$monthFormatted/$dayFormatted"
 
         val hourOfDay = currentCalendar.get(java.util.Calendar.HOUR_OF_DAY)
         val minute = currentCalendar.get(java.util.Calendar.MINUTE)
@@ -151,51 +185,45 @@ fun BookingDialog(
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                 )
 
-                Box(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedTextField(
-                        value = selectedServiceDropdown,
+                        value = bookingDateInput,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("نوع الخدمة المطلوبة", color = themeColors.textSecondary, fontSize = 11.sp) },
-                        modifier = Modifier.fillMaxWidth().clickable { serviceDropdownExpanded = true },
+                        label = { Text("تاريخ الحجز واليوم *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                        modifier = Modifier.weight(1f).clickable { datePickerDialog.show() },
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                         trailingIcon = {
-                            IconButton(onClick = { serviceDropdownExpanded = true }) {
-                                Text("▼", color = Color.White, fontSize = 12.sp)
+                            IconButton(onClick = { datePickerDialog.show() }) {
+                                Text("📅", fontSize = 14.sp)
                             }
                         }
                     )
-                    DropdownMenu(
-                        expanded = serviceDropdownExpanded,
-                        onDismissRequest = { serviceDropdownExpanded = false },
-                        modifier = Modifier.background(Color(0xFF1E293B)).fillMaxWidth(0.8f)
-                    ) {
-                        val services = listOf(
-                            "صيانة أعطال عامة",
-                            "تركيب وتهيئة أجهزة جديدة",
-                            "فحص دوري ومعاينة فنية",
-                            "إصلاح عاجل وطوارئ",
-                            "تأسيس وتشطيب متكامل",
-                            "أخرى (اكتب في الوصف أدناه)"
-                        )
-                        services.forEach { s ->
-                            DropdownMenuItem(
-                                text = { Text(s, color = Color.White, fontSize = 12.sp) },
-                                onClick = {
-                                    selectedServiceDropdown = s
-                                    serviceDropdownExpanded = false
-                                }
-                            )
+
+                    OutlinedTextField(
+                        value = bookingTimeInput,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("وقت وساعة الحجز *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                        modifier = Modifier.weight(1f).clickable { timePickerDialog.show() },
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = {
+                            IconButton(onClick = { timePickerDialog.show() }) {
+                                Text("⏰", fontSize = 14.sp)
+                            }
                         }
-                    }
+                    )
                 }
 
                 OutlinedTextField(
                     value = customerServiceInput,
                     onValueChange = { customerServiceInput = it },
-                    label = { Text("وصف المشكلة بالتفصيل وملاحظاتك *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    label = { Text("شرح المشكلة وإضافة ملاحظات (اختياري)", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    placeholder = { Text("اكتب أي ملاحظات أو تفاصيل للمشكلة إن وجدت...", color = Color.Gray, fontSize = 10.sp) },
                     modifier = Modifier.fillMaxWidth(),
-                    isError = bookingFormSubmittedOnce && customerServiceInput.trim().isEmpty(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                 )
 
@@ -217,7 +245,6 @@ fun BookingDialog(
                             val cleanName = customerNameInput.trim()
                             val cleanPhone = customerPhoneInput.trim().replace(" ", "").replace("+", "")
                             val cleanArea = customerAreaInput.trim()
-                            val cleanService = customerServiceInput.trim()
                             val cleanPin = bookingPinCodeInput.trim()
 
                             val isValidYemeniPhone = cleanPhone.length == 9 && (
@@ -229,7 +256,6 @@ fun BookingDialog(
                             if (cleanName.isEmpty()) missing.add("الاسم الثلاثي بالكامل")
                             if (cleanPhone.isEmpty() || !isValidYemeniPhone) missing.add("رقم الهاتف اليمني المكون من 9 أرقام")
                             if (cleanArea.isEmpty()) missing.add("منطقة السكن والحي")
-                            if (cleanService.isEmpty()) missing.add("تفاصيل ومعلومات المشكلة")
                             if (cleanPin.isEmpty()) missing.add("كلمة المرور السرية للحجز")
 
                             if (missing.isNotEmpty()) {
@@ -277,10 +303,10 @@ fun BookingDialog(
                         Text("• الاسم: $customerNameInput", color = Color.White, fontSize = 11.sp)
                         Text("• رقم الهاتف: $customerPhoneInput", color = Color.White, fontSize = 11.sp)
                         Text("• منطقة السكن والحي: $customerAreaInput", color = Color.White, fontSize = 11.sp)
-                        Text("• نوع الخدمة: $selectedServiceDropdown", color = Color.Yellow, fontSize = 11.sp)
+                        Text("• التخصص والمهنة: ${provider.profession.ifEmpty { "خدمة فنية" }}", color = Color.Yellow, fontSize = 11.sp)
                         Text("• تاريخ الحجز: $bookingDateInput", color = Color.White, fontSize = 11.sp)
                         Text("• وقت الحجز: $bookingTimeInput", color = Color.White, fontSize = 11.sp)
-                        Text("• تفاصيل المشكلة: $customerServiceInput", color = Color.LightGray, fontSize = 11.sp)
+                        Text("• تفاصيل المشكلة / ملاحظات: ${customerServiceInput.ifBlank { "لا يوجد" }}", color = Color.LightGray, fontSize = 11.sp)
                     }
                     Text("• الفني المسؤول: ${provider.name}", color = Color.White, fontSize = 11.sp)
                 }
@@ -288,11 +314,13 @@ fun BookingDialog(
             confirmButton = {
                 Button(
                     onClick = {
+                        val finalServiceType = provider.profession.ifEmpty { "خدمة فنية" } +
+                            if (customerServiceInput.trim().isNotEmpty()) " - ${customerServiceInput.trim()}" else ""
                         viewModel.addBooking(
                             name = customerNameInput,
                             phone = customerPhoneInput,
                             area = customerAreaInput,
-                            serviceType = "$selectedServiceDropdown - $customerServiceInput",
+                            serviceType = finalServiceType,
                             providerId = provider.id,
                             providerName = provider.name,
                             dateString = bookingDateInput,

@@ -9,6 +9,10 @@ enum class Currency(val code: String, val symbolArabic: String, val nameArabic: 
     USD("USD", "$", "دولار أمريكي")
 }
 
+/**
+ * 📌 Architectural Note: Data Model AdminRole enum representing system role categories and Arabic display titles.
+ * Used across admin domain models and UI permissions rendering.
+ */
 @Keep
 enum class AdminRole(val code: String, val titleArabic: String) {
     SUPER_ADMIN("SUPER_ADMIN", "مدير النظام الشامل"),

@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * 📌 Architectural Note: UI-focused BookingStatus enum providing UI labels and hex colors
+ * for state rendering in Compose views.
+ */
 enum class BookingStatus(val label: String, val color: String) {
     PENDING("قيد الانتظار", "#FFC107"),
     ACCEPTED("مقبول", "#4CAF50"),
@@ -391,30 +395,42 @@ open class BookingViewModel @Inject constructor(
                         setCurrentUserResidence?.invoke(area)
                     }
 
+                    // Check Admin bookingRouting setting to control notification distribution
+                    val bookingRouting = appState._settings.value.bookingRouting
+                    val sendUserNotif = bookingRouting == "BOTH" || bookingRouting == "PROVIDER" || bookingRouting == "USER" || bookingRouting.isBlank()
+                    val sendProviderNotif = bookingRouting == "BOTH" || bookingRouting == "PROVIDER" || bookingRouting.isBlank()
+                    val sendAdminNotif = bookingRouting == "BOTH" || bookingRouting == "ADMIN" || bookingRouting.isBlank()
+
                     // 1. Notify the customer (user) with booking number and password
-                    onAddNotification?.invoke(
-                        "📅 تم تسجيل طلب حجزك رقم $finalBookingNumber",
-                        "مرحباً بك $cleanName، تم استقبال طلب الحجز لدى الفني $providerName بنجاح. رقم الحجز السري هو: $finalBookingNumber ورمز المرور لإلغاء وتعديل الحجز هو: $generatedPass. يرجى الاحتفاظ بهما للتحكم بالحجز وإثبات الهوية عند إنجاز الخدمة.",
-                        "USER",
-                        cleanPhone
-                    )
+                    if (sendUserNotif) {
+                        onAddNotification?.invoke(
+                            "📅 تم تسجيل طلب حجزك رقم $finalBookingNumber",
+                            "مرحباً بك $cleanName، تم استقبال طلب الحجز لدى الفني $providerName بنجاح. رقم الحجز السري هو: $finalBookingNumber ورمز المرور لإلغاء وتعديل الحجز هو: $generatedPass. يرجى الاحتفاظ بهما للتحكم بالحجز وإثبات الهوية عند إنجاز الخدمة.",
+                            "USER",
+                            cleanPhone
+                        )
+                    }
 
                     // 2. Notify the Technician (PROVIDER) with actual phone or ID
-                    val technicianTarget = effectiveProviderPhone.ifBlank { providerId.ifBlank { "PROVIDER" } }
-                    onAddNotification?.invoke(
-                        "⚡ حجز عاجل جديد رقم $finalBookingNumber",
-                        "العميل $cleanName ($cleanPhone) من ($area) حجز خدمة ($serviceType) لدى الفني $providerName بموعد $dateString $timeString. السعر المتوقع: $finalPrice ريال يمني.",
-                        "PROVIDER",
-                        technicianTarget
-                    )
+                    if (sendProviderNotif) {
+                        val technicianTarget = effectiveProviderPhone.ifBlank { providerId.ifBlank { "PROVIDER" } }
+                        onAddNotification?.invoke(
+                            "⚡ حجز عاجل جديد رقم $finalBookingNumber",
+                            "العميل $cleanName ($cleanPhone) من ($area) حجز خدمة ($serviceType) لدى الفني $providerName بموعد $dateString $timeString. السعر المتوقع: $finalPrice ريال يمني.",
+                            "PROVIDER",
+                            technicianTarget
+                        )
+                    }
 
-                    // 3. Always notify the Admin/Supervisor
-                    onAddNotification?.invoke(
-                        "📢 حجز جديد مسجل في النظام",
-                        "العميل $cleanName حجز لدى $providerName في مدينة $area. رقم الحجز: $finalBookingNumber والرمز السري: $generatedPass.",
-                        "ADMIN_ONLY",
-                        ""
-                    )
+                    // 3. Notify the Admin/Supervisor according to settings
+                    if (sendAdminNotif) {
+                        onAddNotification?.invoke(
+                            "📢 حجز جديد مسجل في النظام",
+                            "العميل $cleanName حجز لدى $providerName في مدينة $area. رقم الحجز: $finalBookingNumber والرمز السري: $generatedPass.",
+                            "ADMIN_ONLY",
+                            ""
+                        )
+                    }
                 }
                 .addOnFailureListener { e ->
                     triggerNotificationCallback?.invoke("❌ فشل الحجز: ${e.message}")

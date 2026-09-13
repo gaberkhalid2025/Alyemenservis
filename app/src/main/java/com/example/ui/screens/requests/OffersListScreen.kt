@@ -44,6 +44,7 @@ fun OffersListScreen(
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
+    // 📌 Architectural Note: FirebaseFirestore instance retained locally for isolated realtime query listening on urgent offer lists
     val firestore = remember { FirebaseFirestore.getInstance() }
 
     var request by remember { mutableStateOf<InstantRequestEntity?>(null) }

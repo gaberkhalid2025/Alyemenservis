@@ -2,6 +2,10 @@ package com.example.utils
 
 import androidx.annotation.Keep
 
+/**
+ * 📌 Architectural Note: Utility-level AdminRole enum used for security check evaluations
+ * and permission mapping via AdminSecurityManager.
+ */
 @Keep
 enum class AdminRole {
     OWNER,

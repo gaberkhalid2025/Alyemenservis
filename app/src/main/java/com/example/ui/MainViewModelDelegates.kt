@@ -934,16 +934,30 @@ fun MainViewModel.addNotification(
         val currentUserId = authViewModel.getOrGenerateUserId()
         val currentUserName = authViewModel.currentUserName.value.ifBlank { "العميل" }
         val currentUserPhoto = ""
+        val mode = settings.value.chatRoutingMode
+
+        val (finalTargetId, finalTargetName, channelType) = when (mode) {
+            "ADMIN_ONLY" -> Triple(
+                com.example.data.repositories.ChatRepository.SUPPORT_ADMIN_ID,
+                "الدعم الفني والإدارة",
+                com.example.data.models.ChannelType.SUPPORT
+            )
+            else -> Triple(
+                targetId,
+                targetName,
+                com.example.data.models.ChannelType.PRIVATE
+            )
+        }
         
         viewModelScope.launch {
             val result = chatRepo.getOrCreateChannel(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,
-                otherUserId = targetId,
-                otherUserName = targetName,
+                otherUserId = finalTargetId,
+                otherUserName = finalTargetName,
                 otherUserPhoto = "",
-                type = com.example.data.models.ChannelType.PRIVATE,
+                type = channelType,
                 relatedEntityId = relatedEntityId.takeIf { it.isNotBlank() },
                 relatedEntityType = relatedEntityType.takeIf { it.isNotBlank() }
             )

@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * 🏛️ Domain Entity for System Overview Metrics
+ * 📌 Architectural Note: Contract Interfaces retained for modular Clean Architecture abstractions
+ * and future repository decoupling without impacting runtime stability.
  */
 data class SystemStatusMetrics(
     val providersCount: Int = 0,

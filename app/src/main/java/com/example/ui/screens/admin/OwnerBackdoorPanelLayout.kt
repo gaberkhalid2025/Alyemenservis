@@ -85,7 +85,6 @@ import com.example.ui.screens.register.*
 import com.example.ui.screens.status.*
 import com.example.ui.screens.about.*
 import com.example.ui.*
-import com.example.utils.*
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

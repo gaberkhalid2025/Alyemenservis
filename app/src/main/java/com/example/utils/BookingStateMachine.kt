@@ -5,6 +5,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * 📌 Architectural Note: State Machine BookingStatus enum defining valid transitions
+ * and workflow status lifecycle logic across the domain layer.
+ */
 enum class BookingStatus(val label: String, val colorHex: String) {
     PENDING("قيد الانتظار", "#F59E0B"),
     UNDER_REVIEW("قيد المراجعة", "#FCD34D"),
