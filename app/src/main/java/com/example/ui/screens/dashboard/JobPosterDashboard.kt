@@ -41,7 +41,11 @@ fun JobPosterDashboard(
         JobPosterDashboardViewModel(
             ownerId = account.id,
             dashboardRepository = DashboardRepositoryImpl(context),
-            productsRepository = ProductsRepositoryImpl(context)
+            productsRepository = ProductsRepositoryImpl(context),
+            jobRepository = com.example.data.repositories.JobRepository(
+                com.google.firebase.firestore.FirebaseFirestore.getInstance(),
+                com.example.data.LocalAppCacheManager(context)
+            )
         )
     }
 

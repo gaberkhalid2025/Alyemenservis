@@ -59,12 +59,9 @@ fun BookingDialog(
         android.app.DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
-                val cal = java.util.Calendar.getInstance()
-                cal.set(year, month, dayOfMonth)
-                val dayName = java.text.SimpleDateFormat("EEEE", java.util.Locale("ar")).format(cal.time)
                 val monthFormatted = String.format("%02d", month + 1)
                 val dayFormatted = String.format("%02d", dayOfMonth)
-                bookingDateInput = "$dayName $year/$monthFormatted/$dayFormatted"
+                bookingDateInput = "$year-$monthFormatted-$dayFormatted"
             },
             currentCalendar.get(java.util.Calendar.YEAR),
             currentCalendar.get(java.util.Calendar.MONTH),
@@ -91,10 +88,9 @@ fun BookingDialog(
         val year = currentCalendar.get(java.util.Calendar.YEAR)
         val month = currentCalendar.get(java.util.Calendar.MONTH) + 1
         val day = currentCalendar.get(java.util.Calendar.DAY_OF_MONTH)
-        val dayName = java.text.SimpleDateFormat("EEEE", java.util.Locale("ar")).format(currentCalendar.time)
         val monthFormatted = String.format("%02d", month)
         val dayFormatted = String.format("%02d", day)
-        bookingDateInput = "$dayName $year/$monthFormatted/$dayFormatted"
+        bookingDateInput = "$year-$monthFormatted-$dayFormatted"
 
         val hourOfDay = currentCalendar.get(java.util.Calendar.HOUR_OF_DAY)
         val minute = currentCalendar.get(java.util.Calendar.MINUTE)
@@ -190,7 +186,7 @@ fun BookingDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
-                        value = bookingDateInput,
+                        value = com.example.utils.BookingUtils.formatBookingDate(bookingDateInput),
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("تاريخ الحجز واليوم *", color = themeColors.textSecondary, fontSize = 11.sp) },
@@ -304,7 +300,7 @@ fun BookingDialog(
                         Text("• رقم الهاتف: $customerPhoneInput", color = Color.White, fontSize = 11.sp)
                         Text("• منطقة السكن والحي: $customerAreaInput", color = Color.White, fontSize = 11.sp)
                         Text("• التخصص والمهنة: ${provider.profession.ifEmpty { "خدمة فنية" }}", color = Color.Yellow, fontSize = 11.sp)
-                        Text("• تاريخ الحجز: $bookingDateInput", color = Color.White, fontSize = 11.sp)
+                        Text("• تاريخ الحجز: ${com.example.utils.BookingUtils.formatBookingDate(bookingDateInput)}", color = Color.White, fontSize = 11.sp)
                         Text("• وقت الحجز: $bookingTimeInput", color = Color.White, fontSize = 11.sp)
                         Text("• تفاصيل المشكلة / ملاحظات: ${customerServiceInput.ifBlank { "لا يوجد" }}", color = Color.LightGray, fontSize = 11.sp)
                     }

@@ -3,6 +3,7 @@ package com.example.utils
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import java.security.KeyStore
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -109,6 +110,7 @@ object ChatCryptoManager {
 
     /**
      * تشفير النص العادي إلى Base64 باستخدام IV عشوائي 16 بايت
+     * في حال حدوث أي خطأ يتم تسجيله في Crashlytics ورفع استثناء لمنع تسريب النص الصريح
      */
     fun encrypt(plainText: String, roomKey: String? = null): String {
         if (plainText.isBlank()) return plainText
@@ -124,13 +126,17 @@ object ChatCryptoManager {
             val combined = iv + encryptedBytes
             "enc::" + base64Encode(combined)
         } catch (e: Exception) {
-            e.printStackTrace()
-            plainText
+            try {
+                FirebaseCrashlytics.getInstance().recordException(e)
+            } catch (ignored: Throwable) {}
+            throw SecurityException("فشل تشفير البيانات الحساسة بأمان: ${e.message}", e)
         }
     }
 
     /**
      * فك تشفير النص المشفر Base64 مع استخراج الـ IV العشوائي المرفق
+     * إذا كان النص لا يبدأ بـ enc:: يتم إرجاعه كما هو.
+     * إذا كان يبدأ بـ enc:: وفشل فك التشفير، يتم رفع استثناء وتسجيله لمنع إرجاع بيانات تالفة أو نص صريح خاطئ.
      */
     fun decrypt(cipherText: String, roomKey: String? = null): String {
         if (!cipherText.startsWith("enc::")) return cipherText
@@ -163,8 +169,10 @@ object ChatCryptoManager {
                 String(decryptedBytes, Charsets.UTF_8)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            cipherText
+            try {
+                FirebaseCrashlytics.getInstance().recordException(e)
+            } catch (ignored: Throwable) {}
+            throw SecurityException("فشل فك تشفير الرسالة المشفرة (enc::): ${e.message}", e)
         }
     }
 }

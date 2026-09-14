@@ -186,9 +186,11 @@ fun TechnicianDashboard(
                             albums = uiState.galleryAlbums,
                             themeColors = themeColors,
                             onAddPhoto = { img ->
-                                val album = GalleryAlbumEntity(ownerId = account.id, title = "أعمال سابقة", imageUrls = listOf(img))
+                                techViewModel.saveGalleryAlbum(context, img)
                             },
-                            onDeletePhoto = { id -> }
+                            onDeletePhoto = { id -> 
+                                techViewModel.deleteGalleryAlbum(id)
+                            }
                         )
                     }
                     4 -> {

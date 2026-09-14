@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.example.data.local.ChatLocalDataSource
 import com.example.data.models.*
+import com.example.utils.AnalyticsEventsHelper
 import com.example.utils.AppError
 import com.example.utils.AppResult
 import com.google.firebase.firestore.FieldValue
@@ -104,6 +105,13 @@ class ChatRepository(
             }
 
             val docRef = channelsCollection.document(finalChannelId)
+            
+            // 🚀 Check local cache first before Firestore request
+            val localChannel = local?.getChannelById(finalChannelId)
+            if (localChannel != null && localChannel.participants.contains(cleanCurrent)) {
+                return@withContext AppResult.Success(localChannel)
+            }
+
             val snapshot = docRef.get().await()
 
             val channelToReturn = if (snapshot.exists()) {
@@ -156,6 +164,7 @@ class ChatRepository(
                 local?.saveOrUpdateChannel(newChannel)
                 newChannel
             }
+            AnalyticsEventsHelper.logChatOpened(context, channelToReturn.id, otherUserId)
             AppResult.Success(channelToReturn)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))
@@ -504,11 +513,11 @@ class ChatRepository(
     override suspend fun toggleBlockUser(channelId: String, userIdToBlock: String, isBlocked: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
         if (channelId.isBlank() || userIdToBlock.isBlank()) return@withContext AppResult.Success(Unit)
         try {
-            channelsCollection.document(channelId).update("isBlocked.$userIdToBlock", isBlocked).await()
+            channelsCollection.document(channelId).update("blockedUsers.$userIdToBlock", isBlocked).await()
             val cached = local?.getChannelById(channelId)
             if (cached != null) {
-                val updatedBlocked = cached.isBlocked.toMutableMap().apply { put(userIdToBlock, isBlocked) }
-                local?.saveOrUpdateChannel(cached.copy(isBlocked = updatedBlocked))
+                val updatedBlocked = cached.blockedUsers.toMutableMap().apply { put(userIdToBlock, isBlocked) }
+                local?.saveOrUpdateChannel(cached.copy(blockedUsers = updatedBlocked))
             }
             AppResult.Success(Unit)
         } catch (e: Exception) {

@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.security.BookingSecurityHelper
+import com.example.utils.AnalyticsEventsHelper
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -61,6 +62,7 @@ class InstantRequestRepository(private val context: Context? = null) {
                     current.removeAll { it.id == docId }
                     current.add(0, newEntity)
                     _requests.value = current
+                    AnalyticsEventsHelper.logUrgentRequestCreated(context, docId, newEntity.categoryName.ifBlank { newEntity.serviceTitle })
                     onSuccess(newEntity)
                 }
                 .addOnFailureListener {
@@ -156,6 +158,7 @@ class InstantRequestRepository(private val context: Context? = null) {
             transaction.set(offerRef, finalOffer)
             transaction.update(requestRef, "offersCount", currentOffers + 1)
         }.addOnSuccessListener {
+            AnalyticsEventsHelper.logOfferSubmitted(context, offer.requestId, offer.technicianId, offer.price)
             onSuccess()
         }.addOnFailureListener {
             onError(it.localizedMessage ?: "فشل تقديم العرض")
@@ -202,6 +205,7 @@ class InstantRequestRepository(private val context: Context? = null) {
                         acceptedPrice = acceptedPrice
                     ) else it
                 }
+                AnalyticsEventsHelper.logOfferAccepted(context, requestId, providerId)
                 onSuccess()
             }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل قبول العرض") }

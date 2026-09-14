@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 typealias Transaction = com.example.data.models.Transaction
@@ -59,20 +60,8 @@ class WalletManager(private val context: Context? = null) {
     }
 
     private fun loadFromLocalStorage() {
-        // Fallback default sample wallet
-        val defaultUserWallet = Wallet(
-            id = "wallet_user_default",
-            userId = "user_default",
-            type = "USER",
-            balanceYer = 45000.0,
-            balanceUsd = 100.0,
-            balanceSar = 350.0,
-            balance = 45000.0,
-            currency = "YER",
-            status = "ACTIVE"
-        )
-        localWallets[defaultUserWallet.id] = defaultUserWallet
-        localWallets[defaultUserWallet.userId] = defaultUserWallet
+        // Clear out any legacy fake wallet_user_default cache if present
+        sharedPrefs?.edit()?.remove("wallet_user_default")?.apply()
 
         // Try load cached transactions
         sharedPrefs?.getString("cached_txs_json", null)?.let { json ->
@@ -80,41 +69,12 @@ class WalletManager(private val context: Context? = null) {
                 val type = Types.newParameterizedType(List::class.java, Transaction::class.java)
                 val adapter = moshi.adapter<List<Transaction>>(type)
                 val list = adapter.fromJson(json) ?: emptyList()
-                _transactionsFlow.value = list
+                // Filter out any legacy dummy transactions
+                val cleanList = list.filterNot { it.id == "tx_101" || it.id == "tx_102" || it.userId == "user_default" }
+                _transactionsFlow.value = cleanList
             } catch (e: Exception) {
                 // Ignore parse errors
             }
-        }
-
-        if (_transactionsFlow.value.isEmpty()) {
-            val initialTxs = listOf(
-                Transaction(
-                    id = "tx_101",
-                    walletId = defaultUserWallet.id,
-                    userId = defaultUserWallet.userId,
-                    type = TransactionType.DEPOSIT.name,
-                    amount = 50000.0,
-                    balanceAfter = 50000.0,
-                    note = "شحن رصيد عبر محفظة الكريمي مميز",
-                    currency = "YER",
-                    status = TransactionStatus.COMPLETED.name,
-                    timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 48
-                ),
-                Transaction(
-                    id = "tx_102",
-                    walletId = defaultUserWallet.id,
-                    userId = defaultUserWallet.userId,
-                    type = TransactionType.PAYMENT.name,
-                    amount = 5000.0,
-                    balanceAfter = 45000.0,
-                    note = "سداد قيمة فحص وصيانة منزلية",
-                    currency = "YER",
-                    status = TransactionStatus.COMPLETED.name,
-                    timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 12
-                )
-            )
-            _transactionsFlow.value = initialTxs
-            saveTransactionsToCache(initialTxs)
         }
     }
 
@@ -160,67 +120,85 @@ class WalletManager(private val context: Context? = null) {
     }
 
     /**
-     * 2. إيداع رصيد في المحفظة بعملات متعددة
+     * 2. إيداع رصيد في المحفظة بعملات متعددة باستخدام Transcation لضمان التزامن والأمان
      */
-    fun deposit(
+    suspend fun deposit(
         walletId: String,
         amount: Double,
         currency: String = "YER",
         note: String = "إيداع رصيد",
         paymentMethod: String = "INTERNAL_WALLET"
-    ): Result<Transaction> {
-        return try {
-            if (amount <= 0) return Result.failure(IllegalArgumentException("مبلغ الإيداع يجب أن يكون أكبر من الصفر"))
-
-            val current = getOrCreateWallet(walletId)
-            if (current.status == "FROZEN") {
-                return Result.failure(IllegalStateException("المحفظة مجمدة ولا يمكن إجراء إيداعات حالياً"))
+    ): Result<Transaction> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            if (amount <= 0) return@withContext Result.failure(IllegalArgumentException("مبلغ الإيداع يجب أن يكون أكبر من الصفر"))
+            if (amount % 1 != 0.0 && currency.uppercase() == "YER") {
+                return@withContext Result.failure(IllegalArgumentException("الريال اليمني لا يدعم الكسور"))
             }
 
-            val newYer = if (currency.uppercase() == "YER") current.balanceYer + amount else current.balanceYer
-            val newUsd = if (currency.uppercase() == "USD") current.balanceUsd + amount else current.balanceUsd
-            val newSar = if (currency.uppercase() == "SAR") current.balanceSar + amount else current.balanceSar
-            val primaryBalance = newYer
+            val cur = currency.uppercase()
+            val walletRef = firestore.collection("wallets").document(walletId)
 
-            val updated = current.copy(
-                balanceYer = newYer,
-                balanceUsd = newUsd,
-                balanceSar = newSar,
-                balance = primaryBalance,
-                updatedAt = System.currentTimeMillis()
-            )
-            localWallets[current.id] = updated
-            localWallets[current.userId] = updated
+            val txResult = firestore.runTransaction { transaction ->
+                val snapshot = transaction.get(walletRef)
+                
+                val current = if (snapshot.exists()) {
+                    snapshot.toObject(Wallet::class.java) ?: Wallet(id = walletId, userId = walletId.replace("wallet_", ""))
+                } else {
+                    Wallet(id = walletId, userId = walletId.replace("wallet_", ""))
+                }
 
-            val balanceAfter = when (currency.uppercase()) {
-                "USD" -> newUsd
-                "SAR" -> newSar
-                else -> newYer
-            }
+                if (current.status == "FROZEN") {
+                    throw IllegalStateException("المحفظة مجمدة ولا يمكن إجراء إيداعات حالياً")
+                }
 
-            val tx = Transaction(
-                id = "TXN-${UUID.randomUUID().toString().take(8).uppercase()}",
-                walletId = current.id,
-                userId = current.userId,
-                type = TransactionType.DEPOSIT.name,
-                amount = amount,
-                balanceAfter = balanceAfter,
-                currency = currency.uppercase(),
-                paymentMethod = paymentMethod,
-                note = note.ifBlank { "إيداع رصيد" },
-                timestamp = System.currentTimeMillis(),
-                status = TransactionStatus.COMPLETED.name
-            )
+                val newYer = if (cur == "YER") current.balanceYer + amount else current.balanceYer
+                val newUsd = if (cur == "USD") current.balanceUsd + amount else current.balanceUsd
+                val newSar = if (cur == "SAR") current.balanceSar + amount else current.balanceSar
+                val primaryBalance = newYer
 
+                val updated = current.copy(
+                    balanceYer = newYer,
+                    balanceUsd = newUsd,
+                    balanceSar = newSar,
+                    balance = primaryBalance,
+                    updatedAt = System.currentTimeMillis()
+                )
+                
+                transaction.set(walletRef, updated)
+
+                val tx = Transaction(
+                    id = "TXN-${UUID.randomUUID().toString().take(8).uppercase()}",
+                    walletId = updated.id,
+                    userId = updated.userId,
+                    type = TransactionType.DEPOSIT.name,
+                    amount = amount,
+                    balanceAfter = when (cur) {
+                        "USD" -> newUsd
+                        "SAR" -> newSar
+                        else -> newYer
+                    },
+                    currency = cur,
+                    paymentMethod = paymentMethod,
+                    note = note.ifBlank { "إيداع رصيد" },
+                    timestamp = System.currentTimeMillis(),
+                    status = TransactionStatus.COMPLETED.name
+                )
+
+                val txRef = firestore.collection("wallet_transactions").document(tx.id)
+                transaction.set(txRef, tx)
+
+                Pair(updated, tx)
+            }.await()
+
+            val updated = txResult.first
+            val tx = txResult.second
+            
+            localWallets[updated.id] = updated
+            localWallets[updated.userId] = updated
             val currentList = _transactionsFlow.value.toMutableList()
             currentList.add(0, tx)
             _transactionsFlow.value = currentList
             saveTransactionsToCache(currentList)
-
-            try {
-                firestore.collection("wallets").document(current.id).set(updated)
-                firestore.collection("wallet_transactions").document(tx.id).set(tx)
-            } catch (ignored: Exception) {}
 
             Result.success(tx)
         } catch (e: Exception) {
@@ -229,79 +207,92 @@ class WalletManager(private val context: Context? = null) {
     }
 
     /**
-     * 3. سحب رصيد من المحفظة
+     * 3. سحب رصيد من المحفظة باستخدام runTransaction للأمان المالي
      */
-    fun withdraw(
+    suspend fun withdraw(
         walletId: String,
         amount: Double,
         currency: String = "YER",
         note: String = "سحب رصيد"
-    ): Result<Transaction> {
-        return try {
-            if (amount <= 0) return Result.failure(IllegalArgumentException("مبلغ السحب يجب أن يكون أكبر من الصفر"))
-
+    ): Result<Transaction> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            if (amount <= 0) return@withContext Result.failure(IllegalArgumentException("مبلغ السحب يجب أن يكون أكبر من الصفر"))
             if (amount % 1 != 0.0 && currency.uppercase() == "YER") {
-                return Result.failure(IllegalArgumentException("الريال اليمني لا يدعم الكسور"))
-            }
-
-            val current = getOrCreateWallet(walletId)
-            if (current.status == "FROZEN") {
-                return Result.failure(IllegalStateException("المحفظة مجمدة ولا يمكن السحب منها"))
+                return@withContext Result.failure(IllegalArgumentException("الريال اليمني لا يدعم الكسور"))
             }
 
             val cur = currency.uppercase()
-            val available = when (cur) {
-                "USD" -> current.balanceUsd
-                "SAR" -> current.balanceSar
-                else -> current.balanceYer
-            }
+            val walletRef = firestore.collection("wallets").document(walletId)
 
-            if (available < amount) {
-                return Result.failure(IllegalStateException("الرصيد غير كافٍ. الرصيد المتاح: $available $cur"))
-            }
+            val txResult = firestore.runTransaction { transaction ->
+                val snapshot = transaction.get(walletRef)
+                
+                val current = if (snapshot.exists()) {
+                    snapshot.toObject(Wallet::class.java) ?: Wallet(id = walletId, userId = walletId.replace("wallet_", ""))
+                } else {
+                    Wallet(id = walletId, userId = walletId.replace("wallet_", ""))
+                }
 
-            val newYer = if (cur == "YER") current.balanceYer - amount else current.balanceYer
-            val newUsd = if (cur == "USD") current.balanceUsd - amount else current.balanceUsd
-            val newSar = if (cur == "SAR") current.balanceSar - amount else current.balanceSar
+                if (current.status == "FROZEN") {
+                    throw IllegalStateException("المحفظة مجمدة ولا يمكن السحب منها")
+                }
 
-            val updated = current.copy(
-                balanceYer = newYer,
-                balanceUsd = newUsd,
-                balanceSar = newSar,
-                balance = newYer,
-                updatedAt = System.currentTimeMillis()
-            )
-            localWallets[current.id] = updated
-            localWallets[current.userId] = updated
+                val available = when (cur) {
+                    "USD" -> current.balanceUsd
+                    "SAR" -> current.balanceSar
+                    else -> current.balanceYer
+                }
 
-            val balanceAfter = when (cur) {
-                "USD" -> newUsd
-                "SAR" -> newSar
-                else -> newYer
-            }
+                if (available < amount) {
+                    throw IllegalStateException("الرصيد غير كافٍ. الرصيد المتاح: $available $cur")
+                }
 
-            val tx = Transaction(
-                id = "TXN-${UUID.randomUUID().toString().take(8).uppercase()}",
-                walletId = current.id,
-                userId = current.userId,
-                type = TransactionType.WITHDRAWAL.name,
-                amount = amount,
-                balanceAfter = balanceAfter,
-                currency = cur,
-                note = note.ifBlank { "سحب رصيد" },
-                timestamp = System.currentTimeMillis(),
-                status = TransactionStatus.COMPLETED.name
-            )
+                val newYer = if (cur == "YER") current.balanceYer - amount else current.balanceYer
+                val newUsd = if (cur == "USD") current.balanceUsd - amount else current.balanceUsd
+                val newSar = if (cur == "SAR") current.balanceSar - amount else current.balanceSar
 
+                val updated = current.copy(
+                    balanceYer = newYer,
+                    balanceUsd = newUsd,
+                    balanceSar = newSar,
+                    balance = newYer,
+                    updatedAt = System.currentTimeMillis()
+                )
+                
+                transaction.set(walletRef, updated)
+
+                val tx = Transaction(
+                    id = "TXN-${UUID.randomUUID().toString().take(8).uppercase()}",
+                    walletId = updated.id,
+                    userId = updated.userId,
+                    type = TransactionType.WITHDRAWAL.name,
+                    amount = amount,
+                    balanceAfter = when (cur) {
+                        "USD" -> newUsd
+                        "SAR" -> newSar
+                        else -> newYer
+                    },
+                    currency = cur,
+                    note = note.ifBlank { "سحب رصيد" },
+                    timestamp = System.currentTimeMillis(),
+                    status = TransactionStatus.COMPLETED.name
+                )
+                
+                val txRef = firestore.collection("wallet_transactions").document(tx.id)
+                transaction.set(txRef, tx)
+
+                Pair(updated, tx)
+            }.await()
+
+            val updated = txResult.first
+            val tx = txResult.second
+            
+            localWallets[updated.id] = updated
+            localWallets[updated.userId] = updated
             val currentList = _transactionsFlow.value.toMutableList()
             currentList.add(0, tx)
             _transactionsFlow.value = currentList
             saveTransactionsToCache(currentList)
-
-            try {
-                firestore.collection("wallets").document(current.id).set(updated)
-                firestore.collection("wallet_transactions").document(tx.id).set(tx)
-            } catch (ignored: Exception) {}
 
             Result.success(tx)
         } catch (e: Exception) {
@@ -310,38 +301,95 @@ class WalletManager(private val context: Context? = null) {
     }
 
     /**
-     * 4. تحويل رصيد بين محفظتين
+     * 4. تحويل رصيد بين محفظتين باستخدام runTransaction المزدوج
      */
-    fun transfer(
+    suspend fun transfer(
         fromWalletId: String,
         toWalletId: String,
         amount: Double,
         currency: String = "YER"
-    ): Result<Transaction> {
-        return try {
-            if (amount <= 0) return Result.failure(IllegalArgumentException("مبلغ التحويل غير صالح"))
+    ): Result<Transaction> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            if (amount <= 0) return@withContext Result.failure(IllegalArgumentException("مبلغ التحويل غير صالح"))
+            
+            val cur = currency.uppercase()
+            val senderRef = firestore.collection("wallets").document(fromWalletId)
+            val receiverRef = firestore.collection("wallets").document(toWalletId)
 
-            val sender = getOrCreateWallet(fromWalletId)
-            val receiver = getOrCreateWallet(toWalletId)
+            val txResult = firestore.runTransaction { transaction ->
+                val senderSnap = transaction.get(senderRef)
+                val receiverSnap = transaction.get(receiverRef)
+                
+                val sender = if (senderSnap.exists()) senderSnap.toObject(Wallet::class.java)!! else Wallet(id = fromWalletId, userId = fromWalletId.replace("wallet_", ""))
+                val receiver = if (receiverSnap.exists()) receiverSnap.toObject(Wallet::class.java)!! else Wallet(id = toWalletId, userId = toWalletId.replace("wallet_", ""))
 
-            val withdrawRes = withdraw(fromWalletId, amount, currency, "تحويل إلى محفظة ${receiver.userId}")
-            if (withdrawRes.isFailure) return withdrawRes
+                if (sender.status == "FROZEN" || receiver.status == "FROZEN") {
+                    throw IllegalStateException("إحدى المحافظ مجمدة")
+                }
 
-            deposit(toWalletId, amount, currency, "استلام تحويل من محفظة ${sender.userId}")
+                val senderAvailable = when (cur) {
+                    "USD" -> sender.balanceUsd
+                    "SAR" -> sender.balanceSar
+                    else -> sender.balanceYer
+                }
 
-            val tx = Transaction(
-                id = "TXN-${UUID.randomUUID().toString().take(8).uppercase()}",
-                walletId = sender.id,
-                userId = sender.userId,
-                type = TransactionType.TRANSFER.name,
-                amount = amount,
-                balanceAfter = getBalance(fromWalletId, currency),
-                currency = currency.uppercase(),
-                targetWalletId = receiver.id,
-                note = "تحويل إلى $toWalletId",
-                timestamp = System.currentTimeMillis(),
-                status = TransactionStatus.COMPLETED.name
-            )
+                if (senderAvailable < amount) {
+                    throw IllegalStateException("رصيد المرسل غير كافٍ")
+                }
+
+                val updatedSender = sender.copy(
+                    balanceYer = if (cur == "YER") sender.balanceYer - amount else sender.balanceYer,
+                    balanceUsd = if (cur == "USD") sender.balanceUsd - amount else sender.balanceUsd,
+                    balanceSar = if (cur == "SAR") sender.balanceSar - amount else sender.balanceSar,
+                    balance = if (cur == "YER") sender.balanceYer - amount else sender.balanceYer,
+                    updatedAt = System.currentTimeMillis()
+                )
+
+                val updatedReceiver = receiver.copy(
+                    balanceYer = if (cur == "YER") receiver.balanceYer + amount else receiver.balanceYer,
+                    balanceUsd = if (cur == "USD") receiver.balanceUsd + amount else receiver.balanceUsd,
+                    balanceSar = if (cur == "SAR") receiver.balanceSar + amount else receiver.balanceSar,
+                    balance = if (cur == "YER") receiver.balanceYer + amount else receiver.balanceYer,
+                    updatedAt = System.currentTimeMillis()
+                )
+                
+                transaction.set(senderRef, updatedSender)
+                transaction.set(receiverRef, updatedReceiver)
+
+                val tx = Transaction(
+                    id = "TXN-${UUID.randomUUID().toString().take(8).uppercase()}",
+                    walletId = updatedSender.id,
+                    userId = updatedSender.userId,
+                    type = TransactionType.TRANSFER.name,
+                    amount = amount,
+                    balanceAfter = when (cur) {
+                        "USD" -> updatedSender.balanceUsd
+                        "SAR" -> updatedSender.balanceSar
+                        else -> updatedSender.balanceYer
+                    },
+                    currency = cur,
+                    targetWalletId = updatedReceiver.id,
+                    note = "تحويل إلى $toWalletId",
+                    timestamp = System.currentTimeMillis(),
+                    status = TransactionStatus.COMPLETED.name
+                )
+                
+                val txRef = firestore.collection("wallet_transactions").document(tx.id)
+                transaction.set(txRef, tx)
+                
+                Pair(updatedSender, tx)
+            }.await()
+
+            val updatedSender = txResult.first
+            val tx = txResult.second
+            
+            localWallets[updatedSender.id] = updatedSender
+            localWallets[updatedSender.userId] = updatedSender
+            val currentList = _transactionsFlow.value.toMutableList()
+            currentList.add(0, tx)
+            _transactionsFlow.value = currentList
+            saveTransactionsToCache(currentList)
+
             Result.success(tx)
         } catch (e: Exception) {
             Result.failure(e)

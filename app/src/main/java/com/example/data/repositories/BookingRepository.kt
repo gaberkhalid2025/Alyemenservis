@@ -6,6 +6,7 @@ import com.example.data.BookingEntity
 import com.example.data.BookingCache
 import com.example.data.LocalAppCacheManager
 import com.example.security.BookingSecurityHelper
+import com.example.utils.AnalyticsEventsHelper
 import com.example.utils.BookingNotificationManager
 import com.example.utils.BookingUtils
 import com.google.firebase.firestore.FirebaseFirestore
@@ -14,6 +15,10 @@ import com.google.firebase.firestore.Query
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import com.example.data.local.toRoomEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -83,6 +88,16 @@ class BookingRepository(
             val json = adapter.toJson(list)
             cacheManager.saveBookingsCache(json)
             _cachedBookings.value = list
+
+            try {
+                val bookingDao = com.example.data.local.AppDatabase.getInstance(context).bookingDao()
+                val roomList = list.map { it.toRoomEntity() }
+                CoroutineScope(Dispatchers.IO).launch {
+                    bookingDao.insertBookings(roomList)
+                }
+            } catch (e: Exception) {
+                // Room fallback
+            }
         } catch (e: Exception) {
             Log.e("BookingRepository", "Error saving local cache", e)
         }
@@ -158,6 +173,14 @@ class BookingRepository(
         onError: (String) -> Unit
     ) {
         try {
+            // Check technician schedule conflict
+            val targetDate = booking.date.ifBlank { booking.dateString }
+            val targetTime = booking.time.ifBlank { booking.timeString }
+            if (booking.technicianId.isNotBlank() && BookingUtils.hasTechnicianConflict(booking.technicianId, targetDate, targetTime, _cachedBookings.value)) {
+                onError("عذراً، الفني لديه حجز آخر مجدول في نفس التوقيت المختار (+/- ساعتين). يرجى اختيار موعد آخر أو التواصل مع الفني.")
+                return
+            }
+
             val docId = if (booking.id.isNotBlank()) booking.id else firestore.collection("bookings").document().id
             val finalCode = if (booking.bookingNumber.isNotBlank()) booking.bookingNumber else BookingUtils.generateBookingNumber()
             val rawPin = if (rawPasswordPin.isNotBlank()) rawPasswordPin else BookingUtils.generateBookingPassword()
@@ -183,6 +206,7 @@ class BookingRepository(
             current.removeAll { it.id == docId }
             current.add(0, finalBooking)
             saveToCache(current)
+            AnalyticsEventsHelper.logBookingCreated(context, docId, finalBooking.serviceType.ifBlank { finalBooking.category }, finalBooking.totalAmount)
 
             // Sync to Firestore
             firestore.collection("bookings").document(docId)
@@ -255,6 +279,8 @@ class BookingRepository(
                     )
                     firestore.collection("notifications").document(adminNotifId).set(adminNotif)
 
+                    AnalyticsEventsHelper.logBookingCreated(context, finalBooking.id, finalBooking.serviceType, finalBooking.totalAmount)
+
                     onSuccess(finalBooking)
                 }
                 .addOnFailureListener { ex ->
@@ -287,6 +313,10 @@ class BookingRepository(
             "updatedAt" to System.currentTimeMillis(),
             if (newStatus == "COMPLETED") "completedAt" to System.currentTimeMillis() else "updatedAt" to System.currentTimeMillis()
         )
+
+        if (newStatus == "APPROVED" || newStatus == "ACCEPTED") {
+            AnalyticsEventsHelper.logBookingAccepted(context, bookingId)
+        }
 
         // Optimistic local update
         val current = _cachedBookings.value.map {
@@ -369,6 +399,7 @@ class BookingRepository(
         firestore.collection("bookings").document(booking.id)
             .update(updates)
             .addOnSuccessListener {
+                AnalyticsEventsHelper.logBookingCancelled(context, booking.id, cancellationReason)
                 val notifTime = System.currentTimeMillis()
                 
                 val userTitle = when(cancelledBy) {

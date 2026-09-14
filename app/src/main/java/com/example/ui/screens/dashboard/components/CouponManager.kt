@@ -19,16 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
-
-data class CouponModel(
-    val id: String,
-    val code: String,
-    val discountPercent: Int,
-    val maxUses: Int,
-    val usedCount: Int = 0,
-    val minOrderAmount: Double = 0.0,
-    val isActive: Boolean = true
-)
+import com.example.data.SpecialOfferEntity
 
 /**
  * 🎟️ CouponManager (إدارة كوبونات وقسائم الخصم)
@@ -40,7 +31,7 @@ fun CouponManager(
     modifier: Modifier = Modifier
 ) {
     var coupons by remember {
-        mutableStateOf<List<CouponModel>>(emptyList())
+        mutableStateOf<List<SpecialOfferEntity>>(emptyList())
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -103,7 +94,7 @@ fun CouponManager(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    text = coupon.code,
+                                    text = coupon.couponCode,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color(0xFFA855F7)
@@ -122,7 +113,7 @@ fun CouponManager(
                                 }
                             }
                             Text(
-                                text = "الاستخدام: ${coupon.usedCount} / ${coupon.maxUses} • أدنى طلب: ${coupon.minOrderAmount.toInt()} ريال",
+                                text = "وصف العرض: ${coupon.description}",
                                 fontSize = 11.sp,
                                 color = Color(0xFF94A3B8)
                             )
@@ -130,12 +121,12 @@ fun CouponManager(
 
                         Row {
                             IconButton(onClick = {
-                                coupons = coupons.map { if (it.id == coupon.id) it.copy(isActive = !it.isActive) else it }
+                                coupons = coupons.map { if (it.id == coupon.id) it.copy(isEnabled = !it.isEnabled) else it }
                             }) {
                                 Icon(
-                                    if (coupon.isActive) Icons.Default.CheckCircle else Icons.Default.Close,
+                                    if (coupon.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
                                     contentDescription = null,
-                                    tint = if (coupon.isActive) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                    tint = if (coupon.isEnabled) Color(0xFF10B981) else Color(0xFF94A3B8)
                                 )
                             }
                             IconButton(onClick = { coupons = coupons.filter { it.id != coupon.id } }) {
@@ -187,13 +178,13 @@ fun CouponManager(
                 Button(
                     onClick = {
                         if (code.isNotBlank()) {
-                            val newCoupon = CouponModel(
+                            val newCoupon = SpecialOfferEntity(
                                 id = System.currentTimeMillis().toString(),
-                                code = code,
+                                title = "كوبون خصم",
+                                description = "كوبون بقيمة ${discountPercent.toIntOrNull() ?: 10}% لـ ${maxUses.toIntOrNull() ?: 50} استخدام بحد أدنى للطلب ${minAmount.toDoubleOrNull() ?: 0.0}",
+                                couponCode = code,
                                 discountPercent = discountPercent.toIntOrNull() ?: 10,
-                                maxUses = maxUses.toIntOrNull() ?: 50,
-                                minOrderAmount = minAmount.toDoubleOrNull() ?: 0.0,
-                                isActive = true
+                                isEnabled = true
                             )
                             coupons = coupons + newCoupon
                             showAddDialog = false

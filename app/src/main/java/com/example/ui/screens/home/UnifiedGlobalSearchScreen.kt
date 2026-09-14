@@ -10,17 +10,28 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.utils.AnalyticsEventsHelper
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.delay
 
 @Composable
 fun UnifiedGlobalSearchScreen(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     val sampleResults = listOf("صيانة مكيفات (فنيون)", "مطعم الشيباني (مطاعم)", "أجهزة ذكية (متاجر)", "شقة للإيجار (عقارات)")
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.trim().length >= 2) {
+            delay(500)
+            AnalyticsEventsHelper.logSearchPerformed(context, searchQuery.trim())
+        }
+    }
 
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp),

@@ -102,12 +102,27 @@ fun UrgentOffersList(
                                         Text("👨‍🔧", fontSize = 18.sp)
                                     }
                                     Column {
-                                        Text(
-                                            text = offer.technicianName.ifBlank { "فني متخصص" },
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(
+                                                text = offer.technicianName.ifBlank { "فني متخصص" },
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF0F172A)
+                                            )
+                                            // حالة الفني متاح / مشغول
+                                            Surface(
+                                                color = if (offer.isAvailable) Color(0xFFDCFCE7) else Color(0xFFFFE4E6),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (offer.isAvailable) "🟢 متاح الآن" else "🔴 مشغول",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (offer.isAvailable) Color(0xFF166534) else Color(0xFF991B1B),
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
                                         Text(
                                             text = "⭐ ${offer.technicianRating} / 5.0",
                                             fontSize = 11.sp,

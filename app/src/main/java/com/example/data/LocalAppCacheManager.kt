@@ -4,6 +4,9 @@ import com.example.utils.*
 
 import android.content.Context
 import android.content.SharedPreferences
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -12,7 +15,10 @@ import org.json.JSONObject
  * Solves Problem 6: Offline caching, fast local rendering, queued sync operations,
  * and automatic cache pruning for stale records older than 30 days.
  */
-class LocalAppCacheManager(context: Context) {
+@Singleton
+class LocalAppCacheManager @Inject constructor(
+    @ApplicationContext context: Context
+) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("YS_Local_App_Cache_v2026", Context.MODE_PRIVATE)
 
@@ -41,6 +47,18 @@ class LocalAppCacheManager(context: Context) {
 
     fun getBookingsCacheRaw(): String {
         return prefs.getString("KEY_BOOKINGS_CACHE", "[]") ?: "[]"
+    }
+
+    fun saveOffersCache(rawJsonString: String) {
+        prefs.edit().putString("KEY_OFFERS_CACHE", rawJsonString).putLong("KEY_OFFERS_TIME", System.currentTimeMillis()).apply()
+    }
+
+    fun getOffersCacheRaw(): String {
+        return prefs.getString("KEY_OFFERS_CACHE", "[]") ?: "[]"
+    }
+
+    fun getOffersCacheTime(): Long {
+        return prefs.getLong("KEY_OFFERS_TIME", 0L)
     }
 
     // 4. Save & Load Cached Categories

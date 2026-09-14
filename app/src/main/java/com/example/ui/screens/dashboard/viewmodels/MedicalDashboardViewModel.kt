@@ -22,7 +22,8 @@ class MedicalDashboardViewModel(
     private val ownerId: String,
     private val dashboardRepository: IDashboardRepository,
     private val productsRepository: IProductsRepository,
-    private val ratingsRepository: IRatingsRepository
+    private val ratingsRepository: IRatingsRepository,
+    private val medicalRepository: com.example.data.repositories.MedicalRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -36,6 +37,11 @@ class MedicalDashboardViewModel(
 
     init {
         loadDashboardData()
+        viewModelScope.launch {
+            medicalRepository.getDoctors(ownerId).collect {
+                _doctors.value = it
+            }
+        }
     }
 
     fun selectTab(tabIndex: Int) {
@@ -68,22 +74,38 @@ class MedicalDashboardViewModel(
 
     fun addDoctor(name: String, specialty: String, workingHours: String) {
         if (name.isBlank()) return
+        
+        val docId = System.currentTimeMillis().toString()
+        val existing = _doctors.value.find { it.name == name && it.specialty == specialty }
+        if (existing != null) {
+            viewModelScope.launch {
+                _eventFlow.emit(DashboardEvent.ShowToast("الطبيب موجود مسبقاً ⚠️"))
+            }
+            return
+        }
+
         val doc = DoctorItem(
-            id = System.currentTimeMillis().toString(),
+            id = docId,
             name = name,
             specialty = specialty,
             workingHours = workingHours
         )
-        _doctors.value = _doctors.value + doc
         viewModelScope.launch {
-            _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الطبيب بنجاح 🩺"))
+            medicalRepository.addDoctor(ownerId, doc).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الطبيب بنجاح 🩺"))
+            }.onFailure {
+                _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء الإضافة"))
+            }
         }
     }
 
     fun deleteDoctor(id: String) {
-        _doctors.value = _doctors.value.filter { it.id != id }
         viewModelScope.launch {
-            _eventFlow.emit(DashboardEvent.ShowToast("تم حذف الطبيب 🗑️"))
+            medicalRepository.deleteDoctor(id).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم حذف الطبيب 🗑️"))
+            }.onFailure {
+                _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء الحذف"))
+            }
         }
     }
 

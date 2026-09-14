@@ -379,12 +379,14 @@ data class DynamicSection(
 @Keep
 data class SpecialOfferEntity(
     val id: String = java.util.UUID.randomUUID().toString(),
+    val providerId: String = "",
     val title: String = "",
     val description: String = "",
     val discountPercent: Int = 0,
     val originalPrice: Double = 0.0,
     val offerPrice: Double = 0.0,
     val expiryDate: String = "",
+    val couponCode: String = "",
     val isEnabled: Boolean = true
 ) {
     companion object {
@@ -401,7 +403,9 @@ data class SpecialOfferEntity(
                         originalPrice = p.getOrElse(4) { "0" }.toDoubleOrNull() ?: 0.0,
                         offerPrice = p.getOrElse(5) { "0" }.toDoubleOrNull() ?: 0.0,
                         expiryDate = p.getOrElse(6) { "" },
-                        isEnabled = p.getOrElse(7) { "true" }.toBoolean()
+                        isEnabled = p.getOrElse(7) { "true" }.toBoolean(),
+                        providerId = p.getOrElse(8) { "" },
+                        couponCode = p.getOrElse(9) { "" }
                     )
                 }
             } catch (e: Exception) {
@@ -419,7 +423,9 @@ data class SpecialOfferEntity(
                     offer.originalPrice.toString(),
                     offer.offerPrice.toString(),
                     offer.expiryDate,
-                    offer.isEnabled.toString()
+                    offer.isEnabled.toString(),
+                    offer.providerId,
+                    offer.couponCode
                 ).joinToString("|||")
             }
         }

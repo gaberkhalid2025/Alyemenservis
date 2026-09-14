@@ -37,11 +37,13 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionHistoryScreen(
-    currentUserId: String = "user_default",
+    currentUserId: String = "",
     userRole: String = "USER", // USER, PROVIDER, STORE, RESTAURANT, ADMIN
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    if (currentUserId.isBlank()) return
+
     val context = LocalContext.current
     val walletManager = remember { WalletManager(context) }
     val numberFormat = remember { DecimalFormat("#,###.##") }
@@ -280,7 +282,7 @@ fun TransactionHistoryScreen(
                                         modifier = Modifier.size(64.dp)
                                     )
                                     Text(
-                                        "لا توجد معاملات مطابقة",
+                                        if (state.transactions.isEmpty()) "مرحباً بك! لا توجد معاملات سابقة في محفظتك بعد" else "لا توجد معاملات مطابقة للبحث أو التصفية",
                                         fontWeight = FontWeight.Bold,
                                         color = Color.Gray
                                     )

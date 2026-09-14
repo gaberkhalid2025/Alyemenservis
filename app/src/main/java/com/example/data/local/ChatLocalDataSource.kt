@@ -28,8 +28,10 @@ class ChatLocalDataSource(
     context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("YS_Chat_Encrypted_Cache_v2026", Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs: SharedPreferences = appContext.getSharedPreferences("YS_Chat_Encrypted_Cache_v2026", Context.MODE_PRIVATE)
     private val moshi: Moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+    private val chatDao: ChatDao by lazy { AppDatabase.getInstance(appContext).chatDao() }
 
     // Moshi Adapters
     private val channelsListAdapter = moshi.adapter<List<ChatChannel>>(
@@ -46,9 +48,31 @@ class ChatLocalDataSource(
     private val presenceMemoryCache = ConcurrentHashMap<String, MutableStateFlow<UserPresence?>>()
 
     init {
-        // Load initial channels into memory cache
+        migrateLegacyChatData()
         val initialChannels = getCachedChannelsInternal()
         channelsMemoryCache.value = initialChannels
+    }
+
+    /**
+     * سكربت ترحيل البيانات القديمة وتوحيدها مع Room والكاش المشفر
+     */
+    private fun migrateLegacyChatData() {
+        try {
+            val legacyPrefs = appContext.getSharedPreferences("YS_Chat_Cache_Legacy", Context.MODE_PRIVATE)
+            val legacyKeys = legacyPrefs.all
+            if (legacyKeys.isNotEmpty()) {
+                val editor = prefs.edit()
+                for ((key, value) in legacyKeys) {
+                    if (value is String && !prefs.contains(key)) {
+                        editor.putString(key, value)
+                    }
+                }
+                editor.apply()
+                legacyPrefs.edit().clear().apply()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     companion object {

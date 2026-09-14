@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +63,17 @@ fun RequestServiceScreen(
     var isPinVisible by remember { mutableStateOf(false) }
 
     var isSubmitting by remember { mutableStateOf(false) }
+    var attachedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var isUploadingImage by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            attachedImageUri = uri
+        }
+    }
+
     var createdRequestCode by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var expandedCategoryDropdown by remember { mutableStateOf(false) }
@@ -277,11 +289,63 @@ fun RequestServiceScreen(
                 singleLine = true
             )
 
+            // إرفاق صورة للمشكلة (اختياري)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📷 إرفاق صورة المشكلة (اختياري):", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        OutlinedButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    androidx.activity.result.PickVisualMediaRequest(
+                                        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(if (attachedImageUri != null) "تغيير الصورة" else "اختيار صورة", fontSize = 12.sp)
+                        }
+                    }
+
+                    if (attachedImageUri != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = attachedImageUri,
+                                contentDescription = "معاينة صورة الطلب",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            IconButton(
+                                onClick = { attachedImageUri = null },
+                                modifier = Modifier.align(Alignment.TopEnd)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "حذف الصورة", tint = Color.Red)
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // زر إرسال الطلب
+            val isLoading = isSubmitting || isUploadingImage
             Button(
                 onClick = {
+                    if (isLoading) return@Button
                     if (customerPhone.isBlank() || serviceTitle.isBlank() || serviceDetails.isBlank() || selectedArea.isBlank()) {
                         Toast.makeText(context, "يرجى تعبئة كافة الحقول الإجبارية (*)", Toast.LENGTH_SHORT).show()
                         return@Button
@@ -292,26 +356,52 @@ fun RequestServiceScreen(
                     }
 
                     isSubmitting = true
-                    instantViewModel.createInstantRequest(
-                        userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
-                        userName = customerName.ifBlank { "عميل" },
-                        userPhone = customerPhone,
-                        userCity = selectedCity,
-                        userNeighborhood = selectedArea,
-                        categoryId = selectedDepartment,
-                        categoryName = selectedCategory,
-                        serviceTitle = serviceTitle,
-                        description = serviceDetails,
-                        urgencyTime = urgencyTime,
-                        customPin = com.example.utils.PinHasher.hashPin(pinCode)
-                    ) { success, msg, _ ->
-                        isSubmitting = false
-                        if (success) {
-                            createdRequestCode = msg.substringAfter("الكود: ").ifBlank { "REQ-${Random.nextInt(100000, 999999)}" }
-                            showSuccessDialog = true
-                        } else {
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+
+                    val executeSubmit: (String) -> Unit = { imageUrl ->
+                        instantViewModel.createInstantRequest(
+                            userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
+                            userName = customerName.ifBlank { "عميل" },
+                            userPhone = customerPhone,
+                            userCity = selectedCity,
+                            userNeighborhood = selectedArea,
+                            categoryId = selectedDepartment,
+                            categoryName = selectedCategory,
+                            serviceTitle = serviceTitle,
+                            description = if (imageUrl.isNotBlank()) "$serviceDetails\n[مرفق صورة: $imageUrl]" else serviceDetails,
+                            urgencyTime = urgencyTime,
+                            customPin = com.example.utils.PinHasher.hashPin(pinCode)
+                        ) { success, msg, _ ->
+                            isSubmitting = false
+                            if (success) {
+                                createdRequestCode = msg.substringAfter("الكود: ").ifBlank { "REQ-${Random.nextInt(100000, 999999)}" }
+                                showSuccessDialog = true
+                            } else {
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
                         }
+                    }
+
+                    if (attachedImageUri != null) {
+                        isUploadingImage = true
+                        scope.launch {
+                            try {
+                                val path = "urgent_requests/req_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(6)}.webp"
+                                val result = com.example.utils.FirebaseStorageUploader.uploadImageUri(
+                                    context = context,
+                                    uri = attachedImageUri!!,
+                                    storagePath = path,
+                                    maxDimension = 800,
+                                    maxSizeBytes = 300 * 1024L
+                                )
+                                isUploadingImage = false
+                                executeSubmit(result.getOrDefault(""))
+                            } catch (e: Exception) {
+                                isUploadingImage = false
+                                executeSubmit("")
+                            }
+                        }
+                    } else {
+                        executeSubmit("")
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_request_btn"),

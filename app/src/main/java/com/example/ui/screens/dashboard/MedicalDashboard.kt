@@ -41,7 +41,11 @@ fun MedicalDashboard(
             ownerId = account.id,
             dashboardRepository = DashboardRepositoryImpl(context),
             productsRepository = ProductsRepositoryImpl(context),
-            ratingsRepository = RatingsRepositoryImpl(context)
+            ratingsRepository = RatingsRepositoryImpl(context),
+            medicalRepository = com.example.data.repositories.MedicalRepository(
+                com.google.firebase.firestore.FirebaseFirestore.getInstance(),
+                com.example.data.LocalAppCacheManager(context)
+            )
         )
     }
 

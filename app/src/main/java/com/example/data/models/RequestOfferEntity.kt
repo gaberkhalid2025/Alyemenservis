@@ -20,5 +20,6 @@ data class RequestOfferEntity(
     val technicianLatitude: Double = 15.3694,
     val technicianLongitude: Double = 44.1910,
     val distanceKm: Double = 2.5,
+    val isAvailable: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 )

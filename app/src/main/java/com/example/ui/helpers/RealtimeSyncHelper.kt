@@ -152,7 +152,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 3b. Registered Users count listener
-        db.collection("registered_users").limit(200).addSnapshotListenerReg { snapshot, error ->
+        db.collection("registered_users").limit(50).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 appState._registeredUsersCount.value = snapshot.size()
                 val list = snapshot.documents.mapNotNull { doc ->
@@ -165,14 +165,14 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 3c. Internal Wallets Listener
-        db.collection("internal_wallets").limit(100).addSnapshotListenerReg { snapshot, error ->
+        db.collection("internal_wallets").limit(50).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 appState._internalWallets.value = snapshot.documents.mapNotNull { it.toObject(InternalWalletEntity::class.java) }
             }
         }
 
         // 3d. Wallet Transactions Listener
-        db.collection("wallet_transactions").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(100).addSnapshotListenerReg { snapshot, error ->
+        db.collection("wallet_transactions").orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 appState._walletTransactions.value = snapshot.documents.mapNotNull { it.toObject(WalletTransactionEntity::class.java) }.sortedByDescending { it.timestamp }
             }
@@ -200,7 +200,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 5. Providers (Full limit & safe parsing for complete Map & listing coverage)
-        db.collection("providers").limit(250).addSnapshotListenerReg { snapshot, error ->
+        db.collection("providers").limit(20).addSnapshotListenerReg { snapshot, error ->
             appState._isProvidersLoading.value = false
             if (error != null) {
                 error.printStackTrace()
@@ -260,7 +260,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 6. Pending Providers (Full limit & safe parsing)
-        db.collection("pending_providers").limit(200).addSnapshotListenerReg { snapshot, error ->
+        db.collection("pending_providers").limit(50).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListenerReg
@@ -494,7 +494,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 18. Stores (Full limit & safe parsing for Maps & directory coverage)
-        db.collection("stores").limit(250).addSnapshotListenerReg { snapshot, error ->
+        db.collection("stores").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -563,7 +563,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 19. Products (Full limit & safe parsing)
-        db.collection("products").limit(250).addSnapshotListenerReg { snapshot, error ->
+        db.collection("products").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -582,7 +582,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
 
         // 20. Properties (Full limit & safe parsing for Maps & real estate coverage)
-        db.collection("properties").limit(250).addSnapshotListenerReg { snapshot, error ->
+        db.collection("properties").limit(20).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {

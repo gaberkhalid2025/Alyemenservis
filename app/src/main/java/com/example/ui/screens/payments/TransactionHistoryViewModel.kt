@@ -87,22 +87,24 @@ class TransactionHistoryViewModel(
     /**
      * Execute a custom deposit into the wallet.
      */
-    fun deposit(amount: Double, note: String): Result<Transaction> {
-        val result = walletManager.deposit(walletId, amount, note)
-        if (result.isSuccess) {
-            refreshData()
+    fun deposit(amount: Double, note: String) {
+        viewModelScope.launch {
+            val result = walletManager.deposit(walletId, amount, "YER", note)
+            if (result.isSuccess) {
+                refreshData()
+            }
         }
-        return result
     }
 
     /**
      * Execute a custom withdrawal from the wallet.
      */
-    fun withdraw(amount: Double, note: String): Result<Transaction> {
-        val result = walletManager.withdraw(walletId, amount, note)
-        if (result.isSuccess) {
-            refreshData()
+    fun withdraw(amount: Double, note: String) {
+        viewModelScope.launch {
+            val result = walletManager.withdraw(walletId, amount, "YER", note)
+            if (result.isSuccess) {
+                refreshData()
+            }
         }
-        return result
     }
 }

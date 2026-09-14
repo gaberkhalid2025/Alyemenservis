@@ -53,6 +53,7 @@ fun UrgentRequestsListScreen(
 
     val now = System.currentTimeMillis()
     val filteredList = requestsList.filter { req ->
+        val isExpired = req.expiresAt > 0 && req.expiresAt < now && req.status == "OPEN"
         val remainingMinutes = ((req.expiresAt - now) / 1000) / 60
         val matchesTimeFilter = if (onlyUnder10MinFilter) remainingMinutes in 0..10 else true
         val matchesSearch = searchQuery.isBlank() ||
@@ -60,7 +61,7 @@ fun UrgentRequestsListScreen(
                 req.serviceTitle.contains(searchQuery, ignoreCase = true) ||
                 req.userNeighborhood.contains(searchQuery, ignoreCase = true)
 
-        matchesTimeFilter && matchesSearch
+        !isExpired && matchesTimeFilter && matchesSearch
     }
 
     Scaffold(

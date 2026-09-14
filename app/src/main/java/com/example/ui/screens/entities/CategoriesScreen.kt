@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,18 +50,17 @@ fun CategoriesScreen(
             isLoading = true
             errorMessage = null
             try {
-                categoryRepository.observeCategories().collect { result ->
-                    isLoading = false
-                    result.onSuccess { fetched ->
-                        categories = fetched.ifEmpty { vmCategories }
+                val result = categoryRepository.observeCategories().first()
+                isLoading = false
+                result.onSuccess { fetched ->
+                    categories = fetched.ifEmpty { vmCategories }
+                    errorMessage = null
+                }.onFailure { error ->
+                    if (vmCategories.isNotEmpty()) {
+                        categories = vmCategories
                         errorMessage = null
-                    }.onFailure { error ->
-                        if (vmCategories.isNotEmpty()) {
-                            categories = vmCategories
-                            errorMessage = null
-                        } else {
-                            errorMessage = "فشل تحميل الفئات: ${error.localizedMessage ?: "خطأ غير معروف"}"
-                        }
+                    } else {
+                        errorMessage = "فشل تحميل الفئات: ${error.localizedMessage ?: "خطأ غير معروف"}"
                     }
                 }
             } catch (e: Exception) {

@@ -60,64 +60,8 @@ data class ProductAttachment(
     }
 }
 
-@Keep
-data class ChatMessageEntity(
-    val id: String = "",
-    val senderId: String = "guest",
-    val senderName: String = "",
-    val senderPhone: String = "",
-    val recipientId: String = "",
-    val message: String = "",
-    val timestamp: Long = 0L,
-    val mediaType: String = "TEXT", // "TEXT", "AUDIO", "IMAGE", "VIDEO", "FILE", "CALL"
-    val mediaUrl: String = "",
-    val audioDurationSec: Int = 0,
-    val status: String = "SENT", // "SENT", "DELIVERED", "READ"
-    val statusTime: Long = 0L,
-    val imageUrl: String = "",
-    val replyToId: String = "",
-    val replyToText: String = "",
-    val replyToSender: String = "",
-    val reactions: String = "", // e.g. "👍,❤️"
-    val isDeleted: Boolean = false,
-    val deletedBy: String = "",
-    val fileName: String = "",
-    val fileSize: Long = 0L,
-    val fileType: String = "",
-    val forwardedFrom: String = "",
-    val readAt: Long = 0L
-)
-
-@Keep
-data class ChatChannelEntity(
-    val id: String = "",
-    val channelType: String = "PROVIDER", // "PROVIDER", "STORE", "PROPERTY", "RESTAURANT", "ADMIN", "SUPERVISOR", "CATEGORY"
-    val targetId: String = "",
-    val targetName: String = "",
-    val targetPhone: String = "",
-    val targetCategory: String = "",
-    val userName: String = "",
-    val customerName: String = "",
-    val customerPhone: String = "",
-    val customerId: String = "",
-    val lastMessage: String = "",
-    val lastMessageTime: Long = 0L,
-    val isBlocked: Boolean = false,
-    val isProvider: Boolean = false,
-    val timestamp: Long = 0L,
-    val unreadCountUser: Int = 0,
-    val unreadCountTarget: Int = 0,
-    val providerId: String = "",
-    val providerName: String = "",
-    val providerPhoto: String = "",
-    val clientId: String = "",
-    val clientName: String = "",
-    val clientPhoto: String = "",
-    val relatedEntityId: String = "",
-    val relatedEntityType: String = "",
-    val unreadCount: Int = 0,
-    val messages: List<ChatMessageEntity> = emptyList()
-)
+typealias ChatMessageEntity = com.example.data.models.ChatMessage
+typealias ChatChannelEntity = com.example.data.models.ChatChannel
 
 @Keep
 data class CallEntity(

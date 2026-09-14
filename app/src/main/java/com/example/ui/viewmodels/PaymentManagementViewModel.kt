@@ -7,6 +7,7 @@ import com.example.data.PaymentEntity
 import com.example.data.PaymentWalletEntity
 import com.example.data.WalletTransactionEntity
 import com.example.ui.helpers.AppState
+import com.example.utils.AnalyticsEventsHelper
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -112,6 +113,7 @@ class PaymentManagementViewModel @Inject constructor(
 
     fun createPayment(payment: PaymentEntity) {
         viewModelScope.launch {
+            AnalyticsEventsHelper.logPaymentInitiated(null, payment.id, payment.method, payment.amount)
             crud.saveEntity("payments", payment.id, payment,
                 onSuccess = { onTriggerNotification?.invoke("💳 تم تسجيل عملية الدفع بنجاح") }
             )

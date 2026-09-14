@@ -85,6 +85,52 @@ data class BookingRoomEntity(
     val updatedAt: Long
 )
 
+fun com.example.data.BookingEntity.toRoomEntity(): BookingRoomEntity {
+    return BookingRoomEntity(
+        id = id,
+        customerName = customerName.ifBlank { clientName.ifBlank { fullName } },
+        customerPhone = customerPhone.ifBlank { clientPhone.ifBlank { userPhone } },
+        customerArea = customerArea.ifBlank { clientAddress.ifBlank { fullAddress } },
+        serviceType = serviceType.ifBlank { serviceName.ifBlank { category } },
+        providerId = providerId.ifBlank { technicianId },
+        providerName = providerName.ifBlank { technicianName },
+        dateString = dateString.ifBlank { date },
+        timeString = timeString.ifBlank { time },
+        status = status,
+        pinCode = pinCode.ifBlank { secretPin },
+        bookingNumber = bookingNumber.ifBlank { bookingCode },
+        totalAmount = totalAmount,
+        advancePayment = advancePayment,
+        paymentStatus = paymentStatus,
+        scheduledAt = scheduledAt,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+}
+
+fun BookingRoomEntity.toEntity(): com.example.data.BookingEntity {
+    return com.example.data.BookingEntity(
+        id = id,
+        customerName = customerName,
+        customerPhone = customerPhone,
+        customerArea = customerArea,
+        serviceType = serviceType,
+        providerId = providerId,
+        providerName = providerName,
+        dateString = dateString,
+        timeString = timeString,
+        status = status,
+        pinCode = pinCode,
+        bookingNumber = bookingNumber,
+        totalAmount = totalAmount,
+        advancePayment = advancePayment,
+        paymentStatus = paymentStatus,
+        scheduledAt = scheduledAt,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+}
+
 @Entity(
     tableName = "instant_requests",
     indices = [

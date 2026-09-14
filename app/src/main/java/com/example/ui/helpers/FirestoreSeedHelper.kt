@@ -22,7 +22,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
                 db.collection("settings").document("main_settings").set(AdminSettingsEntity())
             }
         }
-        db.collection("categories").get().addOnCompleteListener { task ->
+        db.collection("categories").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
                 if (sn == null || sn.isEmpty) {
@@ -32,7 +32,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
                 try { writeDefaultCategories() } catch (e: Exception) {}
             }
         }
-        db.collection("cities").get().addOnCompleteListener { task ->
+        db.collection("cities").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
                 if (sn == null || sn.isEmpty) {
@@ -42,7 +42,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
                 try { writeDefaultCities() } catch (e: Exception) {}
             }
         }
-        db.collection("banners").get().addOnCompleteListener { task ->
+        db.collection("banners").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
                 if (sn == null || sn.isEmpty) {
@@ -52,7 +52,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
                 try { writeDefaultBanners() } catch (e: Exception) {}
             }
         }
-        db.collection("supervisors").get().addOnCompleteListener { task ->
+        db.collection("supervisors").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
                 if (sn == null || sn.isEmpty) {
@@ -62,7 +62,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
                 try { writeDefaultSupervisors() } catch (e: Exception) {}
             }
         }
-        db.collection("color_themes").get().addOnCompleteListener { task ->
+        db.collection("color_themes").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
                 if (sn == null || sn.isEmpty) {
@@ -72,7 +72,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
                 try { writeDefaultColorPalettes() } catch (e: Exception) {}
             }
         }
-        db.collection("providers").get().addOnCompleteListener { task ->
+        db.collection("providers").limit(20).get().addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val sn = task.result
                 if (sn == null || sn.isEmpty) {

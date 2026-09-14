@@ -365,7 +365,7 @@ fun BookingFormScreen(
                         Column {
                             Text("التاريخ", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
                             Text(
-                                text = selectedDate.ifEmpty { "اختر التاريخ" },
+                                text = if (selectedDate.isNotEmpty()) BookingUtils.formatBookingDate(selectedDate) else "اختر التاريخ",
                                 fontSize = 13.sp,
                                 fontWeight = if (selectedDate.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
                                 color = if (selectedDate.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface

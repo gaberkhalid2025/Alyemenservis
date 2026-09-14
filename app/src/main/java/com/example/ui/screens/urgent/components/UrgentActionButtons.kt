@@ -29,10 +29,12 @@ fun UrgentActionButtons(
     onViewDetails: () -> Unit,
     onSubmitOffer: (() -> Unit)? = null,
     onCallPhone: (() -> Unit)? = null,
+    phoneToCall: String? = null,
     onOpenMap: (() -> Unit)? = null,
     onCancelRequest: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -72,7 +74,19 @@ fun UrgentActionButtons(
             ) {
                 if (onCallPhone != null) {
                     IconButton(
-                        onClick = onCallPhone,
+                        onClick = {
+                            if (!phoneToCall.isNullOrBlank()) {
+                                val cleanPhone = phoneToCall.trim().replace(" ", "").replace("-", "")
+                                val isValidPhone = android.util.Patterns.PHONE.matcher(cleanPhone).matches() && cleanPhone.length >= 7
+                                if (isValidPhone) {
+                                    onCallPhone()
+                                } else {
+                                    android.widget.Toast.makeText(context, "❌ رقم الهاتف غير صالح للاتصال!", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                onCallPhone()
+                            }
+                        },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(Icons.Default.Call, contentDescription = "اتصال", tint = Color(0xFF10B981))

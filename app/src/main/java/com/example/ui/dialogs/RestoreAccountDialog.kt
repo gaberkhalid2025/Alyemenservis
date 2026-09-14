@@ -33,6 +33,8 @@ fun RestoreAccountDialog(
     var restoreStep by remember { mutableStateOf(1) }
     var isSearchingAccount by remember { mutableStateOf(false) }
     var matchResult by remember { mutableStateOf<MainViewModel.RestoreAccountMatch?>(null) }
+    var showSuccessState by remember { mutableStateOf(false) }
+    var successUserName by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -46,7 +48,29 @@ fun RestoreAccountDialog(
             ) {
                 Text("🔑 استعادة حسابك التالف أو المفقود", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
-                if (restoreStep == 1) {
+                if (showSuccessState) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                    ) {
+                        Text("🎉 تم استعادة الحساب بنجاح!", color = Color(0xFF4ADE80), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("أهلاً وسهلاً بك مجدداً: $successUserName", color = Color.White, fontSize = 14.sp)
+                        Text("تم توثيق جهازك وتسجيل الدخول بنجاح إلى حسابك.", color = Color.LightGray, fontSize = 12.sp)
+
+                        Button(
+                            onClick = {
+                                viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                                onDismiss()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("موافق (الانتقال للشاشة الرئيسية) 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                } else if (restoreStep == 1) {
                     Text("الرجاء إدخال رقم الهاتف المسجل به حسابك للبحث المباشر في قاعدة البيانات:", color = Color.LightGray, fontSize = 11.sp)
                     OutlinedTextField(
                         value = restorePhoneInput,
@@ -161,8 +185,8 @@ fun RestoreAccountDialog(
                                         viewModel.navigateToScreen(AppScreens.USER_BROWSE)
                                     }
 
-                                    Toast.makeText(context, "🔓 تم تسجيل الدخول بنجاح! مرحباً بك $provName", Toast.LENGTH_LONG).show()
-                                    onDismiss()
+                                    successUserName = provName
+                                    showSuccessState = true
                                 } else {
                                     Toast.makeText(context, "❌ يرجى إدخال كلمة المرور!", Toast.LENGTH_LONG).show()
                                 }

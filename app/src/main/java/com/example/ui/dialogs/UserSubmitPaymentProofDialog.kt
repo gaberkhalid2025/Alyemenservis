@@ -111,6 +111,14 @@ fun UserSubmitPaymentProofDialog(
     var transferIdInput by remember { mutableStateOf("") }
     var accountNameInput by remember { mutableStateOf("") }
     var photoInput by remember { mutableStateOf("") }
+    var showConfirmSubmitDialog by remember { mutableStateOf(false) }
+
+    val requiredAmount = when {
+        booking.totalAmount > 0.0 -> booking.totalAmount
+        booking.advancePayment > 0.0 -> booking.advancePayment
+        booking.price > 0.0 -> booking.price
+        else -> 0.0
+    }
 
     val proofPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -137,7 +145,24 @@ fun UserSubmitPaymentProofDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text("💳 سداد رسوم الحجز والخدمة بالمنصة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-                Text("يرجى اختيار أحد الحسابات / المحافظ التالية والتحويل إليها بقيمة تكلفة المعاينة والصيانة:", fontSize = 11.sp, color = Color.LightGray)
+                
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = themeColors.accent.copy(alpha = 0.15f)),
+                    border = BorderStroke(1.dp, themeColors.accent),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("💰 المبلغ المطلوب سداده:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("${requiredAmount.toInt()} ريال يمني", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = themeColors.accent)
+                    }
+                }
+
+                Text("يرجى اختيار أحد الحسابات / المحافظ التالية والتحويل إليها بقيمة المبلغ المطلوب:", fontSize = 11.sp, color = Color.LightGray)
 
                 if (paymentWallets.isEmpty()) {
                     Text("⚠️ عذراً، لا توجد محافظ دفع مفعلة حالياً بالمنصة للتسديد. يرجى مراجعة المشرفين.", fontSize = 11.sp, color = Color.Red)
@@ -244,33 +269,11 @@ fun UserSubmitPaymentProofDialog(
                                 viewModel.triggerNotification("❌ الإدارة تتطلب إرفاق صورة الإثبات أو لقطة الشاشة للتحقق!")
                                 return@Button
                             }
-                            val wallet = selectedWallet ?: return@Button
-                            
-                            val docRef = viewModel.db.collection("payments").document()
-                            val payment = com.example.data.PaymentEntity(
-                                id = docRef.id,
-                                userId = booking.customerPhone,
-                                providerId = booking.providerId,
-                                bookingId = booking.id,
-                                type = "service",
-                                method = "mobileWallet",
-                                status = "PROCESSING",
-                                amount = 1000.0,
-                                advanceAmount = 0.0,
-                                remainingAmount = 1000.0,
-                                commission = 0.0,
-                                providerShare = 1000.0,
-                                currency = "YER",
-                                isLinkedToBooking = true,
-                                transferId = transferIdInput,
-                                transferPhoto = photoInput,
-                                walletProvider = wallet.provider,
-                                verificationNote = "بانتظار مراجعة وتأكيد الإدارة"
-                            )
-                            
-                            docRef.set(payment)
-                            viewModel.triggerNotification("✅ تم إرسال إثبات التحويل بنجاح! جاري مراجعته من الإدارة.")
-                            onDismiss()
+                            if (selectedWallet == null) {
+                                viewModel.triggerNotification("❌ يرجى اختيار المحفظة / الحساب المحول إليه")
+                                return@Button
+                            }
+                            showConfirmSubmitDialog = true
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                         modifier = Modifier.weight(1f)
@@ -287,5 +290,64 @@ fun UserSubmitPaymentProofDialog(
                 }
             }
         }
+    }
+
+    if (showConfirmSubmitDialog) {
+        val wallet = selectedWallet
+        AlertDialog(
+            onDismissRequest = { showConfirmSubmitDialog = false },
+            title = { Text("تأكيد إرسال إثبات السداد", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("هل أنت متأكد من صحة بيانات التحويل؟")
+                    Text("• المبلغ: ${requiredAmount.toInt()} ريال يمني", fontWeight = FontWeight.Bold, color = themeColors.accent)
+                    if (wallet != null) {
+                        Text("• المحفظة: ${wallet.provider} (${wallet.walletNumber.ifEmpty { wallet.bankAccountNumber }})")
+                    }
+                    Text("• رقم الحوالة: $transferIdInput")
+                    Text("• اسم المرسل: $accountNameInput")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val currentWallet = selectedWallet ?: return@Button
+                        val docRef = viewModel.db.collection("payments").document()
+                        val payment = com.example.data.PaymentEntity(
+                            id = docRef.id,
+                            userId = booking.customerPhone,
+                            providerId = booking.providerId,
+                            bookingId = booking.id,
+                            type = "service",
+                            method = "mobileWallet",
+                            status = "PROCESSING",
+                            amount = requiredAmount,
+                            advanceAmount = if (booking.advancePayment > 0.0) booking.advancePayment else 0.0,
+                            remainingAmount = if (booking.totalAmount > requiredAmount) booking.totalAmount - requiredAmount else 0.0,
+                            commission = 0.0,
+                            providerShare = requiredAmount,
+                            currency = "YER",
+                            isLinkedToBooking = true,
+                            transferId = transferIdInput,
+                            transferPhoto = photoInput,
+                            walletProvider = currentWallet.provider,
+                            verificationNote = "بانتظار مراجعة وتأكيد الإدارة"
+                        )
+                        docRef.set(payment)
+                        viewModel.triggerNotification("✅ تم إرسال إثبات التحويل بنجاح! جاري مراجعته من الإدارة.")
+                        showConfirmSubmitDialog = false
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("تأكيد وإرسال", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmSubmitDialog = false }) {
+                    Text("تراجع")
+                }
+            }
+        )
     }
 }

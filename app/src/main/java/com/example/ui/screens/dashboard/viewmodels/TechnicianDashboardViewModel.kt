@@ -94,4 +94,37 @@ class TechnicianDashboardViewModel(
             }
         }
     }
+
+    fun saveGalleryAlbum(context: android.content.Context, localUriStr: String) {
+        viewModelScope.launch {
+            _eventFlow.emit(DashboardEvent.ShowToast("جاري رفع الصورة... ⏳"))
+            val uri = android.net.Uri.parse(localUriStr)
+            val uploadResult = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, "galleries/${ownerId}")
+            
+            uploadResult.onSuccess { remoteUrl ->
+                val album = com.example.domain.entities.GalleryAlbumEntity(
+                    ownerId = ownerId,
+                    title = "أعمال سابقة",
+                    imageUrls = listOf(remoteUrl)
+                )
+                galleryRepository.saveGalleryAlbum(album).onSuccess {
+                    _eventFlow.emit(DashboardEvent.ShowToast("تم حفظ الصورة بنجاح ✅"))
+                }.onFailure {
+                    _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء حفظ الصورة"))
+                }
+            }.onFailure {
+                _eventFlow.emit(DashboardEvent.ShowToast("فشل رفع الصورة ❌"))
+            }
+        }
+    }
+
+    fun deleteGalleryAlbum(albumId: String) {
+        viewModelScope.launch {
+            galleryRepository.deleteGalleryAlbum(albumId).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم حذف الصورة بنجاح 🗑️"))
+            }.onFailure {
+                _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء الحذف"))
+            }
+        }
+    }
 }

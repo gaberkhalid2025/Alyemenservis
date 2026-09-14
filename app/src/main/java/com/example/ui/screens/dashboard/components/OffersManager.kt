@@ -19,15 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
-
-data class OfferItem(
-    val id: String,
-    val title: String,
-    val description: String,
-    val discountPercent: Int,
-    val validUntil: String,
-    val isActive: Boolean = true
-)
+import com.example.data.SpecialOfferEntity
 
 /**
  * 🏷️ OffersManager (إدارة العروض والخصومات الخاصة)
@@ -39,7 +31,7 @@ fun OffersManager(
     modifier: Modifier = Modifier
 ) {
     var offers by remember {
-        mutableStateOf<List<OfferItem>>(emptyList())
+        mutableStateOf<List<SpecialOfferEntity>>(emptyList())
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -134,7 +126,7 @@ fun OffersManager(
                                     color = Color(0xFFCBD5E1)
                                 )
                                 Text(
-                                    text = "صالح حتى: ${offer.validUntil}",
+                                    text = "صالح حتى: ${offer.expiryDate}",
                                     fontSize = 10.sp,
                                     color = Color(0xFF94A3B8)
                                 )
@@ -142,12 +134,12 @@ fun OffersManager(
 
                             Row {
                                 IconButton(onClick = {
-                                    offers = offers.map { if (it.id == offer.id) it.copy(isActive = !it.isActive) else it }
+                                    offers = offers.map { if (it.id == offer.id) it.copy(isEnabled = !it.isEnabled) else it }
                                 }) {
                                     Icon(
-                                        if (offer.isActive) Icons.Default.CheckCircle else Icons.Default.Close,
+                                        if (offer.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
                                         contentDescription = "Toggle",
-                                        tint = if (offer.isActive) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                        tint = if (offer.isEnabled) Color(0xFF10B981) else Color(0xFF94A3B8)
                                     )
                                 }
                                 IconButton(onClick = { offers = offers.filter { it.id != offer.id } }) {
@@ -198,13 +190,13 @@ fun OffersManager(
                 Button(
                     onClick = {
                         if (newTitle.isNotBlank()) {
-                            val newOffer = OfferItem(
+                            val newOffer = SpecialOfferEntity(
                                 id = System.currentTimeMillis().toString(),
                                 title = newTitle,
                                 description = newDesc,
                                 discountPercent = newDiscount.toIntOrNull() ?: 10,
-                                validUntil = newExpiry,
-                                isActive = true
+                                expiryDate = newExpiry,
+                                isEnabled = true
                             )
                             offers = offers + newOffer
                             showAddDialog = false

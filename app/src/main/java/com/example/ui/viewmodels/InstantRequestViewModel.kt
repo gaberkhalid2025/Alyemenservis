@@ -259,6 +259,13 @@ class InstantRequestViewModel @Inject constructor(
         estimatedDuration: String = "ساعتان",
         notes: String = ""
     ) {
+        val existingOffers = _requestOffers.value.filter { it.requestId == requestId }
+        if (existingOffers.any { it.technicianId == technicianId }) {
+            _uiState.value = InstantUiState.Error("⚠️ قمت بتقديم عرض سابق لهذا الطلب ولا يمكن تقديم عرض مكرر!")
+            triggerNotification?.invoke("⚠️ قمت بتقديم عرض سابق لهذا الطلب!")
+            return
+        }
+
         _uiState.value = InstantUiState.Loading
         val offerId = UUID.randomUUID().toString()
         val offer = RequestOfferEntity(

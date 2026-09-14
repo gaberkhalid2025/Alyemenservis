@@ -30,6 +30,14 @@ import kotlinx.coroutines.launch
 
 import com.example.ui.screens.urgent.components.UrgentFormFields
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.draw.clip
+import coil.compose.AsyncImage
+import com.example.utils.FirebaseStorageUploader
+import java.util.UUID
+
 /**
  * 🚨 UrgentRequestScreen
  * شاشة طلب خدمة عاجلة خلال 30 دقيقة مع مؤقت فوري وتنبيهات أولوية قصوى.
@@ -43,6 +51,7 @@ fun UrgentRequestScreen(
     onNavigateBack: () -> Unit = {},
     onNavigateToUrgentList: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -59,6 +68,17 @@ fun UrgentRequestScreen(
     var selectedArea by remember { mutableStateOf("") }
     var pinCode by remember { mutableStateOf("") }
     var isPinVisible by remember { mutableStateOf(false) }
+    var attachedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var isUploadingImage by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            attachedImageUri = uri
+        }
+    }
 
     var createdRequestCode by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf(false) }
@@ -242,12 +262,64 @@ fun UrgentRequestScreen(
                 singleLine = true
             )
 
+            // إرفاق صورة المشكلة (معاينة وضغط)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📷 إرفاق صورة المشكلة (اختياري):", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        OutlinedButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    androidx.activity.result.PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(if (attachedImageUri != null) "تغيير الصورة" else "اختيار صورة", fontSize = 12.sp)
+                        }
+                    }
+
+                    if (attachedImageUri != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        ) {
+                            AsyncImage(
+                                model = attachedImageUri,
+                                contentDescription = "معاينة صورة الطلب",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            IconButton(
+                                onClick = { attachedImageUri = null },
+                                modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "حذف الصورة", tint = Color.Red)
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // زر إرسال الطلب العاجل
-            val isLoading = uiState is InstantUiState.Loading
+            val isLoading = isSubmitting || isUploadingImage || (uiState is InstantUiState.Loading)
             Button(
                 onClick = {
+                    if (isSubmitting || isLoading) return@Button
                     if (customerPhone.isBlank() || serviceTitle.isBlank() || serviceDetails.isBlank() || selectedArea.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("يرجى تعبئة كافة الحقول الإجبارية (*)") }
                         return@Button
@@ -263,26 +335,54 @@ fun UrgentRequestScreen(
                         return@Button
                     }
 
-                    instantViewModel.createInstantRequest(
-                        userId = currentUserId,
-                        userName = customerName,
-                        userPhone = customerPhone,
-                        userCity = selectedCity,
-                        userNeighborhood = selectedArea,
-                        categoryId = selectedDepartment,
-                        categoryName = selectedCategory,
-                        serviceTitle = serviceTitle,
-                        description = serviceDetails,
-                        customPin = pinCode,
-                        onResult = { success, msg, _ ->
-                            if (success) {
-                                createdRequestCode = "URG-${(1000..9999).random()}"
-                                showSuccessDialog = true
-                            } else {
-                                scope.launch { snackbarHostState.showSnackbar(msg) }
+                    isSubmitting = true
+
+                    val executeCreateRequest: (String) -> Unit = { uploadedImageUrl ->
+                        instantViewModel.createInstantRequest(
+                            userId = currentUserId,
+                            userName = customerName,
+                            userPhone = customerPhone,
+                            userCity = selectedCity,
+                            userNeighborhood = selectedArea,
+                            categoryId = selectedDepartment,
+                            categoryName = selectedCategory,
+                            serviceTitle = serviceTitle,
+                            description = if (uploadedImageUrl.isNotBlank()) "$serviceDetails\n[مرفق صورة: $uploadedImageUrl]" else serviceDetails,
+                            customPin = pinCode,
+                            onResult = { success, msg, _ ->
+                                isSubmitting = false
+                                if (success) {
+                                    createdRequestCode = "URG-${(1000..9999).random()}"
+                                    showSuccessDialog = true
+                                } else {
+                                    scope.launch { snackbarHostState.showSnackbar(msg) }
+                                }
+                            }
+                        )
+                    }
+
+                    if (attachedImageUri != null) {
+                        isUploadingImage = true
+                        scope.launch {
+                            try {
+                                val path = "urgent_requests/req_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(6)}.webp"
+                                val result = FirebaseStorageUploader.uploadImageUri(
+                                    context = context,
+                                    uri = attachedImageUri!!,
+                                    storagePath = path,
+                                    maxDimension = 800,
+                                    maxSizeBytes = 300 * 1024L
+                                )
+                                isUploadingImage = false
+                                executeCreateRequest(result.getOrDefault(""))
+                            } catch (e: Exception) {
+                                isUploadingImage = false
+                                executeCreateRequest("")
                             }
                         }
-                    )
+                    } else {
+                        executeCreateRequest("")
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("submit_urgent_request_btn"),
                 shape = RoundedCornerShape(12.dp),

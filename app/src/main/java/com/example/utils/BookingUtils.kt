@@ -1,5 +1,6 @@
 package com.example.utils
 
+import com.example.data.BookingEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -114,6 +115,32 @@ object BookingUtils {
         return canModifyOrCancelBooking(0L, dateStr, timeStr)
     }
 
+    fun formatBookingDate(date: String): String {
+        if (date.isBlank()) return ""
+        return try {
+            val cleanDate = date.trim().replace("/", "-")
+            val parts = cleanDate.split("-")
+            if (parts.size == 3) {
+                val year = parts[0].toIntOrNull() ?: 2026
+                val month = parts[1].toIntOrNull() ?: 1
+                val day = parts[2].toIntOrNull() ?: 1
+                val cal = java.util.Calendar.getInstance()
+                cal.set(year, month - 1, day)
+                val sdf = SimpleDateFormat("EEEE، d MMMM yyyy", Locale("ar"))
+                sdf.format(cal.time)
+            } else {
+                val sdfInput = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val parsed = sdfInput.parse(cleanDate)
+                if (parsed != null) {
+                    val sdfOutput = SimpleDateFormat("EEEE، d MMMM yyyy", Locale("ar"))
+                    sdfOutput.format(parsed)
+                } else date
+            }
+        } catch (e: Exception) {
+            date
+        }
+    }
+
     fun isValidYemeniPhone(phone: String): Boolean {
         val clean = phone.trim().replace(" ", "").replace("+967", "").replace("00967", "")
         return clean.length >= 7 && (clean.startsWith("7") || clean.startsWith("0"))
@@ -125,6 +152,54 @@ object BookingUtils {
         if (service.isBlank()) return Pair(false, "يرجى تحديد الخدمة المطلوبة")
         if (date.isBlank()) return Pair(false, "يرجى اختيار التاريخ")
         return Pair(true, "")
+    }
+
+    /**
+     * Checks if a technician has a conflicting booking within +/- 2 hours window.
+     */
+    fun hasTechnicianConflict(
+        technicianId: String,
+        dateString: String,
+        timeString: String,
+        existingBookings: List<com.example.data.BookingEntity>,
+        ignoreBookingId: String = ""
+    ): Boolean {
+        if (technicianId.isBlank() || dateString.isBlank()) return false
+        val targetTimestamp = parseScheduledTimestamp(dateString, timeString)
+        val twoHoursMs = 2 * 60 * 60 * 1000L
+
+        return existingBookings.any { b ->
+            val isSameTech = (b.technicianId.isNotBlank() && b.technicianId == technicianId) || (b.providerId.isNotBlank() && b.providerId == technicianId)
+            b.id != ignoreBookingId &&
+            isSameTech &&
+            b.status !in listOf("CANCELLED", "COMPLETED", "REJECTED") &&
+            ((b.date == dateString || b.dateString == dateString) &&
+             (if (targetTimestamp > 0L && b.scheduledAt > 0L) Math.abs(b.scheduledAt - targetTimestamp) < twoHoursMs else (b.time.isNotBlank() && b.time == timeString)))
+        }
+    }
+
+    fun generateShareableBookingTicket(booking: com.example.data.BookingEntity): String {
+        val client = booking.customerName.ifBlank { booking.clientName.ifBlank { "عميل" } }
+        val phone = booking.customerPhone.ifBlank { booking.clientPhone }
+        val code = booking.bookingNumber.ifBlank { booking.bookingCode.ifBlank { booking.id.take(8) } }
+        val date = booking.date.ifBlank { booking.dateString }
+        val time = booking.time.ifBlank { booking.timeString }
+        val service = booking.serviceType.ifBlank { booking.serviceName.ifBlank { "خدمة عامة" } }
+        val amount = if (booking.totalAmount > 0.0) "${booking.totalAmount.toInt()} ريال يمني" else "حسب الاتفاق"
+
+        return """
+            🎫 *تذكرة حجز خدمة — دليل خدمات اليمن*
+            ━━━━━━━━━━━━━━━━━━━━━━
+            📋 *رقم الحجز:* #$code
+            👤 *العميل:* $client ($phone)
+            🛠️ *الخدمة:* $service
+            📅 *الموعد:* $date — $time
+            💰 *المبلغ:* $amount
+            📌 *الحالة:* ${booking.status}
+            ━━━━━━━━━━━━━━━━━━━━━━
+            🔒 *رمز التحقق الأمني:* ${booking.bookingPassword.ifBlank { "****" }}
+            📱 تم الحجز عبر تطبيق دليل خدمات اليمن
+        """.trimIndent()
     }
 }
 

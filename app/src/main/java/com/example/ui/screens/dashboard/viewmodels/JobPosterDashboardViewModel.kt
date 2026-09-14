@@ -22,7 +22,8 @@ data class JobPostItem(
 class JobPosterDashboardViewModel(
     private val ownerId: String,
     private val dashboardRepository: IDashboardRepository,
-    private val productsRepository: IProductsRepository
+    private val productsRepository: IProductsRepository,
+    private val jobRepository: com.example.data.repositories.JobRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -36,6 +37,11 @@ class JobPosterDashboardViewModel(
 
     init {
         loadDashboardData()
+        viewModelScope.launch {
+            jobRepository.getJobs(ownerId).collect {
+                _jobs.value = it
+            }
+        }
     }
 
     fun selectTab(tabIndex: Int) {
@@ -62,24 +68,40 @@ class JobPosterDashboardViewModel(
 
     fun postJob(title: String, company: String, salary: String, requirements: String) {
         if (title.isBlank()) return
+        
+        val jobId = System.currentTimeMillis().toString()
+        val existing = _jobs.value.find { it.title == title && it.companyName == company }
+        if (existing != null) {
+            viewModelScope.launch {
+                _eventFlow.emit(DashboardEvent.ShowToast("الوظيفة موجودة مسبقاً ⚠️"))
+            }
+            return
+        }
+
         val item = JobPostItem(
-            id = System.currentTimeMillis().toString(),
+            id = jobId,
             title = title,
             companyName = company,
             salary = salary,
             requirements = requirements,
             applicantsCount = 0
         )
-        _jobs.value = _jobs.value + item
         viewModelScope.launch {
-            _eventFlow.emit(DashboardEvent.ShowToast("تم نشر الشاغر الوظيفي بنجاح 💼"))
+            jobRepository.postJob(ownerId, item).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم نشر الشاغر الوظيفي بنجاح 💼"))
+            }.onFailure {
+                _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء النشر"))
+            }
         }
     }
 
     fun deleteJob(id: String) {
-        _jobs.value = _jobs.value.filter { it.id != id }
         viewModelScope.launch {
-            _eventFlow.emit(DashboardEvent.ShowToast("تم حذف إعلان الوظيفة 🗑️"))
+            jobRepository.deleteJob(id).onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast("تم حذف إعلان الوظيفة 🗑️"))
+            }.onFailure {
+                _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء الحذف"))
+            }
         }
     }
 }

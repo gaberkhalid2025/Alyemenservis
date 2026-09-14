@@ -48,12 +48,19 @@ class FavoritesViewModel(
 
     fun toggleFavorite(item: FavoriteItemEntity) {
         viewModelScope.launch {
-            val isFav = favoritesRepository.isFavorite(userId, item.targetId)
+            val currentList = _uiState.value.favorites.toMutableList()
+            val isFav = favoritesRepository.isFavorite(userId, item.targetId) || currentList.any { it.targetId == item.targetId }
             if (isFav) {
+                currentList.removeAll { it.targetId == item.targetId }
+                _uiState.value = _uiState.value.copy(favorites = currentList)
                 favoritesRepository.removeFavorite(userId, item.targetId).onSuccess {
                     _eventFlow.emit(DashboardEvent.ShowToast("تمت الإزالة من المفضلة"))
                 }
             } else {
+                if (!currentList.any { it.targetId == item.targetId }) {
+                    currentList.add(0, item.copy(userId = userId))
+                    _uiState.value = _uiState.value.copy(favorites = currentList)
+                }
                 favoritesRepository.addFavorite(item.copy(userId = userId)).onSuccess {
                     _eventFlow.emit(DashboardEvent.ShowToast("تمت الإضافة للمفضلة"))
                 }

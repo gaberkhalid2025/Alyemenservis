@@ -60,10 +60,16 @@ fun UnifiedSettingsSection(
 
                 OutlinedTextField(
                     value = phoneInput,
-                    onValueChange = { phoneInput = it },
-                    label = { Text("رقم الهاتف التواصل") },
+                    onValueChange = { /* Read only */ },
+                    label = { Text("رقم الهاتف المسجل (غير قابل للتعديل 🔒)") },
+                    enabled = false,
+                    readOnly = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = themeColors.accent)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor = Color.Gray.copy(alpha = 0.5f),
+                        disabledTextColor = Color.LightGray,
+                        disabledLabelColor = Color.Gray
+                    )
                 )
 
                 OutlinedTextField(

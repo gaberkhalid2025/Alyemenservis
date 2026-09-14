@@ -3,6 +3,7 @@ package com.example.utils
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -110,6 +111,7 @@ object SecurityCryptoUtils {
     /**
      * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES cipher text.
      * Generates a unique, cryptographically secure 16-byte random IV for each operation and prefixes it to the ciphertext.
+     * Any error logs to Crashlytics and throws an exception to prevent leaking plain text.
      */
     fun encrypt(plainText: String?): String {
         if (plainText.isNullOrEmpty()) return ""
@@ -124,19 +126,26 @@ object SecurityCryptoUtils {
             val combined = iv + encryptedBytes
             base64Encode(combined)
         } catch (e: Exception) {
-            plainText
+            try {
+                FirebaseCrashlytics.getInstance().recordException(e)
+            } catch (ignored: Throwable) {}
+            throw SecurityException("فشل تشفير البيانات الحساسة: ${e.message}", e)
         }
     }
 
     /**
      * Decrypts Base64 encoded AES cipher text back to plain text.
      * Extracts the 16-byte IV stored at the beginning of the payload.
+     * Throws exception if corrupted payload cannot be decrypted.
      */
     fun decrypt(encryptedText: String?): String {
         if (encryptedText.isNullOrEmpty()) return ""
         return try {
             val decodedBytes = base64Decode(encryptedText)
-            if (decodedBytes.size <= 16) return encryptedText
+            if (decodedBytes.size <= 16) {
+                // If not valid AES encrypted payload, return original as fallback
+                return encryptedText
+            }
             val iv = decodedBytes.copyOfRange(0, 16)
             val encrypted = decodedBytes.copyOfRange(16, decodedBytes.size)
             val key = getSecretKey()
@@ -146,7 +155,10 @@ object SecurityCryptoUtils {
             val decryptedBytes = cipher.doFinal(encrypted)
             String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
-            encryptedText
+            try {
+                FirebaseCrashlytics.getInstance().recordException(e)
+            } catch (ignored: Throwable) {}
+            throw SecurityException("فشل فك تشفير البيانات المشفرة: ${e.message}", e)
         }
     }
 

@@ -66,5 +66,7 @@ data class BookingEntity(
     val userCity: String = "",
     val userNeighborhood: String = "",
     val serviceName: String = "",
-    val secretPin: String = ""
+    val secretPin: String = "",
+    val technicianId: String = "",
+    val technicianName: String = ""
 )

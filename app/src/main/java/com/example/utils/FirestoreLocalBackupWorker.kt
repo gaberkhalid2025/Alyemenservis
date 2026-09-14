@@ -103,6 +103,7 @@ class FirestoreLocalBackupWorker(
 
         fun schedulePeriodicBackup(context: Context) {
             val backupRequest = PeriodicWorkRequestBuilder<FirestoreLocalBackupWorker>(24, TimeUnit.HOURS)
+                .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
                 .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(

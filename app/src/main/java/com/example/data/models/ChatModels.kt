@@ -101,14 +101,37 @@ data class ChatChannel(
     val lastMessageSenderId: String = "",
     val lastMessageStatus: MessageStatus = MessageStatus.SENT,
     val unreadCount: Map<String, Int> = emptyMap(),
-    val isBlocked: Map<String, Boolean> = emptyMap(),
+    val isBlocked: Boolean = false,
+    val blockedUsers: Map<String, Boolean> = emptyMap(),
     val isTyping: Map<String, Boolean> = emptyMap(),
     val isPinned: Map<String, Boolean> = emptyMap(),
     val isMuted: Map<String, Boolean> = emptyMap(),
     val syncStatus: SyncStatus = SyncStatus.SYNCED,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val channelType: String = "PROVIDER",
+    val targetId: String = "",
+    val targetName: String = "",
+    val targetPhone: String = "",
+    val targetCategory: String = "",
+    val userName: String = "",
+    val customerName: String = "",
+    val customerPhone: String = "",
+    val customerId: String = "",
+    val isProvider: Boolean = false,
+    val timestamp: Long = 0L,
+    val unreadCountUser: Int = 0,
+    val unreadCountTarget: Int = 0,
+    val providerId: String = "",
+    val providerName: String = "",
+    val providerPhoto: String = "",
+    val clientId: String = "",
+    val clientName: String = "",
+    val clientPhoto: String = "",
+    val messages: List<ChatMessage> = emptyList()
 ) : Serializable {
+
+    fun toCanonicalChannel(): ChatChannel = this
 
     /**
      * الحصول على اسم الطرف الآخر في المحادثات الثنائية
@@ -137,7 +160,7 @@ data class ChatChannel(
      * فحص ما إذا كان المستخدم محظوراً في القناة
      */
     fun isUserBlocked(userId: String): Boolean {
-        return isBlocked[userId] == true
+        return isBlocked || blockedUsers[userId] == true
     }
 }
 
@@ -151,23 +174,36 @@ data class ChatMessage(
     val senderId: String = "",
     val senderName: String = "",
     val senderPhoto: String = "",
+    val senderPhone: String = "",
+    val recipientId: String = "",
     val message: String = "",
     val mediaType: MediaType = MediaType.TEXT,
     val mediaUrl: String = "",
+    val imageUrl: String = "",
+    val audioDurationSec: Int = 0,
     val attachment: ChatAttachment? = null,
     val replyToId: String? = null,
     val replyToText: String? = null,
     val replyToSender: String? = null,
     val status: MessageStatus = MessageStatus.SENT,
+    val statusTime: Long = 0L,
     val reactions: Map<String, String> = emptyMap(), // Map of userId to emoji
     val isEncrypted: Boolean = false,
     val isEdited: Boolean = false,
     val editTimestamp: Long = 0L,
     val timestamp: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false,
+    val deletedBy: String = "",
     val deletedForUsers: List<String> = emptyList(),
+    val fileName: String = "",
+    val fileSize: Long = 0L,
+    val fileType: String = "",
+    val forwardedFrom: String = "",
+    val readAt: Long = 0L,
     val syncStatus: SyncStatus = SyncStatus.SYNCED
 ) : Serializable {
+
+    fun toCanonicalMessage(chId: String = channelId): ChatMessage = this
 
     /**
      * فحص ما إذا كانت الرسالة مرسلة من المستخدم الحالي

@@ -64,13 +64,22 @@ class MyApplication : Application() {
             val firestore = FirebaseFirestore.getInstance()
             val settings = FirebaseFirestoreSettings.Builder()
                 .setPersistenceEnabled(true)
-                .setCacheSizeBytes(104857600L)
+                .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
                 .build()
             firestore.firestoreSettings = settings
             Log.d("MyApplication", "✅ FirebaseFirestore settings initialized successfully")
         } catch (e: Exception) {
             // تجاهل — قد تكون مهيأة مسبقاً
-            e.printStackTrace()
+            try {
+                val firestore = FirebaseFirestore.getInstance()
+                val settings = FirebaseFirestoreSettings.Builder()
+                    .setPersistenceEnabled(true)
+                    .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
+                    .build()
+                firestore.firestoreSettings = settings
+            } catch (e2: Exception) {
+                e2.printStackTrace()
+            }
         }
 
         // ===================== الخطوة 2: تهيئة Analytics بأمان =====================

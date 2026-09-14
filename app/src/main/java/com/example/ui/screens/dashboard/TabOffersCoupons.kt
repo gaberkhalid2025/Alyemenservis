@@ -14,21 +14,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.screens.dashboard.components.UnifiedEmptyState
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.ui.screens.dashboard.viewmodels.OffersViewModel
 import com.example.utils.VisualThemePalette
-
-data class OfferItem(
-    val id: String = System.currentTimeMillis().toString(),
-    val title: String,
-    val description: String,
-    val discountPercent: Int,
-    val couponCode: String = ""
-)
+import com.example.data.SpecialOfferEntity
 
 @Composable
 fun TabOffersCoupons(
-    themeColors: VisualThemePalette
+    themeColors: VisualThemePalette,
+    viewModel: OffersViewModel = hiltViewModel()
 ) {
-    var offersList by remember { mutableStateOf(listOf<OfferItem>()) }
+    val offersList by viewModel.offers.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
     var titleInput by remember { mutableStateOf("") }
@@ -150,12 +146,12 @@ fun TabOffersCoupons(
                     onClick = {
                         val disc = discountInput.toIntOrNull() ?: 10
                         if (titleInput.isNotBlank()) {
-                            offersList = offersList + OfferItem(
+                            viewModel.addOffer(SpecialOfferEntity(
                                 title = titleInput,
                                 description = descInput,
                                 discountPercent = disc,
                                 couponCode = codeInput
-                            )
+                            ))
                             titleInput = ""
                             descInput = ""
                             discountInput = ""

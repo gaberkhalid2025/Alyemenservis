@@ -92,7 +92,7 @@ fun RequestDetailsScreen(
                 },
                 actions = {
                     val status = selectedRequest?.status
-                    if (status == "WAITING_FOR_OFFERS" || status == "REVIEWING_OFFERS") {
+                    if (status == "PENDING" || status == "ACCEPTED" || status == "OPEN" || status == "WAITING_FOR_OFFERS" || status == "REVIEWING_OFFERS") {
                         IconButton(onClick = { showCancelDialog = true }) {
                             Icon(Icons.Default.Close, contentDescription = "إلغاء الطلب", tint = MaterialTheme.colorScheme.error)
                         }

@@ -16,14 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
-
-data class OfferUiModel(
-    val id: String = System.currentTimeMillis().toString(),
-    val title: String,
-    val discountPercent: Int,
-    val durationDays: Int,
-    val isActive: Boolean = true
-)
+import com.example.data.SpecialOfferEntity
 
 @Composable
 fun AdvancedOffersManagementDialog(
@@ -31,7 +24,7 @@ fun AdvancedOffersManagementDialog(
     onDismiss: () -> Unit
 ) {
     var offers by remember {
-        mutableStateOf<List<OfferUiModel>>(emptyList())
+        mutableStateOf<List<SpecialOfferEntity>>(emptyList())
     }
     var showAddDialog by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }
@@ -87,10 +80,10 @@ fun AdvancedOffersManagementDialog(
                     Button(
                         onClick = {
                             if (newTitle.isNotBlank()) {
-                                offers = offers + OfferUiModel(
+                                offers = offers + SpecialOfferEntity(
                                     title = newTitle,
                                     discountPercent = newDiscount.toIntOrNull() ?: 10,
-                                    durationDays = newDuration.toIntOrNull() ?: 7
+                                    expiryDate = "بعد ${newDuration.toIntOrNull() ?: 7} أيام"
                                 )
                                 newTitle = ""
                                 showAddDialog = false
@@ -117,13 +110,13 @@ fun AdvancedOffersManagementDialog(
                         ) {
                             Column {
                                 Text(offer.title, fontSize = 14.sp)
-                                Text("خصم: ${offer.discountPercent}% - المدة: ${offer.durationDays} يوم", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                                Text("خصم: ${offer.discountPercent}% - المدة: ${offer.expiryDate}", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                             }
                             Row {
                                 Switch(
-                                    checked = offer.isActive,
+                                    checked = offer.isEnabled,
                                     onCheckedChange = { active ->
-                                        offers = offers.map { if (it.id == offer.id) it.copy(isActive = active) else it }
+                                        offers = offers.map { if (it.id == offer.id) it.copy(isEnabled = active) else it }
                                     }
                                 )
                                 IconButton(onClick = {
