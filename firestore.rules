@@ -1,87 +1,503 @@
 rules_version = '2';
+/**
+ * ============================================================================
+ * Firebase Firestore Security Rules
+ * التاريخ: 2026-09-14
+ * سبب التعديل: 
+ *   1. إزالة كاملة لـ request.auth.token.phone_number و exists() و get() من الدوال المساعدة لتقليل استهلاك Firebase Spark Plan (صفر قراءات إضافية للصلاحيات).
+ *   2. الاعتماد المباشر على request.auth.uid عبر Anonymous Auth لمنع تعدد الحسابات من نفس الجهاز.
+ *   3. منع تكرار أرقام الهواتف أو استخدام رقم هاتف مسجل مسبقاً لمستخدم آخر.
+ *   4. حماية شاملة من تصعيد الصلاحيات (Role / Admin status protection).
+ *   5. مبدأ الحظر الافتراضي Deny by default لكافة المسارات غير المعرفة.
+ * الحالة: إصدار أولي قبل النشر النهائي اليدوي على Firebase Console.
+ * ============================================================================
+ */
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ===== دالة مساعدة للتحقق من الأدمن =====
+    // ========================================================================
+    // الدوال المساعدة العامة (خفيفة وبدون أي استعلامات get أو exists)
+    // ========================================================================
+
+    // التحقق من تسجيل الدخول (سواء Anonymous أو عادي)
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // التحقق من أن المستخدم هو صاحب المعرف
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // التحقق من أن المستخدم أدمن عبر custom claims أو عبر معرف الأدمن المصادق
     function isAdmin() {
-      return request.auth != null && 
-             get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'owner'];
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role in ['admin', 'owner', 'super_admin']
+      );
     }
 
-    // ===== دالة مساعدة للتحقق من صاحب الطلب =====
-    function isOwner(phone) {
-      return request.auth != null && 
-             request.auth.token.phone_number == phone;
+    // التحقق من عدم محاولة تصعيد الصلاحيات
+    function doesNotChangeRole() {
+      return !('role' in request.resource.data) ||
+             (resource != null && 'role' in resource.data && request.resource.data.role == resource.data.role);
     }
 
-    // ===== join_requests =====
-    match /join_requests/{requestId} {
-      // القراءة: صاحب الطلب أو الأدمن فقط
-      allow read: if isAdmin() || 
-                     (request.auth != null && resource.data.phone == request.auth.token.phone_number);
-      
-      // الإنشاء: أي مستخدم مسجل يمكنه إنشاء طلب بحالة PENDING فقط
-      allow create: if request.auth != null && 
-                       request.resource.data.status == "PENDING" &&
-                       request.resource.data.approvalStatus == "PENDING";
-      
-      // التحديث: الأدمن فقط يمكنه تغيير الحالة إلى APPROVED أو REJECTED
-      allow update: if isAdmin() || 
-                       (request.auth != null && 
-                        resource.data.phone == request.auth.token.phone_number &&
-                        request.resource.data.status == resource.data.status); // صاحب الطلب لا يغير الحالة
-      
-      // الحذف: الأدمن فقط
+    function doesNotChangeAdminStatus() {
+      return !('isAdmin' in request.resource.data) ||
+             (resource != null && 'isAdmin' in resource.data && request.resource.data.isAdmin == resource.data.isAdmin);
+    }
+
+    // التحقق من عدم تغيير رقم الهاتف بعد تعيينه لأول مرة (منع الاستيلاء أو التغيير العشوائي)
+    function doesNotChangePhone() {
+      return resource == null ||
+             !('phone' in resource.data) ||
+             request.resource.data.phone == resource.data.phone;
+    }
+
+    // ========================================================================
+    // 1. حسابات المستخدمين (Users & Registered Users)
+    // ========================================================================
+    // مستند المستخدم يكون معرفه هو الـ request.auth.uid الخاص بالجهاز لمنع تعدد الحسابات
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      // الإنشاء: فقط للمصادق نفسه بشرط أن userId يطابق request.auth.uid، وأن يكون رقم الهاتف موجوداً
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == userId && 
+                       request.resource.data.uid == request.auth.uid &&
+                       request.resource.data.phone != null &&
+                       doesNotChangeRole();
+      // التعديل: للمالك فقط مع منع تغيير role و isAdmin ورقم الهاتف
+      allow update: if (isOwner(userId) && doesNotChangeRole() && doesNotChangeAdminStatus() && doesNotChangePhone()) || isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ===== providers / stores / properties / jobs =====
-    match /providers/{providerId} {
-      allow read: if true; // عام للقراءة
-      allow write: if isAdmin(); // الكتابة للأدمن فقط بعد الموافقة
+    // جدول أرقام الهواتف الفريدة لمنع تكرار رقم الهاتف بين أجهزة متعددة
+    // مستند هذا الجدول يكون معرفه هو رقم الهاتف نفسه {phone}
+    match /registered_users/{phone} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      // الإنشاء: يتم حجز الرقم بربطه بالـ uid المصادق، ولا يسمح بإعادة إنشائه إذا كان محجوزاً
+      allow create: if isAuthenticated() && 
+                       request.resource.data.uid == request.auth.uid &&
+                       request.resource.data.phone == phone;
+      // التحديث: للمالك نفسه فقط (الذي يملك نفس الـ uid) أو الأدمن
+      allow update: if (isAuthenticated() && resource.data.uid == request.auth.uid) || isAdmin();
+      allow delete: if isAdmin();
     }
-    
+
+    match /user_presence/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    match /fcm_tokens/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // ========================================================================
+    // 2. طلبات الانضمام والمزودين المؤقتين (Join Requests & Pending Providers)
+    // ========================================================================
+    match /join_requests/{requestId} {
+      // القراءة: لصاحب الطلب (عبر uid) أو الأدمن
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
+      // الإنشاء: للمصادق مع ربط الطلب بـ uid الجهاز وحالة انتظار PENDING فقط
+      allow create: if isAuthenticated() && 
+                       request.resource.data.uid == request.auth.uid &&
+                       (request.resource.data.status == "PENDING" || request.resource.data.approvalStatus == "PENDING");
+      // التعديل: للمالك مع منع تغيير الحالة، أو للأدمن
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.uid == request.auth.uid &&
+        request.resource.data.status == resource.data.status
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /pending_providers/{pendingId} {
+      allow read, write: if isAdmin() || (isAuthenticated() && request.resource.data.uid == request.auth.uid);
+    }
+
+    // ========================================================================
+    // 3. مزودو الخدمات والمتاجر والعقارات والوظائف
+    // ========================================================================
+    match /providers/{providerId} {
+      allow read: if true;
+      allow create: if isAdmin() || (isAuthenticated() && (request.resource.data.uid == request.auth.uid || request.resource.data.userId == request.auth.uid));
+      allow update: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.uid == request.auth.uid ||
+          resource.data.userId == request.auth.uid
+        ) && doesNotChangeRole() && doesNotChangePhone()
+      );
+      allow delete: if isAdmin();
+    }
+
     match /stores/{storeId} {
       allow read: if true;
-      allow write: if isAdmin();
-    }
-    
-    match /properties/{propertyId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-    
-    match /jobs/{jobId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
-    }
-
-    // ===== notifications =====
-    match /notifications/{notificationId} {
-      allow read: if isAdmin() || 
-                     (request.auth != null && resource.data.targetValue == request.auth.token.phone_number);
-      allow create: if isAdmin() || request.auth != null;
-      allow update: if isAdmin() || 
-                       (request.auth != null && resource.data.targetValue == request.auth.token.phone_number);
+      allow create: if isAdmin() || (isAuthenticated() && (request.resource.data.ownerId == request.auth.uid || request.resource.data.uid == request.auth.uid));
+      allow update: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.ownerId == request.auth.uid ||
+          resource.data.uid == request.auth.uid
+        )
+      );
       allow delete: if isAdmin();
     }
 
-    // ===== fcm_tokens =====
-    match /fcm_tokens/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
-    // ===== admins =====
+    match /properties/{propertyId} {
+      allow read: if true;
+      allow create: if isAdmin() || (isAuthenticated() && (request.resource.data.ownerId == request.auth.uid || request.resource.data.uid == request.auth.uid));
+      allow update: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.ownerId == request.auth.uid ||
+          resource.data.uid == request.auth.uid
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow create: if isAdmin() || (isAuthenticated() && (request.resource.data.publisherId == request.auth.uid || request.resource.data.uid == request.auth.uid));
+      allow update: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.publisherId == request.auth.uid ||
+          resource.data.uid == request.auth.uid
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /job_applications/{appId} {
+      allow read: if isAuthenticated() && (
+        resource.data.applicantId == request.auth.uid ||
+        resource.data.publisherId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.applicantId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // 4. الحجوزات والطلبات الفورية (Bookings & Instant Requests & Offers)
+    // ========================================================================
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /instant_requests/{reqId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /offers/{offerId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.providerId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.providerId == request.auth.uid ||
+        resource.data.customerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /instant_offers/{offerId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.providerId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /request_offers/{offerId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.providerId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // 5. نظام المحادثات والرسائل الفورية (Chat Channels & Messages)
+    // ========================================================================
+    match /chat_channels/{channelId} {
+      allow read, write: if isAuthenticated() && (
+        request.auth.uid in resource.data.participantIds ||
+        request.auth.uid in request.resource.data.participantIds ||
+        isAdmin()
+      );
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && (
+          request.resource.data.senderId == request.auth.uid ||
+          isAdmin()
+        );
+        allow update: if isAuthenticated() && (
+          resource.data.senderId == request.auth.uid ||
+          isAdmin()
+        );
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /calls/{callId} {
+      allow read, write: if isAuthenticated() && (
+        resource == null ||
+        resource.data.callerId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ========================================================================
+    // 6. الإشعارات والبلاغات واستعادة كلمة المرور
+    // ========================================================================
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() || isAdmin();
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.reporterId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /review_reports/{reportId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /password_recovery_requests/{phone} {
+      // قراءة ومتابعة الطلب لصاحب الـ uid المرتبط بالطلب أو للأدمن
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /password_resets/{resetId} {
+      allow read, write: if isAuthenticated() || isAdmin();
+    }
+
+    // ========================================================================
+    // 7. التقييمات والمفضلة والطلبات (Ratings, Favorites, Orders)
+    // ========================================================================
+    match /ratings/{ratingId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /favorites/{favId} {
+      allow read, write: if isAuthenticated() && (
+        favId == request.auth.uid ||
+        resource == null ||
+        resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.storeOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.storeOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // 8. المحافظ والمعاملات المالية (Wallets & Financial Transactions)
+    // ========================================================================
+    match /wallet_transactions/{txId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /wallets/{walletId} {
+      allow read: if isOwner(walletId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /payment_wallets/{walletId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /internal_wallets/{walletId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ========================================================================
+    // 9. الإعدادات والبيانات الثابتة (Settings, Categories, Banners, Themes)
+    // ========================================================================
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cities/{cityId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /color_themes/{themeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /app_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /quick_service_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /custom_profile_tabs/{tabId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /galleries/{galleryId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /ai_guides/{guideId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ========================================================================
+    // 10. البيانات الإدارية وسجلات النظام (Admin collections & Audit Logs)
+    // ========================================================================
     match /admins/{adminId} {
       allow read, write: if isAdmin();
     }
 
-    // General fallback
+    match /admin_users/{adminId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /supervisors/{supId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admin_settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admin_notifications/{notifId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admin_audit_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /security_audit_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /activity_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /user_behavior_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /system_stats/{statId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /database_backups/{backupId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ========================================================================
+    // 11. الحظر الافتراضي لأي مسار غير مصرح به (Deny by default)
+    // ========================================================================
     match /{document=**} {
       allow read, write: if isAdmin();
     }

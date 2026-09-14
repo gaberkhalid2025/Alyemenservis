@@ -23,9 +23,9 @@ import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 
 /**
-4:  * 🛠️ ProviderForm (استمارة تسجيل الفني والمهني المحدثة والمبسطة)
-5:  * نموذج صفحة واحدة مدمج وموفر للمساحة مع التحقق الفوري للمتطلبات الإجبارية.
-6:  */
+ * 🛠️ ProviderForm (استمارة تسجيل الفني والمهني المحدثة والمبسطة)
+ * نموذج صفحة واحدة مدمج وموفر للمساحة مع التحقق الفوري للمتطلبات الإجبارية.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProviderForm(
@@ -33,6 +33,10 @@ fun ProviderForm(
     onSubmit: (Map<String, Any>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val draftManager = remember { com.example.ui.screens.register.forms.RegistrationDraftManager(context) }
+    val draftRole = "PROVIDER"
+
     // Mandatory fields
     var fullName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -51,6 +55,28 @@ fun ProviderForm(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val savedDraft = draftManager.getDraft(draftRole)
+        if (savedDraft.isNotEmpty()) {
+            savedDraft["entityName"]?.let { if (it.isNotBlank()) fullName = it }
+            savedDraft["phone"]?.let { if (it.isNotBlank()) phone = it }
+            savedDraft["city"]?.let { if (it.isNotBlank()) city = it }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(fullName, phone, city, password) {
+        if (fullName.isNotBlank() || phone.isNotBlank()) {
+            draftManager.saveDraft(draftRole, mapOf(
+                "entityName" to fullName,
+                "phone" to phone,
+                "city" to city,
+                "password" to password,
+                "confirmPassword" to confirmPassword,
+                "specialization" to craftType
+            ))
+        }
+    }
 
     // Validation logic (Mandatory fields only)
     val isFormValid = fullName.trim().split(" ").filter { it.isNotBlank() }.size >= 3 &&

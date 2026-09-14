@@ -68,11 +68,12 @@ fun UnifiedRegistrationForm(
         viewModel.loadDraft(role)
     }
 
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        selectedImageUri = uri
+        if (uri != null) {
+            viewModel.onEvent(RegistrationEvent.ImageChanged(uri.toString()))
+        }
     }
 
     Column(
@@ -101,9 +102,10 @@ fun UnifiedRegistrationForm(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (selectedImageUri != null) {
+                    val currentImageUri = state.imageUri.ifBlank { null }
+                    if (currentImageUri != null) {
                         AsyncImage(
-                            model = selectedImageUri,
+                            model = Uri.parse(currentImageUri),
                             contentDescription = "الصورة المختارة",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -124,14 +126,14 @@ fun UnifiedRegistrationForm(
 
                     Column {
                         Text(
-                            text = if (selectedImageUri != null) "تم إرفاق الصورة بنجاح ✅" else "صورة الحساب / الشعار / الهوية",
+                            text = if (state.imageUri.isNotBlank()) "تم إرفاق الصورة بنجاح ✅" else "صورة الحساب / الشعار / الهوية",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (selectedImageUri != null) Color(0xFF10B981) else Color.White,
+                            color = if (state.imageUri.isNotBlank()) Color(0xFF10B981) else Color.White,
                             maxLines = 1
                         )
                         Text(
-                            text = if (selectedImageUri != null) "انقر لتغيير الصورة" else "اختياري لتوثيق الحساب",
+                            text = if (state.imageUri.isNotBlank()) "انقر لتغيير الصورة" else "اختياري لتوثيق الحساب",
                             fontSize = 10.sp,
                             color = Color.Gray,
                             maxLines = 1
@@ -147,7 +149,7 @@ fun UnifiedRegistrationForm(
                     modifier = Modifier.wrapContentWidth()
                 ) {
                     Text(
-                        text = if (selectedImageUri != null) "تغيير الصورة 🔄" else "اختيار 📷",
+                        text = if (state.imageUri.isNotBlank()) "تغيير الصورة 🔄" else "اختيار 📷",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,

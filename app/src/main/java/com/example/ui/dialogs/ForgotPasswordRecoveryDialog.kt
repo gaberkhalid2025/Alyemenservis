@@ -200,8 +200,10 @@ fun ForgotPasswordRecoveryDialog(
                                 viewModel.db.collection("password_resets").document(cleanPhone).set(resetRequest)
 
                                 // Register recovery request for admin dashboard
+                                val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
                                 val adminRecoveryRequest = mapOf(
                                     "id" to cleanPhone,
+                                    "uid" to currentUid,
                                     "phone" to cleanPhone,
                                     "name" to "طلب استعادة ($cleanPhone)",
                                     "accountType" to "مسترجع",

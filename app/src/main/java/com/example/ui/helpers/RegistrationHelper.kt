@@ -150,6 +150,7 @@ class RegistrationHelper(
                 else -> "PROVIDER"
             }
             val requestDocId = cleanPhone
+            val currentAuthUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
             val securedPasswordHash = if (password.isNotBlank()) com.example.utils.PasswordHasher.hash(password.trim()) else ""
             val newRequest = PendingProviderEntity(
                 id = requestDocId,
@@ -169,7 +170,25 @@ class RegistrationHelper(
                 providerType = requestProfession
             )
             // Push to Cloud
-            db.collection("pending_providers").document(requestDocId).set(newRequest)
+            val pendingDataMap = mapOf(
+                "id" to requestDocId,
+                "uid" to currentAuthUid,
+                "name" to name,
+                "phone" to phone,
+                "categoryId" to catId,
+                "area" to area,
+                "localNeighborhood" to neighborhood,
+                "status" to "PENDING",
+                "selfiePhotoBase64" to encSelfie,
+                "idPhotoBase64" to encIdCard,
+                "workPhotosBase64" to finalWorkPhotos,
+                "customCategoryName" to customCategoryName,
+                "password" to securedPasswordHash,
+                "productAttachmentsJson" to productAttachmentsJson,
+                "profession" to requestProfession,
+                "providerType" to requestProfession
+            )
+            db.collection("pending_providers").document(requestDocId).set(pendingDataMap)
             val unifiedJoinRequest = JoinRequestEntity(
                 id = requestDocId,
                 type = requestType,
@@ -195,7 +214,34 @@ class RegistrationHelper(
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis()
             )
-            db.collection("join_requests").document(requestDocId).set(unifiedJoinRequest)
+            val joinRequestMap = mapOf(
+                "id" to requestDocId,
+                "uid" to currentAuthUid,
+                "userId" to currentAuthUid,
+                "type" to requestType,
+                "status" to "PENDING",
+                "approvalStatus" to "PENDING",
+                "fullName" to name,
+                "phone" to cleanPhone,
+                "passwordHash" to securedPasswordHash,
+                "city" to area,
+                "area" to neighborhood,
+                "neighborhood" to neighborhood,
+                "categoryId" to catId,
+                "categoryName" to customCategoryName.ifBlank { catId },
+                "businessName" to (if (requestType == "STORE" || requestType == "RESTAURANT" || requestType == "MEDICAL") name else ""),
+                "ownerName" to name,
+                "propertyTitle" to (if (requestType == "PROPERTY") (if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب/عقار ($name)") else ""),
+                "jobTitle" to (if (requestType == "JOB") customCategoryName.ifBlank { name } else ""),
+                "companyName" to (if (requestType == "JOB") name else ""),
+                "profileImage" to finalSelfie,
+                "idCardImage" to finalIdCard,
+                "workImages" to finalWorkPhotos,
+                "submittedAt" to System.currentTimeMillis(),
+                "createdAt" to System.currentTimeMillis(),
+                "updatedAt" to System.currentTimeMillis()
+            )
+            db.collection("join_requests").document(requestDocId).set(joinRequestMap)
                 .addOnSuccessListener {
                     try {
                         when (requestType.uppercase()) {
@@ -210,7 +256,7 @@ class RegistrationHelper(
                                     id = requestDocId,
                                     name = name,
                                     phone = cleanPhone,
-                                    ownerId = cleanPhone,
+                                    ownerId = currentAuthUid.ifEmpty { cleanPhone },
                                     ownerName = name,
                                     cityId = area,
                                     localNeighborhood = neighborhood,
@@ -220,7 +266,23 @@ class RegistrationHelper(
                                     isApproved = false,
                                     password = password
                                 )
-                                db.collection("stores").document(requestDocId).set(newStore)
+                                val storeMap = mapOf(
+                                    "id" to requestDocId,
+                                    "uid" to currentAuthUid,
+                                    "ownerId" to (currentAuthUid.ifEmpty { cleanPhone }),
+                                    "name" to name,
+                                    "phone" to cleanPhone,
+                                    "ownerName" to name,
+                                    "cityId" to area,
+                                    "localNeighborhood" to neighborhood,
+                                    "sectionId" to secId,
+                                    "categoryId" to catName,
+                                    "isActive" to false,
+                                    "isApproved" to false,
+                                    "password" to password,
+                                    "createdAt" to System.currentTimeMillis()
+                                )
+                                db.collection("stores").document(requestDocId).set(storeMap)
                                 onStoreAdded(newStore)
                             }
                             "PROPERTY" -> {
@@ -228,14 +290,27 @@ class RegistrationHelper(
                                     id = requestDocId,
                                     title = if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب عقاري - $name",
                                     phone = cleanPhone,
-                                    ownerId = cleanPhone,
+                                    ownerId = currentAuthUid.ifEmpty { cleanPhone },
                                     cityId = area,
                                     localNeighborhood = neighborhood,
                                     isActive = false,
                                     isApproved = false,
                                     password = password
                                 )
-                                db.collection("properties").document(requestDocId).set(newProp)
+                                val propMap = mapOf(
+                                    "id" to requestDocId,
+                                    "uid" to currentAuthUid,
+                                    "ownerId" to (currentAuthUid.ifEmpty { cleanPhone }),
+                                    "title" to (if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب عقاري - $name"),
+                                    "phone" to cleanPhone,
+                                    "cityId" to area,
+                                    "localNeighborhood" to neighborhood,
+                                    "isActive" to false,
+                                    "isApproved" to false,
+                                    "password" to password,
+                                    "createdAt" to System.currentTimeMillis()
+                                )
+                                db.collection("properties").document(requestDocId).set(propMap)
                                 onPropertyAdded(newProp)
                             }
                             "JOB" -> {
@@ -248,12 +323,26 @@ class RegistrationHelper(
                                     isActive = false,
                                     isApproved = false
                                 )
-                                db.collection("jobs").document(requestDocId).set(newJob)
+                                val jobMap = mapOf(
+                                    "id" to requestDocId,
+                                    "uid" to currentAuthUid,
+                                    "publisherId" to (currentAuthUid.ifEmpty { cleanPhone }),
+                                    "title" to (if (customCategoryName.isNotBlank()) customCategoryName else "وظيفة - $name"),
+                                    "companyName" to name,
+                                    "phone" to cleanPhone,
+                                    "cityId" to area,
+                                    "isActive" to false,
+                                    "isApproved" to false,
+                                    "createdAt" to System.currentTimeMillis()
+                                )
+                                db.collection("jobs").document(requestDocId).set(jobMap)
                                 onJobAdded(newJob)
                             }
                             "CLIENT" -> {
                                 val userMap = mapOf(
                                     "id" to requestDocId,
+                                    "uid" to currentAuthUid,
+                                    "userId" to currentAuthUid,
                                     "name" to name,
                                     "phone" to cleanPhone,
                                     "residence" to area,
@@ -261,6 +350,7 @@ class RegistrationHelper(
                                     "createdAt" to System.currentTimeMillis()
                                 )
                                 db.collection("users").document(requestDocId).set(userMap)
+                                db.collection("registered_users").document(cleanPhone).set(userMap)
                                 onClientAdded(userMap)
                             }
                         }
@@ -314,8 +404,11 @@ class RegistrationHelper(
         onClientAdded: (Map<String, Any>) -> Unit
     ) {
         val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val currentAuthUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val userMap = mapOf(
             "id" to cleanPhone,
+            "uid" to currentAuthUid,
+            "userId" to currentAuthUid,
             "name" to name,
             "phone" to cleanPhone,
             "residence" to residence,

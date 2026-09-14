@@ -33,6 +33,10 @@ fun RestaurantForm(
     onSubmit: (Map<String, Any>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val draftManager = remember { com.example.ui.screens.register.forms.RegistrationDraftManager(context) }
+    val draftRole = "RESTAURANT"
+
     // Mandatory fields
     var restaurantName by remember { mutableStateOf("") }
     var managerName by remember { mutableStateOf("") }
@@ -51,6 +55,30 @@ fun RestaurantForm(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val savedDraft = draftManager.getDraft(draftRole)
+        if (savedDraft.isNotEmpty()) {
+            savedDraft["entityName"]?.let { if (it.isNotBlank()) restaurantName = it }
+            savedDraft["managerName"]?.let { if (it.isNotBlank()) managerName = it }
+            savedDraft["phone"]?.let { if (it.isNotBlank()) phone = it }
+            savedDraft["city"]?.let { if (it.isNotBlank()) city = it }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(restaurantName, managerName, phone, city, password) {
+        if (restaurantName.isNotBlank() || phone.isNotBlank()) {
+            draftManager.saveDraft(draftRole, mapOf(
+                "entityName" to restaurantName,
+                "managerName" to managerName,
+                "phone" to phone,
+                "city" to city,
+                "password" to password,
+                "confirmPassword" to confirmPassword,
+                "specialization" to cuisineType
+            ))
+        }
+    }
 
     // Validation (Restaurant Name, Triple Manager Name, Phone >= 9, matching password >= 6, and city)
     val managerNamePartsCount = managerName.trim().split(" ").filter { it.isNotBlank() }.size

@@ -499,4 +499,31 @@ class MainViewModel @Inject constructor(
         val property: com.example.data.PropertyEntity? = null,
         val savedPassword: String = ""
     )
+
+    /**
+     * 🌐 مراقبة حالة طلب استعادة كلمة المرور بشكل حي
+     * هذه الدالة تمنع الواجهة من الوصول المباشر إلى Firestore.
+     */
+    fun observePasswordRecoveryStatus(
+        phone: String,
+        onUpdate: (status: String, newPassword: String, accountName: String, accountType: String) -> Unit
+    ): com.google.firebase.firestore.ListenerRegistration? {
+        if (phone.isBlank()) return null
+        return try {
+            db.collection("password_recovery_requests")
+                .document(phone)
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null && snapshot.exists()) {
+                        val status = snapshot.getString("status") ?: "PENDING"
+                        val newPassword = snapshot.getString("newPassword") ?: ""
+                        val accountName = snapshot.getString("name") ?: "صاحب الحساب"
+                        val accountType = snapshot.getString("accountType") ?: "حساب معتمد"
+                        onUpdate(status, newPassword, accountName, accountType)
+                    }
+                }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }

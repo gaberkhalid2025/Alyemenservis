@@ -33,6 +33,10 @@ fun JobForm(
     onSubmit: (Map<String, Any>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val draftManager = remember { com.example.ui.screens.register.forms.RegistrationDraftManager(context) }
+    val draftRole = "JOB"
+
     // Mandatory fields
     var companyName by remember { mutableStateOf("") }
     var recruiterName by remember { mutableStateOf("") }
@@ -52,6 +56,30 @@ fun JobForm(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val savedDraft = draftManager.getDraft(draftRole)
+        if (savedDraft.isNotEmpty()) {
+            savedDraft["entityName"]?.let { if (it.isNotBlank()) companyName = it }
+            savedDraft["managerName"]?.let { if (it.isNotBlank()) recruiterName = it }
+            savedDraft["phone"]?.let { if (it.isNotBlank()) phone = it }
+            savedDraft["city"]?.let { if (it.isNotBlank()) city = it }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(companyName, recruiterName, phone, city, password) {
+        if (companyName.isNotBlank() || phone.isNotBlank()) {
+            draftManager.saveDraft(draftRole, mapOf(
+                "entityName" to companyName,
+                "managerName" to recruiterName,
+                "phone" to phone,
+                "city" to city,
+                "password" to password,
+                "confirmPassword" to confirmPassword,
+                "specialization" to jobType
+            ))
+        }
+    }
 
     // Validation (Company Name, Triple Recruiter Name, Phone >= 9, matching password >= 6, and city)
     val recruiterNamePartsCount = recruiterName.trim().split(" ").filter { it.isNotBlank() }.size

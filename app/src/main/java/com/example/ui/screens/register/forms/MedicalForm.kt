@@ -33,6 +33,10 @@ fun MedicalForm(
     onSubmit: (Map<String, Any>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val draftManager = remember { com.example.ui.screens.register.forms.RegistrationDraftManager(context) }
+    val draftRole = "MEDICAL"
+
     // Mandatory fields
     var medicalCenterName by remember { mutableStateOf("") }
     var medicalDirectorName by remember { mutableStateOf("") }
@@ -51,6 +55,30 @@ fun MedicalForm(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val savedDraft = draftManager.getDraft(draftRole)
+        if (savedDraft.isNotEmpty()) {
+            savedDraft["entityName"]?.let { if (it.isNotBlank()) medicalCenterName = it }
+            savedDraft["managerName"]?.let { if (it.isNotBlank()) medicalDirectorName = it }
+            savedDraft["phone"]?.let { if (it.isNotBlank()) phone = it }
+            savedDraft["city"]?.let { if (it.isNotBlank()) city = it }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(medicalCenterName, medicalDirectorName, phone, city, password) {
+        if (medicalCenterName.isNotBlank() || phone.isNotBlank()) {
+            draftManager.saveDraft(draftRole, mapOf(
+                "entityName" to medicalCenterName,
+                "managerName" to medicalDirectorName,
+                "phone" to phone,
+                "city" to city,
+                "password" to password,
+                "confirmPassword" to confirmPassword,
+                "specialization" to medicalSpecialties
+            ))
+        }
+    }
 
     // Validation (Center Name, Triple Director Name, Phone >= 9, matching password >= 6, and city)
     val directorNamePartsCount = medicalDirectorName.trim().split(" ").filter { it.isNotBlank() }.size

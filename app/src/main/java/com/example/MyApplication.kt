@@ -39,6 +39,21 @@ class MyApplication : Application() {
         try {
             FirebaseApp.initializeApp(this)
             Log.d("MyApplication", "✅ Firebase initialized successfully")
+
+            // تفعيل Anonymous Auth التلقائي لضمان وجود UID ثابت وموثوق للجهاز
+            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            if (auth.currentUser == null) {
+                auth.signInAnonymously()
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            Log.d("AnonymousAuth", "✅ UID: ${task.result?.user?.uid}")
+                        } else {
+                            Log.e("AnonymousAuth", "❌ Failed: ${task.exception?.message}")
+                        }
+                    }
+            } else {
+                Log.d("AnonymousAuth", "✅ Existing Anonymous UID: ${auth.currentUser?.uid}")
+            }
         } catch (e: Exception) {
             Log.e("MyApplication", "❌ Firebase initialization failed: ${e.message}")
             e.printStackTrace()

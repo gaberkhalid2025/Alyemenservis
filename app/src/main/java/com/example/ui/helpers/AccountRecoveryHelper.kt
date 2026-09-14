@@ -82,8 +82,10 @@ class AccountRecoveryHelper(
         onResult: (Boolean) -> Unit
     ) {
         val cleanPhone = phone.trim().replace(" ", "")
+        val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val reqData = mapOf(
             "id" to cleanPhone,
+            "uid" to currentUid,
             "phone" to cleanPhone,
             "name" to name,
             "accountType" to accountType,

@@ -64,17 +64,13 @@ fun PasswordResetWaitingScreen(
         if (cleanPhone.isBlank()) {
             onDispose { }
         } else {
-            val listener = viewModel.db.collection("password_recovery_requests")
-                .document(cleanPhone)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null && snapshot.exists()) {
-                        status = snapshot.getString("status") ?: "PENDING"
-                        newPassword = snapshot.getString("newPassword") ?: ""
-                        accountName = snapshot.getString("name") ?: accountName
-                        accountType = snapshot.getString("accountType") ?: accountType
-                    }
-                }
-            onDispose { listener.remove() }
+            val listener = viewModel.observePasswordRecoveryStatus(cleanPhone) { newStatus, newPass, newName, newType ->
+                status = newStatus
+                newPassword = newPass
+                accountName = newName
+                accountType = newType
+            }
+            onDispose { listener?.remove() }
         }
     }
 

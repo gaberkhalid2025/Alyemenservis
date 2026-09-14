@@ -71,15 +71,16 @@ fun ChatInputBar(
     // إصلاح تسريب MediaRecorder
     DisposableEffect(Unit) {
         onDispose {
-            if (isRecording) {
-                try {
-                    mediaRecorder?.stop()
-                } catch (e: Exception) {
-                    e.printStackTrace()
+            try {
+                mediaRecorder?.let { recorder ->
+                    try { recorder.stop() } catch (_: Exception) {}
+                    try { recorder.release() } catch (_: Exception) {}
                 }
-                mediaRecorder?.release()
+            } finally {
                 mediaRecorder = null
                 audioFile?.delete()
+                audioFile = null
+                isRecording = false
             }
         }
     }
@@ -226,10 +227,10 @@ fun ChatInputBar(
 
     fun stopAndSendRecording() {
         try {
-            mediaRecorder?.stop()
-            mediaRecorder?.release()
-        } catch (e: Exception) {
-            e.printStackTrace()
+            mediaRecorder?.let { recorder ->
+                try { recorder.stop() } catch (_: Exception) {}
+                try { recorder.release() } catch (_: Exception) {}
+            }
         } finally {
             mediaRecorder = null
             isRecording = false
@@ -278,10 +279,10 @@ fun ChatInputBar(
 
     fun cancelRecording() {
         try {
-            mediaRecorder?.stop()
-            mediaRecorder?.release()
-        } catch (e: Exception) {
-            e.printStackTrace()
+            mediaRecorder?.let { recorder ->
+                try { recorder.stop() } catch (_: Exception) {}
+                try { recorder.release() } catch (_: Exception) {}
+            }
         } finally {
             mediaRecorder = null
             isRecording = false

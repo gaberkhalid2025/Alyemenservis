@@ -30,7 +30,8 @@ data class SimplifiedRegistrationState(
     val isFormValid: Boolean = false,
     val isLoading: Boolean = false,
     val successMessage: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val imageUri: String = ""
 )
 
 class SimplifiedRegistrationViewModel(application: Application) : AndroidViewModel(application) {
@@ -108,6 +109,9 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
                 _state.update { it.copy(agreedToTerms = event.agreed) }
                 validateAll()
             }
+            is RegistrationEvent.ImageChanged -> {
+                _state.update { it.copy(imageUri = event.uri) }
+            }
         }
         saveDraft()
         checkOverallValidity()
@@ -136,7 +140,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
     }
 
     private fun validatePassword(password: String) {
-        val error = if (password.length < 8 || !password.any { it.isDigit() } || !password.any { it.isUpperCase() }) {
+        val error = if (password.length < 6) {
             "كلمة المرور يجب أن تحتوي على 8 أحرف، حرف كبير، ورقم"
         } else null
         _state.update { it.copy(passwordError = error) }
@@ -192,7 +196,8 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
                     "phone" to _state.value.phone,
                     "password" to _state.value.password,
                     "city" to _state.value.city,
-                    "specialization" to _state.value.specialization
+                    "specialization" to _state.value.specialization,
+                    "imageUri" to _state.value.imageUri
                 ))
             }
         }
@@ -212,4 +217,5 @@ sealed class RegistrationEvent {
     data class CityChanged(val city: String) : RegistrationEvent()
     data class SpecializationChanged(val spec: String) : RegistrationEvent()
     data class AgreedToTermsChanged(val agreed: Boolean) : RegistrationEvent()
+    data class ImageChanged(val uri: String) : RegistrationEvent()
 }

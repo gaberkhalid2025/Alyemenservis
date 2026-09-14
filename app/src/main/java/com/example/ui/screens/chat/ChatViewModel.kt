@@ -56,6 +56,8 @@ class ChatViewModel @Inject constructor(
 
     private var messagesJob: Job? = null
     private var markAsReadJob: Job? = null
+    private var lastMarkAsReadTime: Long = 0L
+    private var lastMarkAsReadChannelId: String = ""
     private var activeUserId: String = ""
     private var currentLimit = 25
 
@@ -146,7 +148,8 @@ class ChatViewModel @Inject constructor(
 
     fun loadMoreMessages() {
         val channel = _currentChannel.value ?: return
-        currentLimit += 25
+        if (currentLimit >= 200) return
+        currentLimit = (currentLimit + 25).coerceAtMost(200)
         listenToMessages(channel.id, activeUserId)
     }
 
@@ -229,6 +232,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun markAsRead(channelId: String, currentUserId: String) {
+        val now = System.currentTimeMillis()
+        if (channelId == lastMarkAsReadChannelId && (now - lastMarkAsReadTime) < 3000L) {
+            return
+        }
+        lastMarkAsReadChannelId = channelId
+        lastMarkAsReadTime = now
         markAsReadJob?.cancel()
         markAsReadJob = viewModelScope.launch {
             try {
@@ -289,6 +298,7 @@ class ChatViewModel @Inject constructor(
 
     fun resetState() {
         messagesJob?.cancel()
+        markAsReadJob?.cancel()
         presenceManager.clear()
         typingManager.clear()
         editManager.clear()

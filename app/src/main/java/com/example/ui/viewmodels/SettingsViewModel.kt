@@ -1033,7 +1033,10 @@ fun requestPasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
             onResult(false, "رقم الهاتف غير صالح")
             return
         }
+        val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val request = mapOf(
+            "id" to cleanPhone,
+            "uid" to currentUid,
             "phone" to cleanPhone,
             "status" to "PENDING",
             "requestedAt" to System.currentTimeMillis()

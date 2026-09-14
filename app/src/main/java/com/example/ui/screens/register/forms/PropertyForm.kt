@@ -33,6 +33,10 @@ fun PropertyForm(
     onSubmit: (Map<String, Any>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val draftManager = remember { com.example.ui.screens.register.forms.RegistrationDraftManager(context) }
+    val draftRole = "PROPERTY"
+
     // Mandatory fields
     var officeName by remember { mutableStateOf("") }
     var ownerName by remember { mutableStateOf("") }
@@ -52,6 +56,30 @@ fun PropertyForm(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val savedDraft = draftManager.getDraft(draftRole)
+        if (savedDraft.isNotEmpty()) {
+            savedDraft["entityName"]?.let { if (it.isNotBlank()) officeName = it }
+            savedDraft["managerName"]?.let { if (it.isNotBlank()) ownerName = it }
+            savedDraft["phone"]?.let { if (it.isNotBlank()) phone = it }
+            savedDraft["city"]?.let { if (it.isNotBlank()) city = it }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(officeName, ownerName, phone, city, password) {
+        if (officeName.isNotBlank() || phone.isNotBlank()) {
+            draftManager.saveDraft(draftRole, mapOf(
+                "entityName" to officeName,
+                "managerName" to ownerName,
+                "phone" to phone,
+                "city" to city,
+                "password" to password,
+                "confirmPassword" to confirmPassword,
+                "specialization" to propertyType
+            ))
+        }
+    }
 
     // Validation (Office/Owner Name, Triple Responsible Name, Phone >= 9, matching password >= 6, and city)
     val ownerNamePartsCount = ownerName.trim().split(" ").filter { it.isNotBlank() }.size
@@ -75,7 +103,7 @@ fun PropertyForm(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "يرجى ملء البيانات (الحقول بعلافة * إجبارية):",
+                text = "يرجى ملء البيانات (الحقول بعلامة * إجبارية):",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = themeColors.accent

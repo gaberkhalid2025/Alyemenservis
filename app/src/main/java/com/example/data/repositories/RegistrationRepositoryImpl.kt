@@ -86,6 +86,7 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
             val hashedPassword = com.example.utils.PasswordHasher.hash(client.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
@@ -103,11 +104,29 @@ class RegistrationRepositoryImpl(
             )
 
             // Store request in join_requests
-            firestore.collection("join_requests").document(id).set(request).await()
-
-            // Store client data in "users" collection
-            val userMap = mapOf(
+            val requestMap = mapOf(
                 "id" to id,
+                "uid" to currentUid,
+                "userId" to currentUid,
+                "type" to "CLIENT",
+                "status" to "PENDING",
+                "approvalStatus" to "PENDING",
+                "fullName" to client.fullName.trim(),
+                "phone" to cleanPhone,
+                "passwordHash" to hashedPassword,
+                "city" to client.city.trim(),
+                "profileImage" to client.profileImageUrl,
+                "submittedAt" to System.currentTimeMillis(),
+                "createdAt" to System.currentTimeMillis(),
+                "updatedAt" to System.currentTimeMillis()
+            )
+            firestore.collection("join_requests").document(id).set(requestMap).await()
+
+            // Store client data in "users" and "registered_users" collection
+            val userMap = mapOf(
+                "id" to cleanPhone,
+                "uid" to currentUid,
+                "userId" to currentUid,
                 "name" to client.fullName.trim(),
                 "phone" to cleanPhone,
                 "city" to client.city.trim(),
@@ -117,6 +136,7 @@ class RegistrationRepositoryImpl(
                 "createdAt" to System.currentTimeMillis()
             )
             firestore.collection("users").document(cleanPhone).set(userMap).await()
+            firestore.collection("registered_users").document(cleanPhone).set(userMap).await()
 
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "CLIENT")
             Result.success(id)

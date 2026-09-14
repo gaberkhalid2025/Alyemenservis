@@ -33,6 +33,10 @@ fun StoreForm(
     onSubmit: (Map<String, Any>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val draftManager = remember { com.example.ui.screens.register.forms.RegistrationDraftManager(context) }
+    val draftRole = "STORE"
+
     // Mandatory fields
     var storeName by remember { mutableStateOf("") }
     var ownerName by remember { mutableStateOf("") }
@@ -52,6 +56,30 @@ fun StoreForm(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val savedDraft = draftManager.getDraft(draftRole)
+        if (savedDraft.isNotEmpty()) {
+            savedDraft["entityName"]?.let { if (it.isNotBlank()) storeName = it }
+            savedDraft["managerName"]?.let { if (it.isNotBlank()) ownerName = it }
+            savedDraft["phone"]?.let { if (it.isNotBlank()) phone = it }
+            savedDraft["city"]?.let { if (it.isNotBlank()) city = it }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(storeName, ownerName, phone, city, password) {
+        if (storeName.isNotBlank() || phone.isNotBlank()) {
+            draftManager.saveDraft(draftRole, mapOf(
+                "entityName" to storeName,
+                "managerName" to ownerName,
+                "phone" to phone,
+                "city" to city,
+                "password" to password,
+                "confirmPassword" to confirmPassword,
+                "specialization" to storeCategory
+            ))
+        }
+    }
 
     // Validation logic (Store Name, Triple Owner Name, Phone >= 9, matching password >= 6, and city)
     val ownerNamePartsCount = ownerName.trim().split(" ").filter { it.isNotBlank() }.size
