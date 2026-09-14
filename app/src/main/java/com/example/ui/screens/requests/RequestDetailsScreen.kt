@@ -289,13 +289,31 @@ fun RequestDetailsScreen(
         }
     }
 
-    // حوار الإلغاء برمز PIN
+    // حوار الإلغاء برمز PIN مع اختيار سبب الإلغاء
+    var cancelReason by remember { mutableStateOf("تغيير الرأي") }
+    val cancelReasonsList = listOf("تغيير الرأي", "تأخر مفرط في الاستجابة", "ارتفاع السعر المطلوب", "سبب آخر")
+
     if (showCancelDialog) {
         AlertDialog(
             onDismissRequest = { showCancelDialog = false },
             title = { Text("تأكيد إلغاء الطلب") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("اختر سبب الإلغاء:")
+                    cancelReasonsList.forEach { reason ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { cancelReason = reason }
+                        ) {
+                            RadioButton(
+                                selected = (cancelReason == reason),
+                                onClick = { cancelReason = reason }
+                            )
+                            Text(text = reason, fontSize = 13.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text("يرجى إدخال رمز PIN السري (4 أرقام) الذي تم إنشاؤه مع الطلب لتأكيد الإلغاء:")
                     OutlinedTextField(
                         value = cancelPinInput,

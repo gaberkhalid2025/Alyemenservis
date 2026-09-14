@@ -151,6 +151,14 @@ fun AccountSettings(
                 Spacer(Modifier.width(6.dp))
                 Text("حفظ التغييرات", fontWeight = FontWeight.Bold)
             }
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "إصدار التطبيق: v${com.example.BuildConfig.VERSION_NAME}",
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
         }
     }
 }
