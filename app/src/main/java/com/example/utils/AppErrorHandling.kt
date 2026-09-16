@@ -173,15 +173,19 @@ object CrashlyticsDiagnosticLogger {
     private val criticalErrorsList = mutableListOf<CriticalError>()
 
     fun logEvent(tag: String, message: String, userRole: String = "USER") {
-        val deviceInfo = "Device: ${Build.MANUFACTURER} ${Build.MODEL}, API: ${Build.VERSION.SDK_INT}"
-        android.util.Log.d("AppDiagnostics", "[$tag] Role: $userRole | $message | $deviceInfo")
+        try {
+            val deviceInfo = "Device: ${Build.MANUFACTURER} ${Build.MODEL}, API: ${Build.VERSION.SDK_INT}"
+            android.util.Log.d("AppDiagnostics", "[$tag] Role: $userRole | $message | $deviceInfo")
+        } catch (e: Throwable) {}
     }
 
     fun logException(error: AppError, contextInfo: String = "") {
-        android.util.Log.e(
-            "AppDiagnostics",
-            "❌ EXCEPTION LOGGED [$contextInfo]: ${error.messageArabic} (Cause: ${error.cause?.message})"
-        )
+        try {
+            android.util.Log.e(
+                "AppDiagnostics",
+                "❌ EXCEPTION LOGGED [$contextInfo]: ${error.messageArabic} (Cause: ${error.cause?.message})"
+            )
+        } catch (e: Throwable) {}
         try {
             val crashlyticsClass = Class.forName("com.google.firebase.crashlytics.FirebaseCrashlytics")
             val getInstanceMethod = crashlyticsClass.getMethod("getInstance")
@@ -327,3 +331,35 @@ fun AppErrorBoundary(
         content()
     }
 }
+
+object ErrorHandler {
+    fun getLocalizedMessage(throwable: Throwable, defaultMessage: String = "حدث خطأ غير متوقع"): String {
+        return when (throwable) {
+            is java.net.UnknownHostException -> "تعذر الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت لديك."
+            is java.net.SocketTimeoutException -> "انتهت مهلة الاتصال بالإنترنت. يرجى المحاولة مرة أخرى."
+            is java.io.IOException -> "تعذر الاتصال بالإنترنت أو قراءة البيانات. يرجى إعادة المحاولة."
+            else -> throwable.localizedMessage ?: defaultMessage
+        }
+    }
+
+    fun handleError(
+        context: Context,
+        throwable: Throwable,
+        defaultMessage: String = "حدث خطأ غير متوقع"
+    ) {
+        val message = getLocalizedMessage(throwable, defaultMessage)
+        Toast.makeText(context, "⚠️ $defaultMessage: $message", Toast.LENGTH_SHORT).show()
+        AppErrorLogManager.logFirestoreError("ErrorHandler", defaultMessage, throwable)
+    }
+
+    fun handleError(
+        error: AppError,
+        onShowSnackbar: (String) -> Unit,
+        onLogError: (String) -> Unit = {}
+    ) {
+        val message = error.messageArabic
+        onShowSnackbar(message)
+        onLogError("[$error] $message - ${error.userActionArabic}")
+    }
+}
+

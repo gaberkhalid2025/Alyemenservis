@@ -10,7 +10,15 @@ class ValidatePhoneUseCase {
         if (clean.isEmpty()) {
             return ValidationResult(isValid = false, errorMessage = "يرجى إدخال رقم الهاتف")
         }
-        val digitsOnly = clean.replace("+967", "").replace("00967", "").filter { it.isDigit() }
+        var digitsOnly = clean.filter { it.isDigit() }
+        if (digitsOnly.startsWith("00967")) {
+            digitsOnly = digitsOnly.substring(5)
+        } else if (digitsOnly.startsWith("967")) {
+            digitsOnly = digitsOnly.substring(3)
+        } else if (digitsOnly.startsWith("0") && digitsOnly.length == 10) {
+            digitsOnly = digitsOnly.substring(1)
+        }
+
         if (digitsOnly.length != 9) {
             return ValidationResult(isValid = false, errorMessage = "يجب أن يتكون رقم الهاتف من 9 أرقام (مثال: 771234567)")
         }

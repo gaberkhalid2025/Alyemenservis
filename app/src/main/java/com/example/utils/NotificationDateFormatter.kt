@@ -1,7 +1,6 @@
-package com.example.ui.screens.notifications.helper
+package com.example.utils
 
 import java.text.SimpleDateFormat
-import com.example.ui.*
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -14,11 +13,11 @@ import java.util.TimeZone
  */
 object NotificationDateFormatter {
 
-    private val fullDateFormat = SimpleDateFormat("EEEE، d MMMM yyyy، hh:mm a", Locale("ar")).apply {
+    private val fullDateFormat = SimpleDateFormat("EEEE، d MMMM yyyy، hh:mm a", Locale.forLanguageTag("ar")).apply {
         timeZone = TimeZone.getDefault()
     }
 
-    private val shortTimeFormat = SimpleDateFormat("hh:mm a", Locale("ar")).apply {
+    private val shortTimeFormat = SimpleDateFormat("hh:mm a", Locale.forLanguageTag("ar")).apply {
         timeZone = TimeZone.getDefault()
     }
 

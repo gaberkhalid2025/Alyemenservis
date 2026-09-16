@@ -19,7 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NotificationEntity
-import com.example.ui.screens.notifications.helper.NotificationDateFormatter
+import com.example.utils.NotificationDateFormatter
 import com.example.utils.VisualThemePalette
 
 /**

@@ -93,6 +93,22 @@ class MyApplication : Application() {
 
         // ===================== الخطوة 3: تهيئة Crashlytics بأمان (مع تأخير) =====================
         initializeCrashlyticsSafely()
+
+        // ===================== الخطوة 4: تهيئة قنوات الإشعارات الموحدة =====================
+        try {
+            com.example.utils.NotificationChannels.createAll(this)
+            Log.d("MyApplication", "✅ Unified notification channels created successfully")
+        } catch (e: Exception) {
+            Log.e("MyApplication", "❌ Failed to create notification channels: ${e.message}")
+        }
+
+        // ===================== الخطوة 5: جدولة المزامنة الدورية في الخلفية =====================
+        try {
+            com.example.sync.BackgroundSyncScheduler(this).schedulePeriodicSync()
+            Log.d("MyApplication", "✅ Background periodic sync scheduled successfully")
+        } catch (e: Exception) {
+            Log.e("MyApplication", "❌ Failed to schedule periodic sync: ${e.message}")
+        }
     }
 
     /**

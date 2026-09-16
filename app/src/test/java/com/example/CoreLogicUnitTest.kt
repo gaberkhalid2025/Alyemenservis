@@ -37,15 +37,15 @@ class CoreLogicUnitTest {
 
     @Test
     fun testBookingStateEngineTransitions() {
-        // Pending -> Approved should be valid
-        assertTrue(BookingStateMachine.canTransition("PENDING", "APPROVED"))
+        // Pending -> Accepted should be valid
+        assertTrue(BookingStateMachine.canTransition("PENDING", "ACCEPTED"))
 
-        // Approved -> Completed direct without in_progress should not be allowed or checked
-        assertTrue(BookingStateMachine.canTransition("APPROVED", "IN_PROGRESS"))
+        // Accepted -> In Progress should be allowed
+        assertTrue(BookingStateMachine.canTransition("ACCEPTED", "IN_PROGRESS"))
 
         // Completed is terminal state
-        assertFalse(BookingStateMachine.canTransition("COMPLETED", "APPROVED"))
-        assertFalse(BookingStateMachine.canTransition("REJECTED", "APPROVED"))
+        assertFalse(BookingStateMachine.canTransition("COMPLETED", "ACCEPTED"))
+        assertFalse(BookingStateMachine.canTransition("REJECTED", "ACCEPTED"))
     }
 
     @Test
