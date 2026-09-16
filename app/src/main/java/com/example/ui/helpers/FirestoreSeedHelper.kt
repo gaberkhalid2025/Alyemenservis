@@ -79,7 +79,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
                     writeDefaultProviders()
                 }
             } else {
-                try { writeDefaultProviders() } catch (e: Exception) {}
+                try { if (com.example.BuildConfig.DEBUG) writeDefaultProviders() } catch (e: Exception) {}
             }
         }
         try { writeDefaultStores() } catch (e: Exception) { e.printStackTrace() }
@@ -197,6 +197,7 @@ class FirestoreSeedHelper(private val db: FirebaseFirestore) {
     }
 
     fun writeDefaultProviders() {
+        if (!com.example.BuildConfig.DEBUG) return
         val aminProvider = ProviderEntity(
             id = "p_amin",
             name = "امين الغرباني",

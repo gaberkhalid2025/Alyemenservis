@@ -71,6 +71,11 @@ object SecurityManager {
      */
     fun verifyAppSignature(context: Context): Boolean {
         return try {
+            val expectedHash = com.example.BuildConfig.SIGNATURE_HASH
+            if (expectedHash.isEmpty()) {
+                return com.example.BuildConfig.DEBUG
+            }
+            
             val pm = context.packageManager
             val pkg = context.packageName
             val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -88,21 +93,22 @@ object SecurityManager {
             }
 
             if (signatures.isNullOrEmpty()) {
-                Log.d(TAG, "Signatures not found, permitting dev run.")
-                return true
+                return false
             }
 
             val md = MessageDigest.getInstance("SHA-256")
             for (sig in signatures) {
                 val digest = md.digest(sig.toByteArray())
                 val hash = digest.joinToString("") { "%02x".format(it) }
-                if (hash.isNotBlank()) {
+                if (hash.equals(expectedHash, ignoreCase = true)) {
                     return true
                 }
             }
-            true
+            Log.e(TAG, "Signature mismatch!")
+            false
         } catch (e: Exception) {
-            true
+            Log.e(TAG, "Exception during signature verification: ${e.message}")
+            false
         }
     }
 }

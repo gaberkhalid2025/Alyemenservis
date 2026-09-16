@@ -47,7 +47,7 @@ fun ProviderRegisterFormLayout(
     val currentUserResidence by viewModel.currentUserResidence.collectAsState()
     val categories by viewModel.categories.collectAsState()
 
-    var activeType by remember(regType) { mutableStateOf(RegistrationType.fromId(regType)) }
+    var activeType by remember(regType) { mutableStateOf((RegistrationType.fromId(regType) ?: RegistrationType.PROVIDER)) }
 
     Scaffold(
         topBar = {

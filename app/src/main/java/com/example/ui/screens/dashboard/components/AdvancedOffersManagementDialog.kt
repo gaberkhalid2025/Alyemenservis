@@ -17,9 +17,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.SpecialOfferEntity
+import com.google.firebase.firestore.FirebaseFirestore
+import java.util.UUID
+import android.util.Log
 
 @Composable
 fun AdvancedOffersManagementDialog(
+    ownerId: String = "",
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
@@ -30,6 +34,24 @@ fun AdvancedOffersManagementDialog(
     var newTitle by remember { mutableStateOf("") }
     var newDiscount by remember { mutableStateOf("10") }
     var newDuration by remember { mutableStateOf("7") }
+
+    LaunchedEffect(ownerId) {
+        val query = if (ownerId.isNotBlank()) {
+            FirebaseFirestore.getInstance()
+                .collection("special_offers")
+                .whereEqualTo("providerId", ownerId)
+        } else {
+            FirebaseFirestore.getInstance()
+                .collection("special_offers")
+        }
+        query.addSnapshotListener { snap, _ ->
+            if (snap != null) {
+                offers = snap.documents.mapNotNull { doc ->
+                    doc.toObject(SpecialOfferEntity::class.java)?.copy(id = doc.id)
+                }
+            }
+        }
+    }
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -80,11 +102,21 @@ fun AdvancedOffersManagementDialog(
                     Button(
                         onClick = {
                             if (newTitle.isNotBlank()) {
-                                offers = offers + SpecialOfferEntity(
-                                    title = newTitle,
+                                val offerId = UUID.randomUUID().toString()
+                                val newOffer = SpecialOfferEntity(
+                                    id = offerId,
+                                    providerId = ownerId,
+                                    title = newTitle.trim(),
                                     discountPercent = newDiscount.toIntOrNull() ?: 10,
-                                    expiryDate = "بعد ${newDuration.toIntOrNull() ?: 7} أيام"
+                                    expiryDate = "بعد ${newDuration.toIntOrNull() ?: 7} أيام",
+                                    isEnabled = true
                                 )
+                                FirebaseFirestore.getInstance()
+                                    .collection("special_offers")
+                                    .document(offerId)
+                                    .set(newOffer)
+                                    .addOnFailureListener { e -> Log.e("AdvancedOffers", "Insert failed", e) }
+
                                 newTitle = ""
                                 showAddDialog = false
                             }
@@ -98,7 +130,7 @@ fun AdvancedOffersManagementDialog(
             }
 
             LazyColumn(modifier = Modifier.height(250.dp).fillMaxWidth()) {
-                items(offers) { offer ->
+                items(offers, key = { it.id }) { offer ->
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -116,11 +148,19 @@ fun AdvancedOffersManagementDialog(
                                 Switch(
                                     checked = offer.isEnabled,
                                     onCheckedChange = { active ->
-                                        offers = offers.map { if (it.id == offer.id) it.copy(isEnabled = active) else it }
+                                        FirebaseFirestore.getInstance()
+                                            .collection("special_offers")
+                                            .document(offer.id)
+                                            .update("isEnabled", active)
+                                            .addOnFailureListener { e -> Log.e("AdvancedOffers", "Update failed", e) }
                                     }
                                 )
                                 IconButton(onClick = {
-                                    offers = offers.filter { it.id != offer.id }
+                                    FirebaseFirestore.getInstance()
+                                        .collection("special_offers")
+                                        .document(offer.id)
+                                        .delete()
+                                        .addOnFailureListener { e -> Log.e("AdvancedOffers", "Delete failed", e) }
                                 }) {
                                     Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
                                 }

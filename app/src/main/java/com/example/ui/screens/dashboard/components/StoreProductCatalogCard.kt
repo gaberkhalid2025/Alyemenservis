@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.data.ProductEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
@@ -31,9 +32,14 @@ fun StoreProductCatalogCard(
     storeProducts: List<ProductEntity>,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    context: Context,
+    context: Context = LocalContext.current,
     onAddProductClick: () -> Unit
 ) {
+    var displayLimit by remember { mutableStateOf(20) }
+    val displayedProducts = remember(storeProducts, displayLimit) {
+        storeProducts.take(displayLimit)
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
@@ -66,7 +72,7 @@ fun StoreProductCatalogCard(
                     Text("📭 لا توجد منتجات مضافة لهذا المحل حالياً.", fontSize = 10.sp, color = Color.Gray)
                 }
             } else {
-                storeProducts.forEach { prod ->
+                displayedProducts.forEach { prod ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -111,6 +117,25 @@ fun StoreProductCatalogCard(
                             modifier = Modifier.size(24.dp)
                         ) {
                             Text("🗑️", fontSize = 14.sp)
+                        }
+                    }
+                }
+
+                if (storeProducts.size > displayLimit || displayLimit > 20) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (storeProducts.size > displayLimit) {
+                            TextButton(onClick = { displayLimit += 20 }) {
+                                Text("عرض المزيد (+20 منتج)", color = themeColors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (displayLimit > 20) {
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(onClick = { displayLimit = 20 }) {
+                                Text("عرض أقل", color = Color.Gray, fontSize = 11.sp)
+                            }
                         }
                     }
                 }

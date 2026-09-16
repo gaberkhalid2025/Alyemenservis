@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import kotlinx.coroutines.tasks.await
 
 import android.content.Context
 import com.example.ui.*
@@ -289,16 +290,44 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         }
     }
 
-    fun loginUserDirectly(context: Context, phone: String) {
+    fun loginUserDirectly(context: Context, phone: String, password: String) {
         val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").removePrefix("0")
         val finalPhone = if (cleanPhone.length == 9) cleanPhone else phone
-        _currentUserPhone.value = finalPhone
-        _joinRequestPhone.value = finalPhone
-        val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-        sp.edit().apply {
-            putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
-            putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
-            apply()
+        
+        viewModelScope.launch {
+            try {
+                db.collection("registered_users")
+                    .whereEqualTo("phone", finalPhone)
+                    .limit(1)
+                    .get()
+                    .addOnSuccessListener { snapshot ->
+                        if (!snapshot.isEmpty) {
+                            val doc = snapshot.documents.first()
+                            val storedHash = doc.getString("passwordHash") ?: ""
+                            if (com.example.utils.SecureHasher.verifyPassword(password, storedHash)) {
+                                _currentUserPhone.value = finalPhone
+                                _joinRequestPhone.value = finalPhone
+                                val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+                                sp.edit().apply {
+                                    putBoolean("is_account_logged_in", true)
+                                    putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
+                                    putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
+                                    apply()
+                                }
+                                triggerToast("✅ تم تسجيل الدخول بنجاح")
+                            } else {
+                                triggerToast("❌ كلمة المرور غير صحيحة")
+                            }
+                        } else {
+                            triggerToast("❌ الحساب غير موجود")
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        triggerToast("❌ حدث خطأ أثناء التحقق: ${e.message}")
+                    }
+            } catch (e: Exception) {
+                triggerToast("❌ حدث خطأ أثناء التحقق: ${e.message}")
+            }
         }
     }
 
@@ -327,20 +356,12 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val trimmed = password.trim()
         if (trimmed.isEmpty()) return false
         
-        if (trimmed == adminPass ||
-            trimmed == ownerPass ||
-            com.example.utils.SecurityCryptoUtils.hashPassword(trimmed) == adminPass ||
-            com.example.utils.SecurityCryptoUtils.hashPassword(trimmed) == ownerPass ||
-            com.example.utils.PasswordHasher.verifyPassword(trimmed, adminPass) ||
-            com.example.utils.PasswordHasher.verifyPassword(trimmed, ownerPass) ||
-            com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, adminPass) ||
+        if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, adminPass) ||
             com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, ownerPass)) {
             return true
         }
         val matchSup = _supervisors.value.find {
-            (it.passcode.isNotBlank() && it.passcode.trim() == trimmed) ||
-            (it.passcode.isNotBlank() && com.example.utils.PasswordHasher.verifyPassword(trimmed, it.passcode)) ||
-            (it.passcode.isNotBlank() && com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode))
+            it.passcode.isNotBlank() && com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode)
         }
         return matchSup != null
     }

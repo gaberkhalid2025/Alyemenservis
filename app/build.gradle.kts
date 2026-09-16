@@ -1,3 +1,5 @@
+import java.util.Properties
+import java.io.FileInputStream
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -20,24 +22,34 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    buildConfigField("String", "SIGNATURE_HASH", "\"\"")
   }
 
   signingConfigs {
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(FileInputStream(localPropertiesFile))
+    }
+
     create("releaseConfig") {
-      val customKeystore = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-release-key.jks")
+      val ksPath = System.getenv("KEYSTORE_PATH") ?: localProperties.getProperty("KEYSTORE_PATH") ?: "${rootDir}/my-release-key.jks"
+      val customKeystore = file(ksPath)
       val releaseKeystore = file("${rootDir}/release.keystore")
       val debugKeystore = file("${rootDir}/debug.keystore")
+      
+      val storePass: String? = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD")
+      val keyAl: String? = System.getenv("RELEASE_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: localProperties.getProperty("RELEASE_KEY_ALIAS")
+      val keyPass: String? = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: localProperties.getProperty("RELEASE_KEY_PASSWORD")
 
-      if (customKeystore.exists()) {
-        storeFile = customKeystore
-        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "Maher@@--@@736462##"
-        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "Maher"
-        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "Maher@@--@@736462##"
-      } else if (releaseKeystore.exists()) {
-        storeFile = releaseKeystore
-        storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "Maher@@--@@736462##"
-        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "Maher"
-        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: "Maher@@--@@736462##"
+      if (customKeystore.exists() || releaseKeystore.exists()) {
+        if (storePass == null || keyAl == null || keyPass == null) {
+            throw GradleException("Release keystore passwords are not configured in local.properties or environment variables!")
+        }
+        storeFile = if (customKeystore.exists()) customKeystore else releaseKeystore
+        storePassword = storePass
+        keyAlias = keyAl
+        keyPassword = keyPass
       } else if (debugKeystore.exists()) {
         storeFile = debugKeystore
         storePassword = "android"
@@ -95,8 +107,7 @@ secrets {
 // This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
-  implementation("androidx.fragment:fragment-ktx:1.8.6")
-  implementation(libs.androidx.biometric)
+  // implementation("androidx.fragment:fragment-ktx:1.8.6")
   implementation(libs.androidx.security.crypto)
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)

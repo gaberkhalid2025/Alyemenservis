@@ -29,15 +29,16 @@ fun TechnicianDashboard(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val techViewModel = remember(account.id) {
+    val techViewModel = remember(account.id, appContext) {
         TechnicianDashboardViewModel(
             ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(context),
-            productsRepository = ProductsRepositoryImpl(context),
-            ratingsRepository = RatingsRepositoryImpl(context),
-            galleryRepository = GalleryRepositoryImpl(context)
+            dashboardRepository = DashboardRepositoryImpl(appContext),
+            productsRepository = ProductsRepositoryImpl(appContext),
+            ratingsRepository = RatingsRepositoryImpl(appContext),
+            galleryRepository = GalleryRepositoryImpl(appContext)
         )
     }
 

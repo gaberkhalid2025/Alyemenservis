@@ -43,10 +43,11 @@ fun ServicesBrowserLayout(
     onChatOpen: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
 
-    val browserViewModel = remember {
+    val browserViewModel = remember(appContext) {
         ServicesBrowserViewModel(
-            productsRepository = ProductsRepositoryImpl(context)
+            productsRepository = ProductsRepositoryImpl(appContext)
         )
     }
 

@@ -187,6 +187,22 @@ fun BannerSliderView(banners: List<BannerEntity>, themeColors: VisualThemePalett
     }
 
     if (activeBanner != null) {
+        val bitmap = remember(activeBanner.url, activeBanner.type) {
+            if (activeBanner.type.uppercase() == "IMAGE" && activeBanner.url.isNotEmpty() &&
+                (activeBanner.url.startsWith("data:image") || activeBanner.url.length > 200)
+            ) {
+                try {
+                    val base64Data = if (activeBanner.url.contains(",")) activeBanner.url.substringAfter(",") else activeBanner.url
+                    val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                } catch (e: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -199,31 +215,13 @@ fun BannerSliderView(banners: List<BannerEntity>, themeColors: VisualThemePalett
                 when (activeBanner.type.uppercase()) {
                     "IMAGE" -> {
                         if (activeBanner.url.isNotEmpty()) {
-                            if (activeBanner.url.startsWith("data:image") || activeBanner.url.length > 200) {
-                                val bitmap = remember(activeBanner.url) {
-                                    try {
-                                        val base64Data = if (activeBanner.url.contains(",")) activeBanner.url.substringAfter(",") else activeBanner.url
-                                        val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
-                                        BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-                                }
-                                if (bitmap != null) {
-                                    Image(
-                                        painter = BitmapPainter(bitmap.asImageBitmap()),
-                                        contentDescription = activeBanner.title,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = activeBanner.url,
-                                        contentDescription = activeBanner.title,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                    )
-                                }
+                            if (bitmap != null) {
+                                Image(
+                                    painter = BitmapPainter(bitmap.asImageBitmap()),
+                                    contentDescription = activeBanner.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
                             } else {
                                 AsyncImage(
                                     model = activeBanner.url,

@@ -65,6 +65,7 @@ fun BookingFormScreen(
     var isSubmitting by remember { mutableStateOf(false) }
 
     var createdBookingResult by remember { mutableStateOf<BookingEntity?>(null) }
+    var lastCreatedRawPass by remember { mutableStateOf("") }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -487,8 +488,8 @@ fun BookingFormScreen(
                         id = java.util.UUID.randomUUID().toString(),
                         bookingCode = generatedCode,
                         bookingNumber = generatedCode,
-                        bookingPassword = generatedPass,
-                        pinCode = generatedPass,
+                        bookingPassword = "",
+                        pinCode = com.example.utils.SecureHasher.hashPin(generatedPass),
                         fullName = fullName.trim(),
                         customerName = fullName.trim(),
                         clientName = fullName.trim(),
@@ -513,6 +514,7 @@ fun BookingFormScreen(
                     )
 
                     isSubmitting = false
+                    lastCreatedRawPass = generatedPass
                     createdBookingResult = newBooking
                     showSuccessDialog = true
                 },
@@ -571,7 +573,7 @@ fun BookingFormScreen(
                             ) {
                                 Text("كلمة السر الخاصة بالحجز:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 SelectionContainer {
-                                    Text(bk.bookingPassword, fontWeight = FontWeight.Bold, color = Color(0xFFD97706), fontSize = 14.sp)
+                                    Text(lastCreatedRawPass, fontWeight = FontWeight.Bold, color = Color(0xFFD97706), fontSize = 14.sp)
                                 }
                             }
                         }
@@ -587,7 +589,7 @@ fun BookingFormScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        clipboardManager.setText(AnnotatedString("كود الحجز: ${bk.bookingCode} | كلمة المرور: ${bk.bookingPassword}"))
+                        clipboardManager.setText(AnnotatedString("كود الحجز: ${bk.bookingCode} | كلمة المرور: $lastCreatedRawPass"))
                         Toast.makeText(context, "تم نسخ بيانات الحجز للحافظة", Toast.LENGTH_SHORT).show()
                         showSuccessDialog = false
                         onBookingCreated(bk)

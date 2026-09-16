@@ -28,14 +28,15 @@ fun RestaurantDashboard(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val restaurantViewModel = remember(account.id) {
+    val restaurantViewModel = remember(account.id, appContext) {
         RestaurantDashboardViewModel(
             ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(context),
-            productsRepository = ProductsRepositoryImpl(context),
-            ratingsRepository = RatingsRepositoryImpl(context)
+            dashboardRepository = DashboardRepositoryImpl(appContext),
+            productsRepository = ProductsRepositoryImpl(appContext),
+            ratingsRepository = RatingsRepositoryImpl(appContext)
         )
     }
 

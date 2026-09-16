@@ -464,10 +464,12 @@ fun BookingCalendarScreen(
                         }
 
                         calendarViewModel.setSubmitting(true)
+                        val rawGeneratedPass = "${(1000..9999).random()}"
                         val newBooking = BookingEntity(
                             id = "book_${System.currentTimeMillis()}_${(1000..9999).random()}",
                             bookingNumber = "YEM-${(10000..99999).random()}",
-                            bookingPassword = "${(1000..9999).random()}",
+                            bookingPassword = "",
+                            pinCode = com.example.utils.SecureHasher.hashPin(rawGeneratedPass),
                             clientId = currentUserPhone.ifEmpty { "client_${System.currentTimeMillis()}" },
                             clientName = currentUserName.ifEmpty { "عميل معتمد" },
                             clientPhone = currentUserPhone,

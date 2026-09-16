@@ -184,8 +184,8 @@ fun BookingDetailsScreen(
             }
 
             // Secret Password Card (Visible to Client & Admin only)
-            if (userRole == "CLIENT" || userRole == "ADMIN") {
-                val secretPin = booking.bookingPassword.ifEmpty { booking.pinCode }
+            if ((userRole == "CLIENT" || userRole == "ADMIN") && booking.bookingPassword.isNotBlank()) {
+                val secretPin = booking.bookingPassword
                 if (secretPin.isNotBlank()) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),

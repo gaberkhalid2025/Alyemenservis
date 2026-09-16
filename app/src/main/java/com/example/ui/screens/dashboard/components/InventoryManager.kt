@@ -19,14 +19,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
+import com.google.firebase.firestore.FirebaseFirestore
+import java.util.UUID
+import android.util.Log
 
 data class InventoryItem(
-    val id: String,
-    val sku: String,
-    val name: String,
-    val quantity: Int,
+    val id: String = "",
+    val ownerId: String = "",
+    val sku: String = "",
+    val name: String = "",
+    val quantity: Int = 0,
     val minThreshold: Int = 5,
-    val price: Double,
+    val price: Double = 0.0,
     val inStock: Boolean = true
 )
 
@@ -36,11 +40,30 @@ data class InventoryItem(
  */
 @Composable
 fun InventoryManager(
+    ownerId: String = "",
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
     var inventoryList by remember {
         mutableStateOf<List<InventoryItem>>(emptyList())
+    }
+
+    LaunchedEffect(ownerId) {
+        val query = if (ownerId.isNotBlank()) {
+            FirebaseFirestore.getInstance()
+                .collection("inventory")
+                .whereEqualTo("ownerId", ownerId)
+        } else {
+            FirebaseFirestore.getInstance()
+                .collection("inventory")
+        }
+        query.addSnapshotListener { snap, _ ->
+            if (snap != null) {
+                inventoryList = snap.documents.mapNotNull { doc ->
+                    doc.toObject(InventoryItem::class.java)?.copy(id = doc.id)
+                }
+            }
+        }
     }
 
     var showAddItemDialog by remember { mutableStateOf(false) }
@@ -167,9 +190,12 @@ fun InventoryManager(
                             IconButton(
                                 onClick = {
                                     if (item.quantity > 0) {
-                                        inventoryList = inventoryList.map {
-                                            if (it.id == item.id) it.copy(quantity = it.quantity - 1, inStock = it.quantity - 1 > 0) else it
-                                        }
+                                        val newQty = item.quantity - 1
+                                        FirebaseFirestore.getInstance()
+                                            .collection("inventory")
+                                            .document(item.id)
+                                            .update("quantity", newQty, "inStock", newQty > 0)
+                                            .addOnFailureListener { e -> Log.e("InventoryManager", "Update failed", e) }
                                     }
                                 },
                                 modifier = Modifier.size(32.dp)
@@ -186,13 +212,29 @@ fun InventoryManager(
 
                             IconButton(
                                 onClick = {
-                                    inventoryList = inventoryList.map {
-                                        if (it.id == item.id) it.copy(quantity = it.quantity + 1, inStock = true) else it
-                                    }
+                                    val newQty = item.quantity + 1
+                                    FirebaseFirestore.getInstance()
+                                        .collection("inventory")
+                                        .document(item.id)
+                                        .update("quantity", newQty, "inStock", true)
+                                        .addOnFailureListener { e -> Log.e("InventoryManager", "Update failed", e) }
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Increase", tint = Color.White)
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    FirebaseFirestore.getInstance()
+                                        .collection("inventory")
+                                        .document(item.id)
+                                        .delete()
+                                        .addOnFailureListener { e -> Log.e("InventoryManager", "Delete failed", e) }
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444))
                             }
                         }
                     }
@@ -239,16 +281,24 @@ fun InventoryManager(
                 Button(
                     onClick = {
                         if (newItemName.isNotBlank()) {
+                            val itemId = UUID.randomUUID().toString()
+                            val qty = newItemQty.toIntOrNull() ?: 1
                             val newItem = InventoryItem(
-                                id = System.currentTimeMillis().toString(),
-                                sku = if (newItemSku.isBlank()) "SKU-${System.currentTimeMillis() % 10000}" else newItemSku,
-                                name = newItemName,
-                                quantity = newItemQty.toIntOrNull() ?: 1,
+                                id = itemId,
+                                ownerId = ownerId,
+                                sku = if (newItemSku.isBlank()) "SKU-${UUID.randomUUID().toString().take(8).uppercase()}" else newItemSku,
+                                name = newItemName.trim(),
+                                quantity = qty,
                                 minThreshold = 5,
                                 price = newItemPrice.toDoubleOrNull() ?: 0.0,
-                                inStock = (newItemQty.toIntOrNull() ?: 1) > 0
+                                inStock = qty > 0
                             )
-                            inventoryList = inventoryList + newItem
+                            FirebaseFirestore.getInstance()
+                                .collection("inventory")
+                                .document(itemId)
+                                .set(newItem)
+                                .addOnFailureListener { e -> Log.e("InventoryManager", "Insert failed", e) }
+
                             showAddItemDialog = false
                             newItemName = ""
                             newItemSku = ""

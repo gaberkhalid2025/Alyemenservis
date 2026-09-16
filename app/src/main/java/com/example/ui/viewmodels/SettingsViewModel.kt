@@ -348,7 +348,7 @@ fun initColorSync(context: android.content.Context) {
                         }
                 }
             }
-        firestoreListeners.add(colorSchemeListener!!)
+        colorSchemeListener?.let { firestoreListeners.add(it) }
 
         // 3. Real-time Firestore listener for Personal User Colors
         viewModelScope.launch {
@@ -380,7 +380,7 @@ fun initColorSync(context: android.content.Context) {
                                 }
                             }
                         }
-                    firestoreListeners.add(userColorsListener!!)
+                    userColorsListener?.let { firestoreListeners.add(it) }
                 }
             }
         }

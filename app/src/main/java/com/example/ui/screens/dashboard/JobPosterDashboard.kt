@@ -35,13 +35,14 @@ fun JobPosterDashboard(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val jobViewModel = remember(account.id) {
+    val jobViewModel = remember(account.id, appContext) {
         JobPosterDashboardViewModel(
             ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(context),
-            productsRepository = ProductsRepositoryImpl(context),
+            dashboardRepository = DashboardRepositoryImpl(appContext),
+            productsRepository = ProductsRepositoryImpl(appContext),
             jobRepository = com.example.data.repositories.JobRepository(
                 com.google.firebase.firestore.FirebaseFirestore.getInstance(),
                 com.example.data.LocalAppCacheManager(context)

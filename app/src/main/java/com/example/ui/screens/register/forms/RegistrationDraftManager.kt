@@ -28,13 +28,14 @@ class RegistrationDraftManager(context: Context) {
     fun saveDraft(role: String, data: Map<String, String>) {
         val editor = prefs.edit()
         data.forEach { (key, value) ->
+            if (key == "password" || key == "confirmPassword") return@forEach
             editor.putString("${role}_$key", value)
         }
         editor.apply()
     }
 
     fun getDraft(role: String): Map<String, String> {
-        val keys = listOf("entityName", "managerName", "phone", "password", "confirmPassword", "city", "specialization")
+        val keys = listOf("entityName", "managerName", "phone", "city", "specialization")
         val map = mutableMapOf<String, String>()
         keys.forEach { key ->
             prefs.getString("${role}_$key", null)?.let { value ->
@@ -45,7 +46,7 @@ class RegistrationDraftManager(context: Context) {
     }
 
     fun clearDraft(role: String) {
-        val keys = listOf("entityName", "managerName", "phone", "password", "confirmPassword", "city", "specialization")
+        val keys = listOf("entityName", "managerName", "phone", "city", "specialization")
         val editor = prefs.edit()
         keys.forEach { key ->
             editor.remove("${role}_$key")

@@ -28,14 +28,15 @@ fun StoreDashboard(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val storeViewModel = remember(account.id) {
+    val storeViewModel = remember(account.id, appContext) {
         StoreDashboardViewModel(
             ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(context),
-            productsRepository = ProductsRepositoryImpl(context),
-            ratingsRepository = RatingsRepositoryImpl(context)
+            dashboardRepository = DashboardRepositoryImpl(appContext),
+            productsRepository = ProductsRepositoryImpl(appContext),
+            ratingsRepository = RatingsRepositoryImpl(appContext)
         )
     }
 

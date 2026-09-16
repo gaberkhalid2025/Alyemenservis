@@ -19,12 +19,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
+import com.google.firebase.firestore.FirebaseFirestore
+import java.util.UUID
+import android.util.Log
 
 data class StaffMember(
-    val id: String,
-    val name: String,
-    val role: String, // مدير فرع / فني ميداني / كاشير / استقبال
-    val phone: String,
+    val id: String = "",
+    val ownerId: String = "",
+    val name: String = "",
+    val role: String = "", // مدير فرع / فني ميداني / كاشير / استقبال
+    val phone: String = "",
     val canEditPrices: Boolean = false,
     val canChat: Boolean = true
 )
@@ -35,11 +39,30 @@ data class StaffMember(
  */
 @Composable
 fun StaffManager(
+    ownerId: String = "",
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
     var staffList by remember {
         mutableStateOf<List<StaffMember>>(emptyList())
+    }
+
+    LaunchedEffect(ownerId) {
+        val query = if (ownerId.isNotBlank()) {
+            FirebaseFirestore.getInstance()
+                .collection("staff")
+                .whereEqualTo("ownerId", ownerId)
+        } else {
+            FirebaseFirestore.getInstance()
+                .collection("staff")
+        }
+        query.addSnapshotListener { snap, _ ->
+            if (snap != null) {
+                staffList = snap.documents.mapNotNull { doc ->
+                    doc.toObject(StaffMember::class.java)?.copy(id = doc.id)
+                }
+            }
+        }
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -126,7 +149,13 @@ fun StaffManager(
                             )
                         }
 
-                        IconButton(onClick = { staffList = staffList.filter { it.id != member.id } }) {
+                        IconButton(onClick = {
+                            FirebaseFirestore.getInstance()
+                                .collection("staff")
+                                .document(member.id)
+                                .delete()
+                                .addOnFailureListener { e -> Log.e("StaffManager", "Delete failed", e) }
+                        }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444))
                         }
                     }
@@ -166,15 +195,22 @@ fun StaffManager(
                 Button(
                     onClick = {
                         if (newName.isNotBlank() && newPhone.isNotBlank()) {
+                            val memberId = UUID.randomUUID().toString()
                             val newMember = StaffMember(
-                                id = System.currentTimeMillis().toString(),
-                                name = newName,
-                                role = newRole,
-                                phone = newPhone,
+                                id = memberId,
+                                ownerId = ownerId,
+                                name = newName.trim(),
+                                role = newRole.trim(),
+                                phone = newPhone.trim(),
                                 canEditPrices = false,
                                 canChat = true
                             )
-                            staffList = staffList + newMember
+                            FirebaseFirestore.getInstance()
+                                .collection("staff")
+                                .document(memberId)
+                                .set(newMember)
+                                .addOnFailureListener { e -> Log.e("StaffManager", "Insert failed", e) }
+
                             showAddDialog = false
                             newName = ""
                             newPhone = ""

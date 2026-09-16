@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.ColorScheme
@@ -17,6 +18,7 @@ import com.example.data.StoreEntity
 import com.example.data.PropertyEntity
 import java.io.ByteArrayOutputStream
 
+@Immutable
 data class VisualThemePalette(
     val activeId: String,
     val primary: Color,
@@ -31,6 +33,7 @@ data class VisualThemePalette(
     val border: Color = Color(0xFF374151)
 )
 
+@Immutable
 data class PresetPalette(
     val name: String,
     val primaryHex: String,

@@ -36,6 +36,25 @@ import com.example.ui.MainViewModel
 import com.example.ui.AppScreens
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.tasks.await
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+
+private fun getSecurePrefs(context: Context): android.content.SharedPreferences {
+    return try {
+        val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+            .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        androidx.security.crypto.EncryptedSharedPreferences.create(
+            context,
+            "yemen_service_secure_prefs",
+            masterKey,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +77,9 @@ fun PasswordResetWaitingScreen(
     var accountName by remember { mutableStateOf("صاحب الحساب") }
     var accountType by remember { mutableStateOf("حساب معتمد") }
     var isSubmittingLogin by remember { mutableStateOf(false) }
+    var enteredPassword by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    val secureSp = remember { getSecurePrefs(context) }
 
     // Listen in real-time to Firestore for reset completion
     DisposableEffect(cleanPhone) {
@@ -200,8 +222,31 @@ fun PasswordResetWaitingScreen(
                         }
 
                         // Direct Login Button
+                        OutlinedTextField(
+                            value = enteredPassword,
+                            onValueChange = { 
+                                enteredPassword = it
+                                passwordError = null
+                            },
+                            label = { Text("أدخل كلمة المرور الجديدة للتأكيد") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            isError = passwordError != null,
+                            supportingText = { passwordError?.let { Text(it) } },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = themeColors.accent,
+                                unfocusedBorderColor = Color.Gray
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = {
+                                if (enteredPassword.trim() != newPassword.trim() && !com.example.utils.SecureHasher.verifyPassword(enteredPassword.trim(), newPassword.trim())) {
+                                    passwordError = "❌ كلمة المرور غير صحيحة"
+                                    return@Button
+                                }
                                 isSubmittingLogin = true
                                 viewModel.searchAccountForRestore(cleanPhone) { match ->
                                     isSubmittingLogin = false
@@ -209,7 +254,7 @@ fun PasswordResetWaitingScreen(
                                         val provArea = match.provider?.area ?: match.store?.cityId ?: "اليمن"
                                         viewModel.setUserSessionDetails(context, match.name, cleanPhone, provArea)
                                         
-                                        sp.edit()
+                                        secureSp.edit()
                                             .putBoolean("is_account_logged_in", true)
                                             .putString("user_account_type", match.type)
                                             .putString("logged_account_id", match.provider?.id ?: match.store?.id ?: match.property?.id ?: "")

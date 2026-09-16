@@ -28,14 +28,15 @@ fun PropertyDashboard(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val propertyViewModel = remember(account.id) {
+    val propertyViewModel = remember(account.id, appContext) {
         PropertyDashboardViewModel(
             ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(context),
-            productsRepository = ProductsRepositoryImpl(context),
-            ratingsRepository = RatingsRepositoryImpl(context)
+            dashboardRepository = DashboardRepositoryImpl(appContext),
+            productsRepository = ProductsRepositoryImpl(appContext),
+            ratingsRepository = RatingsRepositoryImpl(appContext)
         )
     }
 

@@ -52,7 +52,7 @@ fun RegisterScreen(
     var showRestoreDialog by remember { mutableStateOf(false) }
     val targetTypeStr by viewModel.targetRegistrationType.collectAsState()
     var selectedType by remember(targetTypeStr) {
-        mutableStateOf(if (!targetTypeStr.isNullOrBlank()) RegistrationType.fromId(targetTypeStr!!) else null)
+        mutableStateOf(RegistrationType.fromId(targetTypeStr))
     }
     var forceShowForm by remember(targetTypeStr) {
         mutableStateOf(!targetTypeStr.isNullOrBlank())

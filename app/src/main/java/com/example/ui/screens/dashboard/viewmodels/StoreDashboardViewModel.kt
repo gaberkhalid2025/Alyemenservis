@@ -10,6 +10,8 @@ import com.example.domain.entities.ProductItemEntity
 import com.example.ui.screens.dashboard.DashboardEvent
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.flow.catch
 
 class StoreDashboardViewModel(
     private val ownerId: String,
@@ -35,22 +37,31 @@ class StoreDashboardViewModel(
     fun loadDashboardData() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-
-            launch {
-                dashboardRepository.getDashboardStats(ownerId, "STORE").collect { stats ->
-                    _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+            
+            supervisorScope {
+                launch {
+                    dashboardRepository.getDashboardStats(ownerId, "STORE")
+                        .catch { e -> 
+                            _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في الإحصائيات")) 
+                            _uiState.value = _uiState.value.copy(isLoading = false)
+                        }
+                        .collect { stats ->
+                            _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+                        }
                 }
-            }
-
-            launch {
-                productsRepository.getOwnerProducts(ownerId).collect { prods ->
-                    _uiState.value = _uiState.value.copy(products = prods)
+                launch {
+                    productsRepository.getOwnerProducts(ownerId)
+                        .catch { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في المنتجات")) }
+                        .collect { prods ->
+                            _uiState.value = _uiState.value.copy(products = prods)
+                        }
                 }
-            }
-
-            launch {
-                ratingsRepository.getTargetRatings(ownerId).collect { revs ->
-                    _uiState.value = _uiState.value.copy(reviews = revs)
+                launch {
+                    ratingsRepository.getTargetRatings(ownerId)
+                        .catch { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في التقييمات")) }
+                        .collect { revs ->
+                            _uiState.value = _uiState.value.copy(reviews = revs)
+                        }
                 }
             }
         }

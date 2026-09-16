@@ -68,8 +68,6 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
             "entityName" to st.entityName,
             "managerName" to st.managerName,
             "phone" to st.phone,
-            "password" to st.password,
-            "confirmPassword" to st.confirmPassword,
             "city" to st.city,
             "specialization" to st.specialization
         )
@@ -141,7 +139,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
 
     private fun validatePassword(password: String) {
         val error = if (password.length < 6) {
-            "كلمة المرور يجب أن تحتوي على 8 أحرف، حرف كبير، ورقم"
+            "كلمة المرور يجب أن تكون 6 أحرف على الأقل"
         } else null
         _state.update { it.copy(passwordError = error) }
     }

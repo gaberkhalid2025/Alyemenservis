@@ -16,7 +16,8 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun UnifiedLoadingIndicator(
     message: String = "جاري تحميل البيانات...",
-    themeColors: VisualThemePalette
+    themeColors: VisualThemePalette,
+    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = Modifier

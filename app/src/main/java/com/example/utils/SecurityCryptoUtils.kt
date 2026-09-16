@@ -87,9 +87,8 @@ object SecurityCryptoUtils {
         if (input.isBlank() || storedHashOrPass.isNullOrBlank()) return false
         val trimmedInput = input.trim()
         val trimmedStored = storedHashOrPass.trim()
-        if (trimmedInput == trimmedStored) return true
-        if (hashPassword(trimmedInput).equals(trimmedStored, ignoreCase = true)) return true
-        return PasswordHasher.verifyPassword(trimmedInput, trimmedStored)
+        return com.example.utils.SecureHasher.verifyPassword(trimmedInput, trimmedStored) || 
+               PasswordHasher.verifyPassword(trimmedInput, trimmedStored)
     }
 
     private fun base64Encode(bytes: ByteArray): String {

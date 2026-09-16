@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.SpecialOfferEntity
+import com.google.firebase.firestore.FirebaseFirestore
+import java.util.UUID
+import android.util.Log
 
 /**
  * 🏷️ OffersManager (إدارة العروض والخصومات الخاصة)
@@ -27,11 +30,30 @@ import com.example.data.SpecialOfferEntity
  */
 @Composable
 fun OffersManager(
+    ownerId: String = "",
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
     var offers by remember {
         mutableStateOf<List<SpecialOfferEntity>>(emptyList())
+    }
+
+    LaunchedEffect(ownerId) {
+        val query = if (ownerId.isNotBlank()) {
+            FirebaseFirestore.getInstance()
+                .collection("special_offers")
+                .whereEqualTo("providerId", ownerId)
+        } else {
+            FirebaseFirestore.getInstance()
+                .collection("special_offers")
+        }
+        query.addSnapshotListener { snap, _ ->
+            if (snap != null) {
+                offers = snap.documents.mapNotNull { doc ->
+                    doc.toObject(SpecialOfferEntity::class.java)?.copy(id = doc.id)
+                }
+            }
+        }
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -134,7 +156,11 @@ fun OffersManager(
 
                             Row {
                                 IconButton(onClick = {
-                                    offers = offers.map { if (it.id == offer.id) it.copy(isEnabled = !it.isEnabled) else it }
+                                    FirebaseFirestore.getInstance()
+                                        .collection("special_offers")
+                                        .document(offer.id)
+                                        .update("isEnabled", !offer.isEnabled)
+                                        .addOnFailureListener { e -> Log.e("OffersManager", "Update failed", e) }
                                 }) {
                                     Icon(
                                         if (offer.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
@@ -142,7 +168,13 @@ fun OffersManager(
                                         tint = if (offer.isEnabled) Color(0xFF10B981) else Color(0xFF94A3B8)
                                     )
                                 }
-                                IconButton(onClick = { offers = offers.filter { it.id != offer.id } }) {
+                                IconButton(onClick = {
+                                    FirebaseFirestore.getInstance()
+                                        .collection("special_offers")
+                                        .document(offer.id)
+                                        .delete()
+                                        .addOnFailureListener { e -> Log.e("OffersManager", "Delete failed", e) }
+                                }) {
                                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444))
                                 }
                             }
@@ -190,15 +222,22 @@ fun OffersManager(
                 Button(
                     onClick = {
                         if (newTitle.isNotBlank()) {
+                            val offerId = UUID.randomUUID().toString()
                             val newOffer = SpecialOfferEntity(
-                                id = System.currentTimeMillis().toString(),
-                                title = newTitle,
-                                description = newDesc,
+                                id = offerId,
+                                providerId = ownerId,
+                                title = newTitle.trim(),
+                                description = newDesc.trim(),
                                 discountPercent = newDiscount.toIntOrNull() ?: 10,
-                                expiryDate = newExpiry,
+                                expiryDate = newExpiry.trim(),
                                 isEnabled = true
                             )
-                            offers = offers + newOffer
+                            FirebaseFirestore.getInstance()
+                                .collection("special_offers")
+                                .document(offerId)
+                                .set(newOffer)
+                                .addOnFailureListener { e -> Log.e("OffersManager", "Insert failed", e) }
+
                             showAddDialog = false
                             newTitle = ""
                             newDesc = ""

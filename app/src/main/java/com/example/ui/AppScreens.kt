@@ -1,7 +1,6 @@
 package com.example.ui
 
 object AppScreens {
-    const val HOME = "USER_BROWSE"
     const val USER_BROWSE = "USER_BROWSE"
     const val ADMIN_PANEL = "ADMIN_PANEL"
     const val OWNER_PANEL = "OWNER_PANEL"

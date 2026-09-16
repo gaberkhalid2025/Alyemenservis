@@ -34,7 +34,7 @@ data class OrderEntity(
     val quantity: Int = 1,
     val totalAmount: Double = 0.0,
     val paymentId: String = "",
-    val paymentStatus: String = "PENDING", // PENDING, PROCESSING, COMPLETED, FAILED
+    val paymentStatus: String = "PENDING", // PENDING, COD_PENDING, PROCESSING, COMPLETED, FAILED
     val status: String = "PENDING", // PENDING, PROCESSING, COMPLETED, CANCELLED
     val notes: String = "",
     val timestamp: Long = System.currentTimeMillis()

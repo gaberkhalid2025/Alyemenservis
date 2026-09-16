@@ -54,51 +54,6 @@ fun UnifiedRatingsSection(
 /**
  * 📅 Unified Bookings Section Component
  */
-@Composable
-fun UnifiedBookingsSection(
-    account: UnifiedBusinessAccount,
-    viewModel: MainViewModel,
-    themeColors: VisualThemePalette
-) {
-    var selectedFilter by remember { mutableStateOf("ALL") }
-
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("📅 إدارة الحجوزات والمواعيد والطلبات", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
-
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            val filters = listOf(
-                Pair("ALL", "الكل"),
-                Pair("PENDING", "قيد الانتظار ⏳"),
-                Pair("APPROVED", "مقبولة ✅"),
-                Pair("COMPLETED", "مكتملة 🎉"),
-                Pair("REJECTED", "ملغاة ❌")
-            )
-            items(filters) { item ->
-                val isSel = selectedFilter == item.first
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSel) themeColors.accent else Color.DarkGray)
-                        .clickable { selectedFilter = item.first }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(item.second, fontSize = 10.sp, color = if (isSel) Color.Black else Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("لا توجد طلبيات أو حجوزات مسجلة ضمن الفلتر المختار حالياً.", fontSize = 11.sp, color = Color.LightGray)
-                Text("تتم المزامنة الفورية عند قيام أي عميل بالحجز أو طلب الخدمة من التطبيق.", fontSize = 10.sp, color = themeColors.textSecondary)
-            }
-        }
-    }
-}
 
 /**
  * 📎 Unified Attachments Section Component

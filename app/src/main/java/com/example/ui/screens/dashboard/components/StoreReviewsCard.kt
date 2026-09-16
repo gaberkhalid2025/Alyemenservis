@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.data.RatingEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
@@ -27,7 +28,7 @@ fun StoreReviewsCard(
     storeRatings: List<RatingEntity>,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    context: Context
+    context: Context = LocalContext.current
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),

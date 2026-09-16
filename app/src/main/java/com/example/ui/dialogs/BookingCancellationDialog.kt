@@ -234,8 +234,8 @@ fun BookingCancellationDialog(
                             }
 
                             if (userRole == "CLIENT") {
-                                val expectedPass = booking.bookingPassword.ifEmpty { booking.pinCode }
-                                if (expectedPass.isNotBlank() && passwordInput.trim() != expectedPass.trim()) {
+                                val expectedTarget = if (booking.pinCode.isNotBlank()) booking.pinCode else booking.bookingPassword
+                                if (expectedTarget.isNotBlank() && !com.example.utils.SecureHasher.verifyPin(passwordInput.trim(), expectedTarget)) {
                                     attemptsLeft--
                                     if (attemptsLeft <= 0) {
                                         errorMessage = "تم قفل الحجز بعد 3 محاولات خاطئة!"

@@ -7737,7 +7737,7 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
         var editCustTime by rememberSaveable(booking.id) { mutableStateOf(booking.timeString) }
         var editCustStatus by rememberSaveable(booking.id) { mutableStateOf(booking.status) }
         var editCustPassword by rememberSaveable(booking.id) { 
-            mutableStateOf(booking.bookingPassword.ifEmpty { booking.pinCode.ifEmpty { "1234" } }) 
+            mutableStateOf(if (booking.bookingPassword.isNotBlank()) booking.bookingPassword else if (booking.pinCode.isNotBlank()) "••••" else "1234") 
         }
 
         Dialog(onDismissRequest = { editingBookingObj = null }) {
@@ -7866,8 +7866,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                                         dateString = editCustDate.trim(),
                                         timeString = editCustTime.trim(),
                                         status = editCustStatus,
-                                        bookingPassword = editCustPassword.trim(),
-                                        pinCode = editCustPassword.trim()
+                                        bookingPassword = "",
+                                        pinCode = if (editCustPassword.trim() == "••••" || editCustPassword.trim().contains(":")) booking.pinCode else if (editCustPassword.trim().isNotBlank()) com.example.utils.SecureHasher.hashPin(editCustPassword.trim()) else booking.pinCode
                                     )
                                     viewModel.updateBooking(updatedB)
                                     editingBookingObj = null

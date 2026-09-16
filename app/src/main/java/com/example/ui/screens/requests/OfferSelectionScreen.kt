@@ -279,7 +279,7 @@ fun OfferSelectionScreen(
                     val newBooking = BookingEntity(
                         id = bookingId,
                         bookingNumber = bNum,
-                        bookingPassword = userPin,
+                        bookingPassword = "",
                         clientId = curReq.userId,
                         clientName = curReq.userName,
                         clientPhone = curReq.userPhone,
@@ -300,7 +300,7 @@ fun OfferSelectionScreen(
                         serviceDetails = "${curReq.description}\nملاحظات: $userNotes",
                         totalAmount = curOffer.price,
                         status = "APPROVED",
-                        pinCode = userPin,
+                        pinCode = com.example.utils.SecureHasher.hashPin(userPin),
                         createdAt = System.currentTimeMillis()
                     )
 

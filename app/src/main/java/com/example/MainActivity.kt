@@ -313,7 +313,7 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
+            // com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
             com.example.utils.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()

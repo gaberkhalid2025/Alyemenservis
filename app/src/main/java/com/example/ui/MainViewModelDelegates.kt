@@ -713,7 +713,7 @@ fun MainViewModel.addNotification(
     fun MainViewModel.restoreGuestUser(context: android.content.Context, phone: String, password: String, onResult: (Boolean, String) -> Unit) {
         restoreUserAccountByPhoneAndPassword(context, phone, password, onResult)
     }
-    fun MainViewModel.loginUserDirectly(context: android.content.Context, phone: String) = authViewModel.loginUserDirectly(context, phone)
+    fun MainViewModel.loginUserDirectly(context: android.content.Context, phone: String, password: String) = authViewModel.loginUserDirectly(context, phone, password)
     fun MainViewModel.showBackdoorDialog() = authViewModel.showBackdoorDialog()
     fun MainViewModel.dismissBackdoorDialog() = authViewModel.dismissBackdoorDialog()
     fun MainViewModel.setSupervisorSession(sup: SupervisorEntity) = authViewModel.setSupervisorSession(sup)

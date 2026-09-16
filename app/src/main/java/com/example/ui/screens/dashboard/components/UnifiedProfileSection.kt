@@ -110,6 +110,7 @@ fun UnifiedProfileSection(
                     Text(text = subtitle, fontSize = 12.sp, color = themeColors.textSecondary)
                 }
 
+                val formattedRating = String.format(java.util.Locale.US, "%.1f", rating)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -120,7 +121,7 @@ fun UnifiedProfileSection(
                     if (cityArea.isNotBlank()) {
                         Text(text = "📍 $cityArea", fontSize = 11.sp, color = themeColors.textSecondary)
                     }
-                    Text(text = "⭐ %.1f ($reviewCount تقييم)".format(rating, reviewCount), fontSize = 11.sp, color = Color(0xFFFFA000))
+                    Text(text = "⭐ $formattedRating ($reviewCount تقييم)", fontSize = 11.sp, color = Color(0xFFFFA000))
                 }
             }
         }

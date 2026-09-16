@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +34,18 @@ fun StatusBookingsContent(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
+    var selectedBookingFilter by remember { mutableStateOf("ALL") }
+
+    val filteredBookings = remember(bookings, selectedBookingFilter) {
+        when (selectedBookingFilter) {
+            "PENDING" -> bookings.filter { it.status.uppercase() == "PENDING" }
+            "APPROVED" -> bookings.filter { it.status.uppercase() == "APPROVED" || it.status.uppercase() == "STARTED" }
+            "COMPLETED" -> bookings.filter { it.status.uppercase() == "COMPLETED" || it.status.uppercase() == "FINISHED" }
+            "CANCELLED" -> bookings.filter { it.status.uppercase() == "CANCELLED" || it.status.uppercase() == "REJECTED" }
+            else -> bookings
+        }
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -102,24 +116,53 @@ fun StatusBookingsContent(
 
         item {
             Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "📋 الحجوزات المؤكدة (${bookings.size})",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.textPrimary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "📋 الحجوزات في النظام (${filteredBookings.size})",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = themeColors.textPrimary
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "ALL" to "الكل",
+                    "PENDING" to "معلق",
+                    "APPROVED" to "جاري",
+                    "COMPLETED" to "مكتمل",
+                    "CANCELLED" to "ملغي"
+                ).forEach { (key, label) ->
+                    FilterChip(
+                        selected = selectedBookingFilter == key,
+                        onClick = { selectedBookingFilter = key },
+                        label = { Text(label, fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = themeColors.primary,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+            }
         }
 
-        if (bookings.isEmpty()) {
+        if (filteredBookings.isEmpty()) {
             item {
                 Text(
-                    text = "لا توجد حجوزات مسجلة بعد",
+                    text = "لا توجد حجوزات مطابقة للفلتر المحدد",
                     fontSize = 13.sp,
                     color = themeColors.textSecondary
                 )
             }
         } else {
-            items(bookings, key = { "booking_${it.id}" }) { booking ->
+            items(filteredBookings, key = { "booking_${it.id}" }) { booking ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),

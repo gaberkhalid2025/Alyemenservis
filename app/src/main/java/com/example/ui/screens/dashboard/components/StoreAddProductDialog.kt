@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.data.ProductEntity
 import com.example.ui.MainViewModel
 import com.example.utils.convertUriToBase64
@@ -33,13 +34,14 @@ fun StoreAddProductDialog(
     storeId: String,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    context: Context,
+    context: Context = LocalContext.current,
     onDismiss: () -> Unit
 ) {
     var prodName by remember { mutableStateOf("") }
     var prodDesc by remember { mutableStateOf("") }
     var prodPrice by remember { mutableStateOf("") }
     var prodImageBase64 by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val prodUriPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -53,9 +55,28 @@ fun StoreAddProductDialog(
         containerColor = themeColors.secondary,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                if (errorMessage != null) {
+                    Surface(
+                        color = Color(0xFFEF4444).copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = errorMessage ?: "",
+                            color = Color(0xFFFCA5A5),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = prodName,
-                    onValueChange = { prodName = it },
+                    onValueChange = { 
+                        prodName = it
+                        if (errorMessage != null) errorMessage = null
+                    },
                     label = { Text("اسم المنتج") },
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 12.sp)
@@ -71,7 +92,10 @@ fun StoreAddProductDialog(
 
                 OutlinedTextField(
                     value = prodPrice,
-                    onValueChange = { prodPrice = it },
+                    onValueChange = { 
+                        prodPrice = it
+                        if (errorMessage != null) errorMessage = null
+                    },
                     label = { Text("سعر المنتج (ريال يمني)") },
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 12.sp)
@@ -110,9 +134,13 @@ fun StoreAddProductDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val dPrice = prodPrice.toDoubleOrNull() ?: 0.0
-                    if (prodName.trim().isEmpty() || dPrice <= 0.0) {
-                        Toast.makeText(context, "⚠️ يرجى تعبئة الحقول والأسعار بطريقة صحيحة!", Toast.LENGTH_SHORT).show()
+                    val dPrice = prodPrice.trim().toDoubleOrNull()
+                    if (prodName.trim().isBlank()) {
+                        errorMessage = "⚠️ يرجى إدخال اسم المنتج بشكل صحيح"
+                        Toast.makeText(context, "⚠️ اسم المنتج مطلوب!", Toast.LENGTH_SHORT).show()
+                    } else if (dPrice == null || dPrice <= 0.0) {
+                        errorMessage = "⚠️ يرجى إدخال سعر صحيح أكبر من الصفر"
+                        Toast.makeText(context, "⚠️ يرجى إدخال سعر صالح!", Toast.LENGTH_SHORT).show()
                     } else {
                         val newProduct = ProductEntity(
                             id = UUID.randomUUID().toString(),

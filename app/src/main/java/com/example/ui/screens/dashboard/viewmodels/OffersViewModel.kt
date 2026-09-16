@@ -44,25 +44,31 @@ class OffersViewModel @Inject constructor(
 
     fun addOffer(offer: SpecialOfferEntity) {
         viewModelScope.launch {
-            repository.addOffer(offer).onSuccess {
-                loadOffers()
-            }
+            repository.addOffer(offer)
+                .onSuccess { loadOffers() }
+                .onFailure { e ->
+                    _error.value = e.localizedMessage ?: "فشل إضافة العرض"
+                }
         }
     }
 
     fun updateOffer(offer: SpecialOfferEntity) {
         viewModelScope.launch {
-            repository.updateOffer(offer).onSuccess {
-                loadOffers()
-            }
+            repository.updateOffer(offer)
+                .onSuccess { loadOffers() }
+                .onFailure { e ->
+                    _error.value = e.localizedMessage ?: "فشل تحديث العرض"
+                }
         }
     }
 
     fun deleteOffer(offerId: String) {
         viewModelScope.launch {
-            repository.deleteOffer(offerId).onSuccess {
-                loadOffers()
-            }
+            repository.deleteOffer(offerId)
+                .onSuccess { loadOffers() }
+                .onFailure { e ->
+                    _error.value = e.localizedMessage ?: "فشل حذف العرض"
+                }
         }
     }
 }

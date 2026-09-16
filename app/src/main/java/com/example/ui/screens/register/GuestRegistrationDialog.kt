@@ -4,8 +4,6 @@ package com.example.ui.screens.register
 import com.example.ui.*
 
 import android.content.Context
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,8 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
 import com.example.ui.MainViewModel
 import com.example.ui.screens.register.components.RegistrationField
 import com.example.ui.screens.register.components.RegistrationSubmitButton
@@ -51,19 +47,7 @@ sealed class GuestAuthUiState {
 }
 
 /**
- * 🔐 Helper extension to safely retrieve FragmentActivity from ContextWrapper hierarchy
- */
-private fun Context.findFragmentActivity(): FragmentActivity? {
-    var current = this
-    while (current is android.content.ContextWrapper) {
-        if (current is FragmentActivity) return current
-        current = current.baseContext ?: break
-    }
-    return null
-}
-
-/**
- * 🔐 GuestRegistrationDialog - نافذة تسجيل الزوار واسترجاع الحسابات مع دعم البصمة والذاكرة المؤقتة
+ * 🔐 GuestRegistrationDialog - نافذة تسجيل الزوار واسترجاع الحسابات
  */
 @Composable
 fun GuestRegistrationDialog(
@@ -95,38 +79,6 @@ fun GuestRegistrationDialog(
     var nameError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
 
-    var biometricAttempts by remember { mutableIntStateOf(0) }
-    var isBiometricLocked by remember { mutableStateOf(false) }
-
-    val promptHolder = remember { arrayOf<BiometricPrompt?>(null) }
-
-    val getSecurePrefs = {
-        try {
-            val masterKey = androidx.security.crypto.MasterKey.Builder(context)
-                .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            androidx.security.crypto.EncryptedSharedPreferences.create(
-                context,
-                "yemen_services_auth_secure",
-                masterKey,
-                androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            context.getSharedPreferences("yemen_services_auth", Context.MODE_PRIVATE)
-        }
-    }
-
-    // Clean up biometric prompt if dialog dismisses or leaves composition
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                promptHolder[0]?.cancelAuthentication()
-            } catch (e: Exception) { }
-            promptHolder[0] = null
-        }
-    }
-
     LaunchedEffect(currentUserId) {
         if (currentUserId.isNotEmpty() && uiState is GuestAuthUiState.Loading) {
             uiState = GuestAuthUiState.Success("تم إنشاء الحساب بنجاح!")
@@ -134,91 +86,6 @@ fun GuestRegistrationDialog(
             onDismiss()
         }
     }
-
-    // Helper for Biometric Prompt
-    val triggerBiometric = {
-        if (isBiometricLocked) {
-            scope.launch { snackbarHostState.showSnackbar("⚠️ تم قفل المصادقة البيومترية مؤقتاً لمدة 5 دقائق بسبب كثرة المحاولات الخاطئة") }
-        } else {
-            val activity = context.findFragmentActivity()
-            if (activity == null) {
-                scope.launch { snackbarHostState.showSnackbar("تعذر تشغيل البصمة") }
-            } else {
-                val canAuth = try {
-                    val biometricManager = BiometricManager.from(context)
-                    biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
-                } catch (e: Exception) {
-                    false
-                }
-                if (canAuth) {
-                    val executor = ContextCompat.getMainExecutor(context)
-                    val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                            super.onAuthenticationSucceeded(result)
-                            val prefs = getSecurePrefs()
-                            val savedPhone = prefs.getString("last_auth_phone", "") ?: ""
-                            val savedPass = prefs.getString("last_auth_pass", "") ?: ""
-                            if (savedPhone.isNotEmpty()) {
-                                uiState = GuestAuthUiState.Loading("جاري استرجاع الحساب بالبصمة...")
-                                viewModel.restoreGuestUser(context, savedPhone, savedPass) { success, msg ->
-                                    if (success) {
-                                        uiState = GuestAuthUiState.Success("تم استرجاع الحساب بنجاح!")
-                                        onDismiss()
-                                    } else {
-                                        uiState = GuestAuthUiState.Error(msg)
-                                    }
-                                }
-                            } else {
-                                scope.launch { snackbarHostState.showSnackbar("لم يتم العثور على بيانات سابقة محفوظة للبصمة") }
-                            }
-                        }
-
-                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        super.onAuthenticationError(errorCode, errString)
-                        uiState = GuestAuthUiState.Idle
-                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
-                            biometricAttempts++
-                            if (biometricAttempts >= 3) {
-                                isBiometricLocked = true
-                                scope.launch {
-                                    kotlinx.coroutines.delay(5 * 60 * 1000L)
-                                    isBiometricLocked = false
-                                    biometricAttempts = 0
-                                }
-                                scope.launch { snackbarHostState.showSnackbar("⚠️ تم قفل المصادقة البيومترية مؤقتاً لمدة 5 دقائق بسبب كثرة المحاولات الخاطئة") }
-                            } else {
-                                scope.launch { snackbarHostState.showSnackbar("فشلت المصادقة البيومترية (محاولة $biometricAttempts من 3): $errString") }
-                            }
-                        }
-                    }
-
-                    override fun onAuthenticationFailed() {
-                        super.onAuthenticationFailed()
-                        biometricAttempts++
-                        if (biometricAttempts >= 3) {
-                            isBiometricLocked = true
-                            scope.launch {
-                                kotlinx.coroutines.delay(5 * 60 * 1000L)
-                                isBiometricLocked = false
-                                biometricAttempts = 0
-                            }
-                            scope.launch { snackbarHostState.showSnackbar("⚠️ تم قفل المصادقة البيومترية مؤقتاً لمدة 5 دقائق بسبب كثرة المحاولات الخاطئة") }
-                        }
-                    }
-                })
-                promptHolder[0] = prompt
-                val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                    .setTitle("المصادقة البيومترية")
-                    .setSubtitle("استخدم بصمة الإصبع أو الوجه لتسجيل الدخول السريع")
-                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-                    .build()
-                prompt.authenticate(promptInfo)
-            } else {
-                scope.launch { snackbarHostState.showSnackbar("المصادقة البيومترية غير مفعلة على جهازك") }
-            }
-        }
-    }
-}
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -292,7 +159,7 @@ fun GuestRegistrationDialog(
 
                 if (isRestoreMode) {
                     Text(
-                        text = "يرجى إدخال رقم هاتفك وكلمة المرور لاسترجاع حسابك أو استخدام البصمة:",
+                        text = "يرجى إدخال رقم هاتفك وكلمة المرور لاسترجاع حسابك:",
                         fontSize = 11.sp,
                         color = Color.LightGray,
                         lineHeight = 16.sp
@@ -340,13 +207,6 @@ fun GuestRegistrationDialog(
 
                             viewModel.restoreGuestUser(context, fullPhone, cleanPassword) { success, msg ->
                                 if (success) {
-                                    // Cache in EncryptedSharedPreferences for Biometrics
-                                    getSecurePrefs()
-                                        .edit()
-                                        .putString("last_auth_phone", fullPhone)
-                                        .putString("last_auth_pass", cleanPassword)
-                                        .apply()
-
                                     uiState = GuestAuthUiState.Success("تم العثور على حسابك واسترجاع البيانات!")
                                     scope.launch { snackbarHostState.showSnackbar("🔓 تم استرجاع الحساب بنجاح!") }
                                     onDismiss()
@@ -359,14 +219,6 @@ fun GuestRegistrationDialog(
                         loadingText = "جاري البحث واسترجاع الحساب...",
                         themeColors = themeColors
                     )
-
-                    OutlinedButton(
-                        onClick = { triggerBiometric() },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = themeColors.accent)
-                    ) {
-                        Text("👆 الدخول بالبصمة البيومترية", fontSize = 11.5.sp)
-                    }
 
                     TextButton(
                         onClick = { isRestoreMode = false; uiState = GuestAuthUiState.Idle },

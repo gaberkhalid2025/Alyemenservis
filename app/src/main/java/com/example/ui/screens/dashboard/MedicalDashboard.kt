@@ -34,14 +34,15 @@ fun MedicalDashboard(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val medicalViewModel = remember(account.id) {
+    val medicalViewModel = remember(account.id, appContext) {
         MedicalDashboardViewModel(
             ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(context),
-            productsRepository = ProductsRepositoryImpl(context),
-            ratingsRepository = RatingsRepositoryImpl(context),
+            dashboardRepository = DashboardRepositoryImpl(appContext),
+            productsRepository = ProductsRepositoryImpl(appContext),
+            ratingsRepository = RatingsRepositoryImpl(appContext),
             medicalRepository = com.example.data.repositories.MedicalRepository(
                 com.google.firebase.firestore.FirebaseFirestore.getInstance(),
                 com.example.data.LocalAppCacheManager(context)

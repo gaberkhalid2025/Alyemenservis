@@ -10,6 +10,8 @@ import com.example.domain.entities.ProductItemEntity
 import com.example.ui.screens.dashboard.DashboardEvent
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.flow.catch
 
 data class DoctorItem(
     val id: String = "",
@@ -51,22 +53,31 @@ class MedicalDashboardViewModel(
     fun loadDashboardData() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-
-            launch {
-                dashboardRepository.getDashboardStats(ownerId, "MEDICAL").collect { stats ->
-                    _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+            
+            supervisorScope {
+                launch {
+                    dashboardRepository.getDashboardStats(ownerId, "MEDICAL")
+                        .catch { e -> 
+                            _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في الإحصائيات")) 
+                            _uiState.value = _uiState.value.copy(isLoading = false)
+                        }
+                        .collect { stats ->
+                            _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+                        }
                 }
-            }
-
-            launch {
-                productsRepository.getOwnerProducts(ownerId).collect { prods ->
-                    _uiState.value = _uiState.value.copy(products = prods)
+                launch {
+                    productsRepository.getOwnerProducts(ownerId)
+                        .catch { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في المنتجات")) }
+                        .collect { prods ->
+                            _uiState.value = _uiState.value.copy(products = prods)
+                        }
                 }
-            }
-
-            launch {
-                ratingsRepository.getTargetRatings(ownerId).collect { revs ->
-                    _uiState.value = _uiState.value.copy(reviews = revs)
+                launch {
+                    ratingsRepository.getTargetRatings(ownerId)
+                        .catch { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في التقييمات")) }
+                        .collect { revs ->
+                            _uiState.value = _uiState.value.copy(reviews = revs)
+                        }
                 }
             }
         }
@@ -75,7 +86,7 @@ class MedicalDashboardViewModel(
     fun addDoctor(name: String, specialty: String, workingHours: String) {
         if (name.isBlank()) return
         
-        val docId = System.currentTimeMillis().toString()
+        val docId = java.util.UUID.randomUUID().toString()
         val existing = _doctors.value.find { it.name == name && it.specialty == specialty }
         if (existing != null) {
             viewModelScope.launch {

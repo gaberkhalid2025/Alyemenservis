@@ -124,7 +124,7 @@ fun RegistrationImagePicker(
             compressionJob?.cancel()
             compressionJob = scope.launch {
                 isProcessingImages = true
-                val compressed = uris.map { compressSingleUriBg(it) }
+                val compressed = uris.mapNotNull { uri: Uri -> compressSingleUriBg(uri) }
                 val combined = (imagesUris + compressed).take(maxImages)
                 onImagesSelected(combined)
                 isProcessingImages = false

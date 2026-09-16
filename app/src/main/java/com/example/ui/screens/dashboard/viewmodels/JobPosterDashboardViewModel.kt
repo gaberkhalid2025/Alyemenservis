@@ -9,6 +9,8 @@ import com.example.domain.entities.ProductItemEntity
 import com.example.ui.screens.dashboard.DashboardEvent
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.flow.catch
 
 data class JobPostItem(
     val id: String = "",
@@ -51,16 +53,24 @@ class JobPosterDashboardViewModel(
     fun loadDashboardData() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-
-            launch {
-                dashboardRepository.getDashboardStats(ownerId, "JOB").collect { stats ->
-                    _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+            
+            supervisorScope {
+                launch {
+                    dashboardRepository.getDashboardStats(ownerId, "JOB")
+                        .catch { e -> 
+                            _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في الإحصائيات")) 
+                            _uiState.value = _uiState.value.copy(isLoading = false)
+                        }
+                        .collect { stats ->
+                            _uiState.value = _uiState.value.copy(stats = stats, isLoading = false)
+                        }
                 }
-            }
-
-            launch {
-                productsRepository.getOwnerProducts(ownerId).collect { prods ->
-                    _uiState.value = _uiState.value.copy(products = prods)
+                launch {
+                    productsRepository.getOwnerProducts(ownerId)
+                        .catch { e -> _eventFlow.emit(DashboardEvent.ShowToast(e.message ?: "خطأ في المنتجات")) }
+                        .collect { prods ->
+                            _uiState.value = _uiState.value.copy(products = prods)
+                        }
                 }
             }
         }
@@ -69,7 +79,7 @@ class JobPosterDashboardViewModel(
     fun postJob(title: String, company: String, salary: String, requirements: String) {
         if (title.isBlank()) return
         
-        val jobId = System.currentTimeMillis().toString()
+        val jobId = java.util.UUID.randomUUID().toString()
         val existing = _jobs.value.find { it.title == title && it.companyName == company }
         if (existing != null) {
             viewModelScope.launch {

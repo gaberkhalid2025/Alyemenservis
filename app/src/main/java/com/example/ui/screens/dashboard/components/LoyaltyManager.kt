@@ -1,7 +1,6 @@
 package com.example.ui.screens.dashboard.components
 
 import androidx.compose.foundation.background
-import com.example.ui.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,48 +18,57 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
-import com.example.data.SpecialOfferEntity
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
 import android.util.Log
 
+data class LoyaltyProgram(
+    val id: String = "",
+    val ownerId: String = "",
+    val name: String = "",
+    val pointsRequired: Int = 100,
+    val rewardDescription: String = "",
+    val discountValue: Double = 0.0,
+    val isEnabled: Boolean = true
+)
+
 /**
- * 🎟️ CouponManager (إدارة كوبونات وقسائم الخصم)
- * توليد رموز ترويجية، تحديد الحد الأقصى للاستخدام، ومراقبة عدد مرات الاستخدام المتبقية.
+ * 🎁 LoyaltyManager (إدارة برامج الولاء ونقاط المكافآت)
+ * إنشاء برامج الولاء، تحديد النقاط المطلوبة، ومكافأة العملاء المتكررين.
  */
 @Composable
-fun CouponManager(
+fun LoyaltyManager(
     ownerId: String = "",
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var coupons by remember {
-        mutableStateOf<List<SpecialOfferEntity>>(emptyList())
+    var programs by remember {
+        mutableStateOf<List<LoyaltyProgram>>(emptyList())
     }
 
     LaunchedEffect(ownerId) {
         val query = if (ownerId.isNotBlank()) {
             FirebaseFirestore.getInstance()
-                .collection("coupons")
-                .whereEqualTo("providerId", ownerId)
+                .collection("loyalty_programs")
+                .whereEqualTo("ownerId", ownerId)
         } else {
             FirebaseFirestore.getInstance()
-                .collection("coupons")
+                .collection("loyalty_programs")
         }
         query.addSnapshotListener { snap, _ ->
             if (snap != null) {
-                coupons = snap.documents.mapNotNull { doc ->
-                    doc.toObject(SpecialOfferEntity::class.java)?.copy(id = doc.id)
+                programs = snap.documents.mapNotNull { doc ->
+                    doc.toObject(LoyaltyProgram::class.java)?.copy(id = doc.id)
                 }
             }
         }
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
-    var code by remember { mutableStateOf("") }
-    var discountPercent by remember { mutableStateOf("10") }
-    var maxUses by remember { mutableStateOf("50") }
-    var minAmount by remember { mutableStateOf("3000") }
+    var programName by remember { mutableStateOf("") }
+    var pointsReq by remember { mutableStateOf("100") }
+    var rewardDesc by remember { mutableStateOf("") }
+    var discountVal by remember { mutableStateOf("50") }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -79,9 +87,9 @@ fun CouponManager(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Favorite, contentDescription = null, tint = Color(0xFFA855F7))
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFEAB308))
                     Text(
-                        text = "كوبونات وقسائم الخصم",
+                        text = "برامج الولاء ونقاط المكافآت",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -91,16 +99,16 @@ fun CouponManager(
                 Button(
                     onClick = { showAddDialog = true },
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA855F7), contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEAB308), contentColor = Color(0xFF0F172A)),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("كوبون جديد", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("برنامج جديد", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
-            coupons.forEach { coupon ->
+            programs.forEach { program ->
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = Color(0xFF334155),
@@ -116,26 +124,26 @@ fun CouponManager(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    text = coupon.couponCode,
+                                    text = program.name,
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color(0xFFA855F7)
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
                                 )
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFFA855F7).copy(alpha = 0.2f)
+                                    color = Color(0xFFEAB308).copy(alpha = 0.2f)
                                 ) {
                                     Text(
-                                        text = "${coupon.discountPercent}% خصم",
+                                        text = "${program.pointsRequired} نقطة",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFA855F7),
+                                        color = Color(0xFFEAB308),
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
                             }
                             Text(
-                                text = "وصف العرض: ${coupon.description}",
+                                text = "المكافأة: ${program.rewardDescription} • خصم ${program.discountValue.toInt()} ريال",
                                 fontSize = 11.sp,
                                 color = Color(0xFF94A3B8)
                             )
@@ -144,23 +152,23 @@ fun CouponManager(
                         Row {
                             IconButton(onClick = {
                                 FirebaseFirestore.getInstance()
-                                    .collection("coupons")
-                                    .document(coupon.id)
-                                    .update("isEnabled", !coupon.isEnabled)
-                                    .addOnFailureListener { e -> Log.e("CouponManager", "Update failed", e) }
+                                    .collection("loyalty_programs")
+                                    .document(program.id)
+                                    .update("isEnabled", !program.isEnabled)
+                                    .addOnFailureListener { e -> Log.e("LoyaltyManager", "Update failed", e) }
                             }) {
                                 Icon(
-                                    if (coupon.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
+                                    if (program.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
                                     contentDescription = null,
-                                    tint = if (coupon.isEnabled) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                    tint = if (program.isEnabled) Color(0xFF10B981) else Color(0xFF94A3B8)
                                 )
                             }
                             IconButton(onClick = {
                                 FirebaseFirestore.getInstance()
-                                    .collection("coupons")
-                                    .document(coupon.id)
+                                    .collection("loyalty_programs")
+                                    .document(program.id)
                                     .delete()
-                                    .addOnFailureListener { e -> Log.e("CouponManager", "Delete failed", e) }
+                                    .addOnFailureListener { e -> Log.e("LoyaltyManager", "Delete failed", e) }
                             }) {
                                 Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444))
                             }
@@ -174,33 +182,32 @@ fun CouponManager(
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("إنشاء كود خصم جديد") },
+            title = { Text("إنشاء برنامج ولاء جديد") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = code,
-                        onValueChange = { code = it.uppercase() },
-                        label = { Text("رمز الكوبون (مثال: PROMO20)") },
+                        value = programName,
+                        onValueChange = { programName = it },
+                        label = { Text("اسم البرنامج (مثال: عملاء VIP)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = discountPercent,
-                        onValueChange = { discountPercent = it },
-                        label = { Text("نسبة الخصم %") },
+                        value = pointsReq,
+                        onValueChange = { pointsReq = it },
+                        label = { Text("النقاط المطلوبة للاستبدال") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = maxUses,
-                        onValueChange = { maxUses = it },
-                        label = { Text("أقصى عدد للاستخدام") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        value = rewardDesc,
+                        onValueChange = { rewardDesc = it },
+                        label = { Text("وصف المكافأة أو الميزة") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = minAmount,
-                        onValueChange = { minAmount = it },
-                        label = { Text("الحد الأدنى للطلب (ريال)") },
+                        value = discountVal,
+                        onValueChange = { discountVal = it },
+                        label = { Text("قيمة الخصم التقديرية (ريال)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -209,30 +216,31 @@ fun CouponManager(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (code.isNotBlank()) {
-                            val couponId = UUID.randomUUID().toString()
-                            val newCoupon = SpecialOfferEntity(
-                                id = couponId,
-                                providerId = ownerId,
-                                title = "كوبون خصم $code",
-                                description = "كوبون بقيمة ${discountPercent.toIntOrNull() ?: 10}% لـ ${maxUses.toIntOrNull() ?: 50} استخدام بحد أدنى للطلب ${minAmount.toDoubleOrNull() ?: 0.0}",
-                                couponCode = code,
-                                discountPercent = discountPercent.toIntOrNull() ?: 10,
+                        if (programName.isNotBlank()) {
+                            val progId = UUID.randomUUID().toString()
+                            val newProg = LoyaltyProgram(
+                                id = progId,
+                                ownerId = ownerId,
+                                name = programName.trim(),
+                                pointsRequired = pointsReq.toIntOrNull() ?: 100,
+                                rewardDescription = rewardDesc.trim(),
+                                discountValue = discountVal.toDoubleOrNull() ?: 50.0,
                                 isEnabled = true
                             )
                             FirebaseFirestore.getInstance()
-                                .collection("coupons")
-                                .document(couponId)
-                                .set(newCoupon)
-                                .addOnFailureListener { e -> Log.e("CouponManager", "Insert failed", e) }
+                                .collection("loyalty_programs")
+                                .document(progId)
+                                .set(newProg)
+                                .addOnFailureListener { e -> Log.e("LoyaltyManager", "Insert failed", e) }
 
                             showAddDialog = false
-                            code = ""
+                            programName = ""
+                            rewardDesc = ""
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA855F7), contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEAB308), contentColor = Color(0xFF0F172A))
                 ) {
-                    Text("إنشاء الكوبون")
+                    Text("إنشاء البرنامج")
                 }
             },
             dismissButton = {

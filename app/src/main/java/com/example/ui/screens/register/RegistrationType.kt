@@ -54,8 +54,9 @@ enum class RegistrationType(
     );
 
     companion object {
-        fun fromId(id: String): RegistrationType {
-            return values().firstOrNull { it.id.equals(id, ignoreCase = true) } ?: PROVIDER
+        fun fromId(id: String?): RegistrationType? {
+            if (id.isNullOrBlank()) return null
+            return values().firstOrNull { it.id.equals(id, ignoreCase = true) }
         }
     }
 }

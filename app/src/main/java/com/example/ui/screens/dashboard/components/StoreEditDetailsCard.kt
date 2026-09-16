@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
@@ -24,9 +25,9 @@ import com.example.utils.VisualThemePalette
 fun StoreEditDetailsCard(
     store: StoreEntity,
     viewModel: MainViewModel,
-    themeColors: VisualThemePalette,
-    context: Context
+    themeColors: VisualThemePalette
 ) {
+    val context = LocalContext.current
     var editName by remember(store) { mutableStateOf(store.name) }
     var editDesc by remember(store) { mutableStateOf(store.description) }
     var editAddress by remember(store) { mutableStateOf(store.localNeighborhood) }

@@ -193,7 +193,7 @@ class BookingRepository(
                 id = docId,
                 bookingNumber = finalCode,
                 bookingCode = finalCode,
-                bookingPassword = rawPin, // Kept locally/securely
+                bookingPassword = "", // Deprecated plaintext usage
                 pinCode = hashedPin,
                 scheduledAt = scheduledTs,
                 status = if (booking.status.isBlank()) "PENDING" else booking.status,
