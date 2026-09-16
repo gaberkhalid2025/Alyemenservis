@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.media.MediaRecorder
 import android.net.Uri
+import androidx.core.content.FileProvider
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -238,7 +239,23 @@ fun ChatInputBar(
 
         val file = audioFile
         if (file != null && file.exists() && recordingDuration >= 1) {
-            val uri = Uri.fromFile(file)
+            val uri = try {
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+            if (uri == null) {
+                Toast.makeText(context, "فشل تجهيز التسجيل الصوتي", Toast.LENGTH_SHORT).show()
+                file.delete()
+                audioFile = null
+                recordingDuration = 0
+                return
+            }
             val validation = ChatValidationUtils.validateFile(uri, context)
             if (!validation.isValid) {
                 Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()

@@ -28,9 +28,9 @@ import com.example.utils.VisualThemePalette
 fun AboutAppDialogView(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    aboutViewModel: AboutViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
-    val aboutViewModel = remember(viewModel) { AboutViewModel(viewModel) }
     val uiState by aboutViewModel.uiState.collectAsState()
 
     Dialog(
@@ -145,9 +145,9 @@ fun AboutAppDialogView(
 @Composable
 fun AboutAppScreenContent(
     viewModel: MainViewModel,
-    themeColors: VisualThemePalette
+    themeColors: VisualThemePalette,
+    aboutViewModel: AboutViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
-    val aboutViewModel = remember(viewModel) { AboutViewModel(viewModel) }
     val uiState by aboutViewModel.uiState.collectAsState()
 
     Column(

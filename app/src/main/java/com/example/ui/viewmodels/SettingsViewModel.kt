@@ -17,7 +17,6 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import javax.inject.Inject
 
-
 class SettingsViewModel @Inject constructor(
     val appState: AppState
 ) : BaseViewModel() {
@@ -348,7 +347,7 @@ fun initColorSync(context: android.content.Context) {
                         }
                 }
             }
-        colorSchemeListener?.let { firestoreListeners.add(it) }
+        firestoreListeners.add(colorSchemeListener!!)
 
         // 3. Real-time Firestore listener for Personal User Colors
         viewModelScope.launch {
@@ -380,7 +379,7 @@ fun initColorSync(context: android.content.Context) {
                                 }
                             }
                         }
-                    userColorsListener?.let { firestoreListeners.add(it) }
+                    firestoreListeners.add(userColorsListener!!)
                 }
             }
         }

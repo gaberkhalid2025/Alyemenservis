@@ -21,13 +21,6 @@ import kotlinx.coroutines.launch
  * 📌 Architectural Note: UI-focused BookingStatus enum providing UI labels and hex colors
  * for state rendering in Compose views.
  */
-enum class BookingStatus(val label: String, val color: String) {
-    PENDING("قيد الانتظار", "#FFC107"),
-    ACCEPTED("مقبول", "#4CAF50"),
-    IN_PROGRESS("قيد التنفيذ", "#2196F3"),
-    COMPLETED("مكتمل", "#9C27B0"),
-    CANCELLED("ملغي", "#F44336")
-}
 
 data class BookingFormFields(
     val tripleName: Boolean = true,

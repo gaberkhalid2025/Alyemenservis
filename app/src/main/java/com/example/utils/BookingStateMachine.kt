@@ -5,20 +5,33 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.annotation.Keep
+
 /**
  * 📌 Architectural Note: State Machine BookingStatus enum defining valid transitions
  * and workflow status lifecycle logic across the domain layer.
  */
-enum class BookingStatus(val label: String, val colorHex: String) {
-    PENDING("قيد الانتظار", "#F59E0B"),
-    UNDER_REVIEW("قيد المراجعة", "#FCD34D"),
-    ACCEPTED("مقبول", "#10B981"),
-    REJECTED("مرفوض", "#EF4444"),
-    IN_PROGRESS("قيد التنفيذ", "#3B82F6"),
-    COMPLETED("مكتمل", "#059669"),
-    PAID("تم الدفع", "#8B5CF6"),
-    CLOSED("مغلق ومؤرشف", "#6B7280"),
-    CANCELLED("ملغي", "#EF4444")
+@Keep
+enum class BookingStatus(
+    val code: String,
+    val label: String,
+    val colorHex: String
+) {
+    PENDING("PENDING", "قيد الانتظار", "#F59E0B"),
+    UNDER_REVIEW("UNDER_REVIEW", "قيد المراجعة", "#FCD34D"),
+    ACCEPTED("ACCEPTED", "مقبول", "#10B981"),
+    REJECTED("REJECTED", "مرفوض", "#EF4444"),
+    IN_PROGRESS("IN_PROGRESS", "قيد التنفيذ", "#3B82F6"),
+    COMPLETED("COMPLETED", "مكتمل", "#059669"),
+    PAID("PAID", "تم الدفع", "#8B5CF6"),
+    CLOSED("CLOSED", "مغلق ومؤرشف", "#6B7280"),
+    CANCELLED("CANCELLED", "ملغي", "#EF4444");
+
+    companion object {
+        fun fromCode(code: String): BookingStatus {
+            return values().firstOrNull { it.code == code.uppercase() } ?: PENDING
+        }
+    }
 }
 
 /**

@@ -1,10 +1,12 @@
 package com.example.ui.screens.about
 
 import androidx.lifecycle.ViewModel
-import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.AdminSettingsEntity
-import com.example.ui.MainViewModel
+import com.example.ui.viewmodels.AuthViewModel
+import com.example.ui.viewmodels.SettingsViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,8 +26,10 @@ sealed class AboutUiState {
 /**
  * ViewModel for managing the "About App" screen settings and layouts.
  */
-class AboutViewModel(
-    private val mainViewModel: MainViewModel
+@HiltViewModel
+class AboutViewModel @Inject constructor(
+    private val settingsViewModel: SettingsViewModel,
+    private val authViewModel: AuthViewModel
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AboutUiState>(AboutUiState.Loading)
@@ -35,8 +39,8 @@ class AboutViewModel(
 
     init {
         viewModelScope.launch {
-            mainViewModel.settings.collectLatest { settings ->
-                val adminRole = mainViewModel.adminRole.value
+            settingsViewModel.settings.collectLatest { settings ->
+                val adminRole = authViewModel.adminRole.value
                 val isAdmin = adminRole != "GUEST"
                 if (isEditingMode) {
                     _uiState.value = AboutUiState.Editing(settings)
@@ -59,11 +63,11 @@ class AboutViewModel(
      */
     fun setEditingMode(editing: Boolean) {
         isEditingMode = editing
-        val settings = mainViewModel.settings.value
+        val settings = settingsViewModel.settings.value
         if (editing) {
             _uiState.value = AboutUiState.Editing(settings)
         } else {
-            val adminRole = mainViewModel.adminRole.value
+            val adminRole = authViewModel.adminRole.value
             val isAdmin = adminRole != "GUEST"
             _uiState.value = AboutUiState.Success(settings, isAdmin)
         }
@@ -73,7 +77,7 @@ class AboutViewModel(
      * Moves an item up or down in the rendering order.
      */
     fun moveItem(index: Int, moveUp: Boolean) {
-        val settings = mainViewModel.settings.value
+        val settings = settingsViewModel.settings.value
         val list = settings.aboutLayoutOrder
             .split(",")
             .map { it.trim().uppercase() }
@@ -90,30 +94,30 @@ class AboutViewModel(
             list[index + 1] = temp
         }
         val newOrder = list.joinToString(",")
-        mainViewModel.saveCustomSettingsState(settings.copy(aboutLayoutOrder = newOrder))
+        settingsViewModel.saveCustomSettingsState(settings.copy(aboutLayoutOrder = newOrder))
     }
 
     /**
      * Updates the custom description text.
      */
     fun updateCustomInfo(newInfo: String) {
-        val settings = mainViewModel.settings.value
-        mainViewModel.saveCustomSettingsState(settings.copy(aboutCustomInfo = newInfo))
-        mainViewModel.triggerNotification("💾 تم تحديث وحفظ نص شاشة عن التطبيق!")
+        val settings = settingsViewModel.settings.value
+        settingsViewModel.saveCustomSettingsState(settings.copy(aboutCustomInfo = newInfo))
+        settingsViewModel.triggerNotification("💾 تم تحديث وحفظ نص شاشة عن التطبيق!")
     }
 
     /**
      * Updates contact info (WhatsApp, Phone, Email).
      */
     fun updateContactInfo(whatsapp: String, phone: String, email: String) {
-        val settings = mainViewModel.settings.value
+        val settings = settingsViewModel.settings.value
         val updated = settings.copy(
             supportWhatsapp = whatsapp.trim(),
             supportPhone = phone.trim(),
             supportEmail = email.trim()
         )
-        mainViewModel.saveCustomSettingsState(updated)
-        mainViewModel.triggerNotification("💾 تم حفظ وتحديث أرقام ووسائل الدعم الفني بنجاح!")
+        settingsViewModel.saveCustomSettingsState(updated)
+        settingsViewModel.triggerNotification("💾 تم حفظ وتحديث أرقام ووسائل الدعم الفني بنجاح!")
     }
 
     /**
@@ -128,7 +132,7 @@ class AboutViewModel(
         youtube: String,
         downloadUrl: String
     ) {
-        val settings = mainViewModel.settings.value
+        val settings = settingsViewModel.settings.value
         val updated = settings.copy(
             telegramUrl = telegram.trim(),
             twitterUrl = twitter.trim(),
@@ -138,15 +142,15 @@ class AboutViewModel(
             youtubeUrl = youtube.trim(),
             appDownloadUrl = downloadUrl.trim()
         )
-        mainViewModel.saveCustomSettingsState(updated)
-        mainViewModel.triggerNotification("💾 تم حفظ وتحديث روابط التواصل والموقع بنجاح!")
+        settingsViewModel.saveCustomSettingsState(updated)
+        settingsViewModel.triggerNotification("💾 تم حفظ وتحديث روابط التواصل والموقع بنجاح!")
     }
 
     /**
      * Toggles visibility of specific social platforms.
      */
     fun toggleSocialVisibility(platform: String, hide: Boolean) {
-        val settings = mainViewModel.settings.value
+        val settings = settingsViewModel.settings.value
         val updated = when (platform.uppercase()) {
             "TELEGRAM" -> settings.copy(hideTelegram = hide)
             "TWITTER" -> settings.copy(hideTwitter = hide)
@@ -156,20 +160,20 @@ class AboutViewModel(
             "YOUTUBE" -> settings.copy(hideYoutube = hide)
             else -> settings
         }
-        mainViewModel.saveCustomSettingsState(updated)
+        settingsViewModel.saveCustomSettingsState(updated)
     }
 
     /**
      * Updates app general identity info.
      */
     fun updateAppIdentity(appName: String, appVersion: String, bannerContent: String) {
-        val settings = mainViewModel.settings.value
+        val settings = settingsViewModel.settings.value
         val updated = settings.copy(
             appName = appName.trim(),
             appVersion = appVersion.trim(),
             bannerContent = bannerContent.trim()
         )
-        mainViewModel.saveCustomSettingsState(updated)
-        mainViewModel.triggerNotification("💾 تم تحديث وحفظ هوية التطبيق بنجاح!")
+        settingsViewModel.saveCustomSettingsState(updated)
+        settingsViewModel.triggerNotification("💾 تم تحديث وحفظ هوية التطبيق بنجاح!")
     }
 }

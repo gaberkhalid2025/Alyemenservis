@@ -72,7 +72,7 @@ fun UnifiedRegistrationForm(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            viewModel.onEvent(RegistrationEvent.ImageChanged(uri.toString()))
+            viewModel.onEvent(RegistrationUiEvent.ImageChanged(uri.toString()))
         }
     }
 
@@ -171,7 +171,7 @@ fun UnifiedRegistrationForm(
         
         OutlinedTextField(
             value = state.entityName,
-            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.EntityNameChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.EntityNameChanged(it)) },
             label = { Text(nameLabel, fontSize = 12.sp) },
             isError = state.entityNameError != null,
             supportingText = { state.entityNameError?.let { Text(it) } },
@@ -183,7 +183,7 @@ fun UnifiedRegistrationForm(
         if (role in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY")) {
             OutlinedTextField(
                 value = state.managerName,
-                onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.ManagerNameChanged(it)) },
+                onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.ManagerNameChanged(it)) },
                 label = { Text("اسم المدير / المسؤول", fontSize = 12.sp) },
                 isError = state.managerNameError != null,
                 supportingText = { state.managerNameError?.let { Text(it) } },
@@ -195,7 +195,7 @@ fun UnifiedRegistrationForm(
         // 3. Phone Number
         OutlinedTextField(
             value = state.phone,
-            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.PhoneChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.PhoneChanged(it)) },
             label = { Text("رقم الهاتف (9 أرقام)", fontSize = 12.sp) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             isError = state.phoneError != null,
@@ -207,7 +207,7 @@ fun UnifiedRegistrationForm(
         // 4. Password
         OutlinedTextField(
             value = state.password,
-            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.PasswordChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.PasswordChanged(it)) },
             label = { Text("كلمة المرور", fontSize = 12.sp) },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -229,7 +229,7 @@ fun UnifiedRegistrationForm(
         // 5. Confirm Password
         OutlinedTextField(
             value = state.confirmPassword,
-            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationEvent.ConfirmPasswordChanged(it)) },
+            onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.ConfirmPasswordChanged(it)) },
             label = { Text("تأكيد كلمة المرور", fontSize = 12.sp) },
             visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -270,7 +270,7 @@ fun UnifiedRegistrationForm(
                     DropdownMenuItem(
                         text = { Text(city) },
                         onClick = {
-                            viewModel.onEvent(RegistrationEvent.CityChanged(city))
+                            viewModel.onEvent(RegistrationUiEvent.CityChanged(city))
                             expandedCity = false
                         }
                     )
@@ -301,7 +301,7 @@ fun UnifiedRegistrationForm(
                         DropdownMenuItem(
                             text = { Text(spec) },
                             onClick = {
-                                viewModel.onEvent(RegistrationEvent.SpecializationChanged(spec))
+                                viewModel.onEvent(RegistrationUiEvent.SpecializationChanged(spec))
                                 expandedSpec = false
                             }
                         )
@@ -317,7 +317,7 @@ fun UnifiedRegistrationForm(
         ) {
             Checkbox(
                 checked = state.agreedToTerms,
-                onCheckedChange = { viewModel.onEvent(RegistrationEvent.AgreedToTermsChanged(it)) },
+                onCheckedChange = { viewModel.onEvent(RegistrationUiEvent.AgreedToTermsChanged(it)) },
                 colors = CheckboxDefaults.colors(checkedColor = themeColors.accent)
             )
             Column {

@@ -24,21 +24,20 @@ data class CallSession(
     val callerUid: String = "",
     val providerId: String = "",
     val token: String = "",
-    val appId: String = "e23e27b4777a40eda0579075dd03127a",
+    val appId: String = com.example.BuildConfig.AGORA_APP_ID,
     val durationSeconds: Int = 0,
     val maxDurationSeconds: Int = 600
 )
 
 /**
  * 📞 AgoraVoiceManager: Handles real-time encrypted audio calls.
- * App ID: e23e27b4777a40eda0579075dd03127a
  * Primary Certificate is ONLY stored in Cloud Functions Secrets (Never inside client APK).
  * Audio stream is strictly P2P via Agora RTC with zero Firebase bandwidth consumption.
  */
 class AgoraVoiceManager(private val context: Context) {
 
     companion object {
-        const val AGORA_APP_ID = "e23e27b4777a40eda0579075dd03127a"
+        val AGORA_APP_ID: String = com.example.BuildConfig.AGORA_APP_ID
         val REQUIRED_PERMISSIONS = arrayOf(
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.INTERNET,

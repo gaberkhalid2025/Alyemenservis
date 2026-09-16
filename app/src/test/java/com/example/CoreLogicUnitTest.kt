@@ -1,6 +1,6 @@
 package com.example
 
-import com.example.utils.BookingStateEngine
+import com.example.utils.BookingStateMachine
 import com.example.utils.PaymentSecurityGuard
 import com.example.utils.SecurityCryptoUtils
 import org.junit.Assert.*
@@ -38,14 +38,14 @@ class CoreLogicUnitTest {
     @Test
     fun testBookingStateEngineTransitions() {
         // Pending -> Approved should be valid
-        assertTrue(BookingStateEngine.isValidTransition("PENDING", "APPROVED"))
+        assertTrue(BookingStateMachine.canTransition("PENDING", "APPROVED"))
 
         // Approved -> Completed direct without in_progress should not be allowed or checked
-        assertTrue(BookingStateEngine.isValidTransition("APPROVED", "IN_PROGRESS"))
+        assertTrue(BookingStateMachine.canTransition("APPROVED", "IN_PROGRESS"))
 
         // Completed is terminal state
-        assertFalse(BookingStateEngine.isValidTransition("COMPLETED", "APPROVED"))
-        assertFalse(BookingStateEngine.isValidTransition("REJECTED", "APPROVED"))
+        assertFalse(BookingStateMachine.canTransition("COMPLETED", "APPROVED"))
+        assertFalse(BookingStateMachine.canTransition("REJECTED", "APPROVED"))
     }
 
     @Test

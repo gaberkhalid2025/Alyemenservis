@@ -15,11 +15,14 @@ enum class Currency(val code: String, val symbolArabic: String, val nameArabic: 
  */
 @Keep
 enum class AdminRole(val code: String, val titleArabic: String) {
+    OWNER("OWNER", "المالك"),
     SUPER_ADMIN("SUPER_ADMIN", "مدير النظام الشامل"),
     ADMIN("ADMIN", "مدير للنظام"),
+    SUPERVISOR("SUPERVISOR", "مشرف"),
     AUDITOR("AUDITOR", "مراقب مالي"),
     SUPPORT("SUPPORT", "الدعم الفني"),
-    OPERATIONS("OPERATIONS", "إدارة العمليات")
+    OPERATIONS("OPERATIONS", "إدارة العمليات"),
+    GUEST("GUEST", "زائر")
 }
 
 @Keep

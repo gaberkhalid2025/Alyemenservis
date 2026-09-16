@@ -10,7 +10,7 @@ import com.example.utils.*
 import com.example.ui.viewmodels.BaseViewModel
 import com.example.ui.viewmodels.BookingDistributionMode
 import com.example.ui.viewmodels.BookingFormFields
-import com.example.ui.viewmodels.BookingStatus
+import com.example.utils.BookingStatus
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
@@ -467,6 +467,9 @@ class MainViewModel @Inject constructor(
     fun setupRealtimeFirestoreListeners() {
         realtimeSyncHelper.clearListeners()
         realtimeSyncHelper.setupRealtimeFirestoreListeners(appState)
+        viewModelScope.launch {
+            realtimeSyncHelper.loadOnDemandInitialData(appState)
+        }
     }
     fun seedFirestoreIfEmpty() {
         firestoreSeedHelper.seedFirestoreIfEmpty()

@@ -61,7 +61,6 @@ data class ProductAttachment(
 }
 
 typealias ChatMessageEntity = com.example.data.models.ChatMessage
-typealias ChatChannelEntity = com.example.data.models.ChatChannel
 
 @Keep
 data class CallEntity(

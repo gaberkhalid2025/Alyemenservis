@@ -8,11 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -181,98 +178,27 @@ fun ChatHeaderBar(
 
         // Booking / Urgent Request Context Strip
         if (!relatedEntityId.isNullOrBlank() || !relatedEntityType.isNullOrBlank()) {
-            val isBooking = relatedEntityType == "BOOKING"
-            val isUrgent = relatedEntityType == "URGENT_REQUEST"
-            val isSupport = relatedEntityType == "SUPPORT"
-
-            // Clean, short display ID (e.g., #955BBB2E or #BK-102)
-            val rawId = relatedEntityId.orEmpty().trim()
-            val formattedId = when {
-                rawId.isBlank() -> ""
-                rawId.length > 10 && rawId.contains("-") -> "#" + rawId.take(8).uppercase()
-                rawId.startsWith("#") -> rawId
-                else -> "#$rawId"
+            val contextText = when (relatedEntityType) {
+                "BOOKING" -> "📌 محادثة بخصوص الحجز رقم ${relatedEntityId ?: ""}"
+                "URGENT_REQUEST" -> "🚨 محادثة بخصوص الطلب العاجل رقم ${relatedEntityId ?: ""}"
+                "SUPPORT" -> "🛠️ محادثة تذكرة الدعم الفني ${relatedEntityId ?: ""}"
+                else -> if (!relatedEntityId.isNullOrBlank()) "📋 محادثة خاصة بطلب رقم $relatedEntityId" else null
             }
 
-            val bannerBg = when {
-                isBooking -> Color(0xFF0A2533)
-                isUrgent -> Color(0xFF331D08)
-                isSupport -> Color(0xFF28133D)
-                else -> Color(0xFF132238)
-            }
-            val bannerBorder = when {
-                isBooking -> Color(0xFF0284C7).copy(alpha = 0.5f)
-                isUrgent -> Color(0xFFD97706).copy(alpha = 0.5f)
-                isSupport -> Color(0xFF9333EA).copy(alpha = 0.5f)
-                else -> Color(0xFF2563EB).copy(alpha = 0.5f)
-            }
-            val accentTone = when {
-                isBooking -> Color(0xFF38BDF8)
-                isUrgent -> Color(0xFFFBBF24)
-                isSupport -> Color(0xFFC084FC)
-                else -> Color(0xFF60A5FA)
-            }
-            val bannerIcon = when {
-                isBooking -> Icons.Default.DateRange
-                isUrgent -> Icons.Default.Notifications
-                isSupport -> Icons.Default.Info
-                else -> Icons.Default.DateRange
-            }
-            val bannerTitle = when {
-                isBooking -> "محادثة خاصة بالحجز"
-                isUrgent -> "طلب خدمة عاجل ومباشر"
-                isSupport -> "تذكرة الدعم الفني والمساعدة"
-                else -> "محادثة خاصة بطلب خدمة"
-            }
-
-            Surface(
-                color = bannerBg,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, bannerBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            if (contextText != null) {
+                Surface(
+                    color = primaryColor.copy(alpha = 0.15f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = bannerIcon,
-                            contentDescription = null,
-                            tint = accentTone,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = bannerTitle,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    if (formattedId.isNotBlank()) {
-                        Surface(
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
-                            color = accentTone.copy(alpha = 0.15f),
-                            border = androidx.compose.foundation.BorderStroke(0.5.dp, accentTone.copy(alpha = 0.4f))
-                        ) {
-                            Text(
-                                text = "رقم $formattedId",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = accentTone,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
+                    Text(
+                        text = contextText,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 5.dp)
+                    )
                 }
             }
         }

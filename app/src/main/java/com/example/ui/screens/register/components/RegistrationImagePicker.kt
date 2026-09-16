@@ -1,6 +1,7 @@
 package com.example.ui.screens.register.components
 
 import android.content.Context
+import androidx.core.content.FileProvider
 import com.example.ui.*
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -105,7 +106,7 @@ fun RegistrationImagePicker(
                 fos.flush()
                 fos.close()
                 bitmap.recycle()
-                Uri.fromFile(tempFile)
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
             } catch (e: Exception) {
                 uri
             }
@@ -159,7 +160,7 @@ fun RegistrationImagePicker(
                         fos.write(out.toByteArray())
                         fos.flush()
                         fos.close()
-                        val uri = Uri.fromFile(tempFile)
+                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
                         val combined = (imagesUris + listOf(uri)).take(maxImages)
                         withContext(Dispatchers.Main) {
                             onImagesSelected(combined)

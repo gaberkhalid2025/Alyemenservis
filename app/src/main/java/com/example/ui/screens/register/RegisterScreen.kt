@@ -496,33 +496,48 @@ fun RegisterScreen(
                                 )
                             }
                             RegistrationType.STORE -> {
-                                StoreForm(
+                                UnifiedRegistrationForm(
+                                    role = "STORE",
                                     themeColors = themeColors,
-                                    onSubmit = { data -> handleFormSubmit(data, RegistrationType.STORE) }
+                                    onRegistrationSuccess = { map ->
+                                        handleFormSubmit(map, RegistrationType.STORE)
+                                    }
                                 )
                             }
                             RegistrationType.RESTAURANT -> {
-                                RestaurantForm(
+                                UnifiedRegistrationForm(
+                                    role = "RESTAURANT",
                                     themeColors = themeColors,
-                                    onSubmit = { data -> handleFormSubmit(data, RegistrationType.RESTAURANT) }
+                                    onRegistrationSuccess = { map ->
+                                        handleFormSubmit(map, RegistrationType.RESTAURANT)
+                                    }
                                 )
                             }
                             RegistrationType.MEDICAL -> {
-                                MedicalForm(
+                                UnifiedRegistrationForm(
+                                    role = "MEDICAL",
                                     themeColors = themeColors,
-                                    onSubmit = { data -> handleFormSubmit(data, RegistrationType.MEDICAL) }
+                                    onRegistrationSuccess = { map ->
+                                        handleFormSubmit(map, RegistrationType.MEDICAL)
+                                    }
                                 )
                             }
                             RegistrationType.PROPERTY -> {
-                                PropertyForm(
+                                UnifiedRegistrationForm(
+                                    role = "PROPERTY",
                                     themeColors = themeColors,
-                                    onSubmit = { data -> handleFormSubmit(data, RegistrationType.PROPERTY) }
+                                    onRegistrationSuccess = { map ->
+                                        handleFormSubmit(map, RegistrationType.PROPERTY)
+                                    }
                                 )
                             }
                             RegistrationType.JOB -> {
-                                JobForm(
+                                UnifiedRegistrationForm(
+                                    role = "JOB",
                                     themeColors = themeColors,
-                                    onSubmit = { data -> handleFormSubmit(data, RegistrationType.JOB) }
+                                    onRegistrationSuccess = { map ->
+                                        handleFormSubmit(map, RegistrationType.JOB)
+                                    }
                                 )
                             }
                             RegistrationType.CLIENT, null -> {

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.AdminPermissionsRegistry
+import com.example.data.models.AdminRole
 
 object PermissionGuard {
     const val PERMISSION_BOOKINGS = "MANAGE_BOOKINGS"

@@ -70,6 +70,10 @@ class NotificationViewModel(
         mainViewModel.deleteAllNotifications()
     }
 
+    fun listenForNotifications(userId: String) {
+        // Live listener handled directly via mainViewModel.notifications Flow
+    }
+
     fun markAsRead(context: Context, notificationId: String) {
         markNotificationAsRead(context, notificationId)
     }

@@ -23,6 +23,13 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "SIGNATURE_HASH", "\"\"")
+    val agoraProps = Properties()
+    val agoraPropsFile = rootProject.file("local.properties")
+    if (agoraPropsFile.exists()) {
+        agoraProps.load(FileInputStream(agoraPropsFile))
+    }
+    val agoraId = agoraProps.getProperty("AGORA_APP_ID") ?: System.getenv("AGORA_APP_ID") ?: "e23e27b4777a40eda0579075dd03127a"
+    buildConfigField("String", "AGORA_APP_ID", "\"$agoraId\"")
   }
 
   signingConfigs {
@@ -75,13 +82,14 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
-      isShrinkResources = false
+      isCrunchPngs = true
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("releaseConfig")
     }
     debug {
+      isMinifyEnabled = false
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }

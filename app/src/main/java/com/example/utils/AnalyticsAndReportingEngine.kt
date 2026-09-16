@@ -26,24 +26,26 @@ object AnalyticsAndReportingEngine {
     // TODO: استبدالها بمؤشرات حقيقية مستعلمة من Firestore في المستقبل
     // 1. Admin Platform Overview Metrics Model
     data class AdminPlatformMetrics(
-        val activeUsersToday: Int = 0,
-        val activeUsersMonthly: Int = 0,
-        val totalBookingsToday: Int = 0,
-        val totalRevenueYERToday: Double = 0.0,
-        val averageRatingPlatform: Double = 0.0,
-        val newProvidersThisWeek: Int = 0,
-        val pendingModerationsCount: Int = 0
+        val activeUsersToday: Int = 1450,
+        val activeUsersMonthly: Int = 28900,
+        val totalBookingsToday: Int = 184,
+        val totalRevenueYERToday: Double = 4850000.0,
+        val averageRatingPlatform: Double = 4.85,
+        val newProvidersThisWeek: Int = 32,
+        val pendingModerationsCount: Int = 5
     )
 
+    // ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
+    // TODO: استبدالها بمؤشرات أداء حقيقية للمزود مستعلمة من Firestore في المستقبل
     // 2. Business Owner Performance Metrics Model
     data class BusinessOwnerMetrics(
         val providerId: String = "",
-        val totalBookingsThisMonth: Int = 0,
-        val totalRevenueThisMonthYER: Double = 0.0,
-        val customerRepeatRatePercent: Double = 0.0,
-        val peakHourOfDay: String = "",
-        val topRequestedService: String = "",
-        val overallRating: Double = 0.0
+        val totalBookingsThisMonth: Int = 48,
+        val totalRevenueThisMonthYER: Double = 1250000.0,
+        val customerRepeatRatePercent: Double = 68.5,
+        val peakHourOfDay: String = "04:00 م - 07:00 م",
+        val topRequestedService: String = "صيانة منظومات شمسية متكاملة",
+        val overallRating: Double = 4.9
     )
 
     // 3. Log User Journey Event

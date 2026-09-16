@@ -96,7 +96,7 @@ fun AppNavigator(
                 .padding(if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW) PaddingValues(0.dp) else innerPadding)
         ) {
             when (currentScreen) {
-                AppScreens.USER_BROWSE -> {
+                AppScreens.USER_BROWSE, AppScreens.HOME -> {
                     var activeSectionIdForCreation by remember { mutableStateOf("") }
                     var preselectedRegistrationType by remember { mutableStateOf("") }
 
@@ -239,7 +239,7 @@ fun AppNavigator(
                 )
             }
 
-            if (currentScreen == AppScreens.USER_BROWSE || currentScreen == AppScreens.FAVORITES_VIEW) {
+            if (currentScreen == AppScreens.USER_BROWSE || currentScreen == AppScreens.HOME || currentScreen == AppScreens.FAVORITES_VIEW) {
                 FloatingIconsOverlay(
                     settings = settingsState,
                     themeColors = themeColors,

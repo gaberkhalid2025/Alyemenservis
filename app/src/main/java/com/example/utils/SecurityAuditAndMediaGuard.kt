@@ -16,49 +16,6 @@ import java.io.FileOutputStream
  * Solves Problem 8: Enforces strict state transitions, tamper-proof logging, secure payments, and media sanitization.
  */
 
-// ==========================================
-// 1. 📅 Strict Booking State Machine
-// ==========================================
-object BookingStateEngine {
-
-    // Valid Status Constants
-    const val STATUS_PENDING = "PENDING"
-    const val STATUS_APPROVED = "APPROVED"
-    const val STATUS_IN_PROGRESS = "IN_PROGRESS"
-    const val STATUS_COMPLETED = "COMPLETED"
-    const val STATUS_REJECTED = "REJECTED"
-    const val STATUS_CANCELLED = "CANCELLED"
-
-    fun isValidTransition(currentStatus: String, newStatus: String): Boolean {
-        val current = normalizeStatus(currentStatus)
-        val target = normalizeStatus(newStatus)
-
-        return when (current) {
-            STATUS_PENDING -> target in listOf(STATUS_APPROVED, STATUS_REJECTED, STATUS_CANCELLED)
-            STATUS_APPROVED -> target in listOf(STATUS_IN_PROGRESS, STATUS_CANCELLED, STATUS_REJECTED)
-            STATUS_IN_PROGRESS -> target in listOf(STATUS_COMPLETED, STATUS_CANCELLED)
-            STATUS_COMPLETED -> false // Terminal state
-            STATUS_REJECTED -> false // Terminal state
-            STATUS_CANCELLED -> false // Terminal state
-            else -> false
-        }
-    }
-
-    private fun normalizeStatus(statusStr: String): String {
-        val upper = statusStr.uppercase().trim()
-        return when {
-            upper.contains("مقبول") || upper.contains("APPROVED") || upper.contains("ACCEPTED") -> STATUS_APPROVED
-            upper.contains("انتظار") || upper.contains("PENDING") -> STATUS_PENDING
-            upper.contains("تنفيذ") || upper.contains("IN_PROGRESS") || upper.contains("STARTED") -> STATUS_IN_PROGRESS
-            upper.contains("مكتمل") || upper.contains("COMPLETED") -> STATUS_COMPLETED
-            upper.contains("ملغى") || upper.contains("CANCELLED") -> STATUS_CANCELLED
-            upper.contains("مرفوض") || upper.contains("REJECTED") -> STATUS_REJECTED
-            else -> STATUS_PENDING
-        }
-    }
-}
-
-// ==========================================
 // 2. 🛡️ Security Audit Trail Logger
 // ==========================================
 object AuditTrailLogger {

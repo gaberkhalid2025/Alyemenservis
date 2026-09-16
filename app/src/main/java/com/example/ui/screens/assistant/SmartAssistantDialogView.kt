@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.screens.assistant.components.*
 import com.example.NetworkUtils
 import com.example.VoiceManager
 import com.example.data.AdminSettingsEntity
@@ -117,11 +118,15 @@ fun SmartAssistantDialogView(
 
                 // Navigation Chips
                 AssistantChipsRow(
-                    viewModel = viewModel,
                     themeColors = themeColors,
                     onRequestQuickService = onRequestQuickService,
-                    onNavigateToMap = onNavigateToMap,
-                    onDismiss = onDismiss
+                    onNavigateStores = { onDismiss() },
+                    onNavigateRestaurants = { onDismiss() },
+                    onNavigateMedical = { onDismiss() },
+                    onNavigateToMap = { 
+                        onDismiss()
+                        onNavigateToMap()
+                    }
                 )
 
                     // Voice Recognition Banner
@@ -268,8 +273,8 @@ fun SmartAssistantDialogView(
                         typedText = typedText,
                         isGenerating = isGenerating,
                         themeColors = themeColors,
-                        onTypedTextChanged = { assistantViewModel.updateTypedText(it) },
-                        onSendQuery = {
+                        onTextChanged = { assistantViewModel.updateTypedText(it) },
+                        onSend = {
                             if (typedText.isNotBlank() && !isGenerating) {
                                 assistantViewModel.sendUserQuery(
                                     prompt = typedText,

@@ -4,6 +4,7 @@ import com.example.data.AdminSettingsEntity
 import com.example.data.SupervisorEntity
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import com.example.data.models.AdminRole
 
 object AdminSecurityManager {
 

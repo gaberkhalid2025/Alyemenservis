@@ -211,7 +211,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         try {
-            com.example.utils.SecurityManager.verifyAppSignature(this)
+            com.example.security.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -314,7 +314,7 @@ class MainActivity : ComponentActivity() {
 
         try {
             // com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
-            com.example.utils.SecurityManager.verifyAppSignature(this)
+            com.example.security.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }
