@@ -4,6 +4,7 @@ package com.example.ui.screens.admin
 import com.example.ui.*
 import com.example.utils.*
 import com.example.data.*
+import com.example.domain.*
 
 
 import android.content.Intent
@@ -126,40 +127,15 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
     var adminBookingSubTab by remember { mutableStateOf("SERVICES") }
     var adminChatSubTab by remember { mutableStateOf("SERVICES") }
     var adminAddSubTab by remember { mutableStateOf("SERVICES") } // SERVICES, PROPERTIES, STORES, MEDICAL, RESTAURANTS, JOBS
+// ========== SECTION: State Variables & Navigation ==========
     var adminReviewSubTab by remember { mutableStateOf("SERVICES") }
     var adminNotifSubTab by remember { mutableStateOf("SERVICES") }
     var adminVipSubTab by remember { mutableStateOf("SERVICES") }
     var adminBannerSubTab by remember { mutableStateOf("SERVICES") }
     var adminPasswordSubTab by remember { mutableStateOf("REQUESTS") }
-    val passwordRecoveryRequests = remember { mutableStateListOf<Map<String, Any>>() }
-    DisposableEffect(Unit) {
-        val listener = try {
-            viewModel.db.collection("password_recovery_requests")
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                .addSnapshotListener { snap, err ->
-                    if (err == null && snap != null) {
-                        try {
-                            passwordRecoveryRequests.clear()
-                            for (doc in snap.documents) {
-                                val m = doc.data?.toMutableMap() ?: mutableMapOf()
-                                m["id"] = doc.id
-                                passwordRecoveryRequests.add(m)
-                            }
-                        } catch (e: Throwable) {
-                            e.printStackTrace()
-                        }
-                    }
-                }
-        } catch (e: Throwable) {
-            e.printStackTrace()
-            null
-        }
-        onDispose {
-            listener?.remove()
-        }
-    }
+    val passwordRecoveryRequests by viewModel.passwordRecoveryRequests.collectAsState()
 
-    // Dialog state controllers for category edits and deletions
+// ========== SECTION: Dialogs & Confirmations ==========
     var showDeleteCategoryConfirmId by remember { mutableStateOf<String?>(null) }
     var showEditCategoryObj by remember { mutableStateOf<CategoryEntity?>(null) }
     var showEditCityObj by remember { mutableStateOf<com.example.data.CityEntity?>(null) }

@@ -3,6 +3,7 @@ package com.example.utils
 import com.example.utils.*
 
 import android.content.Context
+import com.example.BuildConfig
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.text.SimpleDateFormat
@@ -14,38 +15,58 @@ import java.util.Locale
  * Interactive Admin Analytics Dashboard, Business Owner Performance Metrics, Multi-format report export (PDF/CSV/Excel),
  * User journey behavioral event tracking, Anomaly detection alerts, and Predictive trend forecasting.
  *
- * ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
- * TODO: استبدالها ببيانات حقيقية من Firestore في المستقبل
- * لا تحذف هذا الملف — قد يُستخدم في المستقبل
+  * لا تحذف هذا الملف — قد يُستخدم في المستقبل
  */
 object AnalyticsAndReportingEngine {
 
     private val db = FirebaseFirestore.getInstance()
 
-    // ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
-    // TODO: استبدالها بمؤشرات حقيقية مستعلمة من Firestore في المستقبل
-    // 1. Admin Platform Overview Metrics Model
+        // 1. Admin Platform Overview Metrics Model
     data class AdminPlatformMetrics(
-        val activeUsersToday: Int = 1450,
-        val activeUsersMonthly: Int = 28900,
-        val totalBookingsToday: Int = 184,
-        val totalRevenueYERToday: Double = 4850000.0,
-        val averageRatingPlatform: Double = 4.85,
-        val newProvidersThisWeek: Int = 32,
-        val pendingModerationsCount: Int = 5
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val activeUsersToday: Int = if (BuildConfig.DEBUG) 1450 else 0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val activeUsersMonthly: Int = if (BuildConfig.DEBUG) 28900 else 0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val totalBookingsToday: Int = if (BuildConfig.DEBUG) 184 else 0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val totalRevenueYERToday: Double = if (BuildConfig.DEBUG) 4850000.0 else 0.0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val averageRatingPlatform: Double = if (BuildConfig.DEBUG) 4.85 else 0.0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val newProvidersThisWeek: Int = if (BuildConfig.DEBUG) 32 else 0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val pendingModerationsCount: Int = if (BuildConfig.DEBUG) 5 else 0
     )
 
-    // ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
-    // TODO: استبدالها بمؤشرات أداء حقيقية للمزود مستعلمة من Firestore في المستقبل
-    // 2. Business Owner Performance Metrics Model
+        // 2. Business Owner Performance Metrics Model
     data class BusinessOwnerMetrics(
         val providerId: String = "",
-        val totalBookingsThisMonth: Int = 48,
-        val totalRevenueThisMonthYER: Double = 1250000.0,
-        val customerRepeatRatePercent: Double = 68.5,
-        val peakHourOfDay: String = "04:00 م - 07:00 م",
-        val topRequestedService: String = "صيانة منظومات شمسية متكاملة",
-        val overallRating: Double = 4.9
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val totalBookingsThisMonth: Int = if (BuildConfig.DEBUG) 48 else 0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val totalRevenueThisMonthYER: Double = if (BuildConfig.DEBUG) 1250000.0 else 0.0,
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val customerRepeatRatePercent: Double = if (BuildConfig.DEBUG) 68.5 else 0.0,
+        // In release builds, this is empty until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val peakHourOfDay: String = if (BuildConfig.DEBUG) "04:00 م - 07:00 م" else "",
+        // In release builds, this is empty until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val topRequestedService: String = if (BuildConfig.DEBUG) "صيانة منظومات شمسية متكاملة" else "",
+        // In release builds, this is 0 until real aggregation is wired.
+        // See FUTURE_IMPROVEMENTS.md for the roadmap.
+        val overallRating: Double = if (BuildConfig.DEBUG) 4.9 else 0.0
     )
 
     // 3. Log User Journey Event

@@ -49,6 +49,7 @@ fun AdminAutoRoutingScreenContent(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var isSaving by remember { mutableStateOf(false) }
 
     var isGeneralAutoRoutingEnabled by remember { mutableStateOf(true) }
 
@@ -284,6 +285,8 @@ fun AdminAutoRoutingScreenContent(
 
         Button(
             onClick = {
+                if (isSaving) return@Button
+                isSaving = true
                 val config = mapOf(
                     "isGeneralAutoRoutingEnabled" to isGeneralAutoRoutingEnabled,
                     "isStoresRoutingEnabled" to isStoresRoutingEnabled,
@@ -296,16 +299,31 @@ fun AdminAutoRoutingScreenContent(
                     "deliveryMaxRadiusKm" to deliveryMaxRadiusKm,
                     "updatedAt" to System.currentTimeMillis()
                 )
-                viewModel.db.collection("settings").document("auto_routing").set(config)
-                Toast.makeText(context, "✅ تم حفظ وتطبيق خوارزميات التوجيه الذكي سحابياً!", Toast.LENGTH_SHORT).show()
+                viewModel.db.collection("settings").document("auto_routing")
+                    .set(config)
+                    .addOnSuccessListener {
+                        isSaving = false
+                        Toast.makeText(context, "✅ تم حفظ وتطبيق خوارزميات التوجيه الذكي سحابياً!", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener { err ->
+                        isSaving = false
+                        Toast.makeText(context, "❌ فشل حفظ خوارزميات التوجيه: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
+                    }
             },
+            enabled = !isSaving,
             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("💾 حفظ وتطبيق خوارزميات التوجيه سحابياً", color = Color.Black, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+            if (isSaving) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("جاري الحفظ...", color = Color.Black, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+            } else {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("💾 حفظ وتطبيق خوارزميات التوجيه سحابياً", color = Color.Black, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

@@ -25,6 +25,8 @@ import com.example.utils.VisualThemePalette
 /**
  * 🍔 RestaurantsSectionView - عرض المطاعم والكافيهات فقط
  */
+import com.example.domain.isAdmin
+
 @Composable
 fun RestaurantsSectionView(
     viewModel: MainViewModel,
@@ -35,7 +37,7 @@ fun RestaurantsSectionView(
     val allStores by viewModel.stores.collectAsState()
     val currentUserId by viewModel.currentUserId.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
-    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+    val isAdminUser = adminRole.isAdmin()
 
     val restaurantsList = remember(allStores, currentUserId, adminRole) {
         allStores.filter { 

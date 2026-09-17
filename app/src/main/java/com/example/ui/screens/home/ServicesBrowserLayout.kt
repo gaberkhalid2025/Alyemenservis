@@ -270,9 +270,8 @@ fun ServicesBrowserLayout(
                         }
                     } else emptyList()
 
-                    val effectiveDisplayProviders = if (filteredProviders.isNotEmpty()) {
-                        filteredProviders
-                    } else if (searchQuery.isBlank() && (selectedCategory.isNullOrBlank() || selectedCategory == "ALL" || selectedCategory == "الكل")) {
+                    val effectiveDisplayProviders = if (searchQuery.isBlank() && 
+                        (selectedCategory.isNullOrBlank() || selectedCategory == "ALL" || selectedCategory == "الكل")) {
                         allProviders
                     } else {
                         filteredProviders

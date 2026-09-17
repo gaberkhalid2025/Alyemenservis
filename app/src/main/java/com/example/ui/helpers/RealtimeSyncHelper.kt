@@ -66,8 +66,12 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
             if (snapshot != null && snapshot.exists()) {
                 try {
+                    // Security migration: Cleanup legacy adminPassword from Firestore if present
+                    if (snapshot.contains("adminPassword")) {
+                        snapshot.reference.update("adminPassword", com.google.firebase.firestore.FieldValue.delete())
+                    }
                     snapshot.toObject(AdminSettingsEntity::class.java)?.let {
-                        appState._settings.value = it
+                        appState._settings.value = it.copy(adminPassword = "")
                         appState._maxKmRadius.value = it.maxSearchRadiusKm
                     }
                 } catch (e: Exception) {

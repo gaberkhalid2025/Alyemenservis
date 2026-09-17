@@ -31,6 +31,7 @@ import android.util.Log
 @Composable
 fun OffersManager(
     ownerId: String = "",
+    viewModel: com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory { override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T { return com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel(ownerId) as T } }),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
@@ -38,22 +39,9 @@ fun OffersManager(
         mutableStateOf<List<SpecialOfferEntity>>(emptyList())
     }
 
-    LaunchedEffect(ownerId) {
-        val query = if (ownerId.isNotBlank()) {
-            FirebaseFirestore.getInstance()
-                .collection("special_offers")
-                .whereEqualTo("providerId", ownerId)
-        } else {
-            FirebaseFirestore.getInstance()
-                .collection("special_offers")
-        }
-        query.addSnapshotListener { snap, _ ->
-            if (snap != null) {
-                offers = snap.documents.mapNotNull { doc ->
-                    doc.toObject(SpecialOfferEntity::class.java)?.copy(id = doc.id)
-                }
-            }
-        }
+    val offersState by viewModel.specialOffers.collectAsState()
+    LaunchedEffect(offersState) {
+        offers = offersState
     }
 
     var showAddDialog by remember { mutableStateOf(false) }

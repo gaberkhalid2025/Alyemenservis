@@ -12,7 +12,7 @@ fun PropertyListItemCard(
     property: PropertyEntity,
     themeColors: VisualThemePalette,
     onClick: () -> Unit,
-    viewModel: MainViewModel? = null,
+    viewModel: MainViewModel,
     onChatClick: (() -> Unit)? = null
 ) {
     PropertyListItemCard(

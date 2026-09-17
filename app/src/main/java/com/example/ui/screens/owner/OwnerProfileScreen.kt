@@ -37,6 +37,7 @@ fun OwnerProfileScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     var nameInput by remember { mutableStateOf(account.name) }
     var ownerNameInput by remember { mutableStateOf(account.ownerName) }
@@ -44,6 +45,7 @@ fun OwnerProfileScreen(
     var descInput by remember { mutableStateOf(account.description) }
     var neighborhoodInput by remember { mutableStateOf(account.neighborhood) }
     var hoursInput by remember { mutableStateOf(account.workingHours) }
+    var isSaving by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -179,14 +181,49 @@ fun OwnerProfileScreen(
 
                 Button(
                     onClick = {
-                        Toast.makeText(context, "تم حفظ وتحديث بيانات الملف الشخصي بنجاح!", Toast.LENGTH_SHORT).show()
+                        if (isSaving) return@Button
+                        isSaving = true
+                        val updates = mapOf<String, Any>(
+                            "name" to nameInput.trim(),
+                            "ownerName" to ownerNameInput.trim(),
+                            "phone" to phoneInput.trim(),
+                            "description" to descInput.trim(),
+                            "neighborhood" to neighborhoodInput.trim(),
+                            "workingHours" to hoursInput.trim(),
+                            "updatedAt" to System.currentTimeMillis()
+                        )
+                        val targetCollection = when (account.businessType) {
+                            com.example.data.BusinessType.TECHNICIAN -> "providers"
+                            com.example.data.BusinessType.STORE -> "stores"
+                            com.example.data.BusinessType.RESTAURANT -> "stores"
+                            com.example.data.BusinessType.MEDICAL -> "stores"
+                            com.example.data.BusinessType.REAL_ESTATE -> "properties"
+                            com.example.data.BusinessType.JOB_POSTER -> "jobs"
+                        }
+                        viewModel.db.collection(targetCollection).document(account.id)
+                            .update(updates)
+                            .addOnSuccessListener {
+                                isSaving = false
+                                Toast.makeText(context, "✅ تم حفظ وتحديث بيانات الملف الشخصي بنجاح!", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { err ->
+                                isSaving = false
+                                Toast.makeText(context, "❌ فشل حفظ التغييرات: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
+                            }
                     },
+                    enabled = !isSaving,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = "حفظ")
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("حفظ التغييرات 💾", fontWeight = FontWeight.Bold, color = Color.White)
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("جاري الحفظ...", color = Color.White)
+                    } else {
+                        Icon(Icons.Default.Check, contentDescription = "حفظ")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("حفظ التغييرات 💾", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
             }
         }

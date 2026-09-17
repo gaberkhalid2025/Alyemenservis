@@ -145,7 +145,7 @@ class AccountRecoveryHelper(
             val notif = mapOf(
                 "id" to "notif_pwd_${System.currentTimeMillis()}",
                 "title" to "🔑 تم إعادة تعيين كلمة المرور",
-                "message" to "تم إعادة تعيين كلمة المرور الخاصة بك بنجاح. كلمة المرور الجديدة: $newPassword",
+                "message" to "تم إعادة تعيين كلمة مرور حسابك. يرجى التواصل مع الدعم لاستلام كلمة المرور الجديدة",
                 "targetPhone" to cleanPhone,
                 "timestamp" to System.currentTimeMillis()
             )

@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import com.example.utils.ReportExporter
 import com.example.utils.VisualThemePalette
 import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.util.Locale
 
 /**
  * 📊 AnalyticsCharts (لوحة تحليلات وإحصاءات الأداء والنمو)
@@ -35,8 +37,8 @@ fun AnalyticsCharts(
     var timePeriod by remember { mutableStateOf("أسبوعي") } // أسبوعي / شهري / سنوي
     var selectedCurrency by remember { mutableStateOf("YER") } // YER, SAR, USD
 
-    val baseIncomeYer = 425000.0
-    val numberFormat = remember { DecimalFormat("#,###.##") }
+    val baseIncomeYer = 0.0 // stats.totalRevenueYer when available
+    val numberFormat = remember { DecimalFormat("#,###.##", DecimalFormatSymbols(Locale.US)) }
 
     val (convertedIncome, currencySymbol) = remember(selectedCurrency, baseIncomeYer) {
         when (selectedCurrency) {

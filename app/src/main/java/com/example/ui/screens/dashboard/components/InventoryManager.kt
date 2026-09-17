@@ -19,20 +19,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
+import com.example.data.repositories.InventoryItem
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
 import android.util.Log
-
-data class InventoryItem(
-    val id: String = "",
-    val ownerId: String = "",
-    val sku: String = "",
-    val name: String = "",
-    val quantity: Int = 0,
-    val minThreshold: Int = 5,
-    val price: Double = 0.0,
-    val inStock: Boolean = true
-)
 
 /**
  * 📦 InventoryManager (إدارة المخزون وتتبع الكميات والتنبيهات)
@@ -41,6 +31,7 @@ data class InventoryItem(
 @Composable
 fun InventoryManager(
     ownerId: String = "",
+    viewModel: com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory { override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T { return com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel(ownerId) as T } }),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
@@ -48,22 +39,9 @@ fun InventoryManager(
         mutableStateOf<List<InventoryItem>>(emptyList())
     }
 
-    LaunchedEffect(ownerId) {
-        val query = if (ownerId.isNotBlank()) {
-            FirebaseFirestore.getInstance()
-                .collection("inventory")
-                .whereEqualTo("ownerId", ownerId)
-        } else {
-            FirebaseFirestore.getInstance()
-                .collection("inventory")
-        }
-        query.addSnapshotListener { snap, _ ->
-            if (snap != null) {
-                inventoryList = snap.documents.mapNotNull { doc ->
-                    doc.toObject(InventoryItem::class.java)?.copy(id = doc.id)
-                }
-            }
-        }
+    val inventoryState by viewModel.inventory.collectAsState()
+    LaunchedEffect(inventoryState) {
+        inventoryList = inventoryState
     }
 
     var showAddItemDialog by remember { mutableStateOf(false) }

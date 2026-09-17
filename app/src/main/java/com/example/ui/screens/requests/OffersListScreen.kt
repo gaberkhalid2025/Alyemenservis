@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
-import com.google.firebase.firestore.FirebaseFirestore
 
 /**
  * 📋 OffersListScreen
@@ -44,32 +43,19 @@ fun OffersListScreen(
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
-    // 📌 Architectural Note: FirebaseFirestore instance retained locally for isolated realtime query listening on urgent offer lists
-    val firestore = remember { FirebaseFirestore.getInstance() }
 
-    var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
-    var offersList by remember { mutableStateOf<List<RequestOfferEntity>>(emptyList()) }
+    val allRequests by viewModel.instantRequests.collectAsState()
+    val request = allRequests.find { it.id == requestId }
+    val offersList by viewModel.requestOffers.collectAsState()
     var isLoading by remember { mutableStateOf(true) }
 
     var sortBy by remember { mutableStateOf("PRICE_LOW") } // PRICE_LOW, FASTEST, RATING
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
-            firestore.collection("instant_requests").document(requestId)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    request = snapshot.toObject(InstantRequestEntity::class.java)
-                }
-
-            firestore.collection("instant_offers")
-                .whereEqualTo("requestId", requestId)
-                .limit(20)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null) {
-                        offersList = snapshot.documents.mapNotNull { it.toObject(RequestOfferEntity::class.java) }
-                    }
-                    isLoading = false
-                }
+            viewModel.instantRequestViewModel.observeRequestDetails(requestId)
+            kotlinx.coroutines.delay(1000)
+            isLoading = false
         }
     }
 

@@ -754,11 +754,11 @@ fun StoreListItemCard(
     store: StoreEntity,
     themeColors: VisualThemePalette,
     onClick: () -> Unit,
-    viewModel: MainViewModel? = null,
+    viewModel: MainViewModel,
     onChatClick: (() -> Unit)? = null
 ) {
-    val settingsState = viewModel?.settings?.collectAsState()?.value ?: AdminSettingsEntity()
-    val adminRole by (viewModel?.adminRole?.collectAsState() ?: remember { mutableStateOf("GUEST") })
+    val settingsState = viewModel.settings.collectAsState().value ?: AdminSettingsEntity()
+    val adminRole by viewModel.adminRole.collectAsState()
     val isAdmin = adminRole != "GUEST"
     val context = LocalContext.current
 
@@ -1446,7 +1446,7 @@ fun PropertiesTabContent(
             }
         } else {
             activeProps.take(itemsToShowLimit).forEach { prop ->
-                PropertyListItemCard(prop = prop, themeColors = themeColors, onClick = { onPropertyClick(prop) })
+                PropertyListItemCard(prop = prop, themeColors = themeColors, onClick = { onPropertyClick(prop) }, viewModel = viewModel)
             }
             if (activeProps.size > itemsToShowLimit) {
                 Button(
@@ -1466,7 +1466,7 @@ fun PropertyListItemCard(
     prop: PropertyEntity,
     themeColors: VisualThemePalette,
     onClick: () -> Unit,
-    viewModel: MainViewModel? = null
+    viewModel: MainViewModel
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),

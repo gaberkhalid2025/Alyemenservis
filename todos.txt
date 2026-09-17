@@ -1,0 +1,204 @@
+app/src/main/java/com/example/ui/screens/register/components/RegistrationField.kt:46:    placeholder: String = "",
+app/src/main/java/com/example/ui/screens/register/components/RegistrationField.kt:93:            placeholder = { Text(placeholder, fontSize = 11.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/screens/register/forms/ProviderForm.kt:113:                placeholder = { Text("مثال: علي محمد صالح") },
+app/src/main/java/com/example/ui/screens/register/forms/ProviderForm.kt:235:                placeholder = { Text("مثال: سباك، كهربائي منازل") },
+app/src/main/java/com/example/ui/screens/register/forms/ProviderForm.kt:246:                placeholder = { Text("مثال: 5 سنوات") },
+app/src/main/java/com/example/ui/screens/register/forms/ProviderForm.kt:268:                placeholder = { Text("مثال: 8:00 ص - 8:00 م") },
+app/src/main/java/com/example/ui/screens/register/forms/ProviderForm.kt:279:                placeholder = { Text("مثال: حي الروضة وتفرعاته") },
+app/src/main/java/com/example/ui/screens/register/status/StatusChatDialog.kt:193:                        placeholder = { Text("اكتب رسالتك...", fontSize = 11.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/screens/register/RegisterScreen.kt:573:    // Legacy placeholder wrapper
+app/src/main/java/com/example/ui/screens/register/GuestRegistrationDialog.kt:172:                        placeholder = "771234567",
+app/src/main/java/com/example/ui/screens/urgent/UrgentOfferSubmissionScreen.kt:56:        val p = priceText.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/urgent/UrgentOfferSubmissionScreen.kt:198:                    val price = priceText.toDoubleOrNull()
+app/src/main/java/com/example/ui/screens/urgent/UrgentRequestScreen.kt:230:                placeholder = { Text("مثال: تسرب مياه طارئ في المطبخ") },
+app/src/main/java/com/example/ui/screens/urgent/UrgentRequestScreen.kt:239:                placeholder = { Text("اكتب وصفاً توضيحياً للمشكلة لتمكين الفنيين من تقييم العمل وتقديم العرض المناسب...") },
+app/src/main/java/com/example/ui/screens/urgent/UrgentRequestScreen.kt:249:                placeholder = { Text("مثال: 1234 (لحفظ أمان طلبك وإلغائه)") },
+app/src/main/java/com/example/ui/screens/urgent/UrgentRequestScreen.kt:423:                    Text("رمز الطلب: ${createdRequestCode ?: "URG-XXXX"}", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+app/src/main/java/com/example/ui/screens/urgent/UrgentListFilterBar.kt:44:            placeholder = { Text("بحث برقم الطلب، المدينة، أو نوع الخدمة...") },
+app/src/main/java/com/example/ui/screens/map/components/MapFilterBar.kt:70:                placeholder = { 
+app/src/main/java/com/example/ui/screens/map/components/MapFilterBar.kt:113:                    focusedPlaceholderColor = Color(0xFF94A3B8),
+app/src/main/java/com/example/ui/screens/map/components/MapFilterBar.kt:114:                    unfocusedPlaceholderColor = Color(0xFF94A3B8)
+app/src/main/java/com/example/ui/screens/map/components/RadarRenderer.kt:188:            val rad = Math.toRadians(sweepAngle.toDouble())
+app/src/main/java/com/example/ui/screens/map/components/MapBookingDialog.kt:102:                    placeholder = { Text("مثال: صيانة غسالة أوتوماتيك، العنوان بالتفصيل...", fontSize = 11.sp, color = Color(0xFF64748B)) },
+app/src/main/java/com/example/ui/screens/map/components/MapBottomSheet.kt:74:            rating = entity.rating.toDouble()
+app/src/main/java/com/example/ui/screens/map/components/MapBottomSheet.kt:89:            rating = entity.rating.toDouble()
+app/src/main/java/com/example/ui/screens/map/MapScreenFilters.kt:128:                    rating = p.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/map/MapScreenFilters.kt:151:                    rating = s.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/admin/AdminMapPanel.kt:146:            placeholder = { Text("بحث عن فني، متجر، أو عقار...", fontSize = 12.sp) },
+app/src/main/java/com/example/ui/screens/admin/AdminAssistantPanel.kt:118:                    placeholder = { Text("اكتب مشكلة باللهجة اليمنية (مثال: بزبوز يقطر، انفرتر 04...)", fontSize = 11.sp) },
+app/src/main/java/com/example/ui/screens/admin/AdminUserManager.kt:116:                placeholder = { Text("بحث باسم المستخدم أو رقم الهاتف...", color = Color.Gray, fontSize = 11.5.sp) },
+app/src/main/java/com/example/ui/screens/admin/AdminUserManager.kt:269:                        placeholder = { Text("اكتب كلمة المرور الجديدة...", color = Color.DarkGray) },
+app/src/main/java/com/example/ui/screens/admin/AdminPaymentPanel.kt:355:                        val amt = overrideAmount.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/admin/AdminJobsPanel.kt:167:                    placeholder = {
+app/src/main/java/com/example/ui/screens/admin/OwnerBackdoorPanelLayout.kt:742:            placeholder = { Text("مثال: MENU,NOTIF,CHAT,REFRESH,SETTINGS") },
+app/src/main/java/com/example/ui/screens/admin/OwnerBackdoorPanelLayout.kt:1051:            placeholder = { Text("COVER,LOGO,TITLE,ANNOUNCEMENT,ABOUT_CARD,DOWNLOAD_BTN,CONTACTS,SOCIALS") },
+app/src/main/java/com/example/ui/screens/admin/AdminMedicalPanel.kt:115:                    placeholder = { Text("بحث بالاسم، المدينة، الهاتف، التخصص...", fontSize = 11.5.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/screens/admin/AdminRestaurantsPanel.kt:137:                    placeholder = { Text("بحث باسم المطعم، الكافيه، المدينة، الهاتف...", fontSize = 11.5.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/screens/admin/AdminDataManagementScreen.kt:419:                                val prc = editPriceOrSalary.toDoubleOrNull() ?: ent.price
+app/src/main/java/com/example/ui/screens/admin/AdminDataManagementScreen.kt:528:                                price = newPriceOrSalary.toDoubleOrNull() ?: 100000.0,
+app/src/main/java/com/example/ui/screens/admin/AdminStoresPropertiesPanel.kt:179:                    placeholder = { Text(if (selectedSection == "المتاجر") "بحث باسم المتجر، المدينة، الهاتف، النشاط..." else "بحث بنوع العقار، المدينة، الهاتف، السعر...", fontSize = 11.5.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/screens/admin/AdminStoresPropertiesPanel.kt:464:                            price = pPrice.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:1628:                                            val priceVal = manualPriceValue.toDoubleOrNull() ?: 1500.0
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:1695:                                                    price = pPrice.trim().toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:3154:                                    placeholder = { Text("فوري = فارغ") },
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:3163:                                    placeholder = { Text("دائم = فارغ") },
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:3174:                                        val delayH = notifDelayHours.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:3175:                                        val validH = notifValidityHours.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:6341:                                        minAdvanceAmount = minAdvanceAmountInput.toDoubleOrNull() ?: 500.0,
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:6342:                                        maxAdvanceAmount = maxAdvanceAmountInput.toDoubleOrNull() ?: 50000.0,
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:7086:                        placeholder = { Text("مثال: المستندات المرفقة غير واضحة") },
+app/src/main/java/com/example/ui/screens/admin/AdminPanelLayout.kt:8136:                        val amt = txAmountInput.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/home/ServicesBrowserComponents.kt:211:                placeholder = { Text("البحث بالاسم أو رقم الهاتف...", fontSize = 11.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/screens/home/ServicesBrowserComponents.kt:276:                                placeholder = { Text("اكتب اسم المدينة...", fontSize = 10.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/screens/home/ServicesBrowserComponents.kt:327:                        placeholder = { Text("مثال: حدة، الحصبة...", fontSize = 11.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/screens/home/UnifiedGlobalSearchScreen.kt:43:            placeholder = { Text("بحث موحد في جميع الأقسام والخدمات...") },
+app/src/main/java/com/example/ui/screens/dashboard/MedicalDashboard.kt:247:                            rating = account.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/dashboard/TechnicianDashboard.kt:207:                            rating = account.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/dashboard/components/StoreAddProductDialog.kt:137:                    val dPrice = prodPrice.trim().toDoubleOrNull()
+app/src/main/java/com/example/ui/screens/dashboard/components/StoreReviewsCard.kt:90:                                    placeholder = { Text("اكتب ردك للعميل هنا...", fontSize = 9.sp) },
+app/src/main/java/com/example/ui/screens/dashboard/components/UnifiedExtraComponents.kt:414:                        val rVal = overallRating.toDouble()
+app/src/main/java/com/example/ui/screens/dashboard/components/BulkPriceManager.kt:119:                    val rate = percentage.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/dashboard/components/AdvancedReviewsManagementCard.kt:72:                                        placeholder = { Text("اكتب ردك هنا...", fontSize = 11.sp) },
+app/src/main/java/com/example/ui/screens/dashboard/components/CouponManager.kt:217:                                description = "كوبون بقيمة ${discountPercent.toIntOrNull() ?: 10}% لـ ${maxUses.toIntOrNull() ?: 50} استخدام بحد أدنى للطلب ${minAmount.toDoubleOrNull() ?: 0.0}",
+app/src/main/java/com/example/ui/screens/dashboard/components/InventoryManager.kt:293:                                price = newItemPrice.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/screens/dashboard/components/LoyaltyManager.kt:227:                                discountValue = discountVal.toDoubleOrNull() ?: 50.0,
+app/src/main/java/com/example/ui/screens/dashboard/JobPosterDashboard.kt:209:                            rating = account.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/dashboard/TabProductsServices.kt:124:                        val p = priceInput.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/dashboard/StoreDashboard.kt:176:                            rating = account.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/dashboard/PropertyDashboard.kt:168:                            rating = account.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/dashboard/UnifiedDashboardComponents.kt:22:        rating = account.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/dashboard/RestoreAccountBottomSheet.kt:72:                label = { Text("رقم هاتفك اليمني (مثال: 77xxxxxxx)", fontSize = 11.sp) },
+app/src/main/java/com/example/ui/screens/dashboard/RestaurantDashboard.kt:176:                            rating = account.rating.toDouble(),
+app/src/main/java/com/example/ui/screens/entities/MedicalCentersScreen.kt:136:        searchPlaceholder = "بحث عن مركز طبي، عيادة، أو طبيب... 🏥",
+app/src/main/java/com/example/ui/screens/entities/RestaurantsScreen.kt:124:        searchPlaceholder = "بحث عن مطعم، كافيه، أو وجبة... 🍔",
+app/src/main/java/com/example/ui/screens/entities/StoresScreen.kt:121:        searchPlaceholder = "بحث في المحلات والمتاجر... 🏪",
+app/src/main/java/com/example/ui/screens/entities/ProfileOwnerAdminControlBar.kt:537:                                val pVal = editPrice.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/entities/ProfileOwnerAdminControlBar.kt:615:                                        price = prodPrice.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/screens/entities/GenericSectionView.kt:43:    searchPlaceholder: String,
+app/src/main/java/com/example/ui/screens/entities/GenericSectionView.kt:84:            placeholder = { Text(searchPlaceholder, fontSize = 11.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/screens/entities/GenericSectionView.kt:266:    searchPlaceholder: String,
+app/src/main/java/com/example/ui/screens/entities/GenericSectionView.kt:283:        searchPlaceholder = searchPlaceholder,
+app/src/main/java/com/example/ui/screens/entities/ProfileReviewCard.kt:136:            placeholder = { Text("شارك تجربتك مع الآخرين...", fontSize = 12.sp) },
+app/src/main/java/com/example/ui/screens/entities/PropertiesScreen.kt:121:        searchPlaceholder = "بحث عن شقة، أرض، بيت للإيجار أو البيع... 🏠",
+app/src/main/java/com/example/ui/screens/owner/ProductServiceManagementScreen.kt:285:                    val parsedPrice = priceInput.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/owner/PriceManagementScreen.kt:139:                    val parsed = editedPriceText.toDoubleOrNull() ?: product.price
+app/src/main/java/com/example/ui/screens/bookings/OrdersScreenLayout.kt:185:                        placeholder = { Text("مثال: 777123456", color = Color.Gray, fontSize = 12.sp) },
+app/src/main/java/com/example/ui/screens/bookings/OrdersScreenLayout.kt:424:                        placeholder = { Text("اكتب الرمز المكون من 4 أرقام") },
+app/src/main/java/com/example/ui/screens/bookings/InstantRequestsScreen.kt:102:                placeholder = { Text("بحث بالرقم أو الخدمة أو المدينة...", fontSize = 12.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/screens/bookings/InstantRequestComponents.kt:253:                        price = price.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/screens/bookings/BookingListScreen.kt:171:                placeholder = { Text("بحث برقم الحجز، الاسم، أو الهاتف...") },
+app/src/main/java/com/example/ui/screens/bookings/ReviewOffersDialog.kt:215:                        placeholder = { Text("تفاصيل الشكوى...", color = Color.Gray) }
+app/src/main/java/com/example/ui/screens/bookings/BookingFormScreen.kt:212:                placeholder = { Text("مثال: عبدالله محمد صالح") },
+app/src/main/java/com/example/ui/screens/bookings/BookingFormScreen.kt:227:                placeholder = { Text("77XXXXXXX أو 73XXXXXXX") },
+app/src/main/java/com/example/ui/screens/bookings/BookingFormScreen.kt:272:                    placeholder = { Text("الشارع والحي والمنزل") },
+app/src/main/java/com/example/ui/screens/bookings/BookingFormScreen.kt:410:                placeholder = { Text("أي تفاصيل إضافية تريد إبلاغ الفني بها...") },
+app/src/main/java/com/example/ui/screens/chat/components/ChatInputBar.kt:510:                    placeholder = { Text("اكتب رسالتك هنا (الحد 500 حرف)...", color = textSecondary, fontSize = 13.sp) },
+app/src/main/java/com/example/ui/screens/chat/components/ChatSearchBar.kt:25:        placeholder = { Text("بحث في المحادثات...", fontSize = 13.sp) },
+app/src/main/java/com/example/ui/screens/chat/ChatScreen.kt:235:                            placeholder = { Text("بحث في المحادثة...", fontSize = 12.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/screens/chat/ChatListScreen.kt:175:            placeholder = { Text("بحث في المحادثات...", fontSize = 12.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/screens/assistant/components/AssistantInputBar.kt:48:                placeholder = { Text("اكتب سؤالك أو اطلب خدمة هنا...", fontSize = 11.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/screens/payments/TransactionHistoryScreen.kt:228:                            placeholder = { Text("بحث برقم المعاملة أو الوصف...", fontSize = 13.sp) },
+app/src/main/java/com/example/ui/screens/payments/TransactionHistoryScreen.kt:414:                        placeholder = { Text("مثال: 25000") },
+app/src/main/java/com/example/ui/screens/payments/TransactionHistoryScreen.kt:424:                        val amount = depositAmountText.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/screens/requests/RequestsListScreen.kt:129:                placeholder = { Text("بحث برقم الطلب أو العنوان أو الحي...") },
+app/src/main/java/com/example/ui/screens/requests/OfferSubmissionScreen.kt:187:                    val price = priceText.toDoubleOrNull()
+app/src/main/java/com/example/ui/dialogs/BookingCancellationDialog.kt:34: * TODO: نقل منطق Firestore إلى BookingViewModel في المستقبل.
+app/src/main/java/com/example/ui/dialogs/BookingCancellationDialog.kt:164:                            placeholder = { Text("مثال: 1234") },
+app/src/main/java/com/example/ui/dialogs/BookingCancellationDialog.kt:196:                        placeholder = { Text("اكتب سبب الإلغاء بوضوح...") },
+app/src/main/java/com/example/ui/dialogs/BackdoorLoginDialog.kt:101:                    placeholder = { Text("admin@example.com", fontSize = 12.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/dialogs/BookingDialog.kt:221:                    placeholder = { Text("اكتب أي ملاحظات أو تفاصيل للمشكلة إن وجدت...", color = Color.Gray, fontSize = 10.sp) },
+app/src/main/java/com/example/ui/dialogs/QuickServiceRequestDialog.kt:684:            placeholder = { Text("اكتب موقعك بالتحديد ليصل الفني أو الطلب سريعاً") },
+app/src/main/java/com/example/ui/dialogs/QuickServiceRequestDialog.kt:712:            placeholder = { Text("مثال: صيانة تسريب مياه في المطبخ / وجبة غداء لـ 4 أفراد") },
+app/src/main/java/com/example/ui/dialogs/QuickServiceRequestDialog.kt:731:            placeholder = { Text("اكتب أي تفاصيل أخرى أو مستلزمات مطلوبة لتصلك عروض أسعار دقيقة...") },
+app/src/main/java/com/example/ui/dialogs/QuickServiceRequestDialog.kt:820:            placeholder = { Text("مثال: 771234567") },
+app/src/main/java/com/example/ui/dialogs/QuickServiceRequestDialog.kt:843:            placeholder = { Text("مثال: أبو محمد") },
+app/src/main/java/com/example/ui/dialogs/QuickServiceRequestDialog.kt:862:            placeholder = { Text("إذا تركته فارغاً سيتم توليد رمز سري تلقائياً") },
+app/src/main/java/com/example/ui/dialogs/RestoreAccountDialog.kt:123:                        placeholder = { Text("أدخل كلمة المرور") },
+app/src/main/java/com/example/ui/components/SmartAsyncImage.kt:34: * 3. Base64 fallback & Attractive 3D placeholder graphics
+app/src/main/java/com/example/ui/components/SmartAsyncImage.kt:42:    fallbackPlaceholderColor: Color = Color(0xFF1E293B),
+app/src/main/java/com/example/ui/components/SmartAsyncImage.kt:43:    placeholderIconTint: Color = Color.Gray,
+app/src/main/java/com/example/ui/components/SmartAsyncImage.kt:78:                fallbackColor = fallbackPlaceholderColor,
+app/src/main/java/com/example/ui/components/SmartAsyncImage.kt:103:                        .background(fallbackPlaceholderColor),
+app/src/main/java/com/example/ui/components/SmartAsyncImage.kt:116:                    fallbackColor = fallbackPlaceholderColor,
+app/src/main/java/com/example/ui/components/SmartAsyncImage.kt:124:            fallbackColor = fallbackPlaceholderColor,
+app/src/main/java/com/example/ui/components/ProductCard.kt:141:                                val pVal = editingPrice.toDoubleOrNull() ?: product.price
+app/src/main/java/com/example/ui/components/VoiceSearch.kt:29: * ⚠️ PLACEHOLDER: هذه محاكاة للعرض التوضيحي
+app/src/main/java/com/example/ui/components/VoiceSearch.kt:30: * TODO: استبدالها بـ VoiceManager الحقيقي
+app/src/main/java/com/example/ui/components/ProviderCardDialogs.kt:635:                placeholder = { Text("اكتب تجربتك أو رأيك هنا...", fontSize = 11.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/components/ProviderCardDialogs.kt:777:                    placeholder = { Text("اكتب رأيك وتجربتك بالتفصيل هنا...", fontSize = 11.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/components/UnifiedDesignSystemComponents.kt:363:    placeholder: String = "",
+app/src/main/java/com/example/ui/components/UnifiedDesignSystemComponents.kt:372:            placeholder = { Text(placeholder, fontSize = 12.sp, color = Color(0xFF64748B)) },
+app/src/main/java/com/example/ui/components/CustomComponents.kt:454:fun DetailedProviderPlaceholderCard(themeColors: VisualThemePalette) {
+app/src/main/java/com/example/ui/components/CustomComponents.kt:459:            .testTag("provider_detail_placeholder_card"),
+app/src/main/java/com/example/ui/components/UnifiedSearch.kt:65:                    placeholder = {
+app/src/main/java/com/example/ui/components/FlexibleCatalogUploader.kt:263:                            placeholder = { Text("https://drive.google.com/...", fontSize = 10.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/components/ReviewInput.kt:144:                    placeholder = { Text("كيف كانت تجربتك مع هذه الخدمة؟") },
+app/src/main/java/com/example/ui/components/AdminCustomBannerView.kt:161:                            // Load from remote URL or show decorative placeholder
+app/src/main/java/com/example/ui/components/ProductAttachmentsSection.kt:598:                        placeholder = { Text("مثال: خصم الصيف 20%", fontSize = 11.sp, color = Color.Gray) },
+app/src/main/java/com/example/ui/components/ProductAttachmentsSection.kt:641:                                    val orig = originalPriceInput.toDoubleOrNull() ?: 10000.0
+app/src/main/java/com/example/ui/components/ProductAttachmentsSection.kt:642:                                    val dis = pct.toDoubleOrNull() ?: 10.0
+app/src/main/java/com/example/ui/components/ProductAttachmentsSection.kt:662:                                val orig = it.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/components/ProductAttachmentsSection.kt:663:                                val dis = percentInput.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/components/ProductAttachmentsSection.kt:741:                                    originalPrice = originalPriceInput.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/components/ProductAttachmentsSection.kt:742:                                    offerPrice = offerPriceInput.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/viewmodels/AdminViewModel.kt:341:            val propPrice = try { request.chatRecipientId.toDouble() } catch(e: Exception) { 0.0 }
+app/src/main/java/com/example/ui/viewmodels/SettingsViewModel.kt:649:                obj.put("rating", prov.rating.toDouble())
+app/src/main/java/com/example/ui/viewmodels/BookingViewModel.kt:315:                    discountPercent = coupon.discountPercentage.toDouble()
+app/src/main/java/com/example/ui/AdvancedPanelsAndDashboards.kt:306:                onValueChange = { minRating = it.toDouble() },
+app/src/main/java/com/example/ui/AppLocalization.kt:42:    val searchPlaceholder: String = "بحث عن خدمة، مركز تجاري، أو عقار...",
+app/src/main/java/com/example/ui/AppLocalization.kt:101:    searchPlaceholder = "بحث عن خدمة، مركز تجاري، أو عقار...",
+app/src/main/java/com/example/ui/AppLocalization.kt:160:    searchPlaceholder = "Search for service, mall, or real estate...",
+app/src/main/java/com/example/ui/UnifiedUIStateComponents.kt:244:// 6. 💀 Skeleton Shimmer / Placeholder Loading Screens (Services, Restaurants, Jobs)
+app/src/main/java/com/example/ui/UnifiedUIStateComponents.kt:247:fun SkeletonPlaceholderCard(
+app/src/main/java/com/example/ui/UnifiedUIStateComponents.kt:265:            // Placeholder Image Box
+app/src/main/java/com/example/ui/UnifiedUIStateComponents.kt:274:            // Text placeholders
+app/src/main/java/com/example/ui/UnifiedUIStateComponents.kt:293:                // Bottom badge placeholder
+app/src/main/java/com/example/ui/UnifiedUIStateComponents.kt:315:            SkeletonPlaceholderCard(themeColors = themeColors)
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:154:                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:162:                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:163:                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:230:                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:234:                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:235:                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:291:                                price = doc.getDouble("price") ?: doc.getLong("price")?.toDouble() ?: 0.0,
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:298:                                rating = (doc.getDouble("rating") ?: doc.getLong("rating")?.toDouble() ?: 5.0).toFloat(),
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:302:                                latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
+app/src/main/java/com/example/ui/helpers/RealtimeSyncHelper.kt:303:                                longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
+app/src/main/java/com/example/ui/CreateBookingScreen.kt:238:                placeholder = { Text("مثال: أحمد محمد علي") },
+app/src/main/java/com/example/ui/CreateBookingScreen.kt:253:                placeholder = { Text("77XXXXXXX أو 73XXXXXXX") },
+app/src/main/java/com/example/ui/CreateBookingScreen.kt:300:                    placeholder = { Text("مثال: شارع الستين") },
+app/src/main/java/com/example/ui/CreateBookingScreen.kt:438:                placeholder = { Text("اكتب أي تفاصيل إضافية لمساعدة الفني...") },
+app/src/main/java/com/example/ui/CreateBookingScreen.kt:452:                placeholder = { Text("مثال: 1234") },
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:576:                    placeholder = { Text(if (isEn) "Search for store name or service..." else "ابحث عن اسم المتجر أو الخدمة المعروضة...", fontSize = 12.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:1306:                    placeholder = { Text(if (isEn) "Search for apartment, building, land..." else "ابحث عن شقة، عمارة، أرض، دكان...", fontSize = 12.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:2594:                                        singleNewPriceInput.toDoubleOrNull() ?: prod.price
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:2596:                                        val pct = percentInput.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:2605:                                val pct = percentInput.toDoubleOrNull() ?: 0.0
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:2742:                                    price = priceStr.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:3032:                                placeholder = { Text("اكتب سؤالك أو تعليقك...", fontSize = 11.sp, color = themeColors.textSecondary) },
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:4020:                                price = priceInput.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:4158:                    placeholder = { Text("أدخل الشروط والتعليمات لتسجيل المحلات والمطاعم...", fontSize = 10.sp) },
+app/src/main/java/com/example/ui/StoresRealEstateComponents.kt:4170:                    placeholder = { Text("أدخل شروط ووثائق إدراج العقارات والأراضي الحاكمة للتفعيل...", fontSize = 10.sp) },
+app/src/main/java/com/example/ui/AdminDeletedEntitiesPanel.kt:105:                        item { EmptyDeletedPlaceholder("لا توجد محلات أو أنشطة محذوفة ناعماً") }
+app/src/main/java/com/example/ui/AdminDeletedEntitiesPanel.kt:125:                        item { EmptyDeletedPlaceholder("لا يوجد فنيون أو مهنيون محذوفون ناعماً") }
+app/src/main/java/com/example/ui/AdminDeletedEntitiesPanel.kt:145:                        item { EmptyDeletedPlaceholder("لا توجد عقارات محذوفة ناعماً") }
+app/src/main/java/com/example/ui/AdminDeletedEntitiesPanel.kt:165:                        item { EmptyDeletedPlaceholder("لا توجد إعلانات وظائف محذوفة ناعماً") }
+app/src/main/java/com/example/ui/AdminDeletedEntitiesPanel.kt:293:private fun EmptyDeletedPlaceholder(message: String) {
+app/src/main/java/com/example/utils/DirectChatAndAgoraManager.kt:207:                    placeholder = { Text("اكتب رسالة...") },
+app/src/main/java/com/example/utils/ChatValidationUtils.kt:39:            val sizeMb = String.format("%.1f", fileSize.toDouble() / (1024 * 1024))
+app/src/main/java/com/example/utils/CrossFuzzySearchEngine.kt:188:            placeholder = { Text("بحث متسامح بالأخطاء الإملائية (فنيون، محلات، مقالات)...") },
+app/src/main/java/com/example/utils/CrossFuzzySearchEngine.kt:231:                    EmptyResultPlaceholder("لا توجد نتائج فنيين مطابقة للبحث")
+app/src/main/java/com/example/utils/CrossFuzzySearchEngine.kt:268:                    EmptyResultPlaceholder("لا توجد محلات أو مراكز مطابقة للبحث")
+app/src/main/java/com/example/utils/CrossFuzzySearchEngine.kt:302:                    EmptyResultPlaceholder("لا توجد مقالات أو حلول مطابقة")
+app/src/main/java/com/example/utils/CrossFuzzySearchEngine.kt:339:private fun EmptyResultPlaceholder(text: String) {
+app/src/main/java/com/example/utils/FirebaseStorageQuotaGuard.kt:20:        get() = ((totalUsedBytes.toDouble() / maxSparkLimitBytes.toDouble()) * 100).toFloat().coerceIn(0f, 100f)
+app/src/main/java/com/example/utils/ImageAndCacheOptimizer.kt:15:            size.toDouble() / (1024.0 * 1024.0)
+app/src/main/java/com/example/utils/AnalyticsAndReportingEngine.kt:17: * ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
+app/src/main/java/com/example/utils/AnalyticsAndReportingEngine.kt:18: * TODO: استبدالها ببيانات حقيقية من Firestore في المستقبل
+app/src/main/java/com/example/utils/AnalyticsAndReportingEngine.kt:25:    // ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
+app/src/main/java/com/example/utils/AnalyticsAndReportingEngine.kt:26:    // TODO: استبدالها بمؤشرات حقيقية مستعلمة من Firestore في المستقبل
+app/src/main/java/com/example/utils/AnalyticsAndReportingEngine.kt:38:    // ⚠️ PLACEHOLDER: هذه البيانات ثابتة حالياً لأغراض العرض التوضيحي
+app/src/main/java/com/example/utils/AnalyticsAndReportingEngine.kt:39:    // TODO: استبدالها بمؤشرات أداء حقيقية للمزود مستعلمة من Firestore في المستقبل
+app/src/main/java/com/example/data/models/AdminSettingsEntity.kt:405:                        originalPrice = p.getOrElse(4) { "0" }.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/data/models/AdminSettingsEntity.kt:406:                        offerPrice = p.getOrElse(5) { "0" }.toDoubleOrNull() ?: 0.0,
+app/src/main/java/com/example/data/models/BookingEntity.kt:24:    val bookingNumber: String = "",      // BK-YYMMDDHHMMSS-XXXX

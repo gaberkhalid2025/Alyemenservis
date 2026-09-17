@@ -360,8 +360,7 @@ fun ProviderCard(
             viewModel = viewModel,
             themeColors = themeColors,
             onDismiss = { showGuestRegisterDialogForBooking = false },
-            onRegisterCompleted = { name, phone, residence, password ->
-                viewModel.registerGuestUser(context, name, phone, residence, password)
+            onRegisterCompleted = { _, _, _, _ ->
                 showGuestRegisterDialogForBooking = false
                 showBookingDialog = true
             }

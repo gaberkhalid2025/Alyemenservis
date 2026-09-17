@@ -19,19 +19,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
+import com.example.data.repositories.StaffMember
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
 import android.util.Log
-
-data class StaffMember(
-    val id: String = "",
-    val ownerId: String = "",
-    val name: String = "",
-    val role: String = "", // مدير فرع / فني ميداني / كاشير / استقبال
-    val phone: String = "",
-    val canEditPrices: Boolean = false,
-    val canChat: Boolean = true
-)
 
 /**
  * 👥 StaffManager (إدارة الموظفين وفريق العمل والصلاحيات)
@@ -40,6 +31,7 @@ data class StaffMember(
 @Composable
 fun StaffManager(
     ownerId: String = "",
+    viewModel: com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory { override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T { return com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel(ownerId) as T } }),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
@@ -47,22 +39,9 @@ fun StaffManager(
         mutableStateOf<List<StaffMember>>(emptyList())
     }
 
-    LaunchedEffect(ownerId) {
-        val query = if (ownerId.isNotBlank()) {
-            FirebaseFirestore.getInstance()
-                .collection("staff")
-                .whereEqualTo("ownerId", ownerId)
-        } else {
-            FirebaseFirestore.getInstance()
-                .collection("staff")
-        }
-        query.addSnapshotListener { snap, _ ->
-            if (snap != null) {
-                staffList = snap.documents.mapNotNull { doc ->
-                    doc.toObject(StaffMember::class.java)?.copy(id = doc.id)
-                }
-            }
-        }
+    val staffState by viewModel.staff.collectAsState()
+    LaunchedEffect(staffState) {
+        staffList = staffState
     }
 
     var showAddDialog by remember { mutableStateOf(false) }

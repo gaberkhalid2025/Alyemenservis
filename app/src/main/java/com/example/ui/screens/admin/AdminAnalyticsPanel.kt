@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.viewmodels.AdminViewModel
 import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.util.Locale
 
 /**
  * 📊 AdminAnalyticsPanel
@@ -37,7 +39,7 @@ fun AdminAnalyticsPanel(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val numberFormat = remember { DecimalFormat("#,###") }
+    val numberFormat = remember { DecimalFormat("#,###", DecimalFormatSymbols(Locale.US)) }
     var selectedPeriod by remember { mutableStateOf("MONTH") } // TODAY, WEEK, MONTH, YEAR
 
     val stats = adminViewModel.getSystemStats()
@@ -135,8 +137,8 @@ fun AdminAnalyticsPanel(
                 // إجمالي المستخدمين
                 StatMetricCard(
                     title = "إجمالي المستخدمين",
-                    value = "${stats.totalUsers + 1280}",
-                    trend = "+14.2%",
+                    value = "${stats.totalUsers}",
+                    trend = "",
                     icon = Icons.Default.Person,
                     bgColor = Color(0xFFE0F2FE),
                     iconColor = Color(0xFF0288D1),
@@ -145,8 +147,8 @@ fun AdminAnalyticsPanel(
                 // الفنيين المعتمدين
                 StatMetricCard(
                     title = "الفنيين المعتمدين",
-                    value = "${stats.totalProviders + 340}",
-                    trend = "+8.5%",
+                    value = "${stats.totalProviders}",
+                    trend = "",
                     icon = Icons.Default.CheckCircle,
                     bgColor = Color(0xFFE8F5E9),
                     iconColor = Color(0xFF2E7D32),
@@ -158,8 +160,8 @@ fun AdminAnalyticsPanel(
                 // إجمالي الحجوزات والطلبات
                 StatMetricCard(
                     title = "إجمالي الحجوزات",
-                    value = "${bookingStats.total + 5120}",
-                    trend = "+22.4%",
+                    value = "${bookingStats.total}",
+                    trend = "",
                     icon = Icons.Default.List,
                     bgColor = Color(0xFFFFF3E0),
                     iconColor = Color(0xFFE65100),
@@ -168,8 +170,8 @@ fun AdminAnalyticsPanel(
                 // الإيرادات والعمولات
                 StatMetricCard(
                     title = "إجمالي الإيرادات",
-                    value = "${numberFormat.format(revenueStats.totalRevenue + 4500000)} ر.ي",
-                    trend = "+18.0%",
+                    value = "${numberFormat.format(revenueStats.totalRevenue)} ر.ي",
+                    trend = "",
                     icon = Icons.Default.Star,
                     bgColor = Color(0xFFF3E5F5),
                     iconColor = Color(0xFF7B1FA2),

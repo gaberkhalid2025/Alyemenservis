@@ -288,6 +288,12 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
             apply()
         }
+        try {
+            com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().setUserId(_currentUserId.value)
+            com.google.firebase.crashlytics.FirebaseCrashlytics.getInstance().log("Session updated for user ${_currentUserId.value}")
+        } catch (e: Exception) {
+            // تجاهل في بيئات الاختبار
+        }
     }
 
     fun loginUserDirectly(context: Context, phone: String, password: String) {
@@ -421,5 +427,31 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     fun removeSupervisor(id: String) {
         db.collection("supervisors").document(id).delete()
         triggerToast("🗑️ تم إلغاء صلاحية المشرف بنجاح")
+    }
+
+    data class PasswordRecoveryStatus(val status: String = "", val tempPassword: String = "")
+
+    private val _passwordRecoveryStatus = MutableStateFlow(PasswordRecoveryStatus())
+    val passwordRecoveryStatus: StateFlow<PasswordRecoveryStatus> = _passwordRecoveryStatus.asStateFlow()
+
+    private var passwordRecoveryStatusListener: com.google.firebase.firestore.ListenerRegistration? = null
+
+    fun listenToPasswordRecoveryStatus(phone: String) {
+        passwordRecoveryStatusListener?.remove()
+        val cleanPhone = phone.trim().replace(" ", "")
+        passwordRecoveryStatusListener = db.collection("password_resets").document(cleanPhone)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) return@addSnapshotListener
+                if (snapshot != null && snapshot.exists()) {
+                    val status = snapshot.getString("status") ?: "PENDING"
+                    val temp = snapshot.getString("tempPassword") ?: snapshot.getString("newPassword") ?: ""
+                    _passwordRecoveryStatus.value = PasswordRecoveryStatus(status, temp)
+                }
+            }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        passwordRecoveryStatusListener?.remove()
     }
 }

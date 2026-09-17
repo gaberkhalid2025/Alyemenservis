@@ -187,7 +187,7 @@ fun ProviderForm(
             )
 
             // 5. City Dropdown
-            val cities = listOf("صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت")
+            val cities = com.example.domain.YemenCities.MAIN_CITIES
             var expandedCity by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = expandedCity,

@@ -2809,4 +2809,37 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
         _systemLogs.value = emptyList()
     }
 
+    private val _passwordRecoveryRequests = MutableStateFlow<List<Map<String, Any>>>(emptyList())
+    val passwordRecoveryRequests: StateFlow<List<Map<String, Any>>> = _passwordRecoveryRequests.asStateFlow()
+
+    private var passwordRecoveryListenerRegistration: ListenerRegistration? = null
+
+    init {
+        listenToPasswordRecoveryRequests()
+    }
+
+    private fun listenToPasswordRecoveryRequests() {
+        passwordRecoveryListenerRegistration?.remove()
+        passwordRecoveryListenerRegistration = db.collection("password_recovery_requests")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, err ->
+                if (err == null && snap != null) {
+                    try {
+                        val requests = snap.documents.mapNotNull { doc ->
+                            val m = doc.data?.toMutableMap() ?: return@mapNotNull null
+                            m["id"] = doc.id
+                            m
+                        }
+                        _passwordRecoveryRequests.value = requests
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        passwordRecoveryListenerRegistration?.remove()
+    }
 }

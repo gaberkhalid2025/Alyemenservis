@@ -41,3 +41,42 @@ interface IGalleryRepository {
     suspend fun saveGalleryAlbum(album: GalleryAlbumEntity): Result<String>
     suspend fun deleteGalleryAlbum(albumId: String): Result<Unit>
 }
+
+data class InventoryItem(
+    val id: String = "",
+    val ownerId: String = "",
+    val sku: String = "",
+    val name: String = "",
+    val quantity: Int = 0,
+    val minThreshold: Int = 5,
+    val price: Double = 0.0,
+    val inStock: Boolean = true
+)
+
+data class LoyaltyProgram(
+    val id: String = "",
+    val ownerId: String = "",
+    val name: String = "",
+    val pointsRequired: Int = 100,
+    val rewardDescription: String = "",
+    val discountValue: Double = 0.0,
+    val isEnabled: Boolean = true
+)
+
+data class StaffMember(
+    val id: String = "",
+    val ownerId: String = "",
+    val name: String = "",
+    val role: String = "",
+    val phone: String = "",
+    val canEditPrices: Boolean = false,
+    val canChat: Boolean = true
+)
+
+interface IDashboardExtensionsRepository {
+    fun getSpecialOffers(ownerId: String): Flow<List<com.example.data.SpecialOfferEntity>>
+    fun getCoupons(ownerId: String): Flow<List<com.example.data.SpecialOfferEntity>>
+    fun getInventory(ownerId: String): Flow<List<InventoryItem>>
+    fun getLoyaltyPrograms(ownerId: String): Flow<List<LoyaltyProgram>>
+    fun getStaff(ownerId: String): Flow<List<StaffMember>>
+}

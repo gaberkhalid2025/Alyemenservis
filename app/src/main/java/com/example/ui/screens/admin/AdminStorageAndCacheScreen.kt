@@ -41,6 +41,7 @@ import com.example.data.models.*
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import com.example.ui.screens.admin.components.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun AdminStorageAndCacheScreenContent(
@@ -56,6 +57,11 @@ fun AdminStorageAndCacheScreenContent(
     var sectionToWipe by remember { mutableStateOf<Pair<String, String>?>(null) } // CollectionName to DisplayTitle
     var inputAdminPassword by remember { mutableStateOf("") }
     var isPasswordError by remember { mutableStateOf(false) }
+    var isDeleting by remember { mutableStateOf(false) }
+    var deletionProgress by remember { mutableStateOf(0f) }
+    var deletionProgressText by remember { mutableStateOf("") }
+    val dataRepo: com.example.data.repositories.IDataManagementRepository = remember { com.example.data.repositories.DataManagementRepositoryImpl() }
+    val coroutineScope = rememberCoroutineScope()
 
     val stores by viewModel.stores.collectAsState()
     val properties by viewModel.properties.collectAsState()
@@ -178,29 +184,49 @@ fun AdminStorageAndCacheScreenContent(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "تحذير: هذه العملية ستقوم بحذف وتصفية كافة البيانات المسجلة في $title بشكل نهائي من السيرفر. تجنباً للحذف الخاطئ، يرجى إدخال كلمة مرور الأدمن للتأكيد:",
+                        text = "تحذير: هذه العملية ستقوم بحذف وتصفية كافة البيانات المسجلة في $title بشكل نهائي من السيرفر على دفعات آمنة مع تسجيل تدقيق العملية. تجنباً للحذف الخاطئ، يرجى إدخال كلمة مرور الأدمن للتأكيد:",
                         color = Color.LightGray,
                         fontSize = 11.5.sp
                     )
 
-                    OutlinedTextField(
-                        value = inputAdminPassword,
-                        onValueChange = {
-                            inputAdminPassword = it
-                            isPasswordError = false
-                        },
-                        label = { Text("كلمة مرور الأدمن (Admin Password)") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        isError = isPasswordError,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color.Red,
-                            unfocusedBorderColor = Color.LightGray
+                    if (isDeleting) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            LinearProgressIndicator(
+                                progress = { deletionProgress },
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                                color = Color.Red,
+                                trackColor = Color.DarkGray,
+                            )
+                            Text(
+                                text = deletionProgressText,
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = inputAdminPassword,
+                            onValueChange = {
+                                inputAdminPassword = it
+                                isPasswordError = false
+                            },
+                            label = { Text("كلمة مرور الأدمن (Admin Password)") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            isError = isPasswordError,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color.Red,
+                                unfocusedBorderColor = Color.LightGray
+                            )
                         )
-                    )
+                    }
 
                     if (isPasswordError) {
                         Text("❌ كلمة المرور غير صحيحة! تم إيقاف عملية الحذف.", color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -210,40 +236,53 @@ fun AdminStorageAndCacheScreenContent(
             confirmButton = {
                 Button(
                     onClick = {
+                        if (isDeleting) return@Button
                         if (viewModel.verifyAdminOrOwnerPassword(inputAdminPassword)) {
-                            // مسح القسم من Firestore
-                            val targetCol = if (colId == "restaurants" || colId == "medical") "stores" else colId
-                            viewModel.db.collection(targetCol).get()
-                                .addOnSuccessListener { snapshot ->
-                                    val batch = viewModel.db.batch()
-                                    snapshot.documents.forEach { doc ->
-                                        if (colId == "restaurants") {
-                                            val sec = doc.getString("sectionId") ?: ""
-                                            if (sec == "restaurants") batch.delete(doc.reference)
-                                        } else if (colId == "medical") {
-                                            val sec = doc.getString("sectionId") ?: ""
-                                            if (sec == "medical") batch.delete(doc.reference)
-                                        } else {
-                                            batch.delete(doc.reference)
+                            isDeleting = true
+                            deletionProgress = 0f
+                            deletionProgressText = "جاري بدء عملية الحذف الآمن بالدفعات..."
+                            coroutineScope.launch {
+                                val result = dataRepo.wipeCollectionInBatches(
+                                    collectionName = colId,
+                                    performedBy = viewModel.adminRole.value,
+                                    onProgress = { deleted, total ->
+                                        if (total > 0) {
+                                            deletionProgress = deleted.toFloat() / total.toFloat()
+                                            deletionProgressText = "تم حذف $deleted من إجمالي $total عنصر (${(deletionProgress * 100).toInt()}%)"
                                         }
                                     }
-                                    batch.commit().addOnSuccessListener {
-                                        Toast.makeText(context, "💥 تم مسح وتصفية بيانات $title بالكامل بنجاح!", Toast.LENGTH_LONG).show()
-                                        sectionToWipe = null
-                                    }
+                                )
+                                isDeleting = false
+                                if (result.isSuccess) {
+                                    val count = result.getOrDefault(0)
+                                    Toast.makeText(context, "💥 تم مسح $count سجل من بيانات $title بالكامل بنجاح!", Toast.LENGTH_LONG).show()
+                                    sectionToWipe = null
+                                } else {
+                                    val err = result.exceptionOrNull()?.localizedMessage ?: "خطأ غير متوقع"
+                                    Toast.makeText(context, "❌ حدث خطأ أثناء الحذف: $err", Toast.LENGTH_LONG).show()
                                 }
+                            }
                         } else {
                             isPasswordError = true
                         }
                     },
+                    enabled = !isDeleting,
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
-                    Text("تأكيد الحذف النهائي", color = Color.White, fontWeight = FontWeight.Bold)
+                    if (isDeleting) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("جاري الحذف...", color = Color.White)
+                    } else {
+                        Text("تأكيد الحذف النهائي", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { sectionToWipe = null }) {
-                    Text("إلغاء", color = Color.White)
+                if (!isDeleting) {
+                    TextButton(onClick = { sectionToWipe = null }) {
+                        Text("إلغاء", color = Color.White)
+                    }
                 }
             }
         )

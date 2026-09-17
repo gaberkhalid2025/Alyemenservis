@@ -205,10 +205,6 @@ fun updateBackdoorSettings(
         customBackgroundHex: String = "#0A0F0D",
         customSurfaceHex: String = "#121D18"
     ) {
-        val passHash = if (adminPassword.isNotEmpty()) {
-            if (adminPassword.length == 64 && adminPassword.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) adminPassword else com.example.utils.SecurityCryptoUtils.hashPassword(adminPassword)
-        } else _settings.value.adminPassword
-
         val updated = _settings.value.copy(
             appName = appName,
             welcomeMessage = welcomeMsg,
@@ -231,7 +227,7 @@ fun updateBackdoorSettings(
             bookingLabelArea = bookingLabelArea,
             bookingLabelService = bookingLabelService,
             adminUsername = adminUsername,
-            adminPassword = passHash,
+            adminPassword = "",
             customPrimaryHex = customPrimaryHex,
             customSecondaryHex = customSecondaryHex,
             customBackgroundHex = customBackgroundHex,
@@ -1159,7 +1155,7 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
         val (title, message) = when (notifyAction) {
             "DIRECT_PASSWORD" -> Pair(
                 "🔑 إعادة تعيين كلمة المرور بنجاح",
-                "تمت الموافقة على طلب استعادة حسابك وإعادة تعيين كلمة المرور من قبل الإدارة. كلمة المرور الجديدة هي: $newPassword"
+                "تم إعادة تعيين كلمة مرور حسابك. يرجى التواصل مع الدعم لاستلام كلمة المرور الجديدة"
             )
             "VERIFICATION_WHATSAPP" -> Pair(
                 "🔐 التحقق من الهوية - استعادة الحساب",

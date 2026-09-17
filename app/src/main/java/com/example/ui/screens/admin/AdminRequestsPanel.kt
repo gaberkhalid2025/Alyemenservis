@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ fun AdminRequestsPanel(
     var selectedTab by remember { mutableStateOf("SERVICES") }
     var rejectingRequest by remember { mutableStateOf<PendingProviderEntity?>(null) }
     var rejectionReason by remember { mutableStateOf("") }
+    var pendingDeletionTarget by remember { mutableStateOf<Triple<String, String, String>?>(null) } // type, id, title
 
     val pendingPropertiesCount = properties.count { !it.isApproved && !it.isDeleted }
     val pendingMedicalCount = stores.count { !it.isApproved && !it.isDeleted && (it.sectionId == "medical" || it.categoryId.contains("طبي") || it.categoryId.contains("عياد") || it.categoryId.equals("MEDICAL", ignoreCase = true)) } +
@@ -186,7 +188,7 @@ fun AdminRequestsPanel(
                                             Text("موافقة ونشر", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                         }
                                         Button(
-                                            onClick = { viewModel.deleteProperty(prop.id) },
+                                            onClick = { pendingDeletionTarget = Triple("PROPERTY", prop.id, prop.title) },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                                             modifier = Modifier.weight(1f)
                                         ) {
@@ -232,7 +234,7 @@ fun AdminRequestsPanel(
                                             Text("موافقة واعتماد", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                         }
                                         Button(
-                                            onClick = { viewModel.deleteStore(s.id) },
+                                            onClick = { pendingDeletionTarget = Triple("STORE", s.id, s.name) },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                                             modifier = Modifier.weight(1f)
                                         ) {
@@ -272,7 +274,7 @@ fun AdminRequestsPanel(
                                             Text("موافقة ونشر", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                         }
                                         Button(
-                                            onClick = { viewModel.deleteJob(job.id) },
+                                            onClick = { pendingDeletionTarget = Triple("JOB", job.id, job.title) },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                                             modifier = Modifier.weight(1f)
                                         ) {
@@ -320,6 +322,45 @@ fun AdminRequestsPanel(
             },
             dismissButton = {
                 TextButton(onClick = { rejectingRequest = null }) {
+                    Text("إلغاء", color = Color.White)
+                }
+            }
+        )
+    }
+
+    pendingDeletionTarget?.let { (type, targetId, title) ->
+        AlertDialog(
+            onDismissRequest = { pendingDeletionTarget = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color.Red)
+                    Text("تأكيد الحذف / الرفض", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text(
+                    text = "هل أنت متأكد من رغبتك في حذف أو رفض \"$title\" بشكل نهائي؟",
+                    color = themeColors.textSecondary,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        when (type) {
+                            "PROPERTY" -> viewModel.deleteProperty(targetId)
+                            "STORE" -> viewModel.deleteStore(targetId)
+                            "JOB" -> viewModel.deleteJob(targetId)
+                        }
+                        pendingDeletionTarget = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("نعم، حذف", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeletionTarget = null }) {
                     Text("إلغاء", color = Color.White)
                 }
             }

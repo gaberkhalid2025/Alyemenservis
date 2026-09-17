@@ -233,8 +233,12 @@ fun AdminSystemSettingsScreenContent(
             }
         }
 
+        var isSavingSettings by remember { mutableStateOf(false) }
+
         Button(
             onClick = {
+                if (isSavingSettings) return@Button
+                isSavingSettings = true
                 val st = settingsState
                 viewModel.updateBackdoorSettings(
                     appDisplayName, welcomeMessage, st.footerMessage, st.activeThemeId,
@@ -243,7 +247,7 @@ fun AdminSystemSettingsScreenContent(
                     st.chatHidden, st.chatSize, st.maxSearchRadiusKm, st.isSpeechSearchEnabled,
                     false, 90
                 )
-                viewModel.db.collection("settings").document("main_settings").update(
+                viewModel.db.collection("settings").document("main_settings").set(
                     mapOf(
                         "appVersion" to systemVersion,
                         "minRequiredVersion" to minRequiredVersion,
@@ -252,18 +256,32 @@ fun AdminSystemSettingsScreenContent(
                         "defaultLanguage" to defaultLanguage,
                         "showLangIcon" to showLanguageToggle,
                         "defaultCurrency" to defaultCurrency,
-                        "defaultThemeMode" to defaultThemeMode
-                    )
-                )
-                Toast.makeText(context, "✅ تم حفظ ومزامنة إعدادات وتفضيلات النظام سحابياً!", Toast.LENGTH_SHORT).show()
+                        "defaultThemeMode" to defaultThemeMode,
+                        "updatedAt" to System.currentTimeMillis()
+                    ),
+                    com.google.firebase.firestore.SetOptions.merge()
+                ).addOnSuccessListener {
+                    isSavingSettings = false
+                    Toast.makeText(context, "✅ تم حفظ ومزامنة إعدادات وتفضيلات النظام سحابياً!", Toast.LENGTH_SHORT).show()
+                }.addOnFailureListener { err ->
+                    isSavingSettings = false
+                    Toast.makeText(context, "❌ فشل الحفظ: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
             },
+            enabled = !isSavingSettings,
             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("💾 حفظ ومزامنة إعدادات النظام سحابياً", color = Color.Black, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+            if (isSavingSettings) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("جاري الحفظ والمزامنة...", color = Color.Black, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+            } else {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("💾 حفظ ومزامنة إعدادات النظام سحابياً", color = Color.Black, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

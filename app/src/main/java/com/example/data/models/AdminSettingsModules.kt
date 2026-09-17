@@ -75,6 +75,8 @@ data class SupportSettings(
     val supportWhatsapp: String = "777644",
     val supportEmail: String = "",
     val adminUsername: String = "",
+    @get:com.google.firebase.firestore.Exclude
+    @Deprecated("Removed for security.")
     val adminPassword: String = "",
     val ownerEmail: String = "",
     val ownerPassword: String = ""

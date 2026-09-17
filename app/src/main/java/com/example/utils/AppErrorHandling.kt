@@ -82,8 +82,8 @@ sealed class AppError(
         val detailMessage: String = "",
         override val cause: Throwable? = null
     ) : AppError(
-        messageArabic = if (detailMessage.isNotBlank()) detailMessage else "حدث خطأ غير متوقع أثناء معالجة الطلب.",
-        userActionArabic = "يرجى إغلاق الشاشة وإعادة المحاولة.",
+        messageArabic = "حدث خطأ غير متوقع أثناء معالجة الطلب.",
+        userActionArabic = "يرجى المحاولة مرة أخرى لاحقاً. (التفاصيل الفنية: ${if (detailMessage.isNotBlank()) detailMessage else "غير معروف"})",
         cause = cause
     )
 }
@@ -313,7 +313,7 @@ fun AppErrorBoundary(
                 ) {
                     Text("⚠️ حدث تعثر في عرض الشاشة", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
                     Text(
-                        text = caughtError?.message ?: "تم حماية الشاشة لتفادي توقف التطبيق.",
+                        text = "تم حماية الشاشة لتفادي توقف التطبيق. يرجى المحاولة مرة أخرى أو تحديث الصفحة.",
                         fontSize = 12.sp,
                         color = Color.LightGray,
                         textAlign = TextAlign.Center

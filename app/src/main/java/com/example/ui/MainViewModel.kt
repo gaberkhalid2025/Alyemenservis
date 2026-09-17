@@ -137,6 +137,8 @@ class MainViewModel @Inject constructor(
     val registeredUsersList get() = adminViewModel.registeredUsersList
     val _registeredUsersCount get() = adminViewModel._registeredUsersCount
     val registeredUsersCount get() = adminViewModel.registeredUsersCount
+    val _passwordRecoveryRequests get() = adminViewModel.passwordRecoveryRequests
+    val passwordRecoveryRequests get() = adminViewModel.passwordRecoveryRequests
     val _reports get() = adminViewModel._reports
     val reports get() = adminViewModel.reports
     val _activityLogs get() = adminViewModel._activityLogs

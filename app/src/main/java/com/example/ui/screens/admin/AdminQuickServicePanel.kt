@@ -42,6 +42,7 @@ fun AdminQuickServicePanel(
     }
 
     val context = LocalContext.current
+    var isSaving by remember { mutableStateOf(false) }
 
     var isQuickServiceActive by remember { mutableStateOf(true) }
     var quickServiceTitle by remember { mutableStateOf("اطلب خدمتك الفورية ⚡") }
@@ -56,6 +57,24 @@ fun AdminQuickServicePanel(
 
     var broadcastRadiusKm by remember { mutableStateOf("10") }
     var defaultResponseWindowMinutes by remember { mutableStateOf("5") }
+
+    LaunchedEffect(Unit) {
+        viewModel.db.collection("settings").document("quick_service").get()
+            .addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    isQuickServiceActive = doc.getBoolean("isQuickServiceActive") ?: true
+                    quickServiceTitle = doc.getString("quickServiceTitle") ?: "اطلب خدمتك الفورية ⚡"
+                    quickServiceDescription = doc.getString("quickServiceDescription") ?: "أرسل طلبك وسيصلك أقرب مقدم خدمة معتمد في دقائق"
+                    allowAudioRecording = doc.getBoolean("allowAudioRecording") ?: true
+                    allowImageUpload = doc.getBoolean("allowImageUpload") ?: true
+                    allowLiveLocation = doc.getBoolean("allowLiveLocation") ?: true
+                    maxImagesAllowed = doc.getString("maxImagesAllowed") ?: "3"
+                    maxAudioSeconds = doc.getString("maxAudioSeconds") ?: "60"
+                    broadcastRadiusKm = doc.getString("broadcastRadiusKm") ?: "10"
+                    defaultResponseWindowMinutes = doc.getString("defaultResponseWindowMinutes") ?: "5"
+                }
+            }
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -187,15 +206,46 @@ fun AdminQuickServicePanel(
 
             Button(
                 onClick = {
-                    viewModel.triggerNotification("✅ تم حفظ إعدادات استمارة اطلب خدمتك بنجاح")
-                    Toast.makeText(context, "تم حفظ إعدادات اطلب خدمتك بنجاح!", Toast.LENGTH_SHORT).show()
+                    if (isSaving) return@Button
+                    isSaving = true
+                    val data = mapOf<String, Any>(
+                        "isQuickServiceActive" to isQuickServiceActive,
+                        "quickServiceTitle" to quickServiceTitle.trim(),
+                        "quickServiceDescription" to quickServiceDescription.trim(),
+                        "allowAudioRecording" to allowAudioRecording,
+                        "allowImageUpload" to allowImageUpload,
+                        "allowLiveLocation" to allowLiveLocation,
+                        "maxImagesAllowed" to maxImagesAllowed.trim(),
+                        "maxAudioSeconds" to maxAudioSeconds.trim(),
+                        "broadcastRadiusKm" to broadcastRadiusKm.trim(),
+                        "defaultResponseWindowMinutes" to defaultResponseWindowMinutes.trim(),
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                    viewModel.db.collection("settings").document("quick_service")
+                        .set(data)
+                        .addOnSuccessListener {
+                            isSaving = false
+                            viewModel.triggerNotification("✅ تم حفظ وتحديث إعدادات الطلب السريع بنجاح")
+                            Toast.makeText(context, "✅ تم حفظ إعدادات اطلب خدمتك بنجاح!", Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener { err ->
+                            isSaving = false
+                            Toast.makeText(context, "❌ فشل حفظ الإعدادات: ${err.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
                 },
+                enabled = !isSaving,
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("حفظ التغييرات", color = Color.White, fontWeight = FontWeight.Bold)
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("جاري الحفظ...", color = Color.White)
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("حفظ التغييرات", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

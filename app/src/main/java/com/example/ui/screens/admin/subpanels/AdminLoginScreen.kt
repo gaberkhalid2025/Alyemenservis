@@ -21,9 +21,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 
+// DEPRECATED - Not used. Safe to remove after review.
 /**
  * 🔒 Admin Login Screen Component
+ * @deprecated Not used in main navigation flow. Authentication is unified via AdminSecurityManager and Firebase Auth.
  */
+@Deprecated("Not used in main navigation. Unified via AdminSecurityManager.")
 @Composable
 fun AdminLoginScreen(
     onLoginSuccess: () -> Unit,

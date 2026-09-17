@@ -59,37 +59,32 @@ fun ForgotPasswordRecoveryDialog(
         }
     }
 
-        DisposableEffect(phoneInput) {
-            val cleanPhone = phoneInput.trim().replace(" ", "")
-            val listener = viewModel.db.collection("password_resets").document(cleanPhone)
-                .addSnapshotListener { snapshot, e ->
-                    if (e != null) return@addSnapshotListener
-                    if (snapshot != null && snapshot.exists()) {
-                        val status = snapshot.getString("status") ?: "PENDING"
-                        resetStatus = status
-                        if (status == "APPROVED") {
-                            tempPassword = snapshot.getString("tempPassword") ?: snapshot.getString("newPassword") ?: ""
-                            sharedPrefs.edit().clear().apply()
-                        } else if (status == "REJECTED") {
-                            sharedPrefs.edit().clear().apply()
-                        }
-                    }
-                }
-            
-            // Timeout logic
-            val timeoutJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                kotlinx.coroutines.delay(5 * 60 * 1000) // 5 minutes timeout
-                if (resetStatus == "PENDING") {
-                    resetStatus = "TIMEOUT"
-                    sharedPrefs.edit().clear().apply()
-                }
-            }
-
-            onDispose {
-                listener.remove()
-                timeoutJob.cancel()
+    val recoveryStatus by viewModel.authViewModel.passwordRecoveryStatus.collectAsState()
+    
+    LaunchedEffect(recoveryStatus) {
+        if (recoveryStatus.status.isNotBlank()) {
+            resetStatus = recoveryStatus.status
+            if (resetStatus == "APPROVED") {
+                tempPassword = recoveryStatus.tempPassword
+                sharedPrefs.edit().clear().apply()
+            } else if (resetStatus == "REJECTED" || resetStatus == "TIMEOUT") {
+                sharedPrefs.edit().clear().apply()
             }
         }
+    }
+
+    LaunchedEffect(phoneInput) {
+        if (phoneInput.isNotBlank()) {
+            viewModel.authViewModel.listenToPasswordRecoveryStatus(phoneInput)
+            // Timeout logic
+            kotlinx.coroutines.delay(5 * 60 * 1000) // 5 minutes timeout
+            if (resetStatus == "PENDING") {
+                resetStatus = "TIMEOUT"
+                sharedPrefs.edit().clear().apply()
+            }
+        }
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(16.dp),

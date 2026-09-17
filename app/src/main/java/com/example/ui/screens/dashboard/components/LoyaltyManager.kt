@@ -18,19 +18,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
+import com.example.data.repositories.LoyaltyProgram
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
 import android.util.Log
-
-data class LoyaltyProgram(
-    val id: String = "",
-    val ownerId: String = "",
-    val name: String = "",
-    val pointsRequired: Int = 100,
-    val rewardDescription: String = "",
-    val discountValue: Double = 0.0,
-    val isEnabled: Boolean = true
-)
 
 /**
  * 🎁 LoyaltyManager (إدارة برامج الولاء ونقاط المكافآت)
@@ -39,6 +30,7 @@ data class LoyaltyProgram(
 @Composable
 fun LoyaltyManager(
     ownerId: String = "",
+    viewModel: com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory { override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T { return com.example.ui.screens.dashboard.viewmodels.DashboardExtensionsViewModel(ownerId) as T } }),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
@@ -46,22 +38,9 @@ fun LoyaltyManager(
         mutableStateOf<List<LoyaltyProgram>>(emptyList())
     }
 
-    LaunchedEffect(ownerId) {
-        val query = if (ownerId.isNotBlank()) {
-            FirebaseFirestore.getInstance()
-                .collection("loyalty_programs")
-                .whereEqualTo("ownerId", ownerId)
-        } else {
-            FirebaseFirestore.getInstance()
-                .collection("loyalty_programs")
-        }
-        query.addSnapshotListener { snap, _ ->
-            if (snap != null) {
-                programs = snap.documents.mapNotNull { doc ->
-                    doc.toObject(LoyaltyProgram::class.java)?.copy(id = doc.id)
-                }
-            }
-        }
+    val loyaltyState by viewModel.loyaltyPrograms.collectAsState()
+    LaunchedEffect(loyaltyState) {
+        programs = loyaltyState
     }
 
     var showAddDialog by remember { mutableStateOf(false) }

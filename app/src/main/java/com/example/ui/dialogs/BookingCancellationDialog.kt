@@ -31,7 +31,6 @@ import com.example.utils.BookingStateMachine
  * نافذة حوارية مؤمنة لإلغاء الحجز مع التحقق من الرمز السري وقاعدة الـ 8 ساعات وحظر المحاولات الفاشلة.
  *
  * ⚠️ ملاحظة معمارية: هذا الحوار يستخدم Firestore مباشرة لتسجيل قفل الحجز عند استنفاد المحاولات.
- * TODO: نقل منطق Firestore إلى BookingViewModel في المستقبل.
  * القفل الحالي يعمل بشكل صحيح وآمن ولا يحتاج تغييراً عاجلاً.
  */
 @Composable
@@ -39,7 +38,8 @@ fun BookingCancellationDialog(
     booking: BookingEntity,
     userRole: String = "CLIENT", // "CLIENT", "PROVIDER", "ADMIN"
     onDismiss: () -> Unit,
-    onConfirmCancel: (password: String, reason: String) -> Unit
+    onConfirmCancel: (password: String, reason: String) -> Unit,
+    viewModel: com.example.ui.viewmodels.BookingViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     var passwordInput by remember { mutableStateOf("") }
     var reasonInput by remember { mutableStateOf("") }
@@ -239,17 +239,11 @@ fun BookingCancellationDialog(
                                     attemptsLeft--
                                     if (attemptsLeft <= 0) {
                                         errorMessage = "تم قفل الحجز بعد 3 محاولات خاطئة!"
-                                        try {
-                                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                                .collection("bookings").document(booking.id)
-                                                .update(
-                                                    mapOf(
-                                                        "isLocked" to true,
-                                                        "lockedUntil" to System.currentTimeMillis() + (8 * 60 * 60 * 1000L)
-                                                    )
-                                                )
-                                        } catch (e: Exception) {
-                                            e.printStackTrace()
+                                        val lockDurationMs = 8 * 60 * 60 * 1000L
+                                        viewModel.lockBookingAfterFailedAttempts(booking.id, lockDurationMs) { success ->
+                                            if (!success) {
+                                                errorMessage = "فشل في قفل الحجز. يرجى التحقق من اتصالك بالإنترنت."
+                                            }
                                         }
                                     } else {
                                         errorMessage = "كلمة المرور غير صحيحة! متبقي $attemptsLeft محاولات."

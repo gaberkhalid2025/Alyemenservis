@@ -23,12 +23,12 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AdminVoiceCallPanel(
-    viewModel: MainViewModel? = null,
-    themeColors: VisualThemePalette? = null
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette
 ) {
-    val cardBg = themeColors?.surface ?: Color(0xFF1E293B)
-    val textColor = themeColors?.textPrimary ?: Color.White
-    val primaryColor = themeColors?.primary ?: Color(0xFF0D9488)
+    val cardBg = themeColors.surface
+    val textColor = themeColors.textPrimary
+    val primaryColor = themeColors.primary
 
     var voiceCallsEnabled by remember { mutableStateOf(false) } // معطل افتراضياً لتوفير الحجم
     var highQualityAudio by remember { mutableStateOf(false) }

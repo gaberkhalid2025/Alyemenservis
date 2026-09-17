@@ -187,7 +187,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     val sp = remember { context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
     var rememberLoginInput by remember { mutableStateOf(sp.getString("saved_admin_role", "GUEST") != "GUEST") }
     var adminUsernameInput by remember { mutableStateOf(settingsState.adminUsername) }
-    var adminPasswordInput by remember { mutableStateOf(settingsState.adminPassword) }
 
     val galleryLauncherForBanner = rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
@@ -873,23 +872,17 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
         )
 
         Divider(color = themeColors.accent.copy(alpha = 0.3f), thickness = 1.dp)
-        Text("🔐 بيانات المدير (Admin) والدخول:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+        Text("🔐 بيانات المدير (Admin) والمصادقة الآمنة:", fontSize = 12.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
 
         OutlinedTextField(
             value = adminUsernameInput,
             onValueChange = { adminUsernameInput = it },
-            label = { Text("اسم مستخدم المدير") },
+            label = { Text("معرّف/بريد المدير (للقراءة فقط)") },
             modifier = Modifier.fillMaxWidth(),
+            readOnly = true,
             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
         )
-
-        OutlinedTextField(
-            value = adminPasswordInput,
-            onValueChange = { adminPasswordInput = it },
-            label = { Text("كلمة مرور المدير") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-        )
+        Text("🔒 تتم إدارة المصادقة وكلمات المرور للمدير بشكل مشفر عبر Firebase Auth للحماية القصوى.", fontSize = 10.5.sp, color = Color.Gray)
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1259,7 +1252,6 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     bookingLabelArea = bookingLabelAreaInput,
                     bookingLabelService = bookingLabelServiceInput,
                     adminUsername = adminUsernameInput,
-                    adminPassword = adminPasswordInput,
                     aboutCoverType = aboutCoverType,
                     aboutCoverContent = aboutCoverContent,
                     aboutCoverBase64 = aboutCoverBase64,

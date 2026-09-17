@@ -54,7 +54,7 @@ fun AdminMapPanel(
     var selectedTypeFilter by remember { mutableStateOf("ALL") } // ALL, PROVIDER, STORE, RESTAURANT, MEDICAL, PROPERTY
     var searchQuery by remember { mutableStateOf("") }
 
-    val yemeniCities = listOf("الكل", "صنعاء", "عدن", "تعز", "إب", "الحديدة", "حضرموت", "مأرب", "ذمار")
+    val yemeniCities = com.example.domain.YemenCities.listWithAll
 
     val totalProvidersWithGps = providers.count { it.latitude != 0.0 && it.longitude != 0.0 }
     val totalStoresWithGps = stores.count { it.latitude != 0.0 && it.longitude != 0.0 }

@@ -1,5 +1,7 @@
 package com.example.ui.screens.admin
 
+// ⚠️ Sensitive keys (banking, payment) must be stored in Cloud Functions Secrets, not Firestore
+
 import android.widget.Toast
 import com.example.ui.*
 import androidx.compose.foundation.BorderStroke
@@ -38,18 +40,24 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.*
 import com.example.data.models.*
+import com.example.data.repositories.ApiKeyRepositoryImpl
+import com.example.data.repositories.ApiKeysEntity
+import com.example.data.repositories.IApiKeyRepository
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 import com.example.ui.screens.admin.components.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun AdminApiKeysScreenContent(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    apiKeyRepository: IApiKeyRepository = remember { ApiKeyRepositoryImpl() }
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
 
     var geminiApiKey by remember { mutableStateOf("") }
     var openaiApiKey by remember { mutableStateOf("") }
@@ -77,24 +85,20 @@ fun AdminApiKeysScreenContent(
     var newKeyEndpoint by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
-        viewModel.db.collection("settings").document("api_keys").get()
-            .addOnSuccessListener { doc ->
-                if (doc != null && doc.exists()) {
-                    geminiApiKey = doc.getString("geminiApiKey") ?: ""
-                    openaiApiKey = doc.getString("openaiApiKey") ?: ""
-                    selectedAiModel = doc.getString("selectedAiModel") ?: "gemini-1.5-flash"
-                    googleMapsKey = doc.getString("googleMapsKey") ?: ""
-                    mapboxKey = doc.getString("mapboxKey") ?: ""
-                    selectedMapEngine = doc.getString("selectedMapEngine") ?: "OPEN_STREET_MAP"
-                    kuraimiToken = doc.getString("kuraimiToken") ?: ""
-                    jawwalPayKey = doc.getString("jawwalPayKey") ?: ""
-                    floosakKey = doc.getString("floosakKey") ?: ""
-                    oneCashKey = doc.getString("oneCashKey") ?: ""
-                    webhookUrl = doc.getString("webhookUrl") ?: ""
-                    whatsappToken = doc.getString("whatsappToken") ?: ""
-                    smsGatewayKey = doc.getString("smsGatewayKey") ?: ""
-                }
-            }
+        val keys = apiKeyRepository.getApiKeys()
+        geminiApiKey = keys.geminiApiKey
+        openaiApiKey = keys.openaiApiKey
+        selectedAiModel = keys.selectedAiModel
+        googleMapsKey = keys.googleMapsKey
+        mapboxKey = keys.mapboxKey
+        selectedMapEngine = keys.selectedMapEngine
+        kuraimiToken = keys.kuraimiToken
+        jawwalPayKey = keys.jawwalPayKey
+        floosakKey = keys.floosakKey
+        oneCashKey = keys.oneCashKey
+        webhookUrl = keys.webhookUrl
+        whatsappToken = keys.whatsappToken
+        smsGatewayKey = keys.smsGatewayKey
     }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -342,24 +346,31 @@ fun AdminApiKeysScreenContent(
         // زر الحفظ والمزامنة الفورية السحابية
         Button(
             onClick = {
-                val data = mapOf(
-                    "geminiApiKey" to geminiApiKey,
-                    "openaiApiKey" to openaiApiKey,
-                    "selectedAiModel" to selectedAiModel,
-                    "googleMapsKey" to googleMapsKey,
-                    "mapboxKey" to mapboxKey,
-                    "selectedMapEngine" to selectedMapEngine,
-                    "kuraimiToken" to kuraimiToken,
-                    "jawwalPayKey" to jawwalPayKey,
-                    "floosakKey" to floosakKey,
-                    "oneCashKey" to oneCashKey,
-                    "webhookUrl" to webhookUrl,
-                    "whatsappToken" to whatsappToken,
-                    "smsGatewayKey" to smsGatewayKey,
-                    "updatedAt" to System.currentTimeMillis()
+                val customMapList = customKeys.map { mapOf("name" to it.first, "key" to it.second, "endpoint" to it.third) }
+                val keysEntity = ApiKeysEntity(
+                    geminiApiKey = geminiApiKey,
+                    openaiApiKey = openaiApiKey,
+                    selectedAiModel = selectedAiModel,
+                    googleMapsKey = googleMapsKey,
+                    mapboxKey = mapboxKey,
+                    selectedMapEngine = selectedMapEngine,
+                    kuraimiToken = kuraimiToken,
+                    jawwalPayKey = jawwalPayKey,
+                    floosakKey = floosakKey,
+                    oneCashKey = oneCashKey,
+                    webhookUrl = webhookUrl,
+                    whatsappToken = whatsappToken,
+                    smsGatewayKey = smsGatewayKey,
+                    customKeys = customMapList
                 )
-                viewModel.db.collection("settings").document("api_keys").set(data)
-                Toast.makeText(context, "✅ تم حفظ ومزامنة كافة المفاتيح سحابياً فوراً وأمان تام!", Toast.LENGTH_LONG).show()
+                scope.launch {
+                    val result = apiKeyRepository.saveApiKeys(keysEntity)
+                    if (result.isSuccess) {
+                        Toast.makeText(context, "✅ تم حفظ ومزامنة كافة المفاتيح سحابياً فوراً وأمان تام!", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "❌ حدث خطأ أثناء حفظ المفاتيح، يرجى المحاولة لاحقاً", Toast.LENGTH_SHORT).show()
+                    }
+                }
             },
             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
             shape = RoundedCornerShape(10.dp),

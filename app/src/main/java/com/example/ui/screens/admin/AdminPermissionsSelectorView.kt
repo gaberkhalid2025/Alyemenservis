@@ -1,6 +1,7 @@
 package com.example.ui.screens.admin
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 
 import androidx.compose.foundation.BorderStroke
 import com.example.ui.*
@@ -121,14 +122,13 @@ fun AdminPermissionsSelectorView(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 280.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .heightIn(max = 280.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                filteredPerms.forEach { perm ->
+                items(filteredPerms) { perm ->
                     val isChecked = selectedPermissions.contains(perm.key)
                     Row(
                         modifier = Modifier

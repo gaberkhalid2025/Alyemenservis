@@ -249,7 +249,7 @@ fun UnifiedRegistrationForm(
         )
 
         // 6. City (Dropdown simplification for demo)
-        val cities = listOf("صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت")
+        val cities = com.example.domain.YemenCities.MAIN_CITIES
         var expandedCity by remember { mutableStateOf(false) }
         ExposedDropdownMenuBox(
             expanded = expandedCity,

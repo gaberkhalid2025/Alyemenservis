@@ -19,6 +19,7 @@ import com.example.data.local.toRoomEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -555,4 +556,18 @@ class BookingRepository(
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل حذف الحجز") }
     }
+
+    suspend fun lockBooking(bookingId: String, lockDurationMs: Long): Result<Unit> {
+        return try {
+            val updateData = mapOf(
+                "isLocked" to true,
+                "lockedUntil" to System.currentTimeMillis() + lockDurationMs
+            )
+            firestore.collection("bookings").document(bookingId).update(updateData).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
 }

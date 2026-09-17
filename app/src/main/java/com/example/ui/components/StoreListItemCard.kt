@@ -12,7 +12,7 @@ fun StoreListItemCard(
     store: StoreEntity,
     themeColors: VisualThemePalette,
     onClick: () -> Unit,
-    viewModel: MainViewModel? = null,
+    viewModel: MainViewModel,
     onChatClick: (() -> Unit)? = null
 ) {
     StoreListItemCard(

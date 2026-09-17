@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.models.Transaction
 import com.example.utils.WalletManager
 import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -46,7 +47,7 @@ fun TransactionHistoryScreen(
 
     val context = LocalContext.current
     val walletManager = remember { WalletManager(context) }
-    val numberFormat = remember { DecimalFormat("#,###.##") }
+    val numberFormat = remember { DecimalFormat("#,###.##", DecimalFormatSymbols(Locale.US)) }
 
     val walletId = remember(currentUserId) { "wallet_$currentUserId" }
     val viewModel = remember(currentUserId) {

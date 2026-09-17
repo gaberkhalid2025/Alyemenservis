@@ -100,7 +100,7 @@ fun OwnerDashboardScreen(
                 // Card 1: Visitors
                 StatCard(
                     title = "عدد الزوار",
-                    value = "1,250",
+                    value = "0",
                     unit = "زائر اليوم",
                     icon = "👥",
                     color = Color(0xFF3B82F6),
@@ -110,7 +110,7 @@ fun OwnerDashboardScreen(
                 // Card 2: Bookings
                 StatCard(
                     title = "الحجوزات/الطلبات",
-                    value = "15",
+                    value = "0",
                     unit = "حجز جديد",
                     icon = "📋",
                     color = Color(0xFF10B981),
@@ -122,8 +122,8 @@ fun OwnerDashboardScreen(
                 // Card 3: Ratings
                 StatCard(
                     title = "التقييم العام",
-                    value = "⭐ 4.8",
-                    unit = "/ 5 (120 تقييم)",
+                    value = "0",
+                    unit = "/ 5 (0 تقييم)",
                     icon = "⭐",
                     color = Color(0xFFF59E0B),
                     modifier = Modifier.weight(1f)
@@ -132,7 +132,7 @@ fun OwnerDashboardScreen(
                 // Card 4: Revenue
                 StatCard(
                     title = "الإيرادات التقديرية",
-                    value = "500,000",
+                    value = "0",
                     unit = "YER هذا الشهر",
                     icon = "💰",
                     color = Color(0xFF8B5CF6),

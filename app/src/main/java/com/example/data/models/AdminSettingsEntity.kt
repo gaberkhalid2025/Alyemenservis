@@ -37,6 +37,8 @@ data class AdminSettingsEntity(
     val supportWhatsapp: String = "777644",
     val supportEmail: String = "",
     val adminUsername: String = "",
+    @get:com.google.firebase.firestore.Exclude
+    @Deprecated("Removed for security. Admin auth is managed exclusively via Firebase Auth.")
     val adminPassword: String = "",
     val ownerEmail: String = "",
     val ownerPassword: String = "",

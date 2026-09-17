@@ -133,8 +133,9 @@ class InstantRequestViewModel @Inject constructor(
             }
 
         offersListener?.remove()
-        offersListener = firestore.collection("instant_requests").document(requestId)
-            .collection("offers")
+        offersListener = firestore.collection("instant_offers")
+            .whereEqualTo("requestId", requestId)
+            .limit(50)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     _requestOffers.value = emptyList()

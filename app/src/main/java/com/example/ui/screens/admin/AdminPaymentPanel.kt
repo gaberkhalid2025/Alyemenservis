@@ -34,16 +34,16 @@ import com.example.utils.VisualThemePalette
  */
 @Composable
 fun AdminPaymentPanel(
-    viewModel: MainViewModel? = null,
-    themeColors: VisualThemePalette? = null,
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette,
     onToggleSystem: ((Boolean) -> Unit)? = null,
     onUnlinkAll: (() -> Unit)? = null,
     onAdminOverride: ((String, Double) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val primaryColor = themeColors?.primary ?: Color(0xFF0D9488)
-    val cardBg = themeColors?.surface ?: Color(0xFF1E293B)
-    val textColor = themeColors?.textPrimary ?: Color.White
+    val primaryColor = themeColors.primary
+    val cardBg = themeColors.surface
+    val textColor = themeColors.textPrimary
 
     var systemEnabled by remember { mutableStateOf(true) }
     var linkBookings by remember { mutableStateOf(true) }
@@ -56,6 +56,43 @@ fun AdminPaymentPanel(
     var overrideTargetId by remember { mutableStateOf("") }
     var overrideAmount by remember { mutableStateOf("") }
     var showOverrideDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel?.db?.collection("settings")?.document("payment_config")?.get()
+            ?.addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    systemEnabled = doc.getBoolean("systemEnabled") ?: true
+                    linkBookings = doc.getBoolean("linkBookings") ?: true
+                    linkStores = doc.getBoolean("linkStores") ?: true
+                    linkRestaurants = doc.getBoolean("linkRestaurants") ?: true
+                    linkMedical = doc.getBoolean("linkMedical") ?: true
+                    linkProperties = doc.getBoolean("linkProperties") ?: true
+                    linkJobs = doc.getBoolean("linkJobs") ?: true
+                }
+            }
+    }
+
+    fun savePaymentConfig(
+        newSystemEnabled: Boolean = systemEnabled,
+        newLinkBookings: Boolean = linkBookings,
+        newLinkStores: Boolean = linkStores,
+        newLinkRestaurants: Boolean = linkRestaurants,
+        newLinkMedical: Boolean = linkMedical,
+        newLinkProperties: Boolean = linkProperties,
+        newLinkJobs: Boolean = linkJobs
+    ) {
+        val data = mapOf<String, Any>(
+            "systemEnabled" to newSystemEnabled,
+            "linkBookings" to newLinkBookings,
+            "linkStores" to newLinkStores,
+            "linkRestaurants" to newLinkRestaurants,
+            "linkMedical" to newLinkMedical,
+            "linkProperties" to newLinkProperties,
+            "linkJobs" to newLinkJobs,
+            "updatedAt" to System.currentTimeMillis()
+        )
+        viewModel?.db?.collection("settings")?.document("payment_config")?.set(data)
+    }
 
     Column(
         modifier = Modifier
@@ -135,10 +172,11 @@ fun AdminPaymentPanel(
                             checked = systemEnabled,
                             onCheckedChange = {
                                 systemEnabled = it
+                                savePaymentConfig(newSystemEnabled = it)
                                 onToggleSystem?.invoke(it)
                                 Toast.makeText(
                                     context,
-                                    if (it) "تم تفعيل نظام الدفع الكلي" else "تم تعطيل نظام الدفع الكلي",
+                                    if (it) "تم تفعيل نظام الدفع الكلي وحفظ الإعداد" else "تم تعطيل نظام الدفع الكلي وحفظ الإعداد",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -166,7 +204,10 @@ fun AdminPaymentPanel(
                         subtitle = "حساب العربون والعمولات تلقائياً",
                         icon = Icons.Default.DateRange,
                         checked = linkBookings,
-                        onCheckedChange = { linkBookings = it }
+                        onCheckedChange = {
+                            linkBookings = it
+                            savePaymentConfig(newLinkBookings = it)
+                        }
                     )
 
                     PaymentSectorToggleRow(
@@ -174,7 +215,10 @@ fun AdminPaymentPanel(
                         subtitle = "الدفع عبر المحافظ الإلكترونية",
                         icon = Icons.Default.ShoppingCart,
                         checked = linkStores,
-                        onCheckedChange = { linkStores = it }
+                        onCheckedChange = {
+                            linkStores = it
+                            savePaymentConfig(newLinkStores = it)
+                        }
                     )
 
                     PaymentSectorToggleRow(
@@ -182,7 +226,10 @@ fun AdminPaymentPanel(
                         subtitle = "تسوية الفواتير والتوصيل",
                         icon = Icons.Default.ShoppingCart,
                         checked = linkRestaurants,
-                        onCheckedChange = { linkRestaurants = it }
+                        onCheckedChange = {
+                            linkRestaurants = it
+                            savePaymentConfig(newLinkRestaurants = it)
+                        }
                     )
 
                     PaymentSectorToggleRow(
@@ -190,7 +237,10 @@ fun AdminPaymentPanel(
                         subtitle = "رسوم المعاينة والاستشارات",
                         icon = Icons.Default.Info,
                         checked = linkMedical,
-                        onCheckedChange = { linkMedical = it }
+                        onCheckedChange = {
+                            linkMedical = it
+                            savePaymentConfig(newLinkMedical = it)
+                        }
                     )
 
                     PaymentSectorToggleRow(
@@ -198,7 +248,10 @@ fun AdminPaymentPanel(
                         subtitle = "عربون حجز المعاينة أو الإيجار",
                         icon = Icons.Default.Home,
                         checked = linkProperties,
-                        onCheckedChange = { linkProperties = it }
+                        onCheckedChange = {
+                            linkProperties = it
+                            savePaymentConfig(newLinkProperties = it)
+                        }
                     )
 
                     PaymentSectorToggleRow(
@@ -206,7 +259,10 @@ fun AdminPaymentPanel(
                         subtitle = "رسوم التقديم أو توثيق الحسابات",
                         icon = Icons.Default.Person,
                         checked = linkJobs,
-                        onCheckedChange = { linkJobs = it }
+                        onCheckedChange = {
+                            linkJobs = it
+                            savePaymentConfig(newLinkJobs = it)
+                        }
                     )
                 }
             }
@@ -246,8 +302,16 @@ fun AdminPaymentPanel(
                             linkMedical = false
                             linkProperties = false
                             linkJobs = false
+                            savePaymentConfig(
+                                newLinkBookings = false,
+                                newLinkStores = false,
+                                newLinkRestaurants = false,
+                                newLinkMedical = false,
+                                newLinkProperties = false,
+                                newLinkJobs = false
+                            )
                             onUnlinkAll?.invoke()
-                            Toast.makeText(context, "تم إلغاء الربط الشامل لكل القطاعات", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "تم إلغاء الربط الشامل لكل القطاعات وحفظ الحالة", Toast.LENGTH_LONG).show()
                         },
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error

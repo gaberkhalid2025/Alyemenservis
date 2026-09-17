@@ -24,6 +24,8 @@ import com.example.utils.VisualThemePalette
 /**
  * 🏠 PropertiesSectionView - عرض العقارات والشقق المخصصة فقط
  */
+import com.example.domain.isAdmin
+
 @Composable
 fun PropertiesSectionView(
     viewModel: MainViewModel,
@@ -34,7 +36,7 @@ fun PropertiesSectionView(
     val properties by viewModel.properties.collectAsState()
     val currentUserId by viewModel.currentUserId.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
-    val isAdminUser = adminRole == "ADMIN" || adminRole == "SUPER_ADMIN" || adminRole == "MAIN_ADMIN" || adminRole == "OWNER"
+    val isAdminUser = adminRole.isAdmin()
 
     val activeProperties = remember(properties, currentUserId, adminRole) {
         properties.filter { 
