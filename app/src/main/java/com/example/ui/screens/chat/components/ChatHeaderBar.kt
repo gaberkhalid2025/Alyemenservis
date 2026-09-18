@@ -178,26 +178,32 @@ fun ChatHeaderBar(
 
         // Booking / Urgent Request Context Strip
         if (!relatedEntityId.isNullOrBlank() || !relatedEntityType.isNullOrBlank()) {
+            val shortId = if (relatedEntityId != null && relatedEntityId.length > 8) {
+                relatedEntityId.takeLast(8)
+            } else {
+                relatedEntityId ?: ""
+            }
+
             val contextText = when (relatedEntityType) {
-                "BOOKING" -> "📌 محادثة بخصوص الحجز رقم ${relatedEntityId ?: ""}"
-                "URGENT_REQUEST" -> "🚨 محادثة بخصوص الطلب العاجل رقم ${relatedEntityId ?: ""}"
-                "SUPPORT" -> "🛠️ محادثة تذكرة الدعم الفني ${relatedEntityId ?: ""}"
-                else -> if (!relatedEntityId.isNullOrBlank()) "📋 محادثة خاصة بطلب رقم $relatedEntityId" else null
+                "BOOKING" -> "🗓️ ليتم ايضاح انه خاص بحجز: #$shortId"
+                "URGENT_REQUEST" -> "🚨 خاص بطلب عاجل: #$shortId"
+                "SUPPORT" -> "🛠️ تذكرة دعم: #$shortId"
+                else -> if (!relatedEntityId.isNullOrBlank()) "📋 خاص بطلب: #$shortId" else null
             }
 
             if (contextText != null) {
                 Surface(
-                    color = primaryColor.copy(alpha = 0.15f),
+                    color = Color.Red.copy(alpha = 0.12f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = contextText,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = accentColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF5252), // Bright Red
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 5.dp)
+                            .padding(horizontal = 14.dp, vertical = 4.dp)
                     )
                 }
             }

@@ -71,12 +71,12 @@ object SecurityCryptoUtils {
     }
 
     /**
-     * Hashes plain text string using SHA-256 for secure one-way password storage.
+     * Hashes plain text string using SecureHasher (PBKDF2) for secure one-way password storage.
+     * ✨ م2: تم استبدال SHA-256 بـ PBKDF2 المتقدم لضمان أعلى مستويات الحماية
      */
     fun hashPassword(password: String): String {
         if (password.isEmpty()) return ""
-        val bytes = MessageDigest.getInstance("SHA-256").digest(password.trim().toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
+        return com.example.utils.SecureHasher.hashPassword(password.trim())
     }
 
     /**

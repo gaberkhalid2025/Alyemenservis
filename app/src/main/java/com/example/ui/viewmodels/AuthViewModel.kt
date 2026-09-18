@@ -436,13 +436,17 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun addSupervisor(name: String, role: String, passcode: String, permissions: List<String> = emptyList()) {
         val nextId = "sup_" + UUID.randomUUID().toString().take(6)
-        val newSup = SupervisorEntity(nextId, name, role, passcode, permissions)
+        // ✨ م2: تشفير كلمة المرور (Hashing) قبل التخزين لحماية المشرفين
+        val hashedPass = com.example.utils.SecureHasher.hashPassword(passcode.trim())
+        val newSup = SupervisorEntity(nextId, name, role, hashedPass, permissions)
         db.collection("supervisors").document(nextId).set(newSup)
         triggerToast("🔑 تم إضافة المشرف $name وتعيين ${permissions.size} صلاحية بنجاح")
     }
 
     fun editSupervisor(id: String, name: String, role: String, passcode: String, permissions: List<String> = emptyList()) {
-        val updatedSup = SupervisorEntity(id, name, role, passcode, permissions)
+        // ✨ م2: تشفير كلمة المرور في حال التعديل لضمان الأمان
+        val finalPass = if (passcode.contains(":")) passcode else com.example.utils.SecureHasher.hashPassword(passcode.trim())
+        val updatedSup = SupervisorEntity(id, name, role, finalPass, permissions)
         db.collection("supervisors").document(id).set(updatedSup)
         triggerToast("✏️ تم تعديل بيانات وصلاحيات المشرف $name (${permissions.size} صلاحية) بنجاح")
     }
