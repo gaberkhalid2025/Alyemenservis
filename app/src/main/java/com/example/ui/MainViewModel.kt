@@ -87,8 +87,9 @@ class MainViewModel @Inject constructor(
     val currentUserPhone get() = authViewModel.currentUserPhone
     val _currentUserResidence get() = authViewModel._currentUserResidence
     val currentUserResidence get() = authViewModel.currentUserResidence
-    val _adminRole get() = authViewModel._adminRole
-    val adminRole get() = authViewModel.adminRole
+    val _adminRole get() = adminViewModel._adminRole
+    val adminRole get() = adminViewModel.adminRole
+    val supervisorPermissions get() = adminViewModel.supervisorPermissions
     val _passwordRecoveryWaitingPhone get() = authViewModel._passwordRecoveryWaitingPhone
     val passwordRecoveryWaitingPhone get() = authViewModel.passwordRecoveryWaitingPhone
     val _joinRequestPhone get() = authViewModel._joinRequestPhone

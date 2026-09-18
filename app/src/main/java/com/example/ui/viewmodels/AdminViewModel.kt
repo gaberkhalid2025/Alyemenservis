@@ -149,6 +149,9 @@ class AdminViewModel @Inject constructor(
     internal val _adminRole = MutableStateFlow("GUEST")
     val adminRole: StateFlow<String> = _adminRole.asStateFlow()
 
+    private val _supervisorPermissions = MutableStateFlow<List<String>>(emptyList())
+    val supervisorPermissions: StateFlow<List<String>> = _supervisorPermissions.asStateFlow()
+
     /**
      * 🔐 تسجيل دخول الأدمن الآمن
      * - يتحقق عبر Cloud Function
@@ -177,15 +180,18 @@ class AdminViewModel @Inject constructor(
                     val adminDoc = adminQuery.documents[0]
                     val storedPass = adminDoc.getString("passcode") ?: ""
                     val role = adminDoc.getString("role") ?: "ADMIN"
+                    val perms = adminDoc.get("permissions") as? List<String> ?: emptyList()
                     if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
                         val assignedRole = if (role.contains("OWNER")) "OWNER" else "ADMIN"
                         if (rememberMe) {
                             secureStorage.saveAdminSession(com.example.utils.AdminSession(
                                 uid = adminDoc.id, email = trimmedEmail,
-                                loginTime = System.currentTimeMillis(), refreshToken = "FS_SESSION", role = assignedRole
+                                loginTime = System.currentTimeMillis(), refreshToken = "FS_SESSION", 
+                                role = assignedRole, permissions = perms
                             ))
                         }
                         _adminRole.value = assignedRole
+                        _supervisorPermissions.value = perms
                         _isLoading.value = false
                         onResult(true, null)
                         return@launch
@@ -264,14 +270,17 @@ class AdminViewModel @Inject constructor(
                 if (!ownerQuery.isEmpty) {
                     val ownerDoc = ownerQuery.documents[0]
                     val storedPass = ownerDoc.getString("passcode") ?: ""
+                    val perms = ownerDoc.get("permissions") as? List<String> ?: emptyList()
                     if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
                         if (rememberMe) {
                             secureStorage.saveAdminSession(com.example.utils.AdminSession(
                                 uid = ownerDoc.id, email = trimmedEmail,
-                                loginTime = System.currentTimeMillis(), refreshToken = "OWNER_FS_SESSION", role = "OWNER"
+                                loginTime = System.currentTimeMillis(), refreshToken = "OWNER_FS_SESSION", 
+                                role = "OWNER", permissions = perms
                             ))
                         }
                         _adminRole.value = "OWNER"
+                        _supervisorPermissions.value = perms
                         _isLoading.value = false
                         onResult(true, null)
                         return@launch
@@ -362,6 +371,7 @@ class AdminViewModel @Inject constructor(
                 
                 if (supervisorDoc.exists()) {
                     val storedPass = supervisorDoc.getString("passcode") ?: ""
+                    val perms = supervisorDoc.get("permissions") as? List<String> ?: emptyList()
                     if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
                         val role = supervisorDoc.getString("role") ?: "SUPERVISOR"
                         val id = supervisorDoc.id
@@ -374,7 +384,8 @@ class AdminViewModel @Inject constructor(
                                     email = supervisorDoc.getString("email") ?: "$id@supervisor.local",
                                     loginTime = System.currentTimeMillis(),
                                     refreshToken = "SUPERVISOR_SESSION",
-                                    role = "SUPERVISOR"
+                                    role = "SUPERVISOR",
+                                    permissions = perms
                                 )
                             )
                         } else {
@@ -382,6 +393,7 @@ class AdminViewModel @Inject constructor(
                         }
                         
                         _adminRole.value = "SUPERVISOR"
+                        _supervisorPermissions.value = perms
                         _isLoading.value = false
                         onResult(true, null)
                         return@launch
@@ -430,6 +442,7 @@ class AdminViewModel @Inject constructor(
                     // لا نرفض الجلسة إذا لم يكن هناك Claim ولكن الجلسة المحلية موجودة (كحالة طوارئ)
                 }
                 _adminRole.value = session.role
+                _supervisorPermissions.value = session.permissions
                 return true
             }
             false

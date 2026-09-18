@@ -15,7 +15,8 @@ data class AdminSession(
     val email: String,
     val loginTime: Long,
     val refreshToken: String,
-    val role: String = "ADMIN"
+    val role: String = "ADMIN",
+    val permissions: List<String> = emptyList()
 )
 
 /**
@@ -55,6 +56,7 @@ class SecureStorage @Inject constructor(
             .putLong("admin_login_time", session.loginTime)
             .putString("admin_refresh_token", session.refreshToken)
             .putString("admin_role", session.role)
+            .putString("admin_permissions", session.permissions.joinToString(","))
             .apply()
     }
 
@@ -67,8 +69,10 @@ class SecureStorage @Inject constructor(
         val loginTime = prefs.getLong("admin_login_time", 0)
         val refreshToken = prefs.getString("admin_refresh_token", null) ?: return null
         val role = prefs.getString("admin_role", "ADMIN") ?: "ADMIN"
+        val permsStr = prefs.getString("admin_permissions", "") ?: ""
+        val permissions = if (permsStr.isEmpty()) emptyList() else permsStr.split(",")
 
-        return AdminSession(uid, email, loginTime, refreshToken, role)
+        return AdminSession(uid, email, loginTime, refreshToken, role, permissions)
     }
 
     /**
@@ -81,6 +85,7 @@ class SecureStorage @Inject constructor(
             .remove("admin_login_time")
             .remove("admin_refresh_token")
             .remove("admin_role")
+            .remove("admin_permissions")
             .apply()
     }
 }

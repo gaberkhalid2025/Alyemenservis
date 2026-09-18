@@ -113,6 +113,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
     val pendingProviders by viewModel.pendingProviders.collectAsState()
     val reports by viewModel.reports.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
+    val supervisorPermissions by viewModel.supervisorPermissions.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val activatedProviders by viewModel.providers.collectAsState()
     val bookings by viewModel.bookings.collectAsState()
@@ -641,7 +642,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                 isLoginLoading = false
                                 if (success) {
                                     isAuthorized = true
-                                    activeSubTab = "BACKDOOR"
+                                    activeSubTab = "REG_REQ"
                                     viewModel.triggerNotification("👑 مرحباً بك في لوحة التحكم")
                                 } else {
                                     loginError = errorMsg ?: "فشل تسجيل الدخول"
@@ -657,7 +658,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                 isLoginLoading = false
                                 if (success) {
                                     isAuthorized = true
-                                    activeSubTab = "BACKDOOR"
+                                    activeSubTab = "REG_REQ"
                                     viewModel.triggerNotification("💼 مرحباً بك في لوحة التحكم (مشرف)")
                                 } else {
                                     loginError = errorMsg ?: "بيانات دخول المشرف غير صحيحة"
@@ -744,7 +745,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
             item {
                 var selectedGroupFilter by remember { mutableStateOf("ALL") }
 
-                val allTabs = remember(adminRole) {
+                val allTabs = remember(adminRole, supervisorPermissions) {
                     val baseTabs = mutableListOf(
                         Triple("REG_REQ", "2️⃣ ⌛ طلبات الانضمام والاعتماد", "OPERATIONS"),
                         Triple("MANUAL_ADD", "3️⃣ ➕ الإضافة اليدوية", "ENTITIES"),
@@ -796,10 +797,18 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                         Triple("MAINTENANCE_MODE", "🚧 وضع الصيانة", "SYSTEM"),
                         Triple("DATA_MANAGEMENT", "🏢 الإدارة الشاملة للمنشآت", "ENTITIES")
                     )
-                    if (adminRole == "OWNER") {
-                        baseTabs.add(0, Triple("BACKDOOR", "1️⃣ ⚙️ البوابة الخلفية (BACKDOOR)", "SECURITY"))
+
+                    val filteredByRole = if (adminRole == "SUPERVISOR" && supervisorPermissions.isNotEmpty()) {
+                        baseTabs.filter { it.first in supervisorPermissions }
+                    } else {
+                        baseTabs
                     }
-                    baseTabs
+
+                    val finalTabs = filteredByRole.toMutableList()
+                    if (adminRole == "OWNER") {
+                        finalTabs.add(0, Triple("BACKDOOR", "1️⃣ ⚙️ البوابة الخلفية (BACKDOOR)", "SECURITY"))
+                    }
+                    finalTabs
                 }
 
                 val filteredTabs = remember(selectedGroupFilter, allTabs) {
