@@ -200,14 +200,14 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     if (bytes != null) {
                         bannerBase64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                         bannerType = "VIDEO"
-                        viewModel.triggerNotification("📹 تم تحميل الفيديو القصير للبنر بنجاح!")
+                        Toast.makeText(context, "📹 تم تحميل الفيديو القصير للبنر بنجاح!", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     val base64Str = com.example.utils.compressAndResizeImageUri(context, it, 800, 70)
                     if (base64Str.isNotEmpty()) {
                         bannerBase64 = base64Str
                         bannerType = "IMAGE"
-                        viewModel.triggerNotification("📸 تم تحميل صورة البنر الإعلاني من المعرض بنجاح!")
+                        Toast.makeText(context, "📸 تم تحميل صورة البنر الإعلاني من المعرض بنجاح!", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) { e.printStackTrace() }
@@ -223,7 +223,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 if (base64Str.isNotEmpty()) {
                     aboutCoverBase64 = base64Str
                     aboutCoverType = "IMAGE"
-                    viewModel.triggerNotification("📸 تم تحميل صورة الغلاف من المعرض بنجاح!")
+                    Toast.makeText(context, "📸 تم تحميل صورة الغلاف من المعرض بنجاح!", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) { e.printStackTrace() }
         }
@@ -760,7 +760,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     .background(themeColors.surface)
                     .clickable { 
                         headerIconsOrder = "MENU,NOTIF,CHAT"
-                        viewModel.triggerNotification("🎯 تم ضبط الترتيب الافتراضي للأيقونات")
+                        Toast.makeText(context, "🎯 تم ضبط الترتيب الافتراضي للأيقونات", Toast.LENGTH_SHORT).show()
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -773,7 +773,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                     .background(themeColors.surface)
                     .clickable { 
                         headerIconsOrder = "CHAT,NOTIF,MENU"
-                        viewModel.triggerNotification("🎯 تم عكس ترتيب الأيقونات")
+                        Toast.makeText(context, "🎯 تم عكس ترتيب الأيقونات", Toast.LENGTH_SHORT).show()
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -788,7 +788,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                         headerIconsOrder = "MENU,CHAT,NOTIF,REFRESH,SETTINGS"
                         showRefreshIcon = true
                         showSettingsIcon = true
-                        viewModel.triggerNotification("🎯 تم تفعيل كافة الأيقونات بالترتيب الكامل")
+                        Toast.makeText(context, "🎯 تم تفعيل كافة الأيقونات بالترتيب الكامل", Toast.LENGTH_SHORT).show()
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
@@ -1207,7 +1207,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                         .background(if (selectedSimulatedLogo == lg) themeColors.accent else themeColors.surface)
                         .clickable { 
                             selectedSimulatedLogo = lg
-                            viewModel.triggerNotification("🖼️ تم تحديد الشعار ($lg) بنجاح للتطبيق!")
+                            Toast.makeText(context, "🖼️ تم تحديد الشعار ($lg) بنجاح للتطبيق!", Toast.LENGTH_SHORT).show()
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
@@ -1302,7 +1302,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 } else {
                     sp.edit().putString("saved_admin_role", "GUEST").apply()
                 }
-                viewModel.triggerNotification("💾 تم حفظ كافة التخصيصات والتحققات بنجاح!")
+                Toast.makeText(context, "💾 تم حفظ كافة التخصيصات والتحققات بنجاح!", Toast.LENGTH_SHORT).show()
             },
             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
             modifier = Modifier.fillMaxWidth()

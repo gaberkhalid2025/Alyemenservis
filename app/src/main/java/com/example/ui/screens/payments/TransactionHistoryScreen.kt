@@ -24,10 +24,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.models.Transaction
+import com.example.utils.DateFormatter
 import com.example.utils.WalletManager
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
-import java.text.SimpleDateFormat
 import java.util.*
 
 /**
@@ -298,7 +298,8 @@ fun TransactionHistoryScreen(
                                 items(filteredTransactions, key = { it.id }) { tx ->
                                     val isPositive = tx.type == "DEPOSIT" || tx.type == "REFUND"
                                     val formattedDate = remember(tx.timestamp) {
-                                        SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale("ar")).format(Date(tx.timestamp))
+                                        // ✨ م2-ج3: استخدام DateFormatter
+                                        DateFormatter.formatDisplay(tx.timestamp)
                                     }
 
                                     Card(

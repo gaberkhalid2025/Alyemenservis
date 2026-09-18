@@ -35,9 +35,9 @@ import com.example.ui.screens.chat.components.ChatHeaderBar
 import com.example.ui.screens.chat.components.ChatInputBar
 import com.example.ui.screens.chat.components.TypingIndicator
 import com.example.utils.AudioPlayerManager
+import com.example.utils.DateFormatter
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
@@ -512,7 +512,8 @@ private fun formatChatDateHeader(timeMillis: Long): String {
     return when {
         currentYear == msgYear && currentDay == msgDay -> "اليوم"
         currentYear == msgYear && (currentDay - msgDay == 1) -> "أمس"
-        currentYear == msgYear -> SimpleDateFormat("EEEE، d MMMM", Locale("ar")).format(Date(timeMillis))
-        else -> SimpleDateFormat("d MMMM yyyy", Locale("ar")).format(Date(timeMillis))
+        // ✨ م2-ج3: استخدام DateFormatter
+        currentYear == msgYear -> DateFormatter.formatCustom(timeMillis, "EEEE، d MMMM")
+        else -> DateFormatter.formatCustom(timeMillis, "d MMMM yyyy")
     }
 }

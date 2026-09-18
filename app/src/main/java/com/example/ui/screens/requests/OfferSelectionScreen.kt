@@ -36,8 +36,8 @@ import com.example.data.models.RequestOfferEntity
 import com.example.data.repositories.ChatRepository
 import com.example.ui.MainViewModel
 import com.example.ui.viewmodels.InstantRequestViewModel
+import com.example.utils.DateFormatter
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -69,11 +69,12 @@ fun OfferSelectionScreen(
     var request by remember { mutableStateOf<InstantRequestEntity?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
+    // ✨ م2-ج3: استخدام DateFormatter
     var selectedDate by remember {
-        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
+        mutableStateOf(DateFormatter.formatDateDash(System.currentTimeMillis()))
     }
     var selectedTime by remember {
-        mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(System.currentTimeMillis() + 3600 * 1000L)))
+        mutableStateOf(DateFormatter.formatTime24(System.currentTimeMillis() + 3600 * 1000L))
     }
     var userNotes by remember { mutableStateOf("") }
     var userPin by remember { mutableStateOf("") }
@@ -274,7 +275,8 @@ fun OfferSelectionScreen(
 
                     isSubmitting = true
                     val bookingId = UUID.randomUUID().toString()
-                    val bNum = "BK-${SimpleDateFormat("yyMMddHHmm", Locale.getDefault()).format(Date())}-${Random.nextInt(1000, 9999)}"
+                    // ✨ م2-ج3: استخدام DateFormatter
+                    val bNum = "BK-${DateFormatter.formatCustom(System.currentTimeMillis(), "yyMMddHHmm")}-${Random.nextInt(1000, 9999)}"
 
                     val newBooking = BookingEntity(
                         id = bookingId,

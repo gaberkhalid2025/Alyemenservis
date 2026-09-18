@@ -1,8 +1,10 @@
 package com.example.utils
 
 import com.example.data.BookingEntity
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.random.Random
 
@@ -10,9 +12,18 @@ object BookingUtils {
     private const val CANCELLATION_HOURS = 8
     private val CANCELLATION_WINDOW_MS = CANCELLATION_HOURS * 60 * 60 * 1000L
 
+    // ✨ م2-ج3: أنماط تنسيق التواريخ آمنة الخيوط (Thread-Safe)
+    private val BOOKING_NUM_FORMATTER = DateTimeFormatter.ofPattern("yyMMddHHmmss", Locale.US)
+    private val ARABIC_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEEE، d MMMM yyyy", Locale.forLanguageTag("ar-YE"))
+    private val PARSE_FORMATTERS = listOf(
+        DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm a", Locale.US),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
+    )
+
     fun generateBookingNumber(prefix: String = "BK"): String {
-        val sdf = SimpleDateFormat("yyMMddHHmmss", Locale.US)
-        val datePart = sdf.format(Date())
+        // ✨ م2-ج3: استخدام DateTimeFormatter آمن الخيوط
+        val datePart = LocalDateTime.now().format(BOOKING_NUM_FORMATTER)
         val randomPart = String.format(Locale.US, "%04d", Random.nextInt(1000, 9999))
         return "$prefix-$datePart-$randomPart"
     }
@@ -38,15 +49,14 @@ object BookingUtils {
             val cleanDate = dateString.trim().replace("/", "-")
             val cleanTime = timeString.trim().replace("م", "PM").replace("ص", "AM")
             val combined = "$cleanDate $cleanTime"
-            val formats = listOf(
-                SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.US),
-                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US),
-                SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            )
-            for (fmt in formats) {
+            for (fmt in PARSE_FORMATTERS) {
                 try {
-                    val parsed = fmt.parse(combined) ?: fmt.parse(cleanDate)
-                    if (parsed != null) return parsed.time
+                    val ldt = try {
+                        LocalDateTime.parse(combined, fmt)
+                    } catch (e: Exception) {
+                        java.time.LocalDate.parse(cleanDate, fmt).atStartOfDay()
+                    }
+                    return ldt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 } catch (e: Exception) {}
             }
             0L
@@ -124,17 +134,11 @@ object BookingUtils {
                 val year = parts[0].toIntOrNull() ?: 2026
                 val month = parts[1].toIntOrNull() ?: 1
                 val day = parts[2].toIntOrNull() ?: 1
-                val cal = java.util.Calendar.getInstance()
-                cal.set(year, month - 1, day)
-                val sdf = SimpleDateFormat("EEEE، d MMMM yyyy", Locale("ar"))
-                sdf.format(cal.time)
+                val localDate = java.time.LocalDate.of(year, month, day)
+                localDate.format(ARABIC_DATE_FORMATTER)
             } else {
-                val sdfInput = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                val parsed = sdfInput.parse(cleanDate)
-                if (parsed != null) {
-                    val sdfOutput = SimpleDateFormat("EEEE، d MMMM yyyy", Locale("ar"))
-                    sdfOutput.format(parsed)
-                } else date
+                val localDate = java.time.LocalDate.parse(cleanDate)
+                localDate.format(ARABIC_DATE_FORMATTER)
             }
         } catch (e: Exception) {
             date

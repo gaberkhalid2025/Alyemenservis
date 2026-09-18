@@ -297,8 +297,8 @@ fun ForgotPasswordRecoveryDialog(
                                     color = themeColors.accent
                                 )
                                 
-                                val sdf = remember { java.text.SimpleDateFormat("yyyy-MM-dd hh:mm a", java.util.Locale.getDefault()) }
-                                val formattedTime = if (submittedTime > 0L) sdf.format(java.util.Date(submittedTime)) else "الآن"
+                                // ✨ م2: استخدام DateFormatter
+                                val formattedTime = if (submittedTime > 0L) com.example.utils.DateFormatter.formatDisplay(submittedTime) else "الآن"
                                 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.2f)),

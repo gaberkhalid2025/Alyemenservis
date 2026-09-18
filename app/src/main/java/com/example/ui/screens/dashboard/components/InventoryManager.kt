@@ -20,9 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.repositories.InventoryItem
-import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
-import android.util.Log
 
 /**
  * 📦 InventoryManager (إدارة المخزون وتتبع الكميات والتنبيهات)
@@ -169,11 +167,8 @@ fun InventoryManager(
                                 onClick = {
                                     if (item.quantity > 0) {
                                         val newQty = item.quantity - 1
-                                        FirebaseFirestore.getInstance()
-                                            .collection("inventory")
-                                            .document(item.id)
-                                            .update("quantity", newQty, "inStock", newQty > 0)
-                                            .addOnFailureListener { e -> Log.e("InventoryManager", "Update failed", e) }
+                                        // ✨ م2-ج2: استخدام ViewModel بدلاً من Firestore المباشر
+                                        viewModel.updateInventoryQuantity(item.id, newQty, newQty > 0)
                                     }
                                 },
                                 modifier = Modifier.size(32.dp)
@@ -191,11 +186,8 @@ fun InventoryManager(
                             IconButton(
                                 onClick = {
                                     val newQty = item.quantity + 1
-                                    FirebaseFirestore.getInstance()
-                                        .collection("inventory")
-                                        .document(item.id)
-                                        .update("quantity", newQty, "inStock", true)
-                                        .addOnFailureListener { e -> Log.e("InventoryManager", "Update failed", e) }
+                                    // ✨ م2-ج2: استخدام ViewModel
+                                    viewModel.updateInventoryQuantity(item.id, newQty, true)
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
@@ -204,11 +196,8 @@ fun InventoryManager(
 
                             IconButton(
                                 onClick = {
-                                    FirebaseFirestore.getInstance()
-                                        .collection("inventory")
-                                        .document(item.id)
-                                        .delete()
-                                        .addOnFailureListener { e -> Log.e("InventoryManager", "Delete failed", e) }
+                                    // ✨ م2-ج2: استخدام ViewModel
+                                    viewModel.deleteInventoryItem(item.id)
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
@@ -271,11 +260,8 @@ fun InventoryManager(
                                 price = newItemPrice.toDoubleOrNull() ?: 0.0,
                                 inStock = qty > 0
                             )
-                            FirebaseFirestore.getInstance()
-                                .collection("inventory")
-                                .document(itemId)
-                                .set(newItem)
-                                .addOnFailureListener { e -> Log.e("InventoryManager", "Insert failed", e) }
+                            // ✨ م2-ج2: استخدام ViewModel
+                            viewModel.addInventoryItem(newItem)
 
                             showAddItemDialog = false
                             newItemName = ""

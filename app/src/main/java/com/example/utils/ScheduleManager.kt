@@ -1,9 +1,7 @@
 package com.example.utils
 
 import com.example.data.BookingEntity
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -98,15 +96,23 @@ object ScheduleManager {
             return listOf(startDateString)
         }
 
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val result = mutableListOf<String>()
 
         try {
-            val date = sdf.parse(startDateString) ?: return listOf(startDateString)
-            val cal = Calendar.getInstance().apply { time = date }
+            // ✨ م2: استخدام DateFormatter وتحليل يدوي آمن
+            val parts = startDateString.split("-")
+            if (parts.size != 3) return listOf(startDateString)
+            val year = parts[0].toIntOrNull() ?: return listOf(startDateString)
+            val month = parts[1].toIntOrNull() ?: return listOf(startDateString)
+            val day = parts[2].toIntOrNull() ?: return listOf(startDateString)
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+            }
 
             for (i in 0 until occurrences) {
-                result.add(sdf.format(cal.time))
+                result.add(DateFormatter.formatDateDash(cal.timeInMillis))
                 if (recurrenceRule.equals("WEEKLY", ignoreCase = true)) {
                     cal.add(Calendar.WEEK_OF_YEAR, 1)
                 } else if (recurrenceRule.equals("MONTHLY", ignoreCase = true)) {

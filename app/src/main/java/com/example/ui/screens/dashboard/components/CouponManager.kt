@@ -20,9 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.SpecialOfferEntity
-import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
-import android.util.Log
 
 /**
  * 🎟️ CouponManager (إدارة كوبونات وقسائم الخصم)
@@ -131,11 +129,8 @@ fun CouponManager(
 
                         Row {
                             IconButton(onClick = {
-                                FirebaseFirestore.getInstance()
-                                    .collection("coupons")
-                                    .document(coupon.id)
-                                    .update("isEnabled", !coupon.isEnabled)
-                                    .addOnFailureListener { e -> Log.e("CouponManager", "Update failed", e) }
+                                // ✨ م2-ج2: استخدام ViewModel بدلاً من Firestore المباشر
+                                viewModel.updateCouponStatus(coupon.id, !coupon.isEnabled)
                             }) {
                                 Icon(
                                     if (coupon.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
@@ -144,11 +139,8 @@ fun CouponManager(
                                 )
                             }
                             IconButton(onClick = {
-                                FirebaseFirestore.getInstance()
-                                    .collection("coupons")
-                                    .document(coupon.id)
-                                    .delete()
-                                    .addOnFailureListener { e -> Log.e("CouponManager", "Delete failed", e) }
+                                // ✨ م2-ج2: استخدام ViewModel
+                                viewModel.deleteCoupon(coupon.id)
                             }) {
                                 Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444))
                             }
@@ -208,11 +200,8 @@ fun CouponManager(
                                 discountPercent = discountPercent.toIntOrNull() ?: 10,
                                 isEnabled = true
                             )
-                            FirebaseFirestore.getInstance()
-                                .collection("coupons")
-                                .document(couponId)
-                                .set(newCoupon)
-                                .addOnFailureListener { e -> Log.e("CouponManager", "Insert failed", e) }
+                            // ✨ م2-ج2: استخدام ViewModel
+                            viewModel.addCoupon(newCoupon)
 
                             showAddDialog = false
                             code = ""

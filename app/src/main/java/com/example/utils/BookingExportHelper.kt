@@ -7,11 +7,10 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
 import com.example.data.BookingEntity
+import com.example.utils.DateFormatter
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FileWriter
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -29,7 +28,8 @@ object BookingExportHelper {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
 
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            // ✨ م2-ج3: استخدام DateFormatter
+            val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "YemenServices_Bookings_$timeStamp.csv")
 
             FileWriter(file).use { writer ->
@@ -71,7 +71,8 @@ object BookingExportHelper {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
 
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            // ✨ م2-ج3: استخدام DateFormatter
+            val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "YemenServices_Report_$timeStamp.pdf")
 
             val document = PdfDocument()
@@ -103,7 +104,8 @@ object BookingExportHelper {
 
             // Draw Header Banner
             canvas.drawText("دليل خدمات اليمن - تقرير الحجوزات", 40f, 50f, titlePaint)
-            val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale("ar")).format(Date())
+            // ✨ م2-ج3: استخدام DateFormatter
+            val dateStr = DateFormatter.formatDateTime(System.currentTimeMillis())
             canvas.drawText("تاريخ التقرير: $dateStr | إجمالي الحجوزات: ${bookings.size}", 40f, 70f, textPaint)
             canvas.drawLine(40f, 85f, 555f, 85f, linePaint)
 
@@ -144,7 +146,8 @@ object BookingExportHelper {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
 
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            // ✨ م2-ج3: استخدام DateFormatter
+            val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "YemenServices_Bookings_$timeStamp.xls")
 
             FileWriter(file).use { writer ->

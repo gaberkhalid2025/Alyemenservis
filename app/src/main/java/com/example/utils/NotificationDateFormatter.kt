@@ -1,10 +1,5 @@
 package com.example.utils
 
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
-
 /**
  * ⏰ NotificationDateFormatter
  * Helper to format notification timestamps into a unified Arabic format:
@@ -12,14 +7,6 @@ import java.util.TimeZone
  * with smart relative time support for recent events.
  */
 object NotificationDateFormatter {
-
-    private val fullDateFormat = SimpleDateFormat("EEEE، d MMMM yyyy، hh:mm a", Locale.forLanguageTag("ar")).apply {
-        timeZone = TimeZone.getDefault()
-    }
-
-    private val shortTimeFormat = SimpleDateFormat("hh:mm a", Locale.forLanguageTag("ar")).apply {
-        timeZone = TimeZone.getDefault()
-    }
 
     fun format(timestamp: Long): String {
         if (timestamp <= 0L) return "الآن"
@@ -31,21 +18,19 @@ object NotificationDateFormatter {
         val hours = minutes / 60
         val days = hours / 24
 
-        val date = Date(timestamp)
-
         return when {
-            diffMillis < 0 -> fullDateFormat.format(date)
+            diffMillis < 0 -> DateFormatter.formatFull(timestamp)
             minutes < 1 -> "منذ لحظات"
             minutes < 60 -> "منذ $minutes دقيقة"
-            hours < 24 -> "منذ $hours ساعة (${shortTimeFormat.format(date)})"
-            days == 1L -> "أمس في ${shortTimeFormat.format(date)}"
-            days < 7 -> "منذ $days أيام (${shortTimeFormat.format(date)})"
-            else -> fullDateFormat.format(date)
+            hours < 24 -> "منذ $hours ساعة (${DateFormatter.formatTime(timestamp)})"
+            days == 1L -> "أمس في ${DateFormatter.formatTime(timestamp)}"
+            days < 7 -> "منذ $days أيام (${DateFormatter.formatTime(timestamp)})"
+            else -> DateFormatter.formatFull(timestamp)
         }
     }
 
     fun formatFull(timestamp: Long): String {
         if (timestamp <= 0L) return "تاريخ غير محدد"
-        return fullDateFormat.format(Date(timestamp))
+        return DateFormatter.formatFull(timestamp)
     }
 }

@@ -6,7 +6,8 @@ import androidx.annotation.Keep
 data class InstantRequestEntity(
     val id: String = "",
     val requestCode: String = "", // e.g. R-942338
-    val secretPin: String = "", // 6-digit PIN for customer verification
+    val pinHash: String = "", // PBKDF2 hash of the PIN
+    val secretPin: String = "", // PIN for customer verification
     val cancellationPassword: String = "", // 4-digit cancellation code
     val userId: String = "",
     val userName: String = "",

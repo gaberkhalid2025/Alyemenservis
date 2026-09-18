@@ -75,8 +75,22 @@ data class StaffMember(
 
 interface IDashboardExtensionsRepository {
     fun getSpecialOffers(ownerId: String): Flow<List<com.example.data.SpecialOfferEntity>>
+    fun updateSpecialOfferStatus(offerId: String, isEnabled: Boolean)
+    fun deleteSpecialOffer(offerId: String)
+    fun addSpecialOffer(offer: com.example.data.SpecialOfferEntity)
     fun getCoupons(ownerId: String): Flow<List<com.example.data.SpecialOfferEntity>>
+    fun updateCouponStatus(couponId: String, isEnabled: Boolean)
+    fun deleteCoupon(couponId: String)
+    fun addCoupon(coupon: com.example.data.SpecialOfferEntity)
     fun getInventory(ownerId: String): Flow<List<InventoryItem>>
+    fun updateInventoryQuantity(itemId: String, newQty: Int, inStock: Boolean)
+    fun deleteInventoryItem(itemId: String)
+    fun addInventoryItem(item: InventoryItem)
     fun getLoyaltyPrograms(ownerId: String): Flow<List<LoyaltyProgram>>
+    fun updateLoyaltyProgramStatus(programId: String, isEnabled: Boolean)
+    fun deleteLoyaltyProgram(programId: String)
+    fun addLoyaltyProgram(program: LoyaltyProgram)
     fun getStaff(ownerId: String): Flow<List<StaffMember>>
+    fun deleteStaff(staffId: String)
+    fun addStaff(staffMember: StaffMember)
 }

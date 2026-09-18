@@ -68,3 +68,18 @@ enum class InstantRequestStatus(val code: String, val labelArabic: String) {
     EXPIRED("EXPIRED", "منتهي الصلاحية"),
     CANCELLED("CANCELLED", "ملغى")
 }
+
+@Keep
+enum class UrgencyLevel(val code: String, val labelArabic: String) {
+    NORMAL("NORMAL", "عادي"),
+    URGENT("URGENT", "عاجل")
+}
+
+@Keep
+enum class OrderStatus(val code: String, val labelArabic: String) {
+    PENDING("PENDING", "قيد الانتظار"),
+    PROCESSING("PROCESSING", "قيد التجهيز والتوصيل"),
+    COMPLETED("COMPLETED", "مكتمل ومستلم"),
+    CANCELLED("CANCELLED", "ملغي")
+}
+

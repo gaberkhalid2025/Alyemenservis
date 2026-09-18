@@ -19,9 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.repositories.LoyaltyProgram
-import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
-import android.util.Log
 
 /**
  * 🎁 LoyaltyManager (إدارة برامج الولاء ونقاط المكافآت)
@@ -130,11 +128,8 @@ fun LoyaltyManager(
 
                         Row {
                             IconButton(onClick = {
-                                FirebaseFirestore.getInstance()
-                                    .collection("loyalty_programs")
-                                    .document(program.id)
-                                    .update("isEnabled", !program.isEnabled)
-                                    .addOnFailureListener { e -> Log.e("LoyaltyManager", "Update failed", e) }
+                                // ✨ م2-ج2: استخدام ViewModel بدلاً من Firestore المباشر
+                                viewModel.updateLoyaltyProgramStatus(program.id, !program.isEnabled)
                             }) {
                                 Icon(
                                     if (program.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
@@ -143,11 +138,8 @@ fun LoyaltyManager(
                                 )
                             }
                             IconButton(onClick = {
-                                FirebaseFirestore.getInstance()
-                                    .collection("loyalty_programs")
-                                    .document(program.id)
-                                    .delete()
-                                    .addOnFailureListener { e -> Log.e("LoyaltyManager", "Delete failed", e) }
+                                // ✨ م2-ج2: استخدام ViewModel
+                                viewModel.deleteLoyaltyProgram(program.id)
                             }) {
                                 Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444))
                             }
@@ -206,11 +198,8 @@ fun LoyaltyManager(
                                 discountValue = discountVal.toDoubleOrNull() ?: 50.0,
                                 isEnabled = true
                             )
-                            FirebaseFirestore.getInstance()
-                                .collection("loyalty_programs")
-                                .document(progId)
-                                .set(newProg)
-                                .addOnFailureListener { e -> Log.e("LoyaltyManager", "Insert failed", e) }
+                            // ✨ م2-ج2: استخدام ViewModel
+                            viewModel.addLoyaltyProgram(newProg)
 
                             showAddDialog = false
                             programName = ""

@@ -112,11 +112,11 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
             }
         }
 
-        // Quick Summary Stats
-        val newCount = remember(myOrders) { myOrders.count { it.status == "PENDING" || it.status.isEmpty() } }
-        val inProgressCount = remember(myOrders) { myOrders.count { it.status == "PROCESSING" } }
-        val completedCount = remember(myOrders) { myOrders.count { it.status == "COMPLETED" } }
-        val cancelledCount = remember(myOrders) { myOrders.count { it.status == "CANCELLED" } }
+        // ✨ م2: استخدام الـ OrderStatus الموحد بدلاً من السلاسل النصية الخام
+        val newCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.PENDING.code || it.status.isEmpty() } }
+        val inProgressCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.PROCESSING.code } }
+        val completedCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.COMPLETED.code } }
+        val cancelledCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.CANCELLED.code } }
 
         Card(
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -272,14 +272,14 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                                 ) {
                                     Text(
                                         text = when (order.status) {
-                                            "COMPLETED" -> "مكتمل ومستلم ✅"
-                                            "CANCELLED" -> "ملغي ❌"
-                                            "PROCESSING" -> "قيد التجهيز والتوصيل 🛵"
+                                            com.example.data.models.OrderStatus.COMPLETED.code -> "مكتمل ومستلم ✅"
+                                            com.example.data.models.OrderStatus.CANCELLED.code -> "ملغي ❌"
+                                            com.example.data.models.OrderStatus.PROCESSING.code -> "قيد التجهيز والتوصيل 🛵"
                                             else -> "قيد المراجعة ⏳"
                                         },
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (order.status == "PROCESSING" || order.status == "CANCELLED") Color.White else Color.Black,
+                                        color = if (order.status == com.example.data.models.OrderStatus.PROCESSING.code || order.status == com.example.data.models.OrderStatus.CANCELLED.code) Color.White else Color.Black,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }

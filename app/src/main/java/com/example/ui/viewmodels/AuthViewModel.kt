@@ -130,9 +130,37 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val savedJoinPhone = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("join_request_phone", "") ?: "")
         _joinRequestPhone.value = savedJoinPhone
         
-        val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
-        if (savedRole != "GUEST") {
-            _adminRole.value = savedRole
+        val secureStorage = com.example.utils.SecureStorage(context)
+        val session = secureStorage.getAdminSession()
+        if (session != null) {
+            val isExpired = System.currentTimeMillis() - session.loginTime > 30L * 24 * 60 * 60 * 1000
+            if (!isExpired) {
+                _adminRole.value = session.role
+                if (session.role == "SUPERVISOR") {
+                    // إذا كان مشرفاً، نحاول جلب صلاحياته المخزنة أو الافتراضية
+                    viewModelScope.launch {
+                        try {
+                            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            val doc = db.collection("supervisors").document(session.uid).get().await()
+                            if (doc.exists()) {
+                                @Suppress("UNCHECKED_CAST")
+                                val perms = doc.get("permissions") as? List<String> ?: emptyList()
+                                _currentSupervisorPermissions.value = perms
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            } else {
+                secureStorage.clearAdminSession()
+                _adminRole.value = "GUEST"
+            }
+        } else {
+            val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
+            if (savedRole != "GUEST") {
+                _adminRole.value = savedRole
+            }
         }
 
         try {

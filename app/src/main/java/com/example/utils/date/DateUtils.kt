@@ -1,7 +1,5 @@
 package com.example.utils.date
 
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -17,8 +15,8 @@ object DateUtils {
     ): String {
         if (timestamp <= 0L) return ""
         return try {
-            val sdf = SimpleDateFormat(pattern, locale)
-            sdf.format(Date(timestamp))
+            // ✨ م2: استخدام DateFormatter الموحد
+            com.example.utils.DateFormatter.formatCustom(timestamp, pattern)
         } catch (e: Exception) {
             ""
         }

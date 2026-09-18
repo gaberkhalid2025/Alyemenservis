@@ -12,7 +12,6 @@ import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.data.BookingEntity
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
@@ -162,9 +161,17 @@ object BookingReminderService {
 
     private fun parseDateTimeToMillis(dateStr: String, timeStr: String): Long? {
         return try {
-            val sdfDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val date = sdfDate.parse(dateStr) ?: return null
-            val cal = Calendar.getInstance().apply { time = date }
+            // ✨ م2: استخدام تحليل التاريخ المباشر لتجنب SimpleDateFormat
+            val parts = dateStr.split("-")
+            if (parts.size != 3) return null
+            val year = parts[0].toIntOrNull() ?: return null
+            val month = parts[1].toIntOrNull() ?: return null
+            val day = parts[2].toIntOrNull() ?: return null
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+            }
 
             var hour = 9
             var minute = 0

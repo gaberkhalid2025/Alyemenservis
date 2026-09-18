@@ -31,10 +31,11 @@ fun TabBookingsOrders(
 
     val filteredBookings = remember(bookings, selectedFilter) {
         when (selectedFilter) {
-            "PENDING" -> bookings.filter { it.status == "PENDING" }
-            "ACTIVE" -> bookings.filter { it.status in listOf("APPROVED", "IN_PROGRESS", "IN_PREPARATION", "READY") }
-            "COMPLETED" -> bookings.filter { it.status in listOf("COMPLETED", "DELIVERED") }
-            "REJECTED" -> bookings.filter { it.status in listOf("REJECTED", "CANCELLED") }
+            // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
+            com.example.utils.BookingStatus.PENDING.code -> bookings.filter { it.status == com.example.utils.BookingStatus.PENDING.code }
+            "ACTIVE" -> bookings.filter { it.status in listOf(com.example.utils.BookingStatus.ACCEPTED.code, com.example.utils.BookingStatus.IN_PROGRESS.code, "APPROVED", "IN_PREPARATION", "READY") }
+            "COMPLETED" -> bookings.filter { it.status in listOf(com.example.utils.BookingStatus.COMPLETED.code, com.example.utils.BookingStatus.PAID.code, com.example.utils.BookingStatus.CLOSED.code, "DELIVERED") }
+            "REJECTED" -> bookings.filter { it.status in listOf(com.example.utils.BookingStatus.REJECTED.code, com.example.utils.BookingStatus.CANCELLED.code) }
             else -> bookings
         }
     }

@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.models.UserPresence
+import com.example.utils.DateFormatter
 import com.example.utils.VisualThemePalette
-import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
@@ -129,8 +129,8 @@ fun ChatHeaderBar(
                     isOnline -> "متصل الآن"
                     isAway -> "نشط مؤخراً"
                     presence != null && presence.lastSeen > 0 -> {
-                        val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-                        "آخر ظهور ${sdf.format(Date(presence.lastSeen))}"
+                        // ✨ م2-ج3: استخدام DateFormatter
+                        "آخر ظهور ${DateFormatter.formatTime(presence.lastSeen)}"
                     }
                     else -> "غير متصل"
                 }

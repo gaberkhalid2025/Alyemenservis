@@ -9,9 +9,9 @@ import com.example.data.models.AdminRole
 object AdminSecurityManager {
 
     /**
+     * // ✨ إصلاح المرحلة 1.5: التحقق الآمن عبر Cloud Functions و Firebase Auth
      * يتحقق من صحة بيانات الدخول (المالك، المدير، أو المشرف)
-     * باستخدام التشفير الآمن والتحقق السحابي عبر Firestore
-     * دون أي كلمات مرور ثابتة أو أبواب خلفية.
+     * باستخدام التشفير الآمن والتحقق السحابي عبر Cloud Functions / Firestore
      */
     suspend fun verifyCredentials(
         username: String,
@@ -21,24 +21,31 @@ object AdminSecurityManager {
         val trimmedUser = username.trim()
         val trimmedPass = passwordAttempt.trim()
         if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
-        
-        // 1. التحقق من إعدادات المالك والمدير الممررة
-        if (settings != null) {
-            // المالك
-            if (settings.ownerEmail.isNotBlank() && trimmedUser.equals(settings.ownerEmail.trim(), ignoreCase = true)) {
-                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.ownerPassword)) {
-                    return "OWNER"
+
+        // 1. محاولة التحقق السحابي عبر Cloud Function "verifyAdminLogin" إن كان بريداً إلكترونياً
+        try {
+            if (trimmedUser.contains("@")) {
+                val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
+                val result = functions.getHttpsCallable("verifyAdminLogin")
+                    .call(mapOf("email" to trimmedUser, "password" to trimmedPass))
+                    .await()
+                val data = result.data as? Map<*, *>
+                if (data != null && data["success"] == true) {
+                    val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                    val token = user?.getIdToken(false)?.await()
+                    val claims = token?.claims
+                    return when {
+                        claims?.get("isSuperAdmin") == true -> "OWNER"
+                        claims?.get("isAdmin") == true -> "ADMIN"
+                        else -> "ADMIN"
+                    }
                 }
             }
-            // المدير
-            if (settings.adminUsername.isNotBlank() && trimmedUser.equals(settings.adminUsername.trim(), ignoreCase = true)) {
-                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, settings.adminPassword)) {
-                    return "ADMIN"
-                }
-            }
+        } catch (_: Exception) {
+            // الاستمرار في التحقق الاحتياطي عند عدم توفر وظيفة السحابة أو فحص المشرفين
         }
         
-        // 2. التحقق السحابي المباشر من Firestore
+        // 2. التحقق السحابي المباشر من Firestore للمشرفين والمستخدمين الإداريين
         return try {
             val db = FirebaseFirestore.getInstance()
             

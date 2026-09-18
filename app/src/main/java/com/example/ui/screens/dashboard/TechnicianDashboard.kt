@@ -120,18 +120,18 @@ fun TechnicianDashboard(
                 when (activeTab) {
                     0 -> {
                         TabBookingsOrders(
-                            bookings = providerBookings.filter { it.status == "PENDING" },
+                            bookings = providerBookings.filter { it.status == com.example.utils.BookingStatus.PENDING.code },
                             themeColors = themeColors,
                             onAcceptBooking = { bId ->
-                                viewModel.updateBookingStatus(bId, "APPROVED")
+                                viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.ACCEPTED.code)
                                 Toast.makeText(context, "تم قبول طلب الحجز وإشعار العميل ✅", Toast.LENGTH_SHORT).show()
                             },
                             onRejectBooking = { bId, reason ->
-                                viewModel.updateBookingStatus(bId, "REJECTED")
+                                viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.REJECTED.code)
                                 Toast.makeText(context, "تم رفض الطلب وإرسال السبب للعميل ❌", Toast.LENGTH_SHORT).show()
                             },
-                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, "IN_PROGRESS") },
-                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, "COMPLETED") },
+                            onStartProgress = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.IN_PROGRESS.code) },
+                            onCompleteBooking = { bId -> viewModel.updateBookingStatus(bId, com.example.utils.BookingStatus.COMPLETED.code) },
                             onChatWithClient = { phone ->
                                 viewModel.openOrCreateChatChannel(
                                     targetId = account.id,

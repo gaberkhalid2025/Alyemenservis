@@ -4,10 +4,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import com.example.data.models.InstantRequestEntity
+import com.example.utils.DateFormatter
 import java.io.File
 import java.io.FileWriter
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -22,7 +21,8 @@ object ReportExporter {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
 
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            // ✨ م2-ج3: استخدام DateFormatter
+            val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "Urgent_Requests_$timeStamp.csv")
 
             FileWriter(file).use { writer ->
@@ -32,7 +32,8 @@ object ReportExporter {
                 val now = System.currentTimeMillis()
                 requests.forEach { req ->
                     val remainingMinutes = (((req.expiresAt - now) / 1000) / 60).coerceAtLeast(0)
-                    val dateFormatted = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale("ar")).format(Date(req.createdAt))
+                    // ✨ م2-ج3: استخدام DateFormatter
+                    val dateFormatted = DateFormatter.formatDateTime(req.createdAt)
 
                     val line = listOf(
                         "\"${req.requestCode}\"",
@@ -66,7 +67,8 @@ object ReportExporter {
             val exportDir = File(context.cacheDir, "exports")
             if (!exportDir.exists()) exportDir.mkdirs()
 
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            // ✨ م2-ج3: استخدام DateFormatter
+            val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "Financial_Report_${accountName}_$timeStamp.csv")
 
             FileWriter(file).use { writer ->

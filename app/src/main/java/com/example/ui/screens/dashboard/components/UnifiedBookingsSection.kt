@@ -115,7 +115,8 @@ fun UnifiedBookingsSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (status == "PENDING") {
+                // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
+                if (status == com.example.utils.BookingStatus.PENDING.code) {
                     if (onAcceptClick != null) {
                         Button(
                             onClick = onAcceptClick,
@@ -138,7 +139,8 @@ fun UnifiedBookingsSection(
                     }
                 }
 
-                if (status == "APPROVED") {
+                // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
+                if (status == "APPROVED" || status == com.example.utils.BookingStatus.ACCEPTED.code) {
                     if (onStartProgressClick != null) {
                         Button(
                             onClick = onStartProgressClick,
@@ -151,7 +153,8 @@ fun UnifiedBookingsSection(
                     }
                 }
 
-                if (status == "IN_PROGRESS" || status == "APPROVED") {
+                // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
+                if (status == com.example.utils.BookingStatus.IN_PROGRESS.code || status == "APPROVED" || status == com.example.utils.BookingStatus.ACCEPTED.code) {
                     if (onCompleteClick != null) {
                         Button(
                             onClick = onCompleteClick,
@@ -166,7 +169,8 @@ fun UnifiedBookingsSection(
 
                 // Custom order status options for stores / restaurants / medical
                 if (onUpdateOrderStatus != null) {
-                    if (status == "PENDING") {
+                    // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
+                    if (status == com.example.utils.BookingStatus.PENDING.code) {
                         Button(
                             onClick = { onUpdateOrderStatus("IN_PREPARATION") },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),

@@ -103,7 +103,13 @@ object BookingSecurityHelper {
         // Direct match
         if (cleanInput.equals(cleanTarget, ignoreCase = true)) return true
         
-        // Hash match
+        // PBKDF2 match
+        if (com.example.utils.SecureHasher.verifyPin(cleanInput, cleanTarget) ||
+            com.example.utils.SecureHasher.verifyPassword(cleanInput, cleanTarget)) {
+            return true
+        }
+
+        // Hash match (SHA-256 fallback)
         val inputHash = hashPin(cleanInput)
         return inputHash.equals(cleanTarget, ignoreCase = true)
     }

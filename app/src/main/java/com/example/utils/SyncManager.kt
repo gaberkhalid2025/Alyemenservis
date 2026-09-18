@@ -10,8 +10,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -267,8 +265,8 @@ class SyncManager(private val context: Context) {
     fun getLastSyncTime(): String {
         val ts = prefs.getLong(KEY_LAST_SYNC_TS, 0L)
         if (ts == 0L) return "لم تتم المزامنة بعد"
-        val sdf = SimpleDateFormat("yyyy/MM/dd - hh:mm a", Locale("ar"))
-        return sdf.format(Date(ts))
+        // ✨ م2: استخدام DateFormatter الموحد
+        return DateFormatter.formatCustom(ts, "yyyy/MM/dd - hh:mm a")
     }
 
     /**

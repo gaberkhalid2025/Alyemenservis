@@ -24,6 +24,57 @@ class FCMService : FirebaseMessagingService() {
         val data = remoteMessage.data
         val type = data["type"] ?: data["notificationType"] ?: ""
 
+        // 🔑 معالجة طلبات استعادة كلمة المرور الحرجة للأدمن
+        if (type.equals("PASSWORD_RECOVERY", ignoreCase = true)) {
+            val requestId = data["requestId"] ?: ""
+            val phone = data["phone"] ?: ""
+            val name = data["name"] ?: "غير محدد"
+            val accountType = data["accountType"] ?: "حساب"
+
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("navigate_to", "PASSWORD_RECOVERY_PANEL")
+                putExtra("requestId", requestId)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                requestId.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notification = NotificationCompat.Builder(
+                this,
+                NotificationHelper.CHANNEL_ADMIN_CRITICAL
+            )
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle("🔑 طلب استعادة كلمة مرور")
+                .setContentText("$accountType - $name ($phone)")
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText(
+                            "طلب استعادة كلمة مرور جديد\n\n" +
+                            "النوع: $accountType\n" +
+                            "الاسم: $name\n" +
+                            "الهاتف: $phone\n\n" +
+                            "اضغط للمعالجة الفورية"
+                        )
+                )
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setColor(android.graphics.Color.RED)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setVibrate(longArrayOf(0, 500, 200, 500))
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .build()
+
+            notificationManager.notify(requestId.hashCode(), notification)
+            return
+        }
+
         if (type.equals("CHAT", ignoreCase = true) || data.containsKey("channelId")) {
             val channelId = data["channelId"] ?: ""
             val senderId = data["senderId"] ?: ""

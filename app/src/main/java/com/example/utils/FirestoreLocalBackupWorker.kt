@@ -12,8 +12,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -72,7 +70,8 @@ class FirestoreLocalBackupWorker(
                 backupDir.mkdirs()
             }
 
-            val timestampStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            // ✨ م2: استخدام DateFormatter
+            val timestampStr = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val backupFile = File(backupDir, "wam_firestore_backup_$timestampStr.enc")
 
             FileOutputStream(backupFile).use { fos ->

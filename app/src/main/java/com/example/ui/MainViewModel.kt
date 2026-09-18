@@ -19,6 +19,7 @@ import com.example.ui.viewmodels.SettingsViewModel.CardSettings
 import com.example.ui.viewmodels.SettingsViewModel.ChatParticipantType
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 @HiltViewModel
@@ -529,6 +530,39 @@ class MainViewModel @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
             null
+        }
+    }
+
+    /**
+     * 🔑 إرسال طلب استعادة كلمة مرور
+     * يُخزّن الطلب في Firestore ويُنبّه الأدمن تلقائياً
+     */
+    fun requestPasswordRecovery(
+        phone: String,
+        name: String,
+        accountType: String
+    ) {
+        viewModelScope.launch {
+            try {
+                val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+                val requestData = mapOf(
+                    "phone" to cleanPhone,
+                    "name" to name,
+                    "accountType" to accountType,
+                    "status" to "PENDING",
+                    "requestedAt" to System.currentTimeMillis(),
+                    "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                )
+                
+                db.collection("password_recovery_requests")
+                    .document(cleanPhone)
+                    .set(requestData, com.google.firebase.firestore.SetOptions.merge())
+                    .await()
+                
+                triggerNotification("✅ تم إرسال طلبك للإدارة. سيتم التواصل معك قريباً")
+            } catch (e: Exception) {
+                triggerNotification("❌ فشل إرسال الطلب: ${e.message}")
+            }
         }
     }
 }

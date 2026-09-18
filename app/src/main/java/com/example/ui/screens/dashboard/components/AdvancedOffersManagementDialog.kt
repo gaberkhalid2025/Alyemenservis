@@ -17,9 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.SpecialOfferEntity
-import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
-import android.util.Log
 
 @Composable
 fun AdvancedOffersManagementDialog(
@@ -99,11 +97,8 @@ fun AdvancedOffersManagementDialog(
                                     expiryDate = "بعد ${newDuration.toIntOrNull() ?: 7} أيام",
                                     isEnabled = true
                                 )
-                                FirebaseFirestore.getInstance()
-                                    .collection("special_offers")
-                                    .document(offerId)
-                                    .set(newOffer)
-                                    .addOnFailureListener { e -> Log.e("AdvancedOffers", "Insert failed", e) }
+                                // ✨ م2-ج2: استخدام ViewModel بدلاً من Firestore المباشر
+                                viewModel.addSpecialOffer(newOffer)
 
                                 newTitle = ""
                                 showAddDialog = false
@@ -136,19 +131,13 @@ fun AdvancedOffersManagementDialog(
                                 Switch(
                                     checked = offer.isEnabled,
                                     onCheckedChange = { active ->
-                                        FirebaseFirestore.getInstance()
-                                            .collection("special_offers")
-                                            .document(offer.id)
-                                            .update("isEnabled", active)
-                                            .addOnFailureListener { e -> Log.e("AdvancedOffers", "Update failed", e) }
+                                        // ✨ م2-ج2: استخدام ViewModel
+                                        viewModel.updateSpecialOfferStatus(offer.id, active)
                                     }
                                 )
                                 IconButton(onClick = {
-                                    FirebaseFirestore.getInstance()
-                                        .collection("special_offers")
-                                        .document(offer.id)
-                                        .delete()
-                                        .addOnFailureListener { e -> Log.e("AdvancedOffers", "Delete failed", e) }
+                                    // ✨ م2-ج2: استخدام ViewModel
+                                    viewModel.deleteSpecialOffer(offer.id)
                                 }) {
                                     Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
                                 }

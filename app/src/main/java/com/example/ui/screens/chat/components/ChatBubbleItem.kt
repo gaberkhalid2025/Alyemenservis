@@ -35,7 +35,7 @@ import com.example.data.models.MediaType
 import com.example.data.models.MessageStatus
 import com.example.utils.AudioPlayerManager
 import com.example.utils.ChatIcons
-import java.text.SimpleDateFormat
+import com.example.utils.DateFormatter
 import java.util.*
 
 import com.example.utils.VisualThemePalette
@@ -70,8 +70,8 @@ fun ChatBubbleItem(
     }
 
     val textColor = textPrimaryColor
-    val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val formattedTime = timeFormat.format(Date(message.timestamp))
+    // ✨ م2-ج3: استخدام DateFormatter
+    val formattedTime = DateFormatter.formatTime(message.timestamp)
 
     Row(
         modifier = Modifier

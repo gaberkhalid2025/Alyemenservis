@@ -74,7 +74,8 @@ object ChatValidationUtils {
 
     fun canUploadToday(context: Context): Boolean {
         val prefs = context.getSharedPreferences("chat_upload_limits", Context.MODE_PRIVATE)
-        val todayStr = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+        // ✨ م2: استخدام DateFormatter الموحد
+        val todayStr = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd")
         val lastDate = prefs.getString("last_upload_date", "")
         val count = if (lastDate == todayStr) prefs.getInt("upload_count", 0) else 0
         return count < MAX_DAILY_UPLOADS
@@ -82,7 +83,8 @@ object ChatValidationUtils {
 
     fun recordUploadToday(context: Context) {
         val prefs = context.getSharedPreferences("chat_upload_limits", Context.MODE_PRIVATE)
-        val todayStr = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+        // ✨ م2: استخدام DateFormatter الموحد
+        val todayStr = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd")
         val lastDate = prefs.getString("last_upload_date", "")
         val count = if (lastDate == todayStr) prefs.getInt("upload_count", 0) else 0
         prefs.edit()

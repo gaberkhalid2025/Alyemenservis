@@ -561,9 +561,8 @@ fun resolveConflict(context: android.content.Context, useCloud: Boolean) {
 
 fun getCurrentTimestampString(): String {
         return try {
-            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
-                timeZone = java.util.TimeZone.getTimeZone("UTC")
-            }.format(java.util.Date())
+            // ✨ م2: استخدام DateFormatter
+            com.example.utils.DateFormatter.formatIso(System.currentTimeMillis()) + "Z"
         } catch (e: Exception) {
             "2026-08-06T15:00:00Z"
         }

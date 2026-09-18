@@ -88,17 +88,17 @@ fun StatusBookingsSection(
                             Text("العميل: ${b.customerName}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             Text(
                                 text = when (b.status) {
-                                    "PENDING" -> "⏳ بانتظار تأكيدك"
-                                    "APPROVED", "IN_PROGRESS" -> "🟢 مقبول وجاري التنفيذ"
-                                    "REJECTED" -> "❌ مرفوض"
-                                    "COMPLETED" -> "✅ مكتمل"
+                                    com.example.utils.BookingStatus.PENDING.code -> "⏳ بانتظار تأكيدك"
+                                    "APPROVED", com.example.utils.BookingStatus.ACCEPTED.code, com.example.utils.BookingStatus.IN_PROGRESS.code -> "🟢 مقبول وجاري التنفيذ"
+                                    com.example.utils.BookingStatus.REJECTED.code -> "❌ مرفوض"
+                                    com.example.utils.BookingStatus.COMPLETED.code -> "✅ مكتمل"
                                     else -> b.status
                                 },
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = when (b.status) {
-                                    "PENDING" -> Color.Yellow
-                                    "APPROVED", "IN_PROGRESS", "COMPLETED" -> Color.Green
+                                    com.example.utils.BookingStatus.PENDING.code -> Color.Yellow
+                                    "APPROVED", com.example.utils.BookingStatus.ACCEPTED.code, com.example.utils.BookingStatus.IN_PROGRESS.code, com.example.utils.BookingStatus.COMPLETED.code -> Color.Green
                                     else -> Color.Red
                                 }
                             )
@@ -108,7 +108,7 @@ fun StatusBookingsSection(
                         Text("🔧 الخدمة المطلوبة: ${b.serviceType}", fontSize = 10.sp, color = Color.LightGray)
                         Text("⏰ الموعد: ${b.dateString} - ${b.timeString}", fontSize = 10.sp, color = Color.LightGray)
 
-                        if (b.status == "PENDING") {
+                        if (b.status == com.example.utils.BookingStatus.PENDING.code) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

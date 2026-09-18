@@ -1,5 +1,6 @@
 package com.example.ui.screens.requests
 
+import android.content.Context
 import android.content.Intent
 import com.example.ui.*
 import android.net.Uri
@@ -35,9 +36,9 @@ import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
 import com.example.ui.viewmodels.InstantRequestViewModel
 import com.example.ui.viewmodels.InstantUiState
+import com.example.utils.DateFormatter
+import com.example.utils.SecureHasher
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -69,6 +70,7 @@ fun RequestDetailsScreen(
     var showCancelDialog by remember { mutableStateOf(false) }
     var cancelPinInput by remember { mutableStateOf("") }
     var isCancelling by remember { mutableStateOf(false) }
+    var failedAttempts by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
@@ -180,7 +182,8 @@ fun RequestDetailsScreen(
                             }
                         }
 
-                        val dateFormatted = SimpleDateFormat("yyyy/MM/dd - hh:mm a", Locale.getDefault()).format(Date(currentRequest.createdAt))
+                        // ✨ م2-ج3: استخدام DateFormatter
+                        val dateFormatted = DateFormatter.formatDisplay(currentRequest.createdAt)
                         Text("تاريخ النشر: $dateFormatted", fontSize = 11.sp, color = Color.Gray)
                     }
                 }
@@ -330,15 +333,61 @@ fun RequestDetailsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val expectedPin = (selectedRequest?.secretPin ?: selectedRequest?.cancellationPassword ?: "").trim()
-                        if (expectedPin.isBlank()) {
+                        // ✨ إصلاح المرحلة 1.5: التحقق من PIN المشفر و Rate Limiting
+                        val prefs = context.getSharedPreferences("cancel_pin_attempts", Context.MODE_PRIVATE)
+                        val attemptKey = "attempts_$requestId"
+                        val lockKey = "lock_$requestId"
+                        
+                        val lockUntil = prefs.getLong(lockKey, 0L)
+                        if (System.currentTimeMillis() < lockUntil) {
+                            val remainingHours = ((lockUntil - System.currentTimeMillis()) / (1000 * 60 * 60)) + 1
+                            Toast.makeText(
+                                context,
+                                "تم قفل محاولات الإلغاء. حاول بعد $remainingHours ساعة",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@Button
+                        }
+                        
+                        val storedHash = (selectedRequest?.pinHash 
+                            ?: selectedRequest?.secretPin 
+                            ?: selectedRequest?.cancellationPassword 
+                            ?: "").trim()
+                            
+                        if (storedHash.isBlank()) {
                             Toast.makeText(context, "الرمز السري للطلب غير متوفر، الرجاء التواصل مع الدعم.", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
-                        if (cancelPinInput.trim() != expectedPin) {
-                            Toast.makeText(context, "رمز PIN غير صحيح!", Toast.LENGTH_SHORT).show()
+                        
+                        val isPinValid = SecureHasher.verifyPin(cancelPinInput.trim(), storedHash)
+                        if (!isPinValid) {
+                            val currentAttempts = prefs.getInt(attemptKey, 0) + 1
+                            if (currentAttempts >= 5) {
+                                // قفل لمدة 8 ساعات
+                                val lockTime = System.currentTimeMillis() + (8 * 60 * 60 * 1000L)
+                                prefs.edit()
+                                    .putLong(lockKey, lockTime)
+                                    .putInt(attemptKey, 0)
+                                    .apply()
+                                Toast.makeText(
+                                    context,
+                                    "تم تجاوز الحد الأقصى للمحاولات. تم القفل لمدة 8 ساعات",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                prefs.edit().putInt(attemptKey, currentAttempts).apply()
+                                val remaining = 5 - currentAttempts
+                                Toast.makeText(
+                                    context,
+                                    "رمز PIN غير صحيح. متبقي $remaining محاولات",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                             return@Button
                         }
+                        
+                        // نجاح التحقق - مسح المحاولات
+                        prefs.edit().remove(attemptKey).remove(lockKey).apply()
 
                         isCancelling = true
                         instantViewModel.cancelInstantRequest(

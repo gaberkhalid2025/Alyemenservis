@@ -24,4 +24,10 @@ object FirebaseModule {
     fun provideFirebaseAuth(): FirebaseAuth {
         return FirebaseAuth.getInstance()
     }
+
+    @Provides
+    @Singleton
+    fun provideSecureStorage(@dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context): com.example.utils.SecureStorage {
+        return com.example.utils.SecureStorage(context)
+    }
 }

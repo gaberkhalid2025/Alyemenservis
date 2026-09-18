@@ -68,9 +68,11 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -97,8 +99,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 
+// ✨ شاشة الإدارة الرئيسية
 @Composable
-fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) {
+fun AdminPanelLayout(
+    viewModel: MainViewModel,
+    themeColors: VisualThemePalette
+) {
+    AdminPanelLayoutContent(viewModel, themeColors)
+}
+
+@Composable
+private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: VisualThemePalette) {
     val pendingProviders by viewModel.pendingProviders.collectAsState()
     val reports by viewModel.reports.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
@@ -356,59 +367,196 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
 
     val context = LocalContext.current
 
+    // ✨ إصلاح المرحلة 1.5: تسجيل دخول الأدمن الآمن عبر Firebase Auth
     if (!isAuthorized) {
-        var inputUsername by remember { mutableStateOf("") }
-        var inputPassword by remember { mutableStateOf("") }
-        var isLoginPasswordVisible by remember { mutableStateOf(false) }
-        var rememberMe by remember { mutableStateOf(false) }
-        var isLoading by remember { mutableStateOf(false) }
-
+        var accountType by rememberSaveable { mutableStateOf("ADMIN") } // "ADMIN", "OWNER" or "SUPERVISOR"
+        var emailInput by rememberSaveable { mutableStateOf("") }
+        var passwordInput by rememberSaveable { mutableStateOf("") }
+        var passwordVisible by rememberSaveable { mutableStateOf(false) }
+        var loginError by rememberSaveable { mutableStateOf<String?>(null) }
+        var isLoginLoading by remember { mutableStateOf(false) }
+        var rememberMe by rememberSaveable { mutableStateOf(true) }
+        
+        val adminViewModelForLogin: AdminViewModel = viewModel.adminViewModel
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(54.dp))
-            Spacer(modifier = Modifier.height(14.dp))
-            Text("بوابة مسؤولي المنصة الموثقة", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("الرجاء إدخال اسم المستخدم وكلمة المرور للدخول للوحة الإشراف والتحكم:", fontSize = 11.sp, color = themeColors.textSecondary)
-            Spacer(modifier = Modifier.height(16.dp))
+            // أيقونة القفل
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .background(
+                        Color(0xFFF59E0B).copy(alpha = 0.15f),
+                        RoundedCornerShape(20.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.AdminPanelSettings,
+                    contentDescription = "قفل الأدمن",
+                    tint = Color(0xFFF59E0B),
+                    modifier = Modifier.size(40.dp)
+                )
+            }
             
-            OutlinedTextField(
-                value = inputUsername,
-                onValueChange = { inputUsername = it },
-                label = { Text("اسم المستخدم / البريد الإلكتروني") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+            Spacer(Modifier.height(16.dp))
+            
+            Text(
+                "لوحة تحكم الإدارة العليا",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
-            Spacer(modifier = Modifier.height(8.dp))
             
+            Text(
+                "🔒 محمي بواسطة Firebase Auth + Custom Claims",
+                fontSize = 11.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(top = 4.dp),
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // ✨ م2: اختيار نوع الحساب
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { accountType = "ADMIN" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (accountType == "ADMIN") Color(0xFFF59E0B) else Color(0xFF1E293B)
+                    ),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "🛡️ أدمن",
+                        color = if (accountType == "ADMIN") Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+                
+                Button(
+                    onClick = { accountType = "OWNER" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (accountType == "OWNER") Color(0xFFF59E0B) else Color(0xFF1E293B)
+                    ),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "👑 مالك",
+                        color = if (accountType == "OWNER") Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Button(
+                    onClick = { accountType = "SUPERVISOR" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (accountType == "SUPERVISOR") Color(0xFFF59E0B) else Color(0xFF1E293B)
+                    ),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "💼 مشرف",
+                        color = if (accountType == "SUPERVISOR") Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // حقل البريد الإلكتروني
             OutlinedTextField(
-                value = inputPassword,
-                onValueChange = { inputPassword = it },
-                label = { Text("كلمة المرور") },
-                visualTransformation = if (isLoginPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                value = emailInput,
+                onValueChange = { 
+                    emailInput = it.trim()
+                    loginError = null
+                },
+                label = { Text(if (accountType == "SUPERVISOR") "اسم المستخدم أو معرف المشرف" else "البريد الإلكتروني") },
+                leadingIcon = { 
+                    Icon(if (accountType == "SUPERVISOR") Icons.Default.Person else Icons.Default.Email, null, tint = Color(0xFFF59E0B)) 
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (accountType == "SUPERVISOR") KeyboardType.Text else KeyboardType.Email,
+                    imeAction = ImeAction.Next
+                ),
+                singleLine = true,
+                enabled = !isLoginLoading,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFFF59E0B),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedLabelColor = Color(0xFFF59E0B)
+                )
+            )
+            
+            Spacer(Modifier.height(12.dp))
+            
+            // حقل كلمة المرور
+            OutlinedTextField(
+                value = passwordInput,
+                onValueChange = { 
+                    passwordInput = it
+                    loginError = null
+                },
+                label = { Text(if (accountType == "SUPERVISOR") "رمز المرور (Passcode)" else "كلمة المرور") },
+                leadingIcon = { 
+                    Icon(Icons.Default.Lock, null, tint = Color(0xFFF59E0B)) 
+                },
+                visualTransformation = if (passwordVisible) 
+                    VisualTransformation.None 
+                    else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (accountType == "SUPERVISOR") KeyboardType.NumberPassword else KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
                 trailingIcon = {
-                    IconButton(onClick = { isLoginPasswordVisible = !isLoginPasswordVisible }) {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (isLoginPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (isLoginPasswordVisible) "إخفاء كلمة المرور" else "عرض كلمة المرور",
-                            tint = if (isLoginPasswordVisible) themeColors.accent else Color.LightGray
+                            if (passwordVisible) Icons.Default.VisibilityOff 
+                            else Icons.Default.Visibility,
+                            contentDescription = "تبديل الرؤية",
+                            tint = Color.Gray
                         )
                     }
                 },
                 singleLine = true,
+                enabled = !isLoginLoading,
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFFF59E0B),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedLabelColor = Color(0xFFF59E0B)
+                )
             )
-            Spacer(modifier = Modifier.height(8.dp))
 
+            Spacer(Modifier.height(12.dp))
+            
+            // خيار "تذكرني"
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { rememberMe = !rememberMe }
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
@@ -416,143 +564,152 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                     checked = rememberMe,
                     onCheckedChange = { rememberMe = it },
                     colors = CheckboxDefaults.colors(
-                        checkedColor = themeColors.primary,
-                        uncheckedColor = Color.Gray,
-                        checkmarkColor = Color.White
+                        checkedColor = Color(0xFFF59E0B),
+                        uncheckedColor = Color.LightGray,
+                        checkmarkColor = Color.Black
                     )
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "تذكرني وحفظ تسجيل الدخول 🔐",
+                    text = "تذكرني على هذا الجهاز",
                     color = Color.White,
-                    fontSize = 11.sp,
-                    modifier = Modifier.clickable { rememberMe = !rememberMe }
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
             
-            // زر تسجيل دخول المشرف (الموحد)
+            // رسالة الخطأ
+            loginError?.let { error ->
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    color = Color(0xFFEF5350).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Warning, null, tint = Color(0xFFEF5350))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            error,
+                            color = Color(0xFFEF5350),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(20.dp))
+            
+            // زر تسجيل الدخول
             Button(
                 onClick = {
-                    if (inputUsername.isBlank() || inputPassword.isBlank()) {
-                        viewModel.triggerNotification("❌ يرجى إدخال البريد الإلكتروني وكلمة المرور!")
+                    if (emailInput.isBlank() || passwordInput.isBlank()) {
+                        loginError = if (accountType == "SUPERVISOR") "يرجى إدخال اسم المستخدم ورمز المرور" else "يرجى إدخال البريد وكلمة المرور"
                         return@Button
                     }
                     
-                    isLoading = true
+                    isLoginLoading = true
+                    loginError = null
                     
-                                        // التحقق السحابي الآمن
-                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                        val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
-                        when (result) {
-                            "OWNER" -> {
-                                isAuthorized = true
-                                activeSubTab = "BACKDOOR"
-                                viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                                viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
-                                isLoading = false
-                            }
-                            "ADMIN" -> {
-                                isAuthorized = true
-                                activeSubTab = "REG_REQ"
-                                viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                                viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
-                                isLoading = false
-                            }
-                            "SUPERVISOR" -> {
-                                val matchingSup = viewModel.supervisors.value.find { it.id == inputUsername || it.name.trim().equals(inputUsername.trim(), ignoreCase = true) }
-                                if (matchingSup != null) {
+                    when (accountType) {
+                        "OWNER" -> {
+                            adminViewModelForLogin.loginOwnerSecure(
+                                email = emailInput,
+                                password = passwordInput,
+                                rememberMe = rememberMe
+                            ) { success, errorMsg ->
+                                isLoginLoading = false
+                                if (success) {
                                     isAuthorized = true
-                                    viewModel.setSupervisorSession(matchingSup)
-                                    if (rememberMe) {
-                                        val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                        sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
-                                    }
-                                    viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                    activeSubTab = "BACKDOOR"
+                                    viewModel.triggerNotification("👑 مرحباً بك في لوحة التحكم (المالك)")
                                 } else {
-                                    viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
+                                    loginError = errorMsg ?: "فشل تسجيل الدخول"
                                 }
-                                isLoading = false
                             }
-                            else -> {
-                                viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
-                                isLoading = false
+                        }
+                        "ADMIN" -> {
+                            adminViewModelForLogin.loginAdminSecure(
+                                email = emailInput,
+                                password = passwordInput,
+                                rememberMe = rememberMe
+                            ) { success, errorMsg ->
+                                isLoginLoading = false
+                                if (success) {
+                                    isAuthorized = true
+                                    activeSubTab = "BACKDOOR"
+                                    viewModel.triggerNotification("👑 مرحباً بك في لوحة التحكم")
+                                } else {
+                                    loginError = errorMsg ?: "فشل تسجيل الدخول"
+                                }
+                            }
+                        }
+                        "SUPERVISOR" -> {
+                            adminViewModelForLogin.loginSupervisorSecure(
+                                usernameOrEmail = emailInput,
+                                passcode = passwordInput,
+                                rememberMe = rememberMe
+                            ) { success, errorMsg ->
+                                isLoginLoading = false
+                                if (success) {
+                                    isAuthorized = true
+                                    activeSubTab = "BACKDOOR"
+                                    viewModel.triggerNotification("💼 مرحباً بك في لوحة التحكم (مشرف)")
+                                } else {
+                                    loginError = errorMsg ?: "بيانات دخول المشرف غير صحيحة"
+                                }
                             }
                         }
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
+                enabled = emailInput.isNotBlank() && 
+                         passwordInput.isNotBlank() && 
+                         !isLoginLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFF59E0B),
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+                if (isLoginLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.dp
+                    )
                 } else {
-                    Text("تسجيل دخول المشرف", color = Color.White, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Login, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "تسجيل الدخول الآمن",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // زر دخول مالك التطبيق والإدارة
-            if (!settingsState.footerMessage.contains("hide_owner_direct_btn")) {
-                Button(
-                    onClick = {
-                        if (inputUsername.isBlank() || inputPassword.isBlank()) {
-                            viewModel.triggerNotification("❌ يرجى إدخال اسم المستخدم وكلمة المرور الخاصة بالمالك/الإدارة!")
-                            return@Button
-                        }
-                        
-                        isLoading = true
-                        
-                        // استخدام AdminSecurityManager للتحقق من المالك/المدير
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                            val result = com.example.utils.AdminSecurityManager.verifyCredentials(inputUsername, inputPassword, settingsState)
-                        
-                        when (result) {
-                            "OWNER" -> {
-                                isAuthorized = true
-                                activeSubTab = "BACKDOOR"
-                                viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                                viewModel.triggerNotification("👑 مرحباً بك مالك التطبيق في لوحة التحكم والإعدادات!")
-                                isLoading = false
-                            }
-                            "ADMIN" -> {
-                                isAuthorized = true
-                                activeSubTab = "REG_REQ"
-                                viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                                viewModel.triggerNotification("👑 مرحباً بك مدير المنصة في لوحة التحكم والإعدادات!")
-                                isLoading = false
-                            }
-                            else -> {
-                                viewModel.triggerNotification("❌ بيانات مالك التطبيق أو الإدارة غير صحيحة!")
-                                isLoading = false
-                            }
-                        }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
-                        Text("👑 تسجيل دخول مالك التطبيق والإدارة", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
+            
+            Spacer(Modifier.height(12.dp))
+            
             TextButton(
-                onClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                onClick = { 
+                    viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                }
             ) {
-                Text("العودة إلى التطبيق الرئيسي 🏠", color = Color.LightGray, fontSize = 12.sp)
+                Text(
+                    "العودة إلى التطبيق 🏠",
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
             }
         }
+        return  // ⚠️ مهم: أوقف المعالجة هنا
     } else {
         val customTabsListState by viewModel.customProfileTabs.collectAsState()
         // Logged dashboard with beautiful segment rows
@@ -5793,7 +5950,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 callsLog.sortedByDescending { it.timestamp }.forEach { call ->
-                                    val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(call.timestamp))
+                                    // ✨ م2-ج3: استخدام DateFormatter
+                                    val dateStr = com.example.utils.DateFormatter.formatDateTime(call.timestamp)
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -5942,7 +6100,8 @@ fun AdminPanelLayout(viewModel: MainViewModel, themeColors: VisualThemePalette) 
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 couponsList.forEach { coupon ->
-                                    val expiryStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(coupon.expiryTimestamp))
+                                    // ✨ م2-ج3: استخدام DateFormatter
+                                    val expiryStr = com.example.utils.DateFormatter.formatDateDash(coupon.expiryTimestamp)
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -8885,11 +9044,14 @@ fun PasswordEntityCard(
             }
             Text("رقم الهاتف: $phone", fontSize = 11.sp, color = Color.LightGray)
             
+            // ✨ م2: لا نعرض كلمة المرور الخالية أو المكشوفة — كلمة المرور محمية
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("🔑 كلمة المرور الحالية: ${if (showPass) (password ?: "غير متوفرة") else "••••••••"}", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
-                TextButton(onClick = { showPass = !showPass }) {
-                    Text(if (showPass) "إخفاء" else "إظهار", fontSize = 10.sp, color = Color.Yellow)
-                }
+                Text(
+                    "🔒 كلمة المرور محمية (لا يمكن عرضها)",
+                    fontSize = 11.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {

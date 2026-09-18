@@ -35,6 +35,8 @@ interface IApiKeyRepository {
     fun getApiKeysFlow(): Flow<ApiKeysEntity>
     suspend fun getApiKeys(): ApiKeysEntity
     suspend fun saveApiKeys(keys: ApiKeysEntity): Result<Unit>
+    suspend fun getApiKey(keyName: String): Result<String>
+    suspend fun setApiKey(keyName: String, value: String): Result<Unit>
 }
 
 class ApiKeyRepositoryImpl(
@@ -42,6 +44,82 @@ class ApiKeyRepositoryImpl(
 ) : IApiKeyRepository {
 
     private val docRef get() = db.collection("settings").document("api_keys")
+
+    /**
+     * 🔑 جلب مفتاح API عبر Cloud Function الآمن
+     */
+    override suspend fun getApiKey(keyName: String): Result<String> {
+        return try {
+            val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
+            val result = functions
+                .getHttpsCallable("getApiKey")
+                .call(mapOf("keyName" to keyName))
+                .await()
+
+            val data = result.data as? Map<*, *>
+            val value = data?.get("value") as? String
+
+            if (value != null) {
+                Result.success(value)
+            } else {
+                // Fallback إلى Firestore للتوافقية
+                val keys = getApiKeys()
+                val fallbackVal = when (keyName.lowercase()) {
+                    "gemini" -> keys.geminiApiKey
+                    "openai" -> keys.openaiApiKey
+                    "google_maps" -> keys.googleMapsKey
+                    "mapbox" -> keys.mapboxKey
+                    "whatsapp" -> keys.whatsappToken
+                    else -> ""
+                }
+                if (fallbackVal.isNotBlank()) Result.success(fallbackVal)
+                else Result.failure(Exception("Key not found: $keyName"))
+            }
+        } catch (e: Exception) {
+            // Fallback للتوافقية
+            try {
+                val keys = getApiKeys()
+                val fallbackVal = when (keyName.lowercase()) {
+                    "gemini" -> keys.geminiApiKey
+                    "openai" -> keys.openaiApiKey
+                    "google_maps" -> keys.googleMapsKey
+                    "mapbox" -> keys.mapboxKey
+                    "whatsapp" -> keys.whatsappToken
+                    else -> ""
+                }
+                if (fallbackVal.isNotBlank()) Result.success(fallbackVal)
+                else Result.failure(e)
+            } catch (fallbackEx: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * 💾 حفظ مفتاح API عبر Cloud Function الآمن في Secret Manager
+     */
+    override suspend fun setApiKey(keyName: String, value: String): Result<Unit> {
+        return try {
+            val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
+            functions
+                .getHttpsCallable("setApiKey")
+                .call(mapOf(
+                    "keyName" to keyName,
+                    "value" to value
+                ))
+                .await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            // Fallback إلى Firestore
+            try {
+                docRef.set(mapOf(keyName to value), com.google.firebase.firestore.SetOptions.merge()).await()
+                Result.success(Unit)
+            } catch (fallbackEx: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
 
     override fun getApiKeysFlow(): Flow<ApiKeysEntity> = callbackFlow {
         val listener = docRef.addSnapshotListener { snapshot, error ->

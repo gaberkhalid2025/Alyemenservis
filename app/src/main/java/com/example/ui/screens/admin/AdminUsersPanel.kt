@@ -16,7 +16,7 @@ import com.example.utils.VisualThemePalette
 fun AdminUsersPanel(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    adminViewModel: AdminViewModel = viewModel(),
+    adminViewModel: AdminViewModel = viewModel.adminViewModel,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {

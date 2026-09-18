@@ -35,13 +35,14 @@ import java.util.Locale
 @Composable
 fun AdminAnalyticsPanel(
     onBack: () -> Unit = {},
-    adminViewModel: AdminViewModel = viewModel(),
+    adminViewModel: AdminViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val numberFormat = remember { DecimalFormat("#,###", DecimalFormatSymbols(Locale.US)) }
     var selectedPeriod by remember { mutableStateOf("MONTH") } // TODAY, WEEK, MONTH, YEAR
 
+    if (adminViewModel == null) return
     val stats = adminViewModel.getSystemStats()
     val revenueStats = adminViewModel.getRevenueStats()
     val bookingStats = adminViewModel.getBookingStats()

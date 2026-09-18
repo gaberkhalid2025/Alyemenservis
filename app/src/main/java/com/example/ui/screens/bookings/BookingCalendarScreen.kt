@@ -38,10 +38,10 @@ import com.example.data.ProviderEntity
 import com.example.ui.MainViewModel
 import com.example.ui.createBooking
 import com.example.utils.BookingReminderService
+import com.example.utils.DateFormatter
 import com.example.utils.HolidayManager
 import com.example.utils.ScheduleManager
 import com.example.utils.VisualThemePalette
-import java.text.SimpleDateFormat
 import java.util.*
 
 /**
@@ -83,8 +83,8 @@ fun BookingCalendarScreen(
     }
 
     val currentMonthYearLabel = remember(calendarMonthOffset) {
-        val sdf = SimpleDateFormat("MMMM yyyy", Locale("ar"))
-        sdf.format(calendar.time)
+        // ✨ م2-ج3: استخدام DateFormatter
+        DateFormatter.formatCustom(calendar.timeInMillis, "MMMM yyyy")
     }
 
     // Days in current selected month
@@ -93,7 +93,6 @@ fun BookingCalendarScreen(
         val tempCal = calendar.clone() as Calendar
         val maxDays = tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
         val firstDayOfWeek = tempCal.get(Calendar.DAY_OF_WEEK) // 1=Sunday, ..., 7=Saturday
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
         // Empty padding cells before first day
         val emptySlots = (firstDayOfWeek - Calendar.SUNDAY + 7) % 7
@@ -103,7 +102,7 @@ fun BookingCalendarScreen(
 
         for (d in 1..maxDays) {
             tempCal.set(Calendar.DAY_OF_MONTH, d)
-            val dStr = sdf.format(tempCal.time)
+            val dStr = DateFormatter.formatDateDash(tempCal.timeInMillis)
             val (isHol, holName) = HolidayManager.isDateHoliday(dStr, provider.id)
             days.add(CalendarDayInfo(dayNumber = d, dateString = dStr, isHoliday = isHol, holidayName = holName))
         }
@@ -222,11 +221,12 @@ fun BookingCalendarScreen(
                                         Spacer(modifier = Modifier.weight(1f).height(44.dp))
                                     } else {
                                             val isSelected = dayInfo.dateString == selectedDateString
-                                            val todayStr = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) }
+                                            // ✨ م2-ج3: استخدام DateFormatter
+                                            val todayStr = remember { DateFormatter.formatDateDash(System.currentTimeMillis()) }
                                             val max30Str = remember {
                                                 val c = Calendar.getInstance()
                                                 c.add(Calendar.DAY_OF_YEAR, 30)
-                                                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.time)
+                                                DateFormatter.formatDateDash(c.timeInMillis)
                                             }
                                             val isPast = dayInfo.dateString < todayStr
                                             val isBeyond30 = dayInfo.dateString > max30Str

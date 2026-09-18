@@ -20,9 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.SpecialOfferEntity
-import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
-import android.util.Log
 
 /**
  * 🏷️ OffersManager (إدارة العروض والخصومات الخاصة)
@@ -144,11 +142,8 @@ fun OffersManager(
 
                             Row {
                                 IconButton(onClick = {
-                                    FirebaseFirestore.getInstance()
-                                        .collection("special_offers")
-                                        .document(offer.id)
-                                        .update("isEnabled", !offer.isEnabled)
-                                        .addOnFailureListener { e -> Log.e("OffersManager", "Update failed", e) }
+                                    // ✨ م2-ج2: استخدام ViewModel بدلاً من Firestore المباشر
+                                    viewModel.updateSpecialOfferStatus(offer.id, !offer.isEnabled)
                                 }) {
                                     Icon(
                                         if (offer.isEnabled) Icons.Default.CheckCircle else Icons.Default.Close,
@@ -157,11 +152,8 @@ fun OffersManager(
                                     )
                                 }
                                 IconButton(onClick = {
-                                    FirebaseFirestore.getInstance()
-                                        .collection("special_offers")
-                                        .document(offer.id)
-                                        .delete()
-                                        .addOnFailureListener { e -> Log.e("OffersManager", "Delete failed", e) }
+                                    // ✨ م2-ج2: استخدام ViewModel
+                                    viewModel.deleteSpecialOffer(offer.id)
                                 }) {
                                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444))
                                 }
@@ -220,11 +212,8 @@ fun OffersManager(
                                 expiryDate = newExpiry.trim(),
                                 isEnabled = true
                             )
-                            FirebaseFirestore.getInstance()
-                                .collection("special_offers")
-                                .document(offerId)
-                                .set(newOffer)
-                                .addOnFailureListener { e -> Log.e("OffersManager", "Insert failed", e) }
+                            // ✨ م2-ج2: استخدام ViewModel
+                            viewModel.addSpecialOffer(newOffer)
 
                             showAddDialog = false
                             newTitle = ""

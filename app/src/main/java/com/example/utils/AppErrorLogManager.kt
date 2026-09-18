@@ -31,8 +31,6 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
@@ -117,14 +115,14 @@ object AppErrorLogManager {
     }
 
     fun getFormattedLogsText(): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
         val sb = StringBuilder()
         sb.append("=== سجل أخطاء النظام والتطبيقات (App Error Logs) ===\n")
-        sb.append("تاريخ التصدير: ${sdf.format(Date())}\n")
+        // ✨ م2: استخدام DateFormatter
+        sb.append("تاريخ التصدير: ${DateFormatter.formatDateTime(System.currentTimeMillis())}\n")
         sb.append("إجمالي السجلات: ${_logs.value.size}\n\n")
 
         _logs.value.forEachIndexed { index, log ->
-            sb.append("[${index + 1}] [${sdf.format(Date(log.timestamp))}] [${log.type}] [${log.tag}]\n")
+            sb.append("[${index + 1}] [${DateFormatter.formatDateTime(log.timestamp)}] [${log.type}] [${log.tag}]\n")
             sb.append("الرسالة: ${log.message}\n")
             if (log.details.isNotBlank()) {
                 sb.append("التفاصيل التقنية:\n${log.details}\n")
@@ -143,7 +141,6 @@ fun ErrorLogsViewerDialog(
     val context = LocalContext.current
     val logs by AppErrorLogManager.logs.collectAsState()
     var selectedFilter by remember { mutableStateOf("ALL") }
-    val sdf = remember { SimpleDateFormat("HH:mm:ss dd/MM", Locale.ENGLISH) }
 
     val filteredLogs = remember(logs, selectedFilter) {
         when (selectedFilter) {
@@ -358,7 +355,8 @@ fun ErrorLogsViewerDialog(
                                         }
 
                                         Text(
-                                            text = sdf.format(Date(item.timestamp)),
+                                            // ✨ م2: استخدام DateFormatter
+                                            text = DateFormatter.formatCustom(item.timestamp, "HH:mm:ss dd/MM"),
                                             color = Color.Gray,
                                             fontSize = 10.sp
                                         )

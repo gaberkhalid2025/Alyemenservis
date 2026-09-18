@@ -154,6 +154,7 @@ dependencies {
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.storage)
   implementation(libs.firebase.messaging)
+  implementation("com.google.firebase:firebase-functions")
   implementation(libs.firebase.crashlytics)
   implementation("com.google.firebase:firebase-analytics")
   implementation(libs.kotlinx.coroutines.android)

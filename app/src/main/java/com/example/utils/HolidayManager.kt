@@ -1,9 +1,7 @@
 package com.example.utils
 
 import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -49,9 +47,17 @@ object HolidayManager {
      */
     fun isDateHoliday(dateString: String, providerId: String? = null): Pair<Boolean, String?> {
         try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val date = sdf.parse(dateString) ?: return Pair(false, null)
-            val cal = Calendar.getInstance().apply { time = date }
+            // ✨ م2: تحليل التاريخ بشكل آمن وبدون SimpleDateFormat
+            val parts = dateString.split("-")
+            if (parts.size != 3) return Pair(false, null)
+            val year = parts[0].toIntOrNull() ?: return Pair(false, null)
+            val month = parts[1].toIntOrNull() ?: return Pair(false, null)
+            val day = parts[2].toIntOrNull() ?: return Pair(false, null)
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+            }
 
             // 1. فحص يوم الجمعة (Friday)
             if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) {

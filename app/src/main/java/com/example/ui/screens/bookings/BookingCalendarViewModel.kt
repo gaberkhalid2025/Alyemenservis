@@ -4,19 +4,20 @@ import androidx.lifecycle.ViewModel
 import com.example.ui.*
 import com.example.data.BookingEntity
 import com.example.data.ProviderEntity
+import com.example.utils.DateFormatter
 import com.example.utils.HolidayManager
 import com.example.utils.ScheduleManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 
 data class BookingCalendarUiState(
     val calendarMonthOffset: Int = 0,
-    val selectedDateString: String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()),
+    // ✨ م2-ج3: استخدام DateFormatter
+    val selectedDateString: String = DateFormatter.formatDateDash(System.currentTimeMillis()),
     val selectedTimeSlot: ScheduleManager.TimeSlot? = null,
     val recurrenceOption: String = "NONE", // "NONE", "WEEKLY", "MONTHLY"
     val clientNotes: String = "",

@@ -4,11 +4,10 @@ import com.example.utils.*
 
 import android.content.Context
 import com.example.BuildConfig
+import com.example.utils.DateFormatter
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.io.FileWriter
 
 /**
  * 📊 Problem 15 Solution: Advanced Analytics, Reporting & Export Engine
@@ -116,21 +115,16 @@ object AnalyticsAndReportingEngine {
         return try {
             val fileName = "report_${reportTitle.replace(" ", "_")}_${System.currentTimeMillis()}.csv"
             val file = File(context.filesDir, fileName)
-            val writer = file.bufferedWriter()
+            FileWriter(file).use { writer ->
+                // Header
+                writer.write(headers.joinToString(",") + "\n")
 
-            // Header
-            writer.write(headers.joinToString(","))
-            writer.newLine()
-
-            // Rows
-            rows.forEach { row ->
-                val sanitizedRow = row.map { "\"${it.replace("\"", "\"\"")}\"" }
-                writer.write(sanitizedRow.joinToString(","))
-                writer.newLine()
+                // Rows
+                rows.forEach { row ->
+                    val sanitizedRow = row.map { "\"${it.replace("\"", "\"\"")}\"" }
+                    writer.write(sanitizedRow.joinToString(",") + "\n")
+                }
             }
-
-            writer.flush()
-            writer.close()
             file
         } catch (e: Exception) {
             null
@@ -142,7 +136,8 @@ object AnalyticsAndReportingEngine {
         businessName: String,
         metrics: BusinessOwnerMetrics
     ): String {
-        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale("ar")).format(Date())
+        // ✨ م2-ج3: استخدام DateFormatter
+        val dateStr = DateFormatter.formatDateTime(System.currentTimeMillis())
         return """
             ====================================================
             📊 تقرير الأداء الشامل والتحليلات - دليل خدمات اليمن

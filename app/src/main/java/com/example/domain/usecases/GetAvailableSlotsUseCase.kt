@@ -1,7 +1,6 @@
 package com.example.domain.usecases
 
 import com.example.data.BookingEntity
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
@@ -45,8 +44,8 @@ class GetAvailableSlotsUseCase {
             .toSet()
 
         val cal = Calendar.getInstance()
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val todayStr = sdf.format(cal.time)
+        // ✨ م2: استخدام DateFormatter
+        val todayStr = com.example.utils.DateFormatter.formatDateDash(cal.timeInMillis)
         val isToday = cleanDate == todayStr
         val currentHour = cal.get(Calendar.HOUR_OF_DAY)
 

@@ -32,8 +32,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.data.models.ChannelType
 import com.example.data.models.ChatChannel
+import com.example.utils.DateFormatter
 import com.example.utils.VisualThemePalette
-import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
@@ -320,8 +320,8 @@ private fun ChannelItemCard(
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val formattedTime = if (channel.lastMessageTime > 0) timeFormat.format(Date(channel.lastMessageTime)) else ""
+    // ✨ م2-ج3: استخدام DateFormatter
+    val formattedTime = if (channel.lastMessageTime > 0) DateFormatter.formatTime(channel.lastMessageTime) else ""
 
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),

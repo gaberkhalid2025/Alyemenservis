@@ -21,8 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.*
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -246,8 +244,8 @@ private fun DeletedItemRow(
     onPermanentDelete: () -> Unit
 ) {
     val dateStr = remember(deletedAt) {
-        val sdf = SimpleDateFormat("yyyy/MM/dd hh:mm a", Locale("ar"))
-        sdf.format(Date(deletedAt))
+        // ✨ م2: استخدام DateFormatter
+        com.example.utils.DateFormatter.formatDisplay(deletedAt)
     }
 
     Card(

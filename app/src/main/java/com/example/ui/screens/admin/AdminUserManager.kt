@@ -35,8 +35,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun AdminUserManager(
     onBack: () -> Unit = {},
-    adminViewModel: AdminViewModel = viewModel(),
-    mainViewModel: MainViewModel = viewModel(),
+    mainViewModel: MainViewModel,
+    adminViewModel: AdminViewModel = mainViewModel.adminViewModel,
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {

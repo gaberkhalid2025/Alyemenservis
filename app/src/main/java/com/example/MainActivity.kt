@@ -211,6 +211,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         try {
+            com.example.utils.NotificationHelper.createNotificationChannels(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
+        try {
             com.example.security.SecurityManager.verifyAppSignature(this)
         } catch (e: Exception) {
             e.printStackTrace()

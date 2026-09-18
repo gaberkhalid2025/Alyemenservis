@@ -20,9 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
 import com.example.data.repositories.StaffMember
-import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
-import android.util.Log
 
 /**
  * 👥 StaffManager (إدارة الموظفين وفريق العمل والصلاحيات)
@@ -129,11 +127,8 @@ fun StaffManager(
                         }
 
                         IconButton(onClick = {
-                            FirebaseFirestore.getInstance()
-                                .collection("staff")
-                                .document(member.id)
-                                .delete()
-                                .addOnFailureListener { e -> Log.e("StaffManager", "Delete failed", e) }
+                            // ✨ م2-ج2: استخدام ViewModel بدلاً من Firestore المباشر
+                            viewModel.deleteStaff(member.id)
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444))
                         }
@@ -184,11 +179,8 @@ fun StaffManager(
                                 canEditPrices = false,
                                 canChat = true
                             )
-                            FirebaseFirestore.getInstance()
-                                .collection("staff")
-                                .document(memberId)
-                                .set(newMember)
-                                .addOnFailureListener { e -> Log.e("StaffManager", "Insert failed", e) }
+                            // ✨ م2-ج2: استخدام ViewModel
+                            viewModel.addStaff(newMember)
 
                             showAddDialog = false
                             newName = ""

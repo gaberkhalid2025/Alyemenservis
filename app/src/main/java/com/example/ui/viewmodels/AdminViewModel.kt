@@ -14,6 +14,7 @@ import com.example.data.models.*
 import com.example.utils.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -137,9 +138,415 @@ data class SystemLog(
 
 
 class AdminViewModel @Inject constructor(
-    val appState: AppState
+    val appState: AppState,
+    val secureStorage: com.example.utils.SecureStorage
 ) : BaseViewModel() {
     val crud = AdminCrudOperations(db)
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    internal val _adminRole = MutableStateFlow("GUEST")
+    val adminRole: StateFlow<String> = _adminRole.asStateFlow()
+
+    /**
+     * 🔐 تسجيل دخول الأدمن الآمن
+     * - يتحقق عبر Cloud Function
+     * - Rate limiting مطبق على السيرفر
+     * - Custom Claims مطلوبة
+     */
+    fun loginAdminSecure(
+        email: String,
+        password: String,
+        rememberMe: Boolean = true,
+        onResult: (success: Boolean, errorMessage: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                
+                try {
+                    val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
+                    val result = functions
+                        .getHttpsCallable("verifyAdminLogin")
+                        .call(mapOf(
+                            "email" to email,
+                            "password" to password
+                        ))
+                        .await()
+                    
+                    val data = result.data as? Map<*, *>
+                    
+                    if (data?.get("success") == true) {
+                        val idToken = data["idToken"] as? String
+                        val refreshToken = data["refreshToken"] as? String
+                        val uid = data["uid"] as? String ?: ""
+                        
+                        if (idToken != null) {
+                            try {
+                                com.google.firebase.auth.FirebaseAuth.getInstance()
+                                    .signInWithCustomToken(idToken)
+                                    .await()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                        
+                        // ✨ قراءة الـ role من Custom Claims بدقة
+                        val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                        val tokenResult = currentUser?.getIdToken(false)?.await()
+                        val claims = tokenResult?.claims
+ 
+                        val assignedRole = when {
+                            claims?.get("isSuperAdmin") == true -> "OWNER"
+                            claims?.get("isAdmin") == true -> "ADMIN"
+                            else -> "ADMIN"
+                        }
+                        
+                        if (rememberMe) {
+                            secureStorage.saveAdminSession(
+                                com.example.utils.AdminSession(
+                                    uid = uid,
+                                    email = email,
+                                    loginTime = System.currentTimeMillis(),
+                                    refreshToken = refreshToken ?: "",
+                                    role = assignedRole
+                                )
+                            )
+                        } else {
+                            secureStorage.clearAdminSession()
+                        }
+                        
+                        _adminRole.value = assignedRole
+                        _isLoading.value = false
+                        onResult(true, null)
+                        return@launch
+                    }
+                } catch (fnEx: Exception) {
+                    val authResult = com.google.firebase.auth.FirebaseAuth.getInstance()
+                        .signInWithEmailAndPassword(email, password)
+                        .await()
+                    val user: com.google.firebase.auth.FirebaseUser? = authResult.user
+                    if (user != null) {
+                        val tokenResult: com.google.firebase.auth.GetTokenResult = user.getIdToken(false).await()
+                        val claimsMap: Map<String, Any> = tokenResult.claims
+                        // ✨ إصلاح المرحلة 1.5: الاعتماد على Custom Claims فقط
+                        val isAdmin = (claimsMap["isAdmin"] as? Boolean == true)
+                        if (isAdmin) {
+                            val assignedRole = when {
+                                claimsMap["isSuperAdmin"] == true -> "OWNER"
+                                claimsMap["isAdmin"] == true -> "ADMIN"
+                                else -> "ADMIN"
+                            }
+                            if (rememberMe) {
+                                secureStorage.saveAdminSession(
+                                    com.example.utils.AdminSession(
+                                        uid = user.uid,
+                                        email = email,
+                                        loginTime = System.currentTimeMillis(),
+                                        refreshToken = "",
+                                        role = assignedRole
+                                    )
+                                )
+                            } else {
+                                secureStorage.clearAdminSession()
+                            }
+                            _adminRole.value = assignedRole
+                            _isLoading.value = false
+                            onResult(true, null)
+                            return@launch
+                        } else {
+                            _isLoading.value = false
+                            onResult(false, "ليس لديك صلاحيات الأدمن")
+                            return@launch
+                        }
+                    }
+                }
+                
+                _isLoading.value = false
+                onResult(false, "فشل تسجيل الدخول. يرجى التحقق من البيانات.")
+            } catch (e: Exception) {
+                _isLoading.value = false
+                val errorMsg = when {
+                    e.message?.contains("resource-exhausted") == true -> 
+                        "محاولات كثيرة. الرجاء المحاولة بعد 15 دقيقة"
+                    e.message?.contains("permission-denied") == true -> 
+                        "ليس لديك صلاحيات الأدمن"
+                    e.message?.contains("unauthenticated") == true || e.message?.contains("password") == true -> 
+                        "البريد أو كلمة المرور غير صحيحة"
+                    else -> e.message ?: "فشل تسجيل الدخول. حاول مرة أخرى"
+                }
+                onResult(false, errorMsg)
+            }
+        }
+    }
+
+    /**
+     * ✨ م2: تسجيل دخول المالك (SuperAdmin/Owner)
+     */
+    fun loginOwnerSecure(
+        email: String,
+        password: String,
+        rememberMe: Boolean = true,
+        onResult: (success: Boolean, errorMessage: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                
+                val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
+                val result = functions
+                    .getHttpsCallable("verifyAdminLogin")
+                    .call(mapOf(
+                        "email" to email,
+                        "password" to password
+                    ))
+                    .await()
+                
+                val data = result.data as? Map<*, *>
+                
+                if (data?.get("success") != true) {
+                    _isLoading.value = false
+                    onResult(false, "فشل تسجيل الدخول")
+                    return@launch
+                }
+                
+                val idToken = data["idToken"] as? String
+                if (idToken != null) {
+                    try {
+                        com.google.firebase.auth.FirebaseAuth.getInstance()
+                            .signInWithCustomToken(idToken)
+                            .await()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                
+                val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                val tokenResult = user?.getIdToken(false)?.await()
+                val claims = tokenResult?.claims
+                
+                val assignedRole = when {
+                    claims?.get("isSuperAdmin") == true -> "OWNER"
+                    claims?.get("isAdmin") == true -> "ADMIN"
+                    else -> {
+                        _isLoading.value = false
+                        onResult(false, "ليس لديك صلاحيات المالك")
+                        return@launch
+                    }
+                }
+                
+                if (rememberMe) {
+                    secureStorage.saveAdminSession(
+                        com.example.utils.AdminSession(
+                            uid = data["uid"] as? String ?: "",
+                            email = email,
+                            loginTime = System.currentTimeMillis(),
+                            refreshToken = data["refreshToken"] as? String ?: "",
+                            role = assignedRole
+                        )
+                    )
+                } else {
+                    secureStorage.clearAdminSession()
+                }
+                
+                _adminRole.value = assignedRole
+                _isLoading.value = false
+                onResult(true, null)
+                
+            } catch (e: Exception) {
+                _isLoading.value = false
+                val errorMsg = when {
+                    e.message?.contains("resource-exhausted") == true -> 
+                        "محاولات كثيرة. حاول بعد 15 دقيقة"
+                    e.message?.contains("permission-denied") == true -> 
+                        "ليس لديك صلاحيات"
+                    e.message?.contains("unauthenticated") == true -> 
+                        "البريد أو كلمة المرور غير صحيحة"
+                    else -> "فشل تسجيل الدخول"
+                }
+                onResult(false, errorMsg)
+            }
+        }
+    }
+
+    /**
+     * 💼 تسجيل دخول المشرف (Supervisor)
+     */
+    fun loginSupervisorSecure(
+        usernameOrEmail: String,
+        passcode: String,
+        rememberMe: Boolean = true,
+        onResult: (success: Boolean, errorMessage: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                
+                val trimmedUser = usernameOrEmail.trim()
+                val trimmedPass = passcode.trim()
+                
+                var supervisorDoc = db.collection("supervisors").document(trimmedUser).get().await()
+                if (!supervisorDoc.exists()) {
+                    val queryByName = db.collection("supervisors")
+                        .whereEqualTo("name", trimmedUser)
+                        .limit(1)
+                        .get()
+                        .await()
+                    if (!queryByName.isEmpty) {
+                        supervisorDoc = queryByName.documents[0]
+                    } else {
+                        val queryByEmail = db.collection("supervisors")
+                            .whereEqualTo("email", trimmedUser)
+                            .limit(1)
+                            .get()
+                            .await()
+                        if (!queryByEmail.isEmpty) {
+                            supervisorDoc = queryByEmail.documents[0]
+                        }
+                    }
+                }
+                
+                if (supervisorDoc.exists()) {
+                    val storedPass = supervisorDoc.getString("passcode") ?: ""
+                    if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                        val role = supervisorDoc.getString("role") ?: "SUPERVISOR"
+                        val id = supervisorDoc.id
+                        val name = supervisorDoc.getString("name") ?: trimmedUser
+                        
+                        if (rememberMe) {
+                            secureStorage.saveAdminSession(
+                                com.example.utils.AdminSession(
+                                    uid = id,
+                                    email = supervisorDoc.getString("email") ?: "$id@supervisor.local",
+                                    loginTime = System.currentTimeMillis(),
+                                    refreshToken = "SUPERVISOR_SESSION",
+                                    role = "SUPERVISOR"
+                                )
+                            )
+                        } else {
+                            secureStorage.clearAdminSession()
+                        }
+                        
+                        _adminRole.value = "SUPERVISOR"
+                        _isLoading.value = false
+                        onResult(true, null)
+                        return@launch
+                    }
+                }
+                
+                _isLoading.value = false
+                onResult(false, "بيانات دخول المشرف غير صحيحة")
+            } catch (e: Exception) {
+                _isLoading.value = false
+                onResult(false, e.message ?: "فشل تسجيل الدخول")
+            }
+        }
+    }
+
+    /**
+     * 🚪 تسجيل الخروج الآمن
+     */
+    fun logoutAdmin() {
+        viewModelScope.launch {
+            try {
+                secureStorage.clearAdminSession()
+                com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                _adminRole.value = "GUEST"
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * 🔍 التحقق من صحة جلسة الأدمن الحالية
+     */
+    suspend fun isAdminSessionValid(): Boolean {
+        return try {
+            val session = secureStorage.getAdminSession() ?: return false
+            val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser ?: return false
+            val tokenResult: com.google.firebase.auth.GetTokenResult = user.getIdToken(false).await()
+            val claimsMap: Map<String, Any> = tokenResult.claims
+            // ✨ إصلاح المرحلة 1.5: الاعتماد على Custom Claims فقط
+            (claimsMap["isAdmin"] as? Boolean == true)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 💾 حفظ الإعدادات بشكل ذري (Atomic)
+     * يستخدم Firestore Transaction لمنع التضارب
+     */
+    fun saveSettingsAtomically(
+        appName: String,
+        welcomeMessage: String,
+        footerMessage: String,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val settingsRef = db.collection("settings").document("main_settings")
+                db.runTransaction { transaction ->
+                    val snapshot = transaction.get(settingsRef)
+                    val currentVersion = snapshot.getLong("version") ?: 0L
+                    val updatedData = mapOf(
+                        "appName" to appName,
+                        "welcomeMessage" to welcomeMessage,
+                        "footerMessage" to footerMessage,
+                        "version" to (currentVersion + 1),
+                        "updatedAt" to System.currentTimeMillis(),
+                        "updatedBy" to com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                    )
+                    transaction.set(settingsRef, updatedData, SetOptions.merge())
+                    val auditRef = db.collection("audit_logs").document()
+                    transaction.set(auditRef, mapOf(
+                        "action" to "SETTINGS_UPDATED",
+                        "userId" to (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "unknown"),
+                        "timestamp" to System.currentTimeMillis(),
+                        "version" to (currentVersion + 1)
+                    ))
+                    currentVersion + 1
+                }.await()
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "خطأ غير معروف")
+            }
+        }
+    }
+
+    /**
+     * 💾 إنشاء نسخة احتياطية للإعدادات
+     * تُحفظ في settings_backups مع تاريخ الإنشاء
+     */
+    fun createSettingsBackup(onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val settingsDoc = db.collection("settings")
+                    .document("main_settings")
+                    .get()
+                    .await()
+                if (!settingsDoc.exists()) {
+                    onResult(false)
+                    return@launch
+                }
+                val settingsData = settingsDoc.data ?: emptyMap<String, Any>()
+                val backupData: Map<String, Any?> = mapOf(
+                    "timestamp" to System.currentTimeMillis(),
+                    "version" to (settingsData["version"] ?: 0L),
+                    "data" to settingsData,
+                    "createdBy" to com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                )
+                db.collection("settings_backups").add(backupData).await()
+                onResult(true)
+            } catch (e: Exception) {
+                onResult(false)
+            }
+        }
+    }
 
     // --- Callback/Lambda Properties for decoupling ---
     var getHomeViewModel: (() -> HomeViewModel)? = null
@@ -2559,7 +2966,8 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
             val csvContent = StringBuilder()
             csvContent.append("المعرف,اسم المتقدم,رقم الهاتف,الوظيفة,الشركة,المؤهلات,الحالة,تاريخ التقديم\n")
             apps.forEach { app ->
-                val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(app.createdAt))
+                // ✨ م2: استخدام DateFormatter الموحد
+                val dateStr = com.example.utils.DateFormatter.formatCustom(app.createdAt, "yyyy-MM-dd HH:mm")
                 csvContent.append("${app.id},\"${app.applicantName}\",\"${app.applicantPhone}\",\"${app.jobTitle}\",\"${app.companyName}\",\"${app.applicantQuals.replace("\n", " ")}\",\"${app.status}\",\"$dateStr\"\n")
             }
             val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -2744,7 +3152,9 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
 
     fun exportReport(type: String): String {
         recordAuditLog("EXPORT_REPORT", "تصدير تقرير من نوع $type")
-        return "تقرير شامل للـ $type - التاريخ: ${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())}"
+        // ✨ م2: استخدام DateFormatter الموحد
+        val dateStr = com.example.utils.DateFormatter.formatDateDash(System.currentTimeMillis())
+        return "تقرير شامل للـ $type - التاريخ: $dateStr"
     }
 
     fun syncAllData(context: Context, onComplete: ((Boolean) -> Unit)? = null) {

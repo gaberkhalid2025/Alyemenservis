@@ -25,8 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
@@ -246,7 +244,6 @@ private fun ChatMessageBubble(message: DirectChatMessage) {
     val alignment = if (message.isFromMe) Alignment.End else Alignment.Start
     val bgColor = if (message.isFromMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val textColor = if (message.isFromMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
 
     Column(
         horizontalAlignment = alignment,
@@ -270,7 +267,8 @@ private fun ChatMessageBubble(message: DirectChatMessage) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = timeFormat.format(Date(message.timestamp)),
+                    // ✨ م2: استخدام DateFormatter الموحد
+                    text = DateFormatter.formatCustom(message.timestamp, "hh:mm a"),
                     fontSize = 10.sp,
                     color = textColor.copy(alpha = 0.7f),
                     modifier = Modifier.align(Alignment.End)

@@ -1,11 +1,8 @@
 package com.example.utils
 
 import com.example.data.BookingEntity
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-
 import androidx.annotation.Keep
+import java.util.Locale
 
 /**
  * 📌 Architectural Note: State Machine BookingStatus enum defining valid transitions
@@ -144,11 +141,9 @@ object BookingStateMachine {
             val formats = listOf("yyyy-MM-dd HH:mm", "yyyy/MM/dd HH:mm", "dd/MM/yyyy HH:mm", "yyyy-MM-dd")
             val fullStr = "$dateStr ${timeStr.ifBlank { "00:00" }}".trim()
             for (fmt in formats) {
-                try {
-                    val sdf = SimpleDateFormat(fmt, Locale.US)
-                    val d = sdf.parse(fullStr)
-                    if (d != null) return d.time
-                } catch (ignored: Exception) {}
+                // ✨ م2: استخدام DateFormatter الموحد
+                val t = DateFormatter.parseCustom(fullStr, fmt)
+                if (t != null) return t
             }
             0L
         } catch (e: Exception) {
