@@ -55,19 +55,23 @@ class MyApplication : Application() {
                 )
             }
 
-            // تفعيل Anonymous Auth التلقائي لضمان وجود UID ثابت وموثوق للجهاز
-            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-            if (auth.currentUser == null) {
-                auth.signInAnonymously()
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            Log.d("AnonymousAuth", "✅ UID: ${task.result?.user?.uid}")
-                        } else {
-                            Log.e("AnonymousAuth", "❌ Failed: ${task.exception?.message}")
+            // محاولة تسجيل الدخول كمجهول بأمان دون تعطيل مسار التطبيق
+            try {
+                val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                if (auth.currentUser == null) {
+                    auth.signInAnonymously()
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Log.d("AnonymousAuth", "✅ UID: ${task.result?.user?.uid}")
+                            } else {
+                                Log.w("AnonymousAuth", "⚠️ Anonymous Auth note: ${task.exception?.message}")
+                            }
                         }
-                    }
-            } else {
-                Log.d("AnonymousAuth", "✅ Existing Anonymous UID: ${auth.currentUser?.uid}")
+                } else {
+                    Log.d("AnonymousAuth", "✅ Existing UID: ${auth.currentUser?.uid}")
+                }
+            } catch (authEx: Throwable) {
+                Log.w("AnonymousAuth", "⚠️ Auth init skipped: ${authEx.message}")
             }
         } catch (e: Exception) {
             Log.e("MyApplication", "❌ Firebase initialization failed: ${e.message}")
