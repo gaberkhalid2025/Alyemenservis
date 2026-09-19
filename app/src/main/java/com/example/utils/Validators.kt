@@ -80,6 +80,21 @@ object Validators {
         }
         return ValidationResult(true)
     }
+
+    /**
+     * Validates email format.
+     */
+    fun validateEmail(email: String?): ValidationResult {
+        if (email.isNullOrBlank()) {
+            return ValidationResult(false, "يرجى إدخال البريد الإلكتروني")
+        }
+        val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$".toRegex()
+        return if (emailRegex.matches(email.trim())) {
+            ValidationResult(true)
+        } else {
+            ValidationResult(false, "تنسيق البريد الإلكتروني غير صحيح")
+        }
+    }
 }
 
 /**

@@ -7,37 +7,37 @@ import com.example.data.repositories.IDashboardRepository
 import com.example.data.repositories.IProductsRepository
 import com.example.data.repositories.IRatingsRepository
 import com.example.domain.entities.ProductItemEntity
+import com.example.domain.entities.DoctorItem
 import com.example.ui.screens.dashboard.DashboardEvent
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.catch
+import javax.inject.Inject
 
-data class DoctorItem(
-    val id: String = "",
-    val name: String = "",
-    val specialty: String = "",
-    val workingHours: String = ""
-)
-
-class MedicalDashboardViewModel(
-    private val ownerId: String,
+@HiltViewModel
+class MedicalDashboardViewModel @Inject constructor(
     private val dashboardRepository: IDashboardRepository,
     private val productsRepository: IProductsRepository,
     private val ratingsRepository: IRatingsRepository,
     private val medicalRepository: com.example.data.repositories.MedicalRepository
 ) : ViewModel() {
 
+    private var ownerId: String = ""
+
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
-    private val _doctors = MutableStateFlow<List<DoctorItem>>(emptyList())
+    private val _doctors = MutableStateFlow<List<DoctorItem>>(emptySet<DoctorItem>().toList())
     val doctors: StateFlow<List<DoctorItem>> = _doctors.asStateFlow()
 
     private val _eventFlow = MutableSharedFlow<DashboardEvent>()
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
-    init {
+    fun initialize(id: String) {
+        if (ownerId == id) return
+        ownerId = id
         loadDashboardData()
         viewModelScope.launch {
             medicalRepository.getDoctors(ownerId).collect {
@@ -51,6 +51,7 @@ class MedicalDashboardViewModel(
     }
 
     fun loadDashboardData() {
+        if (ownerId.isBlank()) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             

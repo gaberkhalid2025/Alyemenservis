@@ -86,8 +86,8 @@ class AssistantViewModel : ViewModel() {
                         mainViewModel = mainViewModel
                     )
                 } else {
-                    val (localText, localProvs) = generateLocalOfflineResponse(prompt, mainViewModel)
-                    AssistantMessage(text = localText, isUser = false, matchedProviders = localProvs)
+                    val (localText, localEntities) = generateLocalOfflineResponse(prompt, mainViewModel)
+                    AssistantMessage(text = localText, isUser = false, matchedEntities = localEntities)
                 }
 
                 withContext(Dispatchers.Main) {
@@ -210,7 +210,7 @@ class AssistantViewModel : ViewModel() {
                     val part = parts?.optJSONObject(0)
                     val textVal = part?.optString("text")
                     if (!textVal.isNullOrBlank()) {
-                        val response = AssistantMessage(text = textVal, isUser = false, matchedProviders = matched)
+                        val response = AssistantMessage(text = textVal, isUser = false, matchedEntities = matched)
                         cacheResponse(prompt, response)
                         return response
                     }
@@ -223,55 +223,87 @@ class AssistantViewModel : ViewModel() {
             com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "فشل استدعاء Gemini API: ${e.localizedMessage}", e)
         }
 
-        val (localText, localProvs) = generateLocalOfflineResponse(prompt, mainViewModel)
-        val response = AssistantMessage(text = localText, isUser = false, matchedProviders = localProvs)
+        val (localText, localEntities) = generateLocalOfflineResponse(prompt, mainViewModel)
+        val response = AssistantMessage(text = localText, isUser = false, matchedEntities = localEntities)
         cacheResponse(prompt, response)
         return response
     }
 
-    fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): Pair<String, List<ProviderEntity>> {
+    fun generateLocalOfflineResponse(prompt: String, viewModel: MainViewModel): Pair<String, List<Any>> {
         val qNormalized = normalizeArabic(prompt)
         val providers = viewModel.providers.value
+        val stores = viewModel.stores.value
+        val properties = viewModel.properties.value
         val categories = viewModel.categories.value
         val settings = viewModel.settings.value
 
         val isSupportContact = qNormalized.contains("رقم") || qNormalized.contains("اتصال") || 
-                               qNormalized.contains("دعم") || qNormalized.contains("تواصل") || 
-                               qNormalized.contains("واتساب")
+                                qNormalized.contains("دعم") || qNormalized.contains("تواصل") || 
+                                qNormalized.contains("واتساب")
 
         val isJoinRequest = qNormalized.contains("تسجيل") || qNormalized.contains("انضم") || qNormalized.contains("حساب")
         val isPriceInfo = qNormalized.contains("سعر") || qNormalized.contains("رسوم") || qNormalized.contains("مجاني")
         val isMapFeature = qNormalized.contains("خريطه") || qNormalized.contains("موقع") || qNormalized.contains("gps")
 
-        val professions = listOf(
-            "سباك", "كهربا", "دهان", "نجار", "حداد", "خياط", "سائق", "مصلح", "صيانه", "فني", 
-            "مهندس", "تكييف", "تبريد", "بناء", "مقاول", "طبيب", "تنظيف", "ميكانيك"
-        )
-        val hasProfessionKeyword = professions.any { qNormalized.contains(it) }
-        val isProviderSearch = hasProfessionKeyword || qNormalized.contains("ابحث") || 
-                               providers.any { normalizeArabic(it.name).contains(qNormalized) }
+        val matchedEntities = mutableListOf<Any>()
 
+        // 1. Search Providers
+        val professions = listOf("سباك", "كهربا", "دهان", "نجار", "حداد", "خياط", "سائق", "مصلح", "صيانه", "فني", "مهندس", "تكييف", "تبريد", "بناء", "مقاول", "طبيب", "تنظيف", "ميكانيك")
+        val isProviderSearch = professions.any { qNormalized.contains(it) } || qNormalized.contains("فني")
+        
         if (isProviderSearch) {
-            val matchedProviders = providers.filter { p ->
+            val provs = providers.filter { p ->
                 val pNameNorm = normalizeArabic(p.name)
                 val pProfNorm = normalizeArabic(p.profession)
                 val pSpecNorm = normalizeArabic(p.specialization)
-                pNameNorm.contains(qNormalized) || pProfNorm.contains(qNormalized) || 
-                pSpecNorm.contains(qNormalized) || qNormalized.contains(pProfNorm)
-            }.take(5)
+                pNameNorm.contains(qNormalized) || pProfNorm.contains(qNormalized) || pSpecNorm.contains(qNormalized) || qNormalized.contains(pProfNorm)
+            }.take(3)
+            matchedEntities.addAll(provs)
+        }
 
-            if (matchedProviders.isNotEmpty()) {
-                val sb = StringBuilder()
-                sb.append("🔍 عثرت لك على الفنيين المعتمدين في دليل خدمات اليمن:\n\n")
-                matchedProviders.forEachIndexed { index, p ->
-                    val catName = categories.find { it.id == p.categoryId }?.name ?: p.profession
-                    val statusSymbol = if (p.isAvailable) "🟢 متاح" else "🔴 مشغول"
-                    sb.append("${index + 1}. *${p.name}* | $catName\n")
-                    sb.append("   📱 ${p.phone} | 📍 ${p.area} | ⭐ ${p.rating} | $statusSymbol\n\n")
+        // 2. Search Stores (Restaurants, Medical, Stores)
+        val storeKeywords = listOf("مطعم", "اكل", "غداء", "عشاء", "كافيه", "قهوه", "محل", "متجر", "سوبر", "صيدليه", "مستشفى", "عياده", "طبي")
+        if (storeKeywords.any { qNormalized.contains(it) } || qNormalized.contains("شراء")) {
+            val ms = stores.filter { s ->
+                val sNameNorm = normalizeArabic(s.name)
+                val sDescNorm = normalizeArabic(s.description)
+                sNameNorm.contains(qNormalized) || sDescNorm.contains(qNormalized)
+            }.take(3)
+            matchedEntities.addAll(ms)
+        }
+
+        // 3. Search Properties
+        if (qNormalized.contains("بيت") || qNormalized.contains("شقه") || qNormalized.contains("عقار") || qNormalized.contains("ايجار") || qNormalized.contains("بيع")) {
+            val mp = properties.filter { pr ->
+                val prTitleNorm = normalizeArabic(pr.title)
+                val prDescNorm = normalizeArabic(pr.description)
+                prTitleNorm.contains(qNormalized) || prDescNorm.contains(qNormalized)
+            }.take(3)
+            matchedEntities.addAll(mp)
+        }
+
+        if (matchedEntities.isNotEmpty()) {
+            val sb = StringBuilder()
+            sb.append("🔍 عثرت لك على النتائج التالية في دليل خدمات اليمن:\n\n")
+            matchedEntities.forEachIndexed { index, ent ->
+                when (ent) {
+                    is com.example.data.ProviderEntity -> {
+                        val catName = categories.find { it.id == ent.categoryId }?.name ?: ent.profession
+                        sb.append("${index + 1}. *${ent.name}* (فني) | $catName\n")
+                        sb.append("   📍 ${ent.area} | ⭐ ${ent.rating} | ${if (ent.isAvailable) "🟢 متاح" else "🔴 مشغول"}\n\n")
+                    }
+                    is com.example.data.StoreEntity -> {
+                        sb.append("${index + 1}. *${ent.name}* (متجر/مطعم)\n")
+                        sb.append("   📍 ${ent.localNeighborhood} | ⭐ ${ent.rating}\n\n")
+                    }
+                    is com.example.data.PropertyEntity -> {
+                        sb.append("${index + 1}. *${ent.title}* (عقار)\n")
+                        sb.append("   📍 ${ent.localNeighborhood} | 💰 ${ent.price} ${ent.currency}\n\n")
+                    }
                 }
-                sb.append("💡 يمكنك النقر على بطاقة الفني بالأسفل للاتصال به فوراً!")
-                return Pair(sb.toString(), matchedProviders)
             }
+            sb.append("💡 انقر على البطاقة بالأسفل لمزيد من التفاصيل!")
+            return Pair(sb.toString(), matchedEntities)
         }
 
         val textResult = when {

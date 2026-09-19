@@ -288,7 +288,11 @@ fun AdminRequestsPanel(
                 }
             }
             "USERS" -> {
-                AdminUsersPanel(viewModel = viewModel, themeColors = themeColors)
+                AdminUserManager(
+                    mainViewModel = viewModel,
+                    themeColors = themeColors,
+                    isPanelMode = true
+                )
             }
         }
     }

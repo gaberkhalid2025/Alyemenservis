@@ -15,7 +15,10 @@ sealed class JoinStatus {
     data class ActiveClient(val userMap: Map<String, Any>) : JoinStatus()
     data class Rejected(val reason: String) : JoinStatus()
     data class PendingStore(val store: StoreEntity) : JoinStatus()
+    data class PendingRestaurant(val store: StoreEntity) : JoinStatus()
+    data class PendingMedical(val store: StoreEntity) : JoinStatus()
     data class PendingProperty(val property: PropertyEntity) : JoinStatus()
+    data class PendingJob(val job: JobEntity) : JoinStatus()
     data class PendingTechnician(val provider: PendingProviderEntity) : JoinStatus()
     data class PendingGeneric(val phone: String) : JoinStatus()
 }
@@ -113,16 +116,116 @@ class JoinStatusUseCase {
             return JoinStatus.Rejected(rejectionNotif.message)
         }
 
-        // 7. Check Pending entities
+        // 7. Check Pending entities in collections
         if (matchingStore != null && !matchingStore.isActive) {
-            return JoinStatus.PendingStore(matchingStore)
+            val sec = matchingStore.sectionId.lowercase()
+            val cat = matchingStore.categoryId.lowercase()
+            return when {
+                sec == "restaurants" || cat.contains("مطعم") || cat.contains("كافيه") || cat.contains("restaurant") -> JoinStatus.PendingRestaurant(matchingStore)
+                sec == "medical" || cat.contains("طبي") || cat.contains("عياد") || cat.contains("صيدل") || cat.contains("medical") -> JoinStatus.PendingMedical(matchingStore)
+                else -> JoinStatus.PendingStore(matchingStore)
+            }
         }
         if (matchingProperty != null && !matchingProperty.isActive) {
             return JoinStatus.PendingProperty(matchingProperty)
         }
+        val pendingJob = jobs.find {
+            it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone && !it.isActive
+        }
+        if (pendingJob != null) {
+            return JoinStatus.PendingJob(pendingJob)
+        }
 
         if (matchingPending != null) {
-            return JoinStatus.PendingTechnician(matchingPending)
+            val cat = matchingPending.categoryId.uppercase()
+            val custom = matchingPending.customCategoryName
+            val prof = matchingPending.profession.uppercase()
+            val pName = matchingPending.name
+
+            val isRestaurant = cat == "RESTAURANT" || cat.contains("RESTAURANT") ||
+                    custom.contains("مطعم") || custom.contains("كافيه") || pName.contains("مطعم") || pName.contains("كافيه")
+
+            val isMedical = cat == "MEDICAL" || cat.contains("MEDICAL") ||
+                    custom.contains("طبي") || custom.contains("عياد") || custom.contains("صيدل") || custom.contains("مستشفى") ||
+                    pName.contains("طبي") || pName.contains("عيادة") || pName.contains("مستشفى") || pName.contains("صيدلية")
+
+            val isProperty = cat == "PROPERTY" || cat.contains("PROPERTY") || prof == "PROPERTY_OWNER" ||
+                    custom.contains("عقار") || custom.contains("شقة") || custom.contains("أرض") || pName.contains("عقار")
+
+            val isJob = cat == "JOB" || cat.contains("JOB") || prof == "JOB_POSTER" ||
+                    custom.contains("وظيفة") || custom.contains("توظيف") || custom.contains("شاغر")
+
+            val isStore = cat == "STORE" || cat.contains("STORE") || prof == "STORE_OWNER" ||
+                    custom.contains("متجر") || custom.contains("محل") || custom.contains("معرض") || custom.contains("سوق") ||
+                    pName.contains("متجر") || pName.contains("محل")
+
+            return when {
+                isRestaurant -> {
+                    val tempStore = StoreEntity(
+                        id = matchingPending.id,
+                        name = matchingPending.name,
+                        phone = matchingPending.phone,
+                        ownerName = matchingPending.name,
+                        cityId = matchingPending.area,
+                        localNeighborhood = matchingPending.localNeighborhood,
+                        sectionId = "restaurants",
+                        categoryId = "مطاعم وكافيهات",
+                        isActive = false
+                    )
+                    JoinStatus.PendingRestaurant(tempStore)
+                }
+                isMedical -> {
+                    val tempStore = StoreEntity(
+                        id = matchingPending.id,
+                        name = matchingPending.name,
+                        phone = matchingPending.phone,
+                        ownerName = matchingPending.name,
+                        cityId = matchingPending.area,
+                        localNeighborhood = matchingPending.localNeighborhood,
+                        sectionId = "medical",
+                        categoryId = "مراكز طبية وعيادات",
+                        isActive = false
+                    )
+                    JoinStatus.PendingMedical(tempStore)
+                }
+                isProperty -> {
+                    val tempProp = PropertyEntity(
+                        id = matchingPending.id,
+                        title = matchingPending.name,
+                        phone = matchingPending.phone,
+                        cityId = matchingPending.area,
+                        localNeighborhood = matchingPending.localNeighborhood,
+                        isActive = false
+                    )
+                    JoinStatus.PendingProperty(tempProp)
+                }
+                isJob -> {
+                    val tempJob = JobEntity(
+                        id = matchingPending.id,
+                        title = custom.ifBlank { "وظيفة - ${matchingPending.name}" },
+                        companyName = matchingPending.name,
+                        phone = matchingPending.phone,
+                        cityId = matchingPending.area,
+                        isActive = false
+                    )
+                    JoinStatus.PendingJob(tempJob)
+                }
+                isStore -> {
+                    val tempStore = StoreEntity(
+                        id = matchingPending.id,
+                        name = matchingPending.name,
+                        phone = matchingPending.phone,
+                        ownerName = matchingPending.name,
+                        cityId = matchingPending.area,
+                        localNeighborhood = matchingPending.localNeighborhood,
+                        sectionId = "stores",
+                        categoryId = "محلات ومراكز تجارية",
+                        isActive = false
+                    )
+                    JoinStatus.PendingStore(tempStore)
+                }
+                else -> JoinStatus.PendingTechnician(matchingPending)
+            }
         }
 
         return JoinStatus.PendingGeneric(joinPhone)

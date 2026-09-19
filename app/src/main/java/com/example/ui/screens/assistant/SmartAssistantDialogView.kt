@@ -43,7 +43,7 @@ data class AssistantMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val isUser: Boolean,
-    val matchedProviders: List<ProviderEntity> = emptyList()
+    val matchedEntities: List<Any> = emptyList()
 )
 
 /**
@@ -119,10 +119,29 @@ fun SmartAssistantDialogView(
                 // Navigation Chips
                 AssistantChipsRow(
                     themeColors = themeColors,
-                    onRequestQuickService = onRequestQuickService,
-                    onNavigateStores = { onDismiss() },
-                    onNavigateRestaurants = { onDismiss() },
-                    onNavigateMedical = { onDismiss() },
+                    onRequestQuickService = {
+                        onDismiss()
+                        if (onRequestQuickService != {}) {
+                            onRequestQuickService()
+                        } else {
+                            viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
+                        }
+                    },
+                    onNavigateStores = {
+                        onDismiss()
+                        viewModel.selectCategory("محلات ومراكز تجارية")
+                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                    },
+                    onNavigateRestaurants = {
+                        onDismiss()
+                        viewModel.selectCategory("مطاعم وكافيهات")
+                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                    },
+                    onNavigateMedical = {
+                        onDismiss()
+                        viewModel.selectCategory("مراكز طبية وعيادات")
+                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                    },
                     onNavigateToMap = { 
                         onDismiss()
                         onNavigateToMap()

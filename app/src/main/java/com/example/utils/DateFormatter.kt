@@ -47,6 +47,15 @@ object DateFormatter {
         "HH:mm", LOCALE_AR
     )
     
+    private val formatterCache = mutableMapOf<String, DateTimeFormatter>()
+    
+    private fun getOrCreateFormatter(pattern: String, locale: Locale = LOCALE_AR): DateTimeFormatter {
+        val cacheKey = "$pattern-${locale.toLanguageTag()}"
+        return formatterCache.getOrPut(cacheKey) {
+            DateTimeFormatter.ofPattern(pattern, locale)
+        }
+    }
+    
     // ============ دوال التنسيق ============
     
     /** 2026/01/15 - 03:30 م */
@@ -110,15 +119,19 @@ object DateFormatter {
     
     /** تنسيق مخصص */
     fun formatCustom(timestamp: Long, pattern: String): String {
-        return Instant.ofEpochMilli(timestamp)
-            .atZone(ZoneId.systemDefault())
-            .format(DateTimeFormatter.ofPattern(pattern, LOCALE_AR))
+        return try {
+            Instant.ofEpochMilli(timestamp)
+                .atZone(ZoneId.systemDefault())
+                .format(getOrCreateFormatter(pattern))
+        } catch (e: Exception) {
+            ""
+        }
     }
 
     /** تحليل تاريخ مخصص آمن */
     fun parseCustom(text: String, pattern: String): Long? {
         return try {
-            val formatter = DateTimeFormatter.ofPattern(pattern, Locale.US)
+            val formatter = getOrCreateFormatter(pattern, Locale.US)
             if (pattern.contains("HH:mm") || pattern.contains("HH:mm:ss") || pattern.contains("hh:mm")) {
                 java.time.LocalDateTime.parse(text, formatter)
                     .atZone(ZoneId.systemDefault())

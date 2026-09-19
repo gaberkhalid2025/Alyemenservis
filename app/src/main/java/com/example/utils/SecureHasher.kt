@@ -72,8 +72,7 @@ object SecureHasher {
         }
     }
 
-    fun hashPin(pin: String): String {
-        val salt = generateSalt()
+    fun hashPin(pin: String, salt: ByteArray = generateSalt()): String {
         val saltBase64 = base64Encode(salt)
         val spec = PBEKeySpec(pin.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
         val skf = SecretKeyFactory.getInstance(ALGORITHM)

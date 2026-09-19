@@ -80,13 +80,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
-import com.example.ui.MainViewModel
 import com.example.ui.components.*
 import com.example.ui.dialogs.*
 import com.example.ui.screens.home.*
 import com.example.ui.screens.map.*
 import com.example.ui.screens.bookings.*
-import com.example.ui.screens.admin.*
 import com.example.ui.screens.admin.components.*
 import com.example.ui.screens.assistant.*
 import com.example.ui.screens.register.*
@@ -131,6 +129,9 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
     val registeredUsersList by viewModel.registeredUsersList.collectAsState()
     val instantRequests by viewModel.instantRequests.collectAsState()
     val requestOffers by viewModel.requestOffers.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     var inputPasscode by remember { mutableStateOf("") }
     var isAuthorized by remember(adminRole) { mutableStateOf(adminRole != "GUEST") }
@@ -393,7 +394,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                 modifier = Modifier
                     .size(72.dp)
                     .background(
-                        Color(0xFFF59E0B).copy(alpha = 0.15f),
+                        themeColors.accent.copy(alpha = 0.15f),
                         RoundedCornerShape(20.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -401,7 +402,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                 Icon(
                     Icons.Default.AdminPanelSettings,
                     contentDescription = "قفل الأدمن",
-                    tint = Color(0xFFF59E0B),
+                    tint = themeColors.accent,
                     modifier = Modifier.size(40.dp)
                 )
             }
@@ -433,7 +434,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                 Button(
                     onClick = { accountType = "ADMIN" },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (accountType == "ADMIN") Color(0xFFF59E0B) else Color(0xFF1E293B)
+                        containerColor = if (accountType == "ADMIN") themeColors.accent else themeColors.surface
                     ),
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
@@ -449,7 +450,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                 Button(
                     onClick = { accountType = "OWNER" },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (accountType == "OWNER") Color(0xFFF59E0B) else Color(0xFF1E293B)
+                        containerColor = if (accountType == "OWNER") themeColors.accent else themeColors.surface
                     ),
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
@@ -465,13 +466,13 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                 Button(
                     onClick = { accountType = "SUPERVISOR" },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (accountType == "SUPERVISOR") Color(0xFFF59E0B) else Color(0xFF1E293B)
+                        containerColor = if (accountType == "SUPERVISOR") themeColors.accent else themeColors.surface
                     ),
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        "💼 مشرف",
+                        "👮 مشرف",
                         color = if (accountType == "SUPERVISOR") Color.Black else Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp

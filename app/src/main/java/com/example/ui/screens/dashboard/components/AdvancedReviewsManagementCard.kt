@@ -15,16 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
+import com.example.domain.entities.ReviewUiModel
 
 import java.util.UUID
-
-data class ReviewUiModel(
-    val id: String = UUID.randomUUID().toString(),
-    val authorName: String,
-    val rating: Int,
-    val comment: String,
-    var replyText: String = ""
-)
 
 @Composable
 fun AdvancedReviewsManagementCard(

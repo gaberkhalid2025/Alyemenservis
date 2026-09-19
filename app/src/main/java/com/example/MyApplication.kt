@@ -10,6 +10,9 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -39,6 +42,18 @@ class MyApplication : Application() {
         try {
             FirebaseApp.initializeApp(this)
             Log.d("MyApplication", "✅ Firebase initialized successfully")
+
+            // 🔐 Firebase App Check - حماية من Abuse
+            val firebaseAppCheck = FirebaseAppCheck.getInstance()
+            firebaseAppCheck.installAppCheckProviderFactory(
+                PlayIntegrityAppCheckProviderFactory.getInstance()
+            )
+            // تفعيل الـ Debug Provider في وضع التطوير
+            if (BuildConfig.DEBUG) {
+                firebaseAppCheck.installAppCheckProviderFactory(
+                    DebugAppCheckProviderFactory.getInstance()
+                )
+            }
 
             // تفعيل Anonymous Auth التلقائي لضمان وجود UID ثابت وموثوق للجهاز
             val auth = com.google.firebase.auth.FirebaseAuth.getInstance()

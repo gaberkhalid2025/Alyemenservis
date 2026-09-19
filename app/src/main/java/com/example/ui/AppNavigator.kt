@@ -138,7 +138,30 @@ fun AppNavigator(
                     onStartSupportChat = { viewModel.openSupportChat() }
                 )
                 AppScreens.CHAT_DIRECT -> ChatScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, channelId = viewModel.targetChatChannelId, onBackClick = { viewModel.targetChatChannelId = null; viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
-                AppScreens.CREATE_BOOKING -> CreateBookingScreen(onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }, onBookingCreated = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
+                AppScreens.CREATE_BOOKING -> {
+                    val pId = viewModel.selectedProvider?.id
+                        ?: viewModel.selectedStore?.id
+                        ?: viewModel.selectedProperty?.id
+                        ?: ""
+                    val pName = viewModel.selectedProvider?.name
+                        ?: viewModel.selectedStore?.name
+                        ?: viewModel.selectedProperty?.title
+                        ?: ""
+                    val pService = viewModel.selectedProvider?.specialization?.ifBlank { viewModel.selectedProvider?.profession }
+                        ?: viewModel.selectedStore?.categoryId
+                        ?: viewModel.selectedProperty?.title
+                        ?: ""
+                    CreateBookingScreen(
+                        providerId = pId,
+                        providerName = pName,
+                        preselectedService = pService,
+                        onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                        onBookingCreated = { booking ->
+                            viewModel.createBooking(booking)
+                            viewModel.navigateToScreen(AppScreens.BOOKINGS_VIEW)
+                        }
+                    )
+                }
                 AppScreens.DYNAMIC_PROFILE, AppScreens.OWNER_PROFILE_VIEW, AppScreens.PROVIDER_DETAILS, AppScreens.STORE_DETAILS, AppScreens.PROPERTY_DETAILS -> DynamicPolymorphicProfileScreen(
                     provider = viewModel.selectedProvider,
                     store = viewModel.selectedStore,
@@ -153,7 +176,53 @@ fun AppNavigator(
                 AppScreens.ORDERS_VIEW -> OrdersScreenLayout(viewModel = viewModel, themeColors = themeColors, onRequestQuickService = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
                 AppScreens.MAP_VIEW -> MapScreenLayout(
                     viewModel = viewModel,
-                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                    onOpenProviderDetails = { provider ->
+                        viewModel.selectedProvider = provider
+                        viewModel.selectedStore = null
+                        viewModel.selectedProperty = null
+                        viewModel.selectedJob = null
+                        viewModel.navigateToScreen(AppScreens.PROVIDER_DETAILS)
+                    },
+                    onOpenStoreDetails = { store ->
+                        viewModel.selectedStore = store
+                        viewModel.selectedProvider = null
+                        viewModel.selectedProperty = null
+                        viewModel.selectedJob = null
+                        viewModel.navigateToScreen(AppScreens.STORE_DETAILS)
+                    },
+                    onOpenPropertyDetails = { prop ->
+                        viewModel.selectedProperty = prop
+                        viewModel.selectedProvider = null
+                        viewModel.selectedStore = null
+                        viewModel.selectedJob = null
+                        viewModel.navigateToScreen(AppScreens.PROPERTY_DETAILS)
+                    },
+                    onRequestBooking = { entity ->
+                        when (entity) {
+                            is ProviderEntity -> {
+                                viewModel.selectedProvider = entity
+                                viewModel.selectedStore = null
+                                viewModel.selectedProperty = null
+                                viewModel.selectedJob = null
+                                viewModel.navigateToScreen(AppScreens.CREATE_BOOKING)
+                            }
+                            is StoreEntity -> {
+                                viewModel.selectedStore = entity
+                                viewModel.selectedProvider = null
+                                viewModel.selectedProperty = null
+                                viewModel.selectedJob = null
+                                viewModel.navigateToScreen(AppScreens.CREATE_BOOKING)
+                            }
+                            is PropertyEntity -> {
+                                viewModel.selectedProperty = entity
+                                viewModel.selectedProvider = null
+                                viewModel.selectedStore = null
+                                viewModel.selectedJob = null
+                                viewModel.navigateToScreen(AppScreens.CREATE_BOOKING)
+                            }
+                        }
+                    }
                 )
                 AppScreens.FAVORITES_VIEW -> FavoritesScreenLayout(
                     viewModel = viewModel,

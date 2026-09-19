@@ -24,6 +24,7 @@ import com.example.ui.screens.dashboard.components.UnifiedEmptyState
 import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
 import com.example.ui.screens.dashboard.viewmodels.MedicalDashboardViewModel
 import com.example.utils.VisualThemePalette
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,23 +32,14 @@ fun MedicalDashboard(
     account: UnifiedBusinessAccount,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    medicalViewModel: MedicalDashboardViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val medicalViewModel = remember(account.id, appContext) {
-        MedicalDashboardViewModel(
-            ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(appContext),
-            productsRepository = ProductsRepositoryImpl(appContext),
-            ratingsRepository = RatingsRepositoryImpl(appContext),
-            medicalRepository = com.example.data.repositories.MedicalRepository(
-                com.google.firebase.firestore.FirebaseFirestore.getInstance(),
-                com.example.data.LocalAppCacheManager(context)
-            )
-        )
+    LaunchedEffect(account.id) {
+        medicalViewModel.initialize(account.id)
     }
 
     val uiState by medicalViewModel.uiState.collectAsState()

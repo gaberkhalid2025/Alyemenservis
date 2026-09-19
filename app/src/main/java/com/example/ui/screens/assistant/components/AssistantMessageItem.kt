@@ -19,9 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.VoiceManager
+import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.ui.ProviderCard
 import com.example.ui.screens.assistant.AssistantMessage
+import com.example.ui.screens.entities.PropertyCard
+import com.example.ui.screens.entities.StoreItemCard
 import com.example.utils.VisualThemePalette
 
 /**
@@ -118,10 +121,10 @@ fun AssistantMessageItem(
             }
         }
 
-        if (msg.matchedProviders.isNotEmpty()) {
+        if (msg.matchedEntities.isNotEmpty()) {
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "👇 الفنيين المقترحين لطلبك (اتصال / حجز مباشر):",
+                text = "👇 عثرت لك على النتائج التالية لطلبك:",
                 fontSize = 11.sp,
                 color = themeColors.accent,
                 fontWeight = FontWeight.Bold,
@@ -129,13 +132,47 @@ fun AssistantMessageItem(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                msg.matchedProviders.forEach { provider ->
-                    ProviderCard(
-                        provider = provider,
-                        themeColors = themeColors,
-                        viewModel = viewModel,
-                        onChatOpen = onChatOpen
-                    )
+                msg.matchedEntities.forEach { entity ->
+                    when (entity) {
+                        is ProviderEntity -> {
+                            ProviderCard(
+                                provider = entity,
+                                themeColors = themeColors,
+                                viewModel = viewModel,
+                                onChatOpen = onChatOpen
+                            )
+                        }
+                        is StoreEntity -> {
+                            StoreItemCard(
+                                store = entity,
+                                themeColors = themeColors,
+                                onClick = {
+                                    viewModel.selectedStore = entity
+                                    viewModel.navigateToScreen(AppScreens.STORE_DETAILS)
+                                },
+                                onChatClick = { onChatOpen(entity.id) },
+                                onRequestServiceClick = {
+                                    viewModel.selectedStore = entity
+                                    viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
+                                }
+                            )
+                        }
+                        is PropertyEntity -> {
+                            PropertyCard(
+                                property = entity,
+                                themeColors = themeColors,
+                                onClick = {
+                                    viewModel.selectedProperty = entity
+                                    viewModel.navigateToScreen(AppScreens.PROPERTY_DETAILS)
+                                },
+                                onChatClick = { onChatOpen(entity.id) },
+                                onRequestInspectionClick = {
+                                    viewModel.selectedProperty = entity
+                                    viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }

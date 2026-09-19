@@ -356,10 +356,26 @@ class RegistrationHelper(
                         }
                     } catch (e: Exception) {}
 
+                    val adminNotifTitle = when (requestType) {
+                        "STORE" -> "🏪 طلب انضمام متجر جديد"
+                        "RESTAURANT" -> "🍔 طلب انضمام مطعم / كافيه جديد"
+                        "MEDICAL" -> "🏥 طلب انضمام مركز طبي جديد"
+                        "PROPERTY" -> "🏠 طلب إضافة عقار جديد"
+                        "JOB" -> "💼 طلب إعلان وظيفة جديدة"
+                        else -> "🔧 طلب انضمام فني جديد"
+                    }
+                    val entityLabel = when (requestType) {
+                        "STORE" -> "متجر / محل تجاري"
+                        "RESTAURANT" -> "مطعم / كافيه"
+                        "MEDICAL" -> "مركز طبي / عيادة"
+                        "PROPERTY" -> "عقار"
+                        "JOB" -> "إعلان وظيفي"
+                        else -> "مهني / فني"
+                    }
                     val adminNotif = NotificationEntity(
                         id = UUID.randomUUID().toString(),
-                        title = "👷 طلب انضمام جديد للدليل",
-                        message = "قدم ${name} طلب انضمام جديد في قسم ${if (customCategoryName.isNullOrBlank()) catId else customCategoryName} بمنطقة ${area}.",
+                        title = adminNotifTitle,
+                        message = "قدم $name طلب انضمام جديد كـ ($entityLabel) في قسم ${if (customCategoryName.isNullOrBlank()) catId else customCategoryName} بمنطقة $area.",
                         targetType = "SUPERVISOR",
                         targetValue = "ALL",
                         timestamp = System.currentTimeMillis()
@@ -379,9 +395,17 @@ class RegistrationHelper(
             preferenceHelper.setJoinRequestPhone(context, phone)
             onJoinRequestPhoneUpdated(phone)
 
+            val userEntityLabel = when (requestType) {
+                "STORE" -> "متجر / محل تجاري"
+                "RESTAURANT" -> "مطعم / كافيه"
+                "MEDICAL" -> "مركز طبي / عيادة"
+                "PROPERTY" -> "عقار"
+                "JOB" -> "إعلان وظيفة"
+                else -> "فني / مهني"
+            }
             addApplicantNotification(
-                "📨 تم استلام طلب انضمامك بنجاح",
-                "مرحباً يا غالي، تم استلام طلبك وجاري مراجعته والتحقق من التخصص والخبرة من قبل إدارة الدليل. نسعد بانضمامك وسنبلغك فور التنشيط!",
+                "📨 تم استلام طلبك بنجاح ($userEntityLabel)",
+                "مرحباً $name، تم استلام طلبك كـ ($userEntityLabel) وجاري مراجعته والتحقق من البيانات والمستندات من قِبل إدارة التطبيق. نسعد بانضمامك وسنبلغك بإشعار فور التفعيل!",
                 "USER",
                 phone
             )

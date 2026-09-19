@@ -46,7 +46,7 @@ fun MapBottomSheet(
     userLat: Double,
     userLng: Double,
     onDismiss: () -> Unit,
-    onRequestBooking: (ProviderEntity) -> Unit,
+    onRequestBooking: (Any) -> Unit,
     onOpenDetails: (Any) -> Unit,
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
@@ -301,7 +301,8 @@ fun MapBottomSheet(
             // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Primary Action: View Details
                 Button(
@@ -313,12 +314,12 @@ fun MapBottomSheet(
                     ),
                     modifier = Modifier
                         .weight(1.2f)
-                        .height(42.dp)
+                        .height(44.dp)
                         .testTag("view_details_action_btn")
                 ) {
                     Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("عرض التفاصيل", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(4.dp))
+                    Text("التفاصيل", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 // Call Action
@@ -333,11 +334,11 @@ fun MapBottomSheet(
                             }
                         },
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFF10B981)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981)),
+                        border = BorderStroke(1.dp, Color(0xFF38BDF8)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
                         modifier = Modifier
                             .weight(0.9f)
-                            .height(42.dp)
+                            .height(44.dp)
                             .testTag("call_action_btn")
                     ) {
                         Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -346,24 +347,37 @@ fun MapBottomSheet(
                     }
                 }
 
-                // Direct Booking Action (Providers only)
-                if (entity is ProviderEntity) {
-                    Button(
-                        onClick = { onRequestBooking(entity) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF10B981),
-                            contentColor = Color.White
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                            .testTag("book_provider_btn")
-                    ) {
-                        Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("حجز فوري", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                // Booking / Request Action for ALL entity types
+                val bookingBtnText = when (entity) {
+                    is ProviderEntity -> "حجز فوري"
+                    is StoreEntity -> {
+                        val isMedical = entity.sectionId.contains("medical") || entity.categoryId.contains("medical") || entity.name.contains("طبي") || entity.name.contains("عياد")
+                        val isRestaurant = entity.sectionId.contains("restaurant") || entity.categoryId.contains("restaurant") || entity.name.contains("مطعم") || entity.name.contains("كافيه")
+                        when {
+                            isMedical -> "حجز موعد"
+                            isRestaurant -> "حجز طاولة"
+                            else -> "طلب متجر"
+                        }
                     }
+                    is PropertyEntity -> "معاينة"
+                    else -> "حجز"
+                }
+
+                Button(
+                    onClick = { onRequestBooking(entity) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF10B981),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .height(44.dp)
+                        .testTag("book_entity_btn")
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(bookingBtnText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

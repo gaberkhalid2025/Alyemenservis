@@ -60,39 +60,44 @@ object MarkerRenderer {
     }
 
     /**
-     * Compute clusters based on screen distance threshold (e.g. 40 pixels)
+     * Compute clusters based on screen distance threshold (Spatial Hashing optimization O(n))
      */
     fun clusterPoints(points: List<MapItemPoint>, thresholdPx: Float = 50f): List<ClusterGroup> {
+        if (points.isEmpty()) return emptyList()
+        
+        // استخدام نظام الشبكة لتقليل عدد المقارنات (Grid-based clustering)
+        val grid = mutableMapOf<Pair<Int, Int>, MutableList<MapItemPoint>>()
+        
+        for (point in points) {
+            val cellX = (point.x / thresholdPx).toInt()
+            val cellY = (point.y / thresholdPx).toInt()
+            grid.getOrPut(cellX to cellY) { mutableListOf() }.add(point)
+        }
+        
         val clusters = mutableListOf<ClusterGroup>()
-        val visited = BooleanArray(points.size)
-
-        for (i in points.indices) {
-            if (visited[i]) continue
-            visited[i] = true
-
-            val group = mutableListOf(points[i])
-            var sumX = points[i].x
-            var sumY = points[i].y
-
-            for (j in (i + 1) until points.size) {
-                if (visited[j]) continue
-                val dist = sqrt((points[i].x - points[j].x).pow(2) + (points[i].y - points[j].y).pow(2))
-                if (dist <= thresholdPx) {
-                    visited[j] = true
-                    group.add(points[j])
-                    sumX += points[j].x
-                    sumY += points[j].y
-                }
+        val processedCells = mutableSetOf<Pair<Int, Int>>()
+        
+        for ((cell, cellPoints) in grid) {
+            if (cell in processedCells) continue
+            
+            // دمج النقاط في الخلية الحالية ككتلة واحدة (تبسيط ذكي للسرعة)
+            var sumX = 0f
+            var sumY = 0f
+            for (p in cellPoints) {
+                sumX += p.x
+                sumY += p.y
             }
-
+            
             clusters.add(
                 ClusterGroup(
-                    centerX = sumX / group.size,
-                    centerY = sumY / group.size,
-                    items = group
+                    centerX = sumX / cellPoints.size,
+                    centerY = sumY / cellPoints.size,
+                    items = cellPoints
                 )
             )
+            processedCells.add(cell)
         }
+        
         return clusters
     }
 

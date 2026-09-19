@@ -138,6 +138,7 @@ data class SystemLog(
 
 
 class AdminViewModel @Inject constructor(
+    val application: android.app.Application,
     val appState: AppState,
     val secureStorage: com.example.utils.SecureStorage
 ) : BaseViewModel() {
@@ -183,6 +184,16 @@ class AdminViewModel @Inject constructor(
                     val perms = adminDoc.get("permissions") as? List<String> ?: emptyList()
                     if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
                         val assignedRole = if (role.contains("OWNER")) "OWNER" else "ADMIN"
+                        
+                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
+                        com.example.utils.SecureAdminStorage.storeCredentials(
+                            context = application,
+                            ownerEmail = if (assignedRole == "OWNER") trimmedEmail else null,
+                            ownerPassword = if (assignedRole == "OWNER") trimmedPass else null,
+                            adminEmail = if (assignedRole == "ADMIN") trimmedEmail else null,
+                            adminPassword = if (assignedRole == "ADMIN") trimmedPass else null
+                        )
+
                         if (rememberMe) {
                             secureStorage.saveAdminSession(com.example.utils.AdminSession(
                                 uid = adminDoc.id, email = trimmedEmail,
@@ -198,17 +209,8 @@ class AdminViewModel @Inject constructor(
                     }
                 }
 
-                // 2. التحقق من الحسابات الطارئة (Emergency Fallback)
-                if ((trimmedEmail == "mah73646@gmail.com" && trimmedPass == "Maher@@--@@736462##") ||
-                    (trimmedEmail == "meh777644@gmail.com" && trimmedPass == "Meh@@@@777644##")) {
-                    val role = if (trimmedEmail == "mah73646@gmail.com") "OWNER" else "ADMIN"
-                    if (rememberMe) {
-                        secureStorage.saveAdminSession(com.example.utils.AdminSession(
-                            uid = "emergency_$role", email = trimmedEmail,
-                            loginTime = System.currentTimeMillis(), refreshToken = "EMERGENCY_SESSION", role = role
-                        ))
-                    }
-                    _adminRole.value = role
+                // 2. التحقق من الحسابات الطارئة (Emergency Fallback الآمن)
+                if (attemptEmergencyFallback(trimmedEmail, trimmedPass, rememberMe)) {
                     _isLoading.value = false
                     onResult(true, null)
                     return@launch
@@ -223,6 +225,16 @@ class AdminViewModel @Inject constructor(
                     if (data?.get("success") == true) {
                         val uid = data["uid"] as? String ?: ""
                         val assignedRole = if (data["isSuperAdmin"] == true) "OWNER" else "ADMIN"
+                        
+                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
+                        com.example.utils.SecureAdminStorage.storeCredentials(
+                            context = application,
+                            ownerEmail = if (assignedRole == "OWNER") trimmedEmail else null,
+                            ownerPassword = if (assignedRole == "OWNER") trimmedPass else null,
+                            adminEmail = if (assignedRole == "ADMIN") trimmedEmail else null,
+                            adminPassword = if (assignedRole == "ADMIN") trimmedPass else null
+                        )
+
                         if (rememberMe) {
                             secureStorage.saveAdminSession(com.example.utils.AdminSession(
                                 uid = uid, email = email, loginTime = System.currentTimeMillis(),
@@ -272,6 +284,13 @@ class AdminViewModel @Inject constructor(
                     val storedPass = ownerDoc.getString("passcode") ?: ""
                     val perms = ownerDoc.get("permissions") as? List<String> ?: emptyList()
                     if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
+                        com.example.utils.SecureAdminStorage.storeCredentials(
+                            context = application,
+                            ownerEmail = trimmedEmail,
+                            ownerPassword = trimmedPass
+                        )
+
                         if (rememberMe) {
                             secureStorage.saveAdminSession(com.example.utils.AdminSession(
                                 uid = ownerDoc.id, email = trimmedEmail,
@@ -287,15 +306,8 @@ class AdminViewModel @Inject constructor(
                     }
                 }
 
-                // 2. التحقق من حساب المالك الأساسي (Emergency Fallback)
-                if (trimmedEmail == "mah73646@gmail.com" && trimmedPass == "Maher@@--@@736462##") {
-                    if (rememberMe) {
-                        secureStorage.saveAdminSession(com.example.utils.AdminSession(
-                            uid = "owner_root", email = trimmedEmail,
-                            loginTime = System.currentTimeMillis(), refreshToken = "OWNER_ROOT_SESSION", role = "OWNER"
-                        ))
-                    }
-                    _adminRole.value = "OWNER"
+                // 2. التحقق من حساب المالك الأساسي (Emergency Fallback الآمن)
+                if (attemptEmergencyFallback(trimmedEmail, trimmedPass, rememberMe)) {
                     _isLoading.value = false
                     onResult(true, null)
                     return@launch
@@ -309,6 +321,14 @@ class AdminViewModel @Inject constructor(
                     val data = result.data as? Map<*, *>
                     if (data?.get("success") == true) {
                         val uid = data["uid"] as? String ?: ""
+                        
+                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
+                        com.example.utils.SecureAdminStorage.storeCredentials(
+                            context = application,
+                            ownerEmail = trimmedEmail,
+                            ownerPassword = trimmedPass
+                        )
+
                         if (rememberMe) {
                             secureStorage.saveAdminSession(com.example.utils.AdminSession(
                                 uid = uid, email = email, loginTime = System.currentTimeMillis(),
@@ -711,13 +731,31 @@ fun approveRequest(request: PendingProviderEntity) {
             // Instant Local Sync for stores
             _stores.value = _stores.value.filter { it.id != storeId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newStore
 
+            val (approvalTitle, approvalMsg, toastMsg) = when (request.categoryId.uppercase()) {
+                "RESTAURANT" -> Triple(
+                    "🎉 تهانينا! تم تفعيل مطعمك / كافيهك بنجاح",
+                    "مرحباً بك، لقد تم مراجعة وتفعيل مطعمك '${request.name}' بنجاح في دليل المطاعم والكافيهات! يمكنك الآن إدارة قائمتك وحجوزاتك مباشرة من شاشة الانضمام.",
+                    "✅ تم تفعيل مطعم ${request.name}"
+                )
+                "MEDICAL" -> Triple(
+                    "🎉 تهانينا! تم تفعيل مركزك الطبي / عيادتك بنجاح",
+                    "مرحباً بك، لقد تم مراجعة وتفعيل مركزك الطبي/عيادتك '${request.name}' بنجاح في الدليل الطبي! يمكنك الآن استقبال حجوزات المواعيد وإدارتها مباشرة من شاشة الانضمام.",
+                    "✅ تم تفعيل المركز الطبي ${request.name}"
+                )
+                else -> Triple(
+                    "🎉 تهانينا! تم تفعيل متجرك بنجاح",
+                    "مرحباً بك يا غالي، لقد تم مراجعة وتفعيل متجرك/محلك '${request.name}' بنجاح في التطبيق! يمكنك الآن إضافة منتجاتك وإدارة متجرك مباشرة من شاشة الانضمام.",
+                    "✅ تم تفعيل متجر ${request.name}"
+                )
+            }
+
             mainViewModel.addNotification(
-                title = "🎉 تهانينا! تم تفعيل متجرك بنجاح",
-                message = "مرحباً بك يا غالي، لقد تم مراجعة وتفعيل متجرك/محلك '${request.name}' بنجاح في التطبيق! يمكنك الآن إضافة منتجاتك وإدارة متجرك مباشرة من شاشة الانضمام.",
+                title = approvalTitle,
+                message = approvalMsg,
                 targetType = "USER",
                 targetValue = request.phone
             )
-            mainViewModel.triggerNotification("✅ تم تفعيل متجر ${request.name}")
+            mainViewModel.triggerNotification(toastMsg)
         } else if (request.profession == "PROPERTY_OWNER" || request.categoryId.uppercase() == "PROPERTY") {
             val propId = "prop_" + cleanPhone
             val propPrice = try { request.chatRecipientId.toDouble() } catch(e: Exception) { 0.0 }
@@ -1673,6 +1711,19 @@ fun setJobApproved(jobId: String, isApproved: Boolean) {
             "isApproved" to isApproved,
             "isActive" to isApproved
         )
+        val targetJob = _jobs.value.find { it.id == jobId }
+        if (targetJob != null && isApproved) {
+            val notification = NotificationEntity(
+                id = UUID.randomUUID().toString(),
+                title = "🎉 تم قبول ونشر إعلان وظيفتك!",
+                message = "تهانينا! تم قبول ونشر إعلان الوظيفة (${targetJob.title}) للجميع!",
+                targetType = "USER",
+                targetValue = targetJob.phone,
+                timestamp = System.currentTimeMillis()
+            )
+            _notifications.value = listOf(notification) + _notifications.value
+            try { db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
+        }
         db.collection("jobs").document(jobId).update(updates)
             .addOnSuccessListener {
                 mainViewModel.triggerNotification(if (isApproved) "✅ تم قبول ونشر إعلان الوظيفة بنجاح!" else "❌ تم رفض إعلان الوظيفة")
@@ -3226,5 +3277,44 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
     override fun onCleared() {
         super.onCleared()
         passwordRecoveryListenerRegistration?.remove()
+    }
+
+    /**
+     * 🔐 Emergency Fallback - لا يحتوي credentials مكشوفة
+     * يستخدم EncryptedSharedPreferences و SHA-256 Hashing
+     */
+    private suspend fun attemptEmergencyFallback(
+        email: String,
+        password: String,
+        rememberMe: Boolean
+    ): Boolean {
+        val secureAdminStorage = com.example.utils.SecureAdminStorage
+        
+        // 1. التحقق للمالك
+        if (secureAdminStorage.verifyFallbackCredentials(application, email, password, "OWNER")) {
+            handleEmergencyFallbackSuccess("OWNER", email, rememberMe)
+            return true
+        }
+        
+        // 2. التحقق للأدمن
+        if (secureAdminStorage.verifyFallbackCredentials(application, email, password, "ADMIN")) {
+            handleEmergencyFallbackSuccess("ADMIN", email, rememberMe)
+            return true
+        }
+        
+        return false
+    }
+
+    private fun handleEmergencyFallbackSuccess(role: String, email: String, rememberMe: Boolean) {
+        _adminRole.value = role
+        if (rememberMe) {
+            secureStorage.saveAdminSession(com.example.utils.AdminSession(
+                uid = "emergency_${role.lowercase()}",
+                email = email,
+                loginTime = System.currentTimeMillis(),
+                refreshToken = "EMERGENCY_SESSION",
+                role = role
+            ))
+        }
     }
 }

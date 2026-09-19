@@ -28,7 +28,7 @@ fun MapScreen(
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
     onOpenStoreDetails: (StoreEntity) -> Unit = {},
     onOpenPropertyDetails: (PropertyEntity) -> Unit = {},
-    onRequestBooking: (ProviderEntity) -> Unit = {},
+    onRequestBooking: (Any) -> Unit = {},
     themeColors: VisualThemePalette = resolveThemePalette(viewModel.settings.collectAsState().value)
 ) {
     val state = rememberMapScreenState()

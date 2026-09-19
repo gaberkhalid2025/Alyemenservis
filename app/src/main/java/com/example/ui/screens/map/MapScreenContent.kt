@@ -46,7 +46,7 @@ fun MapScreenContent(
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
     onOpenStoreDetails: (StoreEntity) -> Unit = {},
     onOpenPropertyDetails: (PropertyEntity) -> Unit = {},
-    onRequestBooking: (ProviderEntity) -> Unit = {},
+    onRequestBooking: (Any) -> Unit = {},
     themeColors: VisualThemePalette = resolveThemePalette(viewModel.settings.collectAsState().value)
 ) {
     val context = LocalContext.current
@@ -274,10 +274,23 @@ fun MapScreenContent(
                     userLat = safeUserLat,
                     userLng = safeUserLng,
                     onDismiss = { state.selectedEntity = null },
-                    onRequestBooking = { p ->
-                        state.bookingProviderTarget = p
+                    onRequestBooking = { target ->
+                        state.selectedEntity = null
+                        when (target) {
+                            is ProviderEntity -> {
+                                state.bookingProviderTarget = target
+                            }
+                            is StoreEntity -> {
+                                onRequestBooking(target)
+                            }
+                            is PropertyEntity -> {
+                                onRequestBooking(target)
+                            }
+                            else -> onRequestBooking(target)
+                        }
                     },
                     onOpenDetails = { ent ->
+                        state.selectedEntity = null
                         when (ent) {
                             is ProviderEntity -> onOpenProviderDetails(ent)
                             is StoreEntity -> onOpenStoreDetails(ent)

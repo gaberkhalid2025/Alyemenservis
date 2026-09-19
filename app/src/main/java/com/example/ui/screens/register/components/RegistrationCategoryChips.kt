@@ -12,8 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
-
-data class CategoryOption(val id: String, val label: String)
+import com.example.domain.entities.CategoryOption
 
 /**
  * 🏷️ RegistrationCategoryChips - شارات اختيار التصنيف الموحدة

@@ -102,19 +102,81 @@ fun JoinRequestStatusScreen(
                 }
                 is JoinStatus.PendingStore -> {
                     val store = currentStatus.store
-                    val storeName = store?.name ?: "نشاط تجاري جديد"
-                    val ownerName = store?.ownerName ?: "غير محدد"
-                    val phone = store?.phone ?: "غير محدد"
-                    val city = store?.cityId ?: "صنعاء"
-                    val neighborhood = store?.localNeighborhood ?: ""
+                    val storeName = store.name.ifBlank { "متجر جديد" }
+                    val ownerName = store.ownerName.ifBlank { "غير محدد" }
+                    val phone = store.phone.ifBlank { "غير محدد" }
+                    val city = store.cityId.ifBlank { "صنعاء" }
+                    val neighborhood = store.localNeighborhood
+                    
                     PendingApprovalView(
-                        title = "⏳ طلب انضمام النشاط التجاري قيد المراجعة",
-                        message = "تم استلام طلب انضمام النشاط '$storeName' وهو قيد التدقيق والاعتماد الإداري.",
+                        title = "🏪 طلب انضمام المتجر / المحل قيد المراجعة",
+                        message = "تم استلام طلب انضمام المتجر '${storeName}' وهو قيد المراجعة والاعتماد التجاري حالياً.",
                         detailsList = listOf(
-                            "اسم النشاط" to storeName,
-                            "اسم المالك" to ownerName,
+                            "اسم المتجر / المحل" to storeName,
+                            "اسم المالك / المسؤول" to ownerName,
                             "رقم الهاتف" to phone,
-                            "المنطقة" to "$city - $neighborhood"
+                            "المنطقة والحي" to "$city - $neighborhood"
+                        ),
+                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        themeColors = themeColors
+                    )
+                }
+                is JoinStatus.PendingRestaurant -> {
+                    val store = currentStatus.store
+                    val storeName = store.name.ifBlank { "مطعم / كافيه جديد" }
+                    val ownerName = store.ownerName.ifBlank { "غير محدد" }
+                    val phone = store.phone.ifBlank { "غير محدد" }
+                    val city = store.cityId.ifBlank { "صنعاء" }
+                    val neighborhood = store.localNeighborhood
+                    
+                    PendingApprovalView(
+                        title = "🍽️ طلب انضمام المطعم / الكافيه قيد المراجعة",
+                        message = "تم استلام طلب انضمام المطعم '${storeName}' وجاري مراجعته والتحقق من القوائم والبيانات من قِبل إدارة التطبيق.",
+                        detailsList = listOf(
+                            "اسم المطعم / الكافيه" to storeName,
+                            "اسم المالك / المدير" to ownerName,
+                            "رقم الهاتف" to phone,
+                            "المنطقة والحي" to "$city - $neighborhood"
+                        ),
+                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        themeColors = themeColors
+                    )
+                }
+                is JoinStatus.PendingMedical -> {
+                    val store = currentStatus.store
+                    val storeName = store.name.ifBlank { "مركز طبي / عيادة جديدة" }
+                    val ownerName = store.ownerName.ifBlank { "غير محدد" }
+                    val phone = store.phone.ifBlank { "غير محدد" }
+                    val city = store.cityId.ifBlank { "صنعاء" }
+                    val neighborhood = store.localNeighborhood
+                    
+                    PendingApprovalView(
+                        title = "🏥 طلب انضمام المركز الطبي / العيادة قيد المراجعة",
+                        message = "تم استلام طلب انضمام '${storeName}' وجاري مراجعة التراخيص والاعتماد الطبي من قِبل إدارة التطبيق.",
+                        detailsList = listOf(
+                            "اسم المركز / العيادة" to storeName,
+                            "اسم المسؤول / الطبيب" to ownerName,
+                            "رقم الهاتف" to phone,
+                            "المنطقة والحي" to "$city - $neighborhood"
+                        ),
+                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        themeColors = themeColors
+                    )
+                }
+                is JoinStatus.PendingJob -> {
+                    val job = currentStatus.job
+                    val title = job.title.ifBlank { "وظيفة جديدة" }
+                    val company = job.companyName.ifBlank { "منشأة غير محددة" }
+                    val phone = job.phone.ifBlank { "غير محدد" }
+                    val city = job.cityId.ifBlank { "صنعاء" }
+                    PendingApprovalView(
+                        title = "💼 طلب نشر الوظيفة قيد المراجعة",
+                        message = "تم استلام طلب نشر الشاغر الوظيفي '$title' وجاري مراجعته ونشره في قسم الوظائف.",
+                        detailsList = listOf(
+                            "المسمى الوظيفي" to title,
+                            "اسم المنشأة / الشركة" to company,
+                            "رقم التواصل" to phone,
+                            "المدينة" to city
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
@@ -122,20 +184,20 @@ fun JoinRequestStatusScreen(
                 }
                 is JoinStatus.PendingProperty -> {
                     val prop = currentStatus.property
-                    val title = prop?.title ?: "عقار جديد"
-                    val price = prop?.price ?: 0.0
-                    val currency = prop?.currency ?: "ريال يمني"
-                    val phone = prop?.phone ?: "غير محدد"
-                    val city = prop?.cityId ?: "صنعاء"
-                    val neighborhood = prop?.localNeighborhood ?: ""
+                    val title = prop.title.ifBlank { "عقار جديد" }
+                    val price = prop.price
+                    val currency = prop.currency.ifBlank { "ريال يمني" }
+                    val phone = prop.phone.ifBlank { "غير محدد" }
+                    val city = prop.cityId.ifBlank { "صنعاء" }
+                    val neighborhood = prop.localNeighborhood
                     PendingApprovalView(
-                        title = "⏳ إعلان العقار قيد المراجعة",
-                        message = "تم استلام إعلان العقار '$title' وهو قيد المراجعة والاعتماد الظاهر.",
+                        title = "🏢 طلب إدراج العقار قيد المراجعة",
+                        message = "تم استلام بيانات العقار/المكتب '$title' وهو قيد المراجعة والاعتماد.",
                         detailsList = listOf(
                             "عنوان العقار" to title,
-                            "السعر" to "$price $currency",
+                            "السعر" to if (price > 0) "$price $currency" else "حسب الاتفاق",
                             "رقم التواصل" to phone,
-                            "المنطقة" to "$city - $neighborhood"
+                            "المنطقة والحي" to "$city - $neighborhood"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors
@@ -143,17 +205,19 @@ fun JoinRequestStatusScreen(
                 }
                 is JoinStatus.PendingTechnician -> {
                     val pending = currentStatus.provider
-                    val name = pending?.name ?: "فني جديد"
-                    val phone = pending?.phone ?: "غير محدد"
-                    val area = pending?.area ?: "صنعاء"
-                    val neighborhood = pending?.localNeighborhood ?: ""
+                    val name = pending.name.ifBlank { "فني جديد" }
+                    val phone = pending.phone.ifBlank { "غير محدد" }
+                    val area = pending.area.ifBlank { "صنعاء" }
+                    val neighborhood = pending.localNeighborhood
+                    val profession = pending.profession.ifBlank { pending.specialization }.ifBlank { "مهنة فنية" }
                     PendingApprovalView(
-                        title = "⏳ طلب الانضمام كفني قيد المراجعة",
-                        message = "تم استلام بياناتك بنجاح وجاري مراجعة المؤهلات وتفعيل الملف الشخصي.",
+                        title = "🔧 طلب الانضمام كفني / مهني قيد المراجعة",
+                        message = "تم استلام بياناتك بنجاح وجاري مراجعة المؤهلات وتفعيل ملفك المهني في الدليل.",
                         detailsList = listOf(
                             "الاسم" to name,
+                            "المهنة / التخصص" to profession,
                             "رقم التواصل" to phone,
-                            "المنطقة" to "$area - $neighborhood"
+                            "المنطقة والحي" to "$area - $neighborhood"
                         ),
                         onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
                         themeColors = themeColors

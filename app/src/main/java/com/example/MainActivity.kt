@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.example.data.*
 import com.example.data.models.*
 import com.example.ui.MainViewModel
@@ -206,6 +208,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // 🔐 تهيئة Vault إذا لزم الأمر
+        initializeAdminVaultIfNeeded()
         
         try {
             com.example.utils.NotificationHelper.createNotificationChannels(this)
@@ -500,6 +505,23 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * 🔐 تهيئة Vault المالك والأدمن بشكل آمن عند التشغيل
+     */
+    private fun initializeAdminVaultIfNeeded() {
+        if (com.example.utils.SecureAdminStorage.isVaultInitialized(this)) return
+        
+        lifecycleScope.launch {
+            try {
+                // ملاحظة: التهيئة الكاملة تتم عند أول تسجيل دخول ناجح للمالك أو الأدمن
+                // أو يمكن مزامنتها عبر Cloud Function في بيئة الإنتاج
+                android.util.Log.d("MainActivity", "Admin Vault not initialized yet. It will be synced on first login.")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Vault init error: ${e.message}")
             }
         }
     }

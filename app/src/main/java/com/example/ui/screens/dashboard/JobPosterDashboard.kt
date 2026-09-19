@@ -25,6 +25,7 @@ import com.example.ui.screens.dashboard.components.UnifiedEmptyState
 import com.example.ui.screens.dashboard.components.UnifiedLoadingIndicator
 import com.example.ui.screens.dashboard.viewmodels.JobPosterDashboardViewModel
 import com.example.utils.VisualThemePalette
+import androidx.hilt.navigation.compose.hiltViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,22 +33,14 @@ fun JobPosterDashboard(
     account: UnifiedBusinessAccount,
     viewModel: MainViewModel,
     themeColors: VisualThemePalette,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    jobViewModel: JobPosterDashboardViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val appContext = context.applicationContext
     var activeTab by remember { mutableIntStateOf(0) }
 
-    val jobViewModel = remember(account.id, appContext) {
-        JobPosterDashboardViewModel(
-            ownerId = account.id,
-            dashboardRepository = DashboardRepositoryImpl(appContext),
-            productsRepository = ProductsRepositoryImpl(appContext),
-            jobRepository = com.example.data.repositories.JobRepository(
-                com.google.firebase.firestore.FirebaseFirestore.getInstance(),
-                com.example.data.LocalAppCacheManager(context)
-            )
-        )
+    LaunchedEffect(account.id) {
+        jobViewModel.initialize(account.id)
     }
 
     val uiState by jobViewModel.uiState.collectAsState()

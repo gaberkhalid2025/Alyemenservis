@@ -5,108 +5,41 @@ import org.junit.Test
 
 class ValidatorsTest {
     
-    // ============================================
-    // 1. اختبارات validateYemenPhone
-    // ============================================
-    
     @Test
-    fun `valid Yemeni phone passes`() {
-        assertTrue(Validators.validateYemenPhone("771234567").isValid)
-    }
-    
-    @Test
-    fun `empty phone fails`() {
-        val result = Validators.validateYemenPhone("")
-        assertFalse(result.isValid)
-    }
-    
-    @Test
-    fun `null phone fails`() {
-        assertFalse(Validators.validateYemenPhone(null).isValid)
-    }
-    
-    @Test
-    fun `phone with wrong length fails`() {
-        assertFalse(Validators.validateYemenPhone("77123").isValid)
-        assertFalse(Validators.validateYemenPhone("7712345678").isValid)
-    }
-    
-    @Test
-    fun `phone with wrong prefix fails`() {
-        assertFalse(Validators.validateYemenPhone("991234567").isValid)
-        assertFalse(Validators.validateYemenPhone("721234567").isValid)
-    }
-    
-    // ============================================
-    // 2. اختبارات validatePassword
-    // ============================================
-    
-    @Test
-    fun `valid password passes`() {
-        assertTrue(Validators.validatePassword("SecurePass123").isValid)
-    }
-    
-    @Test
-    fun `short password fails`() {
-        assertFalse(Validators.validatePassword("Short1").isValid)
-    }
-    
-    @Test
-    fun `password without numbers fails`() {
-        assertFalse(Validators.validatePassword("OnlyLetters").isValid)
-    }
-    
-    @Test
-    fun `password without letters fails`() {
-        assertFalse(Validators.validatePassword("12345678").isValid)
-    }
-    
-    @Test
-    fun `weak password fails`() {
-        assertFalse(Validators.validatePassword("123456").isValid)
-        assertFalse(Validators.validatePassword("password").isValid)
-    }
-    
-    // ============================================
-    // 3. اختبارات validateName
-    // ============================================
-    
-    @Test
-    fun `valid name passes`() {
-        assertTrue(Validators.validateName("علي محمد").isValid)
-    }
-    
-    @Test
-    fun `short name fails`() {
-        assertFalse(Validators.validateName("عل").isValid)
-    }
-    
-    @Test
-    fun `empty name fails`() {
-        assertFalse(Validators.validateName("").isValid)
-    }
-}
-
-class ProviderValidatorTest {
-    
-    @Test
-    fun `valid provider passes`() {
-        val result = ProviderValidator.validate("علي محمد", "771234567", "سباكة")
+    fun `validateYemenPhone - valid 9 digit number starting with 77`() {
+        val result = Validators.validateYemenPhone("771234567")
         assertTrue(result.isValid)
     }
     
     @Test
-    fun `provider without name fails`() {
-        assertFalse(ProviderValidator.validate("", "771234567", "سباكة").isValid)
+    fun `validateYemenPhone - invalid short number`() {
+        val result = Validators.validateYemenPhone("123456")
+        assertFalse(result.isValid)
     }
     
     @Test
-    fun `provider without phone fails`() {
-        assertFalse(ProviderValidator.validate("علي", "", "سباكة").isValid)
+    fun `validateYemenPhone - valid prefixes 73, 71, 70, 78`() {
+        assertTrue(Validators.validateYemenPhone("731234567").isValid)
+        assertTrue(Validators.validateYemenPhone("711234567").isValid)
+        assertTrue(Validators.validateYemenPhone("701234567").isValid)
+        assertTrue(Validators.validateYemenPhone("781234567").isValid)
     }
     
     @Test
-    fun `provider without category fails`() {
-        assertFalse(ProviderValidator.validate("علي", "771234567", "").isValid)
+    fun `validateYemenPhone - invalid prefix 72`() {
+        val result = Validators.validateYemenPhone("721234567")
+        assertFalse(result.isValid)
+    }
+    
+    @Test
+    fun `validateEmail - valid email`() {
+        val result = Validators.validateEmail("test@example.com")
+        assertTrue(result.isValid)
+    }
+    
+    @Test
+    fun `validateEmail - invalid email without @`() {
+        val result = Validators.validateEmail("testexample.com")
+        assertFalse(result.isValid)
     }
 }

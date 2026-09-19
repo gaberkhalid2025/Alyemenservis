@@ -19,7 +19,7 @@ fun MapScreenLayout(
     onOpenProviderDetails: (ProviderEntity) -> Unit = {},
     onOpenStoreDetails: (StoreEntity) -> Unit = {},
     onOpenPropertyDetails: (PropertyEntity) -> Unit = {},
-    onRequestBooking: (ProviderEntity) -> Unit = {}
+    onRequestBooking: (Any) -> Unit = {}
 ) {
     MapScreen(
         viewModel = viewModel,

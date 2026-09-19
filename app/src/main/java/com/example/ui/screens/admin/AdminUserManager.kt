@@ -38,7 +38,8 @@ fun AdminUserManager(
     mainViewModel: MainViewModel,
     adminViewModel: AdminViewModel = mainViewModel.adminViewModel,
     themeColors: VisualThemePalette,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isPanelMode: Boolean = false
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -74,40 +75,19 @@ fun AdminUserManager(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("👥 إدارة المستخدمين والحسابات", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        val csv = buildString {
-                            appendLine("Name,Phone,Role,City")
-                            rawUsersList.forEach { u ->
-                                appendLine("${u["name"]},${u["phone"]},${u["role"]},${u["city"]}")
-                            }
-                        }
-                        adminViewModel.recordAuditLog("EXPORT_USERS", "تصدير المستخدمين")
-                        scope.launch { snackbarHostState.showSnackbar("📥 تم تصدير بيانات المستخدمين بنجاح") }
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "تصدير", tint = themeColors.accent)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
-            )
-        },
-        containerColor = Color(0xFF0F172A)
-    ) { paddingValues ->
+    val content = @Composable { padding: PaddingValues ->
         Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(12.dp),
+            modifier = if (isPanelMode) {
+                Modifier
+                    .fillMaxWidth()
+                    .padding(padding)
+                    .padding(vertical = 4.dp)
+            } else {
+                modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(12.dp)
+            },
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             OutlinedTextField(
@@ -136,175 +116,264 @@ fun AdminUserManager(
             )
 
             if (filteredUsers.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("لا يوجد مستخدمون يطابقون خيارات البحث", color = Color.Gray, fontSize = 13.sp)
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    itemsIndexed(filteredUsers, key = { index, userMap -> (userMap["id"] as? String)?.ifBlank { null } ?: (userMap["phone"] as? String)?.ifBlank { null } ?: "user_$index" }) { _, userMap ->
-                        val userId = userMap["id"] as? String ?: ""
-                        val name = userMap["name"] as? String ?: "مستخدم"
-                        val phone = userMap["phone"] as? String ?: ""
-                        val city = userMap["city"] as? String ?: "صنعاء"
-                        val role = userMap["role"] as? String ?: "CLIENT"
-                        val isBlocked = userMap["isBlocked"] as? Boolean ?: false
-
-                        AdminEntityCard(
-                            title = name,
-                            subtitle = "📱 $phone • 📍 $city • 👤 $role",
-                            statusText = if (isBlocked) "محظور" else "نشط",
-                            statusColor = if (isBlocked) Color(0xFFEF5350) else Color(0xFF10B981),
-                            isBlocked = isBlocked,
-                            themeColors = themeColors,
-                            actions = {
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = {
-                                                if (isBlocked) {
-                                                    adminViewModel.unblockUser(userId) { success ->
-                                                        scope.launch { snackbarHostState.showSnackbar("تم إلغاء حظر المستخدم") }
-                                                    }
-                                                } else {
-                                                    adminViewModel.blockUser(userId) { success ->
-                                                        scope.launch { snackbarHostState.showSnackbar("تم حظر المستخدم") }
-                                                    }
-                                                }
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text(if (isBlocked) "إلغاء الحظر" else "حظر 🚫", fontSize = 10.5.sp, color = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350))
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                resetPasswordTargetUser = userMap
-                                                newTempPasswordInput = ""
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, Color(0xFF3B82F6)),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("تغيير السر 🔑", fontSize = 10.5.sp, color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold)
-                                        }
-
-                                        IconButton(
-                                            onClick = {
-                                                adminViewModel.deleteUser(userId) { success ->
-                                                    scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف حساب المستخدم") }
-                                                }
-                                            },
-                                            modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                        ) {
-                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
-                                        }
-                                    }
-
-                                    val context = androidx.compose.ui.platform.LocalContext.current
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = {
-                                                val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
-                                                val msg = android.net.Uri.encode("مرحباً $name، تواصل من إدارة تطبيق دليل خدمات اليمن:")
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/$cleanPhone?text=$msg"))
-                                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, Color(0xFF25D366)),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("واتساب 💬", color = Color(0xFF25D366), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
-                                                val msg = android.net.Uri.encode("مرحباً $name، تواصل من إدارة تطبيق دليل خدمات اليمن:")
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/share/url?url=$cleanPhone&text=$msg"))
-                                                try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, Color(0xFF0088CC)),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("تيليجرام ✈️", color = Color(0xFF0088CC), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            }
-                        )
+                // Safely render list based on mode to prevent nested scrollable crashes
+                if (isPanelMode) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        filteredUsers.forEachIndexed { index, userMap ->
+                            UserItem(userMap, index, adminViewModel, scope, snackbarHostState, themeColors, { resetPasswordTargetUser = it }, { newTempPasswordInput = "" })
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(filteredUsers, key = { index, userMap -> (userMap["id"] as? String)?.ifBlank { null } ?: (userMap["phone"] as? String)?.ifBlank { null } ?: "user_$index" }) { index, userMap ->
+                            UserItem(userMap, index, adminViewModel, scope, snackbarHostState, themeColors, { resetPasswordTargetUser = it }, { newTempPasswordInput = "" })
+                        }
                     }
                 }
             }
         }
     }
 
-    if (resetPasswordTargetUser != null) {
-        val target = resetPasswordTargetUser!!
-        val name = target["name"] as? String ?: "المستخدم"
-        val phone = target["phone"] as? String ?: ""
-        val userId = target["id"] as? String ?: phone
-
-        AlertDialog(
-            onDismissRequest = { resetPasswordTargetUser = null },
-            containerColor = Color(0xFF1E293B),
-            title = { Text("🔑 تعيين كلمة مرور جديدة", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("إعادة تعيين كلمة المرور للحساب: $name ($phone)", color = Color.Gray, fontSize = 12.sp)
-                    OutlinedTextField(
-                        value = newTempPasswordInput,
-                        onValueChange = { newTempPasswordInput = it },
-                        placeholder = { Text("اكتب كلمة المرور الجديدة...", color = Color.DarkGray) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newTempPasswordInput.trim().length >= 4) {
-                            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                            val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
-                            val passData = mapOf("password" to newTempPasswordInput.trim(), "updatedAt" to System.currentTimeMillis())
-                            db.collection("registered_users").document(userId).update(passData)
-                            if (cleanPhone.isNotEmpty()) {
-                                db.collection("registered_users").document(cleanPhone).update(passData)
-                                db.collection("providers").document(cleanPhone).update(passData)
-                            }
-                            mainViewModel.addNotification(
-                                title = "🔑 تم تحديث كلمة المرور للحساب",
-                                message = "عزيزي $name، قامت الإدارة بتعيين كلمة مرور جديدة لحسابك: ${newTempPasswordInput.trim()}",
-                                targetType = "USER",
-                                targetValue = phone
-                            )
-                            resetPasswordTargetUser = null
-                            scope.launch { snackbarHostState.showSnackbar("✅ تم تحديث كلمة المرور وإرسال إشعار للمستخدم") }
-                        } else {
-                            scope.launch { snackbarHostState.showSnackbar("⚠️ كلمة المرور يجب أن لا تقل عن 4 رموز") }
+    if (isPanelMode) {
+        content(PaddingValues(0.dp))
+    } else {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                TopAppBar(
+                    title = { Text("👥 إدارة المستخدمين والحسابات", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
-                ) {
-                    Text("حفظ وإرسال 🔑", color = Color.White, fontWeight = FontWeight.Bold)
-                }
+                    actions = {
+                        IconButton(onClick = {
+                            val csv = buildString {
+                                appendLine("Name,Phone,Role,City")
+                                rawUsersList.forEach { u ->
+                                    appendLine("${u["name"]},${u["phone"]},${u["role"]},${u["city"]}")
+                                }
+                            }
+                            adminViewModel.recordAuditLog("EXPORT_USERS", "تصدير المستخدمين")
+                            scope.launch { snackbarHostState.showSnackbar("📥 تم تصدير بيانات المستخدمين بنجاح") }
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = "تصدير", tint = themeColors.accent)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
+                )
             },
-            dismissButton = {
-                TextButton(onClick = { resetPasswordTargetUser = null }) { Text("إلغاء", color = Color.Gray) }
-            }
+            containerColor = Color(0xFF0F172A)
+        ) { paddingValues ->
+            content(paddingValues)
+        }
+    }
+
+    if (resetPasswordTargetUser != null) {
+        PasswordResetDialog(
+            userMap = resetPasswordTargetUser!!,
+            newPasswordInput = newTempPasswordInput,
+            onPasswordChange = { newTempPasswordInput = it },
+            onDismiss = { resetPasswordTargetUser = null },
+            onSave = { userId, phone, name, pass ->
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
+                val passData = mapOf("password" to pass, "updatedAt" to System.currentTimeMillis())
+                db.collection("registered_users").document(userId).update(passData)
+                if (cleanPhone.isNotEmpty()) {
+                    db.collection("registered_users").document(cleanPhone).update(passData)
+                    db.collection("providers").document(cleanPhone).update(passData)
+                }
+                mainViewModel.addNotification(
+                    title = "🔑 تم تحديث كلمة المرور للحساب",
+                    message = "عزيزي $name، قامت الإدارة بتعيين كلمة مرور جديدة لحسابك: $pass",
+                    targetType = "USER",
+                    targetValue = phone
+                )
+                resetPasswordTargetUser = null
+                scope.launch { snackbarHostState.showSnackbar("✅ تم تحديث كلمة المرور وإرسال إشعار للمستخدم") }
+            },
+            snackbarHostState = snackbarHostState,
+            scope = scope
         )
     }
+}
+
+@Composable
+fun UserItem(
+    userMap: Map<String, Any>,
+    index: Int,
+    adminViewModel: AdminViewModel,
+    scope: kotlinx.coroutines.CoroutineScope,
+    snackbarHostState: SnackbarHostState,
+    themeColors: VisualThemePalette,
+    onResetPassword: (Map<String, Any>) -> Unit,
+    onResetInput: () -> Unit
+) {
+    val userId = userMap["id"] as? String ?: ""
+    val name = userMap["name"] as? String ?: "مستخدم"
+    val phone = userMap["phone"] as? String ?: ""
+    val city = userMap["city"] as? String ?: "صنعاء"
+    val role = userMap["role"] as? String ?: "CLIENT"
+    val isBlocked = userMap["isBlocked"] as? Boolean ?: false
+
+    AdminEntityCard(
+        title = name,
+        subtitle = "📱 $phone • 📍 $city • 👤 $role",
+        statusText = if (isBlocked) "محظور" else "نشط",
+        statusColor = if (isBlocked) Color(0xFFEF5350) else Color(0xFF10B981),
+        isBlocked = isBlocked,
+        themeColors = themeColors,
+        actions = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (isBlocked) {
+                                adminViewModel.unblockUser(userId) { success ->
+                                    scope.launch { snackbarHostState.showSnackbar("تم إلغاء حظر المستخدم") }
+                                }
+                            } else {
+                                adminViewModel.blockUser(userId) { success ->
+                                    scope.launch { snackbarHostState.showSnackbar("تم حظر المستخدم") }
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (isBlocked) "إلغاء الحظر" else "حظر 🚫", fontSize = 10.5.sp, color = if (isBlocked) Color(0xFF10B981) else Color(0xFFEF5350))
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            onResetPassword(userMap)
+                            onResetInput()
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("تغيير السر 🔑", fontSize = 10.5.sp, color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold)
+                    }
+
+                    IconButton(
+                        onClick = {
+                            adminViewModel.deleteUser(userId) { success ->
+                                scope.launch { snackbarHostState.showSnackbar("🗑️ تم حذف حساب المستخدم") }
+                            }
+                        },
+                        modifier = Modifier.background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
+                            val msg = android.net.Uri.encode("مرحباً $name، تواصل من إدارة تطبيق دليل خدمات اليمن:")
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/$cleanPhone?text=$msg"))
+                            try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFF25D366)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("واتساب 💬", color = Color(0xFF25D366), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
+                            val msg = android.net.Uri.encode("مرحباً $name، تواصل من إدارة تطبيق دليل خدمات اليمن:")
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/share/url?url=$cleanPhone&text=$msg"))
+                            try { context.startActivity(intent) } catch (e: Exception) { e.printStackTrace() }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFF0088CC)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("تيليجرام ✈️", color = Color(0xFF0088CC), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun PasswordResetDialog(
+    userMap: Map<String, Any>,
+    newPasswordInput: String,
+    onPasswordChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, String) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val name = userMap["name"] as? String ?: "المستخدم"
+    val phone = userMap["phone"] as? String ?: ""
+    val userId = userMap["id"] as? String ?: phone
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1E293B),
+        title = { Text("🔑 تعيين كلمة مرور جديدة", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("إعادة تعيين كلمة المرور للحساب: $name ($phone)", color = Color.Gray, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = newPasswordInput,
+                    onValueChange = onPasswordChange,
+                    placeholder = { Text("اكتب كلمة المرور الجديدة...", color = Color.DarkGray) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (newPasswordInput.trim().length >= 4) {
+                        onSave(userId, phone, name, newPasswordInput.trim())
+                    } else {
+                        scope.launch { snackbarHostState.showSnackbar("⚠️ كلمة المرور يجب أن لا تقل عن 4 رموز") }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+            ) {
+                Text("حفظ وإرسال 🔑", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء", color = Color.Gray) }
+        }
+    )
 }

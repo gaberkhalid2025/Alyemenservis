@@ -1,7 +1,7 @@
 package com.example.data.repositories
 
 import com.example.data.LocalAppCacheManager
-import com.example.ui.screens.dashboard.viewmodels.DoctorItem
+import com.example.domain.entities.DoctorItem
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
