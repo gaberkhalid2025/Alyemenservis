@@ -118,8 +118,8 @@ fun RegisterScreen(
                 )
             }
             RegistrationType.STORE -> {
-                val storeName = (data["storeName"] as? String) ?: "متجر جديد"
-                val category = (data["storeCategory"] as? String) ?: "متجر تجاري"
+                val storeName = (data["entityName"] as? String) ?: (data["storeName"] as? String) ?: "متجر جديد"
+                val category = (data["specialization"] as? String) ?: (data["storeCategory"] as? String) ?: "متجر تجاري"
                 viewModel.submitJoinForm(
                     context = context,
                     name = storeName,
@@ -135,8 +135,8 @@ fun RegisterScreen(
                 )
             }
             RegistrationType.RESTAURANT -> {
-                val restaurantName = (data["restaurantName"] as? String) ?: "مطعم جديد"
-                val cuisine = (data["cuisineType"] as? String) ?: "مطعم وكافيه"
+                val restaurantName = (data["entityName"] as? String) ?: (data["restaurantName"] as? String) ?: "مطعم جديد"
+                val cuisine = (data["specialization"] as? String) ?: (data["cuisineType"] as? String) ?: "مطعم وكافيه"
                 viewModel.submitJoinForm(
                     context = context,
                     name = restaurantName,
@@ -152,8 +152,8 @@ fun RegisterScreen(
                 )
             }
             RegistrationType.MEDICAL -> {
-                val centerName = (data["medicalCenterName"] as? String) ?: (data["centerName"] as? String) ?: (data["clinicName"] as? String) ?: "مركز طبي"
-                val specialty = (data["medicalSpecialties"] as? String) ?: "عيادات ومراكز طبية"
+                val centerName = (data["entityName"] as? String) ?: (data["medicalCenterName"] as? String) ?: (data["centerName"] as? String) ?: (data["clinicName"] as? String) ?: "مركز طبي"
+                val specialty = (data["specialization"] as? String) ?: (data["medicalSpecialties"] as? String) ?: "عيادات ومراكز طبية"
                 viewModel.submitJoinForm(
                     context = context,
                     name = centerName,
@@ -169,8 +169,8 @@ fun RegisterScreen(
                 )
             }
             RegistrationType.PROPERTY -> {
-                val propTitle = (data["officeName"] as? String) ?: (data["ownerName"] as? String) ?: "إعلان عقار"
-                val propType = (data["propertyType"] as? String) ?: "عقار"
+                val propTitle = (data["entityName"] as? String) ?: (data["officeName"] as? String) ?: (data["ownerName"] as? String) ?: "إعلان عقار"
+                val propType = (data["specialization"] as? String) ?: (data["propertyType"] as? String) ?: "عقار"
                 viewModel.submitJoinForm(
                     context = context,
                     name = propTitle,
@@ -186,8 +186,8 @@ fun RegisterScreen(
                 )
             }
             RegistrationType.JOB -> {
-                val company = (data["companyName"] as? String) ?: "إعلان وظيفة"
-                val title = (data["jobTitle"] as? String) ?: "وظيفة شاغرة"
+                val company = (data["entityName"] as? String) ?: (data["companyName"] as? String) ?: "إعلان وظيفة"
+                val title = (data["specialization"] as? String) ?: (data["jobTitle"] as? String) ?: "وظيفة شاغرة"
                 viewModel.submitJoinForm(
                     context = context,
                     name = company,
@@ -203,7 +203,7 @@ fun RegisterScreen(
                 )
             }
             RegistrationType.CLIENT -> {
-                val clientName = (data["fullName"] as? String) ?: "مستخدم جديد"
+                val clientName = (data["entityName"] as? String) ?: (data["fullName"] as? String) ?: "مستخدم جديد"
                 val residence = (data["residence"] as? String) ?: area
                 viewModel.registerClientUser(clientName, phone, residence, password)
                 viewModel.submitJoinForm(

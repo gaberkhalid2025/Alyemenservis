@@ -126,7 +126,17 @@ fun AppNavigator(
                 AppScreens.MEDICAL_VIEW -> MedicalCentersScreen(viewModel = viewModel, themeColors = themeColors, onMedicalCenterClick = {}, onChatClick = { viewModel.openSupportChat() }, onBookAppointmentClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
                 AppScreens.RESTAURANTS_VIEW -> RestaurantsScreen(viewModel = viewModel, themeColors = themeColors, onRestaurantClick = {}, onChatClick = { viewModel.openSupportChat() }, onOrderMealClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
                 AppScreens.PROPERTIES_VIEW -> PropertiesScreen(viewModel = viewModel, themeColors = themeColors, onPropertyClick = {}, onChatClick = { viewModel.openSupportChat() }, onRequestInspectionClick = { viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST) })
-                AppScreens.CHAT_LIST -> ChatListScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, onChannelClick = { ch -> viewModel.targetChatChannelId = ch.id; viewModel.navigateToScreen(AppScreens.CHAT_DIRECT) }, onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
+                AppScreens.CHAT_LIST -> ChatListScreen(
+                    currentUserId = currentUserId,
+                    currentUserName = currentUserName,
+                    themeColors = themeColors,
+                    onChannelClick = { ch ->
+                        viewModel.targetChatChannelId = ch.id
+                        viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+                    },
+                    onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
+                    onStartSupportChat = { viewModel.openSupportChat() }
+                )
                 AppScreens.CHAT_DIRECT -> ChatScreen(currentUserId = currentUserId, currentUserName = currentUserName, themeColors = themeColors, channelId = viewModel.targetChatChannelId, onBackClick = { viewModel.targetChatChannelId = null; viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
                 AppScreens.CREATE_BOOKING -> CreateBookingScreen(onBack = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }, onBookingCreated = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) })
                 AppScreens.DYNAMIC_PROFILE, AppScreens.OWNER_PROFILE_VIEW, AppScreens.PROVIDER_DETAILS, AppScreens.STORE_DETAILS, AppScreens.PROPERTY_DETAILS -> DynamicPolymorphicProfileScreen(

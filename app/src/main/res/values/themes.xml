@@ -1,10 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
+    <!-- الثيم الرئيسي للتطبيق -->
+    <style name="Theme.YemenServices" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">#0F172A</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">#0F172A</item>
         <item name="android:navigationBarColor">#0F172A</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
+
+    <!-- ثيم شاشة البداية (SplashScreen API) -->
+    <style name="Theme.YemenServices.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0F172A</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.YemenServices</item>
+    </style>
+
+    <!-- للتوافق الخلفي مع الكود القديم -->
+    <style name="Theme.MyApplication" parent="Theme.YemenServices" />
+
 </resources>

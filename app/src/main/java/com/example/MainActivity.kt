@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
@@ -203,11 +204,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        try {
-            setTheme(R.style.Theme_MyApplication)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         
         try {

@@ -240,7 +240,7 @@ fun AppHeaderBar(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             // 1. الرئيسية
-            val isBrowse = currentScreen == "USER_BROWSE" || currentScreen == "MAIN_DASHBOARD"
+            val isBrowse = currentScreen == AppScreens.USER_BROWSE || currentScreen == "MAIN_DASHBOARD" || currentScreen == "HOME"
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topHomeIcon.ifEmpty { "🏠" },
                 vectorIcon = Icons.Default.Home,
@@ -249,14 +249,14 @@ fun AppHeaderBar(
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
                 onClick = {
-                    viewModel.navigateTo("USER_BROWSE")
+                    viewModel.navigateToScreen(AppScreens.USER_BROWSE)
                     viewModel.registerBackdoorInteraction()
                 }
             )
 
             // 2. الخرائط
             if (settingsState.isMapFeatureEnabled) {
-                val isMap = currentScreen == "MAP_VIEW"
+                val isMap = currentScreen == AppScreens.MAP_VIEW
                 Luxury3DNavIcon(
                     emojiIcon = settingsState.topMapsIcon.ifEmpty { "🗺️" },
                     vectorIcon = Icons.Default.Place,
@@ -264,12 +264,12 @@ fun AppHeaderBar(
                     isSelected = isMap,
                     iconSizeDp = settingsState.navIconSizeDp,
                     iconStyle = settingsState.topNavIconStyle,
-                    onClick = { viewModel.navigateTo("MAP_VIEW") }
+                    onClick = { viewModel.navigateToScreen(AppScreens.MAP_VIEW) }
                 )
             }
 
             // 3. الانضمام
-            val isJoin = currentScreen == "REGISTER_FORM" || currentScreen == "JOIN_REQUEST_STATUS"
+            val isJoin = currentScreen == AppScreens.REGISTER_FORM || currentScreen == AppScreens.JOIN_REQUEST_STATUS
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topJoinIcon.ifEmpty { "👤" },
                 vectorIcon = Icons.Default.Person,
@@ -277,7 +277,7 @@ fun AppHeaderBar(
                 isSelected = isJoin,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
-                onClick = { viewModel.navigateTo("REGISTER_FORM") }
+                onClick = { viewModel.navigateToScreen(AppScreens.REGISTER_FORM) }
             )
 
             // 4. الإشعارات
@@ -286,7 +286,7 @@ fun AppHeaderBar(
                 emojiIcon = settingsState.topNotifIcon.ifEmpty { "🔔" },
                 vectorIcon = Icons.Default.Notifications,
                 label = if (isEn) "Alerts" else "الإشعارات",
-                isSelected = isNotifScreen || unreadNotifCount > 0,
+                isSelected = isNotifScreen,
                 badgeCount = unreadNotifCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,
@@ -296,12 +296,12 @@ fun AppHeaderBar(
             )
 
             // 5. المحادثات
-            val hasUnreadChats = unreadChatsCount > 0
+            val isChatsScreen = currentScreen == AppScreens.CHAT_LIST || currentScreen == AppScreens.CHAT_DIRECT
             Luxury3DNavIcon(
                 emojiIcon = settingsState.topChatsIcon.ifEmpty { "✉️" },
                 vectorIcon = Icons.Default.Email,
                 label = if (isEn) "Chats" else "المحادثات",
-                isSelected = hasUnreadChats,
+                isSelected = isChatsScreen,
                 badgeCount = unreadChatsCount,
                 iconSizeDp = settingsState.navIconSizeDp,
                 iconStyle = settingsState.topNavIconStyle,

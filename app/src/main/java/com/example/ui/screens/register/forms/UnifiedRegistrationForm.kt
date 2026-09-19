@@ -161,12 +161,13 @@ fun UnifiedRegistrationForm(
         }
         // 1. Entity Name
         val nameLabel = when (role) {
-            "CLIENT" -> "الاسم الثلاثي"
-            "STORE" -> "اسم المتجر"
-            "RESTAURANT" -> "اسم المطعم"
-            "MEDICAL" -> "اسم المركز الطبي/العيادة"
-            "PROPERTY" -> "اسم المكتب العقاري (أو المالك)"
-            else -> "الاسم الكامل"
+            "CLIENT" -> "الاسم الثلاثي *"
+            "STORE" -> "اسم المتجر *"
+            "RESTAURANT" -> "اسم المطعم/الكافيه *"
+            "MEDICAL" -> "اسم المركز الطبي/العيادة *"
+            "PROPERTY" -> "اسم العقار / المكتب العقاري *"
+            "JOB" -> "اسم شركة الإعلانات / جهة العمل *"
+            else -> "الاسم الكامل *"
         }
         
         OutlinedTextField(
@@ -179,12 +180,20 @@ fun UnifiedRegistrationForm(
             singleLine = true
         )
 
-        // 2. Manager Name (if applicable)
-        if (role in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY")) {
+        // 2. Manager Name (if applicable - Mandatory for entities)
+        if (role in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB")) {
+            val managerLabel = when (role) {
+                "STORE" -> "اسم مدير المتجر / المالك *"
+                "RESTAURANT" -> "اسم مدير المطعم / المالك *"
+                "MEDICAL" -> "اسم مدير المركز / الطبيب المسؤول *"
+                "PROPERTY" -> "اسم المالك / مدير المكتب العقاري *"
+                "JOB" -> "اسم مسؤول التوظيف / مدير الشركة *"
+                else -> "اسم المدير / المالك *"
+            }
             OutlinedTextField(
                 value = state.managerName,
                 onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.ManagerNameChanged(it)) },
-                label = { Text("اسم المدير / المسؤول", fontSize = 12.sp) },
+                label = { Text(managerLabel, fontSize = 12.sp) },
                 isError = state.managerNameError != null,
                 supportingText = { state.managerNameError?.let { Text(it) } },
                 modifier = Modifier.fillMaxWidth(),
@@ -196,7 +205,7 @@ fun UnifiedRegistrationForm(
         OutlinedTextField(
             value = state.phone,
             onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.PhoneChanged(it)) },
-            label = { Text("رقم الهاتف (9 أرقام)", fontSize = 12.sp) },
+            label = { Text("رقم الهاتف (9 أرقام) *", fontSize = 12.sp) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             isError = state.phoneError != null,
             supportingText = { state.phoneError?.let { Text(it) } },
@@ -343,9 +352,10 @@ fun UnifiedRegistrationForm(
         }
 
         // Submit Button
+        val isFormValid = state.isFormValidForRole(role)
         Button(
             onClick = { viewModel.submit(onRegistrationSuccess) },
-            enabled = state.isFormValid && !state.isLoading,
+            enabled = isFormValid && !state.isLoading,
             modifier = Modifier.fillMaxWidth().height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
         ) {

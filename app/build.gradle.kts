@@ -132,6 +132,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  implementation("androidx.core:core-splashscreen:1.0.1")
   implementation(libs.hilt.android)
   ksp(libs.hilt.compiler)
   implementation(libs.androidx.hilt.navigation.compose)

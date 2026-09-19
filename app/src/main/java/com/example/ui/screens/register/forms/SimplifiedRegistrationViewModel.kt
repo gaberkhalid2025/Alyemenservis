@@ -26,8 +26,18 @@ data class SimplifiedRegistrationState(
     val isLoading: Boolean = false,
     val successMessage: String? = null
 ) {
+    fun isFormValidForRole(role: String): Boolean {
+        val baseValid = entityName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && agreedToTerms
+        val requiresManager = role in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB")
+        return if (requiresManager) {
+            baseValid && managerName.isNotBlank()
+        } else {
+            baseValid
+        }
+    }
+
     val isFormValid: Boolean
-        get() = entityName.isNotBlank() && phone.length >= 9 && password.length >= 6 && password == confirmPassword && agreedToTerms
+        get() = isFormValidForRole("CLIENT")
 }
 
 sealed class RegistrationUiEvent {

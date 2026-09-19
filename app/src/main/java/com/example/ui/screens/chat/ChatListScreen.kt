@@ -43,7 +43,8 @@ fun ChatListScreen(
     themeColors: VisualThemePalette,
     chatListViewModel: ChatListViewModel = viewModel(),
     onChannelClick: (ChatChannel) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onStartSupportChat: (() -> Unit)? = null
 ) {
     val channels by chatListViewModel.channels.collectAsState()
     val selectedFilter by chatListViewModel.selectedFilter.collectAsState()
@@ -224,12 +225,24 @@ fun ChatListScreen(
             }
         } else if (filteredChannels.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    text = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة." else "لا توجد محادثات في هذا التصنيف حالياً.",
-                    color = themeColors.textSecondary,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة." else "لا توجد محادثات في هذا التصنيف حالياً.",
+                        color = themeColors.textSecondary,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    if (onStartSupportChat != null && searchQuery.isBlank()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onStartSupportChat,
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("بدء محادثة مع الدعم الفني 🛠️", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         } else {
             LazyColumn(
