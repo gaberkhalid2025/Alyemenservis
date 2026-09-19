@@ -56,6 +56,9 @@ open class HomeViewModel @Inject constructor(
     internal val _phoneOrNameFilter = MutableStateFlow("")
     val phoneOrNameFilter: StateFlow<String> = _phoneOrNameFilter.asStateFlow()
 
+    internal val _activeBrowserTab = MutableStateFlow("الرئيسية")
+    val activeBrowserTab: StateFlow<String> = _activeBrowserTab.asStateFlow()
+
     internal val _maxKmRadius = MutableStateFlow(10)
     val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
 
@@ -144,6 +147,18 @@ open class HomeViewModel @Inject constructor(
 
         cachedFilteredResults[cacheKey] = filtered
         _filteredProviders.value = filtered
+    }
+
+    fun setActiveBrowserTab(tabName: String) {
+        _activeBrowserTab.value = tabName
+    }
+
+    fun openBrowserTab(tabName: String, categoryId: String? = null, query: String = "") {
+        _activeBrowserTab.value = tabName
+        _selectedCategoryId.value = categoryId
+        _searchQuery.value = query
+        clearCache()
+        applyFilters()
     }
 
     fun selectCategory(categoryId: String?, userResidence: String = "") {

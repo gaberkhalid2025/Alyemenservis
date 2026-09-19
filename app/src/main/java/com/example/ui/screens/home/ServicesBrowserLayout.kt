@@ -78,7 +78,7 @@ fun ServicesBrowserLayout(
     var selectedJobForDetails by remember { mutableStateOf<JobEntity?>(null) }
     var payingBookingObj by remember { mutableStateOf<BookingEntity?>(null) }
     var providersLimit by remember { mutableStateOf(10) }
-    var activeTabName by remember { mutableStateOf("الرئيسية") }
+    val activeTabName by viewModel.activeBrowserTab.collectAsState()
     var showCreateStoreModalSection by remember { mutableStateOf<String?>(null) }
 
     val activeTabs = remember(settingsState) {
@@ -146,7 +146,7 @@ fun ServicesBrowserLayout(
                 activeTabs.forEach { tabName ->
                     val isSelected = activeTabName == tabName
                     Surface(
-                        onClick = { activeTabName = tabName },
+                        onClick = { viewModel.setActiveBrowserTab(tabName) },
                         shape = RoundedCornerShape(20.dp),
                         color = if (isSelected) themeColors.accent else themeColors.surface,
                         border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.White.copy(alpha = 0.1f))
@@ -170,7 +170,7 @@ fun ServicesBrowserLayout(
                     FavoritesScreenLayout(
                         viewModel = viewModel,
                         themeColors = themeColors,
-                        onBackClick = { activeTabName = "الرئيسية" },
+                        onBackClick = { viewModel.setActiveBrowserTab("الرئيسية") },
                         onOpenProviderDetails = {
                             viewModel.selectedProvider = it
                             viewModel.navigateTo("DYNAMIC_PROFILE")

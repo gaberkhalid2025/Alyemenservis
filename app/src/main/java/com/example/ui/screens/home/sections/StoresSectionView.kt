@@ -72,20 +72,20 @@ fun StoresSectionView(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                 Text("🏪 المحلات والمتاجر التجارية:", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("تصفح جميع المحلات والمعارض والمتاجر المعتمدة باليمن", fontSize = 10.sp, color = Color.Gray)
+                Text("تصفح جميع المحلات والمعارض والمتاجر المعتمدة باليمن", fontSize = 10.sp, color = Color.Gray, maxLines = 1)
             }
             Button(
                 onClick = onCreateStoreClick,
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                modifier = Modifier.defaultMinSize(minHeight = 32.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("إضافة متجر تجاري", fontSize = 10.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("إضافة متجر", fontSize = 10.5.sp, color = Color.Black, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
 

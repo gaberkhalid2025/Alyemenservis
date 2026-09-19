@@ -70,20 +70,20 @@ fun PropertiesSectionView(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                 Text("🏢 العقـارات والاستثمارات:", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("تصفح الشقق والفلل والأراضي والمحلات المعروضة باليمن", fontSize = 10.sp, color = Color.Gray)
+                Text("تصفح الشقق والفلل والأراضي والمحلات المعروضة باليمن", fontSize = 10.sp, color = Color.Gray, maxLines = 1)
             }
             Button(
                 onClick = onCreatePropertyClick,
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                modifier = Modifier.defaultMinSize(minHeight = 32.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("إضافة عقار", fontSize = 10.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("إضافة عقار", fontSize = 10.5.sp, color = Color.Black, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
 

@@ -12,6 +12,14 @@ fun MainViewModel.applyFilters() {
     homeViewModel.applyFilters()
 }
 
+fun MainViewModel.setActiveBrowserTab(tabName: String) {
+    homeViewModel.setActiveBrowserTab(tabName)
+}
+
+fun MainViewModel.openBrowserTab(tabName: String, categoryId: String? = null, query: String = "") {
+    homeViewModel.openBrowserTab(tabName, categoryId, query)
+}
+
 fun MainViewModel.selectCategory(catId: String) {
     homeViewModel.selectCategory(catId)
 }

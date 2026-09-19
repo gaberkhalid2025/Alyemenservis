@@ -127,19 +127,24 @@ fun SmartAssistantDialogView(
                             viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
                         }
                     },
+                    onNavigateTechnicians = {
+                        onDismiss()
+                        viewModel.openBrowserTab("الرئيسية")
+                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                    },
                     onNavigateStores = {
                         onDismiss()
-                        viewModel.selectCategory("محلات ومراكز تجارية")
+                        viewModel.openBrowserTab("المحلات والمتاجر")
                         viewModel.navigateToScreen(AppScreens.USER_BROWSE)
                     },
                     onNavigateRestaurants = {
                         onDismiss()
-                        viewModel.selectCategory("مطاعم وكافيهات")
+                        viewModel.openBrowserTab("المطاعم والكافيهات")
                         viewModel.navigateToScreen(AppScreens.USER_BROWSE)
                     },
                     onNavigateMedical = {
                         onDismiss()
-                        viewModel.selectCategory("مراكز طبية وعيادات")
+                        viewModel.openBrowserTab("المراكز الطبية")
                         viewModel.navigateToScreen(AppScreens.USER_BROWSE)
                     },
                     onNavigateToMap = { 

@@ -103,6 +103,7 @@ class MainViewModel @Inject constructor(
     val filteredProviders get() = homeViewModel.filteredProviders
     val _banners get() = homeViewModel._banners
     val banners get() = homeViewModel.banners
+    val activeBrowserTab get() = homeViewModel.activeBrowserTab
     val _selectedCategoryId get() = homeViewModel._selectedCategoryId
     val selectedCategoryId get() = homeViewModel.selectedCategoryId
     val _searchQuery get() = homeViewModel._searchQuery

@@ -165,6 +165,8 @@ fun Luxury3DNavIcon(
         Text(
             text = label,
             fontSize = 7.5.sp,
+            maxLines = 1,
+            softWrap = false,
             color = if (isSelected) Color(0xFFFFD700) else Color.LightGray,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )

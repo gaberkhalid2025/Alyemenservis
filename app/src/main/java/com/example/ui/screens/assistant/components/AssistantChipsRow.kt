@@ -22,6 +22,7 @@ import com.example.utils.VisualThemePalette
 fun AssistantChipsRow(
     themeColors: VisualThemePalette,
     onRequestQuickService: () -> Unit,
+    onNavigateTechnicians: () -> Unit,
     onNavigateStores: () -> Unit,
     onNavigateRestaurants: () -> Unit,
     onNavigateMedical: () -> Unit,
@@ -49,8 +50,8 @@ fun AssistantChipsRow(
             }
             item {
                 AssistChip(
-                    onClick = onRequestQuickService,
-                    label = { Text("🔧 طلب أقرب فني", fontSize = 10.5.sp, color = themeColors.accent, fontWeight = FontWeight.Bold) },
+                    onClick = onNavigateTechnicians,
+                    label = { Text("🔧 قائمة الفنيين والمهنيين", fontSize = 10.5.sp, color = themeColors.accent, fontWeight = FontWeight.Bold) },
                     colors = AssistChipDefaults.assistChipColors(containerColor = themeColors.surface),
                     border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
                     shape = RoundedCornerShape(8.dp)
