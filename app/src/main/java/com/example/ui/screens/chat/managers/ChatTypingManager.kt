@@ -17,6 +17,20 @@ class ChatTypingManager(
     val isTypingOther: StateFlow<Boolean> = _isTypingOther.asStateFlow()
 
     private var typingJob: Job? = null
+    private var typingListenerJob: Job? = null
+
+    fun listenToTyping(channelId: String, otherUserId: String) {
+        typingListenerJob?.cancel()
+        if (channelId.isBlank() || otherUserId.isBlank()) {
+            _isTypingOther.value = false
+            return
+        }
+        typingListenerJob = scope.launch {
+            repository.getTypingStatus(channelId, otherUserId).collect { isTyping ->
+                _isTypingOther.value = isTyping
+            }
+        }
+    }
 
     fun setOtherUserTyping(isTyping: Boolean) {
         _isTypingOther.value = isTyping
@@ -41,6 +55,9 @@ class ChatTypingManager(
 
     fun clear() {
         typingJob?.cancel()
+        typingListenerJob?.cancel()
+        typingJob = null
+        typingListenerJob = null
         _isTypingOther.value = false
     }
 }

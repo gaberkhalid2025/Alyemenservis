@@ -299,7 +299,7 @@ fun AppNavigator(
                         viewModel = viewModel,
                         themeColors = themeColors,
                         onDismiss = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
-                        onRequestCreated = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
+                        onRequestCreated = { viewModel.navigateToScreen(AppScreens.ORDERS_VIEW) }
                     )
                 }
                 else -> {

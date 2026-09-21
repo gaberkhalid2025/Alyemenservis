@@ -32,7 +32,12 @@ class AboutViewModel @Inject constructor(
     private val authViewModel: AuthViewModel
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<AboutUiState>(AboutUiState.Loading)
+    private val _uiState = MutableStateFlow<AboutUiState>(
+        AboutUiState.Success(
+            settings = settingsViewModel.settings.value,
+            isAdmin = authViewModel.adminRole.value != "GUEST"
+        )
+    )
     val uiState: StateFlow<AboutUiState> = _uiState.asStateFlow()
 
     private var isEditingMode = false

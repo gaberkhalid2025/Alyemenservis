@@ -691,6 +691,30 @@ class ChatRepository(
         }
     }.flowOn(Dispatchers.IO)
 
+    override fun getTypingStatus(channelId: String, userId: String): Flow<Boolean> = callbackFlow {
+        if (channelId.isBlank() || userId.isBlank()) {
+            trySend(false)
+            close()
+            return@callbackFlow
+        }
+
+        val listener = channelsCollection.document(channelId).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                trySend(false)
+                return@addSnapshotListener
+            }
+            val isTypingMap = snapshot?.get("isTyping") as? Map<*, *>
+            val isTyping = (isTypingMap?.get(userId) as? Boolean) ?: false
+            trySend(isTyping)
+        }
+
+        awaitClose {
+            try {
+                listener.remove()
+            } catch (_: Exception) {}
+        }
+    }.flowOn(Dispatchers.IO)
+
     // =========================================================================
     // 4. DELTA SYNC IMPLEMENTATION
     // =========================================================================

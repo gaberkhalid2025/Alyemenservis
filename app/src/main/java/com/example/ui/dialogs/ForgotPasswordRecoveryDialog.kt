@@ -184,41 +184,11 @@ fun ForgotPasswordRecoveryDialog(
                                 val cleanPhone = phoneInput.trim()
                                 val currentTime = System.currentTimeMillis()
 
-                                // Register reset request in Firestore
-                                val resetRequest = mapOf(
-                                    "phone" to cleanPhone,
-                                    "channel" to selectedChannel,
-                                    "note" to noteInput,
-                                    "status" to "PENDING",
-                                    "createdAt" to currentTime
+                                viewModel.authViewModel.submitPasswordRecoveryRequest(
+                                    phone = cleanPhone,
+                                    channel = selectedChannel,
+                                    note = noteInput
                                 )
-                                viewModel.db.collection("password_resets").document(cleanPhone).set(resetRequest)
-
-                                // Register recovery request for admin dashboard
-                                val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
-                                val adminRecoveryRequest = mapOf(
-                                    "id" to cleanPhone,
-                                    "uid" to currentUid,
-                                    "phone" to cleanPhone,
-                                    "name" to "طلب استعادة ($cleanPhone)",
-                                    "accountType" to "مسترجع",
-                                    "status" to "PENDING",
-                                    "timestamp" to currentTime,
-                                    "newPassword" to "",
-                                    "adminNotes" to "القناة: $selectedChannel | ملاحظة: $noteInput"
-                                )
-                                viewModel.db.collection("password_recovery_requests").document(cleanPhone).set(adminRecoveryRequest)
-
-                                val adminNotifId = java.util.UUID.randomUUID().toString()
-                                val adminNotif = mapOf(
-                                    "id" to adminNotifId,
-                                    "title" to "🔑 طلب استعادة حساب جديد",
-                                    "message" to "ورد طلب استعادة حساب للرقم: $cleanPhone عبر قناة $selectedChannel",
-                                    "targetType" to "ADMIN_ONLY",
-                                    "targetValue" to "ALL",
-                                    "timestamp" to currentTime
-                                )
-                                viewModel.db.collection("notifications").document(adminNotifId).set(adminNotif)
 
                                 sharedPrefs.edit()
                                     .putString("pending_recovery_phone", cleanPhone)

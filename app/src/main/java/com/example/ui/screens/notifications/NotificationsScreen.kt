@@ -42,32 +42,40 @@ fun NotificationsScreen(
     val allNotifications by notifViewModel.notifications.collectAsState()
     val readIds by notifViewModel.readNotificationIds.collectAsState()
     val activeTab by notifViewModel.activeTab.collectAsState()
+    val userPhone by notifViewModel.currentUserPhone.collectAsState()
+    val userId by notifViewModel.currentUserId.collectAsState()
+    val adminRole by notifViewModel.adminRole.collectAsState()
 
     LaunchedEffect(Unit) {
         notifViewModel.loadReadNotifications(context)
     }
 
+    // Unified Audience Filtering
+    val audienceFilteredList = remember(allNotifications, userPhone, userId, adminRole) {
+        notifViewModel.filterAudienceNotifications(allNotifications, userPhone, userId, adminRole)
+    }
+
     // Filter list
-    val filteredList = remember(allNotifications, readIds, activeTab) {
+    val filteredList = remember(audienceFilteredList, readIds, activeTab) {
         when (activeTab) {
-            "UNREAD" -> allNotifications.filter { !readIds.contains(it.id) }
-            "BOOKING" -> allNotifications.filter { it.notificationType == "BOOKING" || it.title.contains("حجز") }
-            "MESSAGE" -> allNotifications.filter { it.notificationType == "MESSAGE" || it.title.contains("رسالة") || it.title.contains("دردشة") }
-            "SPECIAL_OFFER" -> allNotifications.filter { it.notificationType == "SPECIAL_OFFER" || it.title.contains("عرض") }
-            "SYSTEM" -> allNotifications.filter { it.notificationType == "SYSTEM" || it.notificationType == "ADMIN" }
-            else -> allNotifications
+            "UNREAD" -> audienceFilteredList.filter { !readIds.contains(it.id) }
+            "BOOKING" -> audienceFilteredList.filter { it.notificationType == "BOOKING" || it.title.contains("حجز") }
+            "MESSAGE" -> audienceFilteredList.filter { it.notificationType == "MESSAGE" || it.title.contains("رسالة") || it.title.contains("دردشة") }
+            "SPECIAL_OFFER" -> audienceFilteredList.filter { it.notificationType == "SPECIAL_OFFER" || it.title.contains("عرض") }
+            "SYSTEM" -> audienceFilteredList.filter { it.notificationType == "SYSTEM" || it.notificationType == "ADMIN" }
+            else -> audienceFilteredList
         }
     }
 
     // Counts Map
-    val countsMap = remember(allNotifications, readIds) {
+    val countsMap = remember(audienceFilteredList, readIds) {
         mapOf(
-            "ALL" to allNotifications.size,
-            "UNREAD" to allNotifications.count { !readIds.contains(it.id) },
-            "BOOKING" to allNotifications.count { it.notificationType == "BOOKING" || it.title.contains("حجز") },
-            "MESSAGE" to allNotifications.count { it.notificationType == "MESSAGE" || it.title.contains("رسالة") },
-            "SPECIAL_OFFER" to allNotifications.count { it.notificationType == "SPECIAL_OFFER" || it.title.contains("عرض") },
-            "SYSTEM" to allNotifications.count { it.notificationType == "SYSTEM" || it.notificationType == "ADMIN" }
+            "ALL" to audienceFilteredList.size,
+            "UNREAD" to audienceFilteredList.count { !readIds.contains(it.id) },
+            "BOOKING" to audienceFilteredList.count { it.notificationType == "BOOKING" || it.title.contains("حجز") },
+            "MESSAGE" to audienceFilteredList.count { it.notificationType == "MESSAGE" || it.title.contains("رسالة") },
+            "SPECIAL_OFFER" to audienceFilteredList.count { it.notificationType == "SPECIAL_OFFER" || it.title.contains("عرض") },
+            "SYSTEM" to audienceFilteredList.count { it.notificationType == "SYSTEM" || it.notificationType == "ADMIN" }
         )
     }
 

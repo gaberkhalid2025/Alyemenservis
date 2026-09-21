@@ -93,6 +93,18 @@ fun RealLeafletMapView(
         }
     }
 
+    // 8-second timeout watchdog: If map hasn't loaded or signalled onMapReady within 8s, trigger fallback/error overlay
+    LaunchedEffect(isMapLoading) {
+        if (isMapLoading) {
+            kotlinx.coroutines.delay(8000L)
+            if (isMapLoading) {
+                Log.w("RealLeafletMapView", "Map loading timed out (8s) - triggering load error fallback")
+                isMapLoading = false
+                hasLoadError = true
+            }
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -101,7 +113,7 @@ fun RealLeafletMapView(
                     webViewRef = this
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                     isHapticFeedbackEnabled = true
-                    setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
+                    setBackgroundColor(android.graphics.Color.parseColor("#1E293B"))
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
@@ -219,6 +231,13 @@ fun RealLeafletMapView(
             },
             update = { webView ->
                 // Maintain page and avoid reload
+            },
+            onReset = { webView ->
+                webView.stopLoading()
+            },
+            onRelease = { webView ->
+                webView.stopLoading()
+                webView.destroy()
             }
         )
 

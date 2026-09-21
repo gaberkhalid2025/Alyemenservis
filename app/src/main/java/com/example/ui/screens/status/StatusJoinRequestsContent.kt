@@ -94,7 +94,7 @@ fun StatusJoinRequestsContent(
                                     .padding(horizontal = 8.dp, vertical = 3.dp)
                             ) {
                                 Text(
-                                    text = "قيد المراجعه ⏳",
+                                    text = "قيد المراجعة ⏳",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFFD97706)

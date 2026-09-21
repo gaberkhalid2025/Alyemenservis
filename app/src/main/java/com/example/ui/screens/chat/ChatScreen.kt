@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.data.models.ChatChannel
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
@@ -53,7 +54,7 @@ fun ChatScreen(
     relatedEntityId: String? = null,
     relatedEntityType: String? = null,
     themeColors: VisualThemePalette,
-    chatViewModel: ChatViewModel = viewModel(),
+    chatViewModel: ChatViewModel = hiltViewModel(),
     onBackClick: () -> Unit
 ) {
     if (currentUserId.isBlank()) {

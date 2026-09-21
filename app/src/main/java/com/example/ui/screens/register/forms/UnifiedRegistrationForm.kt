@@ -180,15 +180,15 @@ fun UnifiedRegistrationForm(
             singleLine = true
         )
 
-        // 2. Manager Name (if applicable - Mandatory for entities)
+        // 2. Manager Name (Optional - can be updated later from dashboard)
         if (role in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB")) {
             val managerLabel = when (role) {
-                "STORE" -> "اسم مدير المتجر / المالك *"
-                "RESTAURANT" -> "اسم مدير المطعم / المالك *"
-                "MEDICAL" -> "اسم مدير المركز / الطبيب المسؤول *"
-                "PROPERTY" -> "اسم المالك / مدير المكتب العقاري *"
-                "JOB" -> "اسم مسؤول التوظيف / مدير الشركة *"
-                else -> "اسم المدير / المالك *"
+                "STORE" -> "اسم مدير المتجر / المالك (اختياري)"
+                "RESTAURANT" -> "اسم مدير المطعم / المالك (اختياري)"
+                "MEDICAL" -> "اسم مدير المركز / الطبيب المسؤول (اختياري)"
+                "PROPERTY" -> "اسم المالك / مدير المكتب العقاري (اختياري)"
+                "JOB" -> "اسم مسؤول التوظيف / مدير الشركة (اختياري)"
+                else -> "اسم المدير / المالك (اختياري)"
             }
             OutlinedTextField(
                 value = state.managerName,

@@ -53,26 +53,34 @@ fun BookingListScreen(
     var bookingToCancel by remember { mutableStateOf<BookingEntity?>(null) }
     var bookingToDelete by remember { mutableStateOf<BookingEntity?>(null) }
 
-    // Filter bookings
-    val filteredBookings = remember(bookings, selectedTabFilter, searchQuery) {
-        bookings.filter { bk ->
-            val matchesTab = when (selectedTabFilter) {
-                "ACTIVE" -> bk.status in listOf("PENDING", "APPROVED")
-                "COMPLETED" -> bk.status == "COMPLETED"
-                "CANCELLED" -> bk.status in listOf("CANCELLED", "REJECTED")
-                else -> true
-            }
+    // Pre-calculate tab counts efficiently with remember
+    val totalCount = remember(bookings) { bookings.size }
+    val activeCount = remember(bookings) { bookings.count { it.status in listOf("PENDING", "APPROVED") } }
+    val completedCount = remember(bookings) { bookings.count { it.status == "COMPLETED" } }
+    val cancelledCount = remember(bookings) { bookings.count { it.status in listOf("CANCELLED", "REJECTED") } }
 
+    // Filter bookings with derivedStateOf
+    val filteredBookings by remember(bookings, selectedTabFilter, searchQuery) {
+        derivedStateOf {
             val query = searchQuery.trim().lowercase()
-            val matchesQuery = query.isEmpty() ||
-                bk.bookingCode.lowercase().contains(query) ||
-                bk.bookingNumber.lowercase().contains(query) ||
-                bk.fullName.lowercase().contains(query) ||
-                bk.customerName.lowercase().contains(query) ||
-                bk.clientPhone.lowercase().contains(query) ||
-                bk.providerName.lowercase().contains(query)
+            bookings.filter { bk ->
+                val matchesTab = when (selectedTabFilter) {
+                    "ACTIVE" -> bk.status in listOf("PENDING", "APPROVED")
+                    "COMPLETED" -> bk.status == "COMPLETED"
+                    "CANCELLED" -> bk.status in listOf("CANCELLED", "REJECTED")
+                    else -> true
+                }
 
-            matchesTab && matchesQuery
+                val matchesQuery = query.isEmpty() ||
+                    bk.bookingCode.lowercase().contains(query) ||
+                    bk.bookingNumber.lowercase().contains(query) ||
+                    bk.fullName.lowercase().contains(query) ||
+                    bk.customerName.lowercase().contains(query) ||
+                    bk.clientPhone.lowercase().contains(query) ||
+                    bk.providerName.lowercase().contains(query)
+
+                matchesTab && matchesQuery
+            }
         }
     }
 
@@ -198,14 +206,14 @@ fun BookingListScreen(
                 Tab(
                     selected = selectedTabFilter == "ALL",
                     onClick = { selectedTabFilter = "ALL" },
-                    text = { Text("الكل (${bookings.size})", fontWeight = FontWeight.Bold) }
+                    text = { Text("الكل ($totalCount)", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = selectedTabFilter == "ACTIVE",
                     onClick = { selectedTabFilter = "ACTIVE" },
                     text = {
                         Text(
-                            "الحالية (${bookings.count { it.status in listOf("PENDING", "APPROVED") }})",
+                            "الحالية ($activeCount)",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -215,7 +223,7 @@ fun BookingListScreen(
                     onClick = { selectedTabFilter = "COMPLETED" },
                     text = {
                         Text(
-                            "المكتملة (${bookings.count { it.status == "COMPLETED" }})",
+                            "المكتملة ($completedCount)",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -225,7 +233,7 @@ fun BookingListScreen(
                     onClick = { selectedTabFilter = "CANCELLED" },
                     text = {
                         Text(
-                            "الملغاة (${bookings.count { it.status in listOf("CANCELLED", "REJECTED") }})",
+                            "الملغاة ($cancelledCount)",
                             fontWeight = FontWeight.Bold
                         )
                     }

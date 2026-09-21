@@ -169,18 +169,13 @@ fun MultiDimensionRatingDialog(
                                 }
 
                                 if (bookingId.isNotEmpty()) {
-                                    viewModel.db.collection("bookings").document(bookingId).get()
-                                        .addOnSuccessListener { doc ->
-                                            val status = doc.getString("status") ?: ""
-                                            if (status != "COMPLETED" && status != "FINISHED") {
-                                                Toast.makeText(context, "لا يمكن التقييم إلا بعد اكتمال الخدمة", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                doSubmit()
-                                            }
-                                        }
-                                        .addOnFailureListener {
-                                            doSubmit()
-                                        }
+                                    val bk = viewModel.bookings.value.find { it.id == bookingId }
+                                    val status = bk?.status?.uppercase() ?: ""
+                                    if (bk != null && status != "COMPLETED" && status != "FINISHED") {
+                                        Toast.makeText(context, "لا يمكن التقييم إلا بعد اكتمال الخدمة", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        doSubmit()
+                                    }
                                 } else {
                                     doSubmit()
                                 }

@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,10 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.BookingEntity
 import com.example.ui.dialogs.BookingCancellationDialog
 import com.example.utils.BookingStateMachine
@@ -272,7 +275,26 @@ fun BookingDetailsScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        DetailRow(icon = Icons.Default.Person, label = "اسم الفني", value = booking.providerName.ifEmpty { "فني معتمد" })
+                        if (booking.providerPhoto.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                AsyncImage(
+                                    model = booking.providerPhoto,
+                                    contentDescription = "صورة مقدم الخدمة",
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Text(
+                                    text = booking.providerName.ifEmpty { "فني معتمد" },
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        } else {
+                            DetailRow(icon = Icons.Default.Person, label = "اسم الفني", value = booking.providerName.ifEmpty { "فني معتمد" })
+                        }
                         if (booking.providerPhone.isNotBlank()) {
                             DetailRow(icon = Icons.Default.Phone, label = "رقم الاتصال", value = booking.providerPhone)
                         }

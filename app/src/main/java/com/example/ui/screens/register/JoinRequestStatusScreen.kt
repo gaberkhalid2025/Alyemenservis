@@ -223,6 +223,23 @@ fun JoinRequestStatusScreen(
                         themeColors = themeColors
                     )
                 }
+                is JoinStatus.PendingClient -> {
+                    val userMap = currentStatus.userMap
+                    val name = (userMap["name"] as? String)?.ifBlank { "عميل جديد" } ?: "عميل جديد"
+                    val phone = (userMap["phone"] as? String)?.ifBlank { "غير محدد" } ?: "غير محدد"
+                    val res = (userMap["residence"] as? String)?.ifBlank { "صنعاء" } ?: "صنعاء"
+                    PendingApprovalView(
+                        title = "👤 طلب تسجيل حساب العميل قيد المراجعة",
+                        message = "تم استلام بيانات تسجيلك كعميل وجاري تفعيل حسابك للاستفادة من كافة خدمات التطبيق والعروض.",
+                        detailsList = listOf(
+                            "الاسم الكامل" to name,
+                            "رقم الهاتف" to phone,
+                            "المدينة / المحافظة" to res
+                        ),
+                        onCancelRequest = { viewModel.cancelOrResetJoinRequest(context) },
+                        themeColors = themeColors
+                    )
+                }
                 is JoinStatus.PendingGeneric -> {
                     PendingApprovalView(
                         title = "⏳ طلب الانضمام قيد المراجعة والتدقيق",

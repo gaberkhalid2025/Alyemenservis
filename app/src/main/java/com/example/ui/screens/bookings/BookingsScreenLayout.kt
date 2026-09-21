@@ -104,7 +104,7 @@ fun BookingsScreenLayout(
                             relatedEntityType = "BOOKING"
                         ) { createdCh ->
                             if (createdCh != null && createdCh.id.isNotEmpty()) {
-                                viewModel.db.collection("bookings").document(booking.id).update("relatedChatChannelId", createdCh.id)
+                                viewModel.updateBookingRelatedChatChannel(booking.id, createdCh.id)
                             }
                         }
                     }
@@ -139,7 +139,7 @@ fun BookingsScreenLayout(
                         relatedEntityType = "BOOKING"
                     ) { createdCh ->
                         if (createdCh != null && createdCh.id.isNotEmpty()) {
-                            viewModel.db.collection("bookings").document(booking.id).update("relatedChatChannelId", createdCh.id)
+                            viewModel.updateBookingRelatedChatChannel(booking.id, createdCh.id)
                         }
                         viewModel.openChatChannel(createdCh)
                         viewModel.navigateTo("CHAT_DIRECT")

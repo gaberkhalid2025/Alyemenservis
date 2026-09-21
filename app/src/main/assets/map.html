@@ -15,7 +15,7 @@
         html, body {
             height: 100%;
             width: 100%;
-            background: #0F172A;
+            background: #1E293B;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow: hidden;
             position: relative;
@@ -25,40 +25,173 @@
             height: 100%;
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: #0F172A;
-            background-image: radial-gradient(rgba(0, 229, 255, 0.08) 1px, transparent 0);
-            background-size: 24px 24px;
+            background: #1E293B;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 32px 32px;
         }
-        /* Fallback inline styles for Leaflet elements if CSS fails to load */
-        .leaflet-container { width: 100%; height: 100%; background: #0F172A !important; font-family: inherit; }
+        
+        .leaflet-container { 
+            width: 100%; 
+            height: 100%; 
+            background: #1E293B !important; 
+            font-family: inherit; 
+        }
         .leaflet-pane { z-index: 400; }
         .leaflet-tile-pane { z-index: 200; }
         .leaflet-marker-pane { z-index: 600; }
         .leaflet-popup-pane { z-index: 700; }
-        .leaflet-tile-container img { filter: brightness(0.92) contrast(1.08); }
-        .leaflet-popup-content-wrapper { background: #1E293B !important; color: #FFFFFF !important; border: 2px solid #00E5FF; border-radius: 16px; padding: 4px; box-shadow: 0 12px 30px rgba(0,0,0,0.8); }
-        .leaflet-popup-tip { background: #1E293B !important; }
+        .leaflet-tile-container img { 
+            filter: brightness(0.96) contrast(1.05); 
+        }
+        .leaflet-popup-content-wrapper { 
+            background: #0F172A !important; 
+            color: #FFFFFF !important; 
+            border: 2px solid #00E5FF; 
+            border-radius: 16px; 
+            padding: 4px; 
+            box-shadow: 0 12px 30px rgba(0,0,0,0.85); 
+        }
+        .leaflet-popup-tip { background: #0F172A !important; }
         
-        .popup-card { font-family: system-ui, -apple-system, sans-serif; text-align: right; direction: rtl; color: #FFFFFF; padding: 8px 6px; min-width: 220px; }
-        .popup-cat-badge { display: inline-block; font-size: 10.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.1); margin-bottom: 4px; font-weight: 700; }
-        .popup-approx-badge { display: inline-block; font-size: 9.5px; padding: 1px 6px; border-radius: 8px; background: rgba(245,158,11,0.2); color: #F59E0B; margin-bottom: 4px; }
-        .popup-title { font-size: 15px; font-weight: 800; color: #00E5FF; margin-bottom: 4px; line-height: 1.3; }
-        .popup-spec { font-size: 12px; color: #CBD5E1; margin-bottom: 6px; }
-        .popup-meta { display: flex; flex-direction: column; gap: 3px; font-size: 11px; margin-bottom: 10px; color: #94A3B8; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 6px 0; }
+        .popup-card { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            text-align: right; 
+            direction: rtl; 
+            color: #FFFFFF; 
+            padding: 8px 6px; 
+            min-width: 220px; 
+        }
+        .popup-cat-badge { 
+            display: inline-block; 
+            font-size: 10.5px; 
+            padding: 2px 8px; 
+            border-radius: 12px; 
+            background: rgba(255,255,255,0.1); 
+            margin-bottom: 4px; 
+            font-weight: 700; 
+        }
+        .popup-approx-badge { 
+            display: inline-block; 
+            font-size: 9.5px; 
+            padding: 1px 6px; 
+            border-radius: 8px; 
+            background: rgba(245,158,11,0.2); 
+            color: #F59E0B; 
+            margin-bottom: 4px; 
+        }
+        .popup-title { 
+            font-size: 15px; 
+            font-weight: 800; 
+            color: #00E5FF; 
+            margin-bottom: 4px; 
+            line-height: 1.3; 
+        }
+        .popup-spec { 
+            font-size: 12px; 
+            color: #CBD5E1; 
+            margin-bottom: 6px; 
+        }
+        .popup-meta { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 3px; 
+            font-size: 11px; 
+            margin-bottom: 10px; 
+            color: #94A3B8; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            padding: 6px 0; 
+        }
         .popup-meta-row { display: flex; justify-content: space-between; }
         .popup-eta { color: #38BDF8; font-weight: bold; }
         .popup-buttons { display: flex; flex-direction: column; gap: 6px; }
         .popup-buttons-row { display: flex; gap: 6px; }
-        .btn-details { width: 100%; background: linear-gradient(135deg, #00E5FF, #00B4D8); color: #0F172A; border: none; padding: 9px 10px; border-radius: 10px; font-weight: 800; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
-        .btn-call { flex: 1; background: #10B981; color: #FFFFFF; border: none; padding: 8px 6px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; text-align: center; text-decoration: none; display: inline-block; }
-        .btn-nav { flex: 1; background: #3B82F6; color: #FFFFFF; border: none; padding: 8px 6px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; text-align: center; }
+        .btn-details { 
+            width: 100%; 
+            background: linear-gradient(135deg, #00E5FF, #00B4D8); 
+            color: #0F172A; 
+            border: none; 
+            padding: 9px 10px; 
+            border-radius: 10px; 
+            font-weight: 800; 
+            font-size: 12px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 4px; 
+        }
+        .btn-call { 
+            flex: 1; 
+            background: #10B981; 
+            color: #FFFFFF; 
+            border: none; 
+            padding: 8px 6px; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            font-size: 12px; 
+            cursor: pointer; 
+            text-align: center; 
+            text-decoration: none; 
+            display: inline-block; 
+        }
+        .btn-nav { 
+            flex: 1; 
+            background: #3B82F6; 
+            color: #FFFFFF; 
+            border: none; 
+            padding: 8px 6px; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            font-size: 12px; 
+            cursor: pointer; 
+            text-align: center; 
+        }
         
-        .custom-pin { width: 44px; height: 44px; background: #1E293B; border-width: 3px; border-style: solid; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .custom-pin { 
+            width: 44px; 
+            height: 44px; 
+            background: #1E293B; 
+            border-width: 3px; 
+            border-style: solid; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 22px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6); 
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
         .custom-pin:active, .custom-pin:hover { transform: scale(1.22); }
         .user-marker-container { position: relative; width: 32px; height: 32px; }
-        .user-marker { width: 22px; height: 22px; background: #00E5FF; border: 3px solid #FFFFFF; border-radius: 50%; box-shadow: 0 0 20px #00E5FF; position: absolute; top: 5px; left: 5px; z-index: 2; }
-        .user-pulse { position: absolute; width: 46px; height: 46px; background: rgba(0, 229, 255, 0.4); border-radius: 50%; top: -7px; left: -7px; animation: pulseRing 2s infinite ease-out; }
-        @keyframes pulseRing { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+        .user-marker { 
+            width: 22px; 
+            height: 22px; 
+            background: #00E5FF; 
+            border: 3px solid #FFFFFF; 
+            border-radius: 50%; 
+            box-shadow: 0 0 20px #00E5FF; 
+            position: absolute; 
+            top: 5px; 
+            left: 5px; 
+            z-index: 2; 
+        }
+        .user-pulse { 
+            position: absolute; 
+            width: 46px; 
+            height: 46px; 
+            background: rgba(0, 229, 255, 0.4); 
+            border-radius: 50%; 
+            top: -7px; 
+            left: -7px; 
+            animation: pulseRing 2s infinite ease-out; 
+        }
+        @keyframes pulseRing { 
+            0% { transform: scale(0.4); opacity: 1; } 
+            100% { transform: scale(1.8); opacity: 0; } 
+        }
         
         .marker-cluster-small { background-color: rgba(0, 229, 255, 0.4); }
         .marker-cluster-small div { background-color: #00E5FF; color: #0F172A; font-weight: 800; }
@@ -74,7 +207,7 @@
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             z-index: 9999;
-            background: #1E293B;
+            background: #0F172A;
             border: 2px solid #00E5FF;
             border-radius: 16px;
             padding: 20px;
@@ -174,19 +307,20 @@
                     zoomAnimation: true
                 }).setView([userLat, userLng], 14);
 
-                // Multiple high-speed tile layers with automatic fallback
-                var primaryLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                    attribution: 'Google Maps'
+                // OpenStreetMap Standard Tiles (Fast, worldwide, reliable & no rate limit headers)
+                var primaryLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    subdomains: ['a', 'b', 'c'],
+                    attribution: 'OpenStreetMap contributors'
                 });
 
                 primaryLayer.on('tileerror', function() {
-                    console.warn("Primary Google tile server warning. Adding fallback tile source...");
-                    var osmBackup = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19
+                    console.warn("Primary tile server warning. Adding Google Maps fallback tile source...");
+                    var googleBackup = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                        maxZoom: 20,
+                        subdomains: ['0', '1', '2', '3']
                     });
-                    osmBackup.addTo(map);
+                    googleBackup.addTo(map);
                 });
 
                 primaryLayer.addTo(map);
@@ -279,9 +413,21 @@
                     window.updateMapMarkers(initialMarkers);
                 }
 
+                // Signal onMapReady immediately once map instance and layers are set
                 if (window.AndroidBridge && typeof window.AndroidBridge.onMapReady === 'function') {
-                    window.AndroidBridge.onMapReady();
+                    try {
+                        window.AndroidBridge.onMapReady();
+                    } catch(e) {
+                        console.error("onMapReady bridge call failed: " + e);
+                    }
                 }
+
+                // Trigger map resize invalidate to prevent blank canvas glitches in WebView
+                setTimeout(function() {
+                    if (map) {
+                        map.invalidateSize();
+                    }
+                }, 300);
             } catch(e) {
                 showFallbackUI("Map init error: " + e.message);
             }
@@ -296,4 +442,3 @@
     </script>
 </body>
 </html>
-

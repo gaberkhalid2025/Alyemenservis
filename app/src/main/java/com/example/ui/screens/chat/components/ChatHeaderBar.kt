@@ -185,7 +185,7 @@ fun ChatHeaderBar(
             }
 
             val contextText = when (relatedEntityType) {
-                "BOOKING" -> "🗓️ ليتم ايضاح انه خاص بحجز: #$shortId"
+                "BOOKING" -> "🗓️ خاص بحجز: #$shortId"
                 "URGENT_REQUEST" -> "🚨 خاص بطلب عاجل: #$shortId"
                 "SUPPORT" -> "🛠️ تذكرة دعم: #$shortId"
                 else -> if (!relatedEntityId.isNullOrBlank()) "📋 خاص بطلب: #$shortId" else null

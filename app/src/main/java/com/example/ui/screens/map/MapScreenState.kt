@@ -29,6 +29,9 @@ class MapScreenState(
     var searchQuery by mutableStateOf(searchQuery)
     var maxRangeKm by mutableFloatStateOf(maxRangeKm)
 
+    var zoomScale by mutableFloatStateOf(1.0f)
+    var panOffset by mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
+
     var selectedEntity by mutableStateOf<Any?>(null)
     var bookingProviderTarget by mutableStateOf<ProviderEntity?>(null)
 

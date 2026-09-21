@@ -70,6 +70,7 @@ class ChatViewModel @Inject constructor(
         val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
         listenToMessages(channel.id, currentUserId)
         presenceManager.listenToPresence(otherUserId)
+        typingManager.listenToTyping(channel.id, otherUserId)
         markAsRead(channel.id, currentUserId)
     }
 

@@ -49,19 +49,45 @@ fun AdminRequestsPanel(
     var rejectionReason by remember { mutableStateOf("") }
     var pendingDeletionTarget by remember { mutableStateOf<Triple<String, String, String>?>(null) } // type, id, title
 
-    val pendingPropertiesCount = properties.count { !it.isApproved && !it.isDeleted }
-    val pendingMedicalCount = stores.count { !it.isApproved && !it.isDeleted && (it.sectionId == "medical" || it.categoryId.contains("طبي") || it.categoryId.contains("عياد") || it.categoryId.equals("MEDICAL", ignoreCase = true)) } +
-            pendingProviders.count { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "MEDICAL" || it.categoryId.equals("medical", ignoreCase = true) || it.categoryId.contains("طبي") || it.categoryId.contains("عياد")) }
-    val pendingRestaurantsCount = stores.count { !it.isApproved && !it.isDeleted && (it.sectionId == "restaurants" || it.categoryId.contains("مطعم") || it.categoryId.contains("كافيه") || it.categoryId.equals("RESTAURANT", ignoreCase = true)) }
-    val pendingStoresCount = stores.count { !it.isApproved && !it.isDeleted && it.sectionId != "medical" && it.sectionId != "restaurants" && !it.categoryId.contains("طبي") && !it.categoryId.contains("عياد") && !it.categoryId.contains("مطعم") && !it.categoryId.contains("كافيه") && !it.categoryId.equals("MEDICAL", ignoreCase = true) && !it.categoryId.equals("RESTAURANT", ignoreCase = true) }
-    val pendingJobsCount = jobs.count { !it.isApproved && !it.isDeleted }
+    val pendingPropertiesList = properties.filter { !it.isApproved && !it.isDeleted }
+    val pendingPropertiesFromProviders = pendingProviders.filter { 
+        (it.status == "PENDING" || it.status.isEmpty()) && 
+        (it.categoryId == "PROPERTY" || it.profession == "PROPERTY_OWNER" || it.categoryId.contains("عقار"))
+    }
+    val pendingPropertiesCount = pendingPropertiesList.size + pendingPropertiesFromProviders.size
 
-    val activeServicesCount = pendingProviders.count {
+    val pendingMedicalStores = stores.filter { !it.isApproved && !it.isDeleted && (it.sectionId == "medical" || it.categoryId.contains("طبي") || it.categoryId.contains("عياد") || it.categoryId.equals("MEDICAL", ignoreCase = true)) }
+    val pendingMedicalProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "MEDICAL" || it.categoryId.equals("medical", ignoreCase = true) || it.categoryId.contains("طبي") || it.categoryId.contains("عياد") || it.categoryId.contains("مستشفى")) }
+    val pendingMedicalCount = pendingMedicalStores.size + pendingMedicalProviders.size
+
+    val pendingRestaurantsStores = stores.filter { !it.isApproved && !it.isDeleted && (it.sectionId == "restaurants" || it.categoryId.contains("مطعم") || it.categoryId.contains("كافيه") || it.categoryId.equals("RESTAURANT", ignoreCase = true)) }
+    val pendingRestaurantsProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "RESTAURANT" || it.categoryId.equals("restaurant", ignoreCase = true) || it.categoryId.contains("مطعم") || it.categoryId.contains("كافيه")) }
+    val pendingRestaurantsCount = pendingRestaurantsStores.size + pendingRestaurantsProviders.size
+
+    val pendingRegularStores = stores.filter { !it.isApproved && !it.isDeleted && it.sectionId != "medical" && it.sectionId != "restaurants" && !it.categoryId.contains("طبي") && !it.categoryId.contains("عياد") && !it.categoryId.contains("مطعم") && !it.categoryId.contains("كافيه") && !it.categoryId.equals("MEDICAL", ignoreCase = true) && !it.categoryId.equals("RESTAURANT", ignoreCase = true) }
+    val pendingStoresProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "STORE" || (it.profession == "STORE_OWNER" && it.categoryId != "MEDICAL" && it.categoryId != "RESTAURANT") || it.categoryId.contains("متجر") || it.categoryId.contains("محل")) }
+    val pendingStoresCount = pendingRegularStores.size + pendingStoresProviders.size
+
+    val pendingJobsList = jobs.filter { !it.isApproved && !it.isDeleted }
+    val pendingJobsProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "JOB" || it.profession == "JOB_POSTER" || it.categoryId.contains("وظيفة") || it.categoryId.contains("توظيف")) }
+    val pendingJobsCount = pendingJobsList.size + pendingJobsProviders.size
+
+    val pendingClientsProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "CLIENT" || it.profession == "CLIENT" || it.categoryId.contains("عميل")) }
+
+    val activeServicesPending = pendingProviders.filter {
         (it.status == "PENDING" || it.status.isEmpty()) &&
         it.categoryId != "STORE" && it.categoryId != "RESTAURANT" &&
         it.categoryId != "MEDICAL" && it.categoryId != "PROPERTY" &&
-        it.categoryId != "JOB" && it.categoryId != "CLIENT"
+        it.categoryId != "JOB" && it.categoryId != "CLIENT" &&
+        it.profession != "STORE_OWNER" && it.profession != "PROPERTY_OWNER" &&
+        it.profession != "JOB_POSTER" && it.profession != "CLIENT" &&
+        !it.categoryId.contains("متجر") && !it.categoryId.contains("محل") &&
+        !it.categoryId.contains("مطعم") && !it.categoryId.contains("كافيه") &&
+        !it.categoryId.contains("طبي") && !it.categoryId.contains("عياد") &&
+        !it.categoryId.contains("عقار") && !it.categoryId.contains("وظيفة") &&
+        !it.categoryId.contains("عميل")
     }
+    val activeServicesCount = activeServicesPending.size
 
     val subTabs = listOf(
         Triple("SERVICES", "🔧 المهن والخدمات", activeServicesCount),
@@ -70,7 +96,7 @@ fun AdminRequestsPanel(
         Triple("MEDICAL", "🏥 المراكز الطبية", pendingMedicalCount),
         Triple("RESTAURANTS", "🍔 المطاعم", pendingRestaurantsCount),
         Triple("JOBS", "💼 إعلانات التوظيف", pendingJobsCount),
-        Triple("USERS", "👤 المستخدمين", registeredUsersList.size)
+        Triple("USERS", "👤 المستخدمين", registeredUsersList.size + pendingClientsProviders.size)
     )
 
     Column(
@@ -112,19 +138,13 @@ fun AdminRequestsPanel(
 
         when (selectedTab) {
             "SERVICES" -> {
-                val activePending = pendingProviders.filter {
-                    (it.status == "PENDING" || it.status.isEmpty()) &&
-                    it.categoryId != "STORE" && it.categoryId != "RESTAURANT" &&
-                    it.categoryId != "MEDICAL" && it.categoryId != "PROPERTY" &&
-                    it.categoryId != "JOB" && it.categoryId != "CLIENT"
-                }
-                if (activePending.isEmpty()) {
+                if (activeServicesPending.isEmpty()) {
                     Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
                         Text("لا توجد طلبات معلقة للمهن والخدمات حالياً.", fontSize = 12.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        activePending.forEach { req ->
+                        activeServicesPending.forEach { req ->
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                                 border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
@@ -132,10 +152,10 @@ fun AdminRequestsPanel(
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(text = "الاسم: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                    Text(text = "الهاتف: ${req.phone}", fontSize = 11.sp, color = themeColors.textSecondary)
-                                    Text(text = "المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    Text(text = "المهنة / الخدمة: ${req.customCategoryName.ifBlank { req.categoryId }}", fontSize = 11.5.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                    Text(text = "الهاتف: ${req.phone} | المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
                                     if (req.password.isNotBlank()) {
-                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -161,14 +181,45 @@ fun AdminRequestsPanel(
                 }
             }
             "PROPERTIES" -> {
-                val pendingProps = properties.filter { !it.isApproved && !it.isDeleted }
-                if (pendingProps.isEmpty()) {
+                if (pendingPropertiesList.isEmpty() && pendingPropertiesFromProviders.isEmpty()) {
                     Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
                         Text("لا توجد عقارات بانتظار الموافقة حالياً.", fontSize = 12.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pendingProps.forEach { prop ->
+                        pendingPropertiesFromProviders.forEach { req ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, Color(0xFF8B5CF6)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(text = "🏠 طلب انضمام عقار: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(text = "الهاتف: ${req.phone} | المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    if (req.password.isNotBlank()) {
+                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Button(
+                                            onClick = { viewModel.approveRequest(req) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("موافقة واعتماد", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { rejectingRequest = req },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("رفض", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        pendingPropertiesList.forEach { prop ->
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                                 border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
@@ -202,20 +253,53 @@ fun AdminRequestsPanel(
                 }
             }
             "STORES", "MEDICAL", "RESTAURANTS" -> {
-                val filteredStores = stores.filter { s ->
-                    !s.isApproved && !s.isDeleted && when (selectedTab) {
-                        "MEDICAL" -> s.sectionId == "medical" || s.categoryId.contains("طبي") || s.categoryId.contains("عياد") || s.categoryId.equals("MEDICAL", ignoreCase = true)
-                        "RESTAURANTS" -> s.sectionId == "restaurants" || s.categoryId.contains("مطعم") || s.categoryId.contains("كافيه") || s.categoryId.equals("RESTAURANT", ignoreCase = true)
-                        else -> s.sectionId != "medical" && s.sectionId != "restaurants" && !s.categoryId.contains("طبي") && !s.categoryId.contains("عياد") && !s.categoryId.contains("مطعم") && !s.categoryId.contains("كافيه") && !s.categoryId.equals("MEDICAL", ignoreCase = true) && !s.categoryId.equals("RESTAURANT", ignoreCase = true)
-                    }
+                val (providerList, entityList, tabName) = when (selectedTab) {
+                    "MEDICAL" -> Triple(pendingMedicalProviders, pendingMedicalStores, "المراكز الطبية")
+                    "RESTAURANTS" -> Triple(pendingRestaurantsProviders, pendingRestaurantsStores, "المطاعم والكافيهات")
+                    else -> Triple(pendingStoresProviders, pendingRegularStores, "المحلات والمتاجر")
                 }
-                if (filteredStores.isEmpty()) {
+                if (providerList.isEmpty() && entityList.isEmpty()) {
                     Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
-                        Text("لا توجد طلبات معلقة لهذا القسم حالياً.", fontSize = 12.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
+                        Text("لا توجد طلبات معلقة لـ $tabName حالياً.", fontSize = 12.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        filteredStores.forEach { s ->
+                        providerList.forEach { req ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, Color(0xFF3B82F6)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(text = "🏪 اسم المنشأة / المحل: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(text = "الهاتف: ${req.phone} | المنطقة: ${req.area} - ${req.localNeighborhood}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    if (req.specialization.isNotBlank()) {
+                                        Text(text = "النشاط: ${req.specialization}", fontSize = 11.sp, color = themeColors.accent)
+                                    }
+                                    if (req.password.isNotBlank()) {
+                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Button(
+                                            onClick = { viewModel.approveRequest(req) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("موافقة واعتماد", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { rejectingRequest = req },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("رفض الطلب", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        entityList.forEach { s ->
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                                 border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
@@ -248,14 +332,45 @@ fun AdminRequestsPanel(
                 }
             }
             "JOBS" -> {
-                val pendingJobs = jobs.filter { !it.isApproved && !it.isDeleted }
-                if (pendingJobs.isEmpty()) {
+                if (pendingJobsList.isEmpty() && pendingJobsProviders.isEmpty()) {
                     Card(colors = CardDefaults.cardColors(containerColor = themeColors.surface), modifier = Modifier.fillMaxWidth()) {
                         Text("لا توجد إعلانات وظائف معلقة بانتظار الاعتماد.", fontSize = 12.sp, color = themeColors.textSecondary, modifier = Modifier.padding(16.dp))
                     }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pendingJobs.forEach { job ->
+                        pendingJobsProviders.forEach { req ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(text = "💼 وظيفة: ${req.customCategoryName.ifBlank { req.name }}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(text = "جهة العمل: ${req.name} | الهاتف: ${req.phone}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    if (req.specialization.isNotBlank()) {
+                                        Text(text = "التفاصيل: ${req.specialization}", fontSize = 11.sp, color = themeColors.accent)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Button(
+                                            onClick = { viewModel.approveRequest(req) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("موافقة ونشر", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { rejectingRequest = req },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("رفض", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        pendingJobsList.forEach { job ->
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                                 border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.5f)),
@@ -288,11 +403,49 @@ fun AdminRequestsPanel(
                 }
             }
             "USERS" -> {
-                AdminUserManager(
-                    mainViewModel = viewModel,
-                    themeColors = themeColors,
-                    isPanelMode = true
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (pendingClientsProviders.isNotEmpty()) {
+                        Text("⏳ طلبات تسجيل مستخدمين معلقة (${pendingClientsProviders.size})", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFBBF24))
+                        pendingClientsProviders.forEach { req ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                                border = BorderStroke(1.dp, Color(0xFFFBBF24).copy(alpha = 0.6f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(text = "👤 اسم المستخدم: ${req.name}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(text = "الهاتف: ${req.phone} | المدينة/المحافظة: ${req.area}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                    if (req.password.isNotBlank()) {
+                                        Text(text = "🔑 كلمة المرور: ${req.password}", fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Button(
+                                            onClick = { viewModel.approveRequest(req) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("تفعيل الحساب", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { rejectingRequest = req },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("رفض", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                    AdminUserManager(
+                        mainViewModel = viewModel,
+                        themeColors = themeColors,
+                        isPanelMode = true
+                    )
+                }
             }
         }
     }

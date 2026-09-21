@@ -465,3 +465,7 @@ fun MainViewModel.submitOfferForRequest(
 fun MainViewModel.cancelInstantRequest(requestId: String, userPin: String = "") {
     instantRequestViewModel.cancelInstantRequest(requestId = requestId, userPin = userPin)
 }
+
+fun MainViewModel.setCurrentUserPhone(phone: String) {
+    authViewModel.setCurrentUserPhone(phone)
+}

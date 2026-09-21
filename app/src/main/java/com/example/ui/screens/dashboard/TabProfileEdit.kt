@@ -5,6 +5,10 @@ import com.example.ui.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.ui.screens.dashboard.components.UnifiedProfileSection
@@ -24,9 +28,14 @@ fun TabProfileEdit(
     rating: Double = 5.0,
     reviewCount: Int = 0,
     themeColors: VisualThemePalette,
+    onChangePhoto: ((String) -> Unit)? = null,
+    onChangeCover: ((String) -> Unit)? = null,
     onSaveProfile: (name: String, phone: String, cityArea: String, description: String, workingHours: String, isAvailable: Boolean) -> Unit,
     onChangePassword: (oldPass: String, newPass: String) -> Unit
 ) {
+    var currentPhoto by remember(photoUrl) { mutableStateOf(photoUrl) }
+    var currentCover by remember(coverUrl) { mutableStateOf(coverUrl) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -39,12 +48,20 @@ fun TabProfileEdit(
             subtitle = description,
             phone = phone,
             cityArea = cityArea,
-            photoUrl = photoUrl,
-            coverUrl = coverUrl,
+            photoUrl = currentPhoto,
+            coverUrl = currentCover,
             rating = rating,
             reviewCount = reviewCount,
             isAvailable = isAvailable,
-            themeColors = themeColors
+            themeColors = themeColors,
+            onChangePhoto = { newUrl ->
+                currentPhoto = newUrl
+                onChangePhoto?.invoke(newUrl)
+            },
+            onChangeCover = { newUrl ->
+                currentCover = newUrl
+                onChangeCover?.invoke(newUrl)
+            }
         )
 
         UnifiedSettingsSection(

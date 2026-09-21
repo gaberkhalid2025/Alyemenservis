@@ -40,6 +40,10 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     internal val _currentUserPhone = MutableStateFlow("")
     val currentUserPhone: StateFlow<String> = _currentUserPhone.asStateFlow()
 
+    fun setCurrentUserPhone(phone: String) {
+        _currentUserPhone.value = phone
+    }
+
     internal val _currentUserResidence = MutableStateFlow("")
     val currentUserResidence: StateFlow<String> = _currentUserResidence.asStateFlow()
 
@@ -459,6 +463,52 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     fun removeSupervisor(id: String) {
         db.collection("supervisors").document(id).delete()
         triggerToast("🗑️ تم إلغاء صلاحية المشرف بنجاح")
+    }
+
+    fun submitPasswordRecoveryRequest(
+        phone: String,
+        channel: String,
+        note: String,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        val cleanPhone = phone.trim().replace(" ", "")
+        val currentTime = System.currentTimeMillis()
+        val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+        val resetRequest = mapOf(
+            "phone" to cleanPhone,
+            "channel" to channel,
+            "note" to note,
+            "status" to "PENDING",
+            "createdAt" to currentTime
+        )
+        db.collection("password_resets").document(cleanPhone).set(resetRequest)
+
+        val adminRecoveryRequest = mapOf(
+            "id" to cleanPhone,
+            "uid" to currentUid,
+            "phone" to cleanPhone,
+            "name" to "طلب استعادة ($cleanPhone)",
+            "accountType" to "مسترجع",
+            "status" to "PENDING",
+            "timestamp" to currentTime,
+            "newPassword" to "",
+            "adminNotes" to "القناة: $channel | ملاحظة: $note"
+        )
+        db.collection("password_recovery_requests").document(cleanPhone).set(adminRecoveryRequest)
+
+        val adminNotifId = java.util.UUID.randomUUID().toString()
+        val adminNotif = mapOf(
+            "id" to adminNotifId,
+            "title" to "🔑 طلب استعادة حساب جديد",
+            "message" to "ورد طلب استعادة حساب للرقم: $cleanPhone عبر قناة $channel",
+            "targetType" to "ADMIN_ONLY",
+            "targetValue" to "ALL",
+            "timestamp" to currentTime
+        )
+        db.collection("notifications").document(adminNotifId).set(adminNotif)
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
     }
 
     data class PasswordRecoveryStatus(val status: String = "", val tempPassword: String = "")

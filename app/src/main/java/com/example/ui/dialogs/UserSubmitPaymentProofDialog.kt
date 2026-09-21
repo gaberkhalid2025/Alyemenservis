@@ -312,9 +312,9 @@ fun UserSubmitPaymentProofDialog(
                 Button(
                     onClick = {
                         val currentWallet = selectedWallet ?: return@Button
-                        val docRef = viewModel.db.collection("payments").document()
+                        val paymentId = "pay_" + java.util.UUID.randomUUID().toString().take(12)
                         val payment = com.example.data.PaymentEntity(
-                            id = docRef.id,
+                            id = paymentId,
                             userId = booking.customerPhone,
                             providerId = booking.providerId,
                             bookingId = booking.id,
@@ -333,7 +333,7 @@ fun UserSubmitPaymentProofDialog(
                             walletProvider = currentWallet.provider,
                             verificationNote = "بانتظار مراجعة وتأكيد الإدارة"
                         )
-                        docRef.set(payment)
+                        viewModel.paymentManagementViewModel.createPayment(payment)
                         viewModel.triggerNotification("✅ تم إرسال إثبات التحويل بنجاح! جاري مراجعته من الإدارة.")
                         showConfirmSubmitDialog = false
                         onDismiss()

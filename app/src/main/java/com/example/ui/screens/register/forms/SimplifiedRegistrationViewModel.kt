@@ -27,13 +27,7 @@ data class SimplifiedRegistrationState(
     val successMessage: String? = null
 ) {
     fun isFormValidForRole(role: String): Boolean {
-        val baseValid = entityName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && agreedToTerms
-        val requiresManager = role in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB")
-        return if (requiresManager) {
-            baseValid && managerName.isNotBlank()
-        } else {
-            baseValid
-        }
+        return entityName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && agreedToTerms
     }
 
     val isFormValid: Boolean
@@ -86,7 +80,6 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
 
     fun submit(onSuccess: (Map<String, String>) -> Unit) {
         val s = _state.value
-        val requiresManager = currentRole in listOf("STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB")
         
         var hasError = false
         var newState = s.copy(
@@ -98,11 +91,6 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
 
         if (newState.entityNameError != null || newState.phoneError != null || 
             newState.passwordError != null || newState.confirmPasswordError != null) {
-            hasError = true
-        }
-
-        if (requiresManager && s.managerName.isBlank()) {
-            newState = newState.copy(managerNameError = "يرجى كتابة اسم المدير/المالك")
             hasError = true
         }
 

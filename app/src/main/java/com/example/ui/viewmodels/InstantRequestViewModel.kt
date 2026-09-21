@@ -8,6 +8,7 @@ import com.example.data.ProviderEntity
 import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
 import com.example.data.models.ChannelType
+import com.example.data.models.ChatChannel
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.MediaType
 import com.example.data.models.Offer
@@ -197,12 +198,12 @@ class InstantRequestViewModel @Inject constructor(
             onSuccess = { createdReq ->
                 _uiState.value = InstantUiState.Success("تم تقديم الطلب الفوري بنجاح بنظام الكود: ${createdReq.requestCode}")
                 sendUrgentRequestNotificationToNearbyProviders(createdReq, 10)
-                onResult(true, "تم تقديم الطلب الفوري بنجاح بنظام الكود: ${createdReq.requestCode}", createdReq.id)
+                onResult(true, createdReq.requestCode, createdReq.secretPin)
             },
             onError = { err ->
                 _uiState.value = InstantUiState.Success("تم حفظ الطلب محلياً بنظام الكود: ${req.requestCode}")
                 triggerNotification?.invoke("⚠️ تم حفظ الطلب محلياً، سيتم المزامنة تلقائياً عند استقرار الاتصال")
-                onResult(true, "تم حفظ الطلب محلياً بنظام الكود: ${req.requestCode}", req.id)
+                onResult(true, req.requestCode, req.secretPin)
             }
         )
     }
@@ -532,6 +533,30 @@ class InstantRequestViewModel @Inject constructor(
 
     fun clearUiState() {
         _uiState.value = InstantUiState.Idle
+    }
+
+    suspend fun getOrCreateChatChannel(
+        currentUserId: String,
+        currentUserName: String,
+        currentUserPhoto: String = "",
+        otherUserId: String,
+        otherUserName: String,
+        otherUserPhoto: String = "",
+        type: ChannelType = ChannelType.PRIVATE,
+        relatedEntityId: String? = null,
+        relatedEntityType: String? = null
+    ): AppResult<ChatChannel> {
+        return chatRepo.getOrCreateChannel(
+            currentUserId = currentUserId,
+            currentUserName = currentUserName,
+            currentUserPhoto = currentUserPhoto,
+            otherUserId = otherUserId,
+            otherUserName = otherUserName,
+            otherUserPhoto = otherUserPhoto,
+            type = type,
+            relatedEntityId = relatedEntityId,
+            relatedEntityType = relatedEntityType
+        )
     }
 
     override fun onCleared() {

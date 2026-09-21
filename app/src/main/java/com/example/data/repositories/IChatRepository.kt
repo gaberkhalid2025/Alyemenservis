@@ -111,6 +111,11 @@ interface IChatRepository {
     fun getUserPresence(userId: String): Flow<UserPresence?>
 
     /**
+     * مراقبة حالة الكتابة لمستخدم في قناة معينة لحظياً
+     */
+    fun getTypingStatus(channelId: String, userId: String): Flow<Boolean>
+
+    /**
      * المزامنة التفاضلية (Delta Sync) للرسائل الجديدة فقط
      */
     suspend fun syncChannelDelta(channelId: String): AppResult<Int>

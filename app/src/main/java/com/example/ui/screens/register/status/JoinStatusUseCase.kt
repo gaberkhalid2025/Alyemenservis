@@ -20,6 +20,7 @@ sealed class JoinStatus {
     data class PendingProperty(val property: PropertyEntity) : JoinStatus()
     data class PendingJob(val job: JobEntity) : JoinStatus()
     data class PendingTechnician(val provider: PendingProviderEntity) : JoinStatus()
+    data class PendingClient(val userMap: Map<String, Any>) : JoinStatus()
     data class PendingGeneric(val phone: String) : JoinStatus()
 }
 
@@ -159,7 +160,17 @@ class JoinStatusUseCase {
                     custom.contains("متجر") || custom.contains("محل") || custom.contains("معرض") || custom.contains("سوق") ||
                     pName.contains("متجر") || pName.contains("محل")
 
+            val isClient = cat == "CLIENT" || cat.contains("CLIENT") || prof == "CLIENT" || custom.contains("عميل")
+
             return when {
+                isClient -> {
+                    val userMap = mapOf(
+                        "name" to matchingPending.name,
+                        "phone" to matchingPending.phone,
+                        "residence" to matchingPending.area
+                    )
+                    JoinStatus.PendingClient(userMap)
+                }
                 isRestaurant -> {
                     val tempStore = StoreEntity(
                         id = matchingPending.id,

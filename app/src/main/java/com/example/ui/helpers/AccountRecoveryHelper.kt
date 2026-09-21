@@ -2,11 +2,13 @@ package com.example.ui.helpers
 
 import android.content.Context
 import com.example.ui.*
+import com.example.data.NotificationEntity
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel.RestoreAccountMatch
 import com.google.firebase.firestore.FirebaseFirestore
+import java.util.UUID
 
 /**
  * Helper class for searching accounts and managing password recovery / reset operations.
@@ -97,6 +99,16 @@ class AccountRecoveryHelper(
         db.collection("password_recovery_requests").document(cleanPhone).set(reqData).addOnSuccessListener {
             onPasswordWaitingPhoneSet(cleanPhone)
             preferenceHelper.setPasswordRecoveryWaitingPhone(context, cleanPhone)
+            val adminNotif = NotificationEntity(
+                id = UUID.randomUUID().toString(),
+                title = "🔑 طلب استعادة كلمة مرور ($name)",
+                message = "قدم $name ($accountType) ذو الرقم $cleanPhone طلباً لاستعادة وتعيين كلمة المرور.",
+                targetType = "SUPERVISOR",
+                targetValue = "ALL",
+                timestamp = System.currentTimeMillis(),
+                dedupKey = "PWD_RESET_${cleanPhone}"
+            )
+            try { db.collection("notifications").document(adminNotif.id).set(adminNotif) } catch (e: Exception) {}
             triggerNotification("🔑 طلب استعادة كلمة مرور جديد من: $name ($cleanPhone)")
             onResult(true)
         }.addOnFailureListener {

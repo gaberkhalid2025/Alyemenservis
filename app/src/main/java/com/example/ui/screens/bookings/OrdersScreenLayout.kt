@@ -36,7 +36,9 @@ import com.example.ui.MainViewModel
 @Composable
 fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette, onRequestQuickService: () -> Unit = {}) {
     val orders by viewModel.orders.collectAsState()
+    val instantRequests by viewModel.instantRequests.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
     val context = LocalContext.current
 
     // Allow user to query by phone if currentUserPhone is empty
@@ -45,9 +47,22 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
         currentUserPhone.ifEmpty { customPhoneInput }
     }
 
+    val cleanActivePhone = remember(activePhone) {
+        activePhone.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+    }
+
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Instant Requests (اطلب خدمتك الآن), 1: Store Orders (المشتريات)
+
+    val myInstantRequests = remember(instantRequests, cleanActivePhone, currentUserId) {
+        instantRequests.filter { req ->
+            val reqPhoneClean = req.userPhone.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+            cleanActivePhone.isBlank() || reqPhoneClean == cleanActivePhone || (currentUserId.isNotBlank() && req.userId == currentUserId)
+        }.sortedByDescending { it.createdAt }
+    }
+
     val myOrders = remember(orders, activePhone) {
         if (activePhone.isBlank()) {
-            emptyList()
+            orders.sortedByDescending { it.timestamp }
         } else {
             orders.filter { 
                 it.customerPhone.trim() == activePhone.trim()
@@ -81,24 +96,24 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                         .background(themeColors.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🛍️", fontSize = 16.sp)
+                    Text(if (selectedTab == 0) "⚡" else "🛍️", fontSize = 16.sp)
                 }
                 Column {
                     Text(
-                        text = "🛍️ سجل طلبات الشراء والمشتريات",
+                        text = "📋 مركز متابعة طلباتي وضمان الخدمة",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
-                        text = "متابعة وتتبع طلبات الشراء من المتاجر والمطاعم",
+                        text = "تتبع الطلبات الفورية العاجلة ومشتريات المتاجر والمطاعم",
                         fontSize = 10.sp,
                         color = Color.LightGray
                     )
                 }
             }
 
-            if (myOrders.isNotEmpty()) {
+            if (selectedTab == 1 && myOrders.isNotEmpty()) {
                 Button(
                     onClick = { showDeleteAllConfirm = true },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f)),
@@ -112,45 +127,40 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
             }
         }
 
-        // ✨ م2: استخدام الـ OrderStatus الموحد بدلاً من السلاسل النصية الخام
-        val newCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.PENDING.code || it.status.isEmpty() } }
-        val inProgressCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.PROCESSING.code } }
-        val completedCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.COMPLETED.code } }
-        val cancelledCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.CANCELLED.code } }
-
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface.copy(alpha = 0.8f)),
-            border = BorderStroke(0.6.dp, themeColors.accent.copy(alpha = 0.2f))
+        // Navigation Tabs: ⚡ طلبات الخدمات العاجلة vs 🛍️ مشتريات المتاجر
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = themeColors.surface,
+            contentColor = themeColors.accent,
+            modifier = Modifier.padding(bottom = 8.dp).clip(RoundedCornerShape(10.dp))
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🔴 $newCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
-                    Text("جديدة", fontSize = 9.sp, color = Color.LightGray)
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = {
+                    Text(
+                        "⚡ طلبات الخدمات العاجلة (${myInstantRequests.size})",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selectedTab == 0) themeColors.accent else Color.LightGray
+                    )
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🟡 $inProgressCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
-                    Text("قيد التجهيز", fontSize = 9.sp, color = Color.LightGray)
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = {
+                    Text(
+                        "🛍️ مشتريات المتاجر (${myOrders.size})",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selectedTab == 1) themeColors.accent else Color.LightGray
+                    )
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🟢 $completedCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
-                    Text("مكتملة", fontSize = 9.sp, color = Color.LightGray)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("⚫ $cancelledCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                    Text("ملغية", fontSize = 9.sp, color = Color.LightGray)
-                }
-            }
+            )
         }
 
-        HorizontalDivider(color = themeColors.accent.copy(alpha = 0.15f), thickness = 1.dp, modifier = Modifier.padding(bottom = 6.dp))
-
-        // If the user's phone is empty, prompt them to enter it
+        // If user phone is empty, prompt for phone entry
         if (currentUserPhone.isEmpty()) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -158,7 +168,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                 border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.2f)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                    .padding(bottom = 8.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
@@ -166,27 +176,20 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "🔐 استعراض فوري لطلبات مشترياتك",
+                        text = "🔐 استعراض فوري لطلباتك",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = themeColors.accent,
                         textAlign = TextAlign.Center
                     )
-                    Text(
-                        text = "اكتب رقم هاتفك لعرض وتتبع جميع طلبات الشراء من المتاجر والمطاعم:",
-                        fontSize = 10.sp,
-                        color = Color.LightGray,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 14.sp
-                    )
                     OutlinedTextField(
                         value = customPhoneInput,
                         onValueChange = { customPhoneInput = it },
-                        placeholder = { Text("مثال: 777123456", color = Color.Gray, fontSize = 12.sp) },
+                        placeholder = { Text("أدخل رقم هاتفك لتصفح جميع طلباتك (مثال: 777123456)", color = Color.Gray, fontSize = 11.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "الهاتف", tint = themeColors.accent, modifier = Modifier.size(18.dp)) },
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -202,42 +205,259 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
             }
         }
 
-        if (activePhone.isBlank()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("🛍️", fontSize = 48.sp)
-                    Text("اكتب رقم هاتفك أعلاه لعرض طلباتك", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+        // TAB 0: Instant Service Requests (اطلب خدمتك الآن / المزاد العكسي)
+        if (selectedTab == 0) {
+            if (myInstantRequests.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text("⚡", fontSize = 52.sp)
+                        Text(
+                            text = if (activePhone.isBlank()) "يرجى كتابة رقم هاتفك أعلى الشاشة لعرض طلباتك" else "لا توجد طلبات خدمات عاجلة مسجلة لهذا الرقم",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "يمكنك إطلاق طلب فوري للحصول على عروض أسعار ومزايدات مباشرة من الفنيين والمزودين خلال دقائق",
+                            fontSize = 11.sp,
+                            color = Color.LightGray,
+                            textAlign = TextAlign.Center
+                        )
+                        Button(
+                            onClick = onRequestQuickService,
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.Black),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("⚡ اطلب خدمتك الآن (المزاد العكسي)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 }
-            }
-        } else if (myOrders.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("📭", fontSize = 48.sp)
-                    Text("لا توجد أي طلبات شراء مسجلة لهذا الرقم", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
-                    Text("تأكد من رقم الهاتف أو اطلب سلعاً من المتاجر والمطاعم", fontSize = 11.sp, color = Color.Gray)
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(myInstantRequests) { req ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                            border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.35f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Header: Request code & Status Badge
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = Color(0xFF10B981).copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, Color(0xFF10B981))
+                                    ) {
+                                        Text(
+                                            text = "كود الطلب: ${req.requestCode}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFF10B981),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+
+                                    val statusLabel = when (req.status) {
+                                        "WAITING_FOR_OFFERS" -> "⏳ بانتظار العروض"
+                                        "REVIEWING_OFFERS" -> "👀 جاري مراجعة العروض"
+                                        "IN_PROGRESS" -> "⚙️ جاري التنفيذ"
+                                        "COMPLETED" -> "✅ مكتمل"
+                                        "CANCELLED" -> "❌ ملغي"
+                                        else -> "⏳ بانتظار العروض"
+                                    }
+                                    val statusColor = when (req.status) {
+                                        "COMPLETED" -> Color(0xFF10B981)
+                                        "IN_PROGRESS" -> Color(0xFFF59E0B)
+                                        "CANCELLED" -> Color.Gray
+                                        else -> Color(0xFF00E5FF)
+                                    }
+
+                                    Surface(
+                                        color = statusColor.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = statusLabel,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = req.serviceTitle.ifBlank { "طلب خدمة عاجلة" },
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("📍 ${req.userCity} ${if(req.userNeighborhood.isNotBlank()) "(${req.userNeighborhood})" else ""}", fontSize = 11.sp, color = Color.LightGray)
+                                    Text("⏱️ ${req.urgencyTime}", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
+                                }
+
+                                if (req.secretPin.isNotBlank()) {
+                                    Surface(
+                                        color = Color(0xFF1E293B),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "🔑 الرمز السري (PIN): ${req.secretPin}",
+                                            fontSize = 10.5.sp,
+                                            color = Color(0xFFFDE047),
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+
+                                if (req.description.isNotBlank()) {
+                                    Text(
+                                        text = req.description,
+                                        fontSize = 11.sp,
+                                        color = Color.Gray,
+                                        maxLines = 2
+                                    )
+                                }
+
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 2.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Button(
+                                        onClick = { viewModel.navigateToScreen(AppScreens.INSTANT_REQUESTS_VIEW) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f).height(36.dp)
+                                    ) {
+                                        Text("تصفح العروض والأسعار 📥", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    if (req.status != "COMPLETED" && req.status != "CANCELLED") {
+                                        OutlinedButton(
+                                            onClick = {
+                                                viewModel.cancelInstantRequest(req.id, req.secretPin)
+                                                Toast.makeText(context, "🗑️ تم إلغاء الطلب بنجاح", Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                                            border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.height(36.dp)
+                                        ) {
+                                            Text("إلغاء ❌", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         } else {
-            var orderPageLimit by remember { mutableIntStateOf(20) }
-            val paginatedOrders = remember(myOrders, orderPageLimit) {
-                myOrders.take(orderPageLimit)
+            // TAB 1: Store & Restaurant Orders
+            // ✨ م2: استخدام الـ OrderStatus الموحد بدلاً من السلاسل النصية الخام
+            val newCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.PENDING.code || it.status.isEmpty() } }
+            val inProgressCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.PROCESSING.code } }
+            val completedCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.COMPLETED.code } }
+            val cancelledCount = remember(myOrders) { myOrders.count { it.status == com.example.data.models.OrderStatus.CANCELLED.code } }
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface.copy(alpha = 0.8f)),
+                border = BorderStroke(0.6.dp, themeColors.accent.copy(alpha = 0.2f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🔴 $newCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                        Text("جديدة", fontSize = 9.sp, color = Color.LightGray)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🟡 $inProgressCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                        Text("قيد التجهيز", fontSize = 9.sp, color = Color.LightGray)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🟢 $completedCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        Text("مكتملة", fontSize = 9.sp, color = Color.LightGray)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("⚫ $cancelledCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                        Text("ملغية", fontSize = 9.sp, color = Color.LightGray)
+                    }
+                }
             }
 
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(paginatedOrders) { order ->
+            if (activePhone.isBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("🛍️", fontSize = 48.sp)
+                        Text("اكتب رقم هاتفك أعلاه لعرض طلباتك", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+                    }
+                }
+            } else if (myOrders.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("📭", fontSize = 48.sp)
+                        Text("لا توجد أي طلبات شراء مسجلة لهذا الرقم", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+                        Text("تأكد من رقم الهاتف أو اطلب سلعاً من المتاجر والمطاعم", fontSize = 11.sp, color = Color.Gray)
+                    }
+                }
+            } else {
+                var orderPageLimit by remember { mutableIntStateOf(20) }
+                val paginatedOrders = remember(myOrders, orderPageLimit) {
+                    myOrders.take(orderPageLimit)
+                }
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(paginatedOrders) { order ->
                     val deleteCode = remember(order.id) { 
                         (order.id.hashCode().let { kotlin.math.abs(it) } % 9000 + 1000).toString()
                     }
@@ -520,4 +740,5 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
             }
         }
     }
+}
 }

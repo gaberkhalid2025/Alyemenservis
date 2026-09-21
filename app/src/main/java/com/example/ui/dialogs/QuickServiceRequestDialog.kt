@@ -334,6 +334,7 @@ fun QuickServiceRequestScreen(
                                     }
 
                                     isSubmitting = true
+                                    viewModel.setCurrentUserPhone(cleanP)
 
                                     viewModel.createInstantRequest(
                                         userId = currentUserId.ifBlank { "user_${cleanP}" },
@@ -354,6 +355,7 @@ fun QuickServiceRequestScreen(
                                             if (success) {
                                                 generatedRequestCode = reqCode
                                                 generatedSecretPin = secretPin
+                                                Toast.makeText(context, "🔔 تم إطلاق طلبك العاجل بنجاح برقم ($reqCode)!\nتمت إضافته لشاشة 'طلباتي' وتنبيه الفنيين.", Toast.LENGTH_LONG).show()
                                             } else {
                                                 Toast.makeText(context, "❌ حدث خطأ أثناء إرسال الطلب، يرجى المحاولة ثانية", Toast.LENGTH_SHORT).show()
                                             }

@@ -1142,6 +1142,15 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
                 }
             }
         }
+        try {
+            db.collection("password_recovery_requests").document(cleanPhone).update(
+                mapOf(
+                    "status" to "RESOLVED",
+                    "newPassword" to newPassword,
+                    "resolvedAt" to System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {}
 
         mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = newPassword) else it }
         mainViewModel.adminViewModel._stores.value = mainViewModel.adminViewModel._stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = newPassword) else it }
@@ -1184,42 +1193,81 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
     }
 
 fun requestPasswordRecoveryForStore(name: String, phone: String, password: String) {
-        mainViewModel.setPasswordRecoveryWaitingPhone(phone)
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        mainViewModel.setPasswordRecoveryWaitingPhone(cleanPhone)
+        val reqData = mapOf(
+            "id" to cleanPhone,
+            "phone" to cleanPhone,
+            "name" to name,
+            "accountType" to "STORE",
+            "status" to "PENDING",
+            "requestedAt" to System.currentTimeMillis(),
+            "newPassword" to "",
+            "adminNotes" to ""
+        )
+        try { db.collection("password_recovery_requests").document(cleanPhone).set(reqData) } catch (e: Exception) {}
         val adminNotif = NotificationEntity(
             id = UUID.randomUUID().toString(),
-            title = "🔑 استعادة كلمة مرور متجر",
-            message = "المتجر $name (هاتف: $phone) يطلب استعادة كلمة مروره. كلمة المرور الحالية هي: $password",
+            title = "🔑 استعادة كلمة مرور متجر ($name)",
+            message = "المتجر $name (هاتف: $cleanPhone) يطلب استعادة وتعيين كلمة المرور.",
             targetType = "SUPERVISOR",
             targetValue = "ALL",
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            dedupKey = "PWD_RESET_${cleanPhone}"
         )
         db.collection("notifications").document(adminNotif.id).set(adminNotif)
         mainViewModel.triggerNotification("📨 تم إرسال طلب استعادة كلمة المرور للمشرف بنجاح!")
     }
 
 fun requestPasswordRecoveryForProperty(title: String, phone: String, password: String) {
-        mainViewModel.setPasswordRecoveryWaitingPhone(phone)
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        mainViewModel.setPasswordRecoveryWaitingPhone(cleanPhone)
+        val reqData = mapOf(
+            "id" to cleanPhone,
+            "phone" to cleanPhone,
+            "name" to title,
+            "accountType" to "PROPERTY",
+            "status" to "PENDING",
+            "requestedAt" to System.currentTimeMillis(),
+            "newPassword" to "",
+            "adminNotes" to ""
+        )
+        try { db.collection("password_recovery_requests").document(cleanPhone).set(reqData) } catch (e: Exception) {}
         val adminNotif = NotificationEntity(
             id = UUID.randomUUID().toString(),
-            title = "🔑 استعادة كلمة مرور عقار",
-            message = "العقار $title (هاتف: $phone) يطلب استعادة كلمة مروره. كلمة المرور الحالية هي: $password",
+            title = "🔑 استعادة كلمة مرور عقار ($title)",
+            message = "العقار $title (هاتف: $cleanPhone) يطلب استعادة وتعيين كلمة المرور.",
             targetType = "SUPERVISOR",
             targetValue = "ALL",
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            dedupKey = "PWD_RESET_${cleanPhone}"
         )
         db.collection("notifications").document(adminNotif.id).set(adminNotif)
         mainViewModel.triggerNotification("📨 تم إرسال طلب استعادة كلمة المرور للمشرف بنجاح!")
     }
 
 fun requestPasswordRecoveryGeneral(accountName: String, phone: String, accountType: String, currentPassword: String) {
-        mainViewModel.setPasswordRecoveryWaitingPhone(phone)
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        mainViewModel.setPasswordRecoveryWaitingPhone(cleanPhone)
+        val reqData = mapOf(
+            "id" to cleanPhone,
+            "phone" to cleanPhone,
+            "name" to accountName,
+            "accountType" to accountType,
+            "status" to "PENDING",
+            "requestedAt" to System.currentTimeMillis(),
+            "newPassword" to "",
+            "adminNotes" to ""
+        )
+        try { db.collection("password_recovery_requests").document(cleanPhone).set(reqData) } catch (e: Exception) {}
         val adminNotif = NotificationEntity(
             id = UUID.randomUUID().toString(),
-            title = "🔑 طلب استعادة كلمة مرور ($accountType)",
-            message = "الحساب: $accountName ($accountType) ذو الرقم: $phone يطلب استعادة كلمة المرور الخاصة به. كلمة المرور الحالية في النظام هي: $currentPassword",
+            title = "🔑 طلب استعادة كلمة مرور ($accountName)",
+            message = "الحساب: $accountName ($accountType) ذو الرقم: $cleanPhone يطلب استعادة وتعيين كلمة المرور.",
             targetType = "SUPERVISOR",
             targetValue = "ALL",
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            dedupKey = "PWD_RESET_${cleanPhone}"
         )
         db.collection("notifications").document(adminNotif.id).set(adminNotif)
             .addOnSuccessListener {

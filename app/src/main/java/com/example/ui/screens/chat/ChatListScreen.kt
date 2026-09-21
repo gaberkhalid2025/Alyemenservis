@@ -28,7 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.data.models.ChannelType
 import com.example.data.models.ChatChannel
@@ -41,7 +41,7 @@ fun ChatListScreen(
     currentUserId: String,
     currentUserName: String,
     themeColors: VisualThemePalette,
-    chatListViewModel: ChatListViewModel = viewModel(),
+    chatListViewModel: ChatListViewModel = hiltViewModel(),
     onChannelClick: (ChatChannel) -> Unit,
     onBackClick: () -> Unit,
     onStartSupportChat: (() -> Unit)? = null

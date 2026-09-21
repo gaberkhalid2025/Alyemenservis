@@ -127,7 +127,7 @@ fun MapScreenContent(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Main Map View (OSM Leaflet or Radar Canvas)
+            // Main Map View (Native Offline-First Canvas Map or Radar Canvas)
             if (state.isRadarMode) {
                 RadarRenderer(
                     items = radarPoints,
@@ -145,16 +145,24 @@ fun MapScreenContent(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                RealLeafletMapView(
+                OfflineInteractiveMap(
                     userCoords = Pair(safeUserLat, safeUserLng),
                     nearbyProviders = filteredProviders,
                     nearbyStores = filteredStores,
                     nearbyProperties = filteredProperties,
                     dynamicOffsets = state.dynamicOffsets,
+                    zoomScale = state.zoomScale,
+                    onZoomScaleChange = { state.zoomScale = it },
+                    panOffset = state.panOffset,
+                    onPanOffsetChange = { state.panOffset = it },
+                    selectedEntity = state.selectedEntity,
                     onProviderSelected = { state.selectedEntity = it },
                     onStoreSelected = { state.selectedEntity = it },
                     onPropertySelected = { state.selectedEntity = it },
-                    onSwitchToRadar = { state.isRadarMode = true },
+                    onDeselect = { state.selectedEntity = null },
+                    onSwitchToRadar = { 
+                        state.isRadarMode = true
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -244,8 +252,12 @@ fun MapScreenContent(
                         )
                     }
                 },
-                onZoomIn = { /* Handled natively on map */ },
-                onZoomOut = { /* Handled natively on map */ },
+                onZoomIn = {
+                    state.zoomScale = (state.zoomScale * 1.25f).coerceIn(0.35f, 6.0f)
+                },
+                onZoomOut = {
+                    state.zoomScale = (state.zoomScale / 1.25f).coerceIn(0.35f, 6.0f)
+                },
                 onRecenterLocation = {
                     val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     if (hasFine) {

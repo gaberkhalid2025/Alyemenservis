@@ -33,7 +33,6 @@ import com.example.data.models.ChannelType
 import com.example.data.models.ChatChannel
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
-import com.example.data.repositories.ChatRepository
 import com.example.ui.MainViewModel
 import com.example.ui.viewmodels.InstantRequestViewModel
 import com.example.utils.DateFormatter
@@ -52,7 +51,7 @@ import kotlin.random.Random
 fun OfferSelectionScreen(
     offerId: String,
     viewModel: MainViewModel,
-    instantViewModel: InstantRequestViewModel = viewModel(),
+    instantViewModel: InstantRequestViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
     onNavigateBack: () -> Unit = {},
     onBookingConfirmed: (bookingId: String) -> Unit = {},
     onNavigateToChat: (phone: String, name: String) -> Unit = { _, _ -> },
@@ -60,7 +59,6 @@ fun OfferSelectionScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val chatRepository = remember { ChatRepository(context = context) }
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
@@ -317,7 +315,7 @@ fun OfferSelectionScreen(
                                     val effectiveUserId = currentUserId.ifBlank { currentUserPhone.ifBlank { "client_${System.currentTimeMillis()}" } }
                                     val effectiveUserName = currentUserName.ifBlank { "العميل" }
                                     val targetTechId = curOffer.technicianId.ifBlank { curOffer.technicianPhone }
-                                    val channelResult = chatRepository.getOrCreateChannel(
+                                    val channelResult = instantViewModel.getOrCreateChatChannel(
                                         currentUserId = effectiveUserId,
                                         currentUserName = effectiveUserName,
                                         currentUserPhoto = "",

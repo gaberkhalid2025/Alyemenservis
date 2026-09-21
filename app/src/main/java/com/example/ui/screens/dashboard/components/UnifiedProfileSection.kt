@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -17,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 
 @Composable
 fun UnifiedProfileSection(
@@ -29,8 +32,35 @@ fun UnifiedProfileSection(
     rating: Double = 5.0,
     reviewCount: Int = 0,
     isAvailable: Boolean = true,
-    themeColors: VisualThemePalette
+    themeColors: VisualThemePalette,
+    onChangePhoto: ((String) -> Unit)? = null,
+    onChangeCover: ((String) -> Unit)? = null
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    val profilePhotoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null && onChangePhoto != null) {
+            coroutineScope.launch {
+                val compressed = com.example.utils.compressAndResizeImageUri(context, uri)
+                onChangePhoto(if (compressed.isNotBlank()) compressed else uri.toString())
+            }
+        }
+    }
+
+    val coverPhotoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null && onChangeCover != null) {
+            coroutineScope.launch {
+                val compressed = com.example.utils.compressAndResizeImageUri(context, uri)
+                onChangeCover(if (compressed.isNotBlank()) compressed else uri.toString())
+            }
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -52,6 +82,23 @@ fun UnifiedProfileSection(
                     )
                 }
 
+                if (onChangeCover != null) {
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                    ) {
+                        TextButton(
+                            onClick = { coverPhotoPicker.launch("image/*") },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("تغيير الغلاف 🖼️", fontSize = 10.sp, color = Color.White)
+                        }
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -70,6 +117,21 @@ fun UnifiedProfileSection(
                         )
                     } else {
                         Text(text = "👤", fontSize = 28.sp)
+                    }
+                    if (onChangePhoto != null) {
+                        IconButton(
+                            onClick = { profilePhotoPicker.launch("image/*") },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddAPhoto,
+                                contentDescription = "تغيير الصورة",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }

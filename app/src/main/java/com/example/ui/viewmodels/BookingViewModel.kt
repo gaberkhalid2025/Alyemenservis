@@ -685,4 +685,13 @@ open class BookingViewModel @Inject constructor(
         }
     }
 
+    fun updateBookingRelatedChatChannel(bookingId: String, channelId: String) {
+        if (bookingId.isBlank() || channelId.isBlank()) return
+        viewModelScope.launch {
+            try {
+                db.collection("bookings").document(bookingId).update("relatedChatChannelId", channelId)
+            } catch (_: Exception) {}
+        }
+    }
+
 }

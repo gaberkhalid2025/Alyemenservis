@@ -92,3 +92,7 @@ fun MainViewModel.attemptCancelBookingImpl(
 ) {
     bookingViewModel.attemptCancelBookingImpl(bookingId, input, reason, cancelledByParam, onResult)
 }
+
+fun MainViewModel.updateBookingRelatedChatChannel(bookingId: String, channelId: String) {
+    bookingViewModel.updateBookingRelatedChatChannel(bookingId, channelId)
+}
