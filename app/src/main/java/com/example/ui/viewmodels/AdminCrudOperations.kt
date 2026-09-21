@@ -17,6 +17,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
             db.collection(collection).document(id).set(data).await()
             onSuccess()
         } catch (e: Exception) {
+            com.example.utils.AppErrorLogManager.logFirestoreError("AdminCrudOperations", "Error saving entity in $collection/$id", e)
             onError(e)
         }
     }
@@ -38,6 +39,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
             }
             onSuccess()
         } catch (e: Exception) {
+            com.example.utils.AppErrorLogManager.logFirestoreError("AdminCrudOperations", "Error deleting entity in $collection/$id (softDelete=$softDelete)", e)
             onError(e)
         }
     }
@@ -54,6 +56,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
             db.collection(collection).document(id).update(field, value).await()
             onSuccess()
         } catch (e: Exception) {
+            com.example.utils.AppErrorLogManager.logFirestoreError("AdminCrudOperations", "Error toggling $field in $collection/$id", e)
             onError(e)
         }
     }
@@ -69,6 +72,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
             db.collection(collection).document(id).update(fields).await()
             onSuccess()
         } catch (e: Exception) {
+            com.example.utils.AppErrorLogManager.logFirestoreError("AdminCrudOperations", "Error updating fields in $collection/$id", e)
             onError(e)
         }
     }

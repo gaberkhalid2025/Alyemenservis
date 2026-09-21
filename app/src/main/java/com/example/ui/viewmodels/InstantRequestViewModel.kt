@@ -134,8 +134,9 @@ class InstantRequestViewModel @Inject constructor(
             }
 
         offersListener?.remove()
-        offersListener = firestore.collection("instant_offers")
-            .whereEqualTo("requestId", requestId)
+        offersListener = firestore.collection("instant_requests")
+            .document(requestId)
+            .collection("offers")
             .limit(50)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -464,13 +465,18 @@ class InstantRequestViewModel @Inject constructor(
         if (offerId.isBlank()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                var fetchedOffer: RequestOfferEntity? = null
-                var fetchedReq: InstantRequestEntity? = null
-                val offerSnap = firestore.collection("instant_offers").document(offerId).get().await()
-                if (offerSnap.exists()) {
-                    fetchedOffer = offerSnap.toObject(RequestOfferEntity::class.java)?.copy(id = offerSnap.id)
+                var fetchedOffer: RequestOfferEntity? = _requestOffers.value.find { it.id == offerId }
+                var fetchedReq: InstantRequestEntity? = _selectedRequest.value
+
+                if (fetchedOffer == null) {
+                    val groupSnap = firestore.collectionGroup("offers").whereEqualTo("id", offerId).limit(1).get().await()
+                    if (!groupSnap.isEmpty) {
+                        val doc = groupSnap.documents.first()
+                        fetchedOffer = doc.toObject(RequestOfferEntity::class.java)?.copy(id = doc.id)
+                    }
                 }
-                if (fetchedOffer != null) {
+
+                if (fetchedOffer != null && (fetchedReq == null || fetchedReq.id != fetchedOffer.requestId)) {
                     val reqSnap = firestore.collection("instant_requests").document(fetchedOffer.requestId).get().await()
                     if (reqSnap.exists()) {
                         fetchedReq = reqSnap.toObject(InstantRequestEntity::class.java)?.copy(id = reqSnap.id)
@@ -499,7 +505,8 @@ class InstantRequestViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 firestore.collection("bookings").document(booking.id).set(booking).await()
-                firestore.collection("instant_offers").document(curOffer.id).update("status", "ACCEPTED").await()
+                firestore.collection("instant_requests").document(curReq.id)
+                    .collection("offers").document(curOffer.id).update("status", "ACCEPTED").await()
                 firestore.collection("instant_requests").document(curReq.id).update(
                     mapOf(
                         "status" to "COMPLETED",
@@ -507,9 +514,10 @@ class InstantRequestViewModel @Inject constructor(
                     )
                 ).await()
 
-                val notifId = UUID.randomUUID().toString()
-                val notif = NotificationEntity(
-                    id = notifId,
+                // Triple notification: PROVIDER, USER, ADMIN_ONLY
+                val provNotifId = UUID.randomUUID().toString()
+                val provNotif = NotificationEntity(
+                    id = provNotifId,
                     title = "🎉 تم اختيار عرضك وتأكيد الحجز!",
                     message = "تم قبول عرضك لطلب ${curReq.requestCode} بمبلغ ${curOffer.price} ر.ي. رقم الحجز: ${booking.bookingNumber}",
                     customerPhone = curOffer.technicianPhone,
@@ -518,7 +526,33 @@ class InstantRequestViewModel @Inject constructor(
                     notificationType = "OFFER_ACCEPTED",
                     timestamp = System.currentTimeMillis()
                 )
-                firestore.collection("notifications").document(notifId).set(notif).await()
+                firestore.collection("notifications").document(provNotifId).set(provNotif).await()
+
+                if (curReq.userPhone.isNotBlank()) {
+                    val userNotifId = UUID.randomUUID().toString()
+                    val userNotif = NotificationEntity(
+                        id = userNotifId,
+                        title = "🎉 تأكيد حجز العرض للطلب ${curReq.requestCode}",
+                        message = "تم تأكيد اختيار عرض الفني ${curOffer.technicianName} بنجاح. رقم الحجز: ${booking.bookingNumber}",
+                        customerPhone = curReq.userPhone,
+                        targetType = "USER",
+                        targetValue = curReq.userPhone,
+                        notificationType = "BOOKING_CONFIRMED",
+                        timestamp = System.currentTimeMillis()
+                    )
+                    firestore.collection("notifications").document(userNotifId).set(userNotif).await()
+                }
+
+                val adminNotifId = UUID.randomUUID().toString()
+                val adminNotif = NotificationEntity(
+                    id = adminNotifId,
+                    title = "📢 تأكيد حجز طلب عاجل",
+                    message = "تم تأكيد حجز الطلب ${curReq.requestCode} للعميل ${curReq.userName} مع الفني ${curOffer.technicianName} بمبلغ ${curOffer.price} ر.ي",
+                    targetType = "ADMIN_ONLY",
+                    targetValue = "ALL",
+                    timestamp = System.currentTimeMillis()
+                )
+                firestore.collection("notifications").document(adminNotifId).set(adminNotif).await()
 
                 withContext(Dispatchers.Main) {
                     onSuccess()

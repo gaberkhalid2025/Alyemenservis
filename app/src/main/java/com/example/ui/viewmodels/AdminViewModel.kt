@@ -2011,7 +2011,13 @@ fun createPayment(
         method: String,
         bookingId: String = "",
         isLinkedToBooking: Boolean = false,
-        bookingServiceType: String = ""
+        bookingServiceType: String = "",
+        walletProvider: String = "",
+        walletNumber: String = "",
+        walletAccountName: String = "",
+        transferId: String = "",
+        transferPhoto: String = "",
+        status: String = "PENDING"
     ) {
         val docRef = db.collection("payments").document()
         
@@ -2041,13 +2047,18 @@ fun createPayment(
             bookingId = bookingId,
             type = "service",
             method = method,
-            status = "PENDING",
+            status = status,
             amount = amount,
             advanceAmount = advanceAmount,
             remainingAmount = remainingAmount,
             commission = commission,
             providerShare = providerShare,
             currency = "YER",
+            walletProvider = walletProvider,
+            walletNumber = walletNumber,
+            walletAccountName = walletAccountName,
+            transferId = transferId,
+            transferPhoto = transferPhoto,
             isLinkedToBooking = isLinkedToBooking,
             bookingDate = if (isLinkedToBooking) System.currentTimeMillis() else null,
             bookingServiceType = bookingServiceType,

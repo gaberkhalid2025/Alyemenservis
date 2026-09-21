@@ -53,8 +53,9 @@ object MapJsonBuilder {
 
             val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
             if (isApproximate) {
-                rawLat = safeUserLat + ((idx % 5) * 0.003 - 0.006)
-                rawLng = safeUserLng + (((idx / 5) % 5) * 0.003 - 0.006)
+                val cityBase = com.example.utils.getAreaCoords(p.area.ifBlank { p.cityId.ifBlank { "صنعاء" } })
+                rawLat = cityBase.first + ((idx % 7) * 0.002 - 0.006)
+                rawLng = cityBase.second + (((idx / 7) % 7) * 0.002 - 0.006)
             }
 
             val categoryEmoji = when {
@@ -107,8 +108,9 @@ object MapJsonBuilder {
             var rawLng = coords.second
             val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
             if (isApproximate) {
-                rawLat = safeUserLat + (((idx + 2) % 6) * 0.0035 - 0.007)
-                rawLng = safeUserLng + ((((idx + 2) / 6) % 6) * 0.0035 - 0.007)
+                val cityBase = com.example.utils.getAreaCoords(s.localNeighborhood.ifBlank { s.cityId.ifBlank { "صنعاء" } })
+                rawLat = cityBase.first + (((idx + 2) % 7) * 0.002 - 0.006)
+                rawLng = cityBase.second + ((((idx + 2) / 7) % 7) * 0.002 - 0.006)
             }
 
             val (badgeColor, categoryLabel) = when {
@@ -144,8 +146,9 @@ object MapJsonBuilder {
             var rawLng = coords.second
             val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
             if (isApproximate) {
-                rawLat = safeUserLat + (((idx + 4) % 5) * 0.004 - 0.008)
-                rawLng = safeUserLng + ((((idx + 4) / 5) % 5) * 0.004 - 0.008)
+                val cityBase = com.example.utils.getAreaCoords(pr.localNeighborhood.ifBlank { pr.cityId.ifBlank { "صنعاء" } })
+                rawLat = cityBase.first + (((idx + 4) % 7) * 0.002 - 0.006)
+                rawLng = cityBase.second + ((((idx + 4) / 7) % 7) * 0.002 - 0.006)
             }
 
             val priceFormatted = if (pr.price > 0) "${pr.price} ${pr.currency.ifEmpty { "ريال" }}" else "حسب الاتفاق"

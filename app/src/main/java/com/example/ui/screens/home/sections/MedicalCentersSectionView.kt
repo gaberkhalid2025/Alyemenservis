@@ -137,8 +137,18 @@ fun MedicalCentersSectionView(
                             color = Color(0xFF1E293B),
                             modifier = Modifier.size(44.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🩺", fontSize = 22.sp)
+                            val logoUrl = store.logoImage.ifBlank { store.coverImage }
+                            if (logoUrl.isNotBlank()) {
+                                coil.compose.AsyncImage(
+                                    model = logoUrl,
+                                    contentDescription = store.name,
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Text("🩺", fontSize = 22.sp)
+                                }
                             }
                         }
                         Column(modifier = Modifier.weight(1f)) {

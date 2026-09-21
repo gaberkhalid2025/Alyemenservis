@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.ui.components.AdminCustomBannerView
@@ -25,7 +26,7 @@ import com.example.utils.VisualThemePalette
 
 import com.example.data.repositories.*
 import com.example.StoreCreateEditDialog
-import com.example.ui.screens.dashboard.ServicesBrowserViewModel
+import com.example.ui.screens.dashboard.viewmodels.ServicesBrowserViewModel
 import com.example.ui.screens.home.sections.*
 
 /**
@@ -45,11 +46,7 @@ fun ServicesBrowserLayout(
     val context = LocalContext.current
     val appContext = context.applicationContext
 
-    val browserViewModel = remember(appContext) {
-        ServicesBrowserViewModel(
-            productsRepository = ProductsRepositoryImpl(appContext)
-        )
-    }
+    val browserViewModel: ServicesBrowserViewModel = hiltViewModel()
 
     val browserUiState by browserViewModel.uiState.collectAsState()
     val categories by viewModel.categories.collectAsState()
@@ -118,19 +115,29 @@ fun ServicesBrowserLayout(
             // 3. Search Bar
             item {
                 val isFilterActive = phoneOrNameFilter.isNotEmpty() || neighborFilter.isNotEmpty() || isVipOnly || isAvailableOnly
-                ServicesSearchBar(
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { viewModel.updateSearchQuery(it) },
-                    isFilterActive = isFilterActive,
-                    onFilterClick = { showFiltersPanel = true },
-                    isSpeechSearchEnabled = settingsState.isSpeechSearchEnabled,
-                    onVoiceClick = {
-                        com.example.VoiceManager.onHear?.invoke { heardText ->
-                            viewModel.updateSearchQuery(heardText)
-                        }
-                    },
-                    themeColors = themeColors
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.navigateToScreen(AppScreens.UNIFIED_SEARCH) }
+                ) {
+                    ServicesSearchBar(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { 
+                            viewModel.updateSearchQuery(it)
+                            viewModel.navigateToScreen(AppScreens.UNIFIED_SEARCH)
+                        },
+                        isFilterActive = isFilterActive,
+                        onFilterClick = { showFiltersPanel = true },
+                        isSpeechSearchEnabled = settingsState.isSpeechSearchEnabled,
+                        onVoiceClick = {
+                            com.example.VoiceManager.onHear?.invoke { heardText ->
+                                viewModel.updateSearchQuery(heardText)
+                                viewModel.navigateToScreen(AppScreens.UNIFIED_SEARCH)
+                            }
+                        },
+                        themeColors = themeColors
+                    )
+                }
             }
         }
 

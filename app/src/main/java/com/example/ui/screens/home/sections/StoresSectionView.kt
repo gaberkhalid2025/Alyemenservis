@@ -140,8 +140,18 @@ fun StoresSectionView(
                             border = BorderStroke(0.5.dp, themeColors.accent.copy(alpha = 0.5f)),
                             modifier = Modifier.size(52.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🛍️", fontSize = 24.sp)
+                            val logoUrl = store.logoImage.ifBlank { store.coverImage }
+                            if (logoUrl.isNotBlank()) {
+                                coil.compose.AsyncImage(
+                                    model = logoUrl,
+                                    contentDescription = store.name,
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Text("🛍️", fontSize = 24.sp)
+                                }
                             }
                         }
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

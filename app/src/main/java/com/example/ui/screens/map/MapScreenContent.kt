@@ -127,7 +127,7 @@ fun MapScreenContent(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Main Map View (Native Offline-First Canvas Map or Radar Canvas)
+            // Main Map View (Real Leaflet / OpenStreetMap or Radar Canvas)
             if (state.isRadarMode) {
                 RadarRenderer(
                     items = radarPoints,
@@ -145,21 +145,15 @@ fun MapScreenContent(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                OfflineInteractiveMap(
+                RealLeafletMapView(
                     userCoords = Pair(safeUserLat, safeUserLng),
                     nearbyProviders = filteredProviders,
                     nearbyStores = filteredStores,
                     nearbyProperties = filteredProperties,
                     dynamicOffsets = state.dynamicOffsets,
-                    zoomScale = state.zoomScale,
-                    onZoomScaleChange = { state.zoomScale = it },
-                    panOffset = state.panOffset,
-                    onPanOffsetChange = { state.panOffset = it },
-                    selectedEntity = state.selectedEntity,
                     onProviderSelected = { state.selectedEntity = it },
                     onStoreSelected = { state.selectedEntity = it },
                     onPropertySelected = { state.selectedEntity = it },
-                    onDeselect = { state.selectedEntity = null },
                     onSwitchToRadar = { 
                         state.isRadarMode = true
                     },

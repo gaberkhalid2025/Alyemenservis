@@ -15,6 +15,19 @@ import kotlinx.coroutines.tasks.await
  */
 class RealtimeSyncHelper(private val db: FirebaseFirestore) {
 
+    companion object {
+        /**
+         * Real-time listeners limit (default 50). Configurable to avoid excessive bandwidth/reads
+         * while keeping active entities responsive. For full catalogs, pagination is used.
+         */
+        var REALTIME_QUERY_LIMIT: Long = 50L
+
+        /**
+         * Default on-demand query limit for paginated data loading.
+         */
+        var ON_DEMAND_FETCH_LIMIT: Long = 50L
+    }
+
     val firestoreListeners = java.util.concurrent.CopyOnWriteArrayList<ListenerRegistration>()
 
     private fun Query.addSnapshotListenerReg(listener: EventListener<QuerySnapshot>): ListenerRegistration? {
@@ -125,8 +138,8 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 4. Providers (limit 20) (Listener 4)
-        db.collection("providers").limit(20).addSnapshotListenerReg { snapshot, error ->
+        // 4. Providers (Realtime limit with pagination support) (Listener 4)
+        db.collection("providers").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
             appState._isProvidersLoading.value = false
             if (error != null) {
                 error.printStackTrace()
@@ -184,8 +197,8 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 5. Stores (limit 20) (Listener 5)
-        db.collection("stores").limit(20).addSnapshotListenerReg { snapshot, error ->
+        // 5. Stores (Realtime limit with pagination support) (Listener 5)
+        db.collection("stores").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -253,8 +266,8 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 6. Properties (limit 20) (Listener 6)
-        db.collection("properties").limit(20).addSnapshotListenerReg { snapshot, error ->
+        // 6. Properties (Realtime limit with pagination support) (Listener 6)
+        db.collection("properties").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
             if (error == null && snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
@@ -318,8 +331,8 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 7. Notifications (limit 20) (Listener 7)
-        db.collection("notifications").orderBy("timestamp", Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
+        // 7. Notifications (Realtime limit with pagination support) (Listener 7)
+        db.collection("notifications").orderBy("timestamp", Query.Direction.DESCENDING).limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
             if (error != null) {
                 error.printStackTrace()
                 return@addSnapshotListenerReg
@@ -343,8 +356,8 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             }
         }
 
-        // 8. Chat Channels (limit 20) (Listener 8)
-        db.collection("chat_channels").orderBy("timestamp", Query.Direction.DESCENDING).limit(20).addSnapshotListenerReg { snapshot, error ->
+        // 8. Chat Channels (Realtime limit with pagination support) (Listener 8)
+        db.collection("chat_channels").orderBy("timestamp", Query.Direction.DESCENDING).limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
             appState._isChatChannelsLoading.value = false
             if (error != null) {
                 error.printStackTrace()
@@ -382,16 +395,16 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                 }
             }
 
-            appState._banners.value = loadBanners(20)
+            appState._banners.value = loadBanners(ON_DEMAND_FETCH_LIMIT)
             appState._customProfileTabs.value = loadCustomProfileTabs()
             appState._colorPalettes.value = loadColorThemes()
-            appState._products.value = loadProducts(20)
+            appState._products.value = loadProducts(ON_DEMAND_FETCH_LIMIT)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    suspend fun loadRegisteredUsers(limit: Long = 50): List<Map<String, Any>> {
+    suspend fun loadRegisteredUsers(limit: Long = ON_DEMAND_FETCH_LIMIT): List<Map<String, Any>> {
         return try {
             db.collection("registered_users")
                 .limit(limit)
@@ -408,7 +421,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadInternalWallets(limit: Long = 50): List<InternalWalletEntity> {
+    suspend fun loadInternalWallets(limit: Long = ON_DEMAND_FETCH_LIMIT): List<InternalWalletEntity> {
         return try {
             db.collection("internal_wallets")
                 .limit(limit)
@@ -421,7 +434,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadWalletTransactions(limit: Long = 50): List<WalletTransactionEntity> {
+    suspend fun loadWalletTransactions(limit: Long = ON_DEMAND_FETCH_LIMIT): List<WalletTransactionEntity> {
         return try {
             db.collection("wallet_transactions")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -435,7 +448,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadBanners(limit: Long = 20): List<BannerEntity> {
+    suspend fun loadBanners(limit: Long = ON_DEMAND_FETCH_LIMIT): List<BannerEntity> {
         return try {
             db.collection("banners")
                 .limit(limit)
@@ -454,7 +467,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadPendingProviders(limit: Long = 20): List<PendingProviderEntity> {
+    suspend fun loadPendingProviders(limit: Long = ON_DEMAND_FETCH_LIMIT): List<PendingProviderEntity> {
         return try {
             db.collection("pending_providers")
                 .limit(limit)
@@ -474,7 +487,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadBookings(limit: Long = 20): List<BookingEntity> {
+    suspend fun loadBookings(limit: Long = ON_DEMAND_FETCH_LIMIT): List<BookingEntity> {
         return try {
             db.collection("bookings")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -488,7 +501,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadReports(limit: Long = 20): List<ReportEntity> {
+    suspend fun loadReports(limit: Long = ON_DEMAND_FETCH_LIMIT): List<ReportEntity> {
         return try {
             db.collection("reports")
                 .limit(limit)
@@ -501,7 +514,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadSupervisors(limit: Long = 20): List<SupervisorEntity> {
+    suspend fun loadSupervisors(limit: Long = ON_DEMAND_FETCH_LIMIT): List<SupervisorEntity> {
         return try {
             db.collection("supervisors")
                 .limit(limit)
@@ -539,7 +552,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadJobs(limit: Long = 20): List<JobEntity> {
+    suspend fun loadJobs(limit: Long = ON_DEMAND_FETCH_LIMIT): List<JobEntity> {
         return try {
             db.collection("jobs")
                 .limit(limit)
@@ -564,7 +577,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadJobApplications(limit: Long = 20): List<JobApplicationEntity> {
+    suspend fun loadJobApplications(limit: Long = ON_DEMAND_FETCH_LIMIT): List<JobApplicationEntity> {
         return try {
             db.collection("job_applications")
                 .limit(limit)
@@ -577,7 +590,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadRatings(limit: Long = 20): List<RatingEntity> {
+    suspend fun loadRatings(limit: Long = ON_DEMAND_FETCH_LIMIT): List<RatingEntity> {
         return try {
             db.collection("ratings")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -591,7 +604,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadOrders(limit: Long = 20): List<OrderEntity> {
+    suspend fun loadOrders(limit: Long = ON_DEMAND_FETCH_LIMIT): List<OrderEntity> {
         return try {
             db.collection("orders")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -605,7 +618,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadOffers(limit: Long = 50): List<Offer> {
+    suspend fun loadOffers(limit: Long = ON_DEMAND_FETCH_LIMIT): List<Offer> {
         return try {
             db.collection("offers")
                 .limit(limit)
@@ -625,7 +638,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadRequestOffers(limit: Long = 20): List<RequestOfferEntity> {
+    suspend fun loadRequestOffers(limit: Long = ON_DEMAND_FETCH_LIMIT): List<RequestOfferEntity> {
         return try {
             db.collection("request_offers")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -639,7 +652,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadInstantRequests(limit: Long = 20): List<InstantRequestEntity> {
+    suspend fun loadInstantRequests(limit: Long = ON_DEMAND_FETCH_LIMIT): List<InstantRequestEntity> {
         return try {
             val docs = db.collection("instant_requests")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -659,7 +672,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadPayments(limit: Long = 20): List<PaymentEntity> {
+    suspend fun loadPayments(limit: Long = ON_DEMAND_FETCH_LIMIT): List<PaymentEntity> {
         return try {
             db.collection("payments")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -673,7 +686,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadPaymentWallets(limit: Long = 20): List<PaymentWalletEntity> {
+    suspend fun loadPaymentWallets(limit: Long = ON_DEMAND_FETCH_LIMIT): List<PaymentWalletEntity> {
         return try {
             db.collection("payment_wallets")
                 .limit(limit)
@@ -687,7 +700,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadCoupons(limit: Long = 20): List<CouponEntity> {
+    suspend fun loadCoupons(limit: Long = ON_DEMAND_FETCH_LIMIT): List<CouponEntity> {
         return try {
             db.collection("coupons")
                 .limit(limit)
@@ -700,7 +713,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadCalls(limit: Long = 20): List<CallEntity> {
+    suspend fun loadCalls(limit: Long = ON_DEMAND_FETCH_LIMIT): List<CallEntity> {
         return try {
             db.collection("calls")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -715,7 +728,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadProducts(limit: Long = 20): List<ProductEntity> {
+    suspend fun loadProducts(limit: Long = ON_DEMAND_FETCH_LIMIT): List<ProductEntity> {
         return try {
             db.collection("products")
                 .limit(limit)
@@ -738,7 +751,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadActivityLogs(limit: Long = 20): List<ActivityLogEntity> {
+    suspend fun loadActivityLogs(limit: Long = ON_DEMAND_FETCH_LIMIT): List<ActivityLogEntity> {
         return try {
             db.collection("activity_logs")
                 .orderBy("timestamp", Query.Direction.DESCENDING)

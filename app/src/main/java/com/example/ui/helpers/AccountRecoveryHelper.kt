@@ -83,7 +83,7 @@ class AccountRecoveryHelper(
         triggerNotification: (String) -> Unit,
         onResult: (Boolean) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "")
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val reqData = mapOf(
             "id" to cleanPhone,
@@ -100,7 +100,7 @@ class AccountRecoveryHelper(
             onPasswordWaitingPhoneSet(cleanPhone)
             preferenceHelper.setPasswordRecoveryWaitingPhone(context, cleanPhone)
             val adminNotif = NotificationEntity(
-                id = UUID.randomUUID().toString(),
+                id = "PWD_NOTIF_$cleanPhone",
                 title = "🔑 طلب استعادة كلمة مرور ($name)",
                 message = "قدم $name ($accountType) ذو الرقم $cleanPhone طلباً لاستعادة وتعيين كلمة المرور.",
                 targetType = "SUPERVISOR",
@@ -109,6 +109,16 @@ class AccountRecoveryHelper(
                 dedupKey = "PWD_RESET_${cleanPhone}"
             )
             try { db.collection("notifications").document(adminNotif.id).set(adminNotif) } catch (e: Exception) {}
+            
+            // Log in activity_logs
+            val logId = db.collection("activity_logs").document().id
+            val log = com.example.data.ActivityLogEntity(
+                id = logId,
+                action = "🔑 طلب استعادة كلمة مرور للحساب: $name ($cleanPhone - $accountType)",
+                timestamp = System.currentTimeMillis()
+            )
+            db.collection("activity_logs").document(logId).set(log)
+
             triggerNotification("🔑 طلب استعادة كلمة مرور جديد من: $name ($cleanPhone)")
             onResult(true)
         }.addOnFailureListener {
@@ -122,46 +132,59 @@ class AccountRecoveryHelper(
         newPassword: String,
         onResult: (Boolean) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "")
+        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        val hashedPassword = com.example.utils.PasswordHasher.hash(newPassword.trim())
         val updates = mapOf(
             "status" to "RESOLVED",
-            "newPassword" to newPassword,
+            "newPassword" to hashedPassword,
             "resolvedAt" to System.currentTimeMillis()
         )
         db.collection("password_recovery_requests").document(cleanPhone).update(updates).addOnSuccessListener {
             db.collection("password_resets").document(cleanPhone).update(
                 mapOf(
                     "status" to "APPROVED",
-                    "newPassword" to newPassword,
-                    "tempPassword" to newPassword
+                    "newPassword" to hashedPassword,
+                    "tempPassword" to hashedPassword
                 )
             )
-            db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("properties").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("registered_users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            db.collection("join_requests").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snaps ->
-                for (doc in snaps.documents) { doc.reference.update("password", newPassword) }
-            }
-            val notif = mapOf(
-                "id" to "notif_pwd_${System.currentTimeMillis()}",
-                "title" to "🔑 تم إعادة تعيين كلمة المرور",
-                "message" to "تم إعادة تعيين كلمة مرور حسابك. يرجى التواصل مع الدعم لاستلام كلمة المرور الجديدة",
-                "targetPhone" to cleanPhone,
-                "timestamp" to System.currentTimeMillis()
+            val passUpdate = mapOf(
+                "password" to hashedPassword,
+                "passwordHash" to hashedPassword
             )
-            db.collection("notifications").add(notif)
+            val phoneQueries = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone").distinct()
+            val collections = listOf("providers", "stores", "properties", "users", "registered_users", "join_requests")
+            
+            for (col in collections) {
+                for (ph in phoneQueries) {
+                    db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { snaps ->
+                        for (doc in snaps.documents) {
+                            doc.reference.update(passUpdate)
+                        }
+                    }
+                }
+            }
+
+            // Log sensitive admin operation in activity_logs
+            val logId = db.collection("activity_logs").document().id
+            val log = com.example.data.ActivityLogEntity(
+                id = logId,
+                action = "🔑 إعادة تعيين كلمة المرور برقم الهاتف: $cleanPhone بواسطة الإدارة",
+                timestamp = System.currentTimeMillis()
+            )
+            db.collection("activity_logs").document(logId).set(log)
+
+            val notifId = "PWD_RESOLVE_$cleanPhone"
+            val notif = mapOf(
+                "id" to notifId,
+                "title" to "🔑 تم إعادة تعيين كلمة المرور",
+                "message" to "تم إعادة تعيين كلمة مرور حسابك بنجاح من قبل الإدارة.",
+                "targetPhone" to cleanPhone,
+                "targetType" to "USER",
+                "targetValue" to cleanPhone,
+                "timestamp" to System.currentTimeMillis(),
+                "dedupKey" to "PWD_RESOLVE_$cleanPhone"
+            )
+            db.collection("notifications").document(notifId).set(notif)
             onResult(true)
         }.addOnFailureListener {
             onResult(false)

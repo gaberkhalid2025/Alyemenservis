@@ -1,7 +1,12 @@
 package com.example.ui.screens.home
 
 import android.content.Context
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import com.example.ui.*
+import com.example.ui.components.SmartAsyncImage
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -41,6 +46,25 @@ fun ServicesBrowserPaymentDialog(
     var transferNumber by remember { mutableStateOf("") }
     var senderName by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
+    var transferPhotoBase64 by remember { mutableStateOf("") }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            if (uri != null) {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val bytes = inputStream?.readBytes()
+                    if (bytes != null) {
+                        transferPhotoBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        Toast.makeText(context, "📸 تم إرفاق صورة الإشعار بنجاح!", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "❌ فشل تحميل الصورة: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    )
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -170,6 +194,44 @@ fun ServicesBrowserPaymentDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // Proof of transfer upload
+                Button(
+                    onClick = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (transferPhotoBase64.isBlank()) "📸 إرفاق صورة إشعار التحويل (اختياري)" else "🔄 تغيير صورة إشعار التحويل",
+                        fontSize = 11.sp,
+                        color = themeColors.accent,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (transferPhotoBase64.isNotBlank()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            SmartAsyncImage(
+                                model = transferPhotoBase64,
+                                contentDescription = "صورة الإشعار المرفقة",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+
                 // Submit Button
                 Button(
                     onClick = {
@@ -186,7 +248,13 @@ fun ServicesBrowserPaymentDialog(
                             method = "mobileWallet",
                             bookingId = booking.id,
                             isLinkedToBooking = true,
-                            bookingServiceType = booking.serviceType
+                            bookingServiceType = booking.serviceType,
+                            walletProvider = selectedWallet?.accountName ?: "محفظة جوال",
+                            walletNumber = selectedWallet?.walletNumber ?: "",
+                            walletAccountName = senderName,
+                            transferId = transferNumber,
+                            transferPhoto = transferPhotoBase64,
+                            status = "PROCESSING"
                         )
                         isSubmitting = false
                         Toast.makeText(context, "✅ تم إرسال إشعار السداد بنجاح وهو قيد التأكيد!", Toast.LENGTH_LONG).show()

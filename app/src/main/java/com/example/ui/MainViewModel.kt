@@ -262,21 +262,44 @@ class MainViewModel @Inject constructor(
     private fun checkAndTriggerFavoriteOffersNotifications() {
     }
     fun updateUserLocation(lat: Double, lng: Double) {
-        _userLatitude.value = lat
-        _userLongitude.value = lng
+        if (lat != 0.0 && lng != 0.0 && !lat.isNaN() && !lng.isNaN()) {
+            _userLatitude.value = lat
+            _userLongitude.value = lng
+            homeViewModel.updateUserLocation(lat, lng)
+        }
     }
     fun startLocationUpdates() {
         _isGpsTrackingActive.value = true
         appContext?.let { ctx ->
             try {
                 val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
-                val loc = lm?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
-                    ?: lm?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
-                loc?.let {
-                    updateUserLocation(it.latitude, it.longitude)
+                if (lm != null) {
+                    val gpsLoc = try { lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER) } catch (e: SecurityException) { null }
+                    val netLoc = try { lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER) } catch (e: SecurityException) { null }
+                    val passLoc = try { lm.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER) } catch (e: SecurityException) { null }
+                    
+                    val bestLoc = listOfNotNull(gpsLoc, netLoc, passLoc).maxByOrNull { it.time }
+                    bestLoc?.let {
+                        updateUserLocation(it.latitude, it.longitude)
+                    }
+
+                    val listener = object : android.location.LocationListener {
+                        override fun onLocationChanged(location: android.location.Location) {
+                            updateUserLocation(location.latitude, location.longitude)
+                        }
+                        override fun onProviderEnabled(provider: String) {}
+                        override fun onProviderDisabled(provider: String) {}
+                    }
+
+                    if (lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                        lm.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER, 5000L, 5f, listener)
+                    }
+                    if (lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                        lm.requestLocationUpdates(android.location.LocationManager.NETWORK_PROVIDER, 5000L, 5f, listener)
+                    }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Error: ", e)
+                android.util.Log.e("MainViewModel", "Error in startLocationUpdates: ", e)
             }
         }
     }
@@ -388,12 +411,12 @@ class MainViewModel @Inject constructor(
         instantRequestViewModel.getOrCreateChatChannel = { providerId, providerName, customerPhone, customerName ->
             openOrCreateChatChannel(
                 targetId = providerId,
-                targetType = "INSTANT_REQUEST",
+                targetType = "URGENT_REQUEST",
                 targetName = providerName,
                 targetPhone = customerPhone,
                 targetCategory = "",
                 relatedEntityId = "",
-                relatedEntityType = "INSTANT_REQUEST",
+                relatedEntityType = "URGENT_REQUEST",
                 onCreated = { }
             )
         }
@@ -516,55 +539,18 @@ class MainViewModel @Inject constructor(
         phone: String,
         onUpdate: (status: String, newPassword: String, accountName: String, accountType: String) -> Unit
     ): com.google.firebase.firestore.ListenerRegistration? {
-        if (phone.isBlank()) return null
-        return try {
-            db.collection("password_recovery_requests")
-                .document(phone)
-                .addSnapshotListener { snapshot, _ ->
-                    if (snapshot != null && snapshot.exists()) {
-                        val status = snapshot.getString("status") ?: "PENDING"
-                        val newPassword = snapshot.getString("newPassword") ?: ""
-                        val accountName = snapshot.getString("name") ?: "صاحب الحساب"
-                        val accountType = snapshot.getString("accountType") ?: "حساب معتمد"
-                        onUpdate(status, newPassword, accountName, accountType)
-                    }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+        return authViewModel.observePasswordRecoveryStatus(phone, onUpdate)
     }
 
     /**
      * 🔑 إرسال طلب استعادة كلمة مرور
-     * يُخزّن الطلب في Firestore ويُنبّه الأدمن تلقائياً
+     * تفويض إلى AuthViewModel لمنع كتابة Firestore من MainViewModel كمنطق UI
      */
     fun requestPasswordRecovery(
         phone: String,
         name: String,
         accountType: String
     ) {
-        viewModelScope.launch {
-            try {
-                val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
-                val requestData = mapOf(
-                    "phone" to cleanPhone,
-                    "name" to name,
-                    "accountType" to accountType,
-                    "status" to "PENDING",
-                    "requestedAt" to System.currentTimeMillis(),
-                    "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                )
-                
-                db.collection("password_recovery_requests")
-                    .document(cleanPhone)
-                    .set(requestData, com.google.firebase.firestore.SetOptions.merge())
-                    .await()
-                
-                triggerNotification("✅ تم إرسال طلبك للإدارة. سيتم التواصل معك قريباً")
-            } catch (e: Exception) {
-                triggerNotification("❌ فشل إرسال الطلب: ${e.message}")
-            }
-        }
+        authViewModel.requestPasswordRecovery(phone, name, accountType)
     }
 }

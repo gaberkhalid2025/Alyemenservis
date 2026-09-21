@@ -202,6 +202,28 @@ fun RegisterScreen(
                     password = password
                 )
             }
+            RegistrationType.JOB_APPLICANT -> {
+                val applicantName = (data["entityName"] as? String) ?: (data["fullName"] as? String) ?: "باحث عن عمل"
+                val desiredRole = (data["specialization"] as? String) ?: "طلب توظيف"
+                val quals = (data["qualifications"] as? String) ?: ""
+                val exp = (data["experienceYears"] as? String) ?: ""
+                val notes = if (quals.isNotBlank() || exp.isNotBlank()) "المؤهل: $quals | الخبرة: $exp" else ""
+                
+                viewModel.registerClientUser(applicantName, phone, area, password)
+                viewModel.submitJoinForm(
+                    context = context,
+                    name = applicantName,
+                    phone = phone,
+                    catId = "JOB_APPLICANT",
+                    area = area,
+                    neighborhood = notes,
+                    photoPath = "",
+                    idCardPath = "",
+                    gpsCoords = "",
+                    customCategoryName = desiredRole,
+                    password = password
+                )
+            }
             RegistrationType.CLIENT -> {
                 val clientName = (data["entityName"] as? String) ?: (data["fullName"] as? String) ?: "مستخدم جديد"
                 val residence = (data["residence"] as? String) ?: area
@@ -537,6 +559,15 @@ fun RegisterScreen(
                                     themeColors = themeColors,
                                     onRegistrationSuccess = { map ->
                                         handleFormSubmit(map, RegistrationType.JOB)
+                                    }
+                                )
+                            }
+                            RegistrationType.JOB_APPLICANT -> {
+                                UnifiedRegistrationForm(
+                                    role = "JOB_APPLICANT",
+                                    themeColors = themeColors,
+                                    onRegistrationSuccess = { map ->
+                                        handleFormSubmit(map, RegistrationType.JOB_APPLICANT)
                                     }
                                 )
                             }

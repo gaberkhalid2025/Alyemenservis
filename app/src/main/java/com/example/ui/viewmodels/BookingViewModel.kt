@@ -674,8 +674,79 @@ open class BookingViewModel @Inject constructor(
         }
     }
     
-    fun createBookingDirectly(provider: com.example.data.ProviderEntity, notes: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        onError("Not implemented")
+    fun createBookingDirectly(
+        provider: com.example.data.ProviderEntity,
+        notes: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val custPhone = getCurrentUserPhone?.invoke()?.ifBlank { "777000000" } ?: "777000000"
+        val custName = getCurrentUserName?.invoke()?.ifBlank { "عميل الخريطة" } ?: "عميل الخريطة"
+        val bookingDate = com.example.utils.DateFormatter.formatDateDash(System.currentTimeMillis())
+        val bookingTime = com.example.utils.DateFormatter.formatTime24(System.currentTimeMillis() + 3600 * 1000L)
+        val rawPin = "${(1000..9999).random()}"
+        val bNum = "YEM-${(10000..99999).random()}"
+        val bId = java.util.UUID.randomUUID().toString()
+
+        val directBooking = BookingEntity(
+            id = bId,
+            bookingNumber = bNum,
+            bookingCode = bNum,
+            providerId = provider.id,
+            providerName = provider.name,
+            providerPhone = provider.phone,
+            customerName = custName,
+            customerPhone = custPhone,
+            clientName = custName,
+            clientPhone = custPhone,
+            clientId = custPhone,
+            serviceType = provider.profession.ifBlank { provider.customCategoryName.ifBlank { "حجز فوري من الخريطة" } },
+            category = provider.customCategoryName.ifBlank { provider.profession },
+            serviceDetails = notes.ifBlank { "حجز مباشر من خريطة التطبيق" },
+            date = bookingDate,
+            dateString = bookingDate,
+            time = bookingTime,
+            timeString = bookingTime,
+            status = "PENDING",
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+
+        injectedRepository.createBooking(
+            booking = directBooking,
+            rawPasswordPin = rawPin,
+            onSuccess = { createdBooking ->
+                _bookings.value = _bookings.value.filter { it.id != createdBooking.id } + createdBooking
+
+                // Triple notification for USER, PROVIDER, and ADMIN_ONLY
+                onAddNotification?.invoke(
+                    "📅 حجز خريطة جديد #${createdBooking.bookingNumber}",
+                    "تم إرسال طلب حجزك بنجاح إلى ${createdBooking.providerName}. رقم الحجز #${createdBooking.bookingNumber} ورمز المرور: $rawPin.",
+                    "USER",
+                    custPhone
+                )
+                if (createdBooking.providerPhone.isNotBlank()) {
+                    onAddNotification?.invoke(
+                        "⚡ طلب حجز جديد من الخريطة #${createdBooking.bookingNumber}",
+                        "قام العميل $custName ($custPhone) بطلب حجز مباشر من الخريطة لديك.",
+                        "PROVIDER",
+                        createdBooking.providerPhone
+                    )
+                }
+                onAddNotification?.invoke(
+                    "📢 حجز خريطة جديد",
+                    "حجز خريطة جديد #${createdBooking.bookingNumber} للعميل $custName لدى ${createdBooking.providerName}.",
+                    "ADMIN_ONLY",
+                    "ALL"
+                )
+
+                triggerToast("🎉 تم إنشاء الحجز بنجاح برقم #${createdBooking.bookingNumber}")
+                onSuccess()
+            },
+            onError = { errorMsg ->
+                onError(errorMsg)
+            }
+        )
     }
 
     fun lockBookingAfterFailedAttempts(bookingId: String, lockDurationMs: Long, onResult: (Boolean) -> Unit) {

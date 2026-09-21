@@ -28,6 +28,7 @@ import com.example.ui.screens.chat.ChatScreen
 import com.example.ui.screens.entities.*
 import com.example.ui.screens.home.FavoritesScreenLayout
 import com.example.ui.screens.home.ServicesBrowserLayout
+import com.example.ui.screens.home.UnifiedGlobalSearchScreen
 import com.example.ui.screens.map.MapScreenLayout
 import com.example.ui.screens.notifications.UserNotificationsDialogView
 import com.example.ui.screens.owner.OwnerDashboardScreen
@@ -300,6 +301,13 @@ fun AppNavigator(
                         themeColors = themeColors,
                         onDismiss = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) },
                         onRequestCreated = { viewModel.navigateToScreen(AppScreens.ORDERS_VIEW) }
+                    )
+                }
+                AppScreens.UNIFIED_SEARCH -> {
+                    UnifiedGlobalSearchScreen(
+                        viewModel = viewModel,
+                        themeColors = themeColors,
+                        onBackClick = { viewModel.navigateToScreen(AppScreens.USER_BROWSE) }
                     )
                 }
                 else -> {

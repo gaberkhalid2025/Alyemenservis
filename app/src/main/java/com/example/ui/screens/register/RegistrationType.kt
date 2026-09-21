@@ -48,9 +48,15 @@ enum class RegistrationType(
     ),
     JOB(
         id = "job",
-        title = "وظيفة / شاغر",
+        title = "صاحب عمل / ناشر وظيفة",
         icon = "💼",
         description = "نشر إعلان وظيفة أو شاغر واستقبال طلبات التوظيف"
+    ),
+    JOB_APPLICANT(
+        id = "job_applicant",
+        title = "باحث عن عمل / توظيف",
+        icon = "👨‍💼",
+        description = "إنشاء ملف مهني وإرفاق السيرة الذاتية للتقديم على الوظائف الشاغرة"
     );
 
     companion object {

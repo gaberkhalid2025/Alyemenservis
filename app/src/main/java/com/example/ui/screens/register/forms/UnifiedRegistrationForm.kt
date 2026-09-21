@@ -167,6 +167,7 @@ fun UnifiedRegistrationForm(
             "MEDICAL" -> "اسم المركز الطبي/العيادة *"
             "PROPERTY" -> "اسم العقار / المكتب العقاري *"
             "JOB" -> "اسم شركة الإعلانات / جهة العمل *"
+            "JOB_APPLICANT" -> "الاسم الثلاثي للمتقدم للعمل *"
             else -> "الاسم الكامل *"
         }
         
@@ -196,6 +197,27 @@ fun UnifiedRegistrationForm(
                 label = { Text(managerLabel, fontSize = 12.sp) },
                 isError = state.managerNameError != null,
                 supportingText = { state.managerNameError?.let { Text(it) } },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+
+        // Dedicated fields for Job Applicant
+        if (role == "JOB_APPLICANT") {
+            OutlinedTextField(
+                value = state.specialization,
+                onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.SpecializationChanged(it)) },
+                label = { Text("المسمى الوظيفي المطلوب / التخصص المهني *", fontSize = 12.sp) },
+                placeholder = { Text("مثال: محاسب عام، مهندس شبكات، سكرتير، مصمم", fontSize = 11.sp, color = Color.Gray) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            OutlinedTextField(
+                value = state.qualifications,
+                onValueChange = { if (it.length <= 500) viewModel.onEvent(RegistrationUiEvent.QualificationsChanged(it)) },
+                label = { Text("المؤهل العلمي وسنوات الخبرة", fontSize = 12.sp) },
+                placeholder = { Text("مثال: بكالوريوس محاسبة - خبرة 3 سنوات", fontSize = 11.sp, color = Color.Gray) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )

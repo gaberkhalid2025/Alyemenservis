@@ -5,10 +5,12 @@ import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.repositories.IProductsRepository
 import com.example.domain.entities.ProductItemEntity
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 data class ServicesBrowserUiState(
     val isLoading: Boolean = true,
@@ -22,7 +24,8 @@ data class ServicesBrowserUiState(
 /**
  * 🧠 ServicesBrowserViewModel - إدارة منطق وتصفح خدمات التطبيق والمنتجات
  */
-class ServicesBrowserViewModel(
+@HiltViewModel
+class ServicesBrowserViewModel @Inject constructor(
     private val productsRepository: IProductsRepository
 ) : ViewModel() {
 

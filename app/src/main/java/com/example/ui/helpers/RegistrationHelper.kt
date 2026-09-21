@@ -264,7 +264,7 @@ class RegistrationHelper(
                                     categoryId = catName,
                                     isActive = false,
                                     isApproved = false,
-                                    password = password
+                                    password = securedPasswordHash
                                 )
                                 val storeMap = mapOf(
                                     "id" to requestDocId,
@@ -279,7 +279,8 @@ class RegistrationHelper(
                                     "categoryId" to catName,
                                     "isActive" to false,
                                     "isApproved" to false,
-                                    "password" to password,
+                                    "password" to securedPasswordHash,
+                                    "passwordHash" to securedPasswordHash,
                                     "createdAt" to System.currentTimeMillis()
                                 )
                                 db.collection("stores").document(requestDocId).set(storeMap)
@@ -295,7 +296,7 @@ class RegistrationHelper(
                                     localNeighborhood = neighborhood,
                                     isActive = false,
                                     isApproved = false,
-                                    password = password
+                                    password = securedPasswordHash
                                 )
                                 val propMap = mapOf(
                                     "id" to requestDocId,
@@ -307,7 +308,8 @@ class RegistrationHelper(
                                     "localNeighborhood" to neighborhood,
                                     "isActive" to false,
                                     "isApproved" to false,
-                                    "password" to password,
+                                    "password" to securedPasswordHash,
+                                    "passwordHash" to securedPasswordHash,
                                     "createdAt" to System.currentTimeMillis()
                                 )
                                 db.collection("properties").document(requestDocId).set(propMap)
@@ -429,6 +431,7 @@ class RegistrationHelper(
     ) {
         val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
         val currentAuthUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+        val hashedPassword = if (password.isNotBlank()) com.example.utils.PasswordHasher.hash(password.trim()) else ""
         val userMap = mapOf(
             "id" to cleanPhone,
             "uid" to currentAuthUid,
@@ -436,7 +439,8 @@ class RegistrationHelper(
             "name" to name,
             "phone" to cleanPhone,
             "residence" to residence,
-            "password" to password,
+            "password" to hashedPassword,
+            "passwordHash" to hashedPassword,
             "isApproved" to false,
             "createdAt" to System.currentTimeMillis()
         )
