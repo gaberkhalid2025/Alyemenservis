@@ -60,7 +60,6 @@ fun BookingFormScreen(
     var selectedDate by remember { mutableStateOf("") }
     var selectedTime by remember { mutableStateOf("") }
     var serviceDetails by remember { mutableStateOf("") }
-    var userSecretPass by remember { mutableStateOf("") }
     var agreeToTerms by remember { mutableStateOf(true) }
     var isSubmitting by remember { mutableStateOf(false) }
 
@@ -480,7 +479,7 @@ fun BookingFormScreen(
 
                     isSubmitting = true
                     val generatedCode = BookingUtils.generateBookingCode("BK")
-                    val generatedPass = if (userSecretPass.trim().isNotBlank()) userSecretPass.trim() else BookingUtils.generateBookingPassword(4)
+                    val generatedPass = BookingUtils.generateBookingPassword(4)
                     val completeAddressStr = "$selectedCity - ${fullAddress.trim()}"
                     val scheduledTs = BookingUtils.parseScheduledTimestamp(selectedDate, selectedTime)
 

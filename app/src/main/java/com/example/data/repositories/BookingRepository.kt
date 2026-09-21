@@ -367,7 +367,7 @@ class BookingRepository(
         if (!isVerified) {
             val attemptsLeft = BookingSecurityHelper.recordFailedAttempt(context, booking.id)
             if (attemptsLeft == 0) {
-                onError("رمز التحقق غير صحيح. تم استنفاد 3 محاولات وقفل الحجز لمدة 5 دقائق لأسباب أمنية.")
+                onError("رمز التحقق غير صحيح. تم استنفاد 3 محاولات وقفل الحجز لمدة ثلاثين دقيقة لأسباب أمنية.")
             } else {
                 onError("رمز التحقق غير صحيح. متبقي لديك $attemptsLeft محاولة فقط قبل القفل المؤقت.")
             }

@@ -81,7 +81,17 @@ data class ChatReaction(
 ) : Serializable
 
 /**
- * 💬 نموذج القناة / المحادثة الكامل (ChatChannel)
+ * 📝 نموذج قناة المحادثة (ChatChannel)
+ *
+ * الحقول المعتمدة:
+ * - العنوان: title و participantNames
+ * - الهاتف: targetPhone
+ * - الصورة: groupAvatarUrl و participantPhotos
+ *
+ * الحقول المهجورة (موجودة للتوافقية فقط ولا يجب استخدامها في المنطق الجديد):
+ * - providerName, clientName, targetName, userName, customerName
+ * - customerPhone
+ * - providerId, clientId
  */
 @Keep
 data class ChatChannel(

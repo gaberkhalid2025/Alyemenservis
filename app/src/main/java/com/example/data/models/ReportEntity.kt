@@ -25,9 +25,5 @@ data class ReportEntity(
 data class ActivityLogEntity(
     val id: String = "",
     val action: String = "",
-    val timestamp: Long = System.currentTimeMillis(),
-    val category: String = "GENERAL",
-    val performedBy: String = "ADMIN",
-    val target: String = "",
-    val details: String = ""
+    val timestamp: Long = 0L
 )

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.ui.components.SmartAsyncImage
+import com.example.ui.helpers.AppPreferenceHelper
 import com.example.utils.VisualThemePalette
 
 enum class ProfileEntityType(val labelAr: String, val badgeColor: Color) {
@@ -117,14 +118,14 @@ fun DynamicPolymorphicProfileScreen(
 
     // Ownership logic: check if logged-in user is the owner
     val isOwner = remember(currentUserId, currentUserPhone, provider, store, property, adminRole) {
-        val phoneClean = currentUserPhone.filter { it.isDigit() }.takeLast(9)
+        val phoneClean = AppPreferenceHelper.normalizePhoneNumber(currentUserPhone)
         val uidClean = currentUserId.trim()
-        val provPhone = (provider?.phone ?: "").filter { it.isDigit() }.takeLast(9)
-        val storePhone = (store?.phone ?: "").filter { it.isDigit() }.takeLast(9)
+        val provPhone = AppPreferenceHelper.normalizePhoneNumber(provider?.phone ?: "")
+        val storePhone = AppPreferenceHelper.normalizePhoneNumber(store?.phone ?: "")
         val storeOwner = store?.ownerId?.trim() ?: ""
-        val propPhone = (property?.phone ?: "").filter { it.isDigit() }.takeLast(9)
+        val propPhone = AppPreferenceHelper.normalizePhoneNumber(property?.phone ?: "")
         val propOwner = property?.ownerId?.trim() ?: ""
-        val joinPhone = viewModel.joinRequestPhone.value.filter { it.isDigit() }.takeLast(9)
+        val joinPhone = AppPreferenceHelper.normalizePhoneNumber(viewModel.joinRequestPhone.value)
         val isAdmin = adminRole != "GUEST"
 
         val provId = provider?.id?.trim() ?: ""

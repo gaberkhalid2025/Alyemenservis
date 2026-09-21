@@ -54,11 +54,7 @@ fun ProfileHeader(
                         )
                     )
             ) {
-                val cover = try {
-                    if (profileCover.isNullOrBlank()) "" else profileCover
-                } catch (e: Exception) {
-                    ""
-                }
+                val cover = if (profileCover.isNullOrBlank()) "" else profileCover
                 SmartAsyncImage(
                     model = cover,
                     contentDescription = entityName,

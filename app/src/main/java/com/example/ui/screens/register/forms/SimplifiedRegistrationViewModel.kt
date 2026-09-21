@@ -22,9 +22,6 @@ data class SimplifiedRegistrationState(
     val confirmPasswordError: String? = null,
     val city: String = "صنعاء",
     val specialization: String = "",
-    val qualifications: String = "",
-    val experienceYears: String = "",
-    val cvUri: String = "",
     val agreedToTerms: Boolean = false,
     val isLoading: Boolean = false,
     val successMessage: String? = null
@@ -46,9 +43,6 @@ sealed class RegistrationUiEvent {
     data class ConfirmPasswordChanged(val pass: String) : RegistrationUiEvent()
     data class CityChanged(val city: String) : RegistrationUiEvent()
     data class SpecializationChanged(val spec: String) : RegistrationUiEvent()
-    data class QualificationsChanged(val quals: String) : RegistrationUiEvent()
-    data class ExperienceYearsChanged(val exp: String) : RegistrationUiEvent()
-    data class CvUriChanged(val uri: String) : RegistrationUiEvent()
     data class AgreedToTermsChanged(val agreed: Boolean) : RegistrationUiEvent()
 }
 
@@ -66,10 +60,7 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
             managerName = draft["managerName"] ?: _state.value.managerName,
             phone = draft["phone"] ?: _state.value.phone,
             city = draft["city"] ?: _state.value.city,
-            specialization = draft["specialization"] ?: _state.value.specialization,
-            qualifications = draft["qualifications"] ?: _state.value.qualifications,
-            experienceYears = draft["experienceYears"] ?: _state.value.experienceYears,
-            cvUri = draft["cvUri"] ?: _state.value.cvUri
+            specialization = draft["specialization"] ?: _state.value.specialization
         )
     }
 
@@ -83,9 +74,6 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
             is RegistrationUiEvent.ConfirmPasswordChanged -> _state.value = _state.value.copy(confirmPassword = event.pass, confirmPasswordError = null)
             is RegistrationUiEvent.CityChanged -> _state.value = _state.value.copy(city = event.city)
             is RegistrationUiEvent.SpecializationChanged -> _state.value = _state.value.copy(specialization = event.spec)
-            is RegistrationUiEvent.QualificationsChanged -> _state.value = _state.value.copy(qualifications = event.quals)
-            is RegistrationUiEvent.ExperienceYearsChanged -> _state.value = _state.value.copy(experienceYears = event.exp)
-            is RegistrationUiEvent.CvUriChanged -> _state.value = _state.value.copy(cvUri = event.uri)
             is RegistrationUiEvent.AgreedToTermsChanged -> _state.value = _state.value.copy(agreedToTerms = event.agreed)
         }
     }
@@ -124,9 +112,6 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
                 "phone" to _state.value.phone,
                 "city" to _state.value.city,
                 "specialization" to _state.value.specialization,
-                "qualifications" to _state.value.qualifications,
-                "experienceYears" to _state.value.experienceYears,
-                "cvUri" to _state.value.cvUri,
                 "imageUri" to _state.value.imageUri,
                 "password" to _state.value.password
             )

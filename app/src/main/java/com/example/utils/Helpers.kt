@@ -269,10 +269,7 @@ fun getAreaCoords(areaName: String): Pair<Double, Double> {
 }
 
 fun getProviderCoords(provider: ProviderEntity): Pair<Double, Double> {
-    val isDefaultSanaa = Math.abs(provider.latitude - 15.3694) < 0.0001 && Math.abs(provider.longitude - 44.1910) < 0.0001
-    val isExplicitOtherCity = (provider.cityId.isNotBlank() && !provider.cityId.contains("صنعاء") && !provider.cityId.contains("sanaa") && !provider.cityId.contains("ye_san")) ||
-                              (provider.area.isNotBlank() && !provider.area.contains("صنعاء"))
-    if (provider.latitude != 0.0 && provider.longitude != 0.0 && !(isDefaultSanaa && isExplicitOtherCity)) {
+    if (provider.latitude != 0.0 && provider.longitude != 0.0) {
         return Pair(provider.latitude, provider.longitude)
     }
     val baseStr = when {
@@ -289,10 +286,7 @@ fun getProviderCoords(provider: ProviderEntity): Pair<Double, Double> {
 }
 
 fun getStoreCoords(store: StoreEntity): Pair<Double, Double> {
-    val isDefaultSanaa = Math.abs(store.latitude - 15.3694) < 0.0001 && Math.abs(store.longitude - 44.1910) < 0.0001
-    val isExplicitOtherCity = (store.cityId.isNotBlank() && !store.cityId.contains("صنعاء") && !store.cityId.contains("sanaa") && !store.cityId.contains("ye_san")) ||
-                              (store.localNeighborhood.isNotBlank() && !store.localNeighborhood.contains("صنعاء"))
-    if (store.latitude != 0.0 && store.longitude != 0.0 && !(isDefaultSanaa && isExplicitOtherCity)) {
+    if (store.latitude != 0.0 && store.longitude != 0.0) {
         return Pair(store.latitude, store.longitude)
     }
     val baseStr = when {
@@ -308,10 +302,7 @@ fun getStoreCoords(store: StoreEntity): Pair<Double, Double> {
 }
 
 fun getPropertyCoords(property: PropertyEntity): Pair<Double, Double> {
-    val isDefaultSanaa = Math.abs(property.latitude - 15.3694) < 0.0001 && Math.abs(property.longitude - 44.1910) < 0.0001
-    val isExplicitOtherCity = (property.cityId.isNotBlank() && !property.cityId.contains("صنعاء") && !property.cityId.contains("sanaa") && !property.cityId.contains("ye_san")) ||
-                              (property.localNeighborhood.isNotBlank() && !property.localNeighborhood.contains("صنعاء"))
-    if (property.latitude != 0.0 && property.longitude != 0.0 && !(isDefaultSanaa && isExplicitOtherCity)) {
+    if (property.latitude != 0.0 && property.longitude != 0.0) {
         return Pair(property.latitude, property.longitude)
     }
     val baseStr = when {

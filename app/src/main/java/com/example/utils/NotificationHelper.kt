@@ -94,4 +94,34 @@ object NotificationHelper {
         }
         manager.createNotificationChannel(userGeneral)
     }
+
+    /**
+     * 📲 إرسال إشعار محلي فوري على جهاز المستخدم
+     */
+    fun showLocalNotification(
+        context: Context,
+        title: String,
+        message: String,
+        channelId: String = CHANNEL_USER_BOOKINGS,
+        notificationId: Int = (System.currentTimeMillis() % 100000).toInt()
+    ) {
+        try {
+            createNotificationChannels(context)
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+            val builder = androidx.core.app.NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setDefaults(androidx.core.app.NotificationCompat.DEFAULT_ALL)
+                .setColor(Color.parseColor("#00E5FF"))
+
+            manager.notify(notificationId, builder.build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }

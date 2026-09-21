@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -28,6 +29,7 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
 import com.example.ui.createBookingDirectly
+import com.example.ui.dialogs.BookingDialog
 import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.VisualThemePalette
@@ -108,6 +110,12 @@ fun MapScreenContent(
         )
     }
 
+    // Reset map pan & zoom when governorate changes
+    LaunchedEffect(state.selectedCity) {
+        state.panOffset = Offset.Zero
+        state.zoomScale = 1.0f
+    }
+
     Scaffold(
         containerColor = Color(0xFF020617),
         snackbarHost = {
@@ -127,7 +135,7 @@ fun MapScreenContent(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Main Map View (Real Leaflet / OpenStreetMap or Radar Canvas)
+            // Main Map View (Leaflet OpenStreetMap View or Radar Canvas)
             if (state.isRadarMode) {
                 RadarRenderer(
                     items = radarPoints,
@@ -151,12 +159,20 @@ fun MapScreenContent(
                     nearbyStores = filteredStores,
                     nearbyProperties = filteredProperties,
                     dynamicOffsets = state.dynamicOffsets,
+                    selectedCity = state.selectedCity,
+                    zoomScale = state.zoomScale,
+                    onZoomScaleChange = { state.zoomScale = it },
+                    panOffset = state.panOffset,
+                    onPanOffsetChange = { state.panOffset = it },
+                    selectedEntity = state.selectedEntity,
                     onProviderSelected = { state.selectedEntity = it },
                     onStoreSelected = { state.selectedEntity = it },
                     onPropertySelected = { state.selectedEntity = it },
+                    onDeselect = { state.selectedEntity = null },
                     onSwitchToRadar = { 
                         state.isRadarMode = true
                     },
+                    themeColors = themeColors,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -312,31 +328,13 @@ fun MapScreenContent(
         }
     }
 
-    // Direct Map Booking Dialog
+    // Unified Direct Booking Dialog
     state.bookingProviderTarget?.let { provider ->
-        MapBookingDialog(
+        BookingDialog(
             provider = provider,
-            userLat = safeUserLat,
-            userLng = safeUserLng,
-            onDismiss = { state.bookingProviderTarget = null },
-            onConfirmBooking = { notes ->
-                viewModel.createBookingDirectly(
-                    provider = provider,
-                    notes = notes,
-                    onSuccess = {
-                        state.bookingProviderTarget = null
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("تم إرسال طلب الحجز بنجاح إلى ${provider.name} ✓")
-                        }
-                    },
-                    onError = { err: String ->
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("فشل إرسال طلب الحجز: $err ⚠️")
-                        }
-                    }
-                )
-            },
-            themeColors = themeColors
+            viewModel = viewModel,
+            themeColors = themeColors,
+            onDismiss = { state.bookingProviderTarget = null }
         )
     }
 }

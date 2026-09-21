@@ -262,44 +262,28 @@ class MainViewModel @Inject constructor(
     private fun checkAndTriggerFavoriteOffersNotifications() {
     }
     fun updateUserLocation(lat: Double, lng: Double) {
-        if (lat != 0.0 && lng != 0.0 && !lat.isNaN() && !lng.isNaN()) {
-            _userLatitude.value = lat
-            _userLongitude.value = lng
-            homeViewModel.updateUserLocation(lat, lng)
-        }
+        _userLatitude.value = lat
+        _userLongitude.value = lng
     }
     fun startLocationUpdates() {
         _isGpsTrackingActive.value = true
         appContext?.let { ctx ->
             try {
-                val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
-                if (lm != null) {
-                    val gpsLoc = try { lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER) } catch (e: SecurityException) { null }
-                    val netLoc = try { lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER) } catch (e: SecurityException) { null }
-                    val passLoc = try { lm.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER) } catch (e: SecurityException) { null }
-                    
-                    val bestLoc = listOfNotNull(gpsLoc, netLoc, passLoc).maxByOrNull { it.time }
-                    bestLoc?.let {
-                        updateUserLocation(it.latitude, it.longitude)
-                    }
-
-                    val listener = object : android.location.LocationListener {
-                        override fun onLocationChanged(location: android.location.Location) {
-                            updateUserLocation(location.latitude, location.longitude)
-                        }
-                        override fun onProviderEnabled(provider: String) {}
-                        override fun onProviderDisabled(provider: String) {}
-                    }
-
-                    if (lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
-                        lm.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER, 5000L, 5f, listener)
-                    }
-                    if (lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
-                        lm.requestLocationUpdates(android.location.LocationManager.NETWORK_PROVIDER, 5000L, 5f, listener)
+                if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                    androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    val fusedClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(ctx)
+                    fusedClient.lastLocation.addOnSuccessListener { loc ->
+                        loc?.let { updateUserLocation(it.latitude, it.longitude) }
                     }
                 }
+                val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager
+                val loc = lm?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                    ?: lm?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                loc?.let {
+                    updateUserLocation(it.latitude, it.longitude)
+                }
             } catch (e: Exception) {
-                android.util.Log.e("MainViewModel", "Error in startLocationUpdates: ", e)
+                android.util.Log.e("MainViewModel", "Error: ", e)
             }
         }
     }

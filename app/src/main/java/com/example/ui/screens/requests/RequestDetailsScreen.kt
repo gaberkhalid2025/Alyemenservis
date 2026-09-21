@@ -70,7 +70,6 @@ fun RequestDetailsScreen(
     var showCancelDialog by remember { mutableStateOf(false) }
     var cancelPinInput by remember { mutableStateOf("") }
     var isCancelling by remember { mutableStateOf(false) }
-    var failedAttempts by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(requestId) {
         if (requestId.isNotBlank()) {
@@ -119,7 +118,8 @@ fun RequestDetailsScreen(
             return@Scaffold
         }
 
-        val isMyRequest = currentRequest.userId == currentUserId || currentRequest.userPhone == currentUserId
+        val isMyRequest = currentRequest.userId == currentUserId || 
+                com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentRequest.userPhone) == com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserId)
 
         LazyColumn(
             modifier = Modifier
@@ -340,10 +340,10 @@ fun RequestDetailsScreen(
                         
                         val lockUntil = prefs.getLong(lockKey, 0L)
                         if (System.currentTimeMillis() < lockUntil) {
-                            val remainingHours = ((lockUntil - System.currentTimeMillis()) / (1000 * 60 * 60)) + 1
+                            val remainingMinutes = ((lockUntil - System.currentTimeMillis()) / (1000 * 60)) + 1
                             Toast.makeText(
                                 context,
-                                "تم قفل محاولات الإلغاء. حاول بعد $remainingHours ساعة",
+                                "تم قفل محاولات الإلغاء. حاول بعد $remainingMinutes دقيقة",
                                 Toast.LENGTH_LONG
                             ).show()
                             return@Button
@@ -363,15 +363,15 @@ fun RequestDetailsScreen(
                         if (!isPinValid) {
                             val currentAttempts = prefs.getInt(attemptKey, 0) + 1
                             if (currentAttempts >= 5) {
-                                // قفل لمدة 8 ساعات
-                                val lockTime = System.currentTimeMillis() + (8 * 60 * 60 * 1000L)
+                                // قفل لمدة ثلاثين دقيقة
+                                val lockTime = System.currentTimeMillis() + (30 * 60 * 1000L)
                                 prefs.edit()
                                     .putLong(lockKey, lockTime)
                                     .putInt(attemptKey, 0)
                                     .apply()
                                 Toast.makeText(
                                     context,
-                                    "تم تجاوز الحد الأقصى للمحاولات. تم القفل لمدة 8 ساعات",
+                                    "تم تجاوز الحد الأقصى للمحاولات. تم القفل لمدة ثلاثين دقيقة",
                                     Toast.LENGTH_LONG
                                 ).show()
                             } else {

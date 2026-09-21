@@ -54,6 +54,7 @@ fun OfflineInteractiveMap(
     nearbyStores: List<StoreEntity>,
     nearbyProperties: List<PropertyEntity>,
     dynamicOffsets: Map<String, Pair<Double, Double>>,
+    selectedCity: String = "الكل",
     zoomScale: Float,
     onZoomScaleChange: (Float) -> Unit,
     panOffset: Offset,
@@ -69,40 +70,22 @@ fun OfflineInteractiveMap(
     val safeUserLat = if (userCoords.first != 0.0) userCoords.first else 15.3694
     val safeUserLng = if (userCoords.second != 0.0) userCoords.second else 44.1910
 
-    // Compute central origin of active pins so they are guaranteed to be at the exact center of map decorations
-    val originLat = remember(nearbyProviders, nearbyStores, nearbyProperties, safeUserLat) {
-        val lats = mutableListOf<Double>()
-        nearbyProviders.forEach { p ->
-            val c = getProviderCoords(p)
-            if (c.first != 0.0 && !c.first.isNaN()) lats.add(c.first)
+    // Compute governorate center coordinates dynamically
+    val cityCenterCoords = remember(selectedCity, safeUserLat, safeUserLng) {
+        when {
+            selectedCity.contains("تعز") -> Pair(13.5789, 44.0195)
+            selectedCity.contains("عدن") -> Pair(12.7855, 45.0186)
+            selectedCity.contains("إب") -> Pair(13.9667, 44.1833)
+            selectedCity.contains("الحديدة") -> Pair(14.7978, 42.9545)
+            selectedCity.contains("حضرموت") || selectedCity.contains("المكلا") -> Pair(14.5425, 49.1242)
+            selectedCity.contains("ذمار") -> Pair(14.5427, 44.4051)
+            selectedCity.contains("مأرب") -> Pair(15.4628, 45.3258)
+            else -> Pair(safeUserLat, safeUserLng)
         }
-        nearbyStores.forEach { s ->
-            val c = getStoreCoords(s)
-            if (c.first != 0.0 && !c.first.isNaN()) lats.add(c.first)
-        }
-        nearbyProperties.forEach { pr ->
-            val c = getPropertyCoords(pr)
-            if (c.first != 0.0 && !c.first.isNaN()) lats.add(c.first)
-        }
-        if (lats.isNotEmpty()) lats.average() else safeUserLat
     }
 
-    val originLng = remember(nearbyProviders, nearbyStores, nearbyProperties, safeUserLng) {
-        val lngs = mutableListOf<Double>()
-        nearbyProviders.forEach { p ->
-            val c = getProviderCoords(p)
-            if (c.second != 0.0 && !c.second.isNaN()) lngs.add(c.second)
-        }
-        nearbyStores.forEach { s ->
-            val c = getStoreCoords(s)
-            if (c.second != 0.0 && !c.second.isNaN()) lngs.add(c.second)
-        }
-        nearbyProperties.forEach { pr ->
-            val c = getPropertyCoords(pr)
-            if (c.second != 0.0 && !c.second.isNaN()) lngs.add(c.second)
-        }
-        if (lngs.isNotEmpty()) lngs.average() else safeUserLng
-    }
+    val originLat = cityCenterCoords.first
+    val originLng = cityCenterCoords.second
 
     // Convert entities into unified map points with calculated local offsets
     val mapPoints = remember(nearbyProviders, nearbyStores, nearbyProperties, dynamicOffsets, originLat, originLng) {
@@ -244,8 +227,8 @@ fun OfflineInteractiveMap(
         points
     }
 
-    // Set map default center smoothly to the average center of points
-    LaunchedEffect(mapPoints) {
+    // Initial map center setup on first launch
+    LaunchedEffect(Unit) {
         onPanOffsetChange(Offset.Zero)
         onZoomScaleChange(1.0f)
     }
@@ -327,7 +310,8 @@ fun OfflineInteractiveMap(
                     widthPx = size.width,
                     heightPx = size.height,
                     panOffset = safePan,
-                    zoomScale = safeZoom
+                    zoomScale = safeZoom,
+                    selectedCity = selectedCity
                 )
 
                 // 3. Draw Service Pins & Name Badges
@@ -456,37 +440,34 @@ private fun DrawScope.drawCityRoadGrid(
     widthPx: Float,
     heightPx: Float,
     panOffset: Offset,
-    zoomScale: Float
+    zoomScale: Float,
+    selectedCity: String
 ) {
-    // 1. Procedural, Infinite, Rich Neighborhood Blocks (Filling the whole screen!)
-    // This ensures no matter how far you drag, you will see highly detailed blocks!
-    val gridSize = 280f * zoomScale
+    val gridSize = 220f * zoomScale
     val startX = (panOffset.x % gridSize) - gridSize
     val startY = (panOffset.y % gridSize) - gridSize
 
-    val blockColor = Color(0xFF151D30) // Contrasting midnight blue
-    val blockBorderColor = Color(0xFF1E293B) // Dark slate gray border
-    val secondaryRoadColor = Color(0xFF2E3E5C) // Highly visible grey-blue for roads
+    val blockColor = Color(0xFF1A263D) // Highly visible urban block fill
+    val blockBorderColor = Color(0xFF334155) // Bright slate block borders
+    val secondaryRoadColor = Color(0xFF475569) // Highly visible street grid lines
 
     // Draw grid neighborhood blocks
     var currentY = startY
     while (currentY < heightPx + gridSize) {
         var currentX = startX
         while (currentX < widthPx + gridSize) {
-            // Draw Block background
             drawRoundRect(
                 color = blockColor,
-                topLeft = Offset(currentX + 15f, currentY + 15f),
-                size = Size(gridSize - 30f, gridSize - 30f),
-                cornerRadius = CornerRadius(14f, 14f)
+                topLeft = Offset(currentX + 12f, currentY + 12f),
+                size = Size(gridSize - 24f, gridSize - 24f),
+                cornerRadius = CornerRadius(12f, 12f)
             )
-            // Draw Block border for premium high-contrast cartography
             drawRoundRect(
                 color = blockBorderColor,
-                topLeft = Offset(currentX + 15f, currentY + 15f),
-                size = Size(gridSize - 30f, gridSize - 30f),
-                cornerRadius = CornerRadius(14f, 14f),
-                style = Stroke(width = 1.5f)
+                topLeft = Offset(currentX + 12f, currentY + 12f),
+                size = Size(gridSize - 24f, gridSize - 24f),
+                cornerRadius = CornerRadius(12f, 12f),
+                style = Stroke(width = 2.0f)
             )
             currentX += gridSize
         }
@@ -500,7 +481,7 @@ private fun DrawScope.drawCityRoadGrid(
             color = secondaryRoadColor,
             start = Offset(0f, currentY),
             end = Offset(widthPx, currentY),
-            strokeWidth = 2.0f
+            strokeWidth = 3.0f
         )
         currentY += gridSize
     }
@@ -510,13 +491,12 @@ private fun DrawScope.drawCityRoadGrid(
             color = secondaryRoadColor,
             start = Offset(currentX, 0f),
             end = Offset(currentX, heightPx),
-            strokeWidth = 2.0f
+            strokeWidth = 3.0f
         )
         currentX += gridSize
     }
 
     // 3. Winding Coastline / River Flow (Stunning Sky Blue)
-    // Draw relative to centerX and centerY so it matches local landmarks, but with bright, clear colors!
     val riverPath = Path().apply {
         moveTo(0f, centerY - 320f)
         quadraticTo(centerX - 150f, centerY - 280f, centerX + 180f, centerY + 280f)
@@ -526,69 +506,81 @@ private fun DrawScope.drawCityRoadGrid(
         lineTo(0f, centerY - 200f)
         close()
     }
-    drawPath(path = riverPath, color = Color(0xFF0284C7).copy(alpha = 0.65f)) // Beautiful Sky Blue
+    drawPath(path = riverPath, color = Color(0xFF38BDF8).copy(alpha = 0.75f)) // Vibrant Sky Blue
 
-    // 4. Large Green Parks (Famous parks in Sana'a)
-    // Sabeen Park (حديقة السبعين)
+    // 4. Large Green Parks
     drawRoundRect(
-        color = Color(0xFF059669).copy(alpha = 0.85f), // Rich vivid emerald green
+        color = Color(0xFF10B981).copy(alpha = 0.90f), // Vibrant Emerald Green
         topLeft = Offset(centerX - 420f, centerY + 220f),
         size = Size(260f, 200f),
         cornerRadius = CornerRadius(16f, 16f)
     )
     
-    // Thawra Park (حديقة الثورة)
     drawRoundRect(
-        color = Color(0xFF059669).copy(alpha = 0.85f),
+        color = Color(0xFF10B981).copy(alpha = 0.90f),
         topLeft = Offset(centerX + 240f, centerY - 480f),
         size = Size(280f, 220f),
         cornerRadius = CornerRadius(16f, 16f)
     )
 
     // 5. Major Arterial Highways (Thick Golden Routes)
-    val primaryAvenueColor = Color(0xFFF59E0B) // Golden main avenues (Zubairy & Sixty Street)
-    val expressHighwayColor = Color(0xFF00E5FF) // Cyan express highways
+    val primaryAvenueColor = Color(0xFFF59E0B) // Amber Gold Main Highways
+    val primaryAvenueInner = Color(0xFFFDE047) // Inner Yellow Core
+    val expressHighwayColor = Color(0xFF00E5FF) // Electric Cyan Express Avenues
 
-    // Zubairy Street (Horizontal Main)
+    // Main Horizontal Highway
     drawLine(
         color = primaryAvenueColor,
         start = Offset(0f, centerY),
         end = Offset(widthPx, centerY),
-        strokeWidth = 7.0f
+        strokeWidth = 10.0f
     )
-    // Sixty Street (Vertical Main)
+    drawLine(
+        color = primaryAvenueInner,
+        start = Offset(0f, centerY),
+        end = Offset(widthPx, centerY),
+        strokeWidth = 4.0f
+    )
+
+    // Main Vertical Highway
     drawLine(
         color = primaryAvenueColor,
         start = Offset(centerX, 0f),
         end = Offset(centerX, heightPx),
-        strokeWidth = 7.0f
+        strokeWidth = 10.0f
+    )
+    drawLine(
+        color = primaryAvenueInner,
+        start = Offset(centerX, 0f),
+        end = Offset(centerX, heightPx),
+        strokeWidth = 4.0f
     )
 
-    // Cyan Ring Roads
+    // Electric Cyan Ring Roads
     val ringOffsetPx = 800f / metersPerPx
     drawLine(
         color = expressHighwayColor,
         start = Offset(0f, centerY - ringOffsetPx),
         end = Offset(widthPx, centerY - ringOffsetPx),
-        strokeWidth = 5.0f
+        strokeWidth = 6.0f
     )
     drawLine(
         color = expressHighwayColor,
         start = Offset(0f, centerY + ringOffsetPx),
         end = Offset(widthPx, centerY + ringOffsetPx),
-        strokeWidth = 5.0f
+        strokeWidth = 6.0f
     )
     drawLine(
         color = expressHighwayColor,
         start = Offset(centerX - ringOffsetPx, 0f),
         end = Offset(centerX - ringOffsetPx, heightPx),
-        strokeWidth = 5.0f
+        strokeWidth = 6.0f
     )
     drawLine(
         color = expressHighwayColor,
         start = Offset(centerX + ringOffsetPx, 0f),
         end = Offset(centerX + ringOffsetPx, heightPx),
-        strokeWidth = 5.0f
+        strokeWidth = 6.0f
     )
 
     // 6. Beautiful Arabic Typography Map Labels (Clean, highly visible)
@@ -616,17 +608,63 @@ private fun DrawScope.drawCityRoadGrid(
         setShadowLayer(3f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
-    // Place labels at exact locations relative to centers
-    val districtLabels = listOf(
-        MapLabel("حي حدة الراقي 🏙️", centerX - 350f, centerY - 220f, textPaint),
-        MapLabel("صنعاء القديمة التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
-        MapLabel("حي السبعين العام 🌳", centerX + 260f, centerY + 240f, textPaint),
-        MapLabel("شارع الستين الغربي 🛣️", centerX + 40f, centerY - 500f, streetPaint),
-        MapLabel("شارع الزبيري الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
-        MapLabel("حديقة السبعين 🌲", centerX - 290f, centerY + 320f, parkPaint),
-        MapLabel("حديقة الثورة 🌲", centerX + 380f, centerY - 370f, parkPaint),
-        MapLabel("موقعك الحالي المباشر 📍", centerX + 10f, centerY - 32f, textPaint)
-    )
+    // Construct governorate-specific labels dynamically
+    val districtLabels = when {
+        selectedCity.contains("تعز") -> listOf(
+            MapLabel("قلعة القاهرة التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
+            MapLabel("حي المسبح والروضة 🏙️", centerX - 350f, centerY - 220f, textPaint),
+            MapLabel("شارع جمال عبد الناصر 🛣️", centerX - 250f, centerY - 15f, streetPaint),
+            MapLabel("شارع 26 سبتمبر 🛣️", centerX + 40f, centerY - 500f, streetPaint),
+            MapLabel("حديقة الحوبان 🌲", centerX - 290f, centerY + 320f, parkPaint),
+            MapLabel("حي وادي القاضي 🌳", centerX + 260f, centerY + 240f, textPaint),
+            MapLabel("مركز محافظة تعز 📍", centerX + 10f, centerY - 32f, textPaint)
+        )
+        selectedCity.contains("عدن") -> listOf(
+            MapLabel("صهاريج عدن التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
+            MapLabel("حي المعلا والقلوعة 🏙️", centerX - 350f, centerY - 220f, textPaint),
+            MapLabel("شارع المعلا الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
+            MapLabel("طريق الجسر البحري 🌉", centerX + 40f, centerY - 500f, streetPaint),
+            MapLabel("ساحل كورنيش صيرة 🌊", centerX + 380f, centerY - 370f, parkPaint),
+            MapLabel("حديقة الكمسري 🌲", centerX - 290f, centerY + 320f, parkPaint),
+            MapLabel("حي خور مكسر العام 🌳", centerX + 260f, centerY + 240f, textPaint),
+            MapLabel("العاصمة عدن 📍", centerX + 10f, centerY - 32f, textPaint)
+        )
+        selectedCity.contains("إب") -> listOf(
+            MapLabel("جبل ربي والمدينة القديمة 🏛️", centerX - 30f, centerY - 380f, textPaint),
+            MapLabel("حي أبلان التجاري 🏙️", centerX - 350f, centerY - 220f, textPaint),
+            MapLabel("شارع العدين الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
+            MapLabel("الدائري الغربي 🛣️", centerX + 40f, centerY - 500f, streetPaint),
+            MapLabel("منتزه مشورة الخضراء 🌲", centerX - 290f, centerY + 320f, parkPaint),
+            MapLabel("حي الميدان العام 🌳", centerX + 260f, centerY + 240f, textPaint),
+            MapLabel("مركز محافظة إب 📍", centerX + 10f, centerY - 32f, textPaint)
+        )
+        selectedCity.contains("الحديدة") -> listOf(
+            MapLabel("قلعة الكورنيش التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
+            MapLabel("حي 7 يوليو التجاري 🏙️", centerX - 350f, centerY - 220f, textPaint),
+            MapLabel("شارع صنعاء الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
+            MapLabel("الكورنيش الساحلي 🌊", centerX + 380f, centerY - 370f, parkPaint),
+            MapLabel("حديقة الشعب 🌲", centerX - 290f, centerY + 320f, parkPaint),
+            MapLabel("مركز عروس البحر الأحمر 📍", centerX + 10f, centerY - 32f, textPaint)
+        )
+        selectedCity.contains("حضرموت") || selectedCity.contains("المكلا") -> listOf(
+            MapLabel("حصن الغويزي التاريخي 🏛️", centerX - 30f, centerY - 380f, textPaint),
+            MapLabel("حي السلام والشرج 🏙️", centerX - 350f, centerY - 220f, textPaint),
+            MapLabel("شارع الستين الساحلي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
+            MapLabel("خور المكلا المباشر 🌊", centerX + 380f, centerY - 370f, parkPaint),
+            MapLabel("حديقة 30 نوفمبر 🌲", centerX - 290f, centerY + 320f, parkPaint),
+            MapLabel("مركز مدينة المكلا 📍", centerX + 10f, centerY - 32f, textPaint)
+        )
+        else -> listOf(
+            MapLabel("صنعاء القديمة التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
+            MapLabel("حي حدة الراقي 🏙️", centerX - 350f, centerY - 220f, textPaint),
+            MapLabel("شارع الزبيري الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
+            MapLabel("شارع الستين الغربي 🛣️", centerX + 40f, centerY - 500f, streetPaint),
+            MapLabel("حديقة السبعين 🌲", centerX - 290f, centerY + 320f, parkPaint),
+            MapLabel("حديقة الثورة 🌲", centerX + 380f, centerY - 370f, parkPaint),
+            MapLabel("حي السبعين العام 🌳", centerX + 260f, centerY + 240f, textPaint),
+            MapLabel("موقعك المباشر بالعاصمة 📍", centerX + 10f, centerY - 32f, textPaint)
+        )
+    }
 
     districtLabels.forEach { labelItem ->
         val x = labelItem.x

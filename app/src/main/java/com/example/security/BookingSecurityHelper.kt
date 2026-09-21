@@ -7,7 +7,7 @@ import java.security.MessageDigest
 /**
  * 🔒 BookingSecurityHelper
  * Manages PIN encryption (SHA-256), 3-attempt failure tracking,
- * and 5-minute security lockouts for booking cancellations and modifications.
+ * and 30-minute security lockouts for booking cancellations and modifications.
  */
 object BookingSecurityHelper {
 
@@ -15,7 +15,7 @@ object BookingSecurityHelper {
     private const val KEY_ATTEMPTS_PREFIX = "attempts_"
     private const val KEY_LOCKOUT_PREFIX = "lockout_"
     private const val MAX_ATTEMPTS = 3
-    private const val LOCKOUT_DURATION_MS = 8 * 60 * 60 * 1000L // 8 hours lockout
+    private const val LOCKOUT_DURATION_MS = 30 * 60 * 1000L // 30 minutes lockout (ثلاثون دقيقة)
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -62,7 +62,7 @@ object BookingSecurityHelper {
     }
 
     /**
-     * Records a failed PIN attempt. If attempts reach 3, locks out for 5 minutes.
+     * Records a failed PIN attempt. If attempts reach 3, locks out for 30 minutes (ثلاثون دقيقة).
      * Returns the number of remaining attempts before lockout.
      */
     fun recordFailedAttempt(context: Context, bookingId: String): Int {

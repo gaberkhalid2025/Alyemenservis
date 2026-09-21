@@ -2,6 +2,21 @@ package com.example.data
 
 import androidx.annotation.Keep
 
+/**
+ * 📝 نموذج الحجز (BookingEntity)
+ *
+ * الحقول المعتمدة:
+ * - الاسم: [customerName]
+ * - الهاتف: [customerPhone]
+ * - المنطقة/العنوان: [customerArea]
+ *
+ * الحقول المهجورة (موجودة للتوافقية مع الأنظمة والملفات القديمة فقط ولا يجب استخدامها في المنطق الجديد):
+ * - الأسماء البديلة: [fullName]، [clientName]
+ * - الهواتف البديلة: [clientPhone]
+ * - العناوين البديلة: [fullAddress]، [clientAddress]
+ * - التواريخ البديلة: [dateString] (التاريخ المعتمد هو [date])
+ * - الأوقات البديلة: [timeString] (الوقت المعتمد هو [time])
+ */
 @Keep
 data class BookingEntity(
     val id: String = "",

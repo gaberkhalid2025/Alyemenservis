@@ -16,6 +16,12 @@ enum class BookingStatus(
 ) {
     PENDING("PENDING", "قيد الانتظار", "#F59E0B"),
     UNDER_REVIEW("UNDER_REVIEW", "قيد المراجعة", "#FCD34D"),
+    /**
+     * ⚠️ ملاحظة معمارية:
+     * APPROVED هي مرادف قديم للقيمة ACCEPTED.
+     * القيمة المعتمدة الجديدة هي ACCEPTED.
+     * APPROVED موجودة للتوافقية فقط.
+     */
     ACCEPTED("ACCEPTED", "مقبول", "#10B981"),
     REJECTED("REJECTED", "مرفوض", "#EF4444"),
     IN_PROGRESS("IN_PROGRESS", "قيد التنفيذ", "#3B82F6"),

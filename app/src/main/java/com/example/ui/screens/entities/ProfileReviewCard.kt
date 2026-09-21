@@ -89,6 +89,15 @@ fun ProfileReviewCard(
     }
 }
 
+/**
+ * ⚠️ ملاحظة معمارية:
+ * هذا المكون (EnhancedReviewInput) معرّف لكنه غير مستخدم حالياً في أي شاشة.
+ * يمكن استخدامه مستقبلاً في:
+ * - تقييم الطلبات العاجلة مع صور
+ * - تقييم مع دعم وسائط
+ * 
+ * لا تحذفه — قد يحتاج المشروع إليه في مرحلة لاحقة.
+ */
 @Composable
 fun EnhancedReviewInput(
     onSubmit: (rating: Int, comment: String, images: List<String>) -> Unit,

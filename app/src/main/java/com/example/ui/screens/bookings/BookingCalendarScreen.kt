@@ -42,6 +42,8 @@ import com.example.utils.DateFormatter
 import com.example.utils.HolidayManager
 import com.example.utils.ScheduleManager
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.util.*
 
 /**
@@ -62,6 +64,7 @@ fun BookingCalendarScreen(
     onBookingSuccess: (BookingEntity) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val bookingsList by viewModel.bookings.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
@@ -210,6 +213,13 @@ fun BookingCalendarScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
+                        // ✨ م2-ج3: استخدام DateFormatter
+                        val todayStr = remember { DateFormatter.formatDateDash(System.currentTimeMillis()) }
+                        val max30Str = remember {
+                            val c = Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Aden"))
+                            c.add(Calendar.DAY_OF_YEAR, 30)
+                            DateFormatter.formatDateDash(c.timeInMillis)
+                        }
                         val chunkedDays = daysInMonth.chunked(7)
                         chunkedDays.forEach { rowDays ->
                             Row(
@@ -221,13 +231,6 @@ fun BookingCalendarScreen(
                                         Spacer(modifier = Modifier.weight(1f).height(44.dp))
                                     } else {
                                             val isSelected = dayInfo.dateString == selectedDateString
-                                            // ✨ م2-ج3: استخدام DateFormatter
-                                            val todayStr = remember { DateFormatter.formatDateDash(System.currentTimeMillis()) }
-                                            val max30Str = remember {
-                                                val c = Calendar.getInstance()
-                                                c.add(Calendar.DAY_OF_YEAR, 30)
-                                                DateFormatter.formatDateDash(c.timeInMillis)
-                                            }
                                             val isPast = dayInfo.dateString < todayStr
                                             val isBeyond30 = dayInfo.dateString > max30Str
 
@@ -464,6 +467,12 @@ fun BookingCalendarScreen(
                         }
 
                         calendarViewModel.setSubmitting(true)
+                        coroutineScope.launch {
+                            kotlinx.coroutines.delay(30000L)
+                            if (calendarViewModel.uiState.value.isSubmitting) {
+                                calendarViewModel.setSubmitting(false)
+                            }
+                        }
                         val rawGeneratedPass = "${(1000..9999).random()}"
                         val newBooking = BookingEntity(
                             id = "book_${System.currentTimeMillis()}_${(1000..9999).random()}",

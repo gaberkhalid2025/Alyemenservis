@@ -133,7 +133,7 @@ fun ReviewOffersDialog(
                                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                                 Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(12.dp))
                                                 Text(
-                                                    text = "${offer.technicianRating ?: "جديد"} (24 تقييم)",
+                                                    text = if (offer.technicianRating > 0) "⭐ ${offer.technicianRating}" else "فني جديد",
                                                     color = Color(0xFFF59E0B),
                                                     fontSize = 11.sp
                                                 )

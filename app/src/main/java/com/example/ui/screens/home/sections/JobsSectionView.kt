@@ -55,6 +55,17 @@ fun JobsSectionView(
         }
     }
 
+    var showJobApplicationDialog by remember { mutableStateOf<JobEntity?>(null) }
+
+    showJobApplicationDialog?.let { targetJob ->
+        com.example.ui.dialogs.JobApplicationDialog(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            jobTitle = targetJob.title,
+            onDismiss = { showJobApplicationDialog = null }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -111,7 +122,10 @@ fun JobsSectionView(
         } else {
             filteredList.forEach { job ->
                 Card(
-                    onClick = { onJobClick(job) },
+                    onClick = { 
+                        showJobApplicationDialog = job
+                        onJobClick(job) 
+                    },
                     colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(0.8.dp, themeColors.accent.copy(alpha = 0.3f)),

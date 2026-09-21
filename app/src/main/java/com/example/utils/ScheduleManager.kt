@@ -3,6 +3,7 @@ package com.example.utils
 import com.example.data.BookingEntity
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * 📅 ScheduleManager
@@ -105,7 +106,7 @@ object ScheduleManager {
             val year = parts[0].toIntOrNull() ?: return listOf(startDateString)
             val month = parts[1].toIntOrNull() ?: return listOf(startDateString)
             val day = parts[2].toIntOrNull() ?: return listOf(startDateString)
-            val cal = Calendar.getInstance().apply {
+            val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Aden")).apply {
                 set(Calendar.YEAR, year)
                 set(Calendar.MONTH, month - 1)
                 set(Calendar.DAY_OF_MONTH, day)

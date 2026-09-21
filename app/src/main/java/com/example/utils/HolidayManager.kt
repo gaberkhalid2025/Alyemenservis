@@ -3,6 +3,7 @@ package com.example.utils
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * 🏖️ HolidayManager
@@ -53,7 +54,7 @@ object HolidayManager {
             val year = parts[0].toIntOrNull() ?: return Pair(false, null)
             val month = parts[1].toIntOrNull() ?: return Pair(false, null)
             val day = parts[2].toIntOrNull() ?: return Pair(false, null)
-            val cal = Calendar.getInstance().apply {
+            val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Aden")).apply {
                 set(Calendar.YEAR, year)
                 set(Calendar.MONTH, month - 1)
                 set(Calendar.DAY_OF_MONTH, day)

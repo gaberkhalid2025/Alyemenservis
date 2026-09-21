@@ -3,6 +3,7 @@ package com.example.domain.usecases
 import com.example.data.BookingEntity
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * 🎯 GetAvailableSlotsUseCase
@@ -43,7 +44,7 @@ class GetAvailableSlotsUseCase {
             .map { it.time.ifBlank { it.timeString }.trim() }
             .toSet()
 
-        val cal = Calendar.getInstance()
+        val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Aden"))
         // ✨ م2: استخدام DateFormatter
         val todayStr = com.example.utils.DateFormatter.formatDateDash(cal.timeInMillis)
         val isToday = cleanDate == todayStr

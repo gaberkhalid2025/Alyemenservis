@@ -202,25 +202,20 @@ fun RegisterScreen(
                     password = password
                 )
             }
-            RegistrationType.JOB_APPLICANT -> {
-                val applicantName = (data["entityName"] as? String) ?: (data["fullName"] as? String) ?: "باحث عن عمل"
-                val desiredRole = (data["specialization"] as? String) ?: "طلب توظيف"
-                val quals = (data["qualifications"] as? String) ?: ""
-                val exp = (data["experienceYears"] as? String) ?: ""
-                val notes = if (quals.isNotBlank() || exp.isNotBlank()) "المؤهل: $quals | الخبرة: $exp" else ""
-                
-                viewModel.registerClientUser(applicantName, phone, area, password)
+            RegistrationType.JOB_SEEKER -> {
+                val name = (data["entityName"] as? String) ?: (data["fullName"] as? String) ?: "متقدم للوظيفة"
+                val cat = (data["specialization"] as? String) ?: "باحث عن عمل"
                 viewModel.submitJoinForm(
                     context = context,
-                    name = applicantName,
+                    name = name,
                     phone = phone,
-                    catId = "JOB_APPLICANT",
+                    catId = "JOB_SEEKER",
                     area = area,
-                    neighborhood = notes,
+                    neighborhood = "",
                     photoPath = "",
                     idCardPath = "",
                     gpsCoords = "",
-                    customCategoryName = desiredRole,
+                    customCategoryName = cat,
                     password = password
                 )
             }
@@ -562,13 +557,11 @@ fun RegisterScreen(
                                     }
                                 )
                             }
-                            RegistrationType.JOB_APPLICANT -> {
-                                UnifiedRegistrationForm(
-                                    role = "JOB_APPLICANT",
+                            RegistrationType.JOB_SEEKER -> {
+                                com.example.ui.screens.register.forms.JobSeekerForm(
+                                    viewModel = viewModel,
                                     themeColors = themeColors,
-                                    onRegistrationSuccess = { map ->
-                                        handleFormSubmit(map, RegistrationType.JOB_APPLICANT)
-                                    }
+                                    onSuccess = { selectedType = null }
                                 )
                             }
                             RegistrationType.CLIENT, null -> {

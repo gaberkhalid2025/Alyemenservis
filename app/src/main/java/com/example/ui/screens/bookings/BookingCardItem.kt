@@ -43,7 +43,10 @@ fun BookingCardItem(
     var isPasswordVisible by remember { mutableStateOf(false) }
 
     val isUserTheClient = remember(booking, currentUserId) {
-        !isAdmin && (booking.clientId == currentUserId || booking.clientPhone == currentUserId || booking.customerPhone == currentUserId || !isProvider)
+        val normalizedCurrentUser = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserId)
+        val normalizedClientPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(booking.clientPhone)
+        val normalizedCustomerPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(booking.customerPhone)
+        !isAdmin && (booking.clientId == currentUserId || normalizedClientPhone == normalizedCurrentUser || normalizedCustomerPhone == normalizedCurrentUser || !isProvider)
     }
 
     val canModifyOrCancel = BookingUtils.canModifyOrCancelBooking(

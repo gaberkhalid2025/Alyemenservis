@@ -59,6 +59,7 @@ class StatusViewModel(
     val eventFlow: SharedFlow<StatusEvent> = _eventFlow.asSharedFlow()
 
     private var autoRefreshJob: Job? = null
+    private var loadDataJob: Job? = null
 
     init {
         loadStatusData()
@@ -70,7 +71,8 @@ class StatusViewModel(
     }
 
     fun loadStatusData() {
-        viewModelScope.launch {
+        loadDataJob?.cancel()
+        loadDataJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
             launch {
@@ -109,6 +111,7 @@ class StatusViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRefreshing = true)
             val result = statusRepository.refreshSystemStatus()
+            loadStatusData()
             _uiState.value = _uiState.value.copy(isRefreshing = false)
             if (result.isSuccess) {
                 _eventFlow.emit(StatusEvent.ShowSnackbar("🔄 تم تحديث حالات وبيانات المنصة"))

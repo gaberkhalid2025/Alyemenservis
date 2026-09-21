@@ -1,3 +1,17 @@
+/**
+ * ⚠️ ملاحظة معمارية:
+ * هذا الملف يحتوي على 500+ سطر في Composable واحد.
+ * يجب تقسيمه في مرحلة التنظيف إلى:
+ * 
+ * 1. OrdersScreenLayout.kt - الحاوية الرئيسية
+ * 2. InstantRequestOrderCard.kt - بطاقة الطلب الفوري
+ * 3. StoreOrderCard.kt - بطاقة طلب المتجر
+ * 4. OrderDeletionDialog.kt - حوار حذف الطلب
+ * 5. DeleteAllOrdersDialog.kt - حوار حذف الكل
+ * 
+ * لا تقسّم الملف الآن، فقط وثّق الخطة.
+ */
+
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.bookings

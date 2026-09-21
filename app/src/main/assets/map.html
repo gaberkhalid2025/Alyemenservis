@@ -10,6 +10,10 @@
     <link rel="stylesheet" href="MarkerCluster.css" />
     <link rel="stylesheet" href="MarkerCluster.Default.css" />
     
+    <!-- Local Leaflet and MarkerCluster JS -->
+    <script src="leaflet.js"></script>
+    <script src="leaflet.markercluster.js"></script>
+    
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body {
@@ -244,19 +248,21 @@
         // Safe default coordinates (Sana'a center: 15.3694, 44.1910)
         var userLat = 15.3694;
         var userLng = 44.1910;
-        try {
-            if (window.AndroidBridge) {
-                if (typeof window.AndroidBridge.getUserLat === 'function') {
-                    var parsedLat = parseFloat(window.AndroidBridge.getUserLat());
-                    if (!isNaN(parsedLat) && parsedLat !== 0) userLat = parsedLat;
+        function loadBridgeCoords() {
+            try {
+                if (window.AndroidBridge) {
+                    if (typeof window.AndroidBridge.getUserLat === 'function') {
+                        var parsedLat = parseFloat(window.AndroidBridge.getUserLat());
+                        if (!isNaN(parsedLat) && parsedLat !== 0) userLat = parsedLat;
+                    }
+                    if (typeof window.AndroidBridge.getUserLng === 'function') {
+                        var parsedLng = parseFloat(window.AndroidBridge.getUserLng());
+                        if (!isNaN(parsedLng) && parsedLng !== 0) userLng = parsedLng;
+                    }
                 }
-                if (typeof window.AndroidBridge.getUserLng === 'function') {
-                    var parsedLng = parseFloat(window.AndroidBridge.getUserLng());
-                    if (!isNaN(parsedLng) && parsedLng !== 0) userLng = parsedLng;
-                }
+            } catch(e) {
+                console.error("Coordinate retrieval exception: " + e);
             }
-        } catch(e) {
-            console.error("Coordinate retrieval exception: " + e);
         }
         var map = null;
         var clusterGroup = null;
@@ -297,6 +303,7 @@
             }
 
             try {
+                loadBridgeCoords();
                 if (isNaN(userLat) || userLat === 0) userLat = 15.3694;
                 if (isNaN(userLng) || userLng === 0) userLng = 44.1910;
 
@@ -307,23 +314,43 @@
                     zoomAnimation: true
                 }).setView([userLat, userLng], 14);
 
-                // OpenStreetMap Standard Tiles (Fast, worldwide, reliable & no rate limit headers)
-                var primaryLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                // Standard OpenStreetMap & Google Maps hybrid tile layers for Yemen region
+                var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     subdomains: ['a', 'b', 'c'],
-                    attribution: 'OpenStreetMap contributors'
+                    attribution: '&copy; OpenStreetMap contributors'
                 });
 
-                primaryLayer.on('tileerror', function() {
-                    console.warn("Primary tile server warning. Adding Google Maps fallback tile source...");
-                    var googleBackup = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                        maxZoom: 20,
-                        subdomains: ['0', '1', '2', '3']
-                    });
-                    googleBackup.addTo(map);
+                var googleLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['0', '1', '2', '3'],
+                    attribution: 'Google Maps'
                 });
 
-                primaryLayer.addTo(map);
+                var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    subdomains: ['a', 'b', 'c', 'd'],
+                    attribution: 'CartoDB'
+                });
+
+                // Add OpenStreetMap as primary layer
+                osmLayer.addTo(map);
+
+                // Add fallback handler if OSM fails
+                osmLayer.on('tileerror', function() {
+                    console.warn("OSM tile notice, adding Google Maps fallback layer...");
+                    if (!map.hasLayer(googleLayer)) {
+                        googleLayer.addTo(map);
+                    }
+                });
+
+                // Layer control for user to switch map styles if desired
+                var baseMaps = {
+                    "خريطة الشوارع المباشرة (OpenStreetMap)": osmLayer,
+                    "خرائط جوجل (Google Maps)": googleLayer,
+                    "خريطة كارتو دي بي (CartoDB)": cartoLayer
+                };
+                L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
                 var userIcon = L.divIcon({
                     className: 'user-marker-container',

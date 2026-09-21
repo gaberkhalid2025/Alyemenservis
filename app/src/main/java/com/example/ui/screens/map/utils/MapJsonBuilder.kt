@@ -45,18 +45,11 @@ object MapJsonBuilder {
         val jsonArray = JSONArray()
 
         // 1. Providers
-        nearbyProviders.forEachIndexed { idx, p ->
+        nearbyProviders.forEach { p ->
             val baseCoords = getProviderCoords(p)
-            val walkOffset = dynamicOffsets[p.id] ?: Pair(0.0, 0.0)
-            var rawLat = baseCoords.first + walkOffset.first
-            var rawLng = baseCoords.second + walkOffset.second
-
-            val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
-            if (isApproximate) {
-                val cityBase = com.example.utils.getAreaCoords(p.area.ifBlank { p.cityId.ifBlank { "صنعاء" } })
-                rawLat = cityBase.first + ((idx % 7) * 0.002 - 0.006)
-                rawLng = cityBase.second + (((idx / 7) % 7) * 0.002 - 0.006)
-            }
+            val rawLat = baseCoords.first
+            val rawLng = baseCoords.second
+            val isApproximate = p.latitude == 0.0 || p.longitude == 0.0
 
             val categoryEmoji = when {
                 p.categoryId.contains("spaka") || p.profession.contains("سباك") -> "🔧"
@@ -92,7 +85,7 @@ object MapJsonBuilder {
         }
 
         // 2. Stores & Medical Centers & Restaurants
-        nearbyStores.forEachIndexed { idx, s ->
+        nearbyStores.forEach { s ->
             val coords = getStoreCoords(s)
             val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.categoryId.contains("pharmacy") || s.medicalLicenseNo.isNotBlank() || s.name.contains("طبي") || s.name.contains("مستشفى") || s.name.contains("عيادة") || s.name.contains("صيدلية")
             val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("مأكولات") || s.name.contains("كافيه") || s.name.contains("شاورما"))
@@ -104,14 +97,9 @@ object MapJsonBuilder {
                 else -> "🏪"
             }
 
-            var rawLat = coords.first
-            var rawLng = coords.second
-            val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
-            if (isApproximate) {
-                val cityBase = com.example.utils.getAreaCoords(s.localNeighborhood.ifBlank { s.cityId.ifBlank { "صنعاء" } })
-                rawLat = cityBase.first + (((idx + 2) % 7) * 0.002 - 0.006)
-                rawLng = cityBase.second + ((((idx + 2) / 7) % 7) * 0.002 - 0.006)
-            }
+            val rawLat = coords.first
+            val rawLng = coords.second
+            val isApproximate = s.latitude == 0.0 || s.longitude == 0.0
 
             val (badgeColor, categoryLabel) = when {
                 isMedical -> Pair("#EC4899", "مراكز طبية وصيدليات")
@@ -140,16 +128,11 @@ object MapJsonBuilder {
         }
 
         // 3. Properties
-        nearbyProperties.forEachIndexed { idx, pr ->
+        nearbyProperties.forEach { pr ->
             val coords = getPropertyCoords(pr)
-            var rawLat = coords.first
-            var rawLng = coords.second
-            val isApproximate = (rawLat == 0.0 && rawLng == 0.0) || rawLat.isNaN() || rawLng.isNaN() || rawLat !in -90.0..90.0 || rawLng !in -180.0..180.0
-            if (isApproximate) {
-                val cityBase = com.example.utils.getAreaCoords(pr.localNeighborhood.ifBlank { pr.cityId.ifBlank { "صنعاء" } })
-                rawLat = cityBase.first + (((idx + 4) % 7) * 0.002 - 0.006)
-                rawLng = cityBase.second + ((((idx + 4) / 7) % 7) * 0.002 - 0.006)
-            }
+            val rawLat = coords.first
+            val rawLng = coords.second
+            val isApproximate = pr.latitude == 0.0 || pr.longitude == 0.0
 
             val priceFormatted = if (pr.price > 0) "${pr.price} ${pr.currency.ifEmpty { "ريال" }}" else "حسب الاتفاق"
             val cleanDesc = pr.description.ifBlank { "عقار معروض" }.take(60)
