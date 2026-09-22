@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.BookingEntity
+import com.example.utils.BookingStateMachine
 import com.example.utils.BookingUtils
 
 /**
@@ -65,23 +66,16 @@ fun BookingCardItem(
 
     val isTerminalState = booking.status in listOf("COMPLETED", "CANCELLED", "REJECTED")
 
-    val statusColor = when (booking.status) {
-        "APPROVED" -> Color(0xFF10B981)
-        "PENDING" -> Color(0xFFF59E0B)
-        "IN_PROGRESS" -> Color(0xFF8B5CF6)
-        "COMPLETED" -> Color(0xFF3B82F6)
-        "CANCELLED", "REJECTED" -> Color(0xFFEF4444)
-        else -> MaterialTheme.colorScheme.primary
+    val statusColor = remember(booking.status) {
+        try {
+            Color(android.graphics.Color.parseColor(BookingStateMachine.getStatusColor(booking.status)))
+        } catch (e: Exception) {
+            Color(0xFFF59E0B)
+        }
     }
 
-    val statusText = when (booking.status) {
-        "APPROVED" -> "مقبول ومؤكد ✅"
-        "PENDING" -> "قيد الانتظار ⏳"
-        "IN_PROGRESS" -> "جاري التنفيذ ⚙️"
-        "COMPLETED" -> "مكتمل بنجاح 🎉"
-        "CANCELLED" -> "ملغي ❌"
-        "REJECTED" -> "مرفوض 🚫"
-        else -> booking.status
+    val statusText = remember(booking.status) {
+        BookingStateMachine.getStatusLabel(booking.status)
     }
 
     Card(

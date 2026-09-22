@@ -14,8 +14,8 @@ object AnalyticsEventsHelper {
             } else {
                 MyApplication.logFirebaseEvent(eventName, params)
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (e: Throwable) {
+            // Safe logging fallback - do not crash if Firebase is not initialized or in test environment
         }
     }
 

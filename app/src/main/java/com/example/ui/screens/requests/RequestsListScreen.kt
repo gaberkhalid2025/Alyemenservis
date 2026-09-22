@@ -47,7 +47,6 @@ fun RequestsListScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: الكل / النشطة, 1: المكتملة, 2: الملغية
     val requestsList by instantViewModel.instantRequests.collectAsState()
-    var isRefreshing by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     val tabs = listOf("النشطة", "المكتملة", "الملغية")
@@ -88,9 +87,16 @@ fun RequestsListScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { refreshRequests() }) {
-                        if (isRefreshing) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    IconButton(
+                        onClick = { refreshRequests() },
+                        enabled = !isLoading
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         } else {
                             Icon(Icons.Default.Refresh, contentDescription = "تحديث الطلبات")
                         }

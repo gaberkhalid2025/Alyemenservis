@@ -471,7 +471,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         note: String,
         onComplete: (Boolean) -> Unit = {}
     ) {
-        val cleanPhone = phone.trim().replace(" ", "")
+        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
         val currentTime = System.currentTimeMillis()
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
@@ -497,14 +497,15 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         )
         db.collection("password_recovery_requests").document(cleanPhone).set(adminRecoveryRequest)
 
-        val adminNotifId = java.util.UUID.randomUUID().toString()
+        val adminNotifId = "PWD_RESET_ADMIN_$cleanPhone"
         val adminNotif = mapOf(
             "id" to adminNotifId,
             "title" to "🔑 طلب استعادة حساب جديد",
             "message" to "ورد طلب استعادة حساب للرقم: $cleanPhone عبر قناة $channel",
             "targetType" to "ADMIN_ONLY",
             "targetValue" to "ALL",
-            "timestamp" to currentTime
+            "timestamp" to currentTime,
+            "dedupKey" to "PWD_RESET_$cleanPhone"
         )
         db.collection("notifications").document(adminNotifId).set(adminNotif)
             .addOnSuccessListener { onComplete(true) }

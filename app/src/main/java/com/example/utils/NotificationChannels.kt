@@ -1,48 +1,35 @@
 package com.example.utils
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
 
 /**
- * 🔔 Centralized Notification Channels Manager
+ * 🔔 Centralized Notification Channels Manager (Delegates to NotificationChannelsRegistry)
  */
 object NotificationChannels {
     
-    const val CHAT_MESSAGES = "chat_messages"
-    const val CHAT_VOICE = "chat_voice"
-    const val CHAT_MEDIA = "chat_media"
-    const val URGENT_ALERTS = "urgent_alerts"
-    const val BOOKING_REMINDERS = "booking_reminders"
-    const val GENERAL = "general_notifications"
+    // Approved 10 Channels Mapping
+    const val CHAT_MESSAGES = NotificationChannelsRegistry.CHANNEL_CHAT_MESSAGES_ALIAS
+    const val CHAT_VOICE = NotificationChannelsRegistry.CHANNEL_CHAT_VOICE_ALIAS
+    const val CHAT_MEDIA = NotificationChannelsRegistry.CHANNEL_CHAT_MEDIA_ALIAS
+    const val URGENT_ALERTS = NotificationChannelsRegistry.CHANNEL_URGENT_ALERTS_ALIAS
+    const val BOOKING_REMINDERS = NotificationChannelsRegistry.CHANNEL_BOOKING_REMINDER_ALIAS
+    const val GENERAL = NotificationChannelsRegistry.CHANNEL_YEMEN_SERVICES_FCM
+    
+    // Admin & Secondary Channels
+    const val ADMIN_CRITICAL = NotificationChannelsRegistry.CHANNEL_ADMIN_CRITICAL
+    const val ADMIN_NORMAL = NotificationChannelsRegistry.CHANNEL_ADMIN_NORMAL
+    const val USER_BOOKINGS = NotificationChannelsRegistry.CHANNEL_BOOKINGS_ALERTS
+    const val USER_CHAT = NotificationChannelsRegistry.CHANNEL_CHAT_MESSAGES_ALIAS
+    const val USER_GENERAL = NotificationChannelsRegistry.CHANNEL_YEMEN_SERVICES_FCM
+    
+    // Legacy / Specific Provider Channels
+    const val CHAT_MESSAGES_CHANNEL = NotificationChannelsRegistry.CHANNEL_CHAT_MESSAGES_ALIAS
+    const val CHAT_VOICE_CHANNEL = NotificationChannelsRegistry.CHANNEL_CHAT_VOICE_ALIAS
+    const val CHAT_MEDIA_CHANNEL = NotificationChannelsRegistry.CHANNEL_CHAT_MEDIA_ALIAS
+    const val URGENT_ALERTS_CHANNEL = NotificationChannelsRegistry.CHANNEL_URGENT_ALERTS_ALIAS
+    const val BOOKING_REMINDER_CHANNEL = NotificationChannelsRegistry.CHANNEL_BOOKING_REMINDER_ALIAS
     
     fun createAll(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-        
-        val channels = listOf(
-            NotificationChannel(CHAT_MESSAGES, "رسائل المحادثات", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "إشعارات الرسائل الفورية في المحادثات"
-            },
-            NotificationChannel(CHAT_VOICE, "الرسائل الصوتية", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "إشعارات المكالمات والرسائل الصوتية"
-            },
-            NotificationChannel(CHAT_MEDIA, "الوسائط والمستندات", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "إشعارات الصور والمستندات المرسلة"
-            },
-            NotificationChannel(URGENT_ALERTS, "الطلبات العاجلة", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "تنبيهات طلبات الخدمة الفورية والمزادات"
-            },
-            NotificationChannel(BOOKING_REMINDERS, "تذكيرات الحجوزات", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "تذكيرات بمواعيد الحجوزات وتغيير الحالات"
-            },
-            NotificationChannel(GENERAL, "إشعارات عامة", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "إشعارات التحديثات والعروض العامة"
-            }
-        )
-        
-        manager.createNotificationChannels(channels)
+        NotificationChannelsRegistry.createAll(context)
     }
 }

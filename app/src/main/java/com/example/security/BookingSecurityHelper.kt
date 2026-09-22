@@ -22,17 +22,11 @@ object BookingSecurityHelper {
     }
 
     /**
-     * Hashes a PIN or password using SHA-256 for secure comparison.
+     * Hashes a PIN or password using SecureHasher (PBKDF2/SHA-256) for secure comparison.
      */
     fun hashPin(pin: String): String {
         if (pin.isBlank()) return ""
-        return try {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hashBytes = digest.digest(pin.trim().toByteArray(Charsets.UTF_8))
-            hashBytes.joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) {
-            pin.trim()
-        }
+        return com.example.utils.SecureHasher.hashPin(pin)
     }
 
     /**

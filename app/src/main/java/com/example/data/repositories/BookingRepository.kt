@@ -36,15 +36,15 @@ import java.util.UUID
  */
 class BookingRepository(
     private val context: Context,
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val memoryCache: BookingCache = BookingCache()
-) {
+) : IBookingRepository {
 
-    private val firestore = FirebaseFirestore.getInstance()
     private val cacheManager = LocalAppCacheManager(context)
     private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
 
     private val _cachedBookings = MutableStateFlow<List<BookingEntity>>(emptyList())
-    val cachedBookings: StateFlow<List<BookingEntity>> = _cachedBookings.asStateFlow()
+    override val cachedBookings: StateFlow<List<BookingEntity>> = _cachedBookings.asStateFlow()
 
     init {
         loadFromCache()
@@ -107,17 +107,17 @@ class BookingRepository(
     /**
      * Realtime flow of all bookings for a user with offline fallback.
      */
-    fun getUserBookings(userId: String, pageLimit: Long = 50): Flow<List<BookingEntity>> = getBookingsFlow(userId, isProvider = false)
+    override fun getUserBookings(userId: String, pageLimit: Long): Flow<List<BookingEntity>> = getBookingsFlow(userId, isProvider = false)
 
     /**
      * Realtime flow of all bookings for a provider with offline fallback.
      */
-    fun getProviderBookings(providerId: String, pageLimit: Long = 50): Flow<List<BookingEntity>> = getBookingsFlow(providerId, isProvider = true)
+    override fun getProviderBookings(providerId: String, pageLimit: Long): Flow<List<BookingEntity>> = getBookingsFlow(providerId, isProvider = true)
 
     /**
      * Realtime flow of all bookings for a user or provider with offline fallback.
      */
-    fun getBookingsFlow(userId: String, isProvider: Boolean = false): Flow<List<BookingEntity>> = callbackFlow {
+    override fun getBookingsFlow(userId: String, isProvider: Boolean): Flow<List<BookingEntity>> = callbackFlow {
         val cacheKey = if (userId.isNotBlank()) "${if (isProvider) "provider" else "user"}_$userId" else "all_bookings"
         val inMemory = memoryCache.getBookings(cacheKey)
         if (inMemory != null && inMemory.isNotEmpty()) {
@@ -167,9 +167,9 @@ class BookingRepository(
     /**
      * Creates a new booking with auto-generated booking code and hashed PIN.
      */
-    fun createBooking(
+    override fun createBooking(
         booking: BookingEntity,
-        rawPasswordPin: String = "",
+        rawPasswordPin: String,
         onSuccess: (BookingEntity) -> Unit,
         onError: (String) -> Unit
     ) {
@@ -266,7 +266,7 @@ class BookingRepository(
                     }
 
                     try {
-                        BookingNotificationManager(context).notifyBookingCreated(finalBooking)
+                        BookingNotificationManager(context, firestore).notifyBookingCreated(finalBooking)
                     } catch (e: Exception) {}
 
                     val adminNotifId = UUID.randomUUID().toString()
@@ -303,7 +303,7 @@ class BookingRepository(
     /**
      * Updates status of a booking (e.g. APPROVED, IN_PROGRESS, COMPLETED).
      */
-    fun updateBookingStatus(
+    override fun updateBookingStatus(
         bookingId: String,
         newStatus: String,
         onSuccess: () -> Unit,
@@ -334,7 +334,7 @@ class BookingRepository(
     /**
      * Cancels booking enforcing 8-hour rule and PIN verification.
      */
-    fun cancelBookingWithSecurity(
+    override fun cancelBookingWithSecurity(
         booking: BookingEntity,
         inputPinOrPassword: String,
         cancellationReason: String,
@@ -501,7 +501,7 @@ class BookingRepository(
     /**
      * Updates booking details (date, time, address, details) with 8-hour check.
      */
-    fun updateBookingDetails(
+    override fun updateBookingDetails(
         updatedBooking: BookingEntity,
         inputPin: String,
         onSuccess: () -> Unit,
@@ -547,7 +547,7 @@ class BookingRepository(
     /**
      * Deletes booking from database.
      */
-    fun deleteBooking(bookingId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    override fun deleteBooking(bookingId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val current = _cachedBookings.value.filter { it.id != bookingId }
         saveToCache(current)
 

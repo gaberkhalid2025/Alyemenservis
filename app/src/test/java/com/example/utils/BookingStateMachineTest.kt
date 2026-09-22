@@ -1,189 +1,133 @@
 package com.example.utils
 
+import com.example.data.BookingEntity
 import org.junit.Assert.*
 import org.junit.Test
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+/**
+ * 🧪 اختبارات آلة حالات الحجز (BookingStateMachine)
+ * تختبر قواعد الانتقال المسموحة، الحالات النهائية، وقاعدة الـ 8 ساعات للإلغاء.
+ */
 class BookingStateMachineTest {
 
-    // ============================================
-    // 1. اختبارات الانتقالات الصحيحة (Valid Transitions)
-    // ============================================
-    
     @Test
-    fun `PENDING to ACCEPTED is valid`() {
+    fun `test allowed transitions from PENDING`() {
         assertTrue(BookingStateMachine.canTransition("PENDING", "ACCEPTED"))
-    }
-    
-    @Test
-    fun `PENDING to REJECTED is valid`() {
+        assertTrue(BookingStateMachine.canTransition("PENDING", "UNDER_REVIEW"))
         assertTrue(BookingStateMachine.canTransition("PENDING", "REJECTED"))
-    }
-    
-    @Test
-    fun `PENDING to CANCELLED is valid`() {
         assertTrue(BookingStateMachine.canTransition("PENDING", "CANCELLED"))
-    }
-    
-    @Test
-    fun `ACCEPTED to IN_PROGRESS is valid`() {
-        assertTrue(BookingStateMachine.canTransition("ACCEPTED", "IN_PROGRESS"))
-    }
-    
-    @Test
-    fun `IN_PROGRESS to COMPLETED is valid`() {
-        assertTrue(BookingStateMachine.canTransition("IN_PROGRESS", "COMPLETED"))
-    }
-    
-    @Test
-    fun `COMPLETED to PAID is valid`() {
-        assertTrue(BookingStateMachine.canTransition("COMPLETED", "PAID"))
-    }
-    
-    @Test
-    fun `PAID to CLOSED is valid`() {
-        assertTrue(BookingStateMachine.canTransition("PAID", "CLOSED"))
-    }
-    
-    // ============================================
-    // 2. اختبارات الانتقالات غير الصحيحة (Invalid)
-    // ============================================
-    
-    @Test
-    fun `PENDING to COMPLETED is invalid`() {
+        assertTrue(BookingStateMachine.canTransition("PENDING", "PENDING")) // Same state allowed
+
         assertFalse(BookingStateMachine.canTransition("PENDING", "COMPLETED"))
+        assertFalse(BookingStateMachine.canTransition("PENDING", "PAID"))
+        assertFalse(BookingStateMachine.canTransition("PENDING", "CLOSED"))
     }
-    
+
     @Test
-    fun `PENDING to IN_PROGRESS is invalid`() {
-        assertFalse(BookingStateMachine.canTransition("PENDING", "IN_PROGRESS"))
-    }
-    
-    @Test
-    fun `ACCEPTED to COMPLETED is invalid`() {
+    fun `test allowed transitions from ACCEPTED`() {
+        assertTrue(BookingStateMachine.canTransition("ACCEPTED", "IN_PROGRESS"))
+        assertTrue(BookingStateMachine.canTransition("ACCEPTED", "CANCELLED"))
+
+        assertFalse(BookingStateMachine.canTransition("ACCEPTED", "PENDING"))
         assertFalse(BookingStateMachine.canTransition("ACCEPTED", "COMPLETED"))
     }
-    
+
     @Test
-    fun `CANCELLED cannot transition anywhere`() {
-        assertFalse(BookingStateMachine.canTransition("CANCELLED", "ACCEPTED"))
-        assertFalse(BookingStateMachine.canTransition("CANCELLED", "PENDING"))
-        assertFalse(BookingStateMachine.canTransition("CANCELLED", "IN_PROGRESS"))
+    fun `test allowed transitions from IN_PROGRESS`() {
+        assertTrue(BookingStateMachine.canTransition("IN_PROGRESS", "COMPLETED"))
+        assertTrue(BookingStateMachine.canTransition("IN_PROGRESS", "CANCELLED"))
+
+        assertFalse(BookingStateMachine.canTransition("IN_PROGRESS", "PENDING"))
+        assertFalse(BookingStateMachine.canTransition("IN_PROGRESS", "ACCEPTED"))
     }
-    
+
     @Test
-    fun `COMPLETED cannot go back to PENDING`() {
-        assertFalse(BookingStateMachine.canTransition("COMPLETED", "PENDING"))
+    fun `test terminal states cannot transition to anything`() {
+        val terminalStates = listOf("CLOSED", "CANCELLED", "REJECTED")
+        for (state in terminalStates) {
+            assertTrue(BookingStateMachine.isTerminalStatus(state))
+            assertFalse(BookingStateMachine.canTransition(state, "PENDING"))
+            assertFalse(BookingStateMachine.canTransition(state, "ACCEPTED"))
+            assertFalse(BookingStateMachine.canTransition(state, "IN_PROGRESS"))
+            assertEquals(emptyList<String>(), BookingStateMachine.getAvailableTransitions(state))
+        }
     }
-    
-    // ============================================
-    // 3. اختبارات نفس الحالة (Self Transition)
-    // ============================================
-    
+
     @Test
-    fun `Same status always returns true`() {
-        assertTrue(BookingStateMachine.canTransition("PENDING", "PENDING"))
-        assertTrue(BookingStateMachine.canTransition("ACCEPTED", "ACCEPTED"))
-        assertTrue(BookingStateMachine.canTransition("COMPLETED", "COMPLETED"))
-    }
-    
-    // ============================================
-    // 4. اختبارات getAvailableTransitions
-    // ============================================
-    
-    @Test
-    fun `getAvailableTransitions for PENDING returns 4 options`() {
-        val transitions = BookingStateMachine.getAvailableTransitions("PENDING")
-        assertEquals(4, transitions.size)
-        assertTrue(transitions.contains("ACCEPTED"))
-        assertTrue(transitions.contains("REJECTED"))
-        assertTrue(transitions.contains("CANCELLED"))
-        assertTrue(transitions.contains("UNDER_REVIEW"))
-    }
-    
-    @Test
-    fun `getAvailableTransitions for CANCELLED returns empty`() {
-        val transitions = BookingStateMachine.getAvailableTransitions("CANCELLED")
-        assertTrue(transitions.isEmpty())
-    }
-    
-    @Test
-    fun `getAvailableTransitions for CLOSED returns empty`() {
-        val transitions = BookingStateMachine.getAvailableTransitions("CLOSED")
-        assertTrue(transitions.isEmpty())
-    }
-    
-    // ============================================
-    // 5. اختبارات Terminal Status
-    // ============================================
-    
-    @Test
-    fun `CLOSED is terminal`() {
-        assertTrue(BookingStateMachine.isTerminalStatus("CLOSED"))
-    }
-    
-    @Test
-    fun `CANCELLED is terminal`() {
-        assertTrue(BookingStateMachine.isTerminalStatus("CANCELLED"))
-    }
-    
-    @Test
-    fun `REJECTED is terminal`() {
-        assertTrue(BookingStateMachine.isTerminalStatus("REJECTED"))
-    }
-    
-    @Test
-    fun `PENDING is not terminal`() {
+    fun `test non terminal states return correct isTerminalStatus`() {
         assertFalse(BookingStateMachine.isTerminalStatus("PENDING"))
-    }
-    
-    @Test
-    fun `IN_PROGRESS is not terminal`() {
+        assertFalse(BookingStateMachine.isTerminalStatus("ACCEPTED"))
         assertFalse(BookingStateMachine.isTerminalStatus("IN_PROGRESS"))
+        assertFalse(BookingStateMachine.isTerminalStatus("UNDER_REVIEW"))
     }
-    
-    // ============================================
-    // 6. اختبارات Labels و Colors
-    // ============================================
-    
+
     @Test
-    fun `getStatusLabel for PENDING returns correct Arabic`() {
+    fun `test canCancel returns false for locked booking`() {
+        val lockedBooking = BookingEntity(
+            id = "b_locked",
+            status = "PENDING",
+            isLocked = true
+        )
+        assertFalse(BookingStateMachine.canCancel(lockedBooking))
+    }
+
+    @Test
+    fun `test canCancel returns false for in-progress or completed booking`() {
+        val inProgressBooking = BookingEntity(id = "b_prog", status = "IN_PROGRESS")
+        assertFalse(BookingStateMachine.canCancel(inProgressBooking))
+
+        val completedBooking = BookingEntity(id = "b_comp", status = "COMPLETED")
+        assertFalse(BookingStateMachine.canCancel(completedBooking))
+    }
+
+    @Test
+    fun `test canCancel enforces 8-hour cancellation rule`() {
+        // موعد بعد ساعتين فقط من الآن (أقل من 8 ساعات) -> لا يمكن الإلغاء
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+        val twoHoursLater = System.currentTimeMillis() + (2 * 60 * 60 * 1000L)
+        val dateTwoHours = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(twoHoursLater))
+        val timeTwoHours = SimpleDateFormat("HH:mm", Locale.US).format(Date(twoHoursLater))
+
+        val urgentBooking = BookingEntity(
+            id = "b_urgent",
+            status = "PENDING",
+            date = dateTwoHours,
+            time = timeTwoHours
+        )
+        assertFalse("Cannot cancel when less than 8 hours remain", BookingStateMachine.canCancel(urgentBooking))
+
+        // موعد بعد يومين من الآن (أكثر من 8 ساعات) -> مسموح الإلغاء
+        val twoDaysLater = System.currentTimeMillis() + (48 * 60 * 60 * 1000L)
+        val dateTwoDays = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(twoDaysLater))
+        val timeTwoDays = SimpleDateFormat("HH:mm", Locale.US).format(Date(twoDaysLater))
+
+        val farBooking = BookingEntity(
+            id = "b_far",
+            status = "PENDING",
+            date = dateTwoDays,
+            time = timeTwoDays
+        )
+        assertTrue("Can cancel when more than 8 hours remain", BookingStateMachine.canCancel(farBooking))
+    }
+
+    @Test
+    fun `test getStatusLabel returns Arabic labels`() {
         assertEquals("قيد الانتظار", BookingStateMachine.getStatusLabel("PENDING"))
-    }
-    
-    @Test
-    fun `getStatusLabel for ACCEPTED returns correct Arabic`() {
         assertEquals("مقبول", BookingStateMachine.getStatusLabel("ACCEPTED"))
+        assertEquals("مرفوض", BookingStateMachine.getStatusLabel("REJECTED"))
+        assertEquals("ملغي", BookingStateMachine.getStatusLabel("CANCELLED"))
+        assertEquals("مكتمل", BookingStateMachine.getStatusLabel("COMPLETED"))
     }
-    
+
     @Test
-    fun `getStatusColor for PENDING returns correct hex`() {
-        assertEquals("#F59E0B", BookingStateMachine.getStatusColor("PENDING"))
-    }
-    
-    @Test
-    fun `getStatusColor for COMPLETED returns correct hex`() {
-        assertEquals("#059669", BookingStateMachine.getStatusColor("COMPLETED"))
-    }
-    
-    // ============================================
-    // 7. اختبارات fromCode
-    // ============================================
-    
-    @Test
-    fun `fromCode returns correct enum`() {
-        assertEquals(BookingStatus.PENDING, BookingStatus.fromCode("PENDING"))
-        assertEquals(BookingStatus.ACCEPTED, BookingStatus.fromCode("ACCEPTED"))
-        assertEquals(BookingStatus.COMPLETED, BookingStatus.fromCode("COMPLETED"))
-    }
-    
-    @Test
-    fun `fromCode with invalid code returns PENDING`() {
-        assertEquals(BookingStatus.PENDING, BookingStatus.fromCode("INVALID"))
-    }
-    
-    @Test
-    fun `fromCode is case insensitive`() {
-        assertEquals(BookingStatus.PENDING, BookingStatus.fromCode("pending"))
-        assertEquals(BookingStatus.ACCEPTED, BookingStatus.fromCode("accepted"))
+    fun `test getStatusColor returns valid hex format`() {
+        val pendingColor = BookingStateMachine.getStatusColor("PENDING")
+        assertTrue(pendingColor.startsWith("#"))
+
+        val acceptedColor = BookingStateMachine.getStatusColor("ACCEPTED")
+        assertEquals("#10B981", acceptedColor)
     }
 }

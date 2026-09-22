@@ -69,7 +69,16 @@ class AgoraVoiceManager(private val context: Context) {
         initializeRtcEngine()
     }
 
+    /**
+     * Checks whether Agora App ID has been configured.
+     */
+    fun isConfigured(): Boolean = AGORA_APP_ID.isNotBlank()
+
     private fun initializeRtcEngine() {
+        if (AGORA_APP_ID.isBlank()) {
+            Log.d("AgoraVoiceManager", "Agora App ID is not configured. Real-time voice engine initialized in standby mode.")
+            return
+        }
         try {
             // Attempt to load Agora RtcEngine via reflection to support io.agora.rtc / io.agora.rtc2 cleanly
             val rtcClass = try {
@@ -102,6 +111,12 @@ class AgoraVoiceManager(private val context: Context) {
         channelNameInput: String = "",
         maxDurationSec: Int = 600
     ) {
+        if (AGORA_APP_ID.isBlank()) {
+            Log.w("AgoraVoiceManager", "Cannot start call: Agora App ID is empty or not configured.")
+            _callState.value = CallState.ERROR
+            return
+        }
+
         val channel = if (channelNameInput.isNotBlank()) {
             channelNameInput
         } else {

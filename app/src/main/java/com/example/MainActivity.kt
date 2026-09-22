@@ -213,7 +213,7 @@ class MainActivity : ComponentActivity() {
         initializeAdminVaultIfNeeded()
         
         try {
-            com.example.utils.NotificationHelper.createNotificationChannels(this)
+            com.example.utils.NotificationChannelsRegistry.createAll(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }

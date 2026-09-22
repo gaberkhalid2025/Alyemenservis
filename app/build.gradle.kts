@@ -29,7 +29,7 @@ android {
     if (agoraPropsFile.exists()) {
         agoraProps.load(FileInputStream(agoraPropsFile))
     }
-    val agoraId = agoraProps.getProperty("AGORA_APP_ID") ?: System.getenv("AGORA_APP_ID") ?: "e23e27b4777a40eda0579075dd03127a"
+    val agoraId = agoraProps.getProperty("AGORA_APP_ID") ?: System.getenv("AGORA_APP_ID") ?: ""
     buildConfigField("String", "AGORA_APP_ID", "\"$agoraId\"")
   }
 
@@ -102,7 +102,17 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all {
+        it.jvmArgs(
+          "-XX:+EnableDynamicAgentLoading",
+          "-Djdk.attach.allowAttachSelf=true"
+        )
+      }
+    }
+  }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
@@ -171,6 +181,8 @@ dependencies {
   testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.mockk)
+  testImplementation(libs.turbine)
   testImplementation(libs.robolectric)
   testImplementation(libs.roborazzi)
   testImplementation(libs.roborazzi.compose)

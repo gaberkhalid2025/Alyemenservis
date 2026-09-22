@@ -40,6 +40,8 @@ workRuntimeKtx = "2.10.0"
 robolectric = "4.16.1"
 roborazzi = "1.59.0"
 firebaseBom = "34.12.0"
+mockk = "1.13.16"
+turbine = "1.2.0"
 secretsGradlePlugin = "2.0.1"
 securityCrypto = "1.1.0-alpha06"
 
@@ -94,6 +96,9 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
 roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
 roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-ai = { group = "com.google.firebase", name = "firebase-ai" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }

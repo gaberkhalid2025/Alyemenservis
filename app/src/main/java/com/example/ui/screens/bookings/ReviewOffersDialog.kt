@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.ui.MainViewModel
@@ -45,7 +45,7 @@ fun ReviewOffersDialog(
     onAcceptOffer: (RequestOfferEntity) -> Unit
 ) {
     val context = LocalContext.current
-    val instantReqViewModel: InstantRequestScreenViewModel = viewModel()
+    val instantReqViewModel: InstantRequestScreenViewModel = hiltViewModel()
     val uiState by instantReqViewModel.uiState.collectAsState()
 
     val sortedOffers = instantReqViewModel.sortOffers(offers)

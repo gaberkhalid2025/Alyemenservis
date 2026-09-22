@@ -127,7 +127,6 @@ class SyncManager(private val context: Context) {
             dataToSync["supportWhatsapp"] = settings.supportWhatsapp
             dataToSync["supportEmail"] = settings.supportEmail
             dataToSync["adminUsername"] = settings.adminUsername
-            dataToSync["adminPassword"] = settings.adminPassword
             dataToSync["allowVoiceInput"] = settings.allowVoiceInput
             dataToSync["allowTextToSpeech"] = settings.allowTextToSpeech
             dataToSync["isAssistantEnabled"] = settings.isAssistantEnabled

@@ -293,6 +293,29 @@ fun BookingEditDialog(
                                 return@Button
                             }
 
+                            if (!isAdmin) {
+                                if (BookingSecurityHelper.isBookingLocked(context, booking.id)) {
+                                    errorMessage = "تم قفل الحجز مؤقتاً بسبب 3 محاولات غير صحيحة. يرجى الانتظار."
+                                    return@Button
+                                }
+                                val targetPin = (booking.pinCode.ifBlank { booking.bookingPassword }).trim()
+                                if (targetPin.isNotBlank()) {
+                                    val isPinValid = com.example.utils.SecureHasher.verifyPin(passwordInput.trim(), targetPin) ||
+                                            BookingSecurityHelper.verifyPassword(passwordInput.trim(), targetPin)
+                                    if (!isPinValid) {
+                                        val remaining = BookingSecurityHelper.recordFailedAttempt(context, booking.id)
+                                        errorMessage = if (remaining <= 0) {
+                                            "تم تجاوز المحاولات المسموحة! تم قفل الحجز لمدة 30 دقيقة."
+                                        } else {
+                                            "رمز PIN غير صحيح. متبقي $remaining محاولات."
+                                        }
+                                        return@Button
+                                    } else {
+                                        BookingSecurityHelper.resetAttempts(context, booking.id)
+                                    }
+                                }
+                            }
+
                             val updated = booking.copy(
                                 customerName = fullName,
                                 fullName = fullName,

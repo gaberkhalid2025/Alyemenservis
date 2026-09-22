@@ -9,6 +9,25 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 
+data class Category(val id: Int, val name: String, val icon: String, val order: Int) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "name" to name,
+        "icon" to icon,
+        "order" to order
+    )
+    companion object {
+        fun fromMap(map: Map<String, Any?>): Category {
+            return Category(
+                id = (map["id"] as Number).toInt(),
+                name = map["name"] as String,
+                icon = map["icon"] as String,
+                order = (map["order"] as Number).toInt()
+            )
+        }
+    }
+}
+
 class CoreBusinessUnitTests {
 
     @Test

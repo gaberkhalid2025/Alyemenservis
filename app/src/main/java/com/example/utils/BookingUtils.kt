@@ -21,10 +21,13 @@ object BookingUtils {
         DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
     )
 
+    private val counter = java.util.concurrent.atomic.AtomicInteger(Random.nextInt(1000, 5000))
+
     fun generateBookingNumber(prefix: String = "BK"): String {
         // ✨ م2-ج3: استخدام DateTimeFormatter آمن الخيوط
         val datePart = LocalDateTime.now().format(BOOKING_NUM_FORMATTER)
-        val randomPart = String.format(Locale.US, "%04d", Random.nextInt(1000, 9999))
+        val seq = (counter.getAndIncrement() % 9000) + 1000
+        val randomPart = String.format(Locale.US, "%04d", seq)
         return "$prefix-$datePart-$randomPart"
     }
 

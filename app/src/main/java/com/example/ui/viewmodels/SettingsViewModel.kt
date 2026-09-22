@@ -243,8 +243,9 @@ fun updateBackdoorSettings(
     }
 
 fun updateAdminSettings(newSettings: AdminSettingsEntity) {
-        db.collection("settings").document("main_settings").set(newSettings)
-        _settings.value = newSettings
+        val sanitized = newSettings.copy(adminPassword = "")
+        db.collection("settings").document("main_settings").set(sanitized)
+        _settings.value = sanitized
         mainViewModel.triggerNotification("👑 تم تحديث ومزامنة إعدادات المنصة بنجاح!")
     }
 

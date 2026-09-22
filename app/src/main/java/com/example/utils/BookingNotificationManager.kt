@@ -20,9 +20,11 @@ import java.util.concurrent.ConcurrentHashMap
  * 🔔 BookingNotificationManager
  * نظام الإشعارات المتقدم: تصنيف، منع التكرار (Deduplication)، الجدولة (Scheduling)، والمزامنة السحابية والمحلية
  */
-class BookingNotificationManager(private val context: Context) {
+class BookingNotificationManager(
+    private val context: Context,
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+) {
 
-    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val scope = CoroutineScope(Dispatchers.IO)
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -32,28 +34,13 @@ class BookingNotificationManager(private val context: Context) {
 
     companion object {
         private const val TAG = "BookingNotificationMgr"
-        private const val CHANNEL_ID = "channel_bookings_alerts"
+        private const val CHANNEL_ID = NotificationChannelsRegistry.CHANNEL_BOOKINGS_ALERTS
         private const val CHANNEL_NAME = "إشعارات الحجوزات والخدمات الشاملة"
         private const val DEDUPLICATION_WINDOW_MS = 10_000L // 10 ثواني منع تكرار
     }
 
-    init {
-        createNotificationChannel()
-    }
-
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "تنبيهات حالة الحجوزات والمواعيد والخدمات"
-                enableVibration(true)
-                setShowBadge(true)
-            }
-            notificationManager?.createNotificationChannel(channel)
-        }
+        NotificationChannelsRegistry.createAll(context)
     }
 
     /**

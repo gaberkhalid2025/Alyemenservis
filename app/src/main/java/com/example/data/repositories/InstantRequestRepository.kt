@@ -41,8 +41,18 @@ class InstantRequestRepository(private val context: Context? = null) {
         try {
             val docId = if (request.id.isNotBlank()) request.id else firestore.collection("instant_requests").document().id
             val requestCode = if (request.requestCode.isNotBlank()) request.requestCode else "URG-${Random.nextInt(100000, 999999)}"
-            val pin = if (request.secretPin.isNotBlank()) request.secretPin else "${Random.nextInt(1000, 9999)}"
-            val cancelPass = if (request.cancellationPassword.isNotBlank()) request.cancellationPassword else "${Random.nextInt(1000, 9999)}"
+            val rawPin = if (request.secretPin.isNotBlank()) request.secretPin else "${Random.nextInt(1000, 9999)}"
+            val pin = if (rawPin.startsWith("$2a$") || rawPin.startsWith("$2b$") || rawPin.contains(":")) {
+                rawPin
+            } else {
+                com.example.utils.SecureHasher.hashPin(rawPin)
+            }
+            val rawCancelPass = if (request.cancellationPassword.isNotBlank()) request.cancellationPassword else rawPin
+            val cancelPass = if (rawCancelPass.startsWith("$2a$") || rawCancelPass.startsWith("$2b$") || rawCancelPass.contains(":")) {
+                rawCancelPass
+            } else {
+                com.example.utils.SecureHasher.hashPin(rawCancelPass)
+            }
             val now = System.currentTimeMillis()
             val expiresAt = if (request.expiresAt > now) request.expiresAt else now + (30 * 60 * 1000L) // 30 mins
 
@@ -230,7 +240,9 @@ class InstantRequestRepository(private val context: Context? = null) {
 
                 if (userPin.isNotBlank()) {
                     val expectedPass = request.cancellationPassword.ifBlank { request.secretPin }
-                    if (expectedPass.isNotBlank() && !BookingSecurityHelper.verifyPassword(userPin, expectedPass)) {
+                    val isValid = com.example.utils.SecureHasher.verifyPin(userPin, expectedPass) ||
+                            BookingSecurityHelper.verifyPassword(userPin, expectedPass)
+                    if (expectedPass.isNotBlank() && !isValid) {
                         onError("رمز PIN للإلغاء غير صحيح")
                         return@addOnSuccessListener
                     }

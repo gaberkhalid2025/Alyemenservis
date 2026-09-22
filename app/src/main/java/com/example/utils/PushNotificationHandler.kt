@@ -37,28 +37,13 @@ class PushNotificationHandler(private val context: Context) {
 
     companion object {
         private const val TAG = "PushNotificationHndlr"
-        private const val CHANNEL_ID = "instant_services_push_channel"
+        private const val CHANNEL_ID = NotificationChannelsRegistry.CHANNEL_INSTANT_SERVICES_PUSH
         private const val CHANNEL_NAME = "إشعارات الطلبات والعروض الفورية"
         private const val KEY_SAVED_NOTIFS = "saved_push_notifications"
     }
 
-    init {
-        createChannel()
-    }
-
     private fun createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "قناة التنبيهات الفورية للعروض والطلبات"
-                enableVibration(true)
-                enableLights(true)
-            }
-            notificationManager?.createNotificationChannel(channel)
-        }
+        NotificationChannelsRegistry.createAll(context)
     }
 
     fun handlePushNotification(remoteMessage: RemoteMessage) {

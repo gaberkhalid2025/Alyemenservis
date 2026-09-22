@@ -20,12 +20,12 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
          * Real-time listeners limit (default 50). Configurable to avoid excessive bandwidth/reads
          * while keeping active entities responsive. For full catalogs, pagination is used.
          */
-        var REALTIME_QUERY_LIMIT: Long = 50L
+        var REALTIME_QUERY_LIMIT: Long = 50L // TODO: Real pagination when data > 50
 
         /**
          * Default on-demand query limit for paginated data loading.
          */
-        var ON_DEMAND_FETCH_LIMIT: Long = 50L
+        var ON_DEMAND_FETCH_LIMIT: Long = 50L // TODO: Real pagination when data > 50
     }
 
     val firestoreListeners = java.util.concurrent.CopyOnWriteArrayList<ListenerRegistration>()

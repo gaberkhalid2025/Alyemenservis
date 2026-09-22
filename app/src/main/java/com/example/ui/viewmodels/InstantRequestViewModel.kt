@@ -503,6 +503,30 @@ class InstantRequestViewModel @Inject constructor(
         onError: (String) -> Unit
     ) {
         viewModelScope.launch(Dispatchers.IO) {
+            // 🛡️ التحقق القبلي الصارم لمنع إنشاء حجوزات يتيمة أو قبول عروض غير متطابقة
+            if (curOffer.requestId.isNotBlank() && curReq.id.isNotBlank() && curOffer.requestId != curReq.id) {
+                withContext(Dispatchers.Main) {
+                    onError("خطأ: العرض المحدد لا ينتمي لهذا الطلب.")
+                }
+                return@launch
+            }
+
+            val nonAcceptableRequestStatuses = listOf("COMPLETED", "CANCELLED", "CLOSED", "EXPIRED")
+            if (curReq.status.uppercase() in nonAcceptableRequestStatuses) {
+                withContext(Dispatchers.Main) {
+                    onError("لا يمكن قبول العرض: حالة الطلب الحالية غير قابلة للقبول (${curReq.status}).")
+                }
+                return@launch
+            }
+
+            val nonAcceptableOfferStatuses = listOf("REJECTED", "CANCELLED", "ACCEPTED")
+            if (curOffer.status.uppercase() in nonAcceptableOfferStatuses) {
+                withContext(Dispatchers.Main) {
+                    onError("لا يمكن قبول العرض: حالة العرض غير صالحة للقبول (${curOffer.status}).")
+                }
+                return@launch
+            }
+
             try {
                 firestore.collection("bookings").document(booking.id).set(booking).await()
                 firestore.collection("instant_requests").document(curReq.id)

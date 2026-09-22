@@ -196,12 +196,18 @@ service cloud.firestore {
     match /bookings/{bookingId} {
       allow read: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid ||
         resource.data.providerId == request.auth.uid ||
         isAdmin()
       );
-      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow create: if isAuthenticated() && (
+        request.resource.data.customerId == request.auth.uid ||
+        request.resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
       allow update: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
+        resource.data.clientId == request.auth.uid ||
         resource.data.providerId == request.auth.uid ||
         isAdmin()
       );
@@ -210,9 +216,14 @@ service cloud.firestore {
 
     match /instant_requests/{reqId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow create: if isAuthenticated() && (
+        request.resource.data.customerId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
       allow update: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
         isAdmin()
       );
       allow delete: if isAdmin();
@@ -220,10 +231,16 @@ service cloud.firestore {
 
     match /offers/{offerId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.providerId == request.auth.uid;
+      allow create: if isAuthenticated() && (
+        request.resource.data.providerId == request.auth.uid ||
+        request.resource.data.technicianId == request.auth.uid ||
+        isAdmin()
+      );
       allow update: if isAuthenticated() && (
         resource.data.providerId == request.auth.uid ||
+        resource.data.technicianId == request.auth.uid ||
         resource.data.customerId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
         isAdmin()
       );
       allow delete: if isAdmin();
@@ -231,14 +248,36 @@ service cloud.firestore {
 
     match /instant_offers/{offerId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.providerId == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow create: if isAuthenticated() && (
+        request.resource.data.providerId == request.auth.uid ||
+        request.resource.data.technicianId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.providerId == request.auth.uid ||
+        resource.data.technicianId == request.auth.uid ||
+        resource.data.customerId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
     match /request_offers/{offerId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.providerId == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow create: if isAuthenticated() && (
+        request.resource.data.providerId == request.auth.uid ||
+        request.resource.data.technicianId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.providerId == request.auth.uid ||
+        resource.data.technicianId == request.auth.uid ||
+        resource.data.customerId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
     // ========================================================================

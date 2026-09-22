@@ -51,19 +51,8 @@ fun MainViewModel.triggerNotification(msg: String, context: Context? = null) {
     val ctx = context ?: appContext
     if (ctx != null) {
         try {
-            val channelId = "yemen_services_alerts"
+            val channelId = com.example.utils.NotificationChannelsRegistry.CHANNEL_YEMEN_SERVICES_FCM
             val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                val channel = android.app.NotificationChannel(
-                    channelId,
-                    "إشعارات الخدمة والحجوزات والمحادثات",
-                    android.app.NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "إشعارات التطبيق الفورية"
-                    enableVibration(true)
-                }
-                nm?.createNotificationChannel(channel)
-            }
             val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply {
                 flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
             }

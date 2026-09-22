@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
 
@@ -25,7 +25,7 @@ fun InstantRequestsScreen(
     themeColors: VisualThemePalette,
     onBackClick: () -> Unit = {}
 ) {
-    val instantReqViewModel: InstantRequestScreenViewModel = viewModel()
+    val instantReqViewModel: InstantRequestScreenViewModel = hiltViewModel()
     val uiState by instantReqViewModel.uiState.collectAsState()
 
     val instantRequests by viewModel.instantRequests.collectAsState()

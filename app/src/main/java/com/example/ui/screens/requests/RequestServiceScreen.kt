@@ -358,10 +358,11 @@ fun RequestServiceScreen(
                     isSubmitting = true
 
                     val executeSubmit: (String) -> Unit = { imageUrl ->
+                        val normalizedPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(customerPhone)
                         instantViewModel.createInstantRequest(
-                            userId = if (currentUserId.isNotBlank()) currentUserId else customerPhone,
+                            userId = if (currentUserId.isNotBlank()) currentUserId else normalizedPhone,
                             userName = customerName.ifBlank { "عميل" },
-                            userPhone = customerPhone,
+                            userPhone = normalizedPhone,
                             userCity = selectedCity,
                             userNeighborhood = selectedArea,
                             categoryId = selectedDepartment,
@@ -369,7 +370,7 @@ fun RequestServiceScreen(
                             serviceTitle = serviceTitle,
                             description = if (imageUrl.isNotBlank()) "$serviceDetails\n[مرفق صورة: $imageUrl]" else serviceDetails,
                             urgencyTime = urgencyTime,
-                            customPin = com.example.utils.PinHasher.hashPin(pinCode)
+                            customPin = com.example.utils.SecureHasher.hashPin(pinCode)
                         ) { success, msg, _ ->
                             isSubmitting = false
                             if (success) {

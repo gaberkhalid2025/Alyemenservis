@@ -1,6 +1,6 @@
 {
-  "name": "دليل خدمات اليمن",
-  "description": "تطبيق يمني فاخر يربط المستخدمين بمقدمي الخدمات في اليمن بشتى المجالات.",
+  "name": "AlYemenServices",
+  "description": "Location Services and Notification Integration with Unit Tests",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
