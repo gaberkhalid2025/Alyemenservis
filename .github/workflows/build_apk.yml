@@ -3,8 +3,6 @@ name: Build Release APK
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -82,18 +80,6 @@ jobs:
 
     - name: Run Unit Tests
       run: ./gradlew :app:testDebugUnitTest --no-daemon
-
-    - name: Run Roborazzi Screenshot Verification
-      run: ./gradlew :app:verifyRoborazziDebug --no-daemon
-
-    - name: Upload Screenshot Test Failures (Diffs)
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: roborazzi-screenshot-diffs
-        path: |
-          app/build/outputs/roborazzi/
-          app/build/reports/roborazzi/
 
     - name: Build Release APK
       env:

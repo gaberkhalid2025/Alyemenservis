@@ -132,7 +132,7 @@ fun ServicesListTestView(
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class ServicesListScreenUiTest {
 
     @get:Rule

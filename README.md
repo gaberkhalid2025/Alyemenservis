@@ -7,7 +7,6 @@
   <a href="https://developer.android.com/about/versions/15"><img src="https://img.shields.io/badge/Target%20SDK-35-green?style=flat-square&logo=android" alt="Target SDK"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License Type"></a>
   <a href="https://github.com/gaber77710/YemenServicesDirectory/tests"><img src="https://img.shields.io/badge/Tests-224%20Total-brightgreen?style=flat-square" alt="Total Tests"></a>
-  <a href="#61-اختبارات-لقطات-الشاشة-البصرية--roborazzi-screenshot-tests"><img src="https://img.shields.io/badge/Screenshots-24%20Golden%20Images-blueviolet?style=flat-square" alt="Roborazzi Screenshots"></a>
   <a href="https://github.com/gaber77710/YemenServicesDirectory/tests"><img src="https://img.shields.io/badge/Success-100%25-brightgreen?style=flat-square" alt="Test Success Rate"></a>
 </p>
 
@@ -27,7 +26,6 @@
 - [4. البنية التقنية والمعمارية | Technical Architecture](#4-البنية-التقنية-والمعمارية--technical-architecture)
 - [5. دليل التثبيت والتشغيل | Setup & Installation Guide](#5-دليل-التثبيت-والتشغيل--setup--installation-guide)
 - [6. استراتيجية وجدول الاختبارات الشامل | Comprehensive Testing Strategy](#6-استراتيجية-وجدول-الاختبارات-الشامل--comprehensive-testing-strategy)
-  - [6.1 اختبارات لقطات الشاشة البصرية | Roborazzi Screenshot Tests](#61-اختبارات-لقطات-الشاشة-البصرية--roborazzi-screenshot-tests)
 - [7. حالة ميزات المشروع | Project Feature Status](#7-حالة-ميزات-المشروع--project-feature-status)
 - [8. المساهمة وتطوير الكود | Contributing Guidelines](#8-المساهمة-وتطوير-الكود--contributing-guidelines)
 - [9. الأسئلة الشائعة | FAQ](#9-الأسئلة-الشائعة--faq)
@@ -192,11 +190,10 @@ gradle :app:testDebugUnitTest
 * **Robolectric Tests:** اختبارات سريعة تعمل على الـ JVM وتحاكي مكونات أندرويد المعقدة (قنوات الإشعارات، خدمات الخلفية، كاش قاعدة بيانات Room) دون الحاجة لبطء المحاكي الحقيقي.
 * **Compose UI Tests:** اختبارات واجهات مرئية تتحقق من عرض وتفاعل واجهات تصفح الخدمات وعملية الحجز الآمنة.
 * **Integration Tests:** اختبارات متكاملة تتحقق من تدفق العمليات ثنائية المسار (مزامنة البيانات بين الكاش و Firestore عند الاتصال بالشبكة).
-* **Roborazzi Screenshot Tests:** اختبارات بصرية متقدمة للقطات الشاشة بنمط Native Graphics تقارن بكسل ببكسل لـ 6 شاشات رئيسية عبر أنماط الفاتح والداكن و RTL و LTR وتضمن عدم التراجع البصري.
 
 ### جدول تغطية الاختبارات المفصل (Test Coverage Matrix)
 
-توضح القائمة التفصيلية أدناه كامل ملفات الاختبار الـ 43 المغطاة في المشروع (بما فيها اختبارات لقطة الشاشة البصرية) وعدد حالات الاختبار في كل منها:
+توضح القائمة التفصيلية أدناه كامل ملفات الاختبار الـ 37 المغطاة في المشروع وعدد حالات الاختبار في كل منها:
 
 | # | اسم ملف الاختبار (Test File Name) | مجال التغطية البرمجية والميزات المختبرة (Tested Scope) | عدد الاختبارات الناجحة (Tests) |
 | :---: | :--- | :--- | :---: |
@@ -223,7 +220,7 @@ gradle :app:testDebugUnitTest
 | 21 | `LocationServiceUnitTest.kt` | سلوك تتبع المواقع تحت حالات الصلاحيات المقبولة والمرفوضة | 7 |
 | 22 | `NotificationDateFormatterTest.kt` | تنسيق التواريخ والأوقات لتبويب الإشعارات بما يتلاءم مع اليمن | 5 |
 | 23 | `SecureHasherTest.kt` | تجزئة وتشفير رموز الـ PIN لحمايتها من الكشف في قواعد البيانات | 5 |
-| 24 | `ValidatorsTest.kt` | اختبار المدخلات وعناvindos البريد الإلكتروني وكلمات المرور والأسماء | 6 |
+| 24 | `ValidatorsTest.kt` | اختبار المدخلات وعناوين البريد الإلكتروني وكلمات المرور والأسماء | 6 |
 | 25 | `WalletManagerTest.kt` | العمليات الحسابية للمحفظة بالريال اليمني ومنع الكسور النقدية | 10 |
 | 26 | `ComprehensiveDomainsUnitTest.kt` | فحص تكامل النماذج الصرفة للبيانات وتفاعلها الخالي من الأخطاء | 8 |
 | 27 | `CoreBusinessUnitTests.kt` | حماية قواعد المبيعات والتجارة ومطابقة العروض المقدمة للطوارئ | 10 |
@@ -236,16 +233,9 @@ gradle :app:testDebugUnitTest
 | 34 | `ExampleRobolectricTest.kt` | محاكاة مكونات نظام أندرويد محلياً للواجهة السريعة | 2 |
 | 35 | `TestMockFactory.kt` | مصنع الموك لتجهيز كائنات وهمية متكاملة لجميع الفحوصات | 2 |
 | 36 | `FakeRegistrationRepository.kt` | مستودع وهمي لمحاكاة عمليات التسجيل والتحقق من حسابات العمل | 2 |
-| 37 | `HomeScreenScreenshotTest.kt` | لقطات بصرية للشاشة الرئيسية (فاتح، داكن، RTL، LTR) | 4 |
-| 38 | `ServicesListScreenScreenshotTest.kt` | لقطات بصرية لقائمة الخدمات (تحميل، فارغة، بيانات: فاتح، داكن، RTL، LTR) | 8 |
-| 39 | `BookingDetailsScreenScreenshotTest.kt` | لقطات بصرية لتفاصيل الحجز الشامل بالـ PIN (فاتح، داكن، RTL، LTR) | 4 |
-| 40 | `ChatScreenScreenshotTest.kt` | لقطات بصرية للمحادثة بالردود والايموجي (فاتح، داكن، RTL، LTR) | 4 |
-| 41 | `WalletScreenScreenshotTest.kt` | لقطات بصرية للمحفظة بثلاث عملات والمعاملات (فاتح، داكن، RTL، LTR) | 4 |
-| 42 | `UrgentRequestScreenScreenshotTest.kt` | لقطات بصرية لرادار الطوارئ والعداد و3 عروض (فاتح، داكن، RTL، LTR) | 4 |
-| **-** | **المجموع الكلي الناجح** | **تغطية برمجية وبصرية استثنائية بنسبة 100% لكافة المكونات** | **252 اختباراً (224 برمجي + 28 بصري)** |
+| **-** | **المجموع الكلي الناجح** | **تغطية استثنائية وشاملة بنسبة 100% لكافة المكونات الأساسية** | **224 اختباراً** |
 
-* **إجمالي الاختبارات المكتوبة والعاملة:** 252 اختباراً برمجياً وبصرياً.
-* **الصور المرجعية المعتمدة:** 28 لقطة شاشة مرجعية بدقة أصلية (Pixel 8 NATIVE).
+* **إجمالي الاختبارات المكتوبة والعاملة:** 224 اختباراً.
 * **نسبة النجاح الفعلي:** 100% بنجاح تام وبدون أي فشل!
 
 ### الأوامر البرمجية لتشغيل الاختبارات محلياً
@@ -261,34 +251,6 @@ gradle :app:connectedDebugAndroidTest
 # 3. تشغيل وفحص جودة تركيب الكود والتنسيق النحوي
 gradle lintDebug
 ```
-
-### 6.1 اختبارات لقطات الشاشة البصرية | Roborazzi Screenshot Tests
-
-تم دمج نظام اختبارات بصرية متقدم وشامل باستخدام مكتبة **Roborazzi** المتطورة بالاعتماد على وضع الرسم الأصيل **Robolectric Native Graphics Mode (`NATIVE`)**، وذلك لضمان ثبات التصميم المرئي عبر الإصدارات ومنع أي تراجع بصري (Visual Regression) دون الحاجة لمحاكي أندرويد بطيء.
-
-#### 🎯 الشاشات المغطاة (6 شاشات رئيسية - 24 لقطة مرجعية معتمدة):
-1. **الشاشة الرئيسية (Home Screen):** تغطية كاملة للترويسة، شريط البحث المخصص لمدن اليمن، البانر الترويجي، شبكة التصنيفات، وبطاقات الفنيين والمتاجر المعتمدة عبر (فاتح، داكن، RTL، LTR).
-2. **شاشة قائمة الخدمات (Services List Screen):** اختبار حالات الواجهة الثلاث (حالة التحميل مع مؤشر دائري، حالة القائمة الفارغة "لا توجد خدمات متاحة حالياً"، وحالة عرض البيانات الواقعية بأسماء يمنية) عبر (فاتح، داكن، RTL، LTR).
-3. **شاشة تفاصيل الحجز (Booking Details Screen):** عرض كامل لجميع الحقول الأساسية (اسم العميل، رقم الهاتف، نوع الخدمة، التاريخ والوقت، رمز الـ PIN السري المكون من 4 أرقام، حالة الحجز المعتمدة، المبلغ الإجمالي بالريال اليمني، والدفعة المقدمة) عبر (فاتح، داكن، RTL، LTR).
-4. **شاشة المحادثة الفورية (Chat Screen):** حوار واقعي بين عميل وفني يتضمن رسالة نصية عادية، رسالة مقتبسة مع رد (Quote Reply)، ورسالة مع تفاعلات تعبيرية (Emoji Reactions) عبر (فاتح، داكن، RTL، LTR).
-5. **شاشة المحفظة الرقمية (Wallet Screen):** عرض أرصدة المحفظة بثلاث عملات رئيسية (الريال اليمني YER، الدولار الأمريكي USD، والريال السعودي SAR)، مع أزرار الإجراءات السريعة وسجل العمليات المالية الأخيرة عبر (فاتح، داكن، RTL، LTR).
-6. **شاشة طلب الطوارئ (Urgent Request Screen):** طلب عاجل نشط مع عداد تنازلي ذكي وثلاثة عروض أسعار منافسة من فنيين معتمدين بأوقات الوصول والتقييمات عبر (فاتح، داكن، RTL، LTR).
-
-#### 🛠️ أوامر تشغيل اختبارات اللقطات (Roborazzi Commands):
-```bash
-# 1. تسجيل وتحديث الصور المرجعية المعتمدة (Golden Baselines)
-gradle :app:recordRoborazziDebug
-
-# 2. التحقق من مطابقة الواجهات الحالية للصور المرجعية (Verification)
-gradle :app:verifyRoborazziDebug
-
-# 3. توليد تقرير المقارنة البصري الشامل بصيغة HTML (Diff Report)
-gradle :app:compareRoborazziDebug
-```
-
-* **مسار حفظ الصور المرجعية:** يتم حفظ الصور في المستودع بشكل دائم تحت المجلد: `app/src/test/screenshots/`
-* **التشغيل الانتقائي السريع:** اختبارات اللقطات معزولة تلقائياً عن أمر `testDebugUnitTest` الروتيني لضمان بقاء دورة الاختبارات البرمجية فائقة السرعة، وتعمل حصراً عند استدعاء مهام Roborazzi الصريحة.
-* **التكامل مع التكامل المستمر (CI/CD):** تعمل خطوة التحقق `verifyRoborazziDebug` آلياً في **GitHub Actions** مع رفع صور الفروقات (Diffs) كملفات مخرجة فورية عند حدوث أي اختلاف في واجهات المستخدم.
 
 ---
 

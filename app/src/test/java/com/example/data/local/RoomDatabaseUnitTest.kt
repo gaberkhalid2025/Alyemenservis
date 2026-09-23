@@ -20,7 +20,7 @@ import java.io.IOException
  * ensuring insertions, updates, queries, deletions, and edge/failure handling operate reliably.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class RoomDatabaseUnitTest {
 
     private lateinit var db: AppDatabase

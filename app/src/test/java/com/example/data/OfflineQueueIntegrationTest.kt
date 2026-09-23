@@ -16,7 +16,7 @@ import org.robolectric.annotation.Config
  * Tests network resilience and offline queue persistence during sudden connectivity drop.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class OfflineQueueIntegrationTest {
 
     private lateinit var context: Context

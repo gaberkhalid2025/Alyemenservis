@@ -6,4 +6,6 @@ plugins {
     alias(libs.plugins.hilt.android) apply false
     alias(libs.plugins.firebase.crashlytics) apply false
     id("com.google.gms.google-services") version "4.4.2" apply false
+    alias(libs.plugins.roborazzi) apply false
+    alias(libs.plugins.kover) apply false
 }
