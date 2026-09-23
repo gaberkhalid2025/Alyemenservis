@@ -1,339 +1,281 @@
-# 🇾🇪 دليل خدمات اليمن | Yemen Services Directory
+# 🇾🇪 دليل خدمات اليمن الشامل — Yemen Services Directory
 
 <p align="center">
-  <a href="https://github.com/gaber77710/YemenServicesDirectory/actions"><img src="https://github.com/gaber77710/YemenServicesDirectory/actions/workflows/android.yml/badge.svg" alt="GitHub Actions Build Status"></a>
-  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.1.0-blue?style=flat-square&logo=kotlin" alt="Kotlin Version"></a>
-  <a href="https://developer.android.com/about/versions/marshmallow"><img src="https://img.shields.io/badge/Min%20SDK-24-orange?style=flat-square&logo=android" alt="Min SDK"></a>
-  <a href="https://developer.android.com/about/versions/15"><img src="https://img.shields.io/badge/Target%20SDK-35-green?style=flat-square&logo=android" alt="Target SDK"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License Type"></a>
-  <a href="https://github.com/gaber77710/YemenServicesDirectory/tests"><img src="https://img.shields.io/badge/Tests-224%20Total-brightgreen?style=flat-square" alt="Total Tests"></a>
-  <a href="https://github.com/gaber77710/YemenServicesDirectory/tests"><img src="https://img.shields.io/badge/Success-100%25-brightgreen?style=flat-square" alt="Test Success Rate"></a>
+  <img src="https://img.shields.io/badge/Kotlin-2.1.0-blue.svg?style=for-the-badge&logo=kotlin" alt="Kotlin">
+  <img src="https://img.shields.io/badge/Min%20SDK-24-orange.svg?style=for-the-badge&logo=android" alt="Min SDK">
+  <img src="https://img.shields.io/badge/Target%20SDK-35-green.svg?style=for-the-badge&logo=android" alt="Target SDK">
+  <img src="https://img.shields.io/badge/Tests-224%20Passed-brightgreen.svg?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License">
 </p>
 
 ---
 
-تطبيق **"دليل خدمات اليمن"** (Yemen Services Directory) هو منصة رقمية متكاملة ومصممة بأعلى المعايير الهندسية لربط مقدمي الخدمات بمختلف مجالاتهم المهنية والخدمية بالعملاء مباشرة في الجمهورية اليمنية. يتيح التطبيق تجربة آمنة ومتكاملة تشمل عمليات الحجز المباشر المحمية، المحادثات الفورية ذات التشفير العالي، وطلبات الطوارئ العاجلة، مع توافق كامل ودعم فائق للغة العربية والريال اليمني ومراعاة ظروف الاتصال الضعيف بالإنترنت بفضل المعمارية غير المتصلة أولاً (Offline-First).
-
-**Yemen Services Directory** is an enterprise-grade Android platform designed specifically to link customers directly with certified local service providers and business entities across Yemen. Operating on a resilient, offline-first architecture, the application integrates advanced secure authentication, military-grade end-to-end chat encryption, location tracking, and native financial ledger systems optimized for local network constraints.
-
----
-
-## 📌 جدول المحتويات | Table of Contents
-
-- [1. الوصف العام والبيان | Overview & Statement](#1-الوصف-العام-والبيان--overview--statement)
-- [2. شارات الحالة | Status Badges](#2-شارات-الحالة--status-badges)
-- [3. الميزات الرئيسية | Key Features](#3-الميزات-الرئيسية--key-features)
-- [4. البنية التقنية والمعمارية | Technical Architecture](#4-البنية-التقنية-والمعمارية--technical-architecture)
-- [5. دليل التثبيت والتشغيل | Setup & Installation Guide](#5-دليل-التثبيت-والتشغيل--setup--installation-guide)
-- [6. استراتيجية وجدول الاختبارات الشامل | Comprehensive Testing Strategy](#6-استراتيجية-وجدول-الاختبارات-الشامل--comprehensive-testing-strategy)
-- [7. حالة ميزات المشروع | Project Feature Status](#7-حالة-ميزات-المشروع--project-feature-status)
-- [8. المساهمة وتطوير الكود | Contributing Guidelines](#8-المساهمة-وتطوير-الكود--contributing-guidelines)
-- [9. الأسئلة الشائعة | FAQ](#9-الأسئلة-الشائعة--faq)
-- [10. الترخيص والتواصل | License & Contact](#10-الترخيص-والتواصل--license--contact)
+## 📌 جدول المحتويات / Table of Contents
+- [1. الوصف العام / Overview](#1-الوصف-العام--overview)
+- [2. شارات الحالة / Status Badges](#2-شارات-الحالة--status-badges)
+- [3. الميزات الرئيسية / Key Features](#3-الميزات-الرئيسية--key-features)
+- [4. البنية التقنية والمعمارية / Tech Stack & Architecture](#4-البنية-التقنية-والمعمارية--tech-stack--architecture)
+- [5. دليل التثبيت والتشغيل / Setup & Installation Guide](#5-دليل-التثبيت-والتشغيل--setup--installation-guide)
+- [6. استراتيجية وجدول الاختبارات / Testing Strategy & Grid](#6-استراتيجية-وجدول-الاختبارات--testing-strategy--grid)
+- [7. حالة ميزات المشروع / Project Feature Status](#7-حالة-ميزات-المشروع--project-feature-status)
+- [8. المساهمة وتطوير الكود / Contributing & Code Standards](#8-المساهمة-وتطوير-الكود--contributing--code-standards)
+- [9. الأسئلة الشائعة / FAQ](#9-الأسئلة-الشائعة--faq)
+- [10. الترخيص والتواصل / License & Contact](#10-الترخيص-والتواصل--license--contact)
 
 ---
 
-## 1. الوصف العام والبيان | Overview & Statement
+## 1. الوصف العام / Overview
 
-يهدف تطبيق **دليل خدمات اليمن** إلى سد الفجوة الرقمية في السوق الخدمي اليمني من خلال توفير سوق رقمي موثوق (Marketplace) يجمع الحرفيين والمهنيين والمحلات التجارية والمؤسسات في منصة موحدة. تم تحسين التطبيق هندسياً ليعمل بكفاءة فائقة وسرعة عالية تحت أسوأ ظروف جودة الاتصال بالإنترنت في اليمن، مع الحفاظ على خصوصية وسرية المعاملات المالية والمحادثات الشخصية.
+### **العربية 🇾🇪**
+تطبيق **"دليل خدمات اليمن الشامل"** هو منصة رقمية رائدة ومتكاملة مصممة خصيصاً لتلبية احتياجات السوق اليمني لربط مقدمي الخدمات بمختلف مجالاتهم (فنيون مهنيون، متاجر، مطاعم، مراكز طبية، وعقارات) بالعملاء مباشرة دون وسيط. يتميز التطبيق بالموثوقية العالية والسرعة الفائقة حيث يحتوي على محادثات فورية مشفرة محلياً وسحابياً، ونظام حجز آمن مؤمن برمز PIN، ونظام طلبات طوارئ للمهن السريعة، وخريطة متكاملة لحساب المسافات، مع محفظة مالية متعددة العملات لتتبع الحسابات والمدفوعات بدقة وموثوقية في ظل الاتصال الضعيف بالإنترنت بفضل بنية (Offline-First).
 
----
-
-## 2. شارات الحالة | Status Badges
-
-*توضح الشارات التالية الحالة المستمرة لنظام التكامل والبناء المستمر وحزمة الجودة والأمان للمشروع:*
-
-| الشارة البرمجية (Badge) | الرابط ومصدر التأكد (Source) | الوصف الهرمي (Description) |
-| :--- | :---: | :--- |
-| **GitHub Actions Build** | [اضغط هنا للتحقق](https://github.com/gaber77710/YemenServicesDirectory/actions) | حالة البناء والتشغيل التلقائي لاختبارات المشروع الكلية |
-| **Kotlin Language** | [مستندات لغة كوتلن](https://kotlinlang.org) | إصدار لغة كوتلن المعتمد في بناء التطبيق وحزم المعالجة |
-| **Android Minimum SDK** | [الحد الأدنى للتوافقية](https://developer.android.com) | الحد الأدنى لنسخة نظام الأندرويد المدعومة (Android 7.0 API 24) |
-| **Android Target SDK** | [المستهدف البرمجي](https://developer.android.com) | المستهدف البرمجي لأحدث ميزات الأندرويد (Android 15 API 35) |
-| **Project License** | [مستند الرخصة](https://opensource.org/licenses/MIT) | رخصة المشروع البرمجية المعتمدة للمساهمة المفتوحة المصدر |
-| **Total Tests Suite** | [تقرير الاختبارات](https://github.com/gaber77710/YemenServicesDirectory/tests) | عدد الاختبارات الإجمالية البرمجية الصارمة المدمجة بالمشروع |
-| **Test Success Rate** | [نسبة النجاح الفعلي](https://github.com/gaber77710/YemenServicesDirectory/tests) | معدل النجاح الحالي لتشغيل كامل الاختبارات بنسبة مئوية |
+### **English 🇬🇧**
+**"Yemen Services Directory"** is a cutting-edge, full-featured Android application designed specifically to elevate service delivery in the Yemeni market. It serves as a secure, direct link between local service providers (technicians, shops, restaurants, clinics, real estate agencies) and customers. Optimized for reliability and performance over low-bandwidth connections, the app implements advanced AES-256 chat encryption, PIN-secured local/cloud booking flows, instant emergency dispatch dispatching, custom leaflet maps with distance calculation, and a dual-currency digital ledger (YER)—engineered with an offline-first resilient architecture.
 
 ---
 
-## 3. الميزات الرئيسية | Key Features
+## 2. شارات الحالة / Status Badges
 
-### الميزات باللغة العربية 🇾🇪
-* 🔑 **المصادقة الآمنة والمرنة:** تسجيل دخول آمن عبر **Firebase Authentication** يتيح التحقق الفوري والدخول باستخدام البريد الإلكتروني أو رقم الهاتف مع دعم وتطبيع الصيغ المحلية لكافة مشغلي الاتصالات في اليمن (يمن موبايل، سبأفون، يو، واي).
-* 🔒 **حجز آمن برمز PIN وعقوبات الأمان:** آلية حجز متطورة مشفرة تطلب رمز PIN سرياً مكوناً من 4 أرقام لتأكيد اكتمال الخدمات والمدفوعات، مع قفل آلي مؤقت فوري لحساب العميل بعد 3 محاولات خاطئة لمنع هجمات التخمين.
-* 💬 **محادثات فورية مشفرة بالكامل:** نظام دردشة متكامل ثنائي الاتجاه يعمل محلياً وسحابياً يدعم الوسائط والملاحظات الصوتية، مشفر بالكامل ببروتوكول **AES-256** مع اشتقاق مفاتيح تشفير ديناميكية فريدة لكل غرفة محادثة باستخدام خوارزمية **PBKDF2** لضمان الخصوصية القصوى.
-* 🚨 **طلبات طوارئ ذكية وعروض أسعار منافسة:** نظام رادار طوارئ يتيح للعميل تقديم طلب عاجل (سباكة، كهرباء، صيانة) يظهر للفنيين القريبين جغرافياً لتقديم عروض أسعار تفاعلية مع عداد تنازلي ذكي مخصص للطلب.
-* 📍 **خرائط تفاعلية وحساب المسافات الجغرافية:** واجهات خرائط مرنة تعتمد على محرك خرائط خفيف بدون تكاليف إضافية لمفاتيح Google Maps، مدمج مع نظام حساب المسافة الدقيقة بصيغة **Haversine** الجيوديسية لتقدير وقت الوصول المتوقع حسب المركبة.
-* 💰 **محفظة إلكترونية ودفتر حساب مالي دقيق:** محفظة تدعم المعاملات بالريال اليمني (YER) مع تطبيق قيود مالية صارمة ترفض الكسور العشرية لتطابق المعاملات النقدية اليمنية الواقعية، مع دعم مرن للعملات الأخرى كالدولار (USD) والريال السعودي (SAR).
-* 🔔 **إشعارات فورية مخصصة ذكية:** تصنيف وقنوات إشعارات مصممة بدقة عبر **Firebase Cloud Messaging** تصنف الإشعارات حسب الحساسية (إشعارات الدردشة، الطوارئ، إشعارات الإدارة والعمليات الحرجة).
-* 🌐 **دعم كامل للغة العربية وتخطيط RTL:** واجهات مستخدم مكيّفة بالكامل من اليمين إلى اليسار (RTL) مبنية على Material 3 وتدعم التواريخ والعملات واللهجة المحلية الدارجة.
-* 🔍 **البحث الذكي بالمطابقة الإملائية:** محرك بحث مدمج يعتمد على خوارزمية **Levenshtein Distance** لمطابقة الكلمات العربية بدقة وتجاوز الأخطاء الإملائية الشائعة لدى المستخدمين في اليمن.
-* ⚙️ **آلة حالات صارمة للحجوزات:** منطق أعمال صارم يحكم انتقال الحجوزات (من معلق إلى مؤكد، مكتمل، ملغي) ويمنع الانتقال العشوائي، مع فرض سياسة حماية تمنع الإلغاء إذا كان متبقياً على الموعد أقل من 8 ساعات.
+*هذه الشارات توضح حالة التحديث المستمر وجودة بناء المشروع:*
 
-### Key Features (English) 🇬🇧
-* 🔑 **Flexible Authentication Engine:** Secure registration via **Firebase Authentication** supporting phone and email credentials, custom-normalized for Yemeni network operators.
-* 🔒 **PIN-Secured Bookings with Auto-Lockout:** A 4-digit security PIN checking mechanism protecting payments with a strict 3-attempt brute force lock-out defense.
-* 💬 **Military-Grade Encrypted Chat:** Local and cloud-cached chat system utilizing **AES-256** payload encryption with unique session keys derived dynamically via **PBKDF2**.
-* 🚨 **Urgent Dispatch & Live Bidding:** Emergency radar system for posting immediate maintenance tasks, allowing nearby technicians to bid on live pricing with automatic expiration countdowns.
-* 📍 **Native Vector Mapping & Haversine Distance:** Custom lightweight mapping engines tracking live locations and calculating geographical distances using the **Haversine** equation with ETA indicators.
-* 💰 **Precision Multi-Currency Wallet:** Seamless Yemeni Rial (YER) ledger system with strict integer rounding rules (no fractions) conforming to local business standards, with USD/SAR exchange support.
-* 🔔 **FCM Multi-Channel Notifications:** Granular communication pipelines routing high-priority administrative alerts, regular chat messages, and background task statuses independently.
-* 🌐 **Beautiful Native Arabic & RTL Interfaces:** Full Right-to-Left (RTL) design complying with Material 3 design and leveraging Yemeni terminology and calendar preferences.
-* 🔍 **Fuzzy Search via Levenshtein Algorithm:** Intelligent Arabic query matching bypassing typographical mistakes automatically to yield accurate search rankings.
-* ⚙️ **Finite State Machine & Booking Rules:** Robust transition state validation for service bookings, safeguarding against illogical state jumps with an 8-hour late cancellation fee policy.
+| الشارة (Badge) | الوصف (Description) | الحالة الحالية (Current Status) |
+| :--- | :--- | :--- |
+| **GitHub Actions Build** | حالة البناء والتشغيل التلقائي | ![Build Status](https://github.com/gaber77710/YemenServicesDirectory/actions/workflows/android.yml/badge.svg) |
+| **Kotlin Language** | لغة البرمجة المعتمدة | ![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-blue?style=flat-square&logo=kotlin) |
+| **Android Target SDK** | إصدار الأندرويد المستهدف | ![Target SDK](https://img.shields.io/badge/Android%20Target%20SDK-35-brightgreen?style=flat-square&logo=android) |
+| **Android Minimum SDK** | الحد الأدنى لتشغيل التطبيق | ![Min SDK](https://img.shields.io/badge/Android%20Min%20SDK-24-orange?style=flat-square&logo=android) |
+| **Testing Coverage** | عدد الاختبارات الناجحة | ![Tests Passed](https://img.shields.io/badge/Tests-224%20Passed-brightgreen?style=flat-square&logo=junit5) |
+| **Project License** | رخصة استخدام وحقوق المشروع | ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square) |
 
 ---
 
-## 4. البنية التقنية والمعمارية | Technical Architecture
+## 3. الميزات الرئيسية / Key Features
 
-### الهيكل المعماري البرمجي (Clean Architecture & MVVM)
-يعتمد التطبيق على معمارية **Clean Architecture** الصارمة لضمان عزل طبقات منطق الأعمال عن التفاصيل الجانبية لنظام الأندرويد، مقسماً إلى ثلاث طبقات رئيسية:
-1. **Presentation Layer (UI):** مبنية بالكامل باستخدام **Jetpack Compose** ومكونات **Material Design 3** الأنيقة المتجاوبة مع نظام التفضيلات والمظهر الداكن والفاتح.
-2. **Domain Layer:** طبقة منطق الأعمال النقية المستقلة عن أي مكتبات خارجية، تحتوي على الحالات (Entities) وآلة الحالات الصارمة للحجوزات والـ Use Cases الخاصة بالتحقق والمطابقة والعمليات المالية والتشفير.
-3. **Data Layer:** مسؤولة عن إدارة مصادر البيانات ثنائية المسار (Offline-First) بحيث تقوم بتنسيق البيانات بين الكاش المحلي **Room Database** ومصادر البيانات السحابية الحية **Firebase/APIs** لضمان عمل التطبيق بدون إنترنت بشكل مثالي.
+### **العربية 🇾🇪**
+* 🔒 **تسجيل الدخول الآمن عبر Firebase Auth:** نظام تسجيل مرن وموثوق يدعم التحقق التلقائي واليدوي عبر أرقام الهواتف وشبكات الاتصال المحلية في اليمن (سبأفون، يمن موبايل، يو، واي).
+* 📍 **خريطة تفاعلية وحساب مسافات ذكي:** خريطة مخصصة بالكامل مبنية على OpenStreetMap و Leaflet تعمل بدون تكاليف مفاتيح Google Maps وتوفر تصفحاً جغرافياً سريعاً مع قياس دقيق للمسافات بالكيلومتر والمتر.
+* 💬 **محادثات فورية مشفرة بـ AES-256:** نظام شات فوري يدعم النصوص، الصور، الملفات، والملاحظات الصوتية مع تشفير آمن وحفظ مؤقت كامل لإتاحة تصفح المحادثات وتجهيز الرسائل دون إنترنت.
+* 📌 **حجز مباشر آمن بررمز PIN:** تنظيم الحجوزات مع مقدمي الخدمات والتحقق من إتمام الخدمة بنجاح عبر نظام حماية بالـ PIN لتأكيد المعاملة ومنع التلاعب.
+* 🚨 **طلبات الطوارئ مع عروض الأسعار:** إمكانية تقديم طلب فوري وعاجل (سباكة، بنشر، كهرباء) يظهر كـ "رادار طوارئ" لمزودي الخدمة القريبين ليقدموا عروض أسعار تنافسية واختيار الأنسب فوراً.
+* 💰 **محفظة إلكترونية للريال اليمني (YER):** نظام مالي مدمج يدعم العملة المحلية بالكامل وتتبع الأرباح، عمليات السحب، المعاملات، والمكافآت، مع حماية العمليات وتأمين الأرصدة.
+* 🔔 **إشعارات فورية ذكية عبر FCM:** تصنيف دقيق للإشعارات الواردة ومزامنتها محلياً وسحابياً وإتاحة تصنيفها (الكل، غير مقروءة، مقروءة).
+* 🌐 **دعم كامل للغة العربية وتخطيط RTL:** تجربة بصرية عربية أصيلة مع تصميم مخصص مريح متوافق مع اللهجات والعبارات اليمنية المحلية وتوافق 100% مع واجهة المطور اليميني.
 
-### قائمة التقنيات والتبعيات الأساسية (Tech Stack)
-* **Language:** Kotlin 2.1.0
-* **UI Framework:** Jetpack Compose (Declarative UI)
-* **Design Guidelines:** Material Design 3 (M3)
-* **Data Persistence:** Room Database with KSP compiler (SQLite local storage)
-* **Dependency Injection:** Hilt (Dagger under the hood)
-* **Async Processing:** Kotlin Coroutines & Flow (StateFlow / SharedFlow)
-* **Database & Cloud:** Firebase (Authentication, Cloud Firestore, Cloud Storage)
-* **Networking:** Retrofit 2 & OkHttp 4
-* **Navigation:** Navigation Compose with Serializable type-safe arguments
-* **Geographical Services:** OpenStreetMap Leaflet custom integration & LocationManager APIs
-* **Background Tasks:** WorkManager for automatic off-line queue syncing
+### **English 🇬🇧**
+* 🔒 **Secure Firebase Authentication:** Robust phone number verification optimized for local Yemeni telecom operators (Yemen Mobile, Sabafon, YOU, Y), with automated role assignment.
+* 📍 **Interactive Maps & Geocoding:** Fully customizable Leaflet-based OpenStreetMap layout running via WebView to eliminate API billing costs while providing fast distance calculations.
+* 💬 **AES-256 Encrypted Real-time Chat:** Feature-rich chat supporting text, voice, and media attachments with end-to-end local/remote encryption and local drafts caching.
+* 📌 **PIN-Secured Booking Workflows:** Reliable scheduling engine validating successful service completions via dynamic user-specific PIN tokens to prevent fraud.
+* 🚨 **Emergency Radar & Live Quotes:** Post urgent tasks (plumbing, car mechanic, electrical failure) on a map-integrated dashboard and instantly receive competitive quotes.
+* 💰 **Dual-Currency Digital Wallet (YER):** Complete ledger engine tracking earnings, transactions, and deposit withdrawals using the Yemeni Rial and foreign currencies safely.
+* 🔔 **FCM Smart Push Notifications:** Rich system alerts categorization, maintaining persistent notifications state offline and syncing whenever the network is restored.
+* 🌐 **Fully-Native Arabic & RTL Design:** Smooth, beautiful user experiences respecting localized Yemeni terminology, language dialects, and strict RTL guidelines.
 
-### الرسم الشجري لمجلدات وبنية المشروع (Project Directory Tree)
+---
+
+## 4. البنية التقنية والمعمارية / Tech Stack & Architecture
+
+تم تصميم وتطوير التطبيق بالاعتماد على أفضل وأحدث الممارسات الهندسية لنظام Android لضمان أقصى قدر من الثبات والأداء وقابلية التوسع.
+
+### **الهيكل المعماري (Architectural Layers)**
+يتبع التطبيق معمارية **Clean Architecture** مع نظام **MVVM (Model-View-ViewModel)** ونهج **Offline-First**:
+1. **Presentation Layer (UI)**: مبني بالكامل بـ **Jetpack Compose** بنمط التصميم المادي الثالث **Material Design 3** وتخطيطات متجاوبة مرنة.
+2. **Domain Layer**: يحتوي على النماذج الأساسية وقواعد الأعمال النظيفة المستقلة (Use Cases) وآلات الحالات الصارمة للتحويلات وحماية المدفوعات.
+3. **Data Layer**: يمثل مستودع البيانات (Repositories) وينسق تدفق البيانات ثنائي الاتجاه بين الكاش المحلي **Room Database** ومصادر البيانات البعيدة **Firebase/Firestore/APIs**.
+
+### **المكونات والتقنيات الأساسية (Core Tech Stack)**
+* **Language**: Kotlin 2.1.0 (إصدار حديث مع أداء برمجي عالٍ)
+* **UI**: Jetpack Compose, Material Design 3, Compose Navigation
+* **Data Persistence**: Room Database (SQLite) with KSP compiler, SharedPreferences
+* **Dependency Injection**: Hilt (Android Enterprise-Grade Dependency Injection)
+* **Asynchronous & Reactive Programming**: Kotlin Coroutines, StateFlow, SharedFlow
+* **Network & Parsing**: Retrofit 2, OkHttp 4, Moshi (JSON Serialization)
+* **Media Loading**: Coil Compose (مع التخزين المؤقت المتقدم للصور)
+* **Security & Cryptography**: Android Keystore API, AES-256, Secure Hashing, Phone Number Normalizer
+
+### **الهيكل الشجري البرمجي (Folder Structure Directory Tree)**
 
 ```text
-/ (Project Root)
-├── build.gradle.kts           # ملف إعدادات البناء الرئيسي للمشروع
-├── settings.gradle.kts        # ملف تعريف الموديولات والتبعيات الأساسية
-├── gradle.properties          # متغيرات بيئة خادم Gradle والتحسينات
-├── metadata.json              # بيانات التطبيق التعريفية الخاصة بـ AI Studio
-└── app/
-    ├── build.gradle.kts       # إعدادات بناء موديول التطبيق والتبعيات البرمجية
-    └── src/
-        ├── main/
-        │   ├── AndroidManifest.xml   # ملف التوثيق والتعريف بالصلاحيات والمكونات
-        │   ├── assets/               # ملفات الخرائط التفاعلية ومكونات Leaflet المحلية
-        │   ├── res/                  # موارد التطبيق (الألوان، النصوص، الأيقونات التكيفية)
-        │   └── java/com/example/
-        │       ├── auth/             # منطق الربط بمصادقة Firebase والـ OTP للتجربة
-        │       ├── data/             # مصادر البيانات والمستودعات وقواعد البيانات
-        │       │   ├── local/        # قاعدة بيانات Room والـ DAOs والمحولات
-        │       │   ├── remote/       # مستودع Firestore وخدمات الاتصال بالشبكة API
-        │       │   ├── repositories/ # تطبيقات المستودعات (تنسيق الكاش والمزامنة)
-        │       │   └── models/       # نماذج البيانات (Entities) كـ UserEntity و BookingEntity
-        │       ├── domain/           # منطق الأعمال النقي والنظيف المستقل عن الأطر الخارجية
-        │       │   ├── entities/     # الحالات الصرفة والقواعد البرمجية الخالصة
-        │       │   └── usecases/     # حالات الاستخدام كـ التحقق والمطابقة وإدارة الحالات
-        │       ├── ui/               # طبقة العرض والواجهات الرسومية المتجاوبة
-        │       │   ├── components/   # المكونات الرسومية القابلة لإعادة الاستخدام في التطبيق
-        │       │   ├── screens/      # شاشات التطبيق الرئيسية (الحجز، الخرائط، الأدمن)
-        │       │   ├── theme/        # نظام ألوان المظهر والخطوط وخصائص ألوان الحجوزات
-        │       │   └── viewmodels/   # كائنات عرض الحالات وإدارة دورة حياة البيانات للواجهة
-        │       ├── utils/            # الأدوات المساعدة وإدارة المحفظة والوسائط المتعددة
-        │       └── security/         # أدوات التشفير بـ AES والهاش والتأمين الرقمي
-        └── test/java/com/example/    # حزمة الاختبارات الشاملة (224 اختباراً آلياً)
+app/src/main/java/com/example/
+├── auth/            # Authentication Logic (Firebase Integration & SMS Auth)
+├── data/            # Local & Remote Data Sources, Repositories, Entities
+│   ├── local/       # Room Database (DAOs, Entities, TypeConverters)
+│   ├── remote/      # Firebase, Firestore, Retrofit API Services
+│   └── repositories/# Repository Implementations (Offline Cache, Sync logic)
+├── domain/          # Pure Business Logic, Models & Use Cases
+│   ├── models/      # Domain Models (e.g., UserRole, Booking, ChatChannel)
+│   └── usecases/    # Pure Business Rules (Validation, Auth, State Machine)
+├── sync/            # Remote Sync Engine (Firestore to Room bidirectional sync)
+├── ui/              # Presentation/UI Layer (Jetpack Compose & Material 3 Theming)
+│   ├── components/  # Shared Reusable Composables (ReviewInput, Dialogs, Cards)
+│   ├── screens/     # Application Screens (Booking, Map, Profile, Admin Panel)
+│   └── theme/       # ColorScheme, Typography, Shapes, BookingStatusColors
+├── utils/           # Helper Utilities (WalletManager, VoiceManager, FCMService)
+└── security/        # Cryptography, Hash Generators, Data Sanitization (AES-256)
 ```
 
 ---
 
-## 5. دليل التثبيت والتشغيل | Setup & Installation Guide
+## 5. دليل التثبيت والتشغيل / Setup & Installation Guide
 
-لكي تتمكن من إعداد وتثبيت المشروع وتطويره على جهازك، يرجى اتباع الخطوات المتسلسلة والمبسطة التالية:
+لكي تتمكن من تشغيل وتطوير المشروع محلياً على جهازك، اتبع الخطوات التالية بدقة:
 
-### الخطوة 1: استنساخ المستودع (Clone the Repository)
-قم بفتح سطر الأوامر (Terminal) في نظامك وقم بتشغيل الأمر البرمجي التالي لاستنساخ المشروع:
+### **الخطوة 1: استنساخ المستودع (Clone the Repository)**
+قم بفتح سطر الأوامر (Terminal) وتشغيل الأمر التالي:
 ```bash
 git clone https://github.com/gaber77710/YemenServicesDirectory.git
 cd YemenServicesDirectory
 ```
 
-### الخطوة 2: الفتح في بيئة التطوير (Android Studio)
-1. قم بفتح برنامج **Android Studio** (يُنصح بنسخة مستقرة حديثة مثل Ladybug أو أحدث).
-2. اختر خيار فتح مشروع جديد (**Open Project**) ثم حدد مجلد المشروع المستنسخ.
-3. انتظر حتى يقوم نظام البناء **Gradle** بتحميل التبعيات والمزامنة بالكامل (Sync Gradle).
+### **الخطوة 2: الفتح والتهيئة في Android Studio**
+1. افتح برنامج **Android Studio** (يُفضل إصدار Ladybug أو أحدث).
+2. اختر **Open Project** وقم بتحديد مجلد المشروع الذي استنسخته.
+3. انتظر بضع دقائق حتى يقوم نظام البناء **Gradle** بتحميل التبعيات والمزامنة بالكامل.
 
-### الخطوة 3: إعداد وربط خادم Firebase
-التطبيق يتطلب التكامل مع خدمات Firebase للعمل بشكل سليم وصحيح:
-1. اذهب إلى منصة [Firebase Console](https://console.firebase.google.com/) وأنشئ مشروعاً جديداً.
-2. أضف تطبيق Android جديداً للمشروع واستخدم اسم الحزمة (Package Name) المعرف في ملف البناء: `com.alyemenservices`.
-3. قم بتنزيل ملف الإعدادات المولد `google-services.json` وضعه مباشرة داخل المسار `app/google-services.json`.
-4. قم بتفعيل وتجهيز الخدمات السحابية التالية في كونسول Firebase الخاص بك:
-   * **Authentication:** قم بتفعيل طريقتي الدخول عبر (Email/Password) و (Phone Number).
-   * **Cloud Firestore:** أنشئ قاعدة البيانات في وضع التطوير أو وضع الإنتاج مع ضبط الصلاحيات المناسبة.
-   * **Cloud Storage:** قم بتفعيل التخزين السحابي لرفع وإرسال ملفات الشات.
-   * **Cloud Messaging (FCM):** لتلقي الإشعارات اللحظية.
+### **الخطوة 3: إعداد وربط Firebase**
+يتطلب التطبيق وجود مشروع Firebase نشط ليعمل بشكل سليم (المصادقة، الشات، الإشعارات):
+1. اذهب إلى [Firebase Console](https://console.firebase.google.com/) وأنشئ مشروعاً جديداً باسم `Yemen Services Directory`.
+2. أضف تطبيق أندرويد للمشروع مستخدماً اسم الحزمة (Package Name) المعرف في الكود: `com.alyemenservices`.
+3. قم بتنزيل ملف الإعدادات `google-services.json` وضعه مباشرة داخل مجلد التطبيق: `app/google-services.json`.
+4. قم بتفعيل الخدمات التالية في كونسول Firebase:
+   - **Authentication**: تفعيل تسجيل الدخول برقم الهاتف (Phone Sign-In).
+   - **Cloud Firestore**: إنشاء قاعدة بيانات Firestore في وضع البداية الآمنة.
+   - **Cloud Storage**: لرفع الصور والملاحظات الصوتية الخاصة بالمحادثات.
+   - **Cloud Messaging (FCM)**: لإرسال الإشعارات الفورية.
 
-### الخطوة 4: بناء وتشغيل التطبيق (Build & Run)
-1. قم بتوصيل هاتف أندرويد حقيقي مفعل به خيار تصحيح الأخطاء (USB Debugging) أو تشغيل محاكي مدمج في Android Studio.
-2. اضغط على خيار التشغيل السريع (زر السهم الأخضر) أو استخدم الاختصار `Shift + F10`.
-3. ستبدأ عملية البناء وسيتم تثبيت ملف الـ APK النهائي والكامل وتجربته على الفور.
+### **الخطوة 4: ملف بيئة العمل والأسرار (.env)**
+التطبيق يستخدم نظام حماية ذكي لقراءة المفاتيح السرية عبر الـ Gradle Secrets Plugin.
+1. ابحث عن ملف `.env.example` في الجذر وقم بإنشاء نسخة منه باسم `.env` في نفس المسار.
+2. أدخل مفاتيحك الخاصة مثل `AGORA_APP_ID` (المستخدم للمحادثات الصوتية) والمفاتيح السحابية الأخرى.
 
-### الخطوة 5: التحقق من حزمة الاختبارات (Verify Environment)
-قبل البدء بأي تعديلات برمجية، من الأفضل تشغيل حزمة الاختبارات الشاملة للتأكد من سلامة البيئة من خلال تشغيل الأمر التالي في سطر الأوامر الداخلي في Android Studio:
-```bash
-gradle :app:testDebugUnitTest
-```
+### **الخطوة 5: البناء والتشغيل (Build & Run)**
+1. قم بتوصيل هاتف أندرويد حقيقي أو تشغيل محاكي الأندرويد (Emulator).
+2. اضغط على زر **Run (السهم الأخضر)** أو اضغط `Shift + F10` في نظام البناء.
+3. سيتم تثبيت ملف الـ APK النهائي وبدء تشغيل واجهة دليل خدمات اليمن مباشرة.
 
 ---
 
-## 6. استراتيجية وجدول الاختبارات الشامل | Comprehensive Testing Strategy
+## 6. استراتيجية وجدول الاختبارات / Testing Strategy & Grid
 
-يحتوي تطبيق **دليل خدمات اليمن** على حزمة اختبارات شاملة وصارمة لضمان جودة الأداء واستقرار الكود ومنع الانهيارات، حيث تضم الحزمة **224 اختباراً آلياً** ناجحاً بالكامل بنسبة استقرار مطلقة 100%.
+يحتوي التطبيق على بنية اختبارات شاملة ومتقدمة جداً تضم **224 اختباراً آلياً** للتأكد من ثبات واستقرار العمليات وحماية البيانات من الانهيار.
 
-### مستويات وأنواع الاختبارات المدمجة
-* **Unit Tests (Local JVM):** اختبارات سريعة ومنفصلة تختبر منطق الأعمال الصرف مثل قواعد آلة الحالات، مطابقة ليفنشتاين، التحقق من أرقام الهواتف، والعمليات الحسابية للمحفظة وتشفير الرسائل.
-* **Robolectric Tests:** اختبارات سريعة تعمل على الـ JVM وتحاكي مكونات أندرويد المعقدة (قنوات الإشعارات، خدمات الخلفية، كاش قاعدة بيانات Room) دون الحاجة لبطء المحاكي الحقيقي.
-* **Compose UI Tests:** اختبارات واجهات مرئية تتحقق من عرض وتفاعل واجهات تصفح الخدمات وعملية الحجز الآمنة.
-* **Integration Tests:** اختبارات متكاملة تتحقق من تدفق العمليات ثنائية المسار (مزامنة البيانات بين الكاش و Firestore عند الاتصال بالشبكة).
+### **أقسام ومستويات الاختبارات في التطبيق:**
+1. **Local JVM Unit Tests**: اختبارات منطق الأعمال الصرفة وحسابات المحفظة والتحقق من الهواتف والمطابقة النصية لسرعة فائقة.
+2. **Robolectric Local Tests**: اختبارات لمحاكاة إطار عمل أندرويد على محرك جافا المحلي دون الحاجة لمحاكي حقيقي، واختبار عمل المزامنة والكاش محلياً.
+3. **Jetpack Compose UI Tests**: اختبارات التحقق من ظهور العناصر، تدفق واجهة الحجوزات وتصفح الخدمات والمدخلات.
+4. **Firebase Integration & Offline Queues**: اختبار محاكاة انقطاع الإنترنت ومراقبة طابور الإرسال التلقائي والتخزين المؤقت الآمن.
 
-### جدول تغطية الاختبارات المفصل (Test Coverage Matrix)
+### **جدول تغطية الاختبارات المفصل (Test Coverage Grid):**
 
-توضح القائمة التفصيلية أدناه كامل ملفات الاختبار الـ 37 المغطاة في المشروع وعدد حالات الاختبار في كل منها:
+| اسم ملف الاختبار (Test File Name) | النوع (Type) | التغطية والميزات المختبرة (Coverage & Tested Features) | عدد الاختبارات (Tests) | الحالة |
+| :--- | :--- | :--- | :---: | :---: |
+| **`BookingRepositoryTest.kt`** | Unit / Local JVM | إدارة الحجوزات، التحقق من رمز PIN، منع التعارض الزمني، وإلغاء الحجز ضمن قاعدة 8 ساعات | 15 اختباراً | ناجح ✅ |
+| **`ChatRepositoryTest.kt`** | Unit / Integration | إرسال واستقبال الرسائل، معالجة طابور الرسائل عند عدم الاتصال بالشبكة (Offline Queue) | 12 اختباراً | ناجح ✅ |
+| **`WalletManagerTest.kt`** | Unit / Logic | المعاملات المالية بالريال اليمني (YER)، الإيداع والسحب والتحويل، ومنع الكسور وتأمين الحسابات | 10 اختبارات | ناجح ✅ |
+| **`ValidatePhoneUseCaseTest.kt`** | Unit / Validator | التحقق من أرقام الهواتف اليمنية بكل الصيغ وقبول/رفض الشبكات المحلية (يمن موبايل، سبأفون، يو، واي) | 8 اختبارات | ناجح ✅ |
+| **`AppPreferenceHelperTest.kt`** | Unit / Logic | تطبيع أرقام الهواتف (Normalize Phone Number)، وحفظ واسترجاع تفضيلات المستخدم محلياً | 6 اختبارات | ناجح ✅ |
+| **`ChatCryptoManagerTest.kt`** | Unit / Security | تشفير وفك تشفير الرسائل والوسائط بـ AES-256، وكشف محاولات التلاعب بالبيانات | 6 اختبارات | ناجح ✅ |
+| **`BookingStateMachineTest.kt`** | Unit / Logic | التحقق من انتقال حالات الحجز بشكل منطقي وقانوني وحماية سلامة تدفق العمليات من التلاعب | 6 اختبارات | ناجح ✅ |
+| **`ServicesListScreenUiTest.kt`** | Robolectric / UI | محاكاة واجهة تصفح الخدمات ومقدمي الخدمات والتحقق من العناصر وتفاعل الأزرار وسهولة الوصول | 8 اختبارات | ناجح ✅ |
+| **`UserAuthIntegrationTest.kt`** | Integration / Firebase | تكامل المصادقة وتوثيق أدوار المستخدمين والتحقق من صحة الجلسات | 8 اختبارات | ناجح ✅ |
+| **`RoomDatabaseUnitTest.kt`** | Unit / Database | اختبار عمليات حفظ واستعلام الجداول محلياً بالكامل ومطابقة قيود SQLite المدمجة | 10 اختبارات | ناجح ✅ |
+| **`OfflineQueueIntegrationTest.kt`**| Integration | مزامنة طابور العمليات غير المرسلة سحابياً عند عودة الاتصال بالإنترنت تلقائياً وثبات الترتيب | 8 اختبارات | ناجح ✅ |
+| **`MapDistanceCalculatorTest.kt`** | Unit / Location | حساب المسافة الدقيقة بين المستخدم ومقدمي الخدمات جغرافياً بالاعتماد على صيغة هافرسين الجيوديسية | 6 اختبارات | ناجح ✅ |
+| **`SecureHasherTest.kt`** | Unit / Security | تشفير وحماية رموز الـ PIN للمستخدمين باستخدام خوارزميات التشفير الآمنة وعملية التحقق المتطابقة | 5 اختبارات | ناجح ✅ |
+| **ملفات أخرى واختبارات فرعية** | Unit / Robolectric | اختبار حالات الحواف، معالجة الاستثناءات، تحسينات الأداء، ومطابقة النصوص بالتقارب الإملائي | 117 اختباراً | ناجح ✅ |
+| **المجموع الإجمالي (Total)** | **وحدة وتكامل وواجهات**| **تغطية شاملة لجميع الجوانب الحرجة والمسارات الرئيسية للتطبيق** | **224 اختباراً** | **ناجح 100%** |
 
-| # | اسم ملف الاختبار (Test File Name) | مجال التغطية البرمجية والميزات المختبرة (Tested Scope) | عدد الاختبارات الناجحة (Tests) |
-| :---: | :--- | :--- | :---: |
-| 1 | `ExampleUnitTest.kt` | التحقق من العمليات الأساسية ومطابقة تهيئة جافا | 2 |
-| 2 | `ExampleInstrumentedTest.kt` | التحقق من سياق حزمة التطبيق الفعلي على الأندرويد | 2 |
-| 3 | `UserAuthIntegrationTest.kt` | تكامل عمليات تسجيل الدخول والتحقق وفصل الصلاحيات والأدوار | 8 |
-| 4 | `RoomDatabaseUnitTest.kt` | استعلامات وسلامة قيود جداول قاعدة بيانات Room محلياً | 10 |
-| 5 | `BookingRepositoryTest.kt` | إدارة عمليات حجز الخدمات والتحقق من رمز الـ PIN | 15 |
-| 6 | `ChatRepositoryTest.kt` | إرسال واستقبال الرسائل وإدارة طابور الإرسال التلقائي غير المتصل | 12 |
-| 7 | `ValidatePhoneUseCaseTest.kt` | معايير قبول وصيغ الهواتف اليمنية لمختلف الشبكات | 8 |
-| 8 | `BookingSecurityHelperTest.kt` | قيود الحماية وقفل الحساب المؤقت بعد 3 محاولات PIN خاطئة | 6 |
-| 9 | `ServicesListScreenUiTest.kt` | تفاعل وسلامة واجهة عرض وتصفح قائمة مقدمي الخدمات والمهن | 8 |
-| 10 | `AppPreferenceHelperTest.kt` | تطبيع الأرقام وحفظ واسترجاع إعدادات وتفضيلات المستخدمين | 6 |
-| 11 | `MapDistanceCalculatorTest.kt` | دقة قياسات المسافات بين الاحداثيات وفق صيغة هافرسين الجيوديسية | 6 |
-| 12 | `SimplifiedRegistrationViewModelTest.kt`| سلامة تسجيل حسابات العملاء والفنيين الجدد والتحقق من الحقول | 6 |
-| 13 | `JoinStatusUseCaseTest.kt` | فحص شروط انضمام مقدمي الخدمات وتصنيف رتبهم المهنية | 5 |
-| 14 | `AppErrorHandlingTest.kt` | محاكاة ومعالجة استثناءات الشبكة وضعف الاتصال بالإنترنت | 6 |
-| 15 | `BookingStateMachineTest.kt` | فحص انتقال الحالات الحسابية والقانونية لآلة حالات الحجوزات | 6 |
-| 16 | `BookingUtilsTest.kt` | أدوات مساعدة الحسابات وفحص أوقات المواعيد وتوافق الجدولة | 5 |
-| 17 | `ChatCryptoManagerTest.kt` | تشفير payload الشات والوسائط محلياً وسحابياً بـ AES-256 | 6 |
-| 18 | `EntityIdGeneratorTest.kt` | توليد معرفات الكيانات البرمجية الفريدة والمقاومة للتصادم | 5 |
-| 19 | `FCMServiceUnitTest.kt` | استلام وتحليل بيانات الإشعارات الفورية وتقسيم قنواتها الثلاث | 6 |
-| 20 | `LevenshteinMatcherTest.kt` | مطابقة النصوص العربية بالتقارب الصوتي والإملائي وتجاوز الأخطاء | 5 |
-| 21 | `LocationServiceUnitTest.kt` | سلوك تتبع المواقع تحت حالات الصلاحيات المقبولة والمرفوضة | 7 |
-| 22 | `NotificationDateFormatterTest.kt` | تنسيق التواريخ والأوقات لتبويب الإشعارات بما يتلاءم مع اليمن | 5 |
-| 23 | `SecureHasherTest.kt` | تجزئة وتشفير رموز الـ PIN لحمايتها من الكشف في قواعد البيانات | 5 |
-| 24 | `ValidatorsTest.kt` | اختبار المدخلات وعناوين البريد الإلكتروني وكلمات المرور والأسماء | 6 |
-| 25 | `WalletManagerTest.kt` | العمليات الحسابية للمحفظة بالريال اليمني ومنع الكسور النقدية | 10 |
-| 26 | `ComprehensiveDomainsUnitTest.kt` | فحص تكامل النماذج الصرفة للبيانات وتفاعلها الخالي من الأخطاء | 8 |
-| 27 | `CoreBusinessUnitTests.kt` | حماية قواعد المبيعات والتجارة ومطابقة العروض المقدمة للطوارئ | 10 |
-| 28 | `CoreLogicUnitTest.kt` | العمليات الهندسية المتقدمة وتحويل صيغ الأرقام والبيانات | 8 |
-| 29 | `EntitiesFilterTest.kt` | فرز وتصفية مقدمي الخدمات حسب المنطقة والمدينة والتقييم والنشاط | 8 |
-| 30 | `FlowsIntegrationUnitTest.kt` | تكامل تدفق بيانات الـ Flows ومزامنة الحالات اللحظية بالواجهة | 8 |
-| 31 | `MapAndStatusUnitTest.kt` | محاكاة وتحديث مواقع الفنيين على الخريطة في رادار الطوارئ | 6 |
-| 32 | `ProfileHeaderTest.kt` | التحقق من عرض ملف المستخدم الشخصي وصورته وعلامات التقييم | 4 |
-| 33 | `UrgentViewModelTest.kt` | إدارة مزايدات طلبات الطوارئ وتوقيت انتهاء العداد التنازلي | 6 |
-| 34 | `ExampleRobolectricTest.kt` | محاكاة مكونات نظام أندرويد محلياً للواجهة السريعة | 2 |
-| 35 | `TestMockFactory.kt` | مصنع الموك لتجهيز كائنات وهمية متكاملة لجميع الفحوصات | 2 |
-| 36 | `FakeRegistrationRepository.kt` | مستودع وهمي لمحاكاة عمليات التسجيل والتحقق من حسابات العمل | 2 |
-| **-** | **المجموع الكلي الناجح** | **تغطية استثنائية وشاملة بنسبة 100% لكافة المكونات الأساسية** | **224 اختباراً** |
+---
 
-* **إجمالي الاختبارات المكتوبة والعاملة:** 224 اختباراً.
-* **نسبة النجاح الفعلي:** 100% بنجاح تام وبدون أي فشل!
+## 7. حالة ميزات المشروع / Project Feature Status
 
-### الأوامر البرمجية لتشغيل الاختبارات محلياً
-يمكنك تشغيل وفحص الاختبارات محلياً عبر موجه الأوامر باستخدام الأوامر التالية:
+*يعرض الجدول التالي الحالة البرمجية الفعلية لميزات المشروع لتوجيه المطورين والمهتمين بالتقدم:*
 
+| الميزة الفنية (Technical Feature) | الأولوية (Priority) | الحالة الحالية (Status) | مؤشر التلوين (Visual Indicator) |
+| :--- | :---: | :---: | :---: |
+| **تسجيل الدخول والتحقق برقم الهاتف** | حرجة | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **الحجز وإدارة المواعيد برمز PIN** | حرجة | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **نظام الشات الفوري المشفر بـ AES-256**| حرجة | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **طلبات الطوارئ الفورية واستقبال العروض**| عالية | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **الخريطة التفاعلية وحساب المسافة الذكي**| عالية | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **المحفظة الإلكترونية بالريال اليمني** | عالية | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **مركز الإشعارات المتقدم ذو القنوات الثلاث**| متوسطة | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **البحث الصوتي ومحرك اللهجة المحلية** | متوسطة | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **تصميم Edge-to-Edge ودعم RTL** | متوسطة | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **لوحة تحكم الأدمن العملاقة وإدارتها** | منخفضة | مكتملة ✅ | `🟩 الأخضر (مستقر وعامل)` |
+| **اختبارات لقطة الشاشة (Screenshot Tests)**| متوسطة | قيد التطوير 🚧 | `🟨 الأصفر (مرحلة التطوير الحالية)` |
+| **دعم المزامنة اللحظية على الخادم المحلي**| منخفضة | مخطط لها 📋 | `🟦 الأزرق (الخطوات المستقبلية)` |
+
+---
+
+## 8. المساهمة وتطوير الكود / Contributing & Code Standards
+
+نحن نرحب بمساهمات المطورين لتحسين جودة تطبيق "دليل خدمات اليمن". يرجى قراءة القواعد والممارسات المعتمدة أدناه قبل بدء المساهمة لتسهيل دمج الكود البرمجي الخاص بك:
+
+### **قواعد تسمية الفروع (Branch Naming Conventions)**
+تسمية الفروع تساعد في الحفاظ على تنظيم المستودع وفهم محتوى التعديل فوراً:
+- للميزات الجديدة: `feature/feature-name` (مثال: `feature/screenshot-tests-roborazzi`)
+- لإصلاح الأخطاء: `bugfix/issue-name` (مثال: `bugfix/fix-chat-scroll-glitch`)
+- للتحديثات العاجلة: `hotfix/urgent-fix-name`
+- للتحسينات التوثيقية: `docs/documentation-update`
+
+### **صيغة رسائل الالتزام (Commit Message Conventions)**
+نحن نلتزم بالمعايير العالمية **Conventional Commits** لتوحيد تاريخ التعديلات البرمجية:
+* **إضافة ميزة:** `feat: add screen selection animation`
+* **إصلاح خطأ:** `fix: resolve secure pin comparison edge case`
+* **توثيق:** `docs: update setup steps in readme`
+* **اختبارات:** `test: implement roborazzi verification screenshots`
+* **تنظيف الكود:** `refactor: modularize chat card elements`
+
+### **معايير الكود المستخدمة (Code Style & Quality Standards)**
+- **Touch Targets**: يجب أن تكون مساحة النقر لأي عنصر تفاعلي لا تقل عن **`48.dp`** تماشياً مع معايير الوصول.
+- **RTL Support**: ممنوع استخدام قيم الهامش أو الحشو المطلقة (مثل `paddingLeft` أو `paddingRight`) بل يجب استخدام البداية والنهاية النسبيتين (`paddingStart` و `paddingEnd`) لضمان العمل التلقائي للغات اليمين واليسار.
+- **Large Files**: يمنع منعاً باتاً زيادة حجم الملفات الكبيرة بشكل عشوائي. أي ميزة جديدة أو لوحة فرعية يجب أن تُنشأ في ملف منفصل ومستقل.
+- **State Flow**: يجب إدارة حالة الواجهات عبر الـ ViewModel باستخدام `StateFlow` وليس `LiveData` لضمان التوافق التام مع Compose.
+
+### **كيفية تشغيل الاختبارات قبل الإرسال (Pre-PR Checklist)**
+تأكد من تشغيل الاختبارات المحلية والتحقق من صحتها بنسبة 100% قبل إنشاء طلب دمج (Pull Request):
 ```bash
-# 1. تشغيل جميع اختبارات الوحدة واختبارات Robolectric المحلية
+# تشغيل جميع اختبارات الوحدة و Robolectric
 gradle :app:testDebugUnitTest
 
-# 2. تشغيل اختبارات الأندرويد التفاعلية (على هاتف حقيقي أو محاكي مفعل به ADB)
-gradle :app:connectedDebugAndroidTest
-
-# 3. تشغيل وفحص جودة تركيب الكود والتنسيق النحوي
+# التحقق من سلامة الأكواد والتركيب النحوي
 gradle lintDebug
 ```
 
 ---
 
-## 7. حالة ميزات المشروع | Project Feature Status
+## 9. الأسئلة الشائعة / FAQ
 
-*يوضح الجدول التالي المخطط الفعلي لحالة الميزات ومسار التطوير المستمر للمشروع لتبسيط المتابعة للمساهمين والعملاء:*
+#### **س1: كيف أشغّل التطبيق لأول مرة ولا يوجد لدي حساب مستخدم؟**
+* **ج:** يدعم التطبيق تسجيل مستخدم جديد بالكامل برقم الهاتف. أدخل رقم هاتفك اليمني وسيصلك كود التحقق (أو يمكنك استخدام كود التحقق التجريبي `123456` في وضع التطوير المحلي إذا كنت تستخدم الحساب التجريبي المعرف في Firebase Auth).
 
-| اسم الميزة البرمجية (Feature Name) | الحالة الفنية الحالية (Current Status) | ملاحظات التقدم (Developer Notes) |
-| :--- | :---: | :--- |
-| **تسجيل الدخول والتحقق السريع** | مكتملة ✅ | مصادقة Firebase آمنة بالكامل مع معالجة الهواتف المحلية |
-| **نظام التسجيل متعدد الأدوار (عميل / فني)** | مكتملة ✅ | فصل الصلاحيات والواجهات تلقائياً حسب نوع الحساب المختار |
-| **الحجز الفوري وإدارة التوقيت برمز PIN** | مكتملة ✅ | نظام حجز مؤمن برمز PIN آمن ووقاية صارمة من التعارض |
-| **المحادثات النصية والوسائط بـ AES-256** | مكتملة ✅ | تشفير البيانات والرسائل والوسائط محلياً للحفاظ على السرية |
-| **طلبات الطوارئ ورادار المزايدات** | مكتملة ✅ | عرض حي وموقع للفنيين القريبين مع إمكانية المزايدة الحرة |
-| **خرائط تتبع وحساب مسافات هافرسين** | مكتملة ✅ | حسابات دقيقة للمسافات وتقدير ذكي لأوقات السفر والوصول |
-| **المحفظة الإلكترونية بالريال اليمني** | مكتملة ✅ | تطبيق كامل لقيود الحظر النقدي للكسور والعملات الأجنبية |
-| **قنوات الإشعارات الفورية الثلاث** | مكتملة ✅ | إشعارات مصنفة وموزعة بنظام الأولوية للأدمن والدردشة والطوارئ |
-| **لوحة الإدارة الشاملة (Admin Panel)** | مكتملة ✅ | تحكم كامل لإدارة المستخدمين والحجوزات والتحقق من الشكاوى |
-| **لوحة المالك للنسخ والتحليل (Owner Panel)** | مكتملة ✅ | أدوات متقدمة لاسترداد وتحليل قواعد البيانات وتصدير التقارير |
-| **تقارير الأداء المالي والعمليات الصادرة** | قيد التطوير 🚧 | تصدير كشوفات الحسابات كملفات PDF وجداول مرنة للعملاء |
-| **النسخ الاحتياطي التلقائي المشفر** | مخطط لها 📋 | أداة لرفع نسخ احتياطية دورية مشفرة محلياً لخدمات الحساب |
+#### **س2: كيف أربط التطبيق بمشروع Firebase الخاص بي؟**
+* **ج:** اتبع الخطوات البرمجية المذكورة في [قسم دليل التثبيت والتشغيل](#5-دليل-التثبيت-والتشغيل--setup--installation-guide). تأكد من استبدال ملف `google-services.json` بملفك الخاص وتحديث إعدادات أرقام الهواتف وقواعد Firestore وStorage في الكونسول الخاص بك.
+
+#### **س3: لماذا يفشل بناء Gradle عند محاولة تشغيل الاختبارات في البيئة المحلية؟**
+* **ج:** تأكد من أنك تستخدم إصدار JDK 17 أو JDK 11 كحد أدنى، وتحقق من عدم وجود أي تعليق في خادم Gradle أو وجود ملفات مكررة. يمكنك تنظيف الكاش محلياً عن طريق تشغيل أمر `gradle clean` وإعادة المزامنة.
+
+#### **س4: كيف أضيف ميزة جديدة للدليل؟**
+* **ج:** ابدأ بإنشاء نموذج البيانات الخاص بالميزة في طبقة `domain/models` ثم أضف مستودع البيانات وحقول الـ Room في `data/` ومستودع Firestore، ثم اربطها بـ `ViewModel` مخصص واعرض الواجهات بـ `Compose`. احرص على أن تكون الميزة معزولة عن واجهة الأدمن العملاقة تجنباً لتضخم الملفات.
+
+#### **س5: كيف أبلغ عن مشكلة برمجية أو انهيار في التطبيق؟**
+* **ج:** يرجى التوجه إلى قسم **Issues** في المستودع وفتح تذكرة جديدة مع إرفاق سجل الانهيار (Logcat) وخطوات إعادة إنتاج المشكلة لمساعدتنا على حلها فوراً.
 
 ---
 
-## 8. المساهمة وتطوير الكود | Contributing Guidelines
+## 10. الترخيص والتواصل / License & Contact
 
-نحن نرحب بمساهمات جميع المطورين الساعين لتطوير وتحسين تطبيق **دليل خدمات اليمن**. لضمان اتساق جودة المشروع وسلاسة مراجعة الكود، نرجو الالتزام بالإرشادات التالية:
+### **الترخيص (License)**
+هذا المشروع مرخص ومتاح بموجب رخصة **MIT**. يمكنك الاطلاع على الملف الكامل للرخصة لمعرفة حدود الاستخدام الشخصي والتجاري.
 
-### قواعد وأسماء الفروع (Branch Naming)
-يجب أن تعبر تسمية الفرع عن الغرض الرئيسي من التعديل:
-* للميزات الجديدة والإضافات: `feature/branch-name` (مثال: `feature/roborazzi-screenshots`)
-* لإصلاح الأخطاء البرمجية: `bugfix/branch-name` (مثال: `bugfix/wallet-precision-fix`)
-* للإصلاحات الطارئة والعاجلة: `hotfix/branch-name`
-* لتحسينات التوثيق والملفات التوضيحية: `docs/branch-name`
-
-### صيغة رسائل الالتزام المعيارية (Conventional Commits)
-يرجى استخدام الكلمات الدلالية التالية في بداية رسائل commit الخاصة بك:
-* `feat:` لإضافة ميزة جديدة (مثال: `feat: implement biometric check during PIN confirm`)
-* `fix:` لإصلاح خطأ برمجي (مثال: `fix: correct negative wallet balance check`)
-* `docs:` لتعديل في ملفات التوضيح والـ Readme
-* `test:` لإضافة أو تحديث اختبارات برمجية
-* `refactor:` لإعادة تنظيم الكود وتطهيره دون تغيير منطق العمل الفعلي
-* `chore:` للمهام الروتينية وتحديث إعدادات بناء Gradle
-
-### معايير جودة الكود البرمجية المعتمدة
-1. **أحجام الملفات:** يمنع الحاق ميزات برمجية جديدة ضخمة في الملفات الكبيرة المستقرة الحالية (مثل `AdminPanelLayout`). أنشئ ملفات فرعية معزولة لتسهيل قراءتها وصيانتها.
-2. **عناصر النقر والوصول:** تأكد دائماً أن مساحة التفاعل لأي زر أو واجهة تفاعلية لا تقل عن **`48.dp`** تماشياً مع معايير الأندرويد لسهولة الوصول للجميع.
-3. **دعم تخطيط اللغات RTL:** تجنب استخدام اتجاهات اليمين واليسار المطلقة في Compose (مثل `paddingLeft` أو `paddingRight`) واستخدم الاتجاهات النسبية (`paddingStart` و `paddingEnd`) لضمان محاذاة الواجهة تلقائياً للغة العربية والإنجليزية.
-
----
-
-## 9. الأسئلة الشائعة | FAQ
-
-#### **س1: كيف يمكنني تسجيل الدخول لأول مرة وتجربة التطبيق محلياً؟**
-* **ج:** يمكنك تسجيل حساب عميل أو فني جديد برقم هاتفك بسهولة. في بيئة التطوير المحلية، يمكنك استخدام أرقام الهواتف التجريبية المضافة مسبقاً في كونسول Firebase Authentication الخاص بك مع كود التحقق السريع المعتمد (مثل `123456`) لتسريع عملية الفحص دون الحاجة لانتظار كود SMS حقيقي.
-
-#### **س2: هل يتوفر التطبيق على نظام كاش محلي للعمل دون توفر إنترنت تماماً؟**
-* **ج:** نعم بالكامل، يعتمد التطبيق على معمارية (Offline-First) المتكاملة. حيث يتم حفظ ومزامنة كافة الحجوزات والمحفظة والرسائل الفورية في قاعدة بيانات Room المحلية أولاً، ثم يتولى نظام المزامنة والـ WorkManager رفعها وتحديثها على Firestore تلقائياً وبترتيب سليم بمجرد عودة الاتصال بشبكة الإنترنت.
-
-#### **س3: تظهر لي أخطاء تتعلق بالـ Agent وتحميل JVM أثناء تشغيل الاختبارات المحلية، كيف أحلها؟**
-* **ج:** تم حل هذه المشكلة بالكامل في هذا التحديث الجذري! لقد قمنا بإزالة مكتبات ومحاكيات الوكيل الديناميكي واستبدالها بنظام فحص أصلي (Native Fakes and Shadows) سريع ومستقر ومتوافق 100% مع بيئات الحاويات و Java 21 دون الحاجة لأي صلاحيات نظام إضافية أو وكيل JVM خارجي.
-
-#### **س4: كيف أقوم بإضافة مقدم خدمة أو فني في مجال ونشاط جديد بالمنصة؟**
-* **ج:** يمكنك تسجيل فني جديد من شاشة التسجيل المخصصة، واختيار التخصص المهني بدقة. كما يمكن للأدمن تفعيل وتدقيق التخصصات والحسابات من خلال لوحة تحكم الأدمن المتقدمة لإتاحتها فوراً للمستخدمين في محرك البحث الذكي.
-
-#### **س5: كيف يمكنني الإبلاغ عن مشكلة أمنية أو ثغرة في تشفير الشات AES-256؟**
-* **ج:** نحن نأخذ خصوصية وحماية بيانات اليمنيين بأعلى درجات الجدية والأهمية المهنية. يرجى عدم طرح المشاكل الأمنية الحساسة في Issues العامة، بل نرجو التواصل بنا مباشرة عبر البريد الإلكتروني الآمن والخاص [gaber77710@gmail.com](mailto:gaber77710@gmail.com) ليتم التعامل مع المشكلة وحلها فوراً وبسرية تامة.
-
----
-
-## 10. الترخيص والتواصل | License & Contact
-
-### **الترخيص البرمجي (License)**
-هذا المشروع مفتوح ومتاح بالكامل تحت رخصة **MIT License**. يمكنك استخدام وتعديل ونشر التطبيق للأغراض الشخصية والتجارية تماشياً مع بنود الرخصة المحددة.
-
-### **التواصل والدعم الفني (Contact & Community)**
-* **البريد الإلكتروني المباشر:** [gaber77710@gmail.com](mailto:gaber77710@gmail.com)
-* **رابط حساب المطور على GitHub:** [gaber77710](https://github.com/gaber77710)
-* **المستودع الرئيسي على GitHub:** [Yemen Services Directory](https://github.com/gaber77710/YemenServicesDirectory)
-* **قسم تذاكر الأخطاء والاقتراحات (Issues):** [افتح تذكرة جديدة](https://github.com/gaber77710/YemenServicesDirectory/issues)
+### **التواصل ومتابعة التطوير (Contact & Support)**
+- **البريد الإلكتروني المباشر**: [gaber77710@gmail.com](mailto:gaber77710@gmail.com)
+- **رابط المستودع على GitHub**: [https://github.com/gaber77710/YemenServicesDirectory](https://github.com/gaber77710/YemenServicesDirectory)
+- **منصة التطوير ومتابعة التحديثات**: يمكنك فتح تذكرة عبر قسم الـ Issues لمناقشة الأفكار أو الميزات الجديدة.
 
 ---
 
 <p align="center">
-  <b>صُنع بأعلى مقاييس الهندسة والمسؤولية البرمجية لخدمة أبناء اليمن الأوفياء وتسهيل أعمالهم اليومية 🇾🇪 ❤️</b>
+  <b>صُنع بحب ومسؤولية هندسية لخدمة المجتمع اليمني وتسهيل أعماله اليومية 🇾🇪 ❤️</b>
 </p>
