@@ -9,7 +9,6 @@ plugins {
   alias(libs.plugins.firebase.crashlytics)
   id("com.google.gms.google-services")
   id("kotlin-parcelize")
-  alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -215,22 +214,4 @@ tasks.withType<Test>().configureEach {
         "--add-opens=java.base/java.util=ALL-UNNAMED",
         "--add-opens=java.base/java.security=ALL-UNNAMED"
     )
-
-    val isRoborazziTask = gradle.startParameter.taskNames.any {
-        it.contains("roborazzi", ignoreCase = true)
-    }
-    val hasRoborazziProp = project.hasProperty("roborazzi.test.record") ||
-            project.hasProperty("roborazzi.test.verify") ||
-            project.hasProperty("roborazzi.test.compare")
-
-    // Selective execution: Exclude visual screenshot tests from standard routine unit tests
-    // unless explicitly running Roborazzi tasks (recordRoborazziDebug / verifyRoborazziDebug)
-    if (!isRoborazziTask && !hasRoborazziProp) {
-        exclude("com/example/screenshots/**")
-    }
 }
-
-roborazzi {
-    outputDir.set(file("src/test/screenshots"))
-}
-

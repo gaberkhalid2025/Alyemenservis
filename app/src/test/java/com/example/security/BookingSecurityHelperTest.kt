@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
  * تغطي تشفير الـ PIN عبر SHA-256، قفل المحاولات بعد 3 مرات، وحجب أرقام الهواتف.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class BookingSecurityHelperTest {
 
     private lateinit var context: Context
