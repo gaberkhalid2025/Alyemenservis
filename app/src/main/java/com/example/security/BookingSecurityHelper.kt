@@ -25,9 +25,8 @@ object BookingSecurityHelper {
      * Hashes a PIN or password using SecureHasher (PBKDF2/SHA-256) for secure comparison.
      */
     fun hashPin(pin: String): String {
-        val trimmed = pin.trim()
-        if (trimmed.isBlank()) return ""
-        return com.example.utils.SecureHasher.hashPin(trimmed)
+        if (pin.isBlank()) return ""
+        return com.example.utils.SecureHasher.hashPin(pin)
     }
 
     /**

@@ -9,7 +9,6 @@ plugins {
   alias(libs.plugins.firebase.crashlytics)
   id("com.google.gms.google-services")
   id("kotlin-parcelize")
-  alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -109,12 +108,7 @@ android {
       all {
         it.jvmArgs(
           "-XX:+EnableDynamicAgentLoading",
-          "-Djdk.attach.allowAttachSelf=true",
-          "--add-opens=java.base/java.lang=ALL-UNNAMED",
-          "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-          "--add-opens=java.base/java.io=ALL-UNNAMED",
-          "--add-opens=java.base/java.util=ALL-UNNAMED",
-          "--add-opens=java.base/java.security=ALL-UNNAMED"
+          "-Djdk.attach.allowAttachSelf=true"
         )
       }
     }
@@ -201,36 +195,3 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
 }
-
-tasks.withType<Test>().configureEach {
-    jvmArgs(
-        "-XX:+EnableDynamicAgentLoading",
-        "-Djdk.attach.allowAttachSelf=true",
-        "-Duser.language=en",
-        "-Duser.country=US",
-        "-Dfile.encoding=UTF-8",
-        "--add-opens=java.base/java.lang=ALL-UNNAMED",
-        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-        "--add-opens=java.base/java.io=ALL-UNNAMED",
-        "--add-opens=java.base/java.util=ALL-UNNAMED",
-        "--add-opens=java.base/java.security=ALL-UNNAMED"
-    )
-
-    val isRoborazziTask = gradle.startParameter.taskNames.any {
-        it.contains("roborazzi", ignoreCase = true)
-    }
-    val hasRoborazziProp = project.hasProperty("roborazzi.test.record") ||
-            project.hasProperty("roborazzi.test.verify") ||
-            project.hasProperty("roborazzi.test.compare")
-
-    // Selective execution: Exclude visual screenshot tests from standard routine unit tests
-    // unless explicitly running Roborazzi tasks (recordRoborazziDebug / verifyRoborazziDebug)
-    if (!isRoborazziTask && !hasRoborazziProp) {
-        exclude("com/example/screenshots/**")
-    }
-}
-
-roborazzi {
-    outputDir.set(file("src/test/screenshots"))
-}
-
