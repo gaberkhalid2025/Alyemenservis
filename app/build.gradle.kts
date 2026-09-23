@@ -108,12 +108,7 @@ android {
       all {
         it.jvmArgs(
           "-XX:+EnableDynamicAgentLoading",
-          "-Djdk.attach.allowAttachSelf=true",
-          "--add-opens=java.base/java.lang=ALL-UNNAMED",
-          "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-          "--add-opens=java.base/java.io=ALL-UNNAMED",
-          "--add-opens=java.base/java.util=ALL-UNNAMED",
-          "--add-opens=java.base/java.security=ALL-UNNAMED"
+          "-Djdk.attach.allowAttachSelf=true"
         )
       }
     }
@@ -199,19 +194,4 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
-}
-
-tasks.withType<Test>().configureEach {
-    jvmArgs(
-        "-XX:+EnableDynamicAgentLoading",
-        "-Djdk.attach.allowAttachSelf=true",
-        "-Duser.language=en",
-        "-Duser.country=US",
-        "-Dfile.encoding=UTF-8",
-        "--add-opens=java.base/java.lang=ALL-UNNAMED",
-        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-        "--add-opens=java.base/java.io=ALL-UNNAMED",
-        "--add-opens=java.base/java.util=ALL-UNNAMED",
-        "--add-opens=java.base/java.security=ALL-UNNAMED"
-    )
 }

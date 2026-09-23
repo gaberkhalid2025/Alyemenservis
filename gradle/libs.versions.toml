@@ -44,7 +44,6 @@ mockk = "1.13.16"
 turbine = "1.2.0"
 secretsGradlePlugin = "2.0.1"
 securityCrypto = "1.1.0-alpha06"
-kover = "0.9.1"
 
 [libraries]
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
@@ -119,4 +118,3 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "googleDevtoolsKsp" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secretsGradlePlugin" }
-kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
