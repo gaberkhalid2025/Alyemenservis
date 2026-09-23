@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
  * تغطي تشفير الـ PIN عبر SHA-256، قفل المحاولات بعد 3 مرات، وحجب أرقام الهواتف.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class BookingSecurityHelperTest {
 
     private lateinit var context: Context
@@ -30,15 +30,15 @@ class BookingSecurityHelperTest {
     fun `test hashPin returns consistent sha256 output`() {
         val pin = "1234"
         val hash1 = BookingSecurityHelper.hashPin(pin)
-        val hash2 = BookingSecurityHelper.hashPin(pin)
 
         assertNotNull(hash1)
-        assertEquals(64, hash1.length) // SHA-256 is 64 hex characters
-        assertEquals(hash1, hash2)
+        assertTrue(hash1.length > 50) // PBKDF2 hash with base64 encoded salt + hash
+        assertTrue(hash1.contains(":"))
+        assertTrue(BookingSecurityHelper.verifyPassword(pin, hash1))
 
         // Trailing whitespace is trimmed
         val hashWithSpace = BookingSecurityHelper.hashPin("1234 ")
-        assertEquals(hash1, hashWithSpace)
+        assertTrue(BookingSecurityHelper.verifyPassword(pin, hashWithSpace))
 
         // Blank returns empty
         assertEquals("", BookingSecurityHelper.hashPin(""))

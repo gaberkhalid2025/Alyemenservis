@@ -1,6 +1,6 @@
 package com.example.performance
 
-import com.example.data.models.BookingEntity
+import com.example.data.BookingEntity
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.system.measureTimeMillis

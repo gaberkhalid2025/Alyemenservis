@@ -1,6 +1,9 @@
 package com.example.utils
 
-import com.example.data.models.*
+import com.example.data.BookingEntity
+import com.example.data.ProviderEntity
+import com.example.data.StoreEntity
+import com.example.data.UserEntity
 
 /**
  * 📦 TestFixtures
@@ -21,27 +24,27 @@ object TestFixtures {
         currency = "YER"
     )
 
-    val validProvider = ServiceProvider(
+    val validProvider = ProviderEntity(
         id = "prov_fixture_202",
         name = "المهندس أحمد علي",
         phone = "770000111",
-        category = "كهرباء",
-        city = "صنعاء",
-        rating = 4.9,
+        categoryId = "كهرباء",
+        cityId = "صنعاء",
+        rating = 4.9f,
         isVerified = true
     )
 
     val validStore = StoreEntity(
         id = "store_fixture_303",
         name = "متجر الأمل للالكترونيات",
-        ownerPhone = "773333444",
-        city = "عدن",
-        category = "إلكترونيات",
+        phone = "773333444",
+        cityId = "عدن",
+        categoryId = "إلكترونيات",
         isApproved = true
     )
 
-    val validUser = User(
-        uid = "usr_fixture_404",
+    val validUser = UserEntity(
+        id = "usr_fixture_404",
         name = "محمد سعيد",
         email = "mohammed@yemen.services.com",
         phone = "775555666",
