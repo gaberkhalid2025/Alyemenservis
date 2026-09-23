@@ -1,6 +1,6 @@
 package com.example
 
-import com.example.utils.AppPreferenceHelper
+import com.example.ui.helpers.AppPreferenceHelper
 import com.example.utils.Validators
 import org.junit.Assert.*
 import org.junit.Test
@@ -28,7 +28,7 @@ class EdgeCasesUnitTest {
         assertTrue(Validators.isValidYemeniPhone(" 711 234 567 "))
 
         // Invalid prefixes or short lengths
-        assertFalse(Validators.isValidYemeniPhone("701234567")) // Invalid prefix 70
+        assertFalse(Validators.isValidYemeniPhone("751234567")) // Invalid prefix 75
         assertFalse(Validators.isValidYemeniPhone("77123")) // Too short
     }
 }
