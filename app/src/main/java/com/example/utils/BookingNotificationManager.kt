@@ -34,13 +34,28 @@ class BookingNotificationManager(
 
     companion object {
         private const val TAG = "BookingNotificationMgr"
-        private const val CHANNEL_ID = NotificationChannelsRegistry.CHANNEL_BOOKINGS_ALERTS
+        private const val CHANNEL_ID = "channel_bookings_alerts"
         private const val CHANNEL_NAME = "إشعارات الحجوزات والخدمات الشاملة"
         private const val DEDUPLICATION_WINDOW_MS = 10_000L // 10 ثواني منع تكرار
     }
 
+    init {
+        createNotificationChannel()
+    }
+
     private fun createNotificationChannel() {
-        NotificationChannelsRegistry.createAll(context)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "تنبيهات حالة الحجوزات والمواعيد والخدمات"
+                enableVibration(true)
+                setShowBadge(true)
+            }
+            notificationManager?.createNotificationChannel(channel)
+        }
     }
 
     /**

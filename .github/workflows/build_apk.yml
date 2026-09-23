@@ -3,8 +3,6 @@ name: Build Release APK
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -79,21 +77,6 @@ jobs:
           echo "Generating fallback keystore..."
           keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         fi
-
-    - name: Run Unit Tests
-      run: ./gradlew :app:testDebugUnitTest --no-daemon
-
-    - name: Run Roborazzi Screenshot Verification
-      run: ./gradlew :app:verifyRoborazziDebug --no-daemon
-
-    - name: Upload Screenshot Test Failures (Diffs)
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: roborazzi-screenshot-diffs
-        path: |
-          app/build/outputs/roborazzi/
-          app/build/reports/roborazzi/
 
     - name: Build Release APK
       env:

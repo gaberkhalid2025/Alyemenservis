@@ -113,12 +113,26 @@ class MyApplication : Application() {
         // ===================== الخطوة 3: تهيئة Crashlytics بأمان (مع تأخير) =====================
         initializeCrashlyticsSafely()
 
-        // ===================== الخطوة 4: تهيئة قنوات الإشعارات الموحدة عبر Registry =====================
+        // ===================== الخطوة 4: تهيئة قنوات الإشعارات الموحدة =====================
         try {
-            com.example.utils.NotificationChannelsRegistry.createAll(this)
-            Log.d("MyApplication", "✅ Centralized notification channels created successfully")
+            com.example.utils.NotificationChannels.createAll(this)
+            Log.d("MyApplication", "✅ Unified notification channels created successfully")
         } catch (e: Exception) {
             Log.e("MyApplication", "❌ Failed to create notification channels: ${e.message}")
+        }
+
+        try {
+            com.example.utils.NotificationHelper.createNotificationChannels(this)
+            Log.d("MyApplication", "✅ Admin notification channels created successfully")
+        } catch (e: Exception) {
+            Log.e("MyApplication", "❌ Failed to create admin notification channels: ${e.message}")
+        }
+
+        try {
+            com.example.utils.ChatNotificationHelper.createNotificationChannels(this)
+            Log.d("MyApplication", "✅ Chat notification channels created successfully")
+        } catch (e: Exception) {
+            Log.e("MyApplication", "❌ Failed to create chat notification channels: ${e.message}")
         }
 
         // ===================== الخطوة 5: جدولة المزامنة الدورية في الخلفية =====================

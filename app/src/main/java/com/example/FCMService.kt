@@ -49,7 +49,7 @@ class FCMService : FirebaseMessagingService() {
                 this,
                 NotificationHelper.CHANNEL_ADMIN_CRITICAL
             )
-                .setSmallIcon(R.drawable.ic_notification)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle("🔑 طلب استعادة كلمة مرور")
                 .setContentText("$accountType - $name ($phone)")
                 .setStyle(
@@ -220,8 +220,21 @@ class FCMService : FirebaseMessagingService() {
     }
 
     private fun sendLocalNotification(title: String, body: String, targetScreen: String = "MAIN") {
-        val channelId = NotificationChannelsRegistry.CHANNEL_YEMEN_SERVICES_FCM
+        val channelId = "yemen_services_fcm_channel"
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "إشعارات الخدمة والحجوزات والمحادثات",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "قناة مخصصة للتنبيهات الفورية بتحديثات الحالة والرسائل والطلبات"
+                enableLights(true)
+                enableVibration(true)
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

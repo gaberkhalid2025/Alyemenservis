@@ -35,17 +35,30 @@ class BookingReminderReceiver : BroadcastReceiver() {
 
 object BookingReminderService {
 
-    private const val CHANNEL_ID = NotificationChannelsRegistry.CHANNEL_BOOKING_REMINDER_ALIAS
+    private const val CHANNEL_ID = "booking_reminder_channel"
     private const val CHANNEL_NAME = "تنبيهات المواعيد والحجوزات"
 
     fun createNotificationChannel(context: Context) {
-        NotificationChannelsRegistry.createAll(context)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "إشعارات تذكير المستخدمين بمواعيد الحجوزات القادمة"
+                enableVibration(true)
+            }
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
     }
 
     /**
      * جدولة تذكير 24 ساعة وتذكير 1 ساعة قبل الموعد
      */
     fun scheduleBookingReminders(context: Context, booking: BookingEntity) {
+        createNotificationChannel(context)
+
         val dateStr = if (booking.date.isNotBlank()) booking.date else booking.dateString
         val timeStr = if (booking.time.isNotBlank()) booking.time else booking.timeString
 
@@ -111,7 +124,7 @@ object BookingReminderService {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))

@@ -108,12 +108,7 @@ android {
       all {
         it.jvmArgs(
           "-XX:+EnableDynamicAgentLoading",
-          "-Djdk.attach.allowAttachSelf=true",
-          "--add-opens=java.base/java.lang=ALL-UNNAMED",
-          "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-          "--add-opens=java.base/java.io=ALL-UNNAMED",
-          "--add-opens=java.base/java.util=ALL-UNNAMED",
-          "--add-opens=java.base/java.security=ALL-UNNAMED"
+          "-Djdk.attach.allowAttachSelf=true"
         )
       }
     }
@@ -189,6 +184,9 @@ dependencies {
   testImplementation(libs.mockk)
   testImplementation(libs.turbine)
   testImplementation(libs.robolectric)
+  testImplementation(libs.roborazzi)
+  testImplementation(libs.roborazzi.compose)
+  testImplementation(libs.roborazzi.junit.rule)
   androidTestImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.espresso.core)
@@ -197,4 +195,3 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
 }
-

@@ -19,7 +19,17 @@ object AppSetup {
     }
 
     private fun setupNotificationChannels(context: Context) {
-        NotificationChannelsRegistry.createAll(context)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val name = "تنبيهات الخدمات والطلبات"
+            val descriptionText = "قناة الإشعارات الفورية لطلبات الصيانة والمحادثات في اليمن"
+            val importance = android.app.NotificationManager.IMPORTANCE_HIGH
+            val channel = android.app.NotificationChannel("YEMEN_SERVICES_CHANNEL", name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager: android.app.NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
     }
 
     private fun setupImageCacheDefaults(context: Context) {

@@ -25,10 +25,10 @@ import java.net.URL
  */
 object ChatNotificationHelper {
 
-    const val CHANNEL_MESSAGES = NotificationChannelsRegistry.CHANNEL_CHAT_MESSAGES_ALIAS
-    const val CHANNEL_VOICE = NotificationChannelsRegistry.CHANNEL_CHAT_VOICE_ALIAS
-    const val CHANNEL_MEDIA = NotificationChannelsRegistry.CHANNEL_CHAT_MEDIA_ALIAS
-    const val CHANNEL_URGENT = NotificationChannelsRegistry.CHANNEL_URGENT_ALERTS_ALIAS
+    const val CHANNEL_MESSAGES = "chat_messages_channel"
+    const val CHANNEL_VOICE = "chat_voice_channel"
+    const val CHANNEL_MEDIA = "chat_media_channel"
+    const val CHANNEL_URGENT = "urgent_alerts_channel"
 
     const val KEY_TEXT_REPLY = "key_text_reply"
     const val EXTRA_CHANNEL_ID = "extra_channel_id"
@@ -36,7 +36,49 @@ object ChatNotificationHelper {
     const val EXTRA_SENDER_NAME = "extra_sender_name"
 
     fun createNotificationChannels(context: Context) {
-        NotificationChannelsRegistry.createAll(context)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            val messagesChannel = NotificationChannel(
+                CHANNEL_MESSAGES,
+                "رسائل المحادثات",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "إشعارات الرسائل النصية المباشرة"
+                enableLights(true)
+                enableVibration(true)
+            }
+
+            val voiceChannel = NotificationChannel(
+                CHANNEL_VOICE,
+                "الرسائل الصوتية والمكالمات",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "إشعارات الرسائل الصوتية والاتصالات"
+                enableLights(true)
+                enableVibration(true)
+            }
+
+            val mediaChannel = NotificationChannel(
+                CHANNEL_MEDIA,
+                "الوسائط والمستندات",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "إشعارات الصور ومقاطع الفيديو والمستندات المرفقة"
+            }
+
+            val urgentChannel = NotificationChannel(
+                CHANNEL_URGENT,
+                "الطلبات العاجلة والطوارئ 🚨",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "إشعارات فورية فائقة الأولوية للطلبات العاجلة خلال 30 دقيقة"
+                enableLights(true)
+                enableVibration(true)
+            }
+
+            notificationManager.createNotificationChannels(listOf(messagesChannel, voiceChannel, mediaChannel, urgentChannel))
+        }
     }
 
     fun showChatMessageNotification(
@@ -50,6 +92,8 @@ object ChatNotificationHelper {
         mediaUrl: String? = null,
         timestamp: Long = System.currentTimeMillis()
     ) {
+        createNotificationChannels(context)
+
         val targetChannel = when (mediaType.uppercase()) {
             "AUDIO", "VOICE", "CALL" -> CHANNEL_VOICE
             "IMAGE", "VIDEO", "FILE", "DOCUMENT" -> CHANNEL_MEDIA
@@ -147,6 +191,8 @@ object ChatNotificationHelper {
         city: String,
         priceHint: String = ""
     ) {
+        createNotificationChannels(context)
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("EXTRA_NAV_TARGET", "instant_requests")
