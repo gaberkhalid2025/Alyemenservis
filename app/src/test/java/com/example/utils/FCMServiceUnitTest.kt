@@ -6,11 +6,12 @@ import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import com.example.FCMService
 import com.google.firebase.messaging.RemoteMessage
+import io.mockk.*
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowNotificationManager
@@ -19,7 +20,7 @@ import org.robolectric.Shadows.shadowOf
 /**
  * 🔔 FCMServiceUnitTest
  * Unit tests for Firebase Cloud Messaging service verifying payload parsing,
- * critical notifications, chat and urgent dispatch, and token caching without MockK.
+ * critical notifications, chat and urgent dispatch, and token caching.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -36,8 +37,30 @@ class FCMServiceUnitTest {
         notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         shadowNotificationManager = shadowOf(notificationManager)
 
-        // Statically build the service using Robolectric
-        fcmService = Robolectric.buildService(FCMService::class.java).create().get()
+        mockkObject(ChatNotificationHelper)
+        every {
+            ChatNotificationHelper.showChatMessageNotification(
+                any(), any(), any(), any(), any(), any(), any(), any()
+            )
+        } returns Unit
+
+        every {
+            ChatNotificationHelper.showUrgentRequestNotification(
+                any(), any(), any(), any(), any(), any()
+            )
+        } returns Unit
+
+        fcmService = spyk(FCMService())
+        every { fcmService.applicationContext } returns context
+        every { fcmService.getSystemService(Context.NOTIFICATION_SERVICE) } returns notificationManager
+        every { fcmService.getSharedPreferences(any(), any()) } answers {
+            context.getSharedPreferences(firstArg(), secondArg())
+        }
+    }
+
+    @After
+    fun tearDown() {
+        unmockkAll()
     }
 
     @Test
@@ -52,48 +75,75 @@ class FCMServiceUnitTest {
 
     @Test
     fun `test onMessageReceived handles chat message payload`() {
-        val message = RemoteMessage.Builder("sender")
-            .addData("type", "CHAT")
-            .addData("channelId", "channel_test_456")
-            .addData("senderId", "user_sender_1")
-            .addData("senderName", "محمد اليماني")
-            .addData("message", "مرحباً، هل الخدمة متاحة؟")
-            .addData("mediaType", "TEXT")
-            .build()
+        val mockRemoteMessage = mockk<RemoteMessage>(relaxed = true)
+        val dataMap = mapOf(
+            "type" to "CHAT",
+            "channelId" to "channel_test_456",
+            "senderId" to "user_sender_1",
+            "senderName" to "محمد اليماني",
+            "message" to "مرحباً، هل الخدمة متاحة؟",
+            "mediaType" to "TEXT"
+        )
+        every { mockRemoteMessage.data } returns dataMap
+        every { mockRemoteMessage.notification } returns null
 
-        fcmService.onMessageReceived(message)
+        fcmService.onMessageReceived(mockRemoteMessage)
 
-        val notifications = shadowNotificationManager.allNotifications
-        assertTrue(notifications.isNotEmpty())
+        verify(exactly = 1) {
+            ChatNotificationHelper.showChatMessageNotification(
+                context = any(),
+                notificationId = any(),
+                channelId = "channel_test_456",
+                senderId = "user_sender_1",
+                senderName = "محمد اليماني",
+                messageText = "مرحباً، هل الخدمة متاحة؟",
+                mediaType = "TEXT",
+                mediaUrl = null
+            )
+        }
     }
 
     @Test
     fun `test onMessageReceived handles urgent request payload`() {
-        val message = RemoteMessage.Builder("sender")
-            .addData("type", "URGENT")
-            .addData("requestCode", "URG-7788")
-            .addData("title", "عطل طارئ في شبكة الكهرباء")
-            .addData("description", "انقطاع كامل في المبنى")
-            .addData("city", "صنعاء")
-            .build()
+        val mockRemoteMessage = mockk<RemoteMessage>(relaxed = true)
+        val dataMap = mapOf(
+            "type" to "URGENT",
+            "requestCode" to "URG-7788",
+            "title" to "عطل طارئ في شبكة الكهرباء",
+            "description" to "انقطاع كامل في المبنى",
+            "city" to "صنعاء"
+        )
+        every { mockRemoteMessage.data } returns dataMap
+        every { mockRemoteMessage.notification } returns null
 
-        fcmService.onMessageReceived(message)
+        fcmService.onMessageReceived(mockRemoteMessage)
 
-        val notifications = shadowNotificationManager.allNotifications
-        assertTrue(notifications.isNotEmpty())
+        verify(exactly = 1) {
+            ChatNotificationHelper.showUrgentRequestNotification(
+                context = any(),
+                notificationId = any(),
+                requestCode = "URG-7788",
+                title = "عطل طارئ في شبكة الكهرباء",
+                description = "انقطاع كامل في المبنى",
+                city = "صنعاء"
+            )
+        }
     }
 
     @Test
     fun `test onMessageReceived handles password recovery critical notification`() {
-        val message = RemoteMessage.Builder("sender")
-            .addData("type", "PASSWORD_RECOVERY")
-            .addData("requestId", "req_pwd_123")
-            .addData("phone", "+967771234567")
-            .addData("name", "صالح أحمد")
-            .addData("accountType", "فني")
-            .build()
+        val mockRemoteMessage = mockk<RemoteMessage>(relaxed = true)
+        val dataMap = mapOf(
+            "type" to "PASSWORD_RECOVERY",
+            "requestId" to "req_pwd_123",
+            "phone" to "+967771234567",
+            "name" to "صالح أحمد",
+            "accountType" to "فني"
+        )
+        every { mockRemoteMessage.data } returns dataMap
+        every { mockRemoteMessage.notification } returns null
 
-        fcmService.onMessageReceived(message)
+        fcmService.onMessageReceived(mockRemoteMessage)
 
         val notifications = shadowNotificationManager.allNotifications
         assertTrue(notifications.isNotEmpty())
@@ -103,13 +153,16 @@ class FCMServiceUnitTest {
 
     @Test
     fun `test onMessageReceived fallback general notification`() {
-        val message = RemoteMessage.Builder("sender")
-            .addData("title", "عرض خاص اليوم")
-            .addData("body", "خصم 20% على جميع خدمات الصيانة")
-            .addData("targetScreen", "OFFERS")
-            .build()
+        val mockRemoteMessage = mockk<RemoteMessage>(relaxed = true)
+        val dataMap = mapOf(
+            "title" to "عرض خاص اليوم",
+            "body" to "خصم 20% على جميع خدمات الصيانة",
+            "targetScreen" to "OFFERS"
+        )
+        every { mockRemoteMessage.data } returns dataMap
+        every { mockRemoteMessage.notification } returns null
 
-        fcmService.onMessageReceived(message)
+        fcmService.onMessageReceived(mockRemoteMessage)
 
         val notifications = shadowNotificationManager.allNotifications
         assertTrue(notifications.isNotEmpty())
