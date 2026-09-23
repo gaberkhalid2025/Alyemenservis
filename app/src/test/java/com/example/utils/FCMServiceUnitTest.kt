@@ -22,7 +22,7 @@ import org.robolectric.Shadows.shadowOf
  * critical notifications, chat and urgent dispatch, and token caching without MockK.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class FCMServiceUnitTest {
 
     private lateinit var context: Context

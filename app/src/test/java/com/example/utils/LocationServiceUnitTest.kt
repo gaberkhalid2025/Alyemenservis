@@ -21,7 +21,7 @@ import org.robolectric.shadows.ShadowLocationManager
  * distance calculation, and behavior under all GPS permission scenarios.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class LocationServiceUnitTest {
 
     private lateinit var context: Context
