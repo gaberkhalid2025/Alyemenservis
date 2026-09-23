@@ -49,7 +49,7 @@ class FCMService : FirebaseMessagingService() {
                 this,
                 NotificationHelper.CHANNEL_ADMIN_CRITICAL
             )
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("🔑 طلب استعادة كلمة مرور")
                 .setContentText("$accountType - $name ($phone)")
                 .setStyle(
