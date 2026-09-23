@@ -274,7 +274,14 @@ fun RealLeafletMapView(
                         fun getMarkersJson(): String = markersJsonArray
                     }, "AndroidBridge")
 
-                    loadUrl("file:///android_asset/map.html")
+                    val htmlContent = getSelfContainedMapHtml(ctx)
+                    loadDataWithBaseURL(
+                        "https://mt1.google.com/",
+                        htmlContent,
+                        "text/html",
+                        "UTF-8",
+                        null
+                    )
                     webViewInstance = this
                 }
             },
@@ -339,3 +346,41 @@ fun RealLeafletMapView(
         }
     }
 }
+
+/**
+ * 📄 getSelfContainedMapHtml
+ * Inlines all local JS and CSS assets directly inside map.html.
+ * This makes the HTML completely self-contained and prevents WebView from blocking
+ * local asset access due to strict CORS origin policies under secure BaseURLs.
+ */
+private fun getSelfContainedMapHtml(context: android.content.Context): String {
+    return try {
+        var html = context.assets.open("map.html").bufferedReader().use { it.readText() }
+
+        val leafletCss = context.assets.open("leaflet.css").bufferedReader().use { it.readText() }
+        val markerClusterCss = context.assets.open("MarkerCluster.css").bufferedReader().use { it.readText() }
+        val markerClusterDefaultCss = context.assets.open("MarkerCluster.Default.css").bufferedReader().use { it.readText() }
+
+        val leafletJs = context.assets.open("leaflet.js").bufferedReader().use { it.readText() }
+        val markerClusterJs = context.assets.open("leaflet.markercluster.js").bufferedReader().use { it.readText() }
+
+        // Inline CSS
+        html = html.replace("<link rel=\"stylesheet\" href=\"leaflet.css\" />", "<style>\n$leafletCss\n</style>")
+        html = html.replace("<link rel=\"stylesheet\" href=\"MarkerCluster.css\" />", "<style>\n$markerClusterCss\n</style>")
+        html = html.replace("<link rel=\"stylesheet\" href=\"MarkerCluster.Default.css\" />", "<style>\n$markerClusterDefaultCss\n</style>")
+
+        // Inline JS
+        html = html.replace("<script src=\"leaflet.js\"></script>", "<script>\n$leafletJs\n</script>")
+        html = html.replace("<script src=\"leaflet.markercluster.js\"></script>", "<script>\n$markerClusterJs\n</script>")
+
+        html
+    } catch (e: Exception) {
+        e.printStackTrace()
+        try {
+            context.assets.open("map.html").bufferedReader().use { it.readText() }
+        } catch (ex: Exception) {
+            "<html><body><h3>Error loading map resources</h3></body></html>"
+        }
+    }
+}
+

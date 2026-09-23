@@ -333,14 +333,14 @@
                     attribution: 'CartoDB'
                 });
 
-                // Add OpenStreetMap as primary layer
-                osmLayer.addTo(map);
+                // Add Google Maps as primary layer
+                googleLayer.addTo(map);
 
-                // Add fallback handler if OSM fails
-                osmLayer.on('tileerror', function() {
-                    console.warn("OSM tile notice, adding Google Maps fallback layer...");
-                    if (!map.hasLayer(googleLayer)) {
-                        googleLayer.addTo(map);
+                // Add fallback handler if Google Maps fails
+                googleLayer.on('tileerror', function() {
+                    console.warn("Google Maps tile notice, adding OpenStreetMap fallback layer...");
+                    if (!map.hasLayer(osmLayer)) {
+                        osmLayer.addTo(map);
                     }
                 });
 
