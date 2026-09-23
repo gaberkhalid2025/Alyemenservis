@@ -57,13 +57,8 @@ class ChatCryptoManagerTest {
         val text = "رسالة سرية جداً"
         val encrypted = ChatCryptoManager.encrypt(text, "correct_key_123")
 
-        try {
-            val decrypted = ChatCryptoManager.decrypt(encrypted, "wrong_key_999")
-            // If it returns, it must not match the original plain text
-            assertNotEquals(text, decrypted)
-        } catch (e: SecurityException) {
-            // Expected security exception on bad padding or decryption error
-            assertTrue(true)
+        assertThrows(SecurityException::class.java) {
+            ChatCryptoManager.decrypt(encrypted, "wrong_key_999")
         }
     }
 }

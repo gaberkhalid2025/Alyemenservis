@@ -1,27 +1,36 @@
 package com.example.utils
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * 🧪 اختبارات مدير المحفظة المالية (WalletManager)
  * تغطي إدارة الأرصدة المتعددة والتحقق الصارم من العمليات وقواعد العملة اليمنية.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class WalletManagerTest {
 
     @get:Rule
     val coroutineRule = CoroutineTestRule()
 
     private lateinit var walletManager: WalletManager
+    private lateinit var context: Context
 
     @Before
     fun setup() {
-        walletManager = WalletManager(context = null)
+        context = ApplicationProvider.getApplicationContext()
+        walletManager = WalletManager(context = context)
     }
 
     @Test

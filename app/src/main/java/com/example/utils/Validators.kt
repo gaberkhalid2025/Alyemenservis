@@ -18,6 +18,23 @@ data class ValidationResult(
 object Validators {
 
     /**
+     * Cleans a phone number using AppPreferenceHelper.normalizePhoneNumber.
+     */
+    fun cleanPhoneNumber(phone: String?): String {
+        if (phone.isNullOrBlank()) return ""
+        return com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
+    }
+
+    /**
+     * Checks if a phone number is a valid Yemeni phone number.
+     */
+    fun isValidYemeniPhone(phone: String?): Boolean {
+        val clean = cleanPhoneNumber(phone)
+        val validPrefixes = listOf("77", "73", "71", "70", "78")
+        return clean.length == 9 && clean.all { it.isDigit() } && validPrefixes.any { clean.startsWith(it) }
+    }
+
+    /**
      * Validates a Yemeni Phone Number.
      * Must be 9 digits starting with 77, 73, 71, 70, or 78 (or international prefix +967).
      */
@@ -25,14 +42,7 @@ object Validators {
         if (phone.isNullOrBlank()) {
             return ValidationResult(false, "يرجى إدخال رقم الهاتف")
         }
-        val clean = phone.trim().replace(" ", "").replace("-", "")
-        val localDigits = when {
-            clean.startsWith("+967") -> clean.substring(4)
-            clean.startsWith("00967") -> clean.substring(5)
-            clean.startsWith("967") -> clean.substring(3)
-            clean.startsWith("0") -> clean.substring(1)
-            else -> clean
-        }
+        val localDigits = cleanPhoneNumber(phone)
 
         if (localDigits.length != 9 || !localDigits.all { it.isDigit() }) {
             return ValidationResult(false, "رقم الهاتف يجب أن يتكون من 9 أرقام (مثال: 771234567)")

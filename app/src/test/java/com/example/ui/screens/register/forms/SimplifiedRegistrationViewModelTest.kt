@@ -10,7 +10,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class SimplifiedRegistrationViewModelTest {
     
     private lateinit var viewModel: SimplifiedRegistrationViewModel
@@ -48,7 +48,7 @@ class SimplifiedRegistrationViewModelTest {
     }
     
     // ============================================
-    // 2. اختبارات form validity
+    // 2. اختبارات form validity & Multi-error Edge Cases
     // ============================================
     
     @Test
@@ -75,6 +75,17 @@ class SimplifiedRegistrationViewModelTest {
         viewModel.onEvent(RegistrationUiEvent.ConfirmPasswordChanged("Password123"))
         viewModel.onEvent(RegistrationUiEvent.AgreedToTermsChanged(false))
         
+        assertFalse(viewModel.state.value.isFormValid)
+    }
+
+    @Test
+    fun `form invalid with multiple combined errors invalid phone mismatched password no terms`() {
+        viewModel.onEvent(RegistrationUiEvent.EntityNameChanged("علي")) // valid name or short
+        viewModel.onEvent(RegistrationUiEvent.PhoneChanged("123")) // invalid phone
+        viewModel.onEvent(RegistrationUiEvent.PasswordChanged("Pass123"))
+        viewModel.onEvent(RegistrationUiEvent.ConfirmPasswordChanged("DifferentPass")) // mismatch
+        viewModel.onEvent(RegistrationUiEvent.AgreedToTermsChanged(false)) // no terms
+
         assertFalse(viewModel.state.value.isFormValid)
     }
 }
