@@ -7060,9 +7060,14 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                             Text("📈 تقارير الأرباح المتقدمة", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                             Text("إجمالي العمليات المنفذة: ${bookings.size}", fontSize = 12.sp, color = Color.White)
                             Text("إجمالي الأرباح المتوقعة من العمولات: ${bookings.size * 500} ريال يمني", fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
-                            Button(onClick = { viewModel.triggerNotification("📊 تم تحديث التقارير المالية بنجاح") }) {
-                                Text("تصدير تقرير الأرباح (PDF)", fontSize = 11.sp)
+                            Button(
+                                onClick = { },
+                                enabled = false,
+                                colors = ButtonDefaults.buttonColors(disabledContainerColor = Color.White.copy(alpha = 0.1f), disabledContentColor = Color.Gray)
+                            ) {
+                                Text("تصدير تقرير الأرباح (PDF) - قيد التطوير ⏳", fontSize = 11.sp)
                             }
+                            Text("ميزة تصدير التقارير بصيغة PDF قيد التطوير وستتوفر في التحديث القادم.", fontSize = 10.sp, color = Color.Gray)
                         }
                     }
                 }
@@ -9092,7 +9097,7 @@ fun PasswordEntityCard(
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = {
-                        val whatsappText = "مرحباً يا غالي، كلمة المرور الخاصة بحسابك في دليل خدمات اليمن هي: ${password ?: "غير متوفرة"}"
+                        val whatsappText = "مرحباً يا غالي، قامت الإدارة بتعيين كلمة مرور جديدة لحسابك في دليل خدمات اليمن، يرجى التواصل مع الإدارة للحصول عليها."
                         val whatsappUrl = "https://wa.me/967${phone.trim().removePrefix("0").removePrefix("+967")}?text=${android.net.Uri.encode(whatsappText)}"
                         try {
                             val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(whatsappUrl))
@@ -9110,7 +9115,7 @@ fun PasswordEntityCard(
 
                 Button(
                     onClick = {
-                        val teleText = "كلمة المرور الخاصة بحسابك في دليل خدمات اليمن هي: ${password ?: "غير متوفرة"}"
+                        val teleText = "مرحباً، تم تعيين كلمة مرور جديدة لحسابك في دليل خدمات اليمن، يرجى التواصل مع الإدارة لاستلامها."
                         val teleUrl = "https://t.me/share/url?url=https://yemen-services.app&text=${android.net.Uri.encode(teleText)}"
                         try {
                             val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(teleUrl))
@@ -9128,7 +9133,7 @@ fun PasswordEntityCard(
 
                 Button(
                     onClick = {
-                        val smsText = "كلمة المرور الخاصة بحسابك في دليل خدمات اليمن هي: ${password ?: "غير متوفرة"}"
+                        val smsText = "تم تعيين كلمة مرور جديدة لحسابك في دليل خدمات اليمن، يرجى التواصل مع الإدارة لاستلامها."
                         try {
                             val intent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:$phone")).apply {
                                 putExtra("sms_body", smsText)

@@ -182,7 +182,7 @@ class AdminViewModel @Inject constructor(
                     val storedPass = adminDoc.getString("passcode") ?: ""
                     val role = adminDoc.getString("role") ?: "ADMIN"
                     val perms = adminDoc.get("permissions") as? List<String> ?: emptyList()
-                    if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                    if (com.example.utils.AdminCredentialsVault.verifyAndMigrate(adminDoc.reference, trimmedPass, storedPass, "passcode")) {
                         val assignedRole = if (role.contains("OWNER")) "OWNER" else "ADMIN"
                         
                         // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
@@ -283,7 +283,7 @@ class AdminViewModel @Inject constructor(
                     val ownerDoc = ownerQuery.documents[0]
                     val storedPass = ownerDoc.getString("passcode") ?: ""
                     val perms = ownerDoc.get("permissions") as? List<String> ?: emptyList()
-                    if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                    if (com.example.utils.AdminCredentialsVault.verifyAndMigrate(ownerDoc.reference, trimmedPass, storedPass, "passcode")) {
                         // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
                         com.example.utils.SecureAdminStorage.storeCredentials(
                             context = application,
@@ -392,7 +392,7 @@ class AdminViewModel @Inject constructor(
                 if (supervisorDoc.exists()) {
                     val storedPass = supervisorDoc.getString("passcode") ?: ""
                     val perms = supervisorDoc.get("permissions") as? List<String> ?: emptyList()
-                    if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                    if (com.example.utils.AdminCredentialsVault.verifyAndMigrate(supervisorDoc.reference, trimmedPass, storedPass, "passcode")) {
                         val role = supervisorDoc.getString("role") ?: "SUPERVISOR"
                         val id = supervisorDoc.id
                         val name = supervisorDoc.getString("name") ?: trimmedUser

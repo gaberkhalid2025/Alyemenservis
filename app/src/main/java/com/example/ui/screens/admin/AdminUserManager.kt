@@ -52,6 +52,7 @@ fun AdminUserManager(
 
     var resetPasswordTargetUser by remember { mutableStateOf<Map<String, Any>?>(null) }
     var newTempPasswordInput by remember { mutableStateOf("") }
+    var generatedPasswordSuccess by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val filteredUsers = remember(rawUsersList, searchQuery, selectedFilter) {
         rawUsersList.filter { userMap ->
@@ -194,7 +195,8 @@ fun AdminUserManager(
             onSave = { userId, phone, name, pass ->
                 val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 val cleanPhone = phone.replace("+", "").replace(" ", "").trim()
-                val passData = mapOf("password" to pass, "updatedAt" to System.currentTimeMillis())
+                val hashedPass = com.example.utils.SecureHasher.hashPassword(pass)
+                val passData = mapOf("password" to hashedPass, "updatedAt" to System.currentTimeMillis())
                 db.collection("registered_users").document(userId).update(passData)
                 if (cleanPhone.isNotEmpty()) {
                     db.collection("registered_users").document(cleanPhone).update(passData)
@@ -202,15 +204,87 @@ fun AdminUserManager(
                 }
                 mainViewModel.addNotification(
                     title = "🔑 تم تحديث كلمة المرور للحساب",
-                    message = "عزيزي $name، قامت الإدارة بتعيين كلمة مرور جديدة لحسابك: $pass",
+                    message = "عزيزي $name، تم تعيين كلمة مرور جديدة لحسابك من قبل الإدارة، يرجى التواصل مع الإدارة للحصول عليها.",
                     targetType = "USER",
                     targetValue = phone
                 )
                 resetPasswordTargetUser = null
-                scope.launch { snackbarHostState.showSnackbar("✅ تم تحديث كلمة المرور وإرسال إشعار للمستخدم") }
+                generatedPasswordSuccess = Pair(name, pass)
+                scope.launch { snackbarHostState.showSnackbar("✅ تم تحديث كلمة المرور وحفظ البصمة المشفرة بنجاح") }
             },
             snackbarHostState = snackbarHostState,
             scope = scope
+        )
+    }
+
+    if (generatedPasswordSuccess != null) {
+        val (targetName, plainPass) = generatedPasswordSuccess!!
+        val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+        AlertDialog(
+            onDismissRequest = { generatedPasswordSuccess = null },
+            containerColor = Color(0xFF1E293B),
+            title = {
+                Text(
+                    "🔑 كلمة المرور الجديدة للحساب",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "المستخدم: $targetName",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "تم حفظ كلمة المرور كبصمة مشفرة (Hash) في قاعدة البيانات بأمان. تظهر كلمة المرور الأصلية هذه المرة فقط ولن يمكن استرجاعها لاحقاً:",
+                        color = Color.LightGray,
+                        fontSize = 12.sp
+                    )
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = plainPass,
+                                color = themeColors.accent,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Button(
+                                onClick = {
+                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(plainPass))
+                                    scope.launch { snackbarHostState.showSnackbar("📋 تم نسخ كلمة المرور إلى الحافظة") }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("نسخ للحافظة 📋", fontSize = 11.sp, color = Color.White)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { generatedPasswordSuccess = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6))
+                ) {
+                    Text("تم وحفظ", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
         )
     }
 }

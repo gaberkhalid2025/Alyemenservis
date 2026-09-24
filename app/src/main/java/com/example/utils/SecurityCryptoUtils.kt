@@ -21,36 +21,62 @@ import javax.crypto.spec.SecretKeySpec
  * are securely encrypted using AndroidKeyStore with randomized IVs and PBKDF2 key derivation.
  */
 object SecurityCryptoUtils {
-    private const val KEYSTORE_ALIAS = "WAM_Services_AndroidKeyStore_MasterKey_2026"
+    private const val ANDROID_KEYSTORE_PROVIDER = "AndroidKeyStore"
+    private const val KEYSTORE_ALIAS = "WAM_MasterVaultKey"
     private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
     private const val PBKDF2_ITERATIONS = 10000
     private const val KEY_SIZE_BITS = 256
     private const val CIPHER_TRANSFORMATION = "AES/CBC/PKCS5Padding"
 
-    private fun getSecretKey(): SecretKey {
+    fun getSecretKey(): SecretKey {
         return try {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val keyBytes = digest.digest("WAM_YemenServices_MasterVaultKey_2026_Secure".toByteArray(Charsets.UTF_8))
-            SecretKeySpec(keyBytes, "AES")
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply {
+                load(null)
+            }
+            if (keyStore.containsAlias(KEYSTORE_ALIAS)) {
+                val entry = keyStore.getEntry(KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
+                entry?.secretKey ?: (keyStore.getKey(KEYSTORE_ALIAS, null) as? SecretKey) ?: generateAndStoreKey()
+            } else {
+                generateAndStoreKey()
+            }
         } catch (e: Throwable) {
-            SecretKeySpec(ByteArray(32) { 0x3F }, "AES")
+            // خط دفاع احتياطي في حال غياب مزود AndroidKeyStore (مثل بيئات اختبارات JVM)
+            deriveFallbackKey()
         }
     }
 
+    private fun generateAndStoreKey(): SecretKey {
+        val keyGenerator = KeyGenerator.getInstance(
+            KeyProperties.KEY_ALGORITHM_AES,
+            ANDROID_KEYSTORE_PROVIDER
+        )
+        val keyGenParameterSpec = KeyGenParameterSpec.Builder(
+            KEYSTORE_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+            .setKeySize(KEY_SIZE_BITS)
+            .setRandomizedEncryptionRequired(false)
+            .build()
+        keyGenerator.init(keyGenParameterSpec)
+        return keyGenerator.generateKey()
+    }
+
     /**
-     * اشتقاق مفتاح احتياطي باستخدام PBKDF2WithHmacSHA256
+     * اشتقاق مفتاح احتياطي ديناميكي في حال تعذر الوصول إلى AndroidKeyStore (مثل اختبارات JVM)
      */
     private fun deriveFallbackKey(): SecretKeySpec {
         return try {
             val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
-            val salt = "YemenServices_Vault_KeyDerivation_2026".toByteArray(Charsets.UTF_8)
-            val pass = "YemenServicesVaultMasterKey".toCharArray()
-            val spec = PBEKeySpec(pass, salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
+            val salt = KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)
+            val seed = (System.getProperty("os.name") ?: "WAM_Fallback_Entropy").toCharArray()
+            val spec = PBEKeySpec(seed, salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
             val secret = factory.generateSecret(spec)
             SecretKeySpec(secret.encoded, "AES")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             val digest = MessageDigest.getInstance("SHA-256")
-            SecretKeySpec(digest.digest("YemenServices_Fallback".toByteArray(Charsets.UTF_8)), "AES")
+            SecretKeySpec(digest.digest(KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)), "AES")
         }
     }
 

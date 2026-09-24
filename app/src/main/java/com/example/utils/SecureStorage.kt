@@ -34,15 +34,48 @@ class SecureStorage @Inject constructor(
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
 
-            EncryptedSharedPreferences.create(
+            val encryptedPrefs = EncryptedSharedPreferences.create(
                 context,
                 "secure_admin_prefs",
                 masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
+            migrateFromPlainSharedPreferences(encryptedPrefs)
+            encryptedPrefs
         } catch (e: Exception) {
             context.getSharedPreferences("secure_admin_prefs_fallback", Context.MODE_PRIVATE)
+        }
+    }
+
+    /**
+     * 🔄 ترحيل بيانات الدخول والجلسات من SharedPreferences العادي إلى المشفر وحذف النسخة القديمة
+     */
+    private fun migrateFromPlainSharedPreferences(targetPrefs: SharedPreferences) {
+        val legacySources = listOf("secure_admin_prefs_fallback", "admin_prefs", "admin_session_prefs")
+        for (sourceName in legacySources) {
+            try {
+                val oldPrefs = context.getSharedPreferences(sourceName, Context.MODE_PRIVATE)
+                val allEntries = oldPrefs.all
+                if (allEntries.isNotEmpty()) {
+                    val editor = targetPrefs.edit()
+                    for ((key, value) in allEntries) {
+                        if (!targetPrefs.contains(key)) {
+                            when (value) {
+                                is String -> editor.putString(key, value)
+                                is Long -> editor.putLong(key, value)
+                                is Int -> editor.putInt(key, value)
+                                is Boolean -> editor.putBoolean(key, value)
+                                is Float -> editor.putFloat(key, value)
+                            }
+                        }
+                    }
+                    editor.apply()
+                    oldPrefs.edit().clear().apply()
+                }
+            } catch (e: Throwable) {
+                // تجاوز أي استثناء في حال كان الملف غير موجود
+            }
         }
     }
 

@@ -53,7 +53,7 @@ object AdminSecurityManager {
             val supDoc = db.collection("supervisors").document(trimmedUser).get().await()
             if (supDoc.exists()) {
                 val storedPass = supDoc.getString("passcode") ?: ""
-                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                if (AdminCredentialsVault.verifyAndMigrate(supDoc.reference, trimmedPass, storedPass, "passcode")) {
                     return supDoc.getString("role") ?: "SUPERVISOR"
                 }
             }
@@ -68,7 +68,8 @@ object AdminSecurityManager {
                 val doc = adminQuery.documents[0]
                 val storedPass = doc.getString("passwordHash") ?: doc.getString("password") ?: ""
                 val role = doc.getString("role") ?: "ADMIN"
-                if (SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedPass)) {
+                val fieldName = if (doc.contains("passwordHash")) "passwordHash" else "password"
+                if (AdminCredentialsVault.verifyAndMigrate(doc.reference, trimmedPass, storedPass, fieldName)) {
                     return role
                 }
             }

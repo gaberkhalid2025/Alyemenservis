@@ -33,22 +33,53 @@ object SecureAdminStorage {
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
             
-            EncryptedSharedPreferences.create(
+            val encryptedPrefs = EncryptedSharedPreferences.create(
                 context.applicationContext,
                 PREFS_NAME,
                 masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             ) as EncryptedSharedPreferences
+            migrateLegacyPrefs(context, encryptedPrefs)
+            encryptedPrefs
         } catch (e: Exception) {
             android.util.Log.e("SecureAdminStorage", "Failed to init secure storage", e)
             null
         }
     }
+
+    /**
+     * 🔄 ترحيل بيانات الاعتماد من SharedPreferences العادي إلى المشفر ثم حذف النسخة القديمة
+     */
+    private fun migrateLegacyPrefs(context: Context, encryptedPrefs: EncryptedSharedPreferences) {
+        val legacySources = listOf("admin_security_prefs", "secure_admin_vault", "admin_vault_legacy")
+        for (src in legacySources) {
+            try {
+                val oldSp = context.getSharedPreferences(src, Context.MODE_PRIVATE)
+                val entries = oldSp.all
+                if (entries.isNotEmpty()) {
+                    val editor = encryptedPrefs.edit()
+                    for ((k, v) in entries) {
+                        if (!encryptedPrefs.contains(k)) {
+                            when (v) {
+                                is String -> editor.putString(k, v)
+                                is Boolean -> editor.putBoolean(k, v)
+                                is Long -> editor.putLong(k, v)
+                                is Int -> editor.putInt(k, v)
+                                is Float -> editor.putFloat(k, v)
+                            }
+                        }
+                    }
+                    editor.apply()
+                    oldSp.edit().clear().apply()
+                }
+            } catch (_: Exception) {}
+        }
+    }
     
     /**
-     * حفظ credentials بشكل آمن (تشفير Hash)
-     * لا نحفظ password نفسه - فقط Hash
+     * حفظ credentials بشكل آمن (تشفير Hash بـ PBKDF2)
+     * لا نحفظ password نفسه في أي مكان إطلاقاً - فقط Hash
      */
     fun storeCredentials(
         context: Context,
@@ -66,13 +97,13 @@ object SecureAdminStorage {
                 editor.putString(KEY_OWNER_EMAIL, hashValue(it, SALT_PREFIX + "email"))
             }
             ownerPassword?.let {
-                editor.putString(KEY_OWNER_HASH, hashValue(it, SALT_PREFIX + "pass"))
+                editor.putString(KEY_OWNER_HASH, SecureHasher.hashPassword(it.trim()))
             }
             adminEmail?.let {
                 editor.putString(KEY_ADMIN_EMAIL, hashValue(it, SALT_PREFIX + "email"))
             }
             adminPassword?.let {
-                editor.putString(KEY_ADMIN_HASH, hashValue(it, SALT_PREFIX + "pass"))
+                editor.putString(KEY_ADMIN_HASH, SecureHasher.hashPassword(it.trim()))
             }
             
             editor.putBoolean(KEY_VAULT_INITIALIZED, true)
@@ -86,7 +117,7 @@ object SecureAdminStorage {
     }
     
     /**
-     * التحقق من Credentials المخزنة محلياً
+     * التحقق من Credentials المخزنة محلياً باستخدام PBKDF2
      */
     fun verifyFallbackCredentials(
         context: Context,
@@ -103,19 +134,29 @@ object SecureAdminStorage {
         return try {
             val emailHash = hashValue(email, SALT_PREFIX + "email")
             val passHash = hashValue(password, SALT_PREFIX + "pass")
+            val cleanEmail = email.trim()
+            val cleanPass = password.trim()
             
             when (role.uppercase()) {
                 "OWNER" -> {
                     val storedEmail = prefs.getString(KEY_OWNER_EMAIL, null) ?: return false
                     val storedPass = prefs.getString(KEY_OWNER_HASH, null) ?: return false
-                    constantTimeEquals(storedEmail, emailHash) && 
-                        constantTimeEquals(storedPass, passHash)
+                    val emailMatches = constantTimeEquals(storedEmail, emailHash) || 
+                            SecureHasher.verifyPassword(cleanEmail, storedEmail) ||
+                            storedEmail.equals(cleanEmail, ignoreCase = true)
+                    val passMatches = constantTimeEquals(storedPass, passHash) || 
+                            SecureHasher.verifyPassword(cleanPass, storedPass)
+                    emailMatches && passMatches
                 }
                 "ADMIN" -> {
                     val storedEmail = prefs.getString(KEY_ADMIN_EMAIL, null) ?: return false
                     val storedPass = prefs.getString(KEY_ADMIN_HASH, null) ?: return false
-                    constantTimeEquals(storedEmail, emailHash) && 
-                        constantTimeEquals(storedPass, passHash)
+                    val emailMatches = constantTimeEquals(storedEmail, emailHash) || 
+                            SecureHasher.verifyPassword(cleanEmail, storedEmail) ||
+                            storedEmail.equals(cleanEmail, ignoreCase = true)
+                    val passMatches = constantTimeEquals(storedPass, passHash) || 
+                            SecureHasher.verifyPassword(cleanPass, storedPass)
+                    emailMatches && passMatches
                 }
                 else -> false
             }
@@ -123,6 +164,37 @@ object SecureAdminStorage {
             android.util.Log.e("SecureAdminStorage", "Failed to verify credentials", e)
             false
         }
+    }
+
+    /**
+     * 🛡️ التحقق من كلمة المرور عبر البصمة (PBKDF2) وترقية الحسابات القديمة تلقائياً في Firestore
+     * عند أول تسجيل دخول ناجح لأي حساب قديم مخزن كنص، يتم تحويله إلى بصمة مشفرة وتحديث Firestore فوراً
+     */
+    fun verifyAndMigrate(
+        docRef: com.google.firebase.firestore.DocumentReference?,
+        inputPassword: String,
+        storedPassOrHash: String,
+        fieldName: String = "passcode"
+    ): Boolean {
+        if (inputPassword.isBlank() || storedPassOrHash.isBlank()) return false
+        val cleanInput = inputPassword.trim()
+        val cleanStored = storedPassOrHash.trim()
+        
+        val isValid = SecureHasher.verifyPassword(cleanInput, cleanStored) ||
+                SecurityCryptoUtils.verifyAdminPassword(cleanInput, cleanStored)
+                
+        if (isValid && docRef != null) {
+            // إذا كانت كلمة المرور القديمة نصاً عادياً لا يحتوي على ملوحة (salt separator ":")
+            if (!cleanStored.contains(":")) {
+                try {
+                    val newHash = SecureHasher.hashPassword(cleanInput)
+                    docRef.update(fieldName, newHash)
+                } catch (e: Exception) {
+                    android.util.Log.e("SecureAdminStorage", "Automatic hash migration in Firestore failed", e)
+                }
+            }
+        }
+        return isValid
     }
     
     /**
@@ -171,3 +243,8 @@ object SecureAdminStorage {
         return prefs.getBoolean(KEY_VAULT_INITIALIZED, false)
     }
 }
+
+/**
+ * 🔐 واجهة ومستودع أوراق اعتماد الأدمن والمشرفين (AdminCredentialsVault)
+ */
+typealias AdminCredentialsVault = SecureAdminStorage

@@ -184,7 +184,7 @@ fun AdminApiKeysScreenContent(
             }
         }
 
-        // 3. محافظ وبوابات الدفع الإلكتروني اليمنية
+        // 3. محافظ وبوابات الدفع الإلكتروني اليمنية (مؤمنة سحابياً)
         Card(
             colors = CardDefaults.cardColors(containerColor = themeColors.surface),
             shape = RoundedCornerShape(14.dp),
@@ -197,41 +197,39 @@ fun AdminApiKeysScreenContent(
                     Text("💳 محافظ وبوابات الدفع الإلكتروني", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
 
-                OutlinedTextField(
-                    value = kuraimiToken,
-                    onValueChange = { kuraimiToken = it },
-                    label = { Text("مفتاح بنك الكريمي إكسبرس (Kuraimi API Token)") },
-                    modifier = Modifier.fillMaxWidth(),
+                Surface(
+                    color = Color(0xFF0F172A),
                     shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
-
-                OutlinedTextField(
-                    value = jawwalPayKey,
-                    onValueChange = { jawwalPayKey = it },
-                    label = { Text("مفتاح محفظة جوال بي (Jawwal Pay Key)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
-
-                OutlinedTextField(
-                    value = floosakKey,
-                    onValueChange = { floosakKey = it },
-                    label = { Text("مفتاح محفظة فلوسك (Floosak Secret Key)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
-
-                OutlinedTextField(
-                    value = oneCashKey,
-                    onValueChange = { oneCashKey = it },
-                    label = { Text("مفتاح ون كاش / جيب (OneCash API Key)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                )
+                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                "🔒 إدارة مشفرة وسحابية (Cloud Functions)",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF10B981)
+                            )
+                            Text(
+                                "هذه المفاتيح الحساسة (بنك الكريمي، جوال بي، فلوسك، ون كاش) تُدار من Cloud Functions، لا حاجة لإدخالها هنا لضمان أقصى درجات الأمان وحماية البيانات المالية.",
+                                fontSize = 11.sp,
+                                color = Color.LightGray,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
             }
         }
 
