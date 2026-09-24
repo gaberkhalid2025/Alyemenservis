@@ -165,11 +165,15 @@ fun loadCardSettings() {
     }
 
 fun updateTheme(themeId: String) {
+        val updated = _settings.value.copy(activeThemeId = themeId)
+        _settings.value = updated
         db.collection("settings").document("main_settings").get().addOnSuccessListener { snapshot ->
             val s = snapshot.toObject(AdminSettingsEntity::class.java) ?: AdminSettingsEntity()
             db.collection("settings").document("main_settings").set(s.copy(activeThemeId = themeId))
+        }.addOnFailureListener {
+            db.collection("settings").document("main_settings").set(updated)
         }
-        mainViewModel.triggerNotification("🎨 تم تغيير مظهر التطبيق إلى $themeId")
+        mainViewModel.triggerNotification("🎨 تم تغيير مظهر التطبيق ومزامنته سحابياً إلى $themeId")
     }
 
 fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
@@ -185,8 +189,8 @@ fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
                         onFailure(e)
                     }
             },
-            onSuccess = { mainViewModel.triggerNotification("✅ تم حفظ ومزامنة كافة إعدادات التطبيق والدفع فورياً عبر الأجهزة!") },
-            onError = { mainViewModel.triggerNotification("⚠️ تم حفظ الإعدادات محلياً، سيتم المزامنة تلقائياً عند استقرار الاتصال") },
+            onSuccess = { mainViewModel.triggerNotification("✅ تم حفظ ومزامنة كافة إعدادات التطبيق والدفع سحابياً بنجاح!") },
+            onError = { mainViewModel.triggerNotification("⚠️ تم حفظ الإعدادات محلياً، وسيتم المزامنة سحابياً فور توفر الاتصال") },
             errorMessage = "فشل حفظ الإعدادات"
         )
     }
@@ -237,16 +241,28 @@ fun updateBackdoorSettings(
             customBackgroundHex = customBackgroundHex,
             customSurfaceHex = customSurfaceHex
         )
-        db.collection("settings").document("main_settings").set(updated)
         _settings.value = updated
-        mainViewModel.triggerNotification("💾 تم حفظ إعدادات البوابة البارزة والملفات بنجاح")
+        db.collection("settings").document("main_settings").set(updated)
+            .addOnSuccessListener {
+                mainViewModel.triggerNotification("💾 تم حفظ ومزامنة إعدادات البوابة الخلفية سحابياً بنجاح!")
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("SettingsViewModel", "Failed to sync backdoor settings", e)
+                mainViewModel.triggerNotification("⚠️ تم حفظ الإعدادات محلياً، وسيتم المزامنة سحابياً فور توفر الاتصال")
+            }
     }
 
 fun updateAdminSettings(newSettings: AdminSettingsEntity) {
         val sanitized = newSettings.copy(adminPassword = "")
-        db.collection("settings").document("main_settings").set(sanitized)
         _settings.value = sanitized
-        mainViewModel.triggerNotification("👑 تم تحديث ومزامنة إعدادات المنصة بنجاح!")
+        db.collection("settings").document("main_settings").set(sanitized)
+            .addOnSuccessListener {
+                mainViewModel.triggerNotification("👑 تم تحديث ومزامنة إعدادات المنصة سحابياً بنجاح!")
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("SettingsViewModel", "Failed to sync admin settings", e)
+                mainViewModel.triggerNotification("⚠️ تم حفظ الإعدادات محلياً، تعذر المزامنة السحابية مؤقتاً")
+            }
     }
 
 fun initColorSync(context: android.content.Context) {

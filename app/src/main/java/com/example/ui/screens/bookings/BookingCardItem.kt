@@ -42,6 +42,10 @@ fun BookingCardItem(
     onOpenChatClick: (BookingEntity) -> Unit
 ) {
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var showPinVerifyDialog by remember { mutableStateOf(false) }
+    var enteredPinText by remember { mutableStateOf("") }
+    var verifiedPlainPin by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val isUserTheClient = remember(booking, currentUserId) {
         val normalizedCurrentUser = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserId)
@@ -238,7 +242,17 @@ fun BookingCardItem(
                                 color = Color(0xFF94A3B8)
                             )
                             Text(
-                                text = if (isPasswordVisible) pass else "••••",
+                                text = if (isPasswordVisible) {
+                                    verifiedPlainPin.ifBlank {
+                                        if (booking.bookingPassword.isNotBlank() && !booking.bookingPassword.contains(":")) {
+                                            booking.bookingPassword
+                                        } else {
+                                            "••••"
+                                        }
+                                    }
+                                } else {
+                                    "••••"
+                                },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF00E5FF)
@@ -246,11 +260,19 @@ fun BookingCardItem(
                         }
 
                         IconButton(
-                            onClick = { isPasswordVisible = !isPasswordVisible },
+                            onClick = {
+                                if (isPasswordVisible) {
+                                    isPasswordVisible = false
+                                    verifiedPlainPin = ""
+                                } else {
+                                    showPinVerifyDialog = true
+                                    enteredPinText = ""
+                                }
+                            },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
-                                if (isPasswordVisible) Icons.Default.Close else Icons.Default.Check,
+                                imageVector = if (isPasswordVisible) Icons.Default.Close else Icons.Default.Check,
                                 contentDescription = "تبديل الرؤية",
                                 tint = Color(0xFF94A3B8),
                                 modifier = Modifier.size(14.dp)
@@ -258,6 +280,61 @@ fun BookingCardItem(
                         }
                     }
                 }
+            }
+
+            // Secure PIN Verification Dialog
+            if (showPinVerifyDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPinVerifyDialog = false },
+                    title = { Text("🔒 أدخل رمز الأمان (PIN)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "يرجى كتابة رمز الأمان المكون من 4 أرقام لتأكيد الهوية وعرض الرمز الأصلي للحجز:",
+                                fontSize = 12.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                            OutlinedTextField(
+                                value = enteredPinText,
+                                onValueChange = { if (it.length <= 6) enteredPinText = it },
+                                placeholder = { Text("مثال: 1234", fontSize = 12.sp, color = Color(0xFF64748B)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = Color(0xFF00E5FF),
+                                    unfocusedBorderColor = Color(0xFF334155)
+                                )
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val targetHash = booking.pinCode.ifBlank { booking.bookingPassword }
+                                val isVerified = com.example.utils.SecureHasher.verifyPin(enteredPinText, targetHash)
+                                if (isVerified) {
+                                    verifiedPlainPin = enteredPinText
+                                    isPasswordVisible = true
+                                    showPinVerifyDialog = false
+                                    android.widget.Toast.makeText(context, "✅ تم التحقق من الرمز بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    android.widget.Toast.makeText(context, "❌ رمز الأمان (PIN) غير صحيح!", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))
+                        ) {
+                            Text("تحقق ✅", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showPinVerifyDialog = false }) {
+                            Text("إلغاء ❌", color = Color(0xFF94A3B8))
+                        }
+                    },
+                    containerColor = Color(0xFF1E293B)
+                )
             }
 
             // Action Buttons based on Role

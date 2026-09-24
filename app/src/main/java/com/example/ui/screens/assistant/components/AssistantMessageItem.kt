@@ -105,7 +105,11 @@ fun AssistantMessageItem(
                             Spacer(modifier = Modifier.weight(1f))
 
                             IconButton(
-                                onClick = { VoiceManager.onSpeak?.invoke(msg.text) },
+                                onClick = {
+                                    try {
+                                        VoiceManager.onSpeak?.invoke(msg.text)
+                                    } catch (_: Exception) {}
+                                },
                                 modifier = Modifier.size(22.dp)
                             ) {
                                 Icon(
@@ -121,7 +125,8 @@ fun AssistantMessageItem(
             }
         }
 
-        if (msg.matchedEntities.isNotEmpty()) {
+        val safeEntities = msg.matchedEntities.orEmpty().filterNotNull()
+        if (safeEntities.isNotEmpty()) {
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "👇 عثرت لك على النتائج التالية لطلبك:",
@@ -132,7 +137,7 @@ fun AssistantMessageItem(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                msg.matchedEntities.forEach { entity ->
+                safeEntities.forEach { entity ->
                     when (entity) {
                         is ProviderEntity -> {
                             ProviderCard(

@@ -32,6 +32,7 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.MapBottomSheet
 import com.example.ui.screens.map.components.MapControls
+import com.example.ui.screens.map.components.MapErrorOverlay
 import com.example.data.AdminSettingsEntity
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
@@ -62,6 +63,7 @@ fun RealLeafletMapView(
     onPropertySelected: (PropertyEntity) -> Unit,
     onDeselect: () -> Unit = {},
     onSwitchToRadar: (() -> Unit)? = null,
+    onMapLoadFailed: (() -> Unit)? = null, // FIXED: Callback when map loading fails or times out
     themeColors: VisualThemePalette = resolveThemePalette(AdminSettingsEntity()),
     modifier: Modifier = Modifier
 ) {
@@ -69,10 +71,22 @@ fun RealLeafletMapView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var currentSelectedEntity by remember { mutableStateOf<Any?>(selectedEntity) }
     var currentZoom by remember { mutableStateOf(14) }
+    var isMapReady by remember { mutableStateOf(false) }
+    var isMapError by remember { mutableStateOf(false) }
 
-    // Safe default user coordinates
-    val safeUserLat = if (userCoords.first != 0.0) userCoords.first else 15.3694
-    val safeUserLng = if (userCoords.second != 0.0) userCoords.second else 44.1910
+    // Safe default user coordinates (Sana'a defaults: 15.3694, 44.1910)
+    val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3694 // FIXED: Always fallback to default Sana'a lat
+    val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1910 // FIXED: Always fallback to default Sana'a lng
+
+    // FIXED: 3-second timeout to fall back to Radar if Leaflet initialization fails
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(3000)
+        if (!isMapReady) {
+            Log.w("LeafletWebView", "Map loading timed out after 3 seconds, triggering radar fallback")
+            isMapError = true
+            onMapLoadFailed?.invoke()
+        }
+    }
 
     // Determine target center coordinates based on selected governorate
     val (targetLat, targetLng) = remember(selectedCity, safeUserLat, safeUserLng) {
@@ -215,35 +229,9 @@ fun RealLeafletMapView(
                         override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                             super.onReceivedError(view, request, error)
                             Log.e("LeafletWebView", "Network Error: ${error?.description} on ${request?.url}")
-                        }
-
-                        override fun shouldInterceptRequest(
-                            view: WebView?,
-                            request: WebResourceRequest?
-                        ): WebResourceResponse? {
-                            val url = request?.url?.toString() ?: return null
-                            return try {
-                                when {
-                                    url.endsWith("leaflet.css") -> {
-                                        WebResourceResponse("text/css", "UTF-8", ctx.assets.open("leaflet.css"))
-                                    }
-                                    url.endsWith("leaflet.js") -> {
-                                        WebResourceResponse("application/javascript", "UTF-8", ctx.assets.open("leaflet.js"))
-                                    }
-                                    url.endsWith("leaflet.markercluster.js") -> {
-                                        WebResourceResponse("application/javascript", "UTF-8", ctx.assets.open("leaflet.markercluster.js"))
-                                    }
-                                    url.endsWith("MarkerCluster.css") -> {
-                                        WebResourceResponse("text/css", "UTF-8", ctx.assets.open("MarkerCluster.css"))
-                                    }
-                                    url.endsWith("MarkerCluster.Default.css") -> {
-                                        WebResourceResponse("text/css", "UTF-8", ctx.assets.open("MarkerCluster.Default.css"))
-                                    }
-                                    else -> super.shouldInterceptRequest(view, request)
-                                }
-                            } catch (e: Exception) {
-                                Log.e("LeafletWebView", "Error intercepting asset $url", e)
-                                null
+                            if (request?.isForMainFrame == true) {
+                                isMapError = true // FIXED: Trigger error fallback when main frame fails
+                                onMapLoadFailed?.invoke()
                             }
                         }
                     }
@@ -272,10 +260,29 @@ fun RealLeafletMapView(
                         @android.webkit.JavascriptInterface
                         fun onMapReady() {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                isMapReady = true // FIXED: Mark map ready
                                 evaluateJavascript("""
                                     if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }
                                     if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }
                                 """.trimIndent(), null)
+                            }
+                        }
+
+                        @android.webkit.JavascriptInterface
+                        fun onMapLoadFailed(reason: String?) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                Log.e("LeafletWebView", "JS reported map load error: $reason")
+                                isMapError = true // FIXED: Mark error state
+                                onMapLoadFailed?.invoke()
+                            }
+                        }
+
+                        @android.webkit.JavascriptInterface
+                        fun onMapError(reason: String) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                Log.e("LeafletWebView", "JS reported map error: $reason")
+                                isMapError = true // FIXED: Mark error state
+                                onMapLoadFailed?.invoke()
                             }
                         }
 
@@ -310,6 +317,8 @@ fun RealLeafletMapView(
                         fun getMarkersJson(): String = markersJsonArray
                     }, "AndroidBridge")
 
+                    // FIXED: Load fully inlined HTML string under https://mt1.google.com/ BaseURL so WebView permits network tile fetches
+                    clearCache(true)
                     val htmlContent = getSelfContainedMapHtml(ctx)
                     loadDataWithBaseURL(
                         "https://mt1.google.com/",
@@ -326,29 +335,30 @@ fun RealLeafletMapView(
             }
         )
 
-        // 2. Map Floating Action Controls (Zoom In, Zoom Out, Recenter Location, Switch to Radar)
-        MapControls(
-            isRadarMode = false,
-            onToggleRadarMode = { onSwitchToRadar?.invoke() },
-            isHeatmapActive = false,
-            onToggleHeatmap = {},
-            onZoomIn = {
-                currentZoom = (currentZoom + 1).coerceAtMost(19)
-                webViewInstance?.evaluateJavascript("if (map) { map.setZoom($currentZoom); }", null)
-            },
-            onZoomOut = {
-                currentZoom = (currentZoom - 1).coerceAtLeast(6)
-                webViewInstance?.evaluateJavascript("if (map) { map.setZoom($currentZoom); }", null)
-            },
-            onRecenterLocation = {
-                webViewInstance?.evaluateJavascript("if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }", null)
-            },
-            isGpsActive = true,
-            themeColors = themeColors,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(top = 100.dp)
-        )
+        // Sync zoom scale changes with Leaflet map instance
+        LaunchedEffect(zoomScale, webViewInstance) {
+            webViewInstance?.let { webView ->
+                val zoomLevel = (14 + (zoomScale - 1.0f) * 2).coerceIn(6f, 19f).toInt()
+                webView.evaluateJavascript("if (map) { map.setZoom($zoomLevel); }", null)
+            }
+        }
+
+        // FIXED: Display MapErrorOverlay if map tile or webview fails
+        if (isMapError) {
+            MapErrorOverlay(
+                onRetry = {
+                    isMapError = false
+                    isMapReady = false
+                    webViewInstance?.reload()
+                },
+                onSwitchToRadar = {
+                    onSwitchToRadar?.invoke()
+                },
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(16.dp)
+            )
+        }
 
         // 3. Detail Bottom Sheet when tapping any pin
         currentSelectedEntity?.let { entity ->

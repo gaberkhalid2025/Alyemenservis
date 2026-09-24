@@ -141,7 +141,9 @@ class ChatViewModel @Inject constructor(
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
             repository.getChannelMessages(channelId, currentUserId, limit = currentLimit).collect { msgs ->
-                messagesManager.updateMessagesList(msgs)
+                // FIXED: Limit messages stored in memory to maximum 200 items
+                val cappedMsgs = if (msgs.size > 200) msgs.takeLast(200) else msgs
+                messagesManager.updateMessagesList(cappedMsgs)
                 markAsRead(channelId, currentUserId)
             }
         }
@@ -271,6 +273,18 @@ class ChatViewModel @Inject constructor(
         )
     }
 
+    private fun sanitizeErrorMessage(raw: String?, defaultMessage: String): String {
+        if (raw.isNullOrBlank()) return defaultMessage
+        val lower = raw.lowercase()
+        return when {
+            lower.contains("permission_denied") || lower.contains("permission-denied") -> "ليس لديك صلاحية لتنفيذ هذا الإجراء"
+            lower.contains("unavailable") || lower.contains("network") || lower.contains("timeout") -> "تعذر الاتصال بالخادم، يرجى التحقق من الإنترنت"
+            lower.contains("failed_precondition") || lower.contains("not-found") -> "لا يمكن تنفيذ هذه العملية حالياً"
+            lower.contains("unauthenticated") -> "انتهت الجلسة، يرجى تسجيل الدخول مجدداً"
+            else -> defaultMessage
+        }
+    }
+
     fun toggleBlock(otherUserId: String, block: Boolean) {
         val channel = _currentChannel.value ?: return
         viewModelScope.launch {
@@ -280,7 +294,7 @@ class ChatViewModel @Inject constructor(
                     _eventFlow.emit(ChatEvent.ShowError(res.error.messageArabic))
                 }
             } catch (e: Exception) {
-                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل تغيير حالة الحظر"))
+                _eventFlow.emit(ChatEvent.ShowError(sanitizeErrorMessage(e.message, "فشل تغيير حالة الحظر، يرجى المحاولة لاحقاً")))
             }
         }
     }
@@ -292,7 +306,7 @@ class ChatViewModel @Inject constructor(
                 repository.deleteChannel(channel.id)
                 onDeleted()
             } catch (e: Exception) {
-                _eventFlow.emit(ChatEvent.ShowError(e.message ?: "فشل حذف المحادثة"))
+                _eventFlow.emit(ChatEvent.ShowError(sanitizeErrorMessage(e.message, "فشل حذف المحادثة، يرجى المحاولة لاحقاً")))
             }
         }
     }

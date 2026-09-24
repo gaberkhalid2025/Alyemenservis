@@ -46,6 +46,17 @@ class ChatAttachmentManager(private val context: Context) {
             return Result.failure(Exception(validation.message))
         }
 
+        // FIXED: Enforce strict file size limits (5MB for images, 10MB for audio/other media)
+        val maxAllowedSize = if (type == "image") 5 * 1024 * 1024L else 10 * 1024 * 1024L
+        val fileSize = try {
+            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
+        } catch (_: Exception) { 0L }
+
+        if (fileSize > maxAllowedSize) {
+            val limitMb = if (type == "image") 5 else 10
+            return Result.failure(Exception("حجم الملف يتجاوز الحد المسموح به ($limitMb ميجابايت)"))
+        }
+
         if (!ChatValidationUtils.canUploadToday(context)) {
             return Result.failure(Exception("⚠️ تجاوزت الحد اليومي المسموح به لرفع الملفات (10 وسائط يومياً)."))
         }

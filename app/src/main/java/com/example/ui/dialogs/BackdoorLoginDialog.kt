@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,10 +45,10 @@ fun BackdoorLoginDialog(
     val settingsState by viewModel.settings.collectAsState()
     val supervisors by viewModel.supervisors.collectAsState()
 
-    var emailInput by remember { mutableStateOf("") }
-    var passwordInput by remember { mutableStateOf("") }
-    var isPasswordVisible by remember { mutableStateOf(false) }
-    var rememberMe by remember { mutableStateOf(true) }
+    var emailInput by rememberSaveable { mutableStateOf("") }
+    var passwordInput by rememberSaveable { mutableStateOf("") }
+    var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
+    var rememberMe by rememberSaveable { mutableStateOf(true) }
     var isAuthenticating by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -200,12 +201,12 @@ fun BackdoorLoginDialog(
                                         "OWNER" -> {
                                             onDismiss()
                                             viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                                            viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك!")
+                                            viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك - تم تسجيل الدخول بنجاح!")
                                         }
                                         "ADMIN" -> {
                                             onDismiss()
                                             viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
-                                            viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام!")
+                                            viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام - تم تسجيل الدخول بنجاح!")
                                         }
                                         "SUPERVISOR" -> {
                                             val matchingSup = supervisors.find { it.id == trimmedUser || it.name.trim().equals(trimmedUser, ignoreCase = true) }
@@ -217,9 +218,9 @@ fun BackdoorLoginDialog(
                                                 }
                                                 onDismiss()
                                                 viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
-                                                viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name}")
+                                                viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name} - تم تسجيل الدخول بنجاح!")
                                             } else {
-                                                viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
+                                                viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة أو تم إلغاء الصلاحية!")
                                             }
                                         }
                                         else -> {
@@ -228,21 +229,25 @@ fun BackdoorLoginDialog(
                                     }
                                 } catch (e: Throwable) {
                                     e.printStackTrace()
-                                    viewModel.triggerNotification("❌ حدث خطأ غير متوقع. حاول مرة أخرى.")
+                                    viewModel.triggerNotification("❌ حدث خطأ غير متوقع أثناء تسجيل الدخول. يرجى المحاولة لاحقاً.")
                                 } finally {
                                     isAuthenticating = false
                                 }
                             }
                         },
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = themeColors.accent,
+                            disabledContainerColor = Color.Gray.copy(alpha = 0.3f),
+                            disabledContentColor = Color.LightGray
+                        ),
                         modifier = Modifier.weight(1.5f),
-                        enabled = !isAuthenticating
+                        enabled = !isAuthenticating && emailInput.isNotBlank() && passwordInput.isNotBlank()
                     ) {
                         if (isAuthenticating) {
                             CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp))
                         } else {
-                            Text("دخول للنظام 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("دخول للنظام 🚀", color = if (emailInput.isNotBlank() && passwordInput.isNotBlank()) Color.Black else Color.LightGray, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }

@@ -100,6 +100,7 @@ fun ProfileReviewCard(
  */
 @Composable
 fun EnhancedReviewInput(
+    currentUserId: String = "",
     onSubmit: (rating: Int, comment: String, images: List<String>) -> Unit,
     themeColors: VisualThemePalette
 ) {
@@ -194,7 +195,9 @@ fun EnhancedReviewInput(
         
         Button(
             onClick = {
-                if (rating > 0 && comment.isNotBlank()) {
+                if (currentUserId.isBlank() || currentUserId == "guest" || currentUserId.startsWith("guest_")) {
+                    android.widget.Toast.makeText(context, "عذراً! التقييم متاح فقط للمستخدمين والفنيين وأصحاب المحلات المسجلين بالنظام.", android.widget.Toast.LENGTH_LONG).show()
+                } else if (rating > 0 && comment.isNotBlank()) {
                     coroutineScope.launch {
                         val imageBase64List = selectedImages.map { uri ->
                             ImageOptimizationUtils.compressAndOptimizeImage(

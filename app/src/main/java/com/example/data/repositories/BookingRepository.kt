@@ -309,11 +309,16 @@ class BookingRepository(
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val updates = mapOf(
+        val now = System.currentTimeMillis()
+        val updates = mutableMapOf<String, Any>(
             "status" to newStatus,
-            "updatedAt" to System.currentTimeMillis(),
-            if (newStatus == "COMPLETED") "completedAt" to System.currentTimeMillis() else "updatedAt" to System.currentTimeMillis()
+            "updatedAt" to now
         )
+
+        val existingBooking = _cachedBookings.value.find { it.id == bookingId }
+        if (newStatus == "COMPLETED" && (existingBooking == null || existingBooking.completedAt == 0L)) {
+            updates["completedAt"] = now
+        }
 
         if (newStatus == "APPROVED" || newStatus == "ACCEPTED") {
             AnalyticsEventsHelper.logBookingAccepted(context, bookingId)
@@ -321,7 +326,13 @@ class BookingRepository(
 
         // Optimistic local update
         val current = _cachedBookings.value.map {
-            if (it.id == bookingId) it.copy(status = newStatus, updatedAt = System.currentTimeMillis()) else it
+            if (it.id == bookingId) {
+                it.copy(
+                    status = newStatus,
+                    updatedAt = now,
+                    completedAt = if (newStatus == "COMPLETED" && it.completedAt == 0L) now else it.completedAt
+                )
+            } else it
         }
         saveToCache(current)
 

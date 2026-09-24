@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,6 +20,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.NetworkUtils
+import com.example.ui.screens.dashboard.components.UnifiedEmptyState
 import androidx.compose.ui.unit.sp
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
@@ -29,12 +34,65 @@ fun InstantRequestList(
     offers: List<RequestOfferEntity>,
     currentUserId: String,
     themeColors: VisualThemePalette,
+    isLoading: Boolean = false,
+    onCreateRequestClick: (() -> Unit)? = null,
+    onRetryClick: (() -> Unit)? = null,
     onViewOffers: (InstantRequestEntity) -> Unit,
     onSubmitOffer: (InstantRequestEntity) -> Unit
 ) {
-    if (requests.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("لا توجد طلبات فورية مطابقة", color = Color.Gray, fontSize = 14.sp)
+    val context = LocalContext.current
+    val isOnline = remember(requests) { NetworkUtils.isNetworkAvailable(context) }
+
+    if (isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator(color = themeColors.accent)
+                Text(
+                    text = "جاري تحميل الطلبات الفورية... ⏳",
+                    fontSize = 13.sp,
+                    color = themeColors.textSecondary
+                )
+            }
+        }
+    } else if (!isOnline && requests.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            UnifiedEmptyState(
+                title = "لا يوجد اتصال بالإنترنت",
+                description = "تعذر تحميل الطلبات لعدم توفر اتصال بالشبكة. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+                iconText = "📡",
+                actionLabel = "إعادة المحاولة 🔄",
+                onActionClick = onRetryClick,
+                themeColors = themeColors
+            )
+        }
+    } else if (requests.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            UnifiedEmptyState(
+                title = "لا توجد طلبات فورية حالياً",
+                description = "يمكنك تقديم طلب جديد وتلقي عروض أسعار تنافسية من الفنيين والمزودين خلال ساعتين.",
+                iconText = "⚡",
+                actionLabel = "اطلب خدمتك الآن ⚡",
+                onActionClick = onCreateRequestClick,
+                themeColors = themeColors
+            )
         }
     } else {
         LazyColumn(
@@ -114,9 +172,9 @@ fun CreateInstantRequestDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var details by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
+    var title by rememberSaveable { mutableStateOf("") }
+    var details by rememberSaveable { mutableStateOf("") }
+    var city by rememberSaveable { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -124,7 +182,12 @@ fun CreateInstantRequestDialog(
         onDismissRequest = onDismiss,
         title = { Text("طلب خدمة فورية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -172,16 +235,18 @@ fun CreateInstantRequestDialog(
                     ) { success, reqId, reqCode ->
                         isSubmitting = false
                         if (success) {
-                            Toast.makeText(context, "تم إرسال طلبك للفنيين", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "✅ تم إرسال طلبك للفنيين بنجاح", Toast.LENGTH_SHORT).show()
                             onDismiss()
+                        } else {
+                            Toast.makeText(context, "❌ تعذر إرسال الطلب، يرجى التأكد من اتصال الإنترنت والمحاولة ثانية", Toast.LENGTH_LONG).show()
                         }
                     }
                 },
-                enabled = !isSubmitting,
+                enabled = !isSubmitting && title.isNotBlank() && city.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
             ) {
                 if (isSubmitting) CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp))
-                else Text("نشر الطلب", color = Color.Black, fontWeight = FontWeight.Bold)
+                else Text("نشر الطلب 🚀", color = Color.Black, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -198,9 +263,9 @@ fun SubmitOfferDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
-    var price by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
+    var price by rememberSaveable { mutableStateOf("") }
+    var time by rememberSaveable { mutableStateOf("") }
+    var notes by rememberSaveable { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -208,7 +273,12 @@ fun SubmitOfferDialog(
         onDismissRequest = onDismiss,
         title = { Text("تقديم عرض سعر", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text("الطلب: ${request.serviceTitle}", color = Color.LightGray, fontSize = 12.sp)
                 OutlinedTextField(
                     value = price,
@@ -256,14 +326,14 @@ fun SubmitOfferDialog(
                         notes = notes
                     )
                     isSubmitting = false
-                    Toast.makeText(context, "تم تقديم عرضك بنجاح", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "✅ تم تقديم عرضك بنجاح للعميل", Toast.LENGTH_SHORT).show()
                     onDismiss()
                 },
-                enabled = !isSubmitting,
+                enabled = !isSubmitting && price.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
             ) {
                 if (isSubmitting) CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp))
-                else Text("إرسال العرض", color = Color.Black, fontWeight = FontWeight.Bold)
+                else Text("إرسال العرض 📤", color = Color.Black, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

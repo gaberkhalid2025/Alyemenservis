@@ -26,6 +26,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
+import com.example.NetworkUtils
+import com.example.ui.screens.dashboard.components.UnifiedEmptyState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -99,7 +102,9 @@ fun ChatListScreen(
                 else -> true
             }
 
-            matchesSearch && matchesFilter
+            val hasMessages = channel.lastMessage.isNotBlank() || channel.lastMessageTime > 0L // FIXED: Only display channels with actual messages
+
+            matchesSearch && matchesFilter && hasMessages
         }
         
         // Deduplicate support channels if user has multiple legacy ones
@@ -218,31 +223,46 @@ fun ChatListScreen(
 
         HorizontalDivider(color = themeColors.border, thickness = 1.dp, modifier = Modifier.padding(vertical = 6.dp))
 
+        val context = LocalContext.current
+        val isOnline = remember(channels) { NetworkUtils.isNetworkAvailable(context) }
+
         // Channels List
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = themeColors.primary)
+            Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(color = themeColors.primary)
+                    Text(
+                        text = "جاري تحميل المحادثات... ⏳",
+                        fontSize = 13.sp,
+                        color = themeColors.textSecondary
+                    )
+                }
+            }
+        } else if (!isOnline && filteredChannels.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                UnifiedEmptyState(
+                    title = "لا يوجد اتصال بالإنترنت",
+                    description = "تعذر تحميل قائمة المحادثات. يرجى التأكد من اتصالك بالإنترنت والضغط على إعادة المحاولة.",
+                    iconText = "📡",
+                    actionLabel = "إعادة المحاولة 🔄",
+                    onActionClick = {
+                        if (currentUserId.isNotBlank()) {
+                            chatListViewModel.loadUserChannels(currentUserId)
+                        }
+                    },
+                    themeColors = themeColors
+                )
             }
         } else if (filteredChannels.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة." else "لا توجد محادثات في هذا التصنيف حالياً.",
-                        color = themeColors.textSecondary,
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    if (onStartSupportChat != null && searchQuery.isBlank()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = onStartSupportChat,
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("بدء محادثة مع الدعم الفني 🛠️", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+            Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                UnifiedEmptyState(
+                    title = if (searchQuery.isNotBlank()) "لا توجد نتائج بحث مطابقة" else "لا توجد رسائل حالياً",
+                    description = if (searchQuery.isNotBlank()) "جرب البحث باسم آخر أو كلمة مختلفة." else "تواصل بأمان مع الفنيين ومزودي الخدمات أو فريق الدعم الفني.",
+                    iconText = "💬",
+                    actionLabel = if (onStartSupportChat != null && searchQuery.isBlank()) "بدء محادثة مع الدعم الفني 🛠️" else null,
+                    onActionClick = onStartSupportChat,
+                    themeColors = themeColors
+                )
             }
         } else {
             LazyColumn(

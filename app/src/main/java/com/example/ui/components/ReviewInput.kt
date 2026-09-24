@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun ReviewInput(
     modifier: Modifier = Modifier,
+    currentUserId: String = "",
     onSubmit: (rating: Int, comment: String) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -172,7 +173,9 @@ fun ReviewInput(
                 // Submit Button
                 Button(
                     onClick = {
-                        if (comment.isBlank()) {
+                        if (currentUserId.isBlank() || currentUserId == "guest" || currentUserId.startsWith("guest_")) {
+                            errorMsg = "عذراً! التقييم متاح فقط للمستخدمين والفنيين وأصحاب المحلات المسجلين بالنظام."
+                        } else if (comment.isBlank()) {
                             errorMsg = "الرجاء كتابة تعليق قبل الإرسال"
                         } else {
                             onSubmit(rating, comment)

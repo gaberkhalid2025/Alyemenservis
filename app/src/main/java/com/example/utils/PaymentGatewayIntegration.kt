@@ -177,8 +177,9 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
      * الحصول على سجل المعاملات لمستخدم معين
      */
     fun getTransactionHistory(userId: String): List<Transaction> {
+        if (userId.isBlank()) return emptyList()
         return activeTransactions.values
-            .filter { it.userId == userId || userId.isBlank() }
+            .filter { it.userId == userId }
             .map { p ->
                 Transaction(
                     id = p.id,

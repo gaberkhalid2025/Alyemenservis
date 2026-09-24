@@ -172,6 +172,9 @@ fun MapScreenContent(
                     onSwitchToRadar = { 
                         state.isRadarMode = true
                     },
+                    onMapLoadFailed = { // FIXED: Fall back to radar automatically on map error
+                        state.isRadarMode = true
+                    },
                     themeColors = themeColors,
                     modifier = Modifier.fillMaxSize()
                 )

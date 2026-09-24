@@ -506,9 +506,14 @@ class AdminViewModel @Inject constructor(
                     ))
                     currentVersion + 1
                 }.await()
+                appState._settings.value = appState._settings.value.copy(
+                    appName = appName,
+                    welcomeMessage = welcomeMessage,
+                    footerMessage = footerMessage
+                )
                 onSuccess()
             } catch (e: Exception) {
-                onError(e.message ?: "خطأ غير معروف")
+                onError(e.message ?: "فشل حفظ الإعدادات سحابياً")
             }
         }
     }

@@ -50,6 +50,9 @@ fun BookingDetailsScreen(
     val context = LocalContext.current
     var showCancelDialog by remember { mutableStateOf(false) }
     var showPasswordVisible by remember { mutableStateOf(false) }
+    var showPinVerifyDialog by remember { mutableStateOf(false) }
+    var enteredPinText by remember { mutableStateOf("") }
+    var verifiedPlainPin by remember { mutableStateOf("") }
     var showRateDialog by remember { mutableStateOf(false) }
     var ratingValue by remember { mutableFloatStateOf(5f) }
 
@@ -187,9 +190,9 @@ fun BookingDetailsScreen(
             }
 
             // Secret Password Card (Visible to Client & Admin only)
-            if ((userRole == "CLIENT" || userRole == "ADMIN") && booking.bookingPassword.isNotBlank()) {
-                val secretPin = booking.bookingPassword
-                if (secretPin.isNotBlank()) {
+            if (userRole == "CLIENT" || userRole == "ADMIN") {
+                val hasSecret = booking.bookingPassword.isNotBlank() || booking.pinCode.isNotBlank()
+                if (hasSecret) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
@@ -215,9 +218,17 @@ fun BookingDetailsScreen(
                                     )
                                 }
 
-                                IconButton(onClick = { showPasswordVisible = !showPasswordVisible }) {
+                                IconButton(onClick = {
+                                    if (showPasswordVisible) {
+                                        showPasswordVisible = false
+                                        verifiedPlainPin = ""
+                                    } else {
+                                        showPinVerifyDialog = true
+                                        enteredPinText = ""
+                                    }
+                                }) {
                                     Icon(
-                                        imageVector = Icons.Default.Lock,
+                                        imageVector = if (showPasswordVisible) Icons.Default.LockOpen else Icons.Default.Lock,
                                         contentDescription = "إظهار الرمز",
                                         tint = MaterialTheme.colorScheme.primary
                                     )
@@ -227,7 +238,17 @@ fun BookingDetailsScreen(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = if (showPasswordVisible) secretPin else "••••",
+                                text = if (showPasswordVisible) {
+                                    verifiedPlainPin.ifBlank {
+                                        if (booking.bookingPassword.isNotBlank() && !booking.bookingPassword.contains(":")) {
+                                            booking.bookingPassword
+                                        } else {
+                                            "••••"
+                                        }
+                                    }
+                                } else {
+                                    "••••"
+                                },
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -236,6 +257,54 @@ fun BookingDetailsScreen(
                         }
                     }
                 }
+            }
+
+            // Secure PIN Verification Dialog in Details
+            if (showPinVerifyDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPinVerifyDialog = false },
+                    title = { Text("🔒 تحقق من رمز الأمان (PIN)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "يرجى كتابة رمز الأمان المكون من 4 أرقام لتأكيد الهوية وعرض الرمز الأصلي للحجز:",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedTextField(
+                                value = enteredPinText,
+                                onValueChange = { if (it.length <= 6) enteredPinText = it },
+                                placeholder = { Text("مثال: 1234", fontSize = 12.sp) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val targetHash = booking.pinCode.ifBlank { booking.bookingPassword }
+                                val isVerified = com.example.utils.SecureHasher.verifyPin(enteredPinText, targetHash)
+                                if (isVerified) {
+                                    verifiedPlainPin = enteredPinText
+                                    showPasswordVisible = true
+                                    showPinVerifyDialog = false
+                                    Toast.makeText(context, "✅ تم التحقق من الرمز بنجاح!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "❌ رمز الأمان (PIN) غير صحيح!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("تحقق ✅", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showPinVerifyDialog = false }) {
+                            Text("إلغاء ❌")
+                        }
+                    }
+                )
             }
 
             // Client Info Card (Visible to Provider & Admin)

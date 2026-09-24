@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,15 +53,15 @@ fun BookingFormScreen(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    var fullName by remember { mutableStateOf("") }
-    var clientPhone by remember { mutableStateOf("") }
-    var selectedCity by remember { mutableStateOf("صنعاء") }
-    var fullAddress by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(preselectedCategory.ifEmpty { "صيانة عامة" }) }
-    var selectedDate by remember { mutableStateOf("") }
-    var selectedTime by remember { mutableStateOf("") }
-    var serviceDetails by remember { mutableStateOf("") }
-    var agreeToTerms by remember { mutableStateOf(true) }
+    var fullName by rememberSaveable { mutableStateOf("") }
+    var clientPhone by rememberSaveable { mutableStateOf("") }
+    var selectedCity by rememberSaveable { mutableStateOf("صنعاء") }
+    var fullAddress by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf(preselectedCategory.ifEmpty { "صيانة عامة" }) }
+    var selectedDate by rememberSaveable { mutableStateOf("") }
+    var selectedTime by rememberSaveable { mutableStateOf("") }
+    var serviceDetails by rememberSaveable { mutableStateOf("") }
+    var agreeToTerms by rememberSaveable { mutableStateOf(true) }
     var isSubmitting by remember { mutableStateOf(false) }
 
     var createdBookingResult by remember { mutableStateOf<BookingEntity?>(null) }
@@ -92,7 +93,7 @@ fun BookingFormScreen(
         }
     }
 
-    var selectedDepartment by remember { mutableStateOf("خدمات وفنيين") }
+    var selectedDepartment by rememberSaveable { mutableStateOf("خدمات وفنيين") }
     var showDeptDropdown by remember { mutableStateOf(false) }
 
     val currentSubCategories = remember(selectedDepartment) {

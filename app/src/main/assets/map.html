@@ -19,7 +19,7 @@
         html, body {
             height: 100%;
             width: 100%;
-            background: #1E293B;
+            background: #0F172A;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow: hidden;
             position: relative;
@@ -29,17 +29,18 @@
             height: 100%;
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: #1E293B;
+            background: #0F172A;
             background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-            background-size: 32px 32px;
+                linear-gradient(rgba(0, 229, 255, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 229, 255, 0.07) 1px, transparent 1px);
+            background-size: 36px 36px;
         }
         
         .leaflet-container { 
             width: 100%; 
             height: 100%; 
-            background: #1E293B !important; 
+            background: #0F172A linear-gradient(rgba(0, 229, 255, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 255, 0.07) 1px, transparent 1px) !important; 
+            background-size: 36px 36px !important;
             font-family: inherit; 
         }
         .leaflet-pane { z-index: 400; }
@@ -233,7 +234,7 @@
     <script src="leaflet.markercluster.js"></script>
 </head>
 <body>
-    <div id="map"></div>
+    <div id="map" style="width:100%;height:100%;min-height:100vh;"></div>
     
     <div id="map-fallback-overlay">
         <h3>📡 تعذر اتصال الخريطة بالشبكة</h3>
@@ -245,6 +246,15 @@
     </div>
 
     <script>
+        // Global JS Error Handler
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error("Global JS Error: " + message);
+            if (window.AndroidBridge && typeof window.AndroidBridge.onMapError === 'function') {
+                window.AndroidBridge.onMapError("js_error: " + message);
+            }
+            return false;
+        };
+
         // Safe default coordinates (Sana'a center: 15.3694, 44.1910)
         var userLat = 15.3694;
         var userLng = 44.1910;
@@ -314,7 +324,18 @@
                     zoomAnimation: true
                 }).setView([userLat, userLng], 14);
 
-                // Standard OpenStreetMap & Google Maps hybrid tile layers for Yemen region
+                // High-performance direct tile layers for Yemen region
+                var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    subdomains: ['a', 'b', 'c', 'd'],
+                    attribution: 'CartoDB Voyager'
+                });
+
+                var esriLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19,
+                    attribution: 'Esri World Street Map'
+                });
+
                 var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     subdomains: ['a', 'b', 'c'],
@@ -327,28 +348,36 @@
                     attribution: 'Google Maps'
                 });
 
-                var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 19,
-                    subdomains: ['a', 'b', 'c', 'd'],
-                    attribution: 'CartoDB'
-                });
+                // Add CartoDB Voyager as primary fast tile layer
+                cartoLayer.addTo(map);
 
-                // Add Google Maps as primary layer
-                googleLayer.addTo(map);
-
-                // Add fallback handler if Google Maps fails
-                googleLayer.on('tileerror', function() {
-                    console.warn("Google Maps tile notice, adding OpenStreetMap fallback layer...");
-                    if (!map.hasLayer(osmLayer)) {
+                // Tile error fallbacks
+                cartoLayer.on('tileerror', function() {
+                    console.warn("CartoDB tile notice, falling back to OpenStreetMap...");
+                    if (!map.hasLayer(osmLayer) && !map.hasLayer(googleLayer)) {
                         osmLayer.addTo(map);
+                    }
+                    if (window.AndroidBridge && typeof window.AndroidBridge.onMapError === 'function') {
+                        window.AndroidBridge.onMapError("tile_failed");
                     }
                 });
 
-                // Layer control for user to switch map styles if desired
+                esriLayer.on('tileerror', function() {
+                    console.warn("Esri tile notice, falling back to OpenStreetMap...");
+                    if (!map.hasLayer(osmLayer)) {
+                        osmLayer.addTo(map);
+                    }
+                    if (window.AndroidBridge && typeof window.AndroidBridge.onMapError === 'function') {
+                        window.AndroidBridge.onMapError("tile_failed_esri");
+                    }
+                });
+
+                // Layer control for user to switch map styles
                 var baseMaps = {
+                    "خريطة كارتو الشاملة (CartoDB)": cartoLayer,
+                    "خريطة الشوارع العالمية (Esri)": esriLayer,
                     "خريطة الشوارع المباشرة (OpenStreetMap)": osmLayer,
-                    "خرائط جوجل (Google Maps)": googleLayer,
-                    "خريطة كارتو دي بي (CartoDB)": cartoLayer
+                    "خرائط جوجل (Google Maps)": googleLayer
                 };
                 L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 

@@ -6,6 +6,7 @@ import com.example.ui.*
 import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
@@ -58,11 +59,13 @@ fun SmartAssistantDialogView(
     onDismiss: () -> Unit,
     onChatOpen: (String) -> Unit,
     assistantViewModel: AssistantViewModel = viewModel(),
-    onRequestQuickService: () -> Unit = {},
+    onRequestQuickService: (() -> Unit)? = null,
     onNavigateToMap: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val isOnline = NetworkUtils.isNetworkAvailable(context)
+    val isOnline = remember(context) {
+        try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { true }
+    }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -93,16 +96,14 @@ fun SmartAssistantDialogView(
         }
     }
 
-    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    BackHandler(onBack = onDismiss)
 
     Surface(
         color = themeColors.background,
         modifier = Modifier.fillMaxSize()
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding()
+            modifier = Modifier.fillMaxSize() // FIXED: Removed root imePadding to prevent dialog background squishing
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header Bar
@@ -121,8 +122,8 @@ fun SmartAssistantDialogView(
                     themeColors = themeColors,
                     onRequestQuickService = {
                         onDismiss()
-                        if (onRequestQuickService != {}) {
-                            onRequestQuickService()
+                        if (onRequestQuickService != null) {
+                            onRequestQuickService.invoke()
                         } else {
                             viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
                         }
@@ -167,11 +168,13 @@ fun SmartAssistantDialogView(
                                     }
                                     speechLauncher.launch(intent)
                                 } catch (e: Exception) {
-                                    VoiceManager.onHear?.invoke { spoken ->
-                                        if (spoken.isNotEmpty()) {
-                                            assistantViewModel.updateTypedText(spoken)
+                                    try {
+                                        VoiceManager.onHear?.invoke { spoken ->
+                                            if (spoken.isNotEmpty()) {
+                                                assistantViewModel.updateTypedText(spoken)
+                                            }
                                         }
-                                    }
+                                    } catch (_: Exception) {}
                                 }
                             },
                         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
@@ -229,7 +232,14 @@ fun SmartAssistantDialogView(
                                 msg = msg,
                                 viewModel = viewModel,
                                 themeColors = themeColors,
-                                onRequestQuickService = onRequestQuickService,
+                                onRequestQuickService = {
+                                    onDismiss()
+                                    if (onRequestQuickService != null) {
+                                        onRequestQuickService.invoke()
+                                    } else {
+                                        viewModel.navigateToScreen(AppScreens.QUICK_SERVICE_REQUEST)
+                                    }
+                                },
                                 onNavigateToMap = onNavigateToMap,
                                 onChatOpen = onChatOpen
                             )
@@ -292,27 +302,35 @@ fun SmartAssistantDialogView(
                         }
                     }
 
-                    // Input Bar
-                    AssistantInputBar(
-                        typedText = typedText,
-                        isGenerating = isGenerating,
-                        themeColors = themeColors,
-                        onTextChanged = { assistantViewModel.updateTypedText(it) },
-                        onSend = {
-                            if (typedText.isNotBlank() && !isGenerating) {
-                                assistantViewModel.sendUserQuery(
-                                    prompt = typedText,
-                                    isOnline = isOnline,
-                                    mainViewModel = viewModel,
-                                    settings = settings,
-                                    onSpeechSpeak = { VoiceManager.onSpeak?.invoke(it) },
-                                    onError = { err ->
-                                        coroutineScope.launch { snackbarHostState.showSnackbar(err) }
+                    // Input Bar (Anchored directly above keyboard)
+                    Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
+                        AssistantInputBar(
+                            typedText = typedText,
+                            isGenerating = isGenerating,
+                            themeColors = themeColors,
+                            onTextChanged = { assistantViewModel.updateTypedText(it) },
+                            onSend = {
+                                try {
+                                    if (typedText.isNotBlank() && !isGenerating) {
+                                        assistantViewModel.sendUserQuery(
+                                            prompt = typedText,
+                                            isOnline = isOnline,
+                                            mainViewModel = viewModel,
+                                            settings = settings,
+                                            onSpeechSpeak = {
+                                                try { VoiceManager.onSpeak?.invoke(it) } catch (_: Exception) {}
+                                            },
+                                            onError = { err ->
+                                                coroutineScope.launch { snackbarHostState.showSnackbar(err) }
+                                            }
+                                        )
                                     }
-                                )
+                                } catch (e: Exception) {
+                                    coroutineScope.launch { snackbarHostState.showSnackbar("تعذر معالجة الطلب: ${e.localizedMessage}") }
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
 
                 SnackbarHost(

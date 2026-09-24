@@ -56,4 +56,48 @@ object ImageCompressor {
             null
         }
     }
+
+    /**
+     * ⚡ ضغط الصور الكاملة المرفوعة وتقليل حجمها لأقل من 250KB قبل الرفع لتوفير باقات الإنترنت.
+     */
+    suspend fun compressFullImage(
+        context: Context,
+        imageUri: Uri,
+        maxDimension: Int = 1024,
+        quality: Int = 80
+    ): File? = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(imageUri) ?: return@withContext null
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeStream(inputStream, null, boundsOptions)
+            inputStream.close()
+
+            val origWidth = boundsOptions.outWidth
+            val origHeight = boundsOptions.outHeight
+            if (origWidth <= 0 || origHeight <= 0) return@withContext null
+
+            var sampleSize = 1
+            while (origWidth / sampleSize > maxDimension || origHeight / sampleSize > maxDimension) {
+                sampleSize *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val nextStream = context.contentResolver.openInputStream(imageUri) ?: return@withContext null
+            val decodedBitmap = BitmapFactory.decodeStream(nextStream, null, decodeOptions)
+            nextStream.close()
+
+            if (decodedBitmap == null) return@withContext null
+
+            val compressedFile = File(context.cacheDir, "compressed_${System.currentTimeMillis()}.jpg")
+            val outputStream = FileOutputStream(compressedFile)
+            decodedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+            outputStream.flush()
+            outputStream.close()
+
+            compressedFile
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }

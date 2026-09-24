@@ -617,7 +617,7 @@ class ChatRepository(
             AppResult.Success(Unit)
         } catch (e: Exception) {
             Log.e("ChatRepository", "deleteChannel error: ${e.message}")
-            AppResult.Success(Unit)
+            AppResult.Error(AppError.NetworkError(e))
         }
     }
 

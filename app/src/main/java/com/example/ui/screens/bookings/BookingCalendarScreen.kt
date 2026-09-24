@@ -467,12 +467,6 @@ fun BookingCalendarScreen(
                         }
 
                         calendarViewModel.setSubmitting(true)
-                        coroutineScope.launch {
-                            kotlinx.coroutines.delay(60000L)
-                            if (calendarViewModel.uiState.value.isSubmitting) {
-                                calendarViewModel.setSubmitting(false)
-                            }
-                        }
                         val rawGeneratedPass = "${(1000..9999).random()}"
                         val newBooking = BookingEntity(
                             id = "book_${System.currentTimeMillis()}_${(1000..9999).random()}",

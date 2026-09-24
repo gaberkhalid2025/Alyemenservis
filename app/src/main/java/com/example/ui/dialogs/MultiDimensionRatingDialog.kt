@@ -39,6 +39,7 @@ fun MultiDimensionRatingDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
@@ -144,7 +145,9 @@ fun MultiDimensionRatingDialog(
 
                     Button(
                         onClick = {
-                            if (commentInput.isNotBlank()) {
+                            if (currentUserId.isBlank() || currentUserId == "guest" || currentUserId.startsWith("guest_")) {
+                                Toast.makeText(context, "عذراً! التقييم متاح فقط للمستخدمين والفنيين وأصحاب المحلات المسجلين بالنظام.", Toast.LENGTH_LONG).show()
+                            } else if (commentInput.isNotBlank()) {
                                 val doSubmit = {
                                     val ratingEntity = RatingEntity(
                                         id = "rate_${UUID.randomUUID().toString().take(8)}",

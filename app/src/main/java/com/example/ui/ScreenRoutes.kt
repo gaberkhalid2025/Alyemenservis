@@ -6,11 +6,11 @@ object ScreenRoutes {
     }
 
     fun showBottomBar(currentScreen: String, adminRole: String = "GUEST"): Boolean {
-        return currentScreen != AppScreens.CHAT_DIRECT && currentScreen != AppScreens.MAP_VIEW
+        return currentScreen != AppScreens.CHAT_DIRECT && currentScreen != AppScreens.MAP_VIEW && currentScreen != AppScreens.SMART_ASSISTANT
     }
 
     fun showTopBar(currentScreen: String, adminRole: String = "GUEST"): Boolean {
-        return currentScreen != AppScreens.CHAT_DIRECT && currentScreen != AppScreens.MAP_VIEW
+        return currentScreen != AppScreens.CHAT_DIRECT && currentScreen != AppScreens.MAP_VIEW && currentScreen != AppScreens.SMART_ASSISTANT
     }
 
     fun isRegistrationOrFormOpen(

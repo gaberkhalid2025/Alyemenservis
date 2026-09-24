@@ -84,7 +84,7 @@ fun AppNavigator(
                 )
             }
         },
-        contentWindowInsets = if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW) {
+        contentWindowInsets = if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW || currentScreen == AppScreens.SMART_ASSISTANT) {
             WindowInsets(0, 0, 0, 0)
         } else {
             ScaffoldDefaults.contentWindowInsets
@@ -94,7 +94,7 @@ fun AppNavigator(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW) PaddingValues(0.dp) else innerPadding)
+                .padding(if (currentScreen == AppScreens.CHAT_DIRECT || currentScreen == AppScreens.MAP_VIEW || currentScreen == AppScreens.SMART_ASSISTANT) PaddingValues(0.dp) else innerPadding)
         ) {
             when (currentScreen) {
                 AppScreens.USER_BROWSE, AppScreens.HOME -> {

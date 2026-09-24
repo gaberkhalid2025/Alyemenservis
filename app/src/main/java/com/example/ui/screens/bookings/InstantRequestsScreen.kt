@@ -114,6 +114,8 @@ fun InstantRequestsScreen(
                 offers = requestOffers,
                 currentUserId = currentUserId,
                 themeColors = themeColors,
+                onCreateRequestClick = { instantReqViewModel.setShowCreateDialog(true) },
+                onRetryClick = { viewModel.refreshData() },
                 onViewOffers = { instantReqViewModel.setSelectedRequestForOffers(it) },
                 onSubmitOffer = { instantReqViewModel.setSelectedRequestForSubmitOffer(it) }
             )

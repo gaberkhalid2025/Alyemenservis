@@ -2,6 +2,7 @@ package com.example.ui.screens.chat
 
 import android.widget.Toast
 import com.example.ui.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -86,6 +87,19 @@ fun ChatScreen(
     var showDeleteChannelDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    BackHandler {
+        if (isSearchOpen) {
+            isSearchOpen = false
+            chatViewModel.setSearchQuery("")
+        } else if (selectedMessageForAction != null) {
+            selectedMessageForAction = null
+        } else if (editingMessage != null) {
+            editingMessage = null
+        } else {
+            onBackClick()
+        }
+    }
 
     LaunchedEffect(Unit) {
         chatViewModel.eventFlow.collect { event ->
@@ -192,9 +206,7 @@ fun ChatScreen(
             .statusBarsPadding()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding()
+            modifier = Modifier.fillMaxSize() // FIXED: Removed root imePadding to prevent screen distortion when keyboard opens
         ) {
             // 1. Fixed Top Header Bar
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -351,6 +363,7 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
+                    .imePadding()
             ) {
                 if (isTypingOther) {
                     TypingIndicator(

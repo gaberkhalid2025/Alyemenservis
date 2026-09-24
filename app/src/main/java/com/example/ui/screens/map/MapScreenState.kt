@@ -15,7 +15,7 @@ import com.example.data.StoreEntity
  */
 @Stable
 class MapScreenState(
-    isRadarMode: Boolean = false,
+    isRadarMode: Boolean = true,
     isHeatmapActive: Boolean = false,
     selectedCategory: String = "ALL",
     selectedCity: String = "الكل",
