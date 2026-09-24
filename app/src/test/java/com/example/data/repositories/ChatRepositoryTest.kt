@@ -85,4 +85,44 @@ class ChatRepositoryTest {
         val result = repository.toggleBlockUser("c1", "u2", true)
         assertTrue(result is AppResult.Success)
     }
+
+    @Test
+    fun `test sendMessage with attachment - succeeds`() = runTest {
+        val attachment = ChatAttachment(
+            id = "att_1",
+            type = "IMAGE",
+            url = "https://example.com/img.jpg",
+            name = "image.jpg"
+        )
+        val result = repository.sendMessage(
+            channelId = "c2",
+            senderId = "u1",
+            senderName = "User 1",
+            messageText = "صورة العطل",
+            mediaType = MediaType.IMAGE,
+            mediaUrl = "https://example.com/img.jpg",
+            attachment = attachment
+        )
+        assertTrue(result is AppResult.Success)
+        val msg = (result as AppResult.Success).data
+        assertEquals("صورة العطل", msg.message)
+    }
+
+    @Test
+    fun `test editMessage - succeeds`() = runTest {
+        val result = repository.editMessage("c1", "msg_1", "رسالة معدلة")
+        assertTrue(result is AppResult.Success)
+    }
+
+    @Test
+    fun `test deleteMessage - succeeds`() = runTest {
+        val result = repository.deleteMessage("c1", "msg_1", forEveryone = true, currentUserId = "u1")
+        assertTrue(result is AppResult.Success)
+    }
+
+    @Test
+    fun `test toggleReaction - succeeds`() = runTest {
+        val result = repository.toggleReaction("c1", "msg_1", "u1", "👍")
+        assertTrue(result is AppResult.Success)
+    }
 }

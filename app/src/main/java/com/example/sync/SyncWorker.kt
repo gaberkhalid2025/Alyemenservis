@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.utils.OfflineQueueManager
-import com.example.utils.SyncManager
+import com.example.utils.FullSyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -18,7 +18,7 @@ class SyncWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         return@withContext try {
-            val syncManager = SyncManager(applicationContext)
+            val syncManager = FullSyncManager(applicationContext)
             val offlineQueue = OfflineQueueManager(applicationContext)
 
             // 1. مزامنة الإعدادات الشاملة

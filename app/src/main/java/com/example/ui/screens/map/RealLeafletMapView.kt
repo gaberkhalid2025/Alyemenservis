@@ -9,6 +9,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebResourceResponse
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -194,6 +196,9 @@ fun RealLeafletMapView(
 
                     webChromeClient = object : WebChromeClient() {
                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                            consoleMessage?.let {
+                                Log.d("LeafletWebView", "Console [${it.messageLevel()}]: ${it.message()} at ${it.sourceId()}:${it.lineNumber()}")
+                            }
                             return true
                         }
                     }
@@ -209,6 +214,37 @@ fun RealLeafletMapView(
 
                         override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                             super.onReceivedError(view, request, error)
+                            Log.e("LeafletWebView", "Network Error: ${error?.description} on ${request?.url}")
+                        }
+
+                        override fun shouldInterceptRequest(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): WebResourceResponse? {
+                            val url = request?.url?.toString() ?: return null
+                            return try {
+                                when {
+                                    url.endsWith("leaflet.css") -> {
+                                        WebResourceResponse("text/css", "UTF-8", ctx.assets.open("leaflet.css"))
+                                    }
+                                    url.endsWith("leaflet.js") -> {
+                                        WebResourceResponse("application/javascript", "UTF-8", ctx.assets.open("leaflet.js"))
+                                    }
+                                    url.endsWith("leaflet.markercluster.js") -> {
+                                        WebResourceResponse("application/javascript", "UTF-8", ctx.assets.open("leaflet.markercluster.js"))
+                                    }
+                                    url.endsWith("MarkerCluster.css") -> {
+                                        WebResourceResponse("text/css", "UTF-8", ctx.assets.open("MarkerCluster.css"))
+                                    }
+                                    url.endsWith("MarkerCluster.Default.css") -> {
+                                        WebResourceResponse("text/css", "UTF-8", ctx.assets.open("MarkerCluster.Default.css"))
+                                    }
+                                    else -> super.shouldInterceptRequest(view, request)
+                                }
+                            } catch (e: Exception) {
+                                Log.e("LeafletWebView", "Error intercepting asset $url", e)
+                                null
+                            }
                         }
                     }
 

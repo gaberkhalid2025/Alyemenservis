@@ -1339,7 +1339,7 @@ fun scheduleAutoCleanup(days: Int = 30) {
     fun triggerManualSync(context: android.content.Context, onComplete: ((Boolean) -> Unit)? = null) {
         viewModelScope.launch {
             try {
-                val syncMgr = com.example.utils.SyncManager(context)
+                val syncMgr = com.example.utils.FullSyncManager(context)
                 val success = syncMgr.syncAllSettings()
                 if (success) {
                     triggerToast("🔄 تم استكمال المزامنة بنجاح")

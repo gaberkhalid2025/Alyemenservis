@@ -26,11 +26,11 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun PrivacyPolicyScreen(
     onBack: () -> Unit = {},
-    themeColors: VisualThemePalette? = null
+    themeColors: VisualThemePalette
 ) {
-    val cardBg = themeColors?.surface ?: MaterialTheme.colorScheme.surface
-    val textColor = themeColors?.textPrimary ?: MaterialTheme.colorScheme.onSurface
-    val primaryColor = themeColors?.primary ?: MaterialTheme.colorScheme.primary
+    val cardBg = themeColors.surface
+    val textColor = themeColors.textPrimary
+    val primaryColor = themeColors.primary
 
     Scaffold(
         topBar = {
@@ -42,7 +42,7 @@ fun PrivacyPolicyScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = themeColors?.background ?: MaterialTheme.colorScheme.surface,
+                    containerColor = themeColors.background,
                     titleContentColor = textColor
                 )
             )

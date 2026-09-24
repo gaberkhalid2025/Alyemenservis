@@ -4,7 +4,7 @@ import com.example.data.models.ChatAttachment
 import com.example.data.models.ChatMessage
 import com.example.data.models.MediaType
 import com.example.data.models.MessageStatus
-import com.example.data.repositories.ChatRepository
+import com.example.data.repositories.IChatRepository
 import com.example.utils.AppResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ChatMessagesManager(
-    private val repository: ChatRepository,
+    private val repository: IChatRepository,
     private val scope: CoroutineScope
 ) {
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())

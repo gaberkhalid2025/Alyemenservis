@@ -227,6 +227,7 @@ class InstantRequestRepository(private val context: Context? = null) {
     fun cancelInstantRequest(
         requestId: String,
         userPin: String = "",
+        cancelReason: String = "",
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
@@ -248,16 +249,19 @@ class InstantRequestRepository(private val context: Context? = null) {
                     }
                 }
 
-                val updates = mapOf(
+                val updates = mutableMapOf<String, Any>(
                     "status" to "CANCELLED",
                     "cancelledAt" to System.currentTimeMillis(),
                     "updatedAt" to System.currentTimeMillis()
                 )
+                if (cancelReason.isNotBlank()) {
+                    updates["cancelReason"] = cancelReason
+                }
 
                 firestore.collection("instant_requests").document(requestId).update(updates)
                     .addOnSuccessListener {
                         _requests.value = _requests.value.map {
-                            if (it.id == requestId) it.copy(status = "CANCELLED") else it
+                            if (it.id == requestId) it.copy(status = "CANCELLED", cancelReason = cancelReason) else it
                         }
                         onSuccess()
                     }

@@ -29,5 +29,6 @@ data class InstantRequestEntity(
     val expiresAt: Long = System.currentTimeMillis() + 30 * 60 * 1000L, // 30 minutes
     val offersCount: Int = 0,
     val deliveryMethod: String = "",
-    val urgencyTime: String = "فوراً (خلال 30 دقيقة)"
+    val urgencyTime: String = "فوراً (خلال 30 دقيقة)",
+    val cancelReason: String = ""
 )

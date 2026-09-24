@@ -393,7 +393,8 @@ fun RequestDetailsScreen(
                         instantViewModel.cancelInstantRequest(
                             requestId = requestId,
                             userPin = cancelPinInput.trim(),
-                            context = context
+                            context = context,
+                            cancelReason = cancelReason
                         ) { success, msg ->
                             isCancelling = false
                             showCancelDialog = false

@@ -184,4 +184,17 @@ class NotificationViewModel(
             notificationType = notificationType
         )
     }
+
+    fun addNotification(request: com.example.data.models.NotificationRequest) {
+        addNotification(
+            title = request.title,
+            message = request.message,
+            targetType = request.targetType,
+            targetValue = request.targetValue,
+            targetAudience = request.targetAudience,
+            targetRoles = request.targetRoles,
+            targetUserIds = request.targetUserIds,
+            notificationType = request.notificationType
+        )
+    }
 }

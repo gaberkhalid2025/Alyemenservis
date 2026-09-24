@@ -13,11 +13,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
 /**
- * 🔄 SyncManager
+ * 🔄 FullSyncManager
  * المركز الرئيسي لإدارة المزامنة الشاملة وحفظ واسترجاع إعدادات الأدمن، الثيمات،
  * واستمارات التسجيل وحقولها من وإلى Firebase Firestore مع التخزين المحلي الدائم.
  */
-class SyncManager(private val context: Context) {
+class FullSyncManager(private val context: Context) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val prefs: SharedPreferences = context.getSharedPreferences("app_sync_manager_prefs", Context.MODE_PRIVATE)
@@ -32,7 +32,7 @@ class SyncManager(private val context: Context) {
     private var autoSyncJob: Job? = null
 
     companion object {
-        private const val TAG = "SyncManager"
+        private const val TAG = "FullSyncManager"
         private const val KEY_LAST_SYNC_TS = "key_last_sync_timestamp"
         private const val KEY_LOCAL_SETTINGS_CACHE = "key_local_admin_settings_cache"
         private const val COLLECTION_ADMIN_SETTINGS = "admin_settings"

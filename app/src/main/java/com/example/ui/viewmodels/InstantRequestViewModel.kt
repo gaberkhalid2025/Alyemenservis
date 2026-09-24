@@ -209,6 +209,28 @@ class InstantRequestViewModel @Inject constructor(
         )
     }
 
+    fun createInstantRequest(
+        params: com.example.data.models.CreateInstantRequestParams,
+        onResult: (Boolean, String, String) -> Unit = { _, _, _ -> }
+    ) {
+        createInstantRequest(
+            userId = params.userId,
+            userName = params.userName,
+            userPhone = params.userPhone,
+            userCity = params.userCity,
+            userNeighborhood = params.userNeighborhood,
+            categoryId = params.categoryId,
+            categoryName = params.categoryName,
+            serviceTitle = params.serviceTitle,
+            description = params.description,
+            images = params.images,
+            urgencyTime = params.urgencyTime,
+            deliveryMethod = params.deliveryMethod,
+            customPin = params.customPin,
+            onResult = onResult
+        )
+    }
+
     private fun sendUrgentRequestNotificationToNearbyProviders(
         request: InstantRequestEntity,
         radiusKm: Int
@@ -427,6 +449,7 @@ class InstantRequestViewModel @Inject constructor(
         requestId: String,
         userPin: String = "",
         context: Context? = null,
+        cancelReason: String = "",
         onResult: (Boolean, String?) -> Unit = { _, _ -> }
     ) {
         if (context != null && BookingSecurityHelper.isBookingLocked(context, requestId)) {
@@ -445,6 +468,7 @@ class InstantRequestViewModel @Inject constructor(
         repository.cancelInstantRequest(
             requestId = requestId,
             userPin = userPin,
+            cancelReason = cancelReason,
             onSuccess = {
                 _uiState.value = InstantUiState.Success("تم إلغاء الطلب الفوري بنجاح")
                 triggerNotification?.invoke("🚫 تم إلغاء الطلب الفوري بنجاح.")

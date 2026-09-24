@@ -22,13 +22,8 @@ class ComprehensiveDomainsUnitTest {
         val lat2 = 12.7855
         val lon2 = 45.0187
 
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2)
-        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        val distanceKm = 6371 * c
+        val distanceMeters = com.example.ui.screens.map.utils.MapDistanceCalculator.calculateDistanceMeters(lat1, lon1, lat2, lon2)
+        val distanceKm = distanceMeters / 1000.0
 
         assertTrue("Distance between Sana'a and Aden should be approx 300-350km", distanceKm in 300.0..360.0)
     }

@@ -59,39 +59,13 @@ class ApiKeyRepositoryImpl(
             val data = result.data as? Map<*, *>
             val value = data?.get("value") as? String
 
-            if (value != null) {
+            if (value != null && value.isNotBlank()) {
                 Result.success(value)
             } else {
-                // Fallback إلى Firestore للتوافقية
-                val keys = getApiKeys()
-                val fallbackVal = when (keyName.lowercase()) {
-                    "gemini" -> keys.geminiApiKey
-                    "openai" -> keys.openaiApiKey
-                    "google_maps" -> keys.googleMapsKey
-                    "mapbox" -> keys.mapboxKey
-                    "whatsapp" -> keys.whatsappToken
-                    else -> ""
-                }
-                if (fallbackVal.isNotBlank()) Result.success(fallbackVal)
-                else Result.failure(Exception("Key not found: $keyName"))
+                Result.failure(Exception("Key not found: $keyName"))
             }
         } catch (e: Exception) {
-            // Fallback للتوافقية
-            try {
-                val keys = getApiKeys()
-                val fallbackVal = when (keyName.lowercase()) {
-                    "gemini" -> keys.geminiApiKey
-                    "openai" -> keys.openaiApiKey
-                    "google_maps" -> keys.googleMapsKey
-                    "mapbox" -> keys.mapboxKey
-                    "whatsapp" -> keys.whatsappToken
-                    else -> ""
-                }
-                if (fallbackVal.isNotBlank()) Result.success(fallbackVal)
-                else Result.failure(e)
-            } catch (fallbackEx: Exception) {
-                Result.failure(e)
-            }
+            Result.failure(e)
         }
     }
 

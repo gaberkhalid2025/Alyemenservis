@@ -137,7 +137,7 @@ class MyApplication : Application() {
 
         // ===================== الخطوة 5: جدولة المزامنة الدورية في الخلفية =====================
         try {
-            com.example.sync.BackgroundSyncScheduler(this).schedulePeriodicSync()
+            com.example.sync.PeriodicSyncScheduler(this).schedulePeriodicSync()
             Log.d("MyApplication", "✅ Background periodic sync scheduled successfully")
         } catch (e: Exception) {
             Log.e("MyApplication", "❌ Failed to schedule periodic sync: ${e.message}")

@@ -38,6 +38,48 @@ class MapScreenViewModel : ViewModel() {
         _selectedCategory.value = category
     }
 
+    /**
+     * تصفية المزودين بناءً على حالة ViewModel الحالية (المدينة، التصنيف، والبحث)
+     */
+    fun filterProviders(providers: List<ProviderEntity>): List<ProviderEntity> {
+        return MapScreenFilters.filterProviders(
+            providers = providers,
+            selectedCategory = _selectedCategory.value,
+            selectedCity = _selectedCity.value,
+            searchQuery = _searchQuery.value
+        )
+    }
+
+    /**
+     * تصفية المتاجر والمطاعم والمراكز الطبية
+     */
+    fun filterStores(stores: List<StoreEntity>): List<StoreEntity> {
+        return MapScreenFilters.filterStores(
+            stores = stores,
+            selectedCategory = _selectedCategory.value,
+            selectedCity = _selectedCity.value,
+            searchQuery = _searchQuery.value
+        )
+    }
+
+    /**
+     * تصفية العقارات
+     */
+    fun filterProperties(properties: List<PropertyEntity>): List<PropertyEntity> {
+        return MapScreenFilters.filterProperties(
+            properties = properties,
+            selectedCategory = _selectedCategory.value,
+            selectedCity = _selectedCity.value,
+            searchQuery = _searchQuery.value
+        )
+    }
+
+    fun resetFilters() {
+        _searchQuery.value = ""
+        _selectedCity.value = "الكل"
+        _selectedCategory.value = "ALL"
+    }
+
     fun onEvent(event: MapScreenEvents) {
         when (event) {
             is MapScreenEvents.OnSearchQueryChanged -> updateSearchQuery(event.query)

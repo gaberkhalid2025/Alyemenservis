@@ -8,9 +8,9 @@ import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 
 /**
- * 🔄 BackgroundSyncScheduler - جدولة المزامنة الدورية الذكية لتوفير استهلاك بيانات الإنترنت والبطارية
+ * 🔄 PeriodicSyncScheduler - جدولة المزامنة الدورية الذكية لتوفير استهلاك بيانات الإنترنت والبطارية
  */
-class BackgroundSyncScheduler(private val context: Context) {
+class PeriodicSyncScheduler(private val context: Context) {
 
     fun schedulePeriodicSync() {
         val constraints = Constraints.Builder()
@@ -25,4 +25,4 @@ class BackgroundSyncScheduler(private val context: Context) {
     }
 }
 
-typealias SyncManager = BackgroundSyncScheduler
+typealias BackgroundSyncScheduler = PeriodicSyncScheduler

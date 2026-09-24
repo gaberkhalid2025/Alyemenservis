@@ -19,7 +19,7 @@ class NotificationRepository {
         try {
             val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)
             val oldNotifs = db.collection("notifications")
-                .whereEqualTo("targetPhone", userPhone)
+                .whereEqualTo("targetValue", userPhone)
                 .whereLessThan("createdAt", thirtyDaysAgo)
                 .get()
                 .await()

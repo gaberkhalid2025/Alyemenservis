@@ -228,7 +228,7 @@ fun ReviewOffersDialog(
                                     reporterPhone = viewModel.currentUserPhone.value,
                                     providerId = uiState.complaintTarget ?: "",
                                     reason = complaintText,
-                                    status = "OPEN",
+                                    status = "PENDING",
                                     timestamp = System.currentTimeMillis()
                                 )
                             ) {

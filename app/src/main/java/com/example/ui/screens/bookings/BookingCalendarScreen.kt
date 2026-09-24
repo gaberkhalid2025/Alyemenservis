@@ -468,7 +468,7 @@ fun BookingCalendarScreen(
 
                         calendarViewModel.setSubmitting(true)
                         coroutineScope.launch {
-                            kotlinx.coroutines.delay(30000L)
+                            kotlinx.coroutines.delay(60000L)
                             if (calendarViewModel.uiState.value.isSubmitting) {
                                 calendarViewModel.setSubmitting(false)
                             }

@@ -3197,7 +3197,7 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
     fun syncAllData(context: Context, onComplete: ((Boolean) -> Unit)? = null) {
         viewModelScope.launch {
             try {
-                val syncMgr = com.example.utils.SyncManager(context)
+                val syncMgr = com.example.utils.FullSyncManager(context)
                 val res = syncMgr.syncAllSettings()
                 onComplete?.invoke(res)
             } catch (e: Exception) {
@@ -3208,7 +3208,7 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
 
     fun clearCache(context: Context) {
         try {
-            com.example.utils.SyncManager(context).clearLocalCache()
+            com.example.utils.FullSyncManager(context).clearLocalCache()
             mainViewModel.triggerNotification("🧹 تم مسح الذاكرة المؤقتة بنجاح")
         } catch (e: Exception) {
             e.printStackTrace()
