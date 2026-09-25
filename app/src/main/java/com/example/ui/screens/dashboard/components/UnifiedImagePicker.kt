@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 
 @Composable
 fun UnifiedImagePicker(
@@ -29,12 +30,25 @@ fun UnifiedImagePicker(
     onImageSelected: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isUploading by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            onImageSelected(it.toString())
+        if (uri != null) {
+            coroutineScope.launch {
+                isUploading = true
+                val path = "products/${System.currentTimeMillis()}_item.webp"
+                val result = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                isUploading = false
+                result.onSuccess { url ->
+                    onImageSelected(url)
+                    android.widget.Toast.makeText(context, "تم رفع صورة العنصر بنجاح ✅", android.widget.Toast.LENGTH_SHORT).show()
+                }.onFailure { err ->
+                    android.widget.Toast.makeText(context, "فشل رفع الصورة: ${err.message ?: "خطأ في الاتصال"}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -70,7 +84,13 @@ fun UnifiedImagePicker(
                         .border(1.dp, themeColors.accent.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (currentImageUrl.isNotBlank()) {
+                    if (isUploading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            color = themeColors.accent,
+                            strokeWidth = 2.dp
+                        )
+                    } else if (currentImageUrl.isNotBlank()) {
                         SmartAsyncImage(
                             model = currentImageUrl,
                             contentDescription = label,
@@ -84,14 +104,25 @@ fun UnifiedImagePicker(
                 Button(
                     onClick = { imagePickerLauncher.launch("image/*") },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isUploading
                 ) {
-                    Text(
-                        text = "رفع / اختيار صورة 🖼️",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
+                    if (isUploading) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.Black, strokeWidth = 2.dp)
+                            Text("جاري الرفع...", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Text(
+                            text = if (currentImageUrl.isNotBlank()) "تغيير الصورة 🖼️" else "رفع / اختيار صورة 🖼️",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    }
                 }
             }
         }

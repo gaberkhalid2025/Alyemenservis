@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,13 +41,24 @@ fun UnifiedProfileSection(
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
+    var isUploadingPhoto by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var isUploadingCover by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
     val profilePhotoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
     ) { uri: android.net.Uri? ->
         if (uri != null && onChangePhoto != null) {
             coroutineScope.launch {
-                val compressed = com.example.utils.compressAndResizeImageUri(context, uri)
-                onChangePhoto(if (compressed.isNotBlank()) compressed else uri.toString())
+                isUploadingPhoto = true
+                val path = "profiles/${System.currentTimeMillis()}_avatar.webp"
+                val result = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                isUploadingPhoto = false
+                result.onSuccess { downloadUrl ->
+                    onChangePhoto(downloadUrl)
+                    android.widget.Toast.makeText(context, "تم رفع وتحديث الصورة الشخصية بنجاح ✅", android.widget.Toast.LENGTH_SHORT).show()
+                }.onFailure { err ->
+                    android.widget.Toast.makeText(context, "فشل رفع الصورة: ${err.message ?: "خطأ في الاتصال"}", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -55,8 +68,16 @@ fun UnifiedProfileSection(
     ) { uri: android.net.Uri? ->
         if (uri != null && onChangeCover != null) {
             coroutineScope.launch {
-                val compressed = com.example.utils.compressAndResizeImageUri(context, uri)
-                onChangeCover(if (compressed.isNotBlank()) compressed else uri.toString())
+                isUploadingCover = true
+                val path = "covers/${System.currentTimeMillis()}_cover.webp"
+                val result = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                isUploadingCover = false
+                result.onSuccess { downloadUrl ->
+                    onChangeCover(downloadUrl)
+                    android.widget.Toast.makeText(context, "تم رفع وتحديث صورة الغلاف بنجاح ✅", android.widget.Toast.LENGTH_SHORT).show()
+                }.onFailure { err ->
+                    android.widget.Toast.makeText(context, "فشل رفع الغلاف: ${err.message ?: "خطأ في الاتصال"}", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -91,10 +112,23 @@ fun UnifiedProfileSection(
                             .padding(8.dp)
                     ) {
                         TextButton(
-                            onClick = { coverPhotoPicker.launch("image/*") },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            onClick = { if (!isUploadingCover) coverPhotoPicker.launch("image/*") },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            enabled = !isUploadingCover
                         ) {
-                            Text("تغيير الغلاف 🖼️", fontSize = 10.sp, color = Color.White)
+                            if (isUploadingCover) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(12.dp),
+                                        color = Color.White,
+                                        strokeWidth = 1.5.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("جاري الرفع... ⏳", fontSize = 10.sp, color = Color.White)
+                                }
+                            } else {
+                                Text("تغيير الغلاف 🖼️", fontSize = 10.sp, color = Color.White)
+                            }
                         }
                     }
                 }
@@ -120,17 +154,26 @@ fun UnifiedProfileSection(
                     }
                     if (onChangePhoto != null) {
                         IconButton(
-                            onClick = { profilePhotoPicker.launch("image/*") },
+                            onClick = { if (!isUploadingPhoto) profilePhotoPicker.launch("image/*") },
+                            enabled = !isUploadingPhoto,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 0.3f))
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.AddAPhoto,
-                                contentDescription = "تغيير الصورة",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            if (isUploadingPhoto) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = themeColors.accent,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.AddAPhoto,
+                                    contentDescription = "تغيير الصورة",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }

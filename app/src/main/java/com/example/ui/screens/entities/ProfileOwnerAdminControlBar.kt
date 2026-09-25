@@ -3,6 +3,7 @@ package com.example.ui.screens.entities
 import android.content.Context
 import com.example.ui.*
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -360,27 +361,98 @@ fun ProfileOwnerAdminControlBar(
                         provider?.coverImage ?: store?.coverImage ?: property?.images?.firstOrNull() ?: ""
                     )
                 }
+                var isUploadingAvatar by remember { mutableStateOf(false) }
+                var isUploadingCover by remember { mutableStateOf(false) }
+                val coroutineScope = rememberCoroutineScope()
+
+                val avatarPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                ) { uri: android.net.Uri? ->
+                    if (uri != null) {
+                        coroutineScope.launch {
+                            isUploadingAvatar = true
+                            val path = "avatars/${System.currentTimeMillis()}_$entityId.webp"
+                            val result = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                            isUploadingAvatar = false
+                            result.onSuccess { url ->
+                                avatarUrl = url
+                                Toast.makeText(context, "تم رفع الصورة الشخصية بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            }.onFailure { err ->
+                                Toast.makeText(context, "فشل الرفع: ${err.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+
+                val coverPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                ) { uri: android.net.Uri? ->
+                    if (uri != null) {
+                        coroutineScope.launch {
+                            isUploadingCover = true
+                            val path = "covers/${System.currentTimeMillis()}_$entityId.webp"
+                            val result = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                            isUploadingCover = false
+                            result.onSuccess { url ->
+                                coverUrl = url
+                                Toast.makeText(context, "تم رفع صورة الغلاف بنجاح ✅", Toast.LENGTH_SHORT).show()
+                            }.onFailure { err ->
+                                Toast.makeText(context, "فشل الرفع: ${err.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
 
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("📸 تغيير الصورة الشخصية وصورة الغلاف", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                     
-                    OutlinedTextField(
-                        value = avatarUrl,
-                        onValueChange = { avatarUrl = it },
-                        label = { Text("رابط / مسار الصورة الشخصية أو الشعار (Avatar/Logo)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = avatarUrl,
+                            onValueChange = { avatarUrl = it },
+                            label = { Text("الصورة الشخصية / الشعار", fontSize = 11.sp) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                        Button(
+                            onClick = { avatarPicker.launch("image/*") },
+                            enabled = !isUploadingAvatar,
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(54.dp)
+                        ) {
+                            if (isUploadingAvatar) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black)
+                            } else {
+                                Text("اختر 📷", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
 
-                    OutlinedTextField(
-                        value = coverUrl,
-                        onValueChange = { coverUrl = it },
-                        label = { Text("رابط / مسار صورة الغلاف (Cover Banner)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = coverUrl,
+                            onValueChange = { coverUrl = it },
+                            label = { Text("صورة الغلاف (Banner)", fontSize = 11.sp) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                        Button(
+                            onClick = { coverPicker.launch("image/*") },
+                            enabled = !isUploadingCover,
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(54.dp)
+                        ) {
+                            if (isUploadingCover) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black)
+                            } else {
+                                Text("اختر 🖼️", fontSize = 11.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(

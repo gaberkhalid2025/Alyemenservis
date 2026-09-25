@@ -459,8 +459,11 @@ class RegistrationHelper(
         onPhoneCleared: () -> Unit,
         onGoBack: () -> Boolean
     ) {
-        if (phone.isNotEmpty()) {
-            val matching = pendingProviders.find { it.phone == phone }
+        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        if (cleanPhone.isNotEmpty()) {
+            val matching = pendingProviders.find { 
+                it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone || it.id == cleanPhone || it.id == phone 
+            }
             matching?.let {
                 onPendingRemoved(it.id)
                 try {
@@ -468,7 +471,12 @@ class RegistrationHelper(
                 } catch (e: Exception) {}
             }
             try {
-                db.collection("join_requests").document(phone).delete()
+                db.collection("pending_providers").document(cleanPhone).delete()
+                db.collection("join_requests").document(cleanPhone).delete()
+                if (phone != cleanPhone) {
+                    db.collection("pending_providers").document(phone).delete()
+                    db.collection("join_requests").document(phone).delete()
+                }
             } catch (e: Exception) {}
         }
         preferenceHelper.clearJoinRequestPhone(context)

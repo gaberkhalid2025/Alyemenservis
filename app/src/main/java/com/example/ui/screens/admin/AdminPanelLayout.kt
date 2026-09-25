@@ -628,6 +628,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                 if (success) {
                                     isAuthorized = true
                                     activeSubTab = "BACKDOOR"
+                                    viewModel.authenticateAdmin(context, "OWNER", rememberMe)
                                     viewModel.triggerNotification("👑 مرحباً بك في لوحة التحكم (المالك)")
                                 } else {
                                     loginError = errorMsg ?: "فشل تسجيل الدخول"
@@ -644,6 +645,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                 if (success) {
                                     isAuthorized = true
                                     activeSubTab = "REG_REQ"
+                                    viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
                                     viewModel.triggerNotification("👑 مرحباً بك في لوحة التحكم")
                                 } else {
                                     loginError = errorMsg ?: "فشل تسجيل الدخول"
@@ -660,6 +662,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                 if (success) {
                                     isAuthorized = true
                                     activeSubTab = "REG_REQ"
+                                    viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
                                     viewModel.triggerNotification("💼 مرحباً بك في لوحة التحكم (مشرف)")
                                 } else {
                                     loginError = errorMsg ?: "بيانات دخول المشرف غير صحيحة"

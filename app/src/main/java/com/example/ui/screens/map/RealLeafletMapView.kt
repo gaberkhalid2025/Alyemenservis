@@ -70,23 +70,13 @@ fun RealLeafletMapView(
     val context = LocalContext.current
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var currentSelectedEntity by remember { mutableStateOf<Any?>(selectedEntity) }
-    var currentZoom by remember { mutableStateOf(14) }
+    var currentZoom by remember { mutableStateOf(13) }
     var isMapReady by remember { mutableStateOf(false) }
     var isMapError by remember { mutableStateOf(false) }
 
     // Safe default user coordinates (Sana'a defaults: 15.3694, 44.1910)
-    val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3694 // FIXED: Always fallback to default Sana'a lat
-    val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1910 // FIXED: Always fallback to default Sana'a lng
-
-    // FIXED: 3-second timeout to fall back to Radar if Leaflet initialization fails
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(3000)
-        if (!isMapReady) {
-            Log.w("LeafletWebView", "Map loading timed out after 3 seconds, triggering radar fallback")
-            isMapError = true
-            onMapLoadFailed?.invoke()
-        }
-    }
+    val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3694
+    val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1910
 
     // Determine target center coordinates based on selected governorate
     val (targetLat, targetLng) = remember(selectedCity, safeUserLat, safeUserLng) {
@@ -102,14 +92,15 @@ fun RealLeafletMapView(
         }
     }
 
-    // Serialize providers, stores, and properties into JSON array for Leaflet markers
+    // Serialize providers, stores, restaurants, medical centers, and properties into JSON array for Leaflet markers
     val markersJsonArray = remember(nearbyProviders, nearbyStores, nearbyProperties, targetLat, targetLng) {
         val jsonArray = JSONArray()
 
+        // 1. Technicians / Providers (#00E5FF - Cyan)
         nearbyProviders.forEachIndexed { index, provider ->
             val lat = provider.latitude.takeIf { it != 0.0 } ?: (targetLat + (index % 5 - 2) * 0.012)
             val lng = provider.longitude.takeIf { it != 0.0 } ?: (targetLng + (index % 4 - 2) * 0.012)
-            val specText = provider.customCategoryName.ifEmpty { provider.specialization.ifEmpty { provider.profession.ifEmpty { "فني صيانة" } } }
+            val specText = provider.customCategoryName.ifEmpty { provider.specialization.ifEmpty { provider.profession.ifEmpty { "فني صيانة معتمد" } } }
             val obj = JSONObject().apply {
                 put("type", "PROVIDER")
                 put("id", provider.id)
@@ -127,10 +118,26 @@ fun RealLeafletMapView(
             jsonArray.put(obj)
         }
 
+        // 2. Stores, Restaurants & Medical Centers
         nearbyStores.forEachIndexed { index, store ->
             val lat = store.latitude.takeIf { it != 0.0 } ?: (targetLat + (index % 4 - 1) * 0.015)
             val lng = store.longitude.takeIf { it != 0.0 } ?: (targetLng + (index % 3 - 1) * 0.015)
             val specText = store.description.ifEmpty { store.workingHours }
+
+            val isRestaurant = store.sectionId.contains("restaurant", ignoreCase = true) ||
+                    store.categoryId.contains("مطعم") || store.categoryId.contains("كافيه") ||
+                    store.name.contains("مطعم") || store.name.contains("كافيه")
+
+            val isMedical = store.sectionId.contains("medical", ignoreCase = true) ||
+                    store.categoryId.contains("طبي") || store.categoryId.contains("عياد") || store.categoryId.contains("مستشفى") ||
+                    store.name.contains("عيادة") || store.name.contains("مركز") || store.name.contains("طبي")
+
+            val (color, emoji, categoryLabel) = when {
+                isRestaurant -> Triple("#F59E0B", "🍽️", "مطعم / كافيه")
+                isMedical -> Triple("#EC4899", "🏥", "مركز طبي / عيادة")
+                else -> Triple("#10B981", "🛒", "متجر تجاري")
+            }
+
             val obj = JSONObject().apply {
                 put("type", "STORE")
                 put("id", store.id)
@@ -138,16 +145,17 @@ fun RealLeafletMapView(
                 put("lat", lat)
                 put("lng", lng)
                 put("spec", specText)
-                put("badgeColor", "#10B981")
-                put("emoji", "🛒")
+                put("badgeColor", color)
+                put("emoji", emoji)
                 put("rating", store.rating.toString())
                 put("status", "مفتوح")
                 put("phone", store.phone)
-                put("serviceCategory", "متجر قطع غيار")
+                put("serviceCategory", categoryLabel)
             }
             jsonArray.put(obj)
         }
 
+        // 3. Properties (#8B5CF6 - Purple)
         nearbyProperties.forEachIndexed { index, prop ->
             val lat = prop.latitude.takeIf { it != 0.0 } ?: (targetLat + (index % 3 - 1) * 0.018)
             val lng = prop.longitude.takeIf { it != 0.0 } ?: (targetLng + (index % 4 - 2) * 0.018)
@@ -159,12 +167,12 @@ fun RealLeafletMapView(
                 put("lat", lat)
                 put("lng", lng)
                 put("spec", specText)
-                put("badgeColor", "#F59E0B")
+                put("badgeColor", "#8B5CF6")
                 put("emoji", "🏢")
                 put("rating", prop.rating.toString())
                 put("status", "متاح للايجار/البيع")
                 put("phone", prop.phone)
-                put("serviceCategory", "عقار/مكتب")
+                put("serviceCategory", "عقار / مكتب")
             }
             jsonArray.put(obj)
         }
@@ -271,18 +279,14 @@ fun RealLeafletMapView(
                         @android.webkit.JavascriptInterface
                         fun onMapLoadFailed(reason: String?) {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                Log.e("LeafletWebView", "JS reported map load error: $reason")
-                                isMapError = true // FIXED: Mark error state
-                                onMapLoadFailed?.invoke()
+                                Log.w("LeafletWebView", "JS map notice: $reason")
                             }
                         }
 
                         @android.webkit.JavascriptInterface
                         fun onMapError(reason: String) {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                Log.e("LeafletWebView", "JS reported map error: $reason")
-                                isMapError = true // FIXED: Mark error state
-                                onMapLoadFailed?.invoke()
+                                Log.w("LeafletWebView", "JS reported notice: $reason")
                             }
                         }
 
@@ -317,11 +321,10 @@ fun RealLeafletMapView(
                         fun getMarkersJson(): String = markersJsonArray
                     }, "AndroidBridge")
 
-                    // FIXED: Load fully inlined HTML string under https://mt1.google.com/ BaseURL so WebView permits network tile fetches
-                    clearCache(true)
+                    // Load fully inlined HTML string with OSM / CartoDB tiles and offline caching
                     val htmlContent = getSelfContainedMapHtml(ctx)
                     loadDataWithBaseURL(
-                        "https://mt1.google.com/",
+                        "https://tile.openstreetmap.org/",
                         htmlContent,
                         "text/html",
                         "UTF-8",

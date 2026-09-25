@@ -192,19 +192,19 @@ object SecurityCryptoUtils {
     }
 
     /**
-     * Validates password against policy (minimum 8 characters, rejecting common weak ones).
+     * Validates password against policy (minimum 7 characters, rejecting common weak ones).
      */
     fun validatePasswordPolicy(password: String): Pair<Boolean, String?> {
         val cleanPass = password.trim()
-        if (cleanPass.length < 8) {
-            return Pair(false, "عفواً، يجب أن تكون كلمة المرور مكونة من 8 خانات (أحرف أو أرقام) على الأقل لضمان قوة حماية حسابك.")
+        if (cleanPass.length < 7) {
+            return Pair(false, "عفواً، يجب أن تكون كلمة المرور مكونة من 7 خانات على الأقل (تحتوي على أحرف وأرقام معاً) لضمان حماية حسابك.")
         }
         val weakPasswords = listOf(
-            "123456", "12345678", "000000", "00000000", "111111", "11111111",
-            "112233", "123123", "password", "yemen123", "yemen2026", "77777777"
+            "123456", "1234567", "12345678", "000000", "0000000", "00000000", "111111", "1111111", "11111111",
+            "112233", "123123", "password", "yemen123", "yemen2026", "7777777", "77777777"
         )
         if (cleanPass.lowercase() in weakPasswords) {
-            return Pair(false, "عفواً، لقد قمت بإدخال كلمة مرور ضعيفة وسهلة التخمين (مثل: 123456 أو 000000). يرجى اختيار كلمة مرور قوية وغير متوقعة لحماية بياناتك.")
+            return Pair(false, "عفواً، لقد قمت بإدخال كلمة مرور ضعيفة وسهلة التخمين. يرجى اختيار كلمة مرور قوية تحتوي على أحرف وأرقام لحماية حسابك.")
         }
         return Pair(true, null)
     }

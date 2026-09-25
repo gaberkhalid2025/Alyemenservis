@@ -138,6 +138,19 @@ class RegistrationRepositoryImpl(
             firestore.collection("users").document(cleanPhone).set(userMap).await()
             firestore.collection("registered_users").document(cleanPhone).set(userMap).await()
 
+            val pendingMap = mapOf(
+                "id" to id,
+                "name" to client.fullName.trim(),
+                "phone" to cleanPhone,
+                "categoryId" to "CLIENT",
+                "area" to client.city.trim(),
+                "status" to "PENDING",
+                "profession" to "CLIENT",
+                "providerType" to "CLIENT",
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "CLIENT")
             Result.success(id)
         } catch (e: Exception) {
@@ -154,13 +167,14 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val hashedPassword = com.example.utils.PasswordHasher.hash(provider.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "PROVIDER",
                 status = "PENDING",
                 fullName = provider.fullName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.utils.PasswordHasher.hash(provider.passwordHash),
+                passwordHash = hashedPassword,
                 city = provider.city.trim(),
                 categoryId = provider.professionCategory.trim(),
                 categoryName = provider.professionCategory.trim(),
@@ -174,6 +188,22 @@ class RegistrationRepositoryImpl(
             )
 
             firestore.collection("join_requests").document(id).set(request).await()
+
+            val pendingMap = mapOf(
+                "id" to id,
+                "name" to provider.fullName.trim(),
+                "phone" to cleanPhone,
+                "categoryId" to provider.professionCategory.trim(),
+                "customCategoryName" to provider.professionCategory.trim(),
+                "area" to provider.city.trim(),
+                "status" to "PENDING",
+                "profession" to "PROVIDER",
+                "providerType" to "PROVIDER",
+                "password" to hashedPassword,
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "PROVIDER")
             Result.success(id)
         } catch (e: Exception) {
@@ -190,6 +220,7 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val hashedPassword = com.example.utils.PasswordHasher.hash(store.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "STORE",
@@ -198,7 +229,7 @@ class RegistrationRepositoryImpl(
                 ownerName = store.ownerName.trim(),
                 fullName = store.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.utils.PasswordHasher.hash(store.passwordHash),
+                passwordHash = hashedPassword,
                 categoryId = store.storeCategory.trim(),
                 categoryName = store.storeCategory.trim(),
                 city = store.city.trim(),
@@ -212,6 +243,24 @@ class RegistrationRepositoryImpl(
             )
 
             firestore.collection("join_requests").document(id).set(request).await()
+
+            val pendingMap = mapOf(
+                "id" to id,
+                "name" to store.storeName.trim(),
+                "ownerName" to store.ownerName.trim(),
+                "phone" to cleanPhone,
+                "categoryId" to "STORE",
+                "customCategoryName" to store.storeCategory.trim(),
+                "area" to store.city.trim(),
+                "localNeighborhood" to store.addressDetails.trim(),
+                "status" to "PENDING",
+                "profession" to "STORE_OWNER",
+                "providerType" to "STORE_OWNER",
+                "password" to hashedPassword,
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
             sendAdminJoinNotification(id, request.businessName, cleanPhone, "STORE")
             Result.success(id)
         } catch (e: Exception) {
@@ -228,6 +277,7 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val hashedPassword = com.example.utils.PasswordHasher.hash(restaurant.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "RESTAURANT",
@@ -236,7 +286,7 @@ class RegistrationRepositoryImpl(
                 ownerName = restaurant.ownerName.trim(),
                 fullName = restaurant.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.utils.PasswordHasher.hash(restaurant.passwordHash),
+                passwordHash = hashedPassword,
                 categoryId = restaurant.cuisineType.trim(),
                 categoryName = restaurant.cuisineType.trim(),
                 city = restaurant.city.trim(),
@@ -250,6 +300,24 @@ class RegistrationRepositoryImpl(
             )
 
             firestore.collection("join_requests").document(id).set(request).await()
+
+            val pendingMap = mapOf(
+                "id" to id,
+                "name" to restaurant.restaurantName.trim(),
+                "ownerName" to restaurant.ownerName.trim(),
+                "phone" to cleanPhone,
+                "categoryId" to "RESTAURANT",
+                "customCategoryName" to restaurant.cuisineType.trim(),
+                "area" to restaurant.city.trim(),
+                "localNeighborhood" to restaurant.addressDetails.trim(),
+                "status" to "PENDING",
+                "profession" to "STORE_OWNER",
+                "providerType" to "STORE_OWNER",
+                "password" to hashedPassword,
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
             sendAdminJoinNotification(id, request.businessName, cleanPhone, "RESTAURANT")
             Result.success(id)
         } catch (e: Exception) {
@@ -266,6 +334,7 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val hashedPassword = com.example.utils.PasswordHasher.hash(medical.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "MEDICAL",
@@ -274,7 +343,7 @@ class RegistrationRepositoryImpl(
                 ownerName = medical.doctorName.trim(),
                 fullName = medical.doctorName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.utils.PasswordHasher.hash(medical.passwordHash),
+                passwordHash = hashedPassword,
                 categoryId = medical.specialtyCategory.trim(),
                 categoryName = medical.specialtyCategory.trim(),
                 city = medical.city.trim(),
@@ -287,6 +356,24 @@ class RegistrationRepositoryImpl(
             )
 
             firestore.collection("join_requests").document(id).set(request).await()
+
+            val pendingMap = mapOf(
+                "id" to id,
+                "name" to medical.centerName.trim(),
+                "ownerName" to medical.doctorName.trim(),
+                "phone" to cleanPhone,
+                "categoryId" to "MEDICAL",
+                "customCategoryName" to medical.specialtyCategory.trim(),
+                "area" to medical.city.trim(),
+                "localNeighborhood" to medical.addressDetails.trim(),
+                "status" to "PENDING",
+                "profession" to "STORE_OWNER",
+                "providerType" to "STORE_OWNER",
+                "password" to hashedPassword,
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
             sendAdminJoinNotification(id, request.businessName, cleanPhone, "MEDICAL")
             Result.success(id)
         } catch (e: Exception) {
@@ -303,6 +390,7 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val hashedPassword = com.example.utils.PasswordHasher.hash(property.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "PROPERTY",
@@ -314,7 +402,7 @@ class RegistrationRepositoryImpl(
                 ownerName = property.ownerName.trim(),
                 fullName = property.ownerName.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.utils.PasswordHasher.hash(property.passwordHash),
+                passwordHash = hashedPassword,
                 city = property.city.trim(),
                 area = property.areaDetails.trim(),
                 price = property.priceYer,
@@ -326,6 +414,24 @@ class RegistrationRepositoryImpl(
             )
 
             firestore.collection("join_requests").document(id).set(request).await()
+
+            val pendingMap = mapOf(
+                "id" to id,
+                "name" to property.title.trim(),
+                "ownerName" to property.ownerName.trim(),
+                "phone" to cleanPhone,
+                "categoryId" to "PROPERTY",
+                "customCategoryName" to property.category.trim(),
+                "area" to property.city.trim(),
+                "localNeighborhood" to property.areaDetails.trim(),
+                "status" to "PENDING",
+                "profession" to "PROPERTY_OWNER",
+                "providerType" to "PROPERTY_OWNER",
+                "password" to hashedPassword,
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
             sendAdminJoinNotification(id, request.propertyTitle, cleanPhone, "PROPERTY")
             Result.success(id)
         } catch (e: Exception) {
@@ -342,6 +448,7 @@ class RegistrationRepositoryImpl(
             }
 
             val id = UUID.randomUUID().toString()
+            val hashedPassword = com.example.utils.PasswordHasher.hash(job.passwordHash)
             val request = JoinRequestEntity(
                 id = id,
                 type = "JOB",
@@ -352,7 +459,7 @@ class RegistrationRepositoryImpl(
                 categoryId = job.category.trim(),
                 categoryName = job.category.trim(),
                 phone = cleanPhone,
-                passwordHash = com.example.utils.PasswordHasher.hash(job.passwordHash),
+                passwordHash = hashedPassword,
                 city = job.city.trim(),
                 approvalStatus = "PENDING",
                 submittedAt = System.currentTimeMillis(),
@@ -361,6 +468,23 @@ class RegistrationRepositoryImpl(
             )
 
             firestore.collection("join_requests").document(id).set(request).await()
+
+            val pendingMap = mapOf(
+                "id" to id,
+                "name" to job.jobTitle.trim(),
+                "ownerName" to job.companyName.trim(),
+                "phone" to cleanPhone,
+                "categoryId" to "JOB",
+                "customCategoryName" to job.category.trim(),
+                "area" to job.city.trim(),
+                "status" to "PENDING",
+                "profession" to "JOB_POSTER",
+                "providerType" to "JOB_POSTER",
+                "password" to hashedPassword,
+                "createdAt" to System.currentTimeMillis()
+            )
+            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
             sendAdminJoinNotification(id, request.jobTitle, cleanPhone, "JOB")
             Result.success(id)
         } catch (e: Exception) {

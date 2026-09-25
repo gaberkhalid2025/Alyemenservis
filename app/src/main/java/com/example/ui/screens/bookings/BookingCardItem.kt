@@ -187,6 +187,24 @@ fun BookingCardItem(
                 )
             }
 
+            // Price display if amount > 0
+            if (booking.totalAmount > 0) {
+                val formattedAmount = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(booking.totalAmount)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                    Text(
+                        text = "سعر الخدمة: $formattedAmount ريال يمني",
+                        color = Color(0xFF10B981),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             // 8-Hour Rule Warning / Countdown Banner
             if (!isTerminalState) {
                 Surface(

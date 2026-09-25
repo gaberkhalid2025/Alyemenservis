@@ -408,10 +408,11 @@ open class BookingViewModel @Inject constructor(
 
                     // 2. Notify the Technician (PROVIDER) with actual phone or ID
                     if (sendProviderNotif) {
+                        val formattedPrice = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(finalPrice)
                         val technicianTarget = effectiveProviderPhone.ifBlank { providerId.ifBlank { "PROVIDER" } }
                         onAddNotification?.invoke(
                             "⚡ حجز عاجل جديد رقم $finalBookingNumber",
-                            "العميل $cleanName ($cleanPhone) من ($area) حجز خدمة ($serviceType) لدى الفني $providerName بموعد $dateString $timeString. السعر المتوقع: $finalPrice ريال يمني.",
+                            "العميل $cleanName ($cleanPhone) من ($area) حجز خدمة ($serviceType) لدى الفني $providerName بموعد $dateString $timeString. سعر الخدمة: $formattedPrice ريال يمني.",
                             "PROVIDER",
                             technicianTarget
                         )

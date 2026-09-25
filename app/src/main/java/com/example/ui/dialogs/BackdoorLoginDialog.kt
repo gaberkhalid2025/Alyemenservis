@@ -196,7 +196,14 @@ fun BackdoorLoginDialog(
                             isAuthenticating = true
                             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
                                 try {
-                                    val result = com.example.utils.AdminSecurityManager.verifyCredentials(trimmedUser, trimmedPass, settingsState)
+                                    val result = com.example.utils.AdminSecurityManager.verifyCredentials(
+                                        username = trimmedUser,
+                                        passwordAttempt = trimmedPass,
+                                        settings = settingsState,
+                                        context = context,
+                                        supervisors = supervisors,
+                                        preferredRole = "OWNER"
+                                    )
                                     when (result) {
                                         "OWNER" -> {
                                             onDismiss()

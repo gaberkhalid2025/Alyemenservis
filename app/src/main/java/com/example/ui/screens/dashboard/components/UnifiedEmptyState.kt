@@ -38,20 +38,24 @@ fun UnifiedEmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(text = iconText, fontSize = 40.sp)
+            Text(text = iconText, fontSize = 42.sp)
             Text(
                 text = title,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = themeColors.textPrimary,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             )
             if (!description.isNullOrBlank()) {
                 Text(
                     text = description,
-                    fontSize = 12.sp,
+                    fontSize = 12.5.sp,
                     color = themeColors.textSecondary,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
                 )
             }
             if (!actionLabel.isNullOrBlank() && onActionClick != null) {

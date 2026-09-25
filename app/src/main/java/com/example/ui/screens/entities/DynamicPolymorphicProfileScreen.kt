@@ -59,6 +59,7 @@ fun DynamicPolymorphicProfileScreen(
     val categories by viewModel.categories.collectAsState()
     val products by viewModel.products.collectAsState()
     val ratings by viewModel.ratings.collectAsState()
+    val bookings by viewModel.bookings.collectAsState()
 
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
@@ -136,6 +137,16 @@ fun DynamicPolymorphicProfileScreen(
         (phoneClean.isNotEmpty() && (phoneClean == provPhone || phoneClean == storePhone || phoneClean == propPhone)) ||
         (joinPhone.isNotEmpty() && (joinPhone == provPhone || joinPhone == storePhone || joinPhone == propPhone))
     }
+
+    val entityBookings = remember(bookings, entityId, entityPhone) {
+        val cleanP = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(entityPhone)
+        bookings.filter { b ->
+            b.providerId == entityId ||
+            (cleanP.isNotEmpty() && com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.providerPhone) == cleanP)
+        }
+    }
+    val calculatedBookingsCount = entityBookings.size
+    val calculatedRevenue = entityBookings.filter { it.status == "COMPLETED" }.sumOf { it.totalAmount }
 
     Scaffold(
         topBar = {
@@ -236,8 +247,8 @@ fun DynamicPolymorphicProfileScreen(
                     isVerified = provider?.isVerified ?: store?.isVerified ?: property?.isVerified ?: true,
                     isVip = provider?.isVip ?: store?.isVip ?: property?.isVip ?: false,
                     isOwner = isOwner,
-                    bookingsCount = 0,
-                    completedRevenue = 0.0,
+                    bookingsCount = calculatedBookingsCount,
+                    completedRevenue = calculatedRevenue,
                     themeColors = themeColors
                 )
             }

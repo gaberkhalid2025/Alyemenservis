@@ -60,10 +60,13 @@ fun UserNotificationsContent(
     val userId by notifViewModel.currentUserId.collectAsState()
     val adminRole by notifViewModel.adminRole.collectAsState()
     val readIds by notifViewModel.readNotificationIds.collectAsState()
+    val bookings by viewModel.bookings.collectAsState()
 
     val activeTab by notifViewModel.activeTab.collectAsState()
     val selectedTypeFilter by notifViewModel.selectedTypeFilter.collectAsState()
     var showClearAllConfirmDialog by remember { mutableStateOf(false) }
+    var selectedBookingForDetails by remember { mutableStateOf<com.example.data.BookingEntity?>(null) }
+    var selectedGenericNotifForDetails by remember { mutableStateOf<NotificationEntity?>(null) }
 
     LaunchedEffect(Unit) {
         notifViewModel.loadReadNotifications(context)
@@ -236,6 +239,27 @@ fun UserNotificationsContent(
                             isUnread = !readIds.contains(notif.id),
                             onCardClick = {
                                 notifViewModel.markNotificationAsRead(context, notif.id)
+                                val isBookingNotif = notif.notificationType == "BOOKING" || notif.title.contains("حجز") || notif.message.contains("حجز")
+                                if (isBookingNotif) {
+                                    // Try to match booking by bookingNumber, id or matching phone/content
+                                    val matchedBooking = bookings.find { b ->
+                                        (b.bookingNumber.isNotBlank() && (notif.title.contains(b.bookingNumber) || notif.message.contains(b.bookingNumber))) ||
+                                        (b.bookingCode.isNotBlank() && (notif.title.contains(b.bookingCode) || notif.message.contains(b.bookingCode))) ||
+                                        (b.id.isNotBlank() && notif.message.contains(b.id.take(6)))
+                                    } ?: bookings.firstOrNull { b ->
+                                        val cPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.clientPhone)
+                                        val pPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.customerPhone)
+                                        val notifTarget = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(notif.targetValue)
+                                        notifTarget.isNotEmpty() && (notifTarget == cPhone || notifTarget == pPhone)
+                                    }
+                                    if (matchedBooking != null) {
+                                        selectedBookingForDetails = matchedBooking
+                                    } else {
+                                        selectedGenericNotifForDetails = notif
+                                    }
+                                } else {
+                                    selectedGenericNotifForDetails = notif
+                                }
                             },
                             onDeleteClick = {
                                 notifViewModel.deleteNotification(notif.id)
@@ -287,6 +311,78 @@ fun UserNotificationsContent(
         },
         onDismiss = { showClearAllConfirmDialog = false }
     )
+
+    // Detailed Dialog for Selected Booking Notification
+    selectedBookingForDetails?.let { booking ->
+        AlertDialog(
+            onDismissRequest = { selectedBookingForDetails = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("📋", fontSize = 20.sp)
+                    Text(
+                        "تفاصيل الحجز #${booking.bookingNumber.ifEmpty { booking.id.take(8) }}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val formattedPrice = if (booking.totalAmount > 0) "${java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(booking.totalAmount)} ريال يمني" else "غير محدد"
+                    Text("الخدمة: ${booking.serviceType.ifBlank { booking.category }}", color = Color.LightGray, fontSize = 13.sp)
+                    Text("العميل: ${booking.customerName.ifBlank { booking.clientName }} (${booking.clientPhone.ifBlank { booking.customerPhone }})", color = Color.LightGray, fontSize = 13.sp)
+                    Text("الفني / المزود: ${booking.providerName}", color = Color.LightGray, fontSize = 13.sp)
+                    Text("الموعد: ${booking.date.ifBlank { booking.dateString }} | ${booking.time.ifBlank { booking.timeString }}", color = Color(0xFF38BDF8), fontSize = 13.sp)
+                    Text("سعر الخدمة: $formattedPrice", color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                    Text("حالة الحجز: ${booking.status}", color = Color(0xFFF59E0B), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        selectedBookingForDetails = null
+                        viewModel.navigateToScreen(AppScreens.BOOKINGS_VIEW)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("الانتقال لجدول الحجوزات 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedBookingForDetails = null }) {
+                    Text("إغلاق", color = Color.White)
+                }
+            },
+            containerColor = Color(0xFF1E293B)
+        )
+    }
+
+    // Generic Notification Details Dialog
+    selectedGenericNotifForDetails?.let { notif ->
+        AlertDialog(
+            onDismissRequest = { selectedGenericNotifForDetails = null },
+            title = {
+                Text(notif.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(notif.message, color = Color.LightGray, fontSize = 13.5.sp, lineHeight = 20.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("🕒 ${com.example.utils.NotificationDateFormatter.format(notif.timestamp)}", color = Color(0xFF64748B), fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { selectedGenericNotifForDetails = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
+                ) {
+                    Text("حسناً", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = Color(0xFF1E293B)
+        )
+    }
 }
 
 /**

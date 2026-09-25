@@ -68,14 +68,27 @@ fun MainViewModel.changeAdminCredentials(newPass: String, newOwnerPass: String =
 
 fun MainViewModel.authenticateAdmin(role: String) {
     authViewModel.authenticateAdmin(role)
+    adminViewModel._adminRole.value = role
+    if (role == "OWNER") {
+        adminViewModel._supervisorPermissions.value = listOf("ALL")
+    }
 }
 
 fun MainViewModel.authenticateAdmin(context: Context, role: String, remember: Boolean) {
     authViewModel.authenticateAdmin(context, role, remember)
+    adminViewModel._adminRole.value = role
+    if (role == "OWNER") {
+        adminViewModel._supervisorPermissions.value = listOf("ALL")
+    }
+    if (remember) {
+        val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+        sp.edit().putString("saved_admin_role", role).apply()
+    }
 }
 
 fun MainViewModel.logout(context: Context) {
     authViewModel.logout(context)
+    adminViewModel.logoutAdmin()
 }
 
 fun MainViewModel.navigateToScreen(screen: String) {

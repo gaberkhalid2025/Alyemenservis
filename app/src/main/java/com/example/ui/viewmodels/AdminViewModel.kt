@@ -150,7 +150,7 @@ class AdminViewModel @Inject constructor(
     internal val _adminRole = MutableStateFlow("GUEST")
     val adminRole: StateFlow<String> = _adminRole.asStateFlow()
 
-    private val _supervisorPermissions = MutableStateFlow<List<String>>(emptyList())
+    internal val _supervisorPermissions = MutableStateFlow<List<String>>(emptyList())
     val supervisorPermissions: StateFlow<List<String>> = _supervisorPermissions.asStateFlow()
 
     /**
@@ -168,86 +168,49 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 val trimmedEmail = email.trim()
                 val trimmedPass = password.trim()
 
-                // 1. محاولة التحقق عبر Firestore (supervisors) - يدعم التشفير الآمن
-                val adminQuery = db.collection("supervisors")
-                    .whereEqualTo("email", trimmedEmail)
-                    .limit(1).get().await()
+                val currentSettings = appState._settings.value
+                val supervisorsList = appState._supervisors.value
+                val verifiedRole = com.example.utils.AdminSecurityManager.verifyCredentials(
+                    username = trimmedEmail,
+                    passwordAttempt = trimmedPass,
+                    settings = currentSettings,
+                    context = application,
+                    supervisors = supervisorsList,
+                    preferredRole = "ADMIN"
+                )
 
-                if (!adminQuery.isEmpty) {
-                    val adminDoc = adminQuery.documents[0]
-                    val storedPass = adminDoc.getString("passcode") ?: ""
-                    val role = adminDoc.getString("role") ?: "ADMIN"
-                    val perms = adminDoc.get("permissions") as? List<String> ?: emptyList()
-                    if (com.example.utils.AdminCredentialsVault.verifyAndMigrate(adminDoc.reference, trimmedPass, storedPass, "passcode")) {
-                        val assignedRole = if (role.contains("OWNER")) "OWNER" else "ADMIN"
-                        
-                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
-                        com.example.utils.SecureAdminStorage.storeCredentials(
-                            context = application,
-                            ownerEmail = if (assignedRole == "OWNER") trimmedEmail else null,
-                            ownerPassword = if (assignedRole == "OWNER") trimmedPass else null,
-                            adminEmail = if (assignedRole == "ADMIN") trimmedEmail else null,
-                            adminPassword = if (assignedRole == "ADMIN") trimmedPass else null
-                        )
+                if (verifiedRole == "ADMIN" || verifiedRole == "OWNER") {
+                    val assignedRole = verifiedRole
+                    val perms = if (assignedRole == "OWNER") listOf("ALL") else emptyList()
 
-                        if (rememberMe) {
-                            secureStorage.saveAdminSession(com.example.utils.AdminSession(
-                                uid = adminDoc.id, email = trimmedEmail,
-                                loginTime = System.currentTimeMillis(), refreshToken = "FS_SESSION", 
-                                role = assignedRole, permissions = perms
-                            ))
-                        }
-                        _adminRole.value = assignedRole
-                        _supervisorPermissions.value = perms
-                        _isLoading.value = false
-                        onResult(true, null)
-                        return@launch
+                    // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
+                    com.example.utils.SecureAdminStorage.storeCredentials(
+                        context = application,
+                        ownerEmail = if (assignedRole == "OWNER") trimmedEmail else null,
+                        ownerPassword = if (assignedRole == "OWNER") trimmedPass else null,
+                        adminEmail = if (assignedRole == "ADMIN") trimmedEmail else null,
+                        adminPassword = if (assignedRole == "ADMIN") trimmedPass else null
+                    )
+
+                    if (rememberMe) {
+                        secureStorage.saveAdminSession(com.example.utils.AdminSession(
+                            uid = "admin_${System.currentTimeMillis()}", email = trimmedEmail,
+                            loginTime = System.currentTimeMillis(), refreshToken = "ADMIN_SESSION", 
+                            role = assignedRole, permissions = perms
+                        ))
+                        val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                        sp.edit().putString("saved_admin_role", assignedRole).apply()
                     }
-                }
-
-                // 2. التحقق من الحسابات الطارئة (Emergency Fallback الآمن)
-                if (attemptEmergencyFallback(trimmedEmail, trimmedPass, rememberMe)) {
+                    _adminRole.value = assignedRole
+                    _supervisorPermissions.value = perms
                     _isLoading.value = false
                     onResult(true, null)
                     return@launch
                 }
 
-                // 3. Fallback to Cloud Functions
-                try {
-                    val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
-                    val result = functions.getHttpsCallable("verifyAdminLogin")
-                        .call(mapOf("email" to email, "password" to password)).await()
-                    val data = result.data as? Map<*, *>
-                    if (data?.get("success") == true) {
-                        val uid = data["uid"] as? String ?: ""
-                        val assignedRole = if (data["isSuperAdmin"] == true) "OWNER" else "ADMIN"
-                        
-                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
-                        com.example.utils.SecureAdminStorage.storeCredentials(
-                            context = application,
-                            ownerEmail = if (assignedRole == "OWNER") trimmedEmail else null,
-                            ownerPassword = if (assignedRole == "OWNER") trimmedPass else null,
-                            adminEmail = if (assignedRole == "ADMIN") trimmedEmail else null,
-                            adminPassword = if (assignedRole == "ADMIN") trimmedPass else null
-                        )
-
-                        if (rememberMe) {
-                            secureStorage.saveAdminSession(com.example.utils.AdminSession(
-                                uid = uid, email = email, loginTime = System.currentTimeMillis(),
-                                refreshToken = data["refreshToken"] as? String ?: "", role = assignedRole
-                            ))
-                        }
-                        _adminRole.value = assignedRole
-                        _isLoading.value = false
-                        onResult(true, null)
-                        return@launch
-                    }
-                } catch (e: Exception) {}
-                
                 _isLoading.value = false
                 onResult(false, "بيانات الدخول غير صحيحة")
             } catch (e: Exception) {
@@ -269,79 +232,43 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 val trimmedEmail = email.trim()
                 val trimmedPass = password.trim()
 
-                // 1. التحقق من الهوية كمالك عبر البوابة الخلفية (Firestore)
-                val ownerQuery = db.collection("supervisors")
-                    .whereEqualTo("email", trimmedEmail)
-                    .whereEqualTo("role", "OWNER")
-                    .limit(1).get().await()
+                val currentSettings = appState._settings.value
+                val supervisorsList = appState._supervisors.value
+                val verifiedRole = com.example.utils.AdminSecurityManager.verifyCredentials(
+                    username = trimmedEmail,
+                    passwordAttempt = trimmedPass,
+                    settings = currentSettings,
+                    context = application,
+                    supervisors = supervisorsList,
+                    preferredRole = "OWNER"
+                )
 
-                if (!ownerQuery.isEmpty) {
-                    val ownerDoc = ownerQuery.documents[0]
-                    val storedPass = ownerDoc.getString("passcode") ?: ""
-                    val perms = ownerDoc.get("permissions") as? List<String> ?: emptyList()
-                    if (com.example.utils.AdminCredentialsVault.verifyAndMigrate(ownerDoc.reference, trimmedPass, storedPass, "passcode")) {
-                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
-                        com.example.utils.SecureAdminStorage.storeCredentials(
-                            context = application,
-                            ownerEmail = trimmedEmail,
-                            ownerPassword = trimmedPass
-                        )
+                if (verifiedRole == "OWNER") {
+                    com.example.utils.SecureAdminStorage.storeCredentials(
+                        context = application,
+                        ownerEmail = trimmedEmail,
+                        ownerPassword = trimmedPass
+                    )
 
-                        if (rememberMe) {
-                            secureStorage.saveAdminSession(com.example.utils.AdminSession(
-                                uid = ownerDoc.id, email = trimmedEmail,
-                                loginTime = System.currentTimeMillis(), refreshToken = "OWNER_FS_SESSION", 
-                                role = "OWNER", permissions = perms
-                            ))
-                        }
-                        _adminRole.value = "OWNER"
-                        _supervisorPermissions.value = perms
-                        _isLoading.value = false
-                        onResult(true, null)
-                        return@launch
+                    if (rememberMe) {
+                        secureStorage.saveAdminSession(com.example.utils.AdminSession(
+                            uid = "owner_${System.currentTimeMillis()}", email = trimmedEmail,
+                            loginTime = System.currentTimeMillis(), refreshToken = "OWNER_SESSION", 
+                            role = "OWNER", permissions = listOf("ALL")
+                        ))
+                        val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                        sp.edit().putString("saved_admin_role", "OWNER").apply()
                     }
-                }
-
-                // 2. التحقق من حساب المالك الأساسي (Emergency Fallback الآمن)
-                if (attemptEmergencyFallback(trimmedEmail, trimmedPass, rememberMe)) {
+                    _adminRole.value = "OWNER"
+                    _supervisorPermissions.value = listOf("ALL")
                     _isLoading.value = false
                     onResult(true, null)
                     return@launch
                 }
 
-                // 3. Fallback to Cloud Function
-                try {
-                    val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
-                    val result = functions.getHttpsCallable("verifyAdminLogin")
-                        .call(mapOf("email" to email, "password" to password)).await()
-                    val data = result.data as? Map<*, *>
-                    if (data?.get("success") == true) {
-                        val uid = data["uid"] as? String ?: ""
-                        
-                        // 🔐 حفظ البيانات بشكل آمن للوصول الطارئ مستقبلاً
-                        com.example.utils.SecureAdminStorage.storeCredentials(
-                            context = application,
-                            ownerEmail = trimmedEmail,
-                            ownerPassword = trimmedPass
-                        )
-
-                        if (rememberMe) {
-                            secureStorage.saveAdminSession(com.example.utils.AdminSession(
-                                uid = uid, email = email, loginTime = System.currentTimeMillis(),
-                                refreshToken = data["refreshToken"] as? String ?: "", role = "OWNER"
-                            ))
-                        }
-                        _adminRole.value = "OWNER"
-                        _isLoading.value = false
-                        onResult(true, null)
-                        return@launch
-                    }
-                } catch (e: Exception) {}
-                
                 _isLoading.value = false
                 onResult(false, "بيانات دخول المالك غير صحيحة")
             } catch (e: Exception) {
@@ -363,63 +290,48 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                
                 val trimmedUser = usernameOrEmail.trim()
                 val trimmedPass = passcode.trim()
-                
-                var supervisorDoc = db.collection("supervisors").document(trimmedUser).get().await()
-                if (!supervisorDoc.exists()) {
-                    val queryByName = db.collection("supervisors")
-                        .whereEqualTo("name", trimmedUser)
-                        .limit(1)
-                        .get()
-                        .await()
-                    if (!queryByName.isEmpty) {
-                        supervisorDoc = queryByName.documents[0]
-                    } else {
-                        val queryByEmail = db.collection("supervisors")
-                            .whereEqualTo("email", trimmedUser)
-                            .limit(1)
-                            .get()
-                            .await()
-                        if (!queryByEmail.isEmpty) {
-                            supervisorDoc = queryByEmail.documents[0]
-                        }
+
+                val currentSettings = appState._settings.value
+                val supervisorsList = appState._supervisors.value
+                val verifiedRole = com.example.utils.AdminSecurityManager.verifyCredentials(
+                    username = trimmedUser,
+                    passwordAttempt = trimmedPass,
+                    settings = currentSettings,
+                    context = application,
+                    supervisors = supervisorsList
+                )
+
+                if (verifiedRole != null && verifiedRole != "GUEST") {
+                    val matchingSup = supervisorsList.find {
+                        it.id.equals(trimmedUser, ignoreCase = true) ||
+                                it.name.trim().equals(trimmedUser, ignoreCase = true)
                     }
-                }
-                
-                if (supervisorDoc.exists()) {
-                    val storedPass = supervisorDoc.getString("passcode") ?: ""
-                    val perms = supervisorDoc.get("permissions") as? List<String> ?: emptyList()
-                    if (com.example.utils.AdminCredentialsVault.verifyAndMigrate(supervisorDoc.reference, trimmedPass, storedPass, "passcode")) {
-                        val role = supervisorDoc.getString("role") ?: "SUPERVISOR"
-                        val id = supervisorDoc.id
-                        val name = supervisorDoc.getString("name") ?: trimmedUser
-                        
-                        if (rememberMe) {
-                            secureStorage.saveAdminSession(
-                                com.example.utils.AdminSession(
-                                    uid = id,
-                                    email = supervisorDoc.getString("email") ?: "$id@supervisor.local",
-                                    loginTime = System.currentTimeMillis(),
-                                    refreshToken = "SUPERVISOR_SESSION",
-                                    role = "SUPERVISOR",
-                                    permissions = perms
-                                )
+                    val perms = matchingSup?.permissions ?: if (verifiedRole == "OWNER") listOf("ALL") else emptyList()
+
+                    if (rememberMe) {
+                        secureStorage.saveAdminSession(
+                            com.example.utils.AdminSession(
+                                uid = matchingSup?.id ?: "sup_${System.currentTimeMillis()}",
+                                email = trimmedUser,
+                                loginTime = System.currentTimeMillis(),
+                                refreshToken = "SUPERVISOR_SESSION",
+                                role = verifiedRole,
+                                permissions = perms
                             )
-                        } else {
-                            secureStorage.clearAdminSession()
-                        }
-                        
-                        _adminRole.value = "SUPERVISOR"
-                        _supervisorPermissions.value = perms
-                        _isLoading.value = false
-                        onResult(true, null)
-                        return@launch
+                        )
+                        val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                        sp.edit().putString("saved_admin_role", verifiedRole).apply()
                     }
+
+                    _adminRole.value = verifiedRole
+                    _supervisorPermissions.value = perms
+                    _isLoading.value = false
+                    onResult(true, null)
+                    return@launch
                 }
-                
+
                 _isLoading.value = false
                 onResult(false, "بيانات دخول المشرف غير صحيحة")
             } catch (e: Exception) {
@@ -436,8 +348,11 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 secureStorage.clearAdminSession()
+                val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                sp.edit().putString("saved_admin_role", "GUEST").apply()
                 com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
                 _adminRole.value = "GUEST"
+                _supervisorPermissions.value = emptyList()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -828,6 +743,28 @@ fun approveRequest(request: PendingProviderEntity) {
                 targetValue = request.phone
             )
             mainViewModel.triggerNotification("✅ تم تفعيل إعلان وظيفة ${request.name}")
+        } else if (request.profession == "JOB_SEEKER" || request.categoryId.uppercase() == "JOB_SEEKER") {
+            val seekerMap = mapOf(
+                "id" to request.id,
+                "name" to request.name,
+                "phone" to cleanPhone,
+                "profession" to request.customCategoryName.ifBlank { "باحث عن عمل" },
+                "city" to request.area,
+                "isApproved" to true,
+                "status" to "APPROVED",
+                "createdAt" to System.currentTimeMillis()
+            )
+            db.collection("job_seekers").document(request.id).set(seekerMap)
+            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                db.collection("job_seekers").document(cleanPhone).set(seekerMap)
+            }
+            mainViewModel.addNotification(
+                title = "🎉 تهانينا! تم اعتماد ملفك كباحث عن عمل",
+                message = "مرحباً بك يا غالي، تم اعتماد ملفك في قسم التوظيف والبحث عن عمل بنجاح!",
+                targetType = "USER",
+                targetValue = request.phone
+            )
+            mainViewModel.triggerNotification("✅ تم اعتماد ملف المتقدم ${request.name}")
         } else if (request.profession == "CLIENT" || request.categoryId.uppercase() == "CLIENT") {
             val userMap = mapOf(
                 "id" to request.id,
@@ -887,17 +824,41 @@ fun approveRequest(request: PendingProviderEntity) {
     }
 
 fun rejectRequest(request: PendingProviderEntity, reason: String) {
+        val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+        val now = System.currentTimeMillis()
+        val finalReason = reason.ifBlank { "لم تستوفِ المستندات أو الشروط المطلوبة" }
+
+        val rejectUpdates = mapOf(
+            "status" to "REJECTED",
+            "approvalStatus" to "REJECTED",
+            "isActive" to false,
+            "rejectionReason" to finalReason,
+            "rejectedAt" to now,
+            "rejectedBy" to "ADMIN",
+            "updatedAt" to now
+        )
+        db.collection("join_requests").document(request.id).update(rejectUpdates)
+        if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+            db.collection("join_requests").document(cleanPhone).update(rejectUpdates)
+        }
+
         db.collection("pending_providers").document(request.id).delete()
+        if (cleanPhone.isNotEmpty()) {
+            db.collection("pending_providers").document(cleanPhone).delete()
+        }
+        _pendingProviders.value = _pendingProviders.value.filter { 
+            it.id != request.id && it.id != cleanPhone && (cleanPhone.isEmpty() || it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone)
+        }
         
         // Add rejected notification!
         mainViewModel.addNotification(
             title = "❌ تنويه حول طلب انضمامك",
-            message = "للأسف لم يتم قبول طلب انضمامك للأسباب التالية: $reason. يرجى تعديل البيانات وإعادة تقديم الطلب.",
+            message = "للأسف لم يتم قبول طلب انضمامك للأسباب التالية: $finalReason. يمكنك تعديل البيانات وإعادة تقديم الطلب.",
             targetType = "USER",
             targetValue = request.phone
         )
         
-        mainViewModel.triggerNotification("❌ تم رفض طلب ${request.name} بسبب: $reason")
+        mainViewModel.triggerNotification("❌ تم رفض طلب ${request.name} بسبب: $finalReason")
     }
 
 fun approveTechnician(providerId: String) {
@@ -3268,6 +3229,22 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
 
     init {
         listenToPasswordRecoveryRequests()
+        try {
+            val session = secureStorage.getAdminSession()
+            if (session != null) {
+                val isExpired = System.currentTimeMillis() - session.loginTime > 30L * 24 * 60 * 60 * 1000
+                if (!isExpired && session.role in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                    _adminRole.value = session.role
+                    _supervisorPermissions.value = session.permissions
+                }
+            } else {
+                val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
+                if (savedRole in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                    _adminRole.value = savedRole
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     private fun listenToPasswordRecoveryRequests() {

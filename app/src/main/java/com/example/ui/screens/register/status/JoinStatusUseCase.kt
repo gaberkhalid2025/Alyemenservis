@@ -2,6 +2,7 @@ package com.example.ui.screens.register.status
 
 import com.example.data.*
 import com.example.ui.*
+import com.example.ui.helpers.AppPreferenceHelper
 
 /**
  * 🎯 الحالات المحددة لطلب الانضمام أو الدخول للوحة التحكم
@@ -49,44 +50,44 @@ class JoinStatusUseCase {
         jobs: List<JobEntity> = emptyList(),
         registeredUsersList: List<Map<String, Any>> = emptyList()
     ): JoinStatus {
-        val cleanPhone = joinPhone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(joinPhone)
         if (cleanPhone.isEmpty()) {
             return JoinStatus.NoRequest
         }
 
         // 1. Check Active Store / Restaurant / Medical
         val matchingStore = stores.find {
-            (it.ownerId.trim().replace(" ", "").replace("+", "") == cleanPhone ||
-                    it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone) && !it.isDeleted
+            (AppPreferenceHelper.normalizePhoneNumber(it.ownerId) == cleanPhone ||
+                    AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone) && !it.isDeleted
         }
-        if (matchingStore != null && matchingStore.isActive) {
-            val isRest = matchingStore.sectionId.contains("restaurant") || matchingStore.name.contains("مطعم")
-            val isMed = matchingStore.sectionId.contains("medical") || matchingStore.name.contains("عيادة")
+        if (matchingStore != null && (matchingStore.isActive || matchingStore.isApproved)) {
+            val isRest = matchingStore.sectionId.contains("restaurant", ignoreCase = true) || matchingStore.name.contains("مطعم") || matchingStore.name.contains("كافيه")
+            val isMed = matchingStore.sectionId.contains("medical", ignoreCase = true) || matchingStore.name.contains("عيادة") || matchingStore.name.contains("مركز") || matchingStore.name.contains("طبي")
             val businessType = if (isRest) "restaurants" else if (isMed) "medical" else "stores"
             return JoinStatus.ActiveStore(matchingStore, businessType)
         }
 
         // 2. Check Active Property
         val matchingProperty = properties.find {
-            (it.ownerId.trim().replace(" ", "").replace("+", "") == cleanPhone ||
-                    it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone) && !it.isDeleted
+            (AppPreferenceHelper.normalizePhoneNumber(it.ownerId) == cleanPhone ||
+                    AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone) && !it.isDeleted
         }
-        if (matchingProperty != null && matchingProperty.isActive) {
+        if (matchingProperty != null && (matchingProperty.isActive || matchingProperty.isApproved)) {
             return JoinStatus.ActiveProperty(matchingProperty)
         }
 
         // 3. Check Approved Provider / Technician
         val matchingApproved = providers.find { 
-            it.phone.trim().replace(" ", "").replace("+", "").replace("-", "") == cleanPhone 
+            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && !it.isDeleted
         }
         if (matchingApproved != null) {
-            val catName = categories.find { it.id == matchingApproved.categoryId }?.name ?: "صيانة فنية"
+            val catName = categories.find { it.id == matchingApproved.categoryId }?.name ?: matchingApproved.customCategoryName.ifBlank { "صيانة فنية" }
             return JoinStatus.ApprovedTechnician(matchingApproved, catName)
         }
 
         // 4. Check Active Job Poster
         val matchingJob = jobs.find {
-            it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone && it.isActive
+            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && (it.isActive || it.isApproved) && !it.isDeleted
         }
         if (matchingJob != null) {
             return JoinStatus.ActiveJobPoster(matchingJob)
@@ -94,31 +95,74 @@ class JoinStatusUseCase {
 
         // 5. Check Active Client
         val matchingClient = registeredUsersList.find {
-            val p = (it["phone"] as? String)?.trim()?.replace(" ", "")?.replace("+", "") ?: ""
-            p == cleanPhone && (it["isApproved"] == true || it["status"] == "APPROVED")
+            val p = (it["phone"] as? String) ?: ""
+            AppPreferenceHelper.normalizePhoneNumber(p) == cleanPhone && (it["isApproved"] == true || it["status"] == "APPROVED" || it["approvalStatus"] == "APPROVED")
         }
         if (matchingClient != null) {
             return JoinStatus.ActiveClient(matchingClient)
         }
 
-        // 6. Check Rejection Notifications or Pending Provider Rejection Status
+        // 6. Check Pending entity with APPROVED status
         val matchingPending = pendingProviders.find { 
-            it.phone.trim().replace(" ", "").replace("+", "").replace("-", "") == cleanPhone 
+            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone 
         }
+        if (matchingPending != null && matchingPending.status == "APPROVED") {
+            val cat = matchingPending.categoryId.uppercase()
+            val custom = matchingPending.customCategoryName
+            val prof = matchingPending.profession.uppercase()
+            val pName = matchingPending.name
+
+            val isRestaurant = cat == "RESTAURANT" || custom.contains("مطعم") || pName.contains("مطعم")
+            val isMedical = cat == "MEDICAL" || custom.contains("طبي") || pName.contains("عيادة")
+            val isProperty = cat == "PROPERTY" || prof == "PROPERTY_OWNER"
+            val isJob = cat == "JOB" || prof == "JOB_POSTER"
+            val isStore = cat == "STORE" || prof == "STORE_OWNER"
+            val isClient = cat == "CLIENT" || prof == "CLIENT"
+
+            return when {
+                isRestaurant -> JoinStatus.ActiveStore(
+                    StoreEntity(id = "store_$cleanPhone", name = pName, phone = matchingPending.phone, sectionId = "restaurants", isActive = true, isApproved = true),
+                    "restaurants"
+                )
+                isMedical -> JoinStatus.ActiveStore(
+                    StoreEntity(id = "store_$cleanPhone", name = pName, phone = matchingPending.phone, sectionId = "medical", isActive = true, isApproved = true),
+                    "medical"
+                )
+                isStore -> JoinStatus.ActiveStore(
+                    StoreEntity(id = "store_$cleanPhone", name = pName, phone = matchingPending.phone, sectionId = "stores", isActive = true, isApproved = true),
+                    "stores"
+                )
+                isProperty -> JoinStatus.ActiveProperty(
+                    PropertyEntity(id = "prop_$cleanPhone", title = pName, phone = matchingPending.phone, isActive = true, isApproved = true)
+                )
+                isJob -> JoinStatus.ActiveJobPoster(
+                    JobEntity(id = "job_$cleanPhone", title = custom.ifBlank { "وظيفة - $pName" }, companyName = pName, phone = matchingPending.phone, isActive = true, isApproved = true)
+                )
+                isClient -> JoinStatus.ActiveClient(
+                    mapOf("name" to pName, "phone" to matchingPending.phone, "residence" to matchingPending.area, "isApproved" to true)
+                )
+                else -> JoinStatus.ApprovedTechnician(
+                    ProviderEntity(id = "prov_$cleanPhone", name = pName, phone = matchingPending.phone, categoryId = matchingPending.categoryId, subscriptionStatus = "APPROVED", isAvailable = true),
+                    matchingPending.customCategoryName.ifBlank { "صيانة فنية" }
+                )
+            }
+        }
+
+        // 7. Check Rejection Notifications or Pending Provider Rejection Status
         if (matchingPending != null && (matchingPending.status == "REJECTED" || matchingPending.reason.isNotBlank())) {
             return JoinStatus.Rejected(matchingPending.reason.ifBlank { "تم رفض طلب الانضمام من قبل الإدارة لعدم استيفاء الشروط." })
         }
 
         val rejectionNotif = notifications.find {
-            val cleanTarget = it.targetValue.trim().replace(" ", "").replace("+", "").replace("-", "")
+            val cleanTarget = AppPreferenceHelper.normalizePhoneNumber(it.targetValue)
             cleanTarget == cleanPhone && (it.title.contains("رفض") || it.message.contains("رفض"))
         }
         if (rejectionNotif != null) {
             return JoinStatus.Rejected(rejectionNotif.message)
         }
 
-        // 7. Check Pending entities in collections
-        if (matchingStore != null && !matchingStore.isActive) {
+        // 8. Check Pending entities in collections
+        if (matchingStore != null && !matchingStore.isActive && !matchingStore.isApproved) {
             val sec = matchingStore.sectionId.lowercase()
             val cat = matchingStore.categoryId.lowercase()
             return when {
@@ -127,11 +171,11 @@ class JoinStatusUseCase {
                 else -> JoinStatus.PendingStore(matchingStore)
             }
         }
-        if (matchingProperty != null && !matchingProperty.isActive) {
+        if (matchingProperty != null && !matchingProperty.isActive && !matchingProperty.isApproved) {
             return JoinStatus.PendingProperty(matchingProperty)
         }
         val pendingJob = jobs.find {
-            it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone && !it.isActive
+            AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone && !it.isActive && !it.isApproved
         }
         if (pendingJob != null) {
             return JoinStatus.PendingJob(pendingJob)

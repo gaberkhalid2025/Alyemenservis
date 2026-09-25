@@ -322,9 +322,15 @@
                     attributionControl: false,
                     fadeAnimation: true,
                     zoomAnimation: true
-                }).setView([userLat, userLng], 14);
+                }).setView([userLat, userLng], 13);
 
                 // High-performance direct tile layers for Yemen region
+                var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    subdomains: ['a', 'b', 'c'],
+                    attribution: '&copy; OpenStreetMap contributors'
+                });
+
                 var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                     maxZoom: 19,
                     subdomains: ['a', 'b', 'c', 'd'],
@@ -336,29 +342,21 @@
                     attribution: 'Esri World Street Map'
                 });
 
-                var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    subdomains: ['a', 'b', 'c'],
-                    attribution: '&copy; OpenStreetMap contributors'
-                });
-
-                var googleLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    subdomains: ['0', '1', '2', '3'],
-                    attribution: 'Google Maps'
-                });
-
-                // Add CartoDB Voyager as primary fast tile layer
-                cartoLayer.addTo(map);
+                // Add OpenStreetMap as primary 100% free tile layer
+                osmLayer.addTo(map);
 
                 // Tile error fallbacks
-                cartoLayer.on('tileerror', function() {
-                    console.warn("CartoDB tile notice, falling back to OpenStreetMap...");
-                    if (!map.hasLayer(osmLayer) && !map.hasLayer(googleLayer)) {
-                        osmLayer.addTo(map);
+                osmLayer.on('tileerror', function() {
+                    console.warn("OSM tile notice, trying CartoDB fallback...");
+                    if (!map.hasLayer(cartoLayer)) {
+                        cartoLayer.addTo(map);
                     }
-                    if (window.AndroidBridge && typeof window.AndroidBridge.onMapError === 'function') {
-                        window.AndroidBridge.onMapError("tile_failed");
+                });
+
+                cartoLayer.on('tileerror', function() {
+                    console.warn("CartoDB tile notice, falling back to Esri...");
+                    if (!map.hasLayer(esriLayer)) {
+                        esriLayer.addTo(map);
                     }
                 });
 

@@ -29,7 +29,9 @@ fun TabGalleryAlbums(
     onAddPhoto: (imageUrl: String) -> Unit,
     onDeletePhoto: (id: String) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
+    var itemToDelete by remember { mutableStateOf<GalleryAlbumEntity?>(null) }
     var newPhotoUrl by remember { mutableStateOf("") }
 
     Column(
@@ -84,7 +86,7 @@ fun TabGalleryAlbums(
                                 modifier = Modifier.fillMaxSize()
                             )
                             IconButton(
-                                onClick = { onDeletePhoto(item.id) },
+                                onClick = { itemToDelete = item },
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .padding(4.dp)
@@ -118,8 +120,11 @@ fun TabGalleryAlbums(
                     onClick = {
                         if (newPhotoUrl.isNotBlank()) {
                             onAddPhoto(newPhotoUrl)
+                            android.widget.Toast.makeText(context, "✅ تم إضافة الصورة إلى المعرض بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
                             newPhotoUrl = ""
                             showAddDialog = false
+                        } else {
+                            android.widget.Toast.makeText(context, "⚠️ يرجى اختيار أو رفع صورة أولاً", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
@@ -129,6 +134,34 @@ fun TabGalleryAlbums(
             },
             dismissButton = {
                 TextButton(onClick = { showAddDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
+
+    // حوار تأكيد الحذف لمنع الحذف العشوائي
+    if (itemToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = { Text("تأكيد الحذف", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = { Text("هل أنت متأكد من رغبتك في حذف هذه الصورة من معرض الأعمال؟ لا يمكن التراجع عن هذا الإجراء.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        itemToDelete?.let {
+                            onDeletePhoto(it.id)
+                            android.widget.Toast.makeText(context, "🗑️ تم حذف الصورة من المعرض بنجاح", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        itemToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("نعم، احذف", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
                     Text("إلغاء")
                 }
             }

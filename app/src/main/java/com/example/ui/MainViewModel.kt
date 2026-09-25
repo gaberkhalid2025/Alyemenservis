@@ -45,6 +45,30 @@ class MainViewModel @Inject constructor(
     val registrationHelper by lazy { com.example.ui.helpers.RegistrationHelper(db, auth, preferenceHelper) }
     val accountRecoveryHelper by lazy { com.example.ui.helpers.AccountRecoveryHelper(db, preferenceHelper) }
 
+    init {
+        viewModelScope.launch {
+            authViewModel.adminRole.collect { role ->
+                if (adminViewModel._adminRole.value != role) {
+                    adminViewModel._adminRole.value = role
+                }
+            }
+        }
+        viewModelScope.launch {
+            adminViewModel.adminRole.collect { role ->
+                if (authViewModel._adminRole.value != role) {
+                    authViewModel._adminRole.value = role
+                }
+            }
+        }
+        viewModelScope.launch {
+            authViewModel.currentSupervisorPermissions.collect { perms ->
+                if (adminViewModel.supervisorPermissions.value != perms) {
+                    adminViewModel._supervisorPermissions.value = perms
+                }
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         try {

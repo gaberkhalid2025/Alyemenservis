@@ -27,7 +27,10 @@ data class SimplifiedRegistrationState(
     val successMessage: String? = null
 ) {
     fun isFormValidForRole(role: String): Boolean {
-        return entityName.isNotBlank() && phone.trim().length >= 9 && password.length >= 6 && password == confirmPassword && agreedToTerms
+        val pass = password.trim()
+        val hasLetter = pass.any { it.isLetter() }
+        val hasDigit = pass.any { it.isDigit() }
+        return entityName.isNotBlank() && phone.trim().length >= 9 && pass.length >= 7 && hasLetter && hasDigit && password == confirmPassword && agreedToTerms
     }
 
     val isFormValid: Boolean
@@ -80,12 +83,22 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
 
     fun submit(onSuccess: (Map<String, String>) -> Unit) {
         val s = _state.value
+        val pass = s.password.trim()
+        val hasLetter = pass.any { it.isLetter() }
+        val hasDigit = pass.any { it.isDigit() }
+        
+        val passErr = when {
+            pass.isBlank() -> "يرجى إدخال كلمة المرور"
+            pass.length < 7 -> "يجب ألا تقل كلمة المرور عن 7 خانات"
+            !hasLetter || !hasDigit -> "يجب أن تحتوي كلمة المرور على أحرف وأرقام معاً"
+            else -> null
+        }
         
         var hasError = false
         var newState = s.copy(
-            entityNameError = if (s.entityName.isBlank()) "يرجى كتابة الاسم" else null,
-            phoneError = if (s.phone.trim().length < 9) "رقم الهاتف غير صحيح" else null,
-            passwordError = if (s.password.length < 6) "كلمة المرور قصيرة" else null,
+            entityNameError = if (s.entityName.isBlank()) "يرجى كتابة الاسم الرباعي" else null,
+            phoneError = if (s.phone.trim().length < 9) "رقم الهاتف غير صحيح (9 أرقام على الأقل)" else null,
+            passwordError = passErr,
             confirmPasswordError = if (s.password != s.confirmPassword) "كلمة المرور غير متطابقة" else null
         )
 

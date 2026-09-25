@@ -76,7 +76,7 @@ fun AppHeaderBar(
 
     val headerContext = LocalContext.current
     val headerSp = remember(headerContext) { headerContext.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
-    var headerReadIds by remember { mutableStateOf(headerSp.getStringSet("read_notif_ids", emptySet()) ?: emptySet()) }
+    val readNotificationIds by viewModel.readNotificationIds.collectAsState()
     
     // Calculate unread notifications count
     val filteredNotifs = remember(allNotifications, userPhoneState, adminRoleState) {
@@ -98,8 +98,8 @@ fun AppHeaderBar(
             }
         }
     }
-    val unreadNotifCount = remember(filteredNotifs, headerReadIds) {
-        if (filteredNotifs.isEmpty()) 0 else filteredNotifs.count { it.id !in headerReadIds }
+    val unreadNotifCount = remember(filteredNotifs, readNotificationIds) {
+        if (filteredNotifs.isEmpty()) 0 else filteredNotifs.count { it.id !in readNotificationIds }
     }
 
     // Calculate unread chats count

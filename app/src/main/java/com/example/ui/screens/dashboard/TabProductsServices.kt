@@ -28,7 +28,9 @@ fun TabProductsServices(
     onAddProduct: (title: String, priceYer: Double, description: String, imageUrl: String) -> Unit,
     onDeleteProduct: (id: String) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
+    var itemToDelete by remember { mutableStateOf<ProductItemEntity?>(null) }
     var titleInput by remember { mutableStateOf("") }
     var priceInput by remember { mutableStateOf("") }
     var descInput by remember { mutableStateOf("") }
@@ -78,12 +80,44 @@ fun TabProductsServices(
                         isAvailable = item.isAvailable,
                         themeColors = themeColors,
                         onEditClick = { /* Edit */ },
-                        onDeleteClick = { onDeleteProduct(item.id) },
+                        onDeleteClick = { itemToDelete = item },
                         onToggleAvailability = null
                     )
                 }
             }
         }
+    }
+
+    if (itemToDelete != null) {
+        val target = itemToDelete!!
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = { Text("تأكيد الحذف 🗑️", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },
+            text = {
+                Text(
+                    "هل أنت متأكد من رغبتك في حذف '${target.title}'؟ لن تتمكن من التراجع عن هذه الخطوة.",
+                    fontSize = 12.sp,
+                    color = Color.LightGray
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteProduct(target.id)
+                        itemToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("حذف نهائي", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text("إلغاء", color = Color.Gray)
+                }
+            },
+            containerColor = Color(0xFF1E293B)
+        )
     }
 
     if (showAddDialog) {
@@ -123,12 +157,14 @@ fun TabProductsServices(
                     onClick = {
                         val p = priceInput.toDoubleOrNull() ?: 0.0
                         if (titleInput.isNotBlank()) {
-                            onAddProduct(titleInput, p, descInput, imageInput)
+                            onAddProduct(titleInput.trim(), p, descInput.trim(), imageInput.trim())
                             titleInput = ""
                             priceInput = ""
                             descInput = ""
                             imageInput = ""
                             showAddDialog = false
+                        } else {
+                            android.widget.Toast.makeText(context, "يرجى إدخال اسم أو عنوان العنصر أولاً", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent)
