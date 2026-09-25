@@ -156,7 +156,9 @@ fun BookingDialog(
                 OutlinedTextField(
                     value = customerNameInput,
                     onValueChange = { customerNameInput = it },
-                    label = { Text("${settingsState.bookingLabelName} *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    label = { Text("الاسم الكامل *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    placeholder = { Text("أدخل الاسم الثلاثي", fontSize = 10.5.sp) },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     isError = bookingFormSubmittedOnce && customerNameInput.trim().isEmpty(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -165,8 +167,10 @@ fun BookingDialog(
                 OutlinedTextField(
                     value = customerPhoneInput,
                     onValueChange = { customerPhoneInput = it },
-                    label = { Text("${settingsState.bookingLabelPhone} *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    label = { Text("رقم الهاتف *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    placeholder = { Text("مثال: 777000111", fontSize = 10.5.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     isError = bookingFormSubmittedOnce && customerPhoneInput.trim().isEmpty(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -175,7 +179,9 @@ fun BookingDialog(
                 OutlinedTextField(
                     value = customerAreaInput,
                     onValueChange = { customerAreaInput = it },
-                    label = { Text("${settingsState.bookingLabelArea} *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    label = { Text("المنطقة والحي *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    placeholder = { Text("مثال: صنعاء - حدة", fontSize = 10.5.sp) },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     isError = bookingFormSubmittedOnce && customerAreaInput.trim().isEmpty(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
@@ -189,12 +195,13 @@ fun BookingDialog(
                         value = com.example.utils.BookingUtils.formatBookingDate(bookingDateInput),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("تاريخ الحجز واليوم *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                        label = { Text("تاريخ الحجز *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                        singleLine = true,
                         modifier = Modifier.weight(1f).clickable { datePickerDialog.show() },
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                         trailingIcon = {
                             IconButton(onClick = { datePickerDialog.show() }) {
-                                Text("📅", fontSize = 14.sp)
+                                Text("📅", fontSize = 13.sp)
                             }
                         }
                     )
@@ -203,12 +210,13 @@ fun BookingDialog(
                         value = bookingTimeInput,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("وقت وساعة الحجز *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                        label = { Text("وقت الحجز *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                        singleLine = true,
                         modifier = Modifier.weight(1f).clickable { timePickerDialog.show() },
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                         trailingIcon = {
                             IconButton(onClick = { timePickerDialog.show() }) {
-                                Text("⏰", fontSize = 14.sp)
+                                Text("⏰", fontSize = 13.sp)
                             }
                         }
                     )
@@ -217,8 +225,9 @@ fun BookingDialog(
                 OutlinedTextField(
                     value = customerServiceInput,
                     onValueChange = { customerServiceInput = it },
-                    label = { Text("شرح المشكلة وإضافة ملاحظات (اختياري)", color = themeColors.textSecondary, fontSize = 11.sp) },
-                    placeholder = { Text("اكتب أي ملاحظات أو تفاصيل للمشكلة إن وجدت...", color = Color.Gray, fontSize = 10.sp) },
+                    label = { Text("الملاحظات (اختياري)", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    placeholder = { Text("شرح المشكلة أو ملاحظات إن وجدت...", color = Color.Gray, fontSize = 10.sp) },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                 )
@@ -226,7 +235,9 @@ fun BookingDialog(
                 OutlinedTextField(
                     value = bookingPinCodeInput,
                     onValueChange = { bookingPinCodeInput = it },
-                    label = { Text("🔑 كلمة مرور سرية لحفظ وتأمين الحجز (مطلوب) *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    label = { Text("كلمة المرور للحجز *", color = themeColors.textSecondary, fontSize = 11.sp) },
+                    placeholder = { Text("كلمة سر لحفظ حجزك", fontSize = 10.5.sp) },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     isError = bookingFormSubmittedOnce && bookingPinCodeInput.trim().isEmpty(),
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)

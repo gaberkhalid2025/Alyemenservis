@@ -15,14 +15,14 @@ import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme =
   darkColorScheme(
-    primary = EmeraldGreen,
+    primary = WarmGoldAccent,
     onPrimary = White,
-    secondary = Gold,
+    secondary = AmberGoldHighlight,
     onSecondary = Black,
-    background = DarkGray,
-    onBackground = White,
-    surface = DarkGray,
-    onSurface = White,
+    background = SlateDarkBackground,
+    onBackground = TextPrimaryWhite,
+    surface = SlateCardSurface,
+    onSurface = TextPrimaryWhite,
   )
 
 private val LightColorScheme =

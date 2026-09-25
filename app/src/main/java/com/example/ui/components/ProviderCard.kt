@@ -282,7 +282,7 @@ fun ProviderCard(
                         modifier = Modifier.weight(1f).height(32.dp),
                         contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                     ) {
-                        Text("محادثة 💬", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("محادثة 💬", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
 
                     // زر التفاصيل (شاشة كاملة)
@@ -293,7 +293,7 @@ fun ProviderCard(
                         modifier = Modifier.weight(1f).height(32.dp),
                         contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                     ) {
-                        Text("التفاصيل 📋", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("التفاصيل 📋", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
 
                     // زر حجز الموعد
@@ -310,7 +310,7 @@ fun ProviderCard(
                         modifier = Modifier.weight(1f).height(32.dp),
                         contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                     ) {
-                        Text("حجز 📅", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("حجز 📅", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                     }
 
                     // زر الآراء والتقييمات
@@ -322,7 +322,7 @@ fun ProviderCard(
                         modifier = Modifier.weight(0.9f).height(32.dp),
                         contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                     ) {
-                        Text("⭐", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("⭐", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                     }
                 }
             }

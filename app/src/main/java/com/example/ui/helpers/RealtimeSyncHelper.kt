@@ -189,7 +189,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                     }
                 }.filter { !it.name.contains("ماهر") && it.id != "p_maher" }
 
-                val activeList = allList.filter { !it.isDeleted }
+                val activeList = allList.filter { !it.isDeleted && !it.isBlocked && (it.subscriptionStatus == "APPROVED" || it.subscriptionStatus == "ACTIVE" || it.subscriptionStatus.isBlank()) }
                 val deletedList = allList.filter { it.isDeleted }
 
                 appState._providers.value = activeList
@@ -206,7 +206,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         if (obj != null) {
                             val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
                             val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
-                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: act
+                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: false
                             val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
                             val vip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true
                             val rec = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true
@@ -247,7 +247,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                                 latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
                                 longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
                                 isDeleted = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true,
-                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: true,
+                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: false,
                                 isVip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true,
                                 isVerified = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true,
                                 isRecommended = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true,
@@ -262,7 +262,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         }
                     }
                 }
-                appState._stores.value = fetched.filter { !it.isDeleted }
+                appState._stores.value = fetched.filter { !it.isDeleted && it.isApproved && it.isActive && !it.isBlocked }
             }
         }
 
@@ -275,7 +275,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         if (obj != null) {
                             val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
                             val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
-                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: act
+                            val appr = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: false
                             val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
                             val vip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true
                             val rec = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true
@@ -315,7 +315,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                                 latitude = doc.getDouble("latitude") ?: doc.getString("latitude")?.toDoubleOrNull() ?: 15.3694,
                                 longitude = doc.getDouble("longitude") ?: doc.getString("longitude")?.toDoubleOrNull() ?: 44.1910,
                                 isDeleted = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true,
-                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: true,
+                                isApproved = doc.getBoolean("isApproved") ?: doc.getBoolean("approved") ?: false,
                                 isVip = doc.getBoolean("isVip") == true || doc.getBoolean("vip") == true,
                                 isVerified = doc.getBoolean("isVerified") == true || doc.getBoolean("verified") == true,
                                 isRecommended = doc.getBoolean("isRecommended") == true || doc.getBoolean("recommended") == true,
@@ -327,7 +327,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         }
                     }
                 }
-                appState._properties.value = fetched.filter { !it.isDeleted }
+                appState._properties.value = fetched.filter { !it.isDeleted && it.isApproved && it.isActive && !it.isBlocked }
             }
         }
 
@@ -373,6 +373,81 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                     }
                 }.sortedByDescending { it.timestamp }
                 appState._chatChannels.value = fetched
+            }
+        }
+
+        // 9. Pending Providers & Join Requests (Realtime Listener 9)
+        db.collection("pending_providers").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        val parsed = doc.toObject(PendingProviderEntity::class.java)
+                        parsed?.copy(id = doc.id)
+                    } catch (e: Exception) {
+                        try {
+                            PendingProviderEntity(
+                                id = doc.id,
+                                name = doc.getString("name") ?: doc.getString("ownerName") ?: "",
+                                phone = doc.getString("phone") ?: "",
+                                categoryId = doc.getString("categoryId") ?: "",
+                                area = doc.getString("area") ?: "",
+                                localNeighborhood = doc.getString("localNeighborhood") ?: "",
+                                status = doc.getString("status") ?: "PENDING",
+                                profession = doc.getString("profession") ?: "",
+                                customCategoryName = doc.getString("customCategoryName") ?: "",
+                                password = doc.getString("password") ?: ""
+                            )
+                        } catch (ex: Exception) {
+                            null
+                        }
+                    }
+                }
+                appState._pendingProviders.value = fetched
+            }
+        }
+
+        // 10. Registered Users (Realtime Listener 10)
+        db.collection("registered_users").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val fetched = snapshot.documents.mapNotNull { doc ->
+                    val data = doc.data?.toMutableMap() ?: mutableMapOf()
+                    data["id"] = doc.id
+                    data
+                }
+                appState._registeredUsersList.value = fetched
+                appState._registeredUsersCount.value = fetched.size
+            }
+        }
+
+        // 11. Fallback Sync from join_requests collection for any pending request
+        db.collection("join_requests").whereEqualTo("status", "PENDING").limit(REALTIME_QUERY_LIMIT).addSnapshotListenerReg { snapshot, error ->
+            if (error == null && snapshot != null) {
+                val currentPending = appState._pendingProviders.value.associateBy { it.id }.toMutableMap()
+                var updated = false
+                snapshot.documents.forEach { doc ->
+                    val docId = doc.id
+                    if (!currentPending.containsKey(docId)) {
+                        val type = doc.getString("type") ?: "CLIENT"
+                        val phone = doc.getString("phone") ?: ""
+                        val name = doc.getString("fullName") ?: doc.getString("name") ?: doc.getString("businessName") ?: "طلب انضمام جديد"
+                        val city = doc.getString("city") ?: doc.getString("area") ?: ""
+                        val entity = PendingProviderEntity(
+                            id = docId,
+                            name = name,
+                            phone = phone,
+                            categoryId = type,
+                            area = city,
+                            status = "PENDING",
+                            profession = type,
+                            providerType = type
+                        )
+                        currentPending[docId] = entity
+                        updated = true
+                    }
+                }
+                if (updated) {
+                    appState._pendingProviders.value = currentPending.values.toList()
+                }
             }
         }
     }

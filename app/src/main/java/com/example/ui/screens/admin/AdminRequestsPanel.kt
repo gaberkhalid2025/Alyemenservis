@@ -69,10 +69,10 @@ fun AdminRequestsPanel(
     val pendingStoresCount = pendingRegularStores.size + pendingStoresProviders.size
 
     val pendingJobsList = jobs.filter { !it.isApproved && !it.isDeleted }
-    val pendingJobsProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "JOB" || it.profession == "JOB_POSTER" || it.categoryId.contains("وظيفة") || it.categoryId.contains("توظيف")) }
+    val pendingJobsProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId.equals("JOB", ignoreCase = true) || it.categoryId.equals("JOB_SEEKER", ignoreCase = true) || it.profession == "JOB_POSTER" || it.profession == "JOB_SEEKER" || it.categoryId.contains("وظيفة") || it.categoryId.contains("توظيف") || it.categoryId.contains("باحث")) }
     val pendingJobsCount = pendingJobsList.size + pendingJobsProviders.size
 
-    val pendingClientsProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId == "CLIENT" || it.profession == "CLIENT" || it.categoryId.contains("عميل")) }
+    val pendingClientsProviders = pendingProviders.filter { (it.status == "PENDING" || it.status.isEmpty()) && (it.categoryId.equals("CLIENT", ignoreCase = true) || it.profession.equals("CLIENT", ignoreCase = true) || it.providerType.equals("CLIENT", ignoreCase = true) || it.categoryId.contains("عميل")) }
 
     val activeServicesPending = pendingProviders.filter {
         (it.status == "PENDING" || it.status.isEmpty()) &&

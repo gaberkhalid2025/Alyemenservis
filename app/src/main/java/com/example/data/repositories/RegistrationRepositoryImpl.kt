@@ -47,6 +47,7 @@ class RegistrationRepositoryImpl(
                 return
             }
             val notifId = UUID.randomUUID().toString()
+            val userNotifId = UUID.randomUUID().toString()
             val typeTitle = when (type) {
                 "PROVIDER" -> "مهني / فني"
                 "STORE" -> "متجر / محل تجاري"
@@ -54,15 +55,33 @@ class RegistrationRepositoryImpl(
                 "MEDICAL" -> "مركز طبي / دكتور"
                 "PROPERTY" -> "عقار / مكتب عقاري"
                 "JOB" -> "إعلان توظيف / صاحب عمل"
+                "JOB_SEEKER" -> "متقدم للوظائف"
                 "CLIENT" -> "عميل جديد"
                 else -> type
             }
+
+            // 1. Admin Notification
             val notification = NotificationEntity(
                 id = notifId,
                 title = "📥 طلب انضمام جديد ($typeTitle)",
-                message = "قدم $applicantName ($phone) طلب انضمام جديد. يرجى مراجعة بيانات الطلب والموافقة عليه.",
+                message = "قدم $applicantName ($phone) طلب انضمام جديد كـ ($typeTitle). يرجى مراجعة بيانات الطلب والموافقة عليه.",
                 targetType = "ADMIN",
-                targetValue = "",
+                targetValue = "ALL",
+                notificationType = "JOIN_REQUEST",
+                relatedRequestId = requestId,
+                isRead = false,
+                fcmSent = false,
+                timestamp = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis()
+            )
+
+            // 2. Applicant Notification
+            val userNotification = NotificationEntity(
+                id = userNotifId,
+                title = "📨 تم استلام طلب انضمامك بنجاح",
+                message = "أهلاً $applicantName، تم استلام طلب تسجيلك كـ ($typeTitle) وجاري مراجعته والتحقق من البيانات من قِبل إدارة التطبيق. نسعد بانضمامك وسنبلغك بإشعار فور التفعيل والاعتماد!",
+                targetType = "USER",
+                targetValue = phone,
                 notificationType = "JOIN_REQUEST",
                 relatedRequestId = requestId,
                 isRead = false,
@@ -72,9 +91,10 @@ class RegistrationRepositoryImpl(
             )
 
             firestore.collection("notifications").document(notifId).set(notification).await()
+            firestore.collection("notifications").document(userNotifId).set(userNotification).await()
             deduplicator.markJoinNotificationSent(requestId, "JOIN_REQUEST")
         } catch (e: Exception) {
-            Log.e("RegistrationRepository", "Failed to send admin notification", e)
+            Log.e("RegistrationRepository", "Failed to send join notifications", e)
         }
     }
 

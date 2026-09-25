@@ -31,12 +31,12 @@ class HolidayManagerTest {
         val providerId = "prov_vacation_1"
         val vacationDate = "2026-10-15"
 
-        HolidayManager.addCustomProviderHoliday(providerId, vacationDate)
+        HolidayManager.addProviderHoliday(providerId, vacationDate)
         val (isVacation, vacationMsg) = HolidayManager.isDateHoliday(vacationDate, providerId)
         assertTrue("Provider custom vacation should be a holiday", isVacation)
         assertTrue(vacationMsg?.contains("إجازة خاصة") == true)
 
-        HolidayManager.removeCustomProviderHoliday(providerId, vacationDate)
+        HolidayManager.removeProviderHoliday(providerId, vacationDate)
     }
 
     @Test

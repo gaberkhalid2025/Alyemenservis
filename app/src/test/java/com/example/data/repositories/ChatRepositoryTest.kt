@@ -89,10 +89,9 @@ class ChatRepositoryTest {
     @Test
     fun `test sendMessage with attachment - succeeds`() = runTest {
         val attachment = ChatAttachment(
-            id = "att_1",
-            type = "IMAGE",
             url = "https://example.com/img.jpg",
-            name = "image.jpg"
+            fileName = "image.jpg",
+            mimeType = "image/jpeg"
         )
         val result = repository.sendMessage(
             channelId = "c2",

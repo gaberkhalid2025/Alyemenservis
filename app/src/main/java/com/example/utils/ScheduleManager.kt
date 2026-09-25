@@ -127,6 +127,10 @@ object ScheduleManager {
         return result
     }
 
+    fun formatHour12(hour24: Int): String {
+        return formatHourToArabicString(hour24)
+    }
+
     private fun formatHourToArabicString(hour24: Int): String {
         val period = if (hour24 < 12) "ص" else "م"
         val hour12 = when {

@@ -17,13 +17,15 @@ class ChatMessagesManagerTest {
     @get:Rule
     val coroutineRule = CoroutineTestRule()
 
-    private lateinit var manager: ChatMessagesManager
     private val fakeRepo = TestMockFactory.createChatRepository()
+    private lateinit var manager: ChatMessagesManager
 
     @Before
     fun setup() {
-        manager = ChatMessagesManager(fakeRepo, coroutineRule.testScope)
+        manager = ChatMessagesManager(fakeRepo, kotlinx.coroutines.CoroutineScope(coroutineRule.testDispatcher))
     }
+
+
 
     @Test
     fun testUpdateMessagesList() {

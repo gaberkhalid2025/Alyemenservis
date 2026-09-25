@@ -495,7 +495,7 @@ fun RegisterScreen(
                             }
                             Text(selectedType?.icon ?: "📋", fontSize = 18.sp)
                             Text(
-                                text = "استمارة: ${selectedType?.title}",
+                                text = selectedType?.title ?: "استمارة التسجيل",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White

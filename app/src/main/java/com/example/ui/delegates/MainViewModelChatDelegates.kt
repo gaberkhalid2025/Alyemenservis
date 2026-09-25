@@ -122,9 +122,22 @@ fun MainViewModel.openOrCreateChatChannel(
     relatedEntityType: String = "",
     onCreated: (ChatChannelEntity?) -> Unit
 ) {
-    val currentUserId = authViewModel.getOrGenerateUserId()
-    val currentUserName = authViewModel.currentUserName.value.ifBlank { "العميل" }
-    val currentUserPhoto = ""
+    val myUserId = currentUserId.value
+    val isGuest = myUserId.isBlank() || myUserId == "guest" || currentUserPhone.value.isBlank()
+    if (isGuest) {
+        triggerNotification("⚠️ يجب تسجيل الدخول أو إنشاء حساب لبدء محادثة فورية")
+        onCreated(null)
+        return
+    }
+
+    val isChatDisabled = settings.value.disableChatAll || settings.value.chatRoutingMode == "DISABLED"
+    if (isChatDisabled) {
+        triggerNotification("⚠️ تم تعطيل خدمة المحادثات الفورية مؤقتاً من قبل الإدارة")
+        onCreated(null)
+        return
+    }
+
+    val curUserName = currentUserName.value.ifBlank { "العميل" }
     val mode = settings.value.chatRoutingMode
 
     val (finalTargetId, finalTargetName, channelType) = when (mode) {
@@ -134,17 +147,17 @@ fun MainViewModel.openOrCreateChatChannel(
             ChannelType.SUPPORT
         )
         else -> Triple(
-            targetId,
-            targetName,
+            targetId.ifBlank { targetPhone.ifBlank { "provider_$targetName" } },
+            targetName.ifBlank { "مقدم الخدمة" },
             ChannelType.PRIVATE
         )
     }
     
     viewModelScope.launch {
         val result = chatRepo.getOrCreateChannel(
-            currentUserId = currentUserId,
-            currentUserName = currentUserName,
-            currentUserPhoto = currentUserPhoto,
+            currentUserId = myUserId,
+            currentUserName = curUserName,
+            currentUserPhoto = "",
             otherUserId = finalTargetId,
             otherUserName = finalTargetName,
             otherUserPhoto = "",

@@ -139,13 +139,15 @@ class RegistrationHelper(
                 "MEDICAL" -> "MEDICAL"
                 "PROPERTY" -> "PROPERTY"
                 "JOB" -> "JOB"
+                "JOB_SEEKER" -> "JOB_SEEKER"
                 "CLIENT" -> "CLIENT"
-                else -> "PROVIDER"
+                else -> if (catId.contains("وظيف", ignoreCase = true) || customCategoryName.contains("باحث", ignoreCase = true) || customCategoryName.contains("متقدم", ignoreCase = true)) "JOB_SEEKER" else "PROVIDER"
             }
             val requestProfession = when (requestType) {
                 "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
                 "PROPERTY" -> "PROPERTY_OWNER"
                 "JOB" -> "JOB_POSTER"
+                "JOB_SEEKER" -> "JOB_SEEKER"
                 "CLIENT" -> "CLIENT"
                 else -> "PROVIDER"
             }
@@ -243,127 +245,14 @@ class RegistrationHelper(
             )
             db.collection("join_requests").document(requestDocId).set(joinRequestMap)
                 .addOnSuccessListener {
-                    try {
-                        when (requestType.uppercase()) {
-                            "STORE", "RESTAURANT", "MEDICAL" -> {
-                                val secId = if (requestType == "RESTAURANT") "restaurants" else if (requestType == "MEDICAL") "medical" else "stores"
-                                val catName = when (requestType) {
-                                    "RESTAURANT" -> "مطاعم وكافيهات"
-                                    "MEDICAL" -> "مراكز طبية وعيادات"
-                                    else -> "محلات ومراكز تجارية"
-                                }
-                                val newStore = StoreEntity(
-                                    id = requestDocId,
-                                    name = name,
-                                    phone = cleanPhone,
-                                    ownerId = currentAuthUid.ifEmpty { cleanPhone },
-                                    ownerName = name,
-                                    cityId = area,
-                                    localNeighborhood = neighborhood,
-                                    sectionId = secId,
-                                    categoryId = catName,
-                                    isActive = false,
-                                    isApproved = false,
-                                    password = securedPasswordHash
-                                )
-                                val storeMap = mapOf(
-                                    "id" to requestDocId,
-                                    "uid" to currentAuthUid,
-                                    "ownerId" to (currentAuthUid.ifEmpty { cleanPhone }),
-                                    "name" to name,
-                                    "phone" to cleanPhone,
-                                    "ownerName" to name,
-                                    "cityId" to area,
-                                    "localNeighborhood" to neighborhood,
-                                    "sectionId" to secId,
-                                    "categoryId" to catName,
-                                    "isActive" to false,
-                                    "isApproved" to false,
-                                    "password" to securedPasswordHash,
-                                    "passwordHash" to securedPasswordHash,
-                                    "createdAt" to System.currentTimeMillis()
-                                )
-                                db.collection("stores").document(requestDocId).set(storeMap)
-                                onStoreAdded(newStore)
-                            }
-                            "PROPERTY" -> {
-                                val newProp = PropertyEntity(
-                                    id = requestDocId,
-                                    title = if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب عقاري - $name",
-                                    phone = cleanPhone,
-                                    ownerId = currentAuthUid.ifEmpty { cleanPhone },
-                                    cityId = area,
-                                    localNeighborhood = neighborhood,
-                                    isActive = false,
-                                    isApproved = false,
-                                    password = securedPasswordHash
-                                )
-                                val propMap = mapOf(
-                                    "id" to requestDocId,
-                                    "uid" to currentAuthUid,
-                                    "ownerId" to (currentAuthUid.ifEmpty { cleanPhone }),
-                                    "title" to (if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب عقاري - $name"),
-                                    "phone" to cleanPhone,
-                                    "cityId" to area,
-                                    "localNeighborhood" to neighborhood,
-                                    "isActive" to false,
-                                    "isApproved" to false,
-                                    "password" to securedPasswordHash,
-                                    "passwordHash" to securedPasswordHash,
-                                    "createdAt" to System.currentTimeMillis()
-                                )
-                                db.collection("properties").document(requestDocId).set(propMap)
-                                onPropertyAdded(newProp)
-                            }
-                            "JOB" -> {
-                                val newJob = JobEntity(
-                                    id = requestDocId,
-                                    title = if (customCategoryName.isNotBlank()) customCategoryName else "وظيفة - $name",
-                                    companyName = name,
-                                    phone = cleanPhone,
-                                    cityId = area,
-                                    isActive = false,
-                                    isApproved = false
-                                )
-                                val jobMap = mapOf(
-                                    "id" to requestDocId,
-                                    "uid" to currentAuthUid,
-                                    "publisherId" to (currentAuthUid.ifEmpty { cleanPhone }),
-                                    "title" to (if (customCategoryName.isNotBlank()) customCategoryName else "وظيفة - $name"),
-                                    "companyName" to name,
-                                    "phone" to cleanPhone,
-                                    "cityId" to area,
-                                    "isActive" to false,
-                                    "isApproved" to false,
-                                    "createdAt" to System.currentTimeMillis()
-                                )
-                                db.collection("jobs").document(requestDocId).set(jobMap)
-                                onJobAdded(newJob)
-                            }
-                            "CLIENT" -> {
-                                val userMap = mapOf(
-                                    "id" to requestDocId,
-                                    "uid" to currentAuthUid,
-                                    "userId" to currentAuthUid,
-                                    "name" to name,
-                                    "phone" to cleanPhone,
-                                    "residence" to area,
-                                    "isApproved" to false,
-                                    "createdAt" to System.currentTimeMillis()
-                                )
-                                db.collection("users").document(requestDocId).set(userMap)
-                                db.collection("registered_users").document(cleanPhone).set(userMap)
-                                onClientAdded(userMap)
-                            }
-                        }
-                    } catch (e: Exception) {}
-
                     val adminNotifTitle = when (requestType) {
                         "STORE" -> "🏪 طلب انضمام متجر جديد"
                         "RESTAURANT" -> "🍔 طلب انضمام مطعم / كافيه جديد"
                         "MEDICAL" -> "🏥 طلب انضمام مركز طبي جديد"
                         "PROPERTY" -> "🏠 طلب إضافة عقار جديد"
                         "JOB" -> "💼 طلب إعلان وظيفة جديدة"
+                        "JOB_SEEKER" -> "💼 طلب انضمام متقدم للوظائف"
+                        "CLIENT" -> "👤 طلب تسجيل حساب عميل جديد"
                         else -> "🔧 طلب انضمام فني جديد"
                     }
                     val entityLabel = when (requestType) {
@@ -372,21 +261,23 @@ class RegistrationHelper(
                         "MEDICAL" -> "مركز طبي / عيادة"
                         "PROPERTY" -> "عقار"
                         "JOB" -> "إعلان وظيفي"
+                        "JOB_SEEKER" -> "متقدم للوظيفة"
+                        "CLIENT" -> "عميل / مستخدم عادي"
                         else -> "مهني / فني"
                     }
                     val adminNotif = NotificationEntity(
                         id = UUID.randomUUID().toString(),
                         title = adminNotifTitle,
-                        message = "قدم $name طلب انضمام جديد كـ ($entityLabel) في قسم ${if (customCategoryName.isNullOrBlank()) catId else customCategoryName} بمنطقة $area.",
+                        message = "قدم $name طلب تسجيل جديد كـ ($entityLabel) في مدينة/منطقة $area.",
                         targetType = "SUPERVISOR",
                         targetValue = "ALL",
+                        notificationType = "JOIN_REQUEST",
+                        relatedRequestId = requestDocId,
                         timestamp = System.currentTimeMillis()
                     )
                     try {
                         db.collection("notifications").document(adminNotif.id).set(adminNotif)
                     } catch (e: Exception) {}
-                    
-                    triggerNotification("📨 تم تقديم طلبك ورفع المستندات بنجاح، جاري المراجعة من الإدارة")
                 }
                 .addOnFailureListener { e ->
                     val errorMsg = e.localizedMessage ?: "تأكد من صغر حجم الصور واتصالك بالإنترنت"
@@ -403,16 +294,18 @@ class RegistrationHelper(
                 "MEDICAL" -> "مركز طبي / عيادة"
                 "PROPERTY" -> "عقار"
                 "JOB" -> "إعلان وظيفة"
+                "JOB_SEEKER" -> "متقدم للوظيفة"
+                "CLIENT" -> "حساب عميل"
                 else -> "فني / مهني"
             }
             addApplicantNotification(
-                "📨 تم استلام طلبك بنجاح ($userEntityLabel)",
-                "مرحباً $name، تم استلام طلبك كـ ($userEntityLabel) وجاري مراجعته والتحقق من البيانات والمستندات من قِبل إدارة التطبيق. نسعد بانضمامك وسنبلغك بإشعار فور التفعيل!",
+                "📨 تم استلام طلب انضمامك بنجاح",
+                "مرحباً $name، تم استلام طلب تسجيلك كـ ($userEntityLabel) وجاري مراجعته والتحقق من البيانات من قِبل إدارة التطبيق. نسعد بانضمامك وسنبلغك بإشعار فور التفعيل والاعتماد!",
                 "USER",
-                phone
+                cleanPhone
             )
 
-            triggerNotification("📨 تم تقديم طلبك بنجاح، سيتم مراجعته من قبل الإدارة")
+            triggerNotification("📨 تم إرسال طلب انضمامك بنجاح، وهو قيد المراجعة لدى الإدارة")
             onNavigateToScreen("JOIN_REQUEST_STATUS")
             } catch (e: Exception) {
                 e.printStackTrace()

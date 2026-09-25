@@ -149,7 +149,6 @@ fun MainViewModel.addNotification(
     } catch (e: Exception) {
         android.util.Log.e("MainViewModel", "Error: ", e)
     }
-    triggerNotification("🔔 تم إرسال الإشعار الموثوق بنجاح!")
 }
 
 fun MainViewModel.markNotificationAsRead(context: Context, notifId: String) {

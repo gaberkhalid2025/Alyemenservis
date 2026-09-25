@@ -273,8 +273,8 @@ fun UnifiedRegistrationForm(
             OutlinedTextField(
                 value = phone,
                 onValueChange = { phone = it },
-                label = { Text("رقم الهاتف * (9 أرقام بدون مفتاح)", fontSize = 12.sp) },
-                placeholder = { Text("77XXXXXXX أو 73XXXXXXX", fontSize = 11.sp) },
+                label = { Text("رقم الهاتف *", fontSize = 12.sp) },
+                placeholder = { Text("77XXXXXXX أو 73XXXXXXX (9 أرقام)", fontSize = 11.sp) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -284,7 +284,8 @@ fun UnifiedRegistrationForm(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("كلمة المرور * (7 خانات على الأقل - حروف وأرقام)", fontSize = 12.sp) },
+                label = { Text("كلمة المرور *", fontSize = 12.sp) },
+                placeholder = { Text("7 خانات على الأقل (حروف وأرقام)", fontSize = 11.sp) },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
@@ -305,6 +306,7 @@ fun UnifiedRegistrationForm(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
                 label = { Text("تأكيد كلمة المرور *", fontSize = 12.sp) },
+                placeholder = { Text("إعادة كتابة كلمة المرور", fontSize = 11.sp) },
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
@@ -323,19 +325,30 @@ fun UnifiedRegistrationForm(
             // 6️⃣ حقل التخصص / النشاط / المجال
             if (normalizedRole in listOf("PROVIDER", "TECHNICIAN", "JOB_SEEKER", "STORE", "RESTAURANT", "MEDICAL", "PROPERTY", "JOB", "JOB_POSTER")) {
                 val specLabel = when (normalizedRole) {
-                    "PROVIDER", "TECHNICIAN" -> "المهنة / التخصص * (مثال: كهربائي منازل، سباك)"
-                    "JOB_SEEKER" -> "المجال المطلوب * (مثال: محاسبة، تسويق، إدارة)"
-                    "STORE" -> "نوع النشاط * (مثال: إلكترونيات، مواد غذائية، ملابس)"
-                    "RESTAURANT" -> "نوع المأكولات * (مثال: مأكولات شعبية، مشويات، وجبات سريعة)"
-                    "MEDICAL" -> "التخصصات * (مثال: باطنية، أسنان، صيدلية شاملة)"
-                    "PROPERTY" -> "أنواع العقارات * (مثال: شقق تمليك، أراضي، إيجارات)"
-                    "JOB", "JOB_POSTER" -> "مجال الشركة * (مثال: تقنية معلومات، مقاولات)"
-                    else -> "التخصص / النشاط *"
+                    "PROVIDER", "TECHNICIAN" -> "المهنة والتخصص *"
+                    "JOB_SEEKER" -> "المجال المطلوب *"
+                    "STORE" -> "نوع النشاط *"
+                    "RESTAURANT" -> "نوع المأكولات *"
+                    "MEDICAL" -> "التخصصات الطبيّة *"
+                    "PROPERTY" -> "أنواع العقارات *"
+                    "JOB", "JOB_POSTER" -> "مجال الشركة *"
+                    else -> "التخصص والنشاط *"
+                }
+                val specPlaceholder = when (normalizedRole) {
+                    "PROVIDER", "TECHNICIAN" -> "مثال: كهربائي منازل، سباك"
+                    "JOB_SEEKER" -> "مثال: محاسبة، تسويق، إدارة"
+                    "STORE" -> "مثال: إلكترونيات، مواد غذائية"
+                    "RESTAURANT" -> "مثال: مأكولات شعبية، وجبات سريعة"
+                    "MEDICAL" -> "مثال: باطنية، أسنان، صيدلية"
+                    "PROPERTY" -> "مثال: شقق تمليك، أراضي، إيجارات"
+                    "JOB", "JOB_POSTER" -> "مثال: تقنية معلومات، مقاولات"
+                    else -> "أدخل التخصص أو النشاط"
                 }
                 OutlinedTextField(
                     value = specialization,
                     onValueChange = { specialization = it },
                     label = { Text(specLabel, fontSize = 12.sp) },
+                    placeholder = { Text(specPlaceholder, fontSize = 11.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -346,7 +359,8 @@ fun UnifiedRegistrationForm(
                 OutlinedTextField(
                     value = experienceYears,
                     onValueChange = { experienceYears = it },
-                    label = { Text("سنوات الخبرة * (مثال: 3 سنوات)", fontSize = 12.sp) },
+                    label = { Text("سنوات الخبرة *", fontSize = 12.sp) },
+                    placeholder = { Text("مثال: 3 سنوات", fontSize = 11.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -354,11 +368,12 @@ fun UnifiedRegistrationForm(
 
             // 8️⃣ حقل ساعات العمل
             if (normalizedRole in listOf("RESTAURANT", "STORE")) {
-                val hoursLabel = if (normalizedRole == "RESTAURANT") "ساعات العمل * (مثال: 8:00 ص - 12:00 م)" else "ساعات العمل (اختياري)"
+                val hoursLabel = if (normalizedRole == "RESTAURANT") "ساعات العمل *" else "ساعات العمل (اختياري)"
                 OutlinedTextField(
                     value = workingHours,
                     onValueChange = { workingHours = it },
                     label = { Text(hoursLabel, fontSize = 12.sp) },
+                    placeholder = { Text("مثال: 8:00 ص - 12:00 م", fontSize = 11.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -376,6 +391,7 @@ fun UnifiedRegistrationForm(
                     readOnly = true,
                     label = { Text("المدينة / المحافظة *", fontSize = 12.sp) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCity) },
+                    singleLine = true,
                     modifier = Modifier.menuAnchor().fillMaxWidth()
                 )
                 ExposedDropdownMenu(
@@ -398,7 +414,7 @@ fun UnifiedRegistrationForm(
             OutlinedTextField(
                 value = address,
                 onValueChange = { address = it },
-                label = { Text("الحي / العنوان بالتفصيل *", fontSize = 12.sp) },
+                label = { Text("الحي والعنوان *", fontSize = 12.sp) },
                 placeholder = { Text("مثال: شارع الستين - بجوار جولة عصر", fontSize = 11.sp) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -411,7 +427,7 @@ fun UnifiedRegistrationForm(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("هل يوفر خدمة التوصيل للمنازل؟ (اختياري)", fontSize = 12.sp, color = Color.White)
+                    Text("خدمة التوصيل للمنازل (اختياري)", fontSize = 12.sp, color = Color.White)
                     Switch(
                         checked = extraOption1,
                         onCheckedChange = { extraOption1 = it },
@@ -426,7 +442,7 @@ fun UnifiedRegistrationForm(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("هل يوفر خدمة الطوارئ على مدار 24 ساعة؟ (اختياري)", fontSize = 12.sp, color = Color.White)
+                    Text("خدمة الطوارئ 24 ساعة (اختياري)", fontSize = 12.sp, color = Color.White)
                     Switch(
                         checked = extraOption1,
                         onCheckedChange = { extraOption1 = it },
@@ -438,10 +454,10 @@ fun UnifiedRegistrationForm(
             // 1️⃣2️⃣ حقول اختيارية للوصف أو السيرة الذاتية أو المؤهل العلمي
             if (normalizedRole in listOf("JOB_SEEKER", "PROVIDER", "TECHNICIAN", "STORE", "PROPERTY", "JOB", "JOB_POSTER")) {
                 val notesLabel = when (normalizedRole) {
-                    "PROVIDER", "TECHNICIAN" -> "نبذة عن الخدمات المقدمة (اختياري)"
-                    "JOB_SEEKER" -> "المؤهل العلمي ونبذة عن الخبرات ورابط الـ CV (اختياري)"
-                    "STORE" -> "وصف مختصر للمتجر والمنتجات (اختياري)"
-                    "PROPERTY" -> "نبذة عن المكتب والخدمات العقارية (اختياري)"
+                    "PROVIDER", "TECHNICIAN" -> "نبذة عن الخدمات (اختياري)"
+                    "JOB_SEEKER" -> "المؤهل ورابط السيرة الذاتية (اختياري)"
+                    "STORE" -> "وصف مختصر للمتجر (اختياري)"
+                    "PROPERTY" -> "نبذة عن المكتب العقاري (اختياري)"
                     "JOB", "JOB_POSTER" -> "نبذة عن الشركة ومزايا العمل (اختياري)"
                     else -> "ملاحظات إضافية (اختياري)"
                 }
@@ -449,7 +465,8 @@ fun UnifiedRegistrationForm(
                     value = notesOrDescription,
                     onValueChange = { notesOrDescription = it },
                     label = { Text(notesLabel, fontSize = 12.sp) },
-                    maxLines = 3,
+                    placeholder = { Text("أدخل تفاصيل إضافية هنا...", fontSize = 11.sp) },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

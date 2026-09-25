@@ -184,6 +184,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
 
     val context = LocalContext.current
     var showLogsDialog by remember { mutableStateOf(false) }
+    var showRegistrationTestScreen by remember { mutableStateOf(false) }
     val sp = remember { context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
     var rememberLoginInput by remember { mutableStateOf(sp.getString("saved_admin_role", "GUEST") != "GUEST") }
     var adminUsernameInput by remember { mutableStateOf(settingsState.adminUsername) }
@@ -1373,6 +1374,25 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
 
         Button(
             onClick = {
+                showRegistrationTestScreen = true
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "تشغيل اختبار التسجيل",
+                tint = Color.Black,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("🧪 تشغيل اختبار التسجيل الشامل للأقسام 8", color = Color.Black, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = {
                 showWipeConfirmDialog = true
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
@@ -1392,6 +1412,14 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             com.example.utils.ErrorLogsViewerDialog(
                 themeColors = themeColors,
                 onDismiss = { showLogsDialog = false }
+            )
+        }
+
+        if (showRegistrationTestScreen) {
+            RegistrationTestScreen(
+                viewModel = viewModel,
+                themeColors = themeColors,
+                onDismiss = { showRegistrationTestScreen = false }
             )
         }
     }
