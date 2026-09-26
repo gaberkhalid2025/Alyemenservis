@@ -344,12 +344,12 @@ class StatusRepositoryImpl(
                 "updatedAt" to now
             ))
 
-            // Update status in pending_providers as well
+            // Update status in pending_providers as well safely with merge
             val pendingRef = firestore.collection("pending_providers").document(request.id)
-            batch.update(pendingRef, mapOf(
+            batch.set(pendingRef, mapOf(
                 "status" to "REJECTED",
                 "reason" to finalReason
-            ))
+            ), com.google.firebase.firestore.SetOptions.merge())
 
             // Create notification for user
             val notifId = java.util.UUID.randomUUID().toString()

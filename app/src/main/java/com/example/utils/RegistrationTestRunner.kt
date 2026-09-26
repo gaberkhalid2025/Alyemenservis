@@ -300,7 +300,7 @@ class RegistrationTestRunner(private val context: Context) {
                     var isMoved = false
                     when (type) {
                         "CLIENT" -> {
-                            val userDoc = db.collection("registered_users").document(id).get().await()
+                            val userDoc = db.collection("registered_users").document(phone).get().await()
                             if (userDoc.exists()) isMoved = true
                         }
                         "PROVIDER" -> {

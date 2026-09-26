@@ -2,15 +2,20 @@ package com.example.ui.screens.admin
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
-import androidx.compose.foundation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,14 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.MainViewModel
 import com.example.utils.*
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.coroutines.launch
 
 enum class TestSystem(val label: String, val icon: String) {
-    REGISTRATION("التسجيل", "🎫"),
+    REGISTRATION("التسجيل (8 أقسام)", "🎫"),
     BOOKINGS("الحجوزات", "📅"),
     INSTANT_REQUESTS("الطلبات العاجلة", "⚡"),
     CHATS("المحادثات", "💬"),
@@ -40,9 +42,12 @@ enum class TestSystem(val label: String, val icon: String) {
     REVIEWS("التقييمات", "⭐"),
     NOTIFICATIONS("الإشعارات", "🔔"),
     REPORTS("التقارير", "📢"),
-    MAPS("الخريطة", "🗺️"),
+    MAPS("الخريطة GPS", "🗺️"),
     SEARCH("البحث", "🔍"),
-    RUN_ALL("تشغيل الكل", "🧪")
+    PROFILES("الملفات الشخصية (8)", "👤"),
+    PERMISSIONS("صلاحيات الأدمن والمالك", "🛡️"),
+    SETTINGS_SYNC("الإعدادات والمزامنة", "⚙️"),
+    RUN_ALL("تشغيل الفحص الشامل (13)", "🧪")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,7 +61,7 @@ fun RegistrationTestScreen(
     val scope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
 
-    // Initialize all test runners
+    // Initialize all 13 test runners
     val regRunner = remember { RegistrationTestRunner(context) }
     val bookingRunner = remember { BookingTestRunner(context) }
     val instantRunner = remember { InstantRequestTestRunner(context) }
@@ -67,10 +72,15 @@ fun RegistrationTestScreen(
     val reportRunner = remember { ReportTestRunner(context) }
     val mapRunner = remember { MapTestRunner(context) }
     val searchRunner = remember { SearchTestRunner(context) }
+    val profileRunner = remember { ProfileDiagnosticRunner(context) }
+    val permissionRunner = remember { PermissionsDiagnosticRunner(context) }
+    val settingsRunner = remember { SettingsSyncDiagnosticRunner(context) }
 
-    var selectedSystem by remember { mutableStateOf(TestSystem.REGISTRATION) }
+    var selectedSystem by remember { mutableStateOf(TestSystem.RUN_ALL) }
     var isRunning by remember { mutableStateOf(false) }
-    var currentProgressText by remember { mutableStateOf("يرجى اختيار النظام ثم الضغط على 'بدء الاختبار الشامل'...") }
+    var currentProgressText by remember {
+        mutableStateOf("جاهز لتشغيل الفحص الهندسي الشامل والمفصل (13 نظاماً مع تشخيص السطر والدالة والسبب والحل)...")
+    }
 
     // Reports states
     var regReport by remember { mutableStateOf<FullTestReport?>(null) }
@@ -83,19 +93,44 @@ fun RegistrationTestScreen(
     var reportReport by remember { mutableStateOf<ReportFullReport?>(null) }
     var mapReport by remember { mutableStateOf<MapFullReport?>(null) }
     var searchReport by remember { mutableStateOf<SearchFullReport?>(null) }
+    var profileReport by remember { mutableStateOf<ProfileFullReport?>(null) }
+    var permissionReport by remember { mutableStateOf<PermissionFullReport?>(null) }
+    var settingsReport by remember { mutableStateOf<SettingsFullReport?>(null) }
+
+    val masterDiagnosticReport = remember(
+        regReport, bookingReport, instantReport, chatReport, paymentReport,
+        reviewReport, notificationReport, reportReport, mapReport, searchReport,
+        profileReport, permissionReport, settingsReport
+    ) {
+        DeepSystemDiagnosticOrchestrator.buildComprehensiveReport(
+            reg = regReport,
+            bk = bookingReport,
+            inst = instantReport,
+            ch = chatReport,
+            pay = paymentReport,
+            rev = reviewReport,
+            noti = notificationReport,
+            rep = reportReport,
+            mp = mapReport,
+            srh = searchReport,
+            prof = profileReport,
+            perm = permissionReport,
+            sett = settingsReport
+        )
+    }
 
     BackHandler {
         if (!isRunning) {
             onDismiss()
         } else {
-            Toast.makeText(context, "⏳ يرجى الانتظار حتى اكتمال دورة الاختبار!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "⏳ يرجى الانتظار حتى اكتمال دورة الفحص العملي!", Toast.LENGTH_SHORT).show()
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F172A)) // Slate Dark Background
+            .background(Color(0xFF0F172A))
     ) {
         Column(
             modifier = Modifier
@@ -107,12 +142,12 @@ fun RegistrationTestScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 10.dp)
             ) {
                 IconButton(
                     onClick = {
                         if (!isRunning) onDismiss()
-                        else Toast.makeText(context, "⏳ الاختبار قيد التشغيل حالياً!", Toast.LENGTH_SHORT).show()
+                        else Toast.makeText(context, "⏳ الفحص قيد التشغيل حالياً!", Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Icon(
@@ -121,22 +156,28 @@ fun RegistrationTestScreen(
                         tint = Color.White
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "🧪 فحص وتحقق الأنظمة الشامل العملي",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.weight(1f)
-                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "🔬 أداة الفحص والتشخيص الهندسي الشامل (13 نظاماً)",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "تحديد دقيق لمكان الخطأ (File + Line + Function) + السبب والحل المقترح",
+                        fontSize = 11.sp,
+                        color = themeColors.accent
+                    )
+                }
             }
 
-            // Tabs / Sidebar selection for Systems
+            // Tabs selection for the 13 Systems + RUN_ALL
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TestSystem.values().forEach { system ->
@@ -149,17 +190,17 @@ fun RegistrationTestScreen(
                         modifier = Modifier.clickable {
                             if (!isRunning) {
                                 selectedSystem = system
-                                currentProgressText = "جاهز لبدء فحص نظام: ${system.label}"
+                                currentProgressText = "جاهز لبدء فحص: ${system.label}"
                             } else {
                                 Toast.makeText(context, "⏳ يرجى الانتظار حتى انتهاء الفحص الجاري!", Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(system.icon, fontSize = 14.sp)
+                            Text(system.icon, fontSize = 13.sp)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = system.label,
@@ -172,118 +213,131 @@ fun RegistrationTestScreen(
                 }
             }
 
-            // Info Box
+            // Live Progress Box
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                 shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, if (isRunning) themeColors.accent else Color(0xFF334155)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 10.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "ℹ️ معلومات هامة عن الفحص العملي الجاري:",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = themeColors.accent
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "هذا الفحص يتصل مباشرة بالفايربيز ويقوم بمحاكاة عمليات حقيقية 100% ثم تنظيف قاعدة البيانات بعد الفحص.",
-                        fontSize = 11.sp,
-                        color = Color.LightGray,
-                        lineHeight = 16.sp
-                    )
-                }
-            }
-
-            // Progress log area
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, if (isRunning) themeColors.accent else Color.DarkGray),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-                    .padding(bottom = 12.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .padding(12.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        if (isRunning) {
-                            CircularProgressIndicator(
-                                color = themeColors.accent,
-                                strokeWidth = 2.5.dp,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                        Text(
-                            text = currentProgressText,
-                            fontSize = 12.sp,
-                            color = if (isRunning) Color.White else Color.LightGray,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 16.sp
+                    if (isRunning) {
+                        CircularProgressIndicator(
+                            color = themeColors.accent,
+                            strokeWidth = 2.5.dp,
+                            modifier = Modifier.size(22.dp)
                         )
+                        Spacer(modifier = Modifier.width(10.dp))
                     }
+                    Text(
+                        text = currentProgressText,
+                        fontSize = 12.sp,
+                        color = if (isRunning) Color.White else Color.LightGray,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
 
-            // Test results list depending on selection
+            // Main Content Area
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
             ) {
                 when (selectedSystem) {
-                    TestSystem.REGISTRATION -> {
-                        RenderRegistrationReport(regReport, themeColors)
-                    }
-                    TestSystem.BOOKINGS -> {
-                        RenderBookingReport(bookingReport)
-                    }
-                    TestSystem.INSTANT_REQUESTS -> {
-                        RenderInstantRequestReport(instantReport)
-                    }
-                    TestSystem.CHATS -> {
-                        RenderChatReport(chatReport)
-                    }
-                    TestSystem.PAYMENTS -> {
-                        RenderPaymentReport(paymentReport)
-                    }
-                    TestSystem.REVIEWS -> {
-                        RenderReviewReport(reviewReport)
-                    }
-                    TestSystem.NOTIFICATIONS -> {
-                        RenderNotificationReport(notificationReport)
-                    }
-                    TestSystem.REPORTS -> {
-                        RenderReportReport(reportReport)
-                    }
-                    TestSystem.MAPS -> {
-                        RenderMapReport(mapReport)
-                    }
-                    TestSystem.SEARCH -> {
-                        RenderSearchReport(searchReport)
-                    }
-                    TestSystem.RUN_ALL -> {
-                        RenderAllSummary(
-                            regReport, bookingReport, instantReport, chatReport,
-                            paymentReport, reviewReport, notificationReport, reportReport,
-                            mapReport, searchReport
-                        )
-                    }
+                    TestSystem.REGISTRATION -> RenderDetailedSystemSection(
+                        title = "1. نظام التسجيل الشامل (8 أقسام)",
+                        details = masterDiagnosticReport.systemDetails["1. نظام التسجيل الشامل (8 أقسام)"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.BOOKINGS -> RenderDetailedSystemSection(
+                        title = "2. نظام الحجوزات والدورة المستندية",
+                        details = masterDiagnosticReport.systemDetails["2. نظام الحجوزات والدورة المستندية"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.INSTANT_REQUESTS -> RenderDetailedSystemSection(
+                        title = "3. نظام الطلبات العاجلة وعروض الأسعار",
+                        details = masterDiagnosticReport.systemDetails["3. نظام الطلبات العاجلة وعروض الأسعار"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.CHATS -> RenderDetailedSystemSection(
+                        title = "4. نظام المحادثات الفورية والوسائط",
+                        details = masterDiagnosticReport.systemDetails["4. نظام المحادثات الفورية والوسائط"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.PAYMENTS -> RenderDetailedSystemSection(
+                        title = "5. نظام المدفوعات والمحافظ المالية",
+                        details = masterDiagnosticReport.systemDetails["5. نظام المدفوعات والمحافظ المالية"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.REVIEWS -> RenderDetailedSystemSection(
+                        title = "6. نظام التقييمات ومراجعة الأبعاد",
+                        details = masterDiagnosticReport.systemDetails["6. نظام التقييمات ومراجعة الأبعاد"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.NOTIFICATIONS -> RenderDetailedSystemSection(
+                        title = "7. نظام الإشعارات والتنبيهات الجغرافية",
+                        details = masterDiagnosticReport.systemDetails["7. نظام الإشعارات والتنبيهات الجغرافية"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.REPORTS -> RenderDetailedSystemSection(
+                        title = "8. نظام البلاغات والشكاوى الإدارية",
+                        details = masterDiagnosticReport.systemDetails["8. نظام البلاغات والشكاوى الإدارية"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.MAPS -> RenderDetailedSystemSection(
+                        title = "9. نظام الخريطة التفاعلية GPS و Leaflet",
+                        details = masterDiagnosticReport.systemDetails["9. نظام الخريطة التفاعلية GPS و Leaflet"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.SEARCH -> RenderDetailedSystemSection(
+                        title = "10. نظام البحث الذكي والفلترة",
+                        details = masterDiagnosticReport.systemDetails["10. نظام البحث الذكي والفلترة"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.PROFILES -> RenderDetailedSystemSection(
+                        title = "11. نظام الملفات الشخصية (8 أنواع حسابات)",
+                        details = masterDiagnosticReport.systemDetails["11. نظام الملفات الشخصية (8 أنواع)"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.PERMISSIONS -> RenderDetailedSystemSection(
+                        title = "12. نظام صلاحيات الأدمن والمالك والمشرفين",
+                        details = masterDiagnosticReport.systemDetails["12. نظام صلاحيات الأدمن والمالك"],
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.SETTINGS_SYNC -> RenderSettingsDiagnosticSection(
+                        report = settingsReport,
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
+                    TestSystem.RUN_ALL -> RenderMasterDiagnosticSummary(
+                        report = masterDiagnosticReport,
+                        reg = regReport,
+                        bk = bookingReport,
+                        inst = instantReport,
+                        ch = chatReport,
+                        pay = paymentReport,
+                        rev = reviewReport,
+                        noti = notificationReport,
+                        rep = reportReport,
+                        mp = mapReport,
+                        srh = searchReport,
+                        prof = profileReport,
+                        perm = permissionReport,
+                        sett = settingsReport,
+                        onCopyError = { clipboardManager.setText(AnnotatedString(it)) }
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Action Buttons
             Column(
@@ -301,75 +355,77 @@ fun RegistrationTestScreen(
                                 scope.launch {
                                     try {
                                         when (selectedSystem) {
-                                            TestSystem.REGISTRATION -> {
-                                                regRunner.runFullTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { regReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.BOOKINGS -> {
-                                                bookingRunner.runBookingTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { bookingReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.INSTANT_REQUESTS -> {
-                                                instantRunner.runInstantRequestTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { instantReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.CHATS -> {
-                                                chatRunner.runChatTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { chatReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.PAYMENTS -> {
-                                                paymentRunner.runPaymentTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { paymentReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.REVIEWS -> {
-                                                reviewRunner.runReviewTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { reviewReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.NOTIFICATIONS -> {
-                                                notificationRunner.runNotificationTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { notificationReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.REPORTS -> {
-                                                reportRunner.runReportTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { reportReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.MAPS -> {
-                                                mapRunner.runMapTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { mapReport = it; isRunning = false }
-                                                )
-                                            }
-                                            TestSystem.SEARCH -> {
-                                                searchRunner.runSearchTest(
-                                                    onProgress = { currentProgressText = it },
-                                                    onComplete = { searchReport = it; isRunning = false }
-                                                )
-                                            }
+                                            TestSystem.REGISTRATION -> regRunner.runFullTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { regReport = it; isRunning = false }
+                                            )
+                                            TestSystem.BOOKINGS -> bookingRunner.runBookingTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { bookingReport = it; isRunning = false }
+                                            )
+                                            TestSystem.INSTANT_REQUESTS -> instantRunner.runInstantRequestTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { instantReport = it; isRunning = false }
+                                            )
+                                            TestSystem.CHATS -> chatRunner.runChatTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { chatReport = it; isRunning = false }
+                                            )
+                                            TestSystem.PAYMENTS -> paymentRunner.runPaymentTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { paymentReport = it; isRunning = false }
+                                            )
+                                            TestSystem.REVIEWS -> reviewRunner.runReviewTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { reviewReport = it; isRunning = false }
+                                            )
+                                            TestSystem.NOTIFICATIONS -> notificationRunner.runNotificationTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { notificationReport = it; isRunning = false }
+                                            )
+                                            TestSystem.REPORTS -> reportRunner.runReportTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { reportReport = it; isRunning = false }
+                                            )
+                                            TestSystem.MAPS -> mapRunner.runMapTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { mapReport = it; isRunning = false }
+                                            )
+                                            TestSystem.SEARCH -> searchRunner.runSearchTest(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { searchReport = it; isRunning = false }
+                                            )
+                                            TestSystem.PROFILES -> profileRunner.runProfileDiagnostics(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { profileReport = it; isRunning = false }
+                                            )
+                                            TestSystem.PERMISSIONS -> permissionRunner.runPermissionsDiagnostics(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { permissionReport = it; isRunning = false }
+                                            )
+                                            TestSystem.SETTINGS_SYNC -> settingsRunner.runSettingsDiagnostics(
+                                                onProgress = { currentProgressText = it },
+                                                onComplete = { settingsReport = it; isRunning = false }
+                                            )
                                             TestSystem.RUN_ALL -> {
-                                                runAllSystemsSequentialTests(
-                                                    regRunner, bookingRunner, instantRunner, chatRunner,
-                                                    paymentRunner, reviewRunner, notificationRunner, reportRunner,
-                                                    mapRunner, searchRunner,
+                                                runAll13SystemsSequentialTests(
+                                                    regRunner = regRunner,
+                                                    bookingRunner = bookingRunner,
+                                                    instantRunner = instantRunner,
+                                                    chatRunner = chatRunner,
+                                                    paymentRunner = paymentRunner,
+                                                    reviewRunner = reviewRunner,
+                                                    notificationRunner = notificationRunner,
+                                                    reportRunner = reportRunner,
+                                                    mapRunner = mapRunner,
+                                                    searchRunner = searchRunner,
+                                                    profileRunner = profileRunner,
+                                                    permissionRunner = permissionRunner,
+                                                    settingsRunner = settingsRunner,
                                                     onProgress = { currentProgressText = it },
-                                                    onComplete = { reg, book, inst, ch, pay, rev, noti, rep, mp, srh ->
+                                                    onComplete = { reg, bk, inst, ch, pay, rev, noti, rep, mp, srh, prof, perm, sett ->
                                                         regReport = reg
-                                                        bookingReport = book
+                                                        bookingReport = bk
                                                         instantReport = inst
                                                         chatReport = ch
                                                         paymentReport = pay
@@ -378,15 +434,18 @@ fun RegistrationTestScreen(
                                                         reportReport = rep
                                                         mapReport = mp
                                                         searchReport = srh
+                                                        profileReport = prof
+                                                        permissionReport = perm
+                                                        settingsReport = sett
                                                         isRunning = false
-                                                        currentProgressText = "✅ تم الانتهاء من فحص كافة أنظمة التطبيق وحفظ تقاريرها بنجاح!"
+                                                        currentProgressText = "✅ اكتمل الفحص الهندسي الشامل للأنظمة الـ 13 بنجاح وتم توليد التقرير المفصل!"
                                                     }
                                                 )
                                             }
                                         }
                                     } catch (e: Exception) {
                                         isRunning = false
-                                        currentProgressText = "❌ حدث خطأ: ${e.localizedMessage}"
+                                        currentProgressText = "❌ حدث خطأ غير متوقع: ${e.localizedMessage}"
                                     }
                                 }
                             }
@@ -397,7 +456,12 @@ fun RegistrationTestScreen(
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "تشغيل", tint = Color.Black, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isRunning) "جاري الفحص..." else "بدء الفحص العملي", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(
+                            text = if (isRunning) "جاري الفحص..." else "بدء الفحص المفصل",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
                     }
 
                     Button(
@@ -406,7 +470,7 @@ fun RegistrationTestScreen(
                                 isRunning = true
                                 scope.launch {
                                     try {
-                                        currentProgressText = "🧹 جاري تصفية وتطهير قاعدة البيانات..."
+                                        currentProgressText = "🧹 جاري تنظيف وتطهير كافة السجلات الاختبارية من Firestore..."
                                         regRunner.cleanAllTestData()
                                         bookingRunner.cleanAllTestData()
                                         instantRunner.cleanAllTestData()
@@ -415,6 +479,9 @@ fun RegistrationTestScreen(
                                         reviewRunner.cleanAllTestData()
                                         notificationRunner.cleanAllTestData()
                                         reportRunner.cleanAllTestData()
+                                        profileRunner.cleanAllTestData()
+                                        permissionRunner.cleanAllTestData()
+                                        settingsRunner.cleanAllTestData()
 
                                         regReport = null
                                         bookingReport = null
@@ -426,10 +493,13 @@ fun RegistrationTestScreen(
                                         reportReport = null
                                         mapReport = null
                                         searchReport = null
+                                        profileReport = null
+                                        permissionReport = null
+                                        settingsReport = null
 
-                                        currentProgressText = "🧹 تم تنظيف وتطهير كافة السجلات الاختبارية بنجاح!"
+                                        currentProgressText = "🧹 تم تنظيف وتطهير كافة السجلات الاختبارية للأنظمة الـ 13 بنجاح!"
                                     } catch (e: Exception) {
-                                        currentProgressText = "❌ خطأ أثناء تصفية البيانات"
+                                        currentProgressText = "❌ خطأ أثناء تنظيف البيانات: ${e.localizedMessage}"
                                     } finally {
                                         isRunning = false
                                     }
@@ -448,57 +518,104 @@ fun RegistrationTestScreen(
 
                 Button(
                     onClick = {
-                        val reportText = buildComprehensiveReportText(
-                            regReport, bookingReport, instantReport, chatReport,
-                            paymentReport, reviewReport, notificationReport, reportReport,
-                            mapReport, searchReport
-                        )
-                        clipboardManager.setText(AnnotatedString(reportText))
-                        Toast.makeText(context, "📋 تم نسخ التقرير الشامل للحافظة!", Toast.LENGTH_SHORT).show()
+                        val fullText = DeepSystemDiagnosticOrchestrator.formatComprehensiveDiagnosticReportText(masterDiagnosticReport)
+                        clipboardManager.setText(AnnotatedString(fullText))
+                        Toast.makeText(context, "📋 تم نسخ التقرير الهندسي الشامل والمفصل (13 نظاماً) للحافظة!", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "نسخ", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = "نسخ التقرير", modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("نسخ التقرير الشامل للحافظة", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("نسخ التقرير الشامل المفصل (مع السطر والدالة والحل)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
     }
 }
 
-// ────────────────────────────────────────────────────────
-// Render Functions for report types
-// ────────────────────────────────────────────────────────
-
 @Composable
-fun RenderRegistrationReport(report: FullTestReport?, themeColors: VisualThemePalette) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام التسجيل")
+fun RenderDetailedSystemSection(
+    title: String,
+    details: List<TestDetail>?,
+    onCopyError: (String) -> Unit
+) {
+    val context = LocalContext.current
+    if (details.isNullOrEmpty()) {
+        RenderEmptyPlaceholder(title)
     } else {
+        val passed = details.count { it.status == "SUCCESS" }
+        val failed = details.count { it.status == "FAILED" }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
-                Text("📋 نتائج فحص التسجيل (8 أقسام):", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Text(title, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Text(
+                            text = "ناجح: $passed | فشل: $failed",
+                            color = if (failed == 0) Color(0xFF10B981) else Color(0xFFEF4444),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+            itemsIndexed(details) { idx, detail ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    border = BorderStroke(
+                        1.dp,
+                        if (detail.status == "SUCCESS") Color(0xFF1E3A2F) else Color(0xFF7F1D1D)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(step.section, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
                             Text(
-                                text = if (step.groupVerified) "✅ ناجح" else "❌ فشل",
-                                color = if (step.groupVerified) Color.Green else Color.Red,
+                                text = "${idx + 1}. ${detail.testName}",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = if (detail.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
+                                color = if (detail.status == "SUCCESS") Color(0xFF10B981) else Color(0xFFEF4444),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("الهاتف: ${step.phone} | الاسم: ${step.name}", fontSize = 11.sp, color = Color.LightGray)
-                        Text("الحالة بالفايربيز: ${step.status}", fontSize = 11.sp, color = themeColors.accent)
+                        Text(
+                            text = "📄 ${detail.fileName} : Line ${detail.lineNumber} • ${detail.functionName}",
+                            fontSize = 10.sp,
+                            color = Color(0xFF38BDF8)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = detail.message,
+                            fontSize = 11.sp,
+                            color = Color.LightGray
+                        )
+                        if (detail.error != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            RenderErrorDiagnosticCard(
+                                err = detail.error,
+                                onCopy = {
+                                    onCopyError(it)
+                                    Toast.makeText(context, "📋 تم نسخ تشخيص الخطأ!", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -507,58 +624,135 @@ fun RenderRegistrationReport(report: FullTestReport?, themeColors: VisualThemePa
 }
 
 @Composable
-fun RenderBookingReport(report: BookingFullReport?) {
+fun RenderErrorDiagnosticCard(
+    err: TestError,
+    onCopy: (String) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A1215)),
+        border = BorderStroke(1.dp, Color(0xFFEF4444)),
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(10.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "🚨 تشخيص الخطأ المفصل #${err.errorIndex}: ${err.testName}",
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = Color(0xFFFCA5A5)
+            )
+            Text("• الخطوة الفاشلة: ${err.failedStep}", fontSize = 11.sp, color = Color.White)
+            Text("• الملف والسطر: ${err.fileName} (Line ${err.lineNumber})", fontSize = 11.sp, color = Color(0xFF38BDF8))
+            Text("• الدالة المسؤولة: ${err.functionName}", fontSize = 11.sp, color = Color(0xFF38BDF8))
+            Text("• نوع الخطأ: ${err.errorType}", fontSize = 11.sp, color = Color(0xFFFBBF24))
+            Text("• النص الكامل: ${err.fullMessage}", fontSize = 11.sp, color = Color.LightGray)
+            Text("• المتوقع: ${err.expectedOutcome}", fontSize = 10.sp, color = Color(0xFF86EFAC))
+            Text("• الفعلي: ${err.actualOutcome}", fontSize = 10.sp, color = Color(0xFFFCA5A5))
+            Text("🔍 السبب المحتمل: ${err.probableCause}", fontSize = 11.sp, color = Color(0xFFFDE047))
+            Text("🛠️ الحل المقترح:\n${err.suggestedFix}", fontSize = 11.sp, color = Color(0xFF6EE7B7), lineHeight = 15.sp)
+
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = {
+                    val text = """
+                        ❌ خطأ #${err.errorIndex}: ${err.testName}
+                        • الخطوة الفاشلة: ${err.failedStep}
+                        • الملف المسؤول: ${err.fileName}
+                        • السطر: Line ${err.lineNumber}
+                        • الدالة: ${err.functionName}
+                        • نوع الخطأ: ${err.errorType}
+                        • الرسالة: ${err.fullMessage}
+                        • السبب المحتمل: ${err.probableCause}
+                        • الحل المقترح: ${err.suggestedFix}
+                    """.trimIndent()
+                    onCopy(text)
+                },
+                border = BorderStroke(1.dp, Color(0xFFF87171)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("نسخ تفاصيل هذا الخطأ والحل المقترح", fontSize = 11.sp, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun RenderSettingsDiagnosticSection(
+    report: SettingsFullReport?,
+    onCopyError: (String) -> Unit
+) {
     if (report == null) {
-        RenderEmptyPlaceholder("نظام الحجوزات")
+        RenderEmptyPlaceholder("13. نظام الإعدادات والمزامنة (AdminSettingsEntity)")
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
-                Text("📋 مخرجات فحص نظام الحجوزات والدورة المستندية:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                Text(
+                    text = "⚙️ أولاً: فحوصات الاتصال الحي والمزامنة اللحظية (${report.passed}/${report.totalChecks} ناجح):",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 13.sp
+                )
             }
-            itemsIndexed(report.steps) { _, step ->
+            itemsIndexed(report.details) { idx, d ->
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
                     Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
                         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                            Text("${idx + 1}. ${d.testName}", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
                             Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
+                                text = if (d.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
+                                color = if (d.status == "SUCCESS") Color(0xFF10B981) else Color(0xFFEF4444),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontSize = 11.sp
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
+                        Text("📄 ${d.fileName} : Line ${d.lineNumber} • ${d.functionName}", fontSize = 10.sp, color = Color(0xFF38BDF8))
+                        Text(d.message, fontSize = 11.sp, color = Color.LightGray)
+                        if (d.error != null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            RenderErrorDiagnosticCard(d.error, onCopyError)
+                        }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun RenderInstantRequestReport(report: InstantRequestFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام الطلبات العاجلة")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
-                Text("📋 مخرجات فحص نظام الطلبات العاجلة وعروض الفنيين:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "📋 ثانياً: جدول فحص وتشخيص حقول AdminSettingsEntity (${report.fieldDiagnostics.size} حقلاً):",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 13.sp
+                )
             }
-            itemsIndexed(report.steps) { _, step ->
+            itemsIndexed(report.fieldDiagnostics) { idx, f ->
+                val isWorking = f.status == "WORKING"
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                    Column(modifier = Modifier.padding(10.dp).fillMaxWidth()) {
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
+                                text = "${idx + 1}. ${f.fieldName} (${f.arabicLabel})",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = if (isWorking) "✅ يعمل" else "⚠️ مهجور أمنياً",
+                                color = if (isWorking) Color(0xFF10B981) else Color(0xFFFBBF24),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
+                        Text(
+                            text = "الفئة: ${f.category} | الحفظ: ${if (f.isSaved) "✅" else "➖"} | القراءة: ${if (f.isRead) "✅" else "➖"} | الواجهة: ${if (f.isAppliedInUi) "✅" else "➖"} | المزامنة اللحظية: ${if (f.isSyncedRealtime) "✅" else "➖"}",
+                            fontSize = 10.sp,
+                            color = Color(0xFF93C5FD)
+                        )
+                        Text("📍 الكود: ${f.whereUsedInCode}", fontSize = 10.sp, color = Color.LightGray)
+                        Text("💡 ${f.causeOrNotes}", fontSize = 10.sp, color = Color(0xFFA7F3D0))
                     }
                 }
             }
@@ -567,231 +761,45 @@ fun RenderInstantRequestReport(report: InstantRequestFullReport?) {
 }
 
 @Composable
-fun RenderChatReport(report: ChatFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام المحادثات")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Text("📋 مخرجات فحص المحادثات والردود والحذف الآمن:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                            Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RenderPaymentReport(report: PaymentFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام المدفوعات")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Text("📋 مخرجات فحص المحفظة والعمليات المالية والتحويلات:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                            Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RenderReviewReport(report: ReviewFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام التقييمات")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Text("📋 مخرجات فحص التقييمات وحساب المتوسط والردود:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                            Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RenderNotificationReport(report: NotificationFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام الإشعارات")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Text("📋 مخرجات فحص الإشعارات الموجهة والجماعية والجغرافية:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                            Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RenderReportReport(report: ReportFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام الشكاوى والتقارير")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Text("📋 مخرجات فحص بلاغات الشكاوى والمرفقات والقرارات الادارية:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                            Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RenderMapReport(report: MapFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام الخريطة الجغرافية")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Text("📋 مخرجات فحص إعدادات وحاسبة الخريطة ومواقع المنشآت:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                            Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RenderSearchReport(report: SearchFullReport?) {
-    if (report == null) {
-        RenderEmptyPlaceholder("نظام البحث والفرز")
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                Text("📋 مخرجات فحص نتائج كلمات البحث وتصفية المدن والأقسام الفنية:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-            }
-            itemsIndexed(report.steps) { _, step ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
-                    Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(step.stepName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
-                            Text(
-                                text = if (step.status == "SUCCESS") "✅ ناجح" else "❌ فشل",
-                                color = if (step.status == "SUCCESS") Color.Green else Color.Red,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(step.notes, fontSize = 11.sp, color = Color.LightGray)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RenderAllSummary(
-    reg: FullTestReport?, bk: BookingFullReport?, inst: InstantRequestFullReport?,
-    ch: ChatFullReport?, pay: PaymentFullReport?, rev: ReviewFullReport?,
-    noti: NotificationFullReport?, rep: ReportFullReport?, mp: MapFullReport?, srh: SearchFullReport?
+fun RenderMasterDiagnosticSummary(
+    report: ComprehensiveDiagnosticReport,
+    reg: FullTestReport?,
+    bk: BookingFullReport?,
+    inst: InstantRequestFullReport?,
+    ch: ChatFullReport?,
+    pay: PaymentFullReport?,
+    rev: ReviewFullReport?,
+    noti: NotificationFullReport?,
+    rep: ReportFullReport?,
+    mp: MapFullReport?,
+    srh: SearchFullReport?,
+    prof: ProfileFullReport?,
+    perm: PermissionFullReport?,
+    sett: SettingsFullReport?,
+    onCopyError: (String) -> Unit
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            Text("📋 تقرير الأداء الإجمالي لكافة أنظمة التطبيق العشرة:", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
-        }
-        item {
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                border = BorderStroke(1.dp, Color(0xFF3B82F6))
+            ) {
                 Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
-                    Text("💡 ملخص الفحوصات الجارية ومقارنتها بالواقع:", fontSize = 12.sp, color = Color.LightGray)
+                    Text(
+                        text = "📊 الملخص التنفيذي لأداة الفحص الشامل والمفصل (13 نظاماً)",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "إجمالي الفحوصات المشغّلة: ${report.totalChecks} | ناجح: ${report.passedCount} ✅ | فشل: ${report.failedCount} ❌ | تحذيرات: ${report.warningsCount} ⚠️",
+                        fontSize = 12.sp,
+                        color = if (report.failedCount == 0) Color(0xFF10B981) else Color(0xFFF87171),
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    RenderSummaryRow("1. نظام التسجيل (8 أقسام)", reg != null, reg?.passed ?: 0, reg?.failed ?: 0)
+                    RenderSummaryRow("1. نظام التسجيل الشامل (8 أقسام)", reg != null, reg?.passed ?: 0, reg?.failed ?: 0)
                     RenderSummaryRow("2. نظام الحجوزات والتعميد", bk != null, bk?.passed ?: 0, bk?.failed ?: 0)
                     RenderSummaryRow("3. نظام الطلبات العاجلة والتفاوض", inst != null, inst?.passed ?: 0, inst?.failed ?: 0)
                     RenderSummaryRow("4. نظام المحادثات والرسائل والردود", ch != null, ch?.passed ?: 0, ch?.failed ?: 0)
@@ -799,9 +807,26 @@ fun RenderAllSummary(
                     RenderSummaryRow("6. نظام التقييمات ومراجعة الأبعاد", rev != null, rev?.passed ?: 0, rev?.failed ?: 0)
                     RenderSummaryRow("7. نظام الإشعارات والتنبيهات الجغرافية", noti != null, noti?.passed ?: 0, noti?.failed ?: 0)
                     RenderSummaryRow("8. نظام البلاغات والشكاوى الإدارية", rep != null, rep?.passed ?: 0, rep?.failed ?: 0)
-                    RenderSummaryRow("9. نظام الخريطة وحساب المسافات دقة GPS", mp != null, mp?.passed ?: 0, mp?.failed ?: 0)
-                    RenderSummaryRow("10. نظام البحث والفلترة الذكي للفنيين", srh != null, srh?.passed ?: 0, srh?.failed ?: 0)
+                    RenderSummaryRow("9. نظام الخريطة GPS و Leaflet (9 فحوصات)", mp != null, mp?.passed ?: 0, mp?.failed ?: 0)
+                    RenderSummaryRow("10. نظام البحث والفلترة الذكي", srh != null, srh?.passed ?: 0, srh?.failed ?: 0)
+                    RenderSummaryRow("11. نظام الملفات الشخصية (8 أنواع حسابات)", prof != null, prof?.passed ?: 0, prof?.failed ?: 0)
+                    RenderSummaryRow("12. نظام صلاحيات الأدمن والمالك (38 تبويباً)", perm != null, perm?.passed ?: 0, perm?.failed ?: 0)
+                    RenderSummaryRow("13. نظام الإعدادات والمزامنة اللحظية", sett != null, sett?.passed ?: 0, sett?.failed ?: 0)
                 }
+            }
+        }
+
+        if (report.errors.isNotEmpty()) {
+            item {
+                Text(
+                    text = "🚨 الأخطاء المكتشفة مع رقم السطر والدالة والسبب والحل (${report.errors.size}):",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFF87171),
+                    fontSize = 13.sp
+                )
+            }
+            itemsIndexed(report.errors) { _, err ->
+                RenderErrorDiagnosticCard(err = err, onCopy = onCopyError)
             }
         }
     }
@@ -811,12 +836,19 @@ fun RenderAllSummary(
 fun RenderSummaryRow(name: String, ran: Boolean, passed: Int, failed: Int) {
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(name, fontSize = 12.sp, color = Color.White, modifier = Modifier.weight(1f))
         if (ran) {
-            Text("ناجح: $passed | فشل: $failed", fontSize = 11.sp, color = if (failed == 0) Color.Green else Color.Red)
+            Text(
+                text = "ناجح: $passed | فشل: $failed",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (failed == 0) Color(0xFF10B981) else Color(0xFFEF4444)
+            )
         } else {
             Text("لم يُشغّل بعد 💤", fontSize = 11.sp, color = Color.Gray)
         }
@@ -827,7 +859,7 @@ fun RenderSummaryRow(name: String, ran: Boolean, passed: Int, failed: Int) {
 fun RenderEmptyPlaceholder(systemName: String) {
     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
         Text(
-            text = "لم يتم تشغيل فحص ($systemName) بعد.\nاضغط على زر 'بدء الفحص العملي' في الأسفل لتشغيله ومراقبته على الفايربيز حياً.",
+            text = "لم يتم تشغيل فحص ($systemName) بعد.\nاضغط على زر 'بدء الفحص المفصل' بالأسفل لتشغيله على Firestore حياً واستخراج تقرير السطر والدالة.",
             color = Color.Gray,
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
@@ -836,11 +868,7 @@ fun RenderEmptyPlaceholder(systemName: String) {
     }
 }
 
-// ────────────────────────────────────────────────────────
-// Logic Helpers
-// ────────────────────────────────────────────────────────
-
-suspend fun runAllSystemsSequentialTests(
+suspend fun runAll13SystemsSequentialTests(
     regRunner: RegistrationTestRunner,
     bookingRunner: BookingTestRunner,
     instantRunner: InstantRequestTestRunner,
@@ -851,11 +879,15 @@ suspend fun runAllSystemsSequentialTests(
     reportRunner: ReportTestRunner,
     mapRunner: MapTestRunner,
     searchRunner: SearchTestRunner,
+    profileRunner: ProfileDiagnosticRunner,
+    permissionRunner: PermissionsDiagnosticRunner,
+    settingsRunner: SettingsSyncDiagnosticRunner,
     onProgress: (String) -> Unit,
     onComplete: (
         FullTestReport?, BookingFullReport?, InstantRequestFullReport?,
         ChatFullReport?, PaymentFullReport?, ReviewFullReport?,
-        NotificationFullReport?, ReportFullReport?, MapFullReport?, SearchFullReport?
+        NotificationFullReport?, ReportFullReport?, MapFullReport?,
+        SearchFullReport?, ProfileFullReport?, PermissionFullReport?, SettingsFullReport?
     ) -> Unit
 ) {
     var reg: FullTestReport? = null
@@ -868,116 +900,90 @@ suspend fun runAllSystemsSequentialTests(
     var rep: ReportFullReport? = null
     var mp: MapFullReport? = null
     var srh: SearchFullReport? = null
+    var prof: ProfileFullReport? = null
+    var perm: PermissionFullReport? = null
+    var sett: SettingsFullReport? = null
 
-    onProgress("🧪 جاري بدء الفحص الشامل التراكمي لكافة أنظمة التطبيق (10 أنظمة)...")
-    delay(1000)
+    onProgress("🧪 جاري بدء الفحص الهندسي الشامل لكافة أنظمة التطبيق (13 نظاماً)...")
+    delay(400)
 
     regRunner.runFullTest(
-        onProgress = { onProgress("🎫 [1/10] فحص التسجيل: $it") },
+        onProgress = { onProgress("🎫 [1/13] التسجيل: $it") },
         onComplete = { reg = it }
     )
-    delay(1000)
+    delay(300)
 
     bookingRunner.runBookingTest(
-        onProgress = { onProgress("📅 [2/10] فحص الحجوزات: $it") },
+        onProgress = { onProgress("📅 [2/13] الحجوزات: $it") },
         onComplete = { book = it }
     )
-    delay(1000)
+    delay(300)
 
     instantRunner.runInstantRequestTest(
-        onProgress = { onProgress("⚡ [3/10] فحص الطلبات العاجلة: $it") },
+        onProgress = { onProgress("⚡ [3/13] الطلبات العاجلة: $it") },
         onComplete = { inst = it }
     )
-    delay(1000)
+    delay(300)
 
     chatRunner.runChatTest(
-        onProgress = { onProgress("💬 [4/10] فحص المحادثات: $it") },
+        onProgress = { onProgress("💬 [4/13] المحادثات: $it") },
         onComplete = { ch = it }
     )
-    delay(1000)
+    delay(300)
 
     paymentRunner.runPaymentTest(
-        onProgress = { onProgress("💳 [5/10] فحص المدفوعات والمحافظ: $it") },
+        onProgress = { onProgress("💳 [5/13] المدفوعات: $it") },
         onComplete = { pay = it }
     )
-    delay(1000)
+    delay(300)
 
     reviewRunner.runReviewTest(
-        onProgress = { onProgress("⭐ [6/10] فحص التقييمات والمتوسطات: $it") },
+        onProgress = { onProgress("⭐ [6/13] التقييمات: $it") },
         onComplete = { rev = it }
     )
-    delay(1000)
+    delay(300)
 
     notificationRunner.runNotificationTest(
-        onProgress = { onProgress("🔔 [7/10] فحص الإشعارات الجغرافية والموجهة: $it") },
+        onProgress = { onProgress("🔔 [7/13] الإشعارات: $it") },
         onComplete = { noti = it }
     )
-    delay(1000)
+    delay(300)
 
     reportRunner.runReportTest(
-        onProgress = { onProgress("📢 [8/10] فحص الشكاوى والحلول: $it") },
+        onProgress = { onProgress("📢 [8/13] الشكاوى والتقارير: $it") },
         onComplete = { rep = it }
     )
-    delay(1000)
+    delay(300)
 
     mapRunner.runMapTest(
-        onProgress = { onProgress("🗺️ [9/10] فحص الخريطة وحساب المسافات: $it") },
+        onProgress = { onProgress("🗺️ [9/13] الخريطة GPS و Leaflet: $it") },
         onComplete = { mp = it }
     )
-    delay(1000)
+    delay(300)
 
     searchRunner.runSearchTest(
-        onProgress = { onProgress("🔍 [10/10] فحص محرك البحث والفرز والكلمات المفتاحية: $it") },
+        onProgress = { onProgress("🔍 [10/13] البحث والفلترة: $it") },
         onComplete = { srh = it }
     )
-    delay(1000)
+    delay(300)
 
-    onComplete(reg, book, inst, ch, pay, rev, noti, rep, mp, srh)
-}
+    profileRunner.runProfileDiagnostics(
+        onProgress = { onProgress("👤 [11/13] الملفات الشخصية (8 أنواع): $it") },
+        onComplete = { prof = it }
+    )
+    delay(300)
 
-fun buildComprehensiveReportText(
-    reg: FullTestReport?, bk: BookingFullReport?, inst: InstantRequestFullReport?,
-    ch: ChatFullReport?, pay: PaymentFullReport?, rev: ReviewFullReport?,
-    noti: NotificationFullReport?, rep: ReportFullReport?, mp: MapFullReport?, srh: SearchFullReport?
-): String {
-    val sb = StringBuilder()
-    sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-    sb.append("📋 تقرير الفحص العملي والتحقق الشامل لكافة أنظمة التطبيق\n")
-    sb.append("تاريخ التوليد: ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())}\n")
-    sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+    permissionRunner.runPermissionsDiagnostics(
+        onProgress = { onProgress("🛡️ [12/13] صلاحيات الأدمن والمالك: $it") },
+        onComplete = { perm = it }
+    )
+    delay(300)
 
-    sb.append("1. نظام التسجيل (8 أقسام): ")
-    if (reg != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${reg.passed} | فشل: ${reg.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
+    settingsRunner.runSettingsDiagnostics(
+        onProgress = { onProgress("⚙️ [13/13] الإعدادات والمزامنة اللحظية: $it") },
+        onComplete = { sett = it }
+    )
+    delay(300)
 
-    sb.append("2. نظام الحجوزات: ")
-    if (bk != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${bk.passed} | فشل: ${bk.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("3. نظام الطلبات العاجلة: ")
-    if (inst != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${inst.passed} | فشل: ${inst.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("4. نظام المحادثات والرسائل: ")
-    if (ch != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${ch.passed} | فشل: ${ch.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("5. نظام المدفوعات والعمليات: ")
-    if (pay != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${pay.passed} | فشل: ${pay.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("6. نظام التقييمات ومراجعة الأبعاد: ")
-    if (rev != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${rev.passed} | فشل: ${rev.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("7. نظام الإشعارات والتنبيهات: ")
-    if (noti != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${noti.passed} | فشل: ${noti.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("8. نظام التقارير والشكاوى الإدارية: ")
-    if (rep != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${rep.passed} | فشل: ${rep.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("9. نظام الخريطة GPS وحساب المسافات: ")
-    if (mp != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${mp.passed} | فشل: ${mp.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("10. نظام البحث والفلترة الذكية: ")
-    if (srh != null) sb.append("✅ تم الفحص بنجاح | ناجح: ${srh.passed} | فشل: ${srh.failed}\n") else sb.append("💤 لم يُفحص بعد\n")
-
-    sb.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-    sb.append("تمت عملية الفحص الفعلي والتكامل الحقيقي بنجاح 100% ويشمل تنظيف البيانات من خوادم Firestore.\n")
-    sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-    return sb.toString()
+    onComplete(reg, book, inst, ch, pay, rev, noti, rep, mp, srh, prof, perm, sett)
 }
