@@ -19,7 +19,7 @@ fun EntityTabContent(
     onRequestActionClick: (() -> Unit)? = null
 ) {
     when (entityType) {
-        EntityType.STORE -> {
+        EntityType.STORE, EntityType.TECHNICIAN -> {
             StoresScreen(
                 viewModel = viewModel,
                 themeColors = themeColors,
@@ -34,7 +34,7 @@ fun EntityTabContent(
                 }
             )
         }
-        EntityType.PROPERTY -> {
+        EntityType.PROPERTY, EntityType.REAL_ESTATE -> {
             PropertiesScreen(
                 viewModel = viewModel,
                 themeColors = themeColors,
@@ -79,7 +79,7 @@ fun EntityTabContent(
                 }
             )
         }
-        EntityType.JOB -> {
+        EntityType.JOB, EntityType.JOB_POSTER -> {
             StoresScreen(
                 viewModel = viewModel,
                 themeColors = themeColors,

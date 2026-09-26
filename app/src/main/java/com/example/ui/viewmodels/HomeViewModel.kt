@@ -29,7 +29,7 @@ open class HomeViewModel @Inject constructor(
     internal val _filteredProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val filteredProviders: StateFlow<List<ProviderEntity>> = _filteredProviders.asStateFlow()
 
-    internal val _banners = MutableStateFlow<List<BannerEntity>>(emptyList())
+    internal val _banners get() = appState._banners
     val banners: StateFlow<List<BannerEntity>> = _banners.asStateFlow()
 
     internal val _selectedCategoryId = MutableStateFlow<String?>(null)
@@ -59,10 +59,19 @@ open class HomeViewModel @Inject constructor(
     internal val _activeBrowserTab = MutableStateFlow("الرئيسية")
     val activeBrowserTab: StateFlow<String> = _activeBrowserTab.asStateFlow()
 
-    internal val _maxKmRadius = MutableStateFlow(10)
+    internal val _maxKmRadius get() = appState._maxKmRadius
     val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
 
     private val cachedFilteredResults = mutableMapOf<String, List<ProviderEntity>>()
+
+    init {
+        viewModelScope.launch {
+            _providers.collect {
+                clearCache()
+                applyFilters()
+            }
+        }
+    }
 
     fun clearCache() {
         cachedFilteredResults.clear()

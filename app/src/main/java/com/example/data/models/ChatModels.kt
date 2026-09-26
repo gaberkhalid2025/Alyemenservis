@@ -141,29 +141,101 @@ data class ChatChannel(
     val messages: List<ChatMessage> = emptyList()
 ) : Serializable {
 
-    fun toCanonicalChannel(): ChatChannel = this
+    /**
+     * يوحّد الحقول المهجورة والقديمة (providerId, clientId, targetName, customerName, timestamp, unreadCountUser...)
+     * إلى الحقول القياسية المعتمدة (participants, participantNames, participantPhotos, title, updatedAt, unreadCount).
+     */
+    fun toCanonicalChannel(): ChatChannel {
+        val resolvedParticipants = if (participants.isNotEmpty()) {
+            participants
+        } else {
+            listOf(providerId, clientId, targetId, customerId).map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        }
+
+        val resolvedNames = participantNames.toMutableMap()
+        if (providerId.isNotBlank() && providerName.isNotBlank() && !resolvedNames.containsKey(providerId)) {
+            resolvedNames[providerId] = providerName
+        }
+        if (targetId.isNotBlank() && targetName.isNotBlank() && !resolvedNames.containsKey(targetId)) {
+            resolvedNames[targetId] = targetName
+        }
+        val effectiveClientId = clientId.ifBlank { customerId }
+        val effectiveClientName = clientName.ifBlank { customerName.ifBlank { userName } }
+        if (effectiveClientId.isNotBlank() && effectiveClientName.isNotBlank() && !resolvedNames.containsKey(effectiveClientId)) {
+            resolvedNames[effectiveClientId] = effectiveClientName
+        }
+
+        val resolvedPhotos = participantPhotos.toMutableMap()
+        if (providerId.isNotBlank() && providerPhoto.isNotBlank() && !resolvedPhotos.containsKey(providerId)) {
+            resolvedPhotos[providerId] = providerPhoto
+        }
+        if (effectiveClientId.isNotBlank() && clientPhoto.isNotBlank() && !resolvedPhotos.containsKey(effectiveClientId)) {
+            resolvedPhotos[effectiveClientId] = clientPhoto
+        }
+
+        val resolvedUnread = unreadCount.toMutableMap()
+        if (effectiveClientId.isNotBlank() && unreadCountUser > 0 && !resolvedUnread.containsKey(effectiveClientId)) {
+            resolvedUnread[effectiveClientId] = unreadCountUser
+        }
+        val effectiveTargetId = targetId.ifBlank { providerId }
+        if (effectiveTargetId.isNotBlank() && unreadCountTarget > 0 && !resolvedUnread.containsKey(effectiveTargetId)) {
+            resolvedUnread[effectiveTargetId] = unreadCountTarget
+        }
+
+        val resolvedTitle = title.ifBlank {
+            targetName.ifBlank { providerName.ifBlank { customerName.ifBlank { clientName.ifBlank { userName } } } }
+        }
+        val resolvedAvatar = groupAvatarUrl.ifBlank { providerPhoto.ifBlank { clientPhoto } }
+        val resolvedTime = when {
+            lastMessageTime > 0L -> lastMessageTime
+            timestamp > 0L -> timestamp
+            else -> updatedAt
+        }
+
+        return copy(
+            participants = resolvedParticipants,
+            participantNames = resolvedNames,
+            participantPhotos = resolvedPhotos,
+            unreadCount = resolvedUnread,
+            title = resolvedTitle,
+            groupAvatarUrl = resolvedAvatar,
+            lastMessageTime = resolvedTime,
+            updatedAt = if (updatedAt > 0L) updatedAt else resolvedTime
+        )
+    }
 
     /**
      * الحصول على اسم الطرف الآخر في المحادثات الثنائية
      */
     fun getOtherParticipantName(currentUserId: String): String {
-        val otherId = participants.firstOrNull { it != currentUserId } ?: return title.ifBlank { "مستخدم" }
-        return participantNames[otherId] ?: title.ifBlank { "مستخدم" }
+        val otherId = participants.firstOrNull { it != currentUserId }
+        if (otherId != null) {
+            participantNames[otherId]?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return title.ifBlank {
+            targetName.ifBlank { providerName.ifBlank { customerName.ifBlank { clientName.ifBlank { userName.ifBlank { "مستخدم" } } } } }
+        }
     }
 
     /**
      * الحصول على صورة الطرف الآخر في المحادثات الثنائية
      */
     fun getOtherParticipantPhoto(currentUserId: String): String {
-        val otherId = participants.firstOrNull { it != currentUserId } ?: return groupAvatarUrl
-        return participantPhotos[otherId] ?: groupAvatarUrl
+        val otherId = participants.firstOrNull { it != currentUserId }
+        if (otherId != null) {
+            participantPhotos[otherId]?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return groupAvatarUrl.ifBlank { providerPhoto.ifBlank { clientPhoto } }
     }
 
     /**
      * الحصول على عدد الرسائل غير المقروءة للمستخدم الحالي
      */
     fun getUnreadFor(userId: String): Int {
-        return unreadCount[userId] ?: 0
+        unreadCount[userId]?.let { return it }
+        if (userId.isNotBlank() && (userId == clientId || userId == customerId)) return unreadCountUser
+        if (userId.isNotBlank() && (userId == providerId || userId == targetId)) return unreadCountTarget
+        return 0
     }
 
     /**
@@ -213,7 +285,22 @@ data class ChatMessage(
     val syncStatus: SyncStatus = SyncStatus.SYNCED
 ) : Serializable {
 
-    fun toCanonicalMessage(chId: String = channelId): ChatMessage = this
+    fun toCanonicalMessage(chId: String = channelId): ChatMessage {
+        val resolvedChannelId = chId.ifBlank { channelId }
+        val resolvedMediaUrl = mediaUrl.ifBlank { imageUrl.ifBlank { attachment?.url ?: "" } }
+        val resolvedImageUrl = imageUrl.ifBlank { if (mediaType == MediaType.IMAGE) resolvedMediaUrl else "" }
+        val resolvedMediaType = if (mediaType == MediaType.TEXT && resolvedImageUrl.isNotBlank()) {
+            MediaType.IMAGE
+        } else {
+            mediaType
+        }
+        return copy(
+            channelId = resolvedChannelId,
+            mediaUrl = resolvedMediaUrl,
+            imageUrl = resolvedImageUrl,
+            mediaType = resolvedMediaType
+        )
+    }
 
     /**
      * فحص ما إذا كانت الرسالة مرسلة من المستخدم الحالي

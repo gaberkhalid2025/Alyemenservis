@@ -49,7 +49,24 @@ data class RatingReviewEntity(
     val rating: Double = 5.0,
     val comment: String = "",
     val dateTimestamp: Long = System.currentTimeMillis()
-)
+) {
+    val userName: String get() = authorName
+    val userPhone: String get() = authorPhone
+    val timestamp: Long get() = dateTimestamp
+
+    fun toRatingEntity(targetType: String = "STORE"): com.example.data.RatingEntity {
+        return com.example.data.RatingEntity(
+            id = id,
+            targetId = targetId,
+            targetType = targetType,
+            userName = authorName,
+            userPhone = authorPhone,
+            rating = rating.toFloat(),
+            comment = comment,
+            timestamp = dateTimestamp
+        )
+    }
+}
 
 data class GalleryAlbumEntity(
     val id: String = "",

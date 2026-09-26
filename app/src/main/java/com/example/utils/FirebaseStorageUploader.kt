@@ -233,8 +233,46 @@ object FirebaseStorageUploader {
     fun getChatMessageMediaPath(channelId: String, messageId: String): String =
         "chat/$channelId/${messageId}.webp"
 
+    fun getPortfolioImagePath(providerId: String): String =
+        "providers/$providerId/portfolio/img_${UUID.randomUUID().toString().take(8)}.webp"
+
     suspend fun uploadImageToStorage(context: Context, uri: Uri, path: String): Result<String> {
         return uploadImageUri(context, uri, path, maxDimension = 800, maxSizeBytes = 300 * 1024L)
+    }
+
+    /**
+     * يحوّل أي نص صورة Base64 إلى رابط سحابي في Firebase Storage لمنع تضخم مستندات Firestore (حد 1MB).
+     * وفي حال عدم توفر اتصال، يضغط الصورة إلى حجم مصغر آمن جداً (< 35KB).
+     */
+    suspend fun resolveBase64ToStorageUrl(
+        input: String,
+        storagePath: String,
+        maxDimension: Int = 800,
+        maxSizeBytes: Long = 250 * 1024L
+    ): String = withContext(Dispatchers.IO) {
+        val trimmed = input.trim()
+        if (trimmed.isBlank()) return@withContext ""
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return@withContext trimmed
+        try {
+            val cleanBase64 = if (trimmed.contains(",")) trimmed.substringAfter(",") else trimmed
+            val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            if (bitmap != null) {
+                val uploaded = uploadBitmap(bitmap, storagePath, maxDimension, maxSizeBytes)
+                if (uploaded.isSuccess) {
+                    return@withContext uploaded.getOrThrow()
+                }
+                // Offline safe thumbnail fallback (< 35KB) so Firestore 1MB limit is never exceeded
+                val thumbBytes = compressBitmapToBytes(bitmap, maxDimension = 320, maxSizeBytes = 35 * 1024L)
+                return@withContext "data:image/webp;base64," + android.util.Base64.encodeToString(thumbBytes, android.util.Base64.NO_WRAP)
+            } else {
+                val pdfUpload = uploadBytesToStorage(bytes, storagePath, "application/pdf")
+                if (pdfUpload.isSuccess) return@withContext pdfUpload.getOrThrow()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        trimmed
     }
 
     /**

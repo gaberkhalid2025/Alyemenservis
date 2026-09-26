@@ -32,14 +32,6 @@ fun MainViewModel.triggerNotification(
     triggerNotification("$title: $message", context)
 }
 
-var MainViewModel.lastNotifMsg: String
-    get() = ""
-    set(value) {}
-
-var MainViewModel.lastNotifTime: Long
-    get() = 0L
-    set(value) {}
-
 fun MainViewModel.triggerNotification(msg: String, context: Context? = null) {
     val now = System.currentTimeMillis()
     if (msg == lastNotifMsg && (now - lastNotifTime) < 3000L) {

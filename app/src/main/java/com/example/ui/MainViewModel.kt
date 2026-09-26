@@ -67,6 +67,13 @@ class MainViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            appState._supervisors.collect { sups ->
+                if (authViewModel._supervisors.value != sups) {
+                    authViewModel._supervisors.value = sups
+                }
+            }
+        }
     }
 
     override fun onCleared() {
@@ -388,7 +395,9 @@ class MainViewModel @Inject constructor(
         adminViewModel.onTriggerNotification = { msg ->
             triggerNotification(msg)
         }
-        adminViewModel.onApplyFilters = {  }
+        adminViewModel.onApplyFilters = {
+            homeViewModel.applyFilters(_currentUserResidence.value)
+        }
         storeManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
         propertyManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }
         jobManagementViewModel.onTriggerNotification = { msg -> triggerNotification(msg) }

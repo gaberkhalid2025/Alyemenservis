@@ -385,6 +385,10 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun logout(context: Context) {
         _adminRole.value = "GUEST"
+        _currentSupervisorPermissions.value = emptyList()
+        try {
+            com.example.utils.SecureStorage(context).clearAdminSession()
+        } catch (_: Exception) {}
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         sp.edit().putString("saved_admin_role", "GUEST").apply()
         triggerToast("🔒 تم تسجيل الخروج بنجاح")

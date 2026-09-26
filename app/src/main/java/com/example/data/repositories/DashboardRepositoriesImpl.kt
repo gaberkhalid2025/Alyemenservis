@@ -303,14 +303,25 @@ class RatingsRepositoryImpl(
                 }
 
                 val list = snapshot.documents.mapNotNull { doc ->
+                    val entity = try {
+                        doc.toObject(com.example.data.RatingEntity::class.java)?.copy(id = doc.id)
+                    } catch (_: Exception) {
+                        null
+                    }
                     RatingReviewEntity(
                         id = doc.id,
                         targetId = targetId,
-                        authorName = doc.getString("authorName") ?: doc.getString("userName") ?: "عميل",
-                        authorPhone = doc.getString("authorPhone") ?: "",
-                        rating = doc.getDouble("rating") ?: 5.0,
-                        comment = doc.getString("comment") ?: doc.getString("review") ?: "",
-                        dateTimestamp = doc.getLong("dateTimestamp") ?: System.currentTimeMillis()
+                        authorName = doc.getString("userName")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("authorName")?.takeIf { it.isNotBlank() }
+                            ?: entity?.userName?.takeIf { it.isNotBlank() }
+                            ?: "عميل",
+                        authorPhone = doc.getString("userPhone")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("authorPhone")
+                            ?: entity?.userPhone
+                            ?: "",
+                        rating = doc.getDouble("rating") ?: entity?.rating?.toDouble() ?: 5.0,
+                        comment = doc.getString("comment") ?: doc.getString("review") ?: entity?.comment ?: "",
+                        dateTimestamp = doc.getLong("timestamp") ?: doc.getLong("dateTimestamp") ?: entity?.timestamp ?: System.currentTimeMillis()
                     )
                 }
                 trySend(list)
@@ -321,15 +332,25 @@ class RatingsRepositoryImpl(
 
     override suspend fun addRating(rating: RatingReviewEntity): Result<String> {
         return try {
-            val id = UUID.randomUUID().toString()
+            val id = rating.id.ifBlank { UUID.randomUUID().toString() }
+            val now = if (rating.dateTimestamp > 0L) rating.dateTimestamp else System.currentTimeMillis()
             val map = mapOf(
                 "id" to id,
                 "targetId" to rating.targetId,
+                "targetType" to "STORE",
+                "userName" to rating.authorName,
                 "authorName" to rating.authorName,
+                "userPhone" to rating.authorPhone,
                 "authorPhone" to rating.authorPhone,
                 "rating" to rating.rating,
+                "qualityRating" to rating.rating,
+                "speedRating" to rating.rating,
+                "professionalismRating" to rating.rating,
+                "priceFairnessRating" to rating.rating,
                 "comment" to rating.comment,
-                "dateTimestamp" to System.currentTimeMillis()
+                "isApproved" to true,
+                "timestamp" to now,
+                "dateTimestamp" to now
             )
             firestore.collection("ratings").document(id).set(map).await()
             Result.success(id)

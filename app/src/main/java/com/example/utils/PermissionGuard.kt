@@ -55,7 +55,7 @@ object PermissionGuard {
         supervisorGrantedPermissions: List<String> = emptyList()
     ): Boolean {
         if (role == AdminRole.GUEST) return false
-        if (role == AdminRole.OWNER || role == AdminRole.SUPER_ADMIN) return true
+        if (role == AdminRole.OWNER || role == AdminRole.SUPER_ADMIN || role == AdminRole.MAIN_ADMIN) return true
 
         if (supervisorGrantedPermissions.contains("ALL") || supervisorGrantedPermissions.contains("ALL_538")) return true
 
@@ -75,7 +75,7 @@ object PermissionGuard {
             if (supervisorGrantedPermissions.contains(mainCatKey)) return true
         }
 
-        return role == AdminRole.ADMIN || role == AdminRole.SUPER_ADMIN || role == AdminRole.OWNER || role == AdminRole.SUPERVISOR
+        return role == AdminRole.ADMIN || role == AdminRole.SUPER_ADMIN || role == AdminRole.OWNER || role == AdminRole.MAIN_ADMIN || role == AdminRole.SUPERVISOR
     }
 
     fun hasPermission(role: String, permission: String, grantedPermissions: List<String> = emptyList()): Boolean {

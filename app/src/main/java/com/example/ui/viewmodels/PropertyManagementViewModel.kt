@@ -25,7 +25,26 @@ class PropertyManagementViewModel @Inject constructor(
 
     fun saveProperty(property: PropertyEntity) {
         viewModelScope.launch {
-            crud.saveEntity("properties", property.id, property,
+            val targetId = property.id.ifBlank { db.collection("properties").document().id }
+            val resolvedImages = property.images.mapIndexed { idx, img ->
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                    img,
+                    com.example.utils.FirebaseStorageUploader.getPropertyPhotoPath(targetId, idx),
+                    maxSizeBytes = 250 * 1024L
+                )
+            }
+            val resolvedPdf = if (property.pdfFileBase64.isNotBlank()) {
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                    property.pdfFileBase64,
+                    "properties/$targetId/brochure.pdf"
+                )
+            } else ""
+            val cleanProp = property.copy(
+                id = targetId,
+                images = resolvedImages,
+                pdfFileBase64 = resolvedPdf
+            )
+            crud.saveEntity("properties", targetId, cleanProp,
                 onSuccess = { onTriggerNotification?.invoke("✅ تم حفظ العقار بنجاح") },
                 onError = { onTriggerNotification?.invoke("❌ فشل حفظ العقار: ${it.message}") }
             )

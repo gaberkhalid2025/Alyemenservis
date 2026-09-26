@@ -17,12 +17,22 @@ enum class Currency(val code: String, val symbolArabic: String, val nameArabic: 
 enum class AdminRole(val code: String, val titleArabic: String) {
     OWNER("OWNER", "المالك"),
     SUPER_ADMIN("SUPER_ADMIN", "مدير النظام الشامل"),
+    MAIN_ADMIN("MAIN_ADMIN", "المدير الرئيسي"),
     ADMIN("ADMIN", "مدير للنظام"),
     SUPERVISOR("SUPERVISOR", "مشرف"),
     AUDITOR("AUDITOR", "مراقب مالي"),
     SUPPORT("SUPPORT", "الدعم الفني"),
     OPERATIONS("OPERATIONS", "إدارة العمليات"),
-    GUEST("GUEST", "زائر")
+    GUEST("GUEST", "زائر");
+
+    val roleId: String get() = code
+
+    companion object {
+        fun fromString(value: String): AdminRole {
+            val clean = value.trim()
+            return entries.firstOrNull { it.code.equals(clean, ignoreCase = true) } ?: GUEST
+        }
+    }
 }
 
 @Keep

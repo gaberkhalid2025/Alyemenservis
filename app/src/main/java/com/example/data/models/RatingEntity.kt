@@ -31,4 +31,19 @@ data class RatingEntity(
 ) {
     val providerId: String get() = targetId
     val customerName: String get() = userName
+    val authorName: String get() = userName
+    val authorPhone: String get() = userPhone
+    val dateTimestamp: Long get() = timestamp
+
+    fun toReviewEntity(): com.example.domain.entities.RatingReviewEntity {
+        return com.example.domain.entities.RatingReviewEntity(
+            id = id,
+            targetId = targetId,
+            authorName = userName.ifBlank { "عميل" },
+            authorPhone = userPhone,
+            rating = rating.toDouble(),
+            comment = comment,
+            dateTimestamp = timestamp
+        )
+    }
 }

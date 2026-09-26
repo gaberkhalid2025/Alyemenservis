@@ -15,21 +15,13 @@ enum class ApplicableType {
     PRODUCT
 }
 
-@Keep
-enum class EntityType {
-    TECHNICIAN,
-    STORE,
-    RESTAURANT,
-    MEDICAL,
-    REAL_ESTATE,
-    JOB_POSTER
-}
+typealias EntityType = com.example.data.EntityType
 
 @Keep
 data class Offer(
     val id: String = "",
     val entityId: String = "",                  // صاحب العرض (فني / متجر / مطعم / مركز طبي / عقار)
-    val entityType: EntityType = EntityType.STORE,
+    val entityType: String = com.example.data.EntityType.STORE.code,
     val title: String = "",
     val description: String = "",
     val discountType: DiscountType = DiscountType.PERCENTAGE, // PERCENTAGE أو FIXED

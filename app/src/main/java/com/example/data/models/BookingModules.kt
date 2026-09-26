@@ -1,6 +1,7 @@
 package com.example.data.models
 
 import androidx.annotation.Keep
+import com.example.data.BookingEntity
 
 @Keep
 data class BookingCore(
@@ -9,10 +10,14 @@ data class BookingCore(
     val bookingCode: String = "",
     val status: String = "PENDING",
     val clientId: String = "",
-    val clientName: String = "",
-    val clientPhone: String = "",
-    val clientAddress: String = ""
-)
+    val customerName: String = "",
+    val customerPhone: String = "",
+    val customerArea: String = ""
+) {
+    val clientName: String get() = customerName
+    val clientPhone: String get() = customerPhone
+    val clientAddress: String get() = customerArea
+}
 
 @Keep
 data class BookingService(
@@ -27,16 +32,81 @@ data class BookingService(
 
 @Keep
 data class BookingSchedule(
-    val dateString: String = "",
-    val timeString: String = "",
     val date: String = "",
     val time: String = "",
     val scheduledAt: Long = 0L
-)
+) {
+    val dateString: String get() = date
+    val timeString: String get() = time
+}
 
 @Keep
 data class BookingSecurity(
     val pinCode: String = "",
-    val bookingPassword: String = "",
+    val secretPin: String = "",
     val rejectionReason: String = ""
+)
+
+fun BookingEntity.toCore() = BookingCore(
+    id = id,
+    bookingNumber = bookingNumber,
+    bookingCode = bookingCode,
+    status = status,
+    clientId = clientId,
+    customerName = customerName.ifBlank { clientName.ifBlank { fullName } },
+    customerPhone = customerPhone.ifBlank { clientPhone.ifBlank { userPhone } },
+    customerArea = customerArea.ifBlank { clientAddress.ifBlank { fullAddress } }
+)
+
+fun BookingEntity.toService() = BookingService(
+    serviceType = serviceType,
+    category = category,
+    subCategory = subCategory,
+    serviceDetails = serviceDetails,
+    providerId = providerId,
+    providerName = providerName,
+    providerPhone = providerPhone
+)
+
+fun BookingEntity.toSchedule() = BookingSchedule(
+    date = date.ifBlank { dateString },
+    time = time.ifBlank { timeString },
+    scheduledAt = scheduledAt
+)
+
+fun BookingEntity.toSecurity() = BookingSecurity(
+    pinCode = pinCode,
+    secretPin = secretPin,
+    rejectionReason = rejectionReason
+)
+
+fun createBookingFromModules(
+    core: BookingCore,
+    service: BookingService,
+    schedule: BookingSchedule,
+    security: BookingSecurity = BookingSecurity()
+): BookingEntity = BookingEntity(
+    id = core.id,
+    bookingNumber = core.bookingNumber,
+    bookingCode = core.bookingCode,
+    status = core.status,
+    clientId = core.clientId,
+    customerName = core.customerName,
+    customerPhone = core.customerPhone,
+    customerArea = core.customerArea,
+    serviceType = service.serviceType,
+    category = service.category,
+    subCategory = service.subCategory,
+    serviceDetails = service.serviceDetails,
+    providerId = service.providerId,
+    providerName = service.providerName,
+    providerPhone = service.providerPhone,
+    date = schedule.date,
+    time = schedule.time,
+    dateString = schedule.date,
+    timeString = schedule.time,
+    scheduledAt = schedule.scheduledAt,
+    pinCode = security.pinCode,
+    secretPin = security.secretPin,
+    rejectionReason = security.rejectionReason
 )

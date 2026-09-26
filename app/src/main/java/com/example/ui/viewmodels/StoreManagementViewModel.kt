@@ -31,7 +31,38 @@ class StoreManagementViewModel @Inject constructor(
 
     fun saveStore(store: StoreEntity) {
         viewModelScope.launch {
-            crud.saveEntity("stores", store.id, store,
+            val targetId = store.id.ifBlank { db.collection("stores").document().id }
+            val resolvedLogo = com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                store.logoImage,
+                com.example.utils.FirebaseStorageUploader.getStoreLogoPath(targetId),
+                maxSizeBytes = 150 * 1024L
+            )
+            val resolvedCover = com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                store.coverImage,
+                com.example.utils.FirebaseStorageUploader.getStoreCoverPath(targetId),
+                maxSizeBytes = 250 * 1024L
+            )
+            val resolvedImages = store.images.mapIndexed { idx, img ->
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                    img,
+                    com.example.utils.FirebaseStorageUploader.getStorePhotoPath(targetId, idx),
+                    maxSizeBytes = 250 * 1024L
+                )
+            }
+            val resolvedPdf = if (store.pdfFileBase64.isNotBlank()) {
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                    store.pdfFileBase64,
+                    "stores/$targetId/catalog.pdf"
+                )
+            } else ""
+            val cleanStore = store.copy(
+                id = targetId,
+                logoImage = resolvedLogo,
+                coverImage = resolvedCover,
+                images = resolvedImages,
+                pdfFileBase64 = resolvedPdf
+            )
+            crud.saveEntity("stores", targetId, cleanStore,
                 onSuccess = { onTriggerNotification?.invoke("✅ تم حفظ المتجر بنجاح") },
                 onError = { onTriggerNotification?.invoke("❌ فشل حفظ المتجر: ${it.message}") }
             )

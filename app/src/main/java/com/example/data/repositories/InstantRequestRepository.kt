@@ -160,12 +160,14 @@ class InstantRequestRepository(private val context: Context? = null) {
             .collection("offers")
             .document(offerId)
 
+        val topLevelOfferRef = firestore.collection("request_offers").document(offerId)
         val requestRef = firestore.collection("instant_requests").document(offer.requestId)
 
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(requestRef)
             val currentOffers = snapshot.getLong("offersCount") ?: 0L
             transaction.set(offerRef, finalOffer)
+            transaction.set(topLevelOfferRef, finalOffer)
             transaction.update(requestRef, "offersCount", currentOffers + 1)
         }.addOnSuccessListener {
             AnalyticsEventsHelper.logOfferSubmitted(context, offer.requestId, offer.technicianId, offer.price)
@@ -204,6 +206,8 @@ class InstantRequestRepository(private val context: Context? = null) {
             .addOnSuccessListener {
                 firestore.collection("instant_requests").document(requestId)
                     .collection("offers").document(offerId)
+                    .update("status", "ACCEPTED")
+                firestore.collection("request_offers").document(offerId)
                     .update("status", "ACCEPTED")
                 _requests.value = _requests.value.map {
                     if (it.id == requestId) it.copy(

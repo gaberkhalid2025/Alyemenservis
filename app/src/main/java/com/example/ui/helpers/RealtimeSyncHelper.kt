@@ -366,12 +366,12 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             if (snapshot != null) {
                 val fetched = snapshot.documents.mapNotNull { doc ->
                     try {
-                        doc.toObject(ChatChannelEntity::class.java)
+                        doc.toObject(ChatChannelEntity::class.java)?.copy(id = doc.id)?.toCanonicalChannel()
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
                     }
-                }.sortedByDescending { it.timestamp }
+                }.sortedByDescending { it.lastMessageTime.coerceAtLeast(it.timestamp) }
                 appState._chatChannels.value = fetched
             }
         }
@@ -695,19 +695,34 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
 
     suspend fun loadOffers(limit: Long = ON_DEMAND_FETCH_LIMIT): List<Offer> {
         return try {
-            db.collection("offers")
+            val primary = db.collection("offers")
                 .limit(limit)
                 .get()
                 .await()
                 .documents
                 .mapNotNull { doc ->
                     try {
-                        val obj = doc.toObject(Offer::class.java)
-                        obj?.copy(id = doc.id)
+                        doc.toObject(Offer::class.java)?.copy(id = doc.id)
                     } catch (e: Exception) {
                         null
                     }
                 }
+            if (primary.isNotEmpty()) {
+                primary
+            } else {
+                db.collection("special_offers")
+                    .limit(limit)
+                    .get()
+                    .await()
+                    .documents
+                    .mapNotNull { doc ->
+                        try {
+                            doc.toObject(Offer::class.java)?.copy(id = doc.id)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+            }
         } catch (e: Exception) {
             emptyList()
         }
@@ -715,13 +730,24 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
 
     suspend fun loadRequestOffers(limit: Long = ON_DEMAND_FETCH_LIMIT): List<RequestOfferEntity> {
         return try {
-            db.collection("request_offers")
+            val topLevel = db.collection("request_offers")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(limit)
                 .get()
                 .await()
                 .documents
                 .mapNotNull { it.toObject(RequestOfferEntity::class.java)?.copy(id = it.id) }
+            if (topLevel.isNotEmpty()) {
+                topLevel
+            } else {
+                db.collectionGroup("offers")
+                    .limit(limit)
+                    .get()
+                    .await()
+                    .documents
+                    .mapNotNull { it.toObject(RequestOfferEntity::class.java)?.copy(id = it.id) }
+                    .sortedByDescending { it.createdAt }
+            }
         } catch (e: Exception) {
             emptyList()
         }

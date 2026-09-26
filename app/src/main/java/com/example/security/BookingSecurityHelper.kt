@@ -97,15 +97,9 @@ object BookingSecurityHelper {
         // Direct match
         if (cleanInput.equals(cleanTarget, ignoreCase = true)) return true
         
-        // PBKDF2 match
-        if (com.example.utils.SecureHasher.verifyPin(cleanInput, cleanTarget) ||
-            com.example.utils.SecureHasher.verifyPassword(cleanInput, cleanTarget)) {
-            return true
-        }
-
-        // Hash match (SHA-256 fallback)
-        val inputHash = hashPin(cleanInput)
-        return inputHash.equals(cleanTarget, ignoreCase = true)
+        // PBKDF2 / Salted SHA-256 / Unsalted SHA-256 match via SecureHasher
+        return com.example.utils.SecureHasher.verifyPin(cleanInput, cleanTarget) ||
+            com.example.utils.SecureHasher.verifyPassword(cleanInput, cleanTarget)
     }
 
     /**

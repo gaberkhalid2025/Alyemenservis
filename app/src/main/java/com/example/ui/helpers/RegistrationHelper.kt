@@ -39,21 +39,18 @@ class RegistrationHelper(
                 val res = FirebaseStorageUploader.uploadImageUri(
                     context, uri, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
                 )
-                res.getOrDefault(input)
+                res.getOrElse {
+                    val compressed = FirebaseStorageUploader.compressImageToBytes(context, uri, maxDimension = 320, maxSizeBytes = 35 * 1024L)
+                    if (compressed != null) {
+                        "data:image/webp;base64," + android.util.Base64.encodeToString(compressed, android.util.Base64.NO_WRAP)
+                    } else ""
+                }
             } else {
-                val cleanBase64 = if (input.contains(",")) input.substringAfter(",") else input
-                val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
-                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                if (bitmap != null) {
-                    val res = FirebaseStorageUploader.uploadBitmap(
-                        bitmap, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes
-                    )
-                    res.getOrDefault(input)
-                } else input
+                FirebaseStorageUploader.resolveBase64ToStorageUrl(input, storagePath, maxDimension = 800, maxSizeBytes = maxSizeBytes)
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            input
+            ""
         }
     }
 

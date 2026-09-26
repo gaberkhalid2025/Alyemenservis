@@ -9,7 +9,7 @@ fun MainViewModel.openUnifiedSupportChat() {
 }
 
 fun MainViewModel.replyToChannelMessage(channelId: String, text: String, senderId: String, senderName: String) {
-    this.replyToChatChannel(channelId, text, senderId, senderName)
+    this.replyToChatChannel(channelId = channelId, senderId = senderId, msgText = text, senderName = senderName)
 }
 
 fun MainViewModel.deleteChatChannelById(channelId: String) {

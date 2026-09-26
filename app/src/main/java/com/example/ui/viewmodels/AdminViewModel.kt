@@ -1014,6 +1014,7 @@ fun approveRegisteredUser(userId: String, userName: String = "") {
             .addOnSuccessListener {
                 mainViewModel.triggerNotification("✅ تم قبول وتأكيد طلب انضمام المستخدم $userName بنجاح من قبل الأدمن!")
             }
+        db.collection("users").document(userId).update("isApproved", true)
     }
 
 fun toggleBlockRegisteredUser(userId: String, currentBlocked: Boolean, userName: String = "") {
@@ -1028,6 +1029,7 @@ fun toggleBlockRegisteredUser(userId: String, currentBlocked: Boolean, userName:
                 val actionText = if (newBlockedState) "حظر" else "إلغاء حظر"
                 mainViewModel.triggerNotification("🛡️ تم $actionText حساب المستخدم $userName بنجاح.")
             }
+        db.collection("users").document(userId).update("isBlocked", newBlockedState)
     }
 
 fun deleteRegisteredUser(userId: String, userName: String = "") {
@@ -1036,6 +1038,7 @@ fun deleteRegisteredUser(userId: String, userName: String = "") {
             .addOnSuccessListener {
                 mainViewModel.triggerNotification("🗑️ تم حذف حساب المستخدم $userName من القاعدة بنجاح.")
             }
+        db.collection("users").document(userId).delete()
     }
 
 fun saveStore(store: com.example.data.StoreEntity) {
@@ -2860,15 +2863,24 @@ fun updateProviderPortfolio(providerId: String, images: List<String>) {
     }
 
 fun addPortfolioImage(providerId: String, imageBase64: String) {
-        try {
-            db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
-                if (snapshot != null && snapshot.exists()) {
-                    val list = snapshot.get("portfolioImages") as? List<String> ?: emptyList()
-                    val updated = list + imageBase64
-                    db.collection("providers").document(providerId).update("portfolioImages", updated)
+        viewModelScope.launch {
+            try {
+                val uploadedUrl = com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                    imageBase64,
+                    com.example.utils.FirebaseStorageUploader.getPortfolioImagePath(providerId),
+                    maxSizeBytes = 250 * 1024L
+                )
+                if (uploadedUrl.isBlank()) return@launch
+                db.collection("providers").document(providerId).get().addOnSuccessListener { snapshot ->
+                    if (snapshot != null && snapshot.exists()) {
+                        @Suppress("UNCHECKED_CAST")
+                        val list = snapshot.get("portfolioImages") as? List<String> ?: emptyList()
+                        val updated = list + uploadedUrl
+                        db.collection("providers").document(providerId).update("portfolioImages", updated)
+                    }
                 }
-            }
-        } catch (e: Exception) {}
+            } catch (e: Exception) {}
+        }
     }
 
 fun removePortfolioImage(providerId: String, index: Int) {
