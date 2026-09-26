@@ -256,30 +256,37 @@ class SettingsSyncDiagnosticRunner(private val context: Context) {
         }
         delay(200)
 
-        // 4. Security check: Verify adminPassword is @Exclude and not leaked in plaintext serialization
-        onProgress("🔐 [4/6] فحص أمان حقول كلمات المرور (@Exclude على adminPassword)...")
+        // 4. Security check: Verify adminPassword is removed and ownerPassword is @Exclude
+        onProgress("🔐 [4/6] فحص أمان حقول كلمات المرور (حذف adminPassword وعزل ownerPassword بـ @Exclude)...")
         val t4Start = System.currentTimeMillis()
-        val adminPassExcludeAnnotation = try {
-            val method = AdminSettingsEntity::class.java.getDeclaredMethod("getAdminPassword")
+        val adminPassRemoved = try {
+            AdminSettingsEntity::class.java.getDeclaredMethod("getAdminPassword")
+            false
+        } catch (_: NoSuchMethodException) {
+            true
+        }
+        val ownerPassExcluded = try {
+            val method = AdminSettingsEntity::class.java.getDeclaredMethod("getOwnerPassword")
             method.isAnnotationPresent(com.google.firebase.firestore.Exclude::class.java)
         } catch (_: Exception) {
             true
         }
+        val t4Passed = adminPassRemoved && ownerPassExcluded
         val t4Dur = System.currentTimeMillis() - t4Start
         details.add(
             TestDetail(
                 id = "settings_security_exclude",
                 systemName = "13. نظام الإعدادات والمزامنة (AdminSettings)",
                 subCategory = "الأمان وحماية كلمات المرور",
-                testName = "التحقق من استبعاد حقل adminPassword من التخزين النصي عبر @Exclude",
+                testName = "التحقق من حذف adminPassword المهجور وعزل ownerPassword عبر @Exclude",
                 fileName = "AdminSettingsEntity.kt",
                 lineNumber = 40,
-                functionName = "getAdminPassword()",
-                status = if (adminPassExcludeAnnotation) "SUCCESS" else "FAILED",
-                message = if (adminPassExcludeAnnotation) "✅ حقل adminPassword محمي بـ @Exclude ومستبعد من التخزين النصي الصريح" else "❌ حقل adminPassword غير مستبعد!",
+                functionName = "getOwnerPassword()",
+                status = if (t4Passed) "SUCCESS" else "FAILED",
+                message = if (t4Passed) "✅ تم حذف adminPassword نهائياً وعزل ownerPassword بـ @Exclude لمنع التخزين النصي" else "❌ تحذير أمني في حقول كلمات المرور!",
                 durationMs = t4Dur,
-                expectedOutcome = "وجود @get:Exclude على الحقل المهجور adminPassword",
-                actualOutcome = "isAnnotationPresent(Exclude) = $adminPassExcludeAnnotation"
+                expectedOutcome = "حذف adminPassword ووجود @get:Exclude على ownerPassword",
+                actualOutcome = "adminPassRemoved=$adminPassRemoved, ownerPassExcluded=$ownerPassExcluded"
             )
         )
         delay(150)
@@ -435,18 +442,18 @@ class SettingsSyncDiagnosticRunner(private val context: Context) {
             SettingFieldDiagnostic("supportPhone", "رقم هاتف الدعم الفني", "البنرات والتواصل", true, true, true, true, "AboutScreen / SupportChat", "WORKING", "يظهر في شاشة حول التطبيق والدعم"),
             SettingFieldDiagnostic("supportWhatsapp", "رقم واتساب الدعم الفني", "البنرات والتواصل", true, true, true, true, "AboutScreen / SupportChat", "WORKING", "يفتح محادثة واتساب مباشرة مع الإدارة"),
 
-            // 10. الحقول المهجورة لأسباب أمنية
+            // 10. الحقول المحمية أمنياً (@Exclude)
             SettingFieldDiagnostic(
-                fieldName = "adminPassword",
-                arabicLabel = "كلمة مرور الأدمن النصية (مهجور أمنياً)",
+                fieldName = "ownerPassword",
+                arabicLabel = "كلمة مرور المالك (محمي بـ @Exclude)",
                 category = "الأمان والمصادقة",
                 isSaved = false,
-                isRead = false,
-                isAppliedInUi = false,
+                isRead = true,
+                isAppliedInUi = true,
                 isSyncedRealtime = false,
-                whereUsedInCode = "AdminSettingsEntity.kt:40 (@Exclude @Deprecated)",
-                status = "DEPRECATED",
-                causeOrNotes = "مهجور ومستبعد بـ @Exclude لحماية الأمان؛ تتم المصادقة حصرياً عبر Firebase Auth و AdminSecurityManager"
+                whereUsedInCode = "AdminSettingsEntity.kt:41 (@Exclude) / AdminSecurityManager.kt",
+                status = "WORKING",
+                causeOrNotes = "معزول بـ @Exclude لمنع التخزين النصي في Firestore؛ تم حذف adminPassword المهجور نهائياً"
             )
         )
     }

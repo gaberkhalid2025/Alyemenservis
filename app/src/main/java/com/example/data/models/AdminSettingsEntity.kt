@@ -3,6 +3,7 @@ package com.example.data
 import androidx.annotation.Keep
 
 @Keep
+@com.google.firebase.firestore.IgnoreExtraProperties
 data class AdminSettingsEntity(
     val id: String = "main_settings",
     val appName: String = "دليل خدمات اليمن",
@@ -37,10 +38,8 @@ data class AdminSettingsEntity(
     val supportWhatsapp: String = "777644",
     val supportEmail: String = "",
     val adminUsername: String = "",
-    @get:com.google.firebase.firestore.Exclude
-    @Deprecated("Removed for security. Admin auth is managed exclusively via Firebase Auth.")
-    val adminPassword: String = "",
     val ownerEmail: String = "",
+    @get:com.google.firebase.firestore.Exclude
     val ownerPassword: String = "",
     
     // Notifications control

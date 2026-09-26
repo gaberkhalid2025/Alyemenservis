@@ -185,6 +185,7 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     val context = LocalContext.current
     var showLogsDialog by remember { mutableStateOf(false) }
     var showRegistrationTestScreen by remember { mutableStateOf(false) }
+    var showAssistantTestScreen by remember { mutableStateOf(false) }
     val sp = remember { context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
     var rememberLoginInput by remember { mutableStateOf(sp.getString("saved_admin_role", "GUEST") != "GUEST") }
     var adminUsernameInput by remember { mutableStateOf(settingsState.adminUsername) }
@@ -1389,6 +1390,25 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
             Text("🧪 تشغيل اختبار التسجيل الشامل للأقسام 8", color = Color.Black, fontWeight = FontWeight.Bold)
         }
 
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Button(
+            onClick = {
+                showAssistantTestScreen = true
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "اختبار المساعد الذكي",
+                tint = Color.Black,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("🤖 اختبار المساعد الذكي", color = Color.Black, fontWeight = FontWeight.Bold)
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         Button(
@@ -1420,6 +1440,14 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 viewModel = viewModel,
                 themeColors = themeColors,
                 onDismiss = { showRegistrationTestScreen = false }
+            )
+        }
+
+        if (showAssistantTestScreen) {
+            AssistantTestScreen(
+                viewModel = viewModel,
+                themeColors = themeColors,
+                onDismiss = { showAssistantTestScreen = false }
             )
         }
     }

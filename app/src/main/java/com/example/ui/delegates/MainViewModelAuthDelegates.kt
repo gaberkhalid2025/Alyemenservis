@@ -59,7 +59,6 @@ fun MainViewModel.registerBackdoorInteraction() {
 fun MainViewModel.changeAdminCredentials(newPass: String, newOwnerPass: String = "") {
     val current = _settings.value
     val updated = current.copy(
-        adminPassword = if (newPass.isNotBlank()) newPass else current.adminPassword,
         ownerPassword = if (newOwnerPass.isNotBlank()) newOwnerPass else current.ownerPassword
     )
     _settings.value = updated
@@ -368,7 +367,7 @@ val MainViewModel._currentSupervisorPermissions get() = authViewModel._currentSu
 val MainViewModel.currentSupervisorPermissions get() = authViewModel.currentSupervisorPermissions
 
 fun MainViewModel.verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
-    val effectiveAdmin = adminPass.ifEmpty { settings.value.adminPassword }
+    val effectiveAdmin = adminPass
     val effectiveOwner = ownerPass.ifEmpty { settings.value.ownerPassword }
     return authViewModel.verifyAdminOrOwnerPassword(password, effectiveAdmin, effectiveOwner)
 }

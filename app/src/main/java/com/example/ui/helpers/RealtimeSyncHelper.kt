@@ -84,7 +84,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                         snapshot.reference.update("adminPassword", com.google.firebase.firestore.FieldValue.delete())
                     }
                     snapshot.toObject(AdminSettingsEntity::class.java)?.let {
-                        appState._settings.value = it.copy(adminPassword = "")
+                        appState._settings.value = it.copy(ownerPassword = "")
                         appState._maxKmRadius.value = it.maxSearchRadiusKm
                     }
                 } catch (e: Exception) {

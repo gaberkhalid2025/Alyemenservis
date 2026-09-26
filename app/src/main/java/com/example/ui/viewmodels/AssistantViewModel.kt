@@ -45,6 +45,13 @@ class AssistantViewModel : ViewModel() {
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
 
+    private val sharedHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
     fun updateTypedText(text: String) {
         _typedText.value = text
     }
@@ -194,28 +201,24 @@ class AssistantViewModel : ViewModel() {
                     .post(RequestBody.create(mediaType, finalRequestJsonObj.toString()))
                     .build()
 
-                val okHttpClient = OkHttpClient.Builder()
-                    .connectTimeout(15, TimeUnit.SECONDS)
-                    .readTimeout(15, TimeUnit.SECONDS)
-                    .build()
-
-                val apiResponse = okHttpClient.newCall(request).execute()
-                if (apiResponse.isSuccessful) {
-                    val bodyString = apiResponse.body?.string() ?: ""
-                    val jsonObject = JSONObject(bodyString)
-                    val candidates = jsonObject.optJSONArray("candidates")
-                    val candidate = candidates?.optJSONObject(0)
-                    val content = candidate?.optJSONObject("content")
-                    val parts = content?.optJSONArray("parts")
-                    val part = parts?.optJSONObject(0)
-                    val textVal = part?.optString("text")
-                    if (!textVal.isNullOrBlank()) {
-                        val response = AssistantMessage(text = textVal, isUser = false, matchedEntities = matched)
-                        cacheResponse(prompt, response)
-                        return response
+                sharedHttpClient.newCall(request).execute().use { apiResponse ->
+                    if (apiResponse.isSuccessful) {
+                        val bodyString = apiResponse.body?.string() ?: ""
+                        val jsonObject = JSONObject(bodyString)
+                        val candidates = jsonObject.optJSONArray("candidates")
+                        val candidate = candidates?.optJSONObject(0)
+                        val content = candidate?.optJSONObject("content")
+                        val parts = content?.optJSONArray("parts")
+                        val part = parts?.optJSONObject(0)
+                        val textVal = part?.optString("text")
+                        if (!textVal.isNullOrBlank()) {
+                            val response = AssistantMessage(text = textVal, isUser = false, matchedEntities = matched)
+                            cacheResponse(prompt, response)
+                            return response
+                        }
+                    } else {
+                        com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "HTTP Error: ${apiResponse.code} - ${apiResponse.message}")
                     }
-                } else {
-                    com.example.utils.AppErrorLogManager.logApiError("GeminiAssistant", "HTTP Error: ${apiResponse.code} - ${apiResponse.message}")
                 }
             }
         } catch (e: Exception) {
@@ -248,15 +251,17 @@ class AssistantViewModel : ViewModel() {
         val matchedEntities = mutableListOf<Any>()
 
         // 1. Search Providers
-        val professions = listOf("سباك", "كهربا", "دهان", "نجار", "حداد", "خياط", "سائق", "مصلح", "صيانه", "فني", "مهندس", "تكييف", "تبريد", "بناء", "مقاول", "طبيب", "تنظيف", "ميكانيك")
+        val professions = listOf("سباك", "كهربا", "دهان", "نجار", "حداد", "خياط", "سائق", "مصلح", "صيانه", "فني", "مهندس", "تكييف", "تبريد", "بناء", "مقاول", "طبيب", "تنظيف", "ميكانيك", "غساله", "غسالات")
         val isProviderSearch = professions.any { qNormalized.contains(it) } || qNormalized.contains("فني")
-        
+        val isWashingMachinePrice = (qNormalized.contains("غساله") || qNormalized.contains("غسالات")) && (qNormalized.contains("سعر") || qNormalized.contains("كم") || qNormalized.contains("تكلفه") || qNormalized.contains("صيانه"))
+
         if (isProviderSearch) {
             val provs = providers.filter { p ->
                 val pNameNorm = normalizeArabic(p.name)
                 val pProfNorm = normalizeArabic(p.profession)
                 val pSpecNorm = normalizeArabic(p.specialization)
-                pNameNorm.contains(qNormalized) || pProfNorm.contains(qNormalized) || pSpecNorm.contains(qNormalized) || qNormalized.contains(pProfNorm)
+                pNameNorm.contains(qNormalized) || pProfNorm.contains(qNormalized) || pSpecNorm.contains(qNormalized) || qNormalized.contains(pProfNorm) ||
+                    (qNormalized.contains("سباك") && (pProfNorm.contains("سباك") || pSpecNorm.contains("سباك")))
             }.take(3)
             matchedEntities.addAll(provs)
         }
@@ -280,6 +285,11 @@ class AssistantViewModel : ViewModel() {
                 prTitleNorm.contains(qNormalized) || prDescNorm.contains(qNormalized)
             }.take(3)
             matchedEntities.addAll(mp)
+        }
+
+        if (isWashingMachinePrice) {
+            val priceText = "🧺 متوسط تكلفة معاينة وصيانة الغسالات في دليل خدمات اليمن يتراوح بين 4,000 إلى 9,000 ريال يمني (حسب نوع الغسالة والعطل وقطع الغيار). يمكنك طلب فني صيانة غسالات معتمد للمعاينة المباشرة!"
+            return Pair(priceText, matchedEntities)
         }
 
         if (matchedEntities.isNotEmpty()) {
@@ -317,13 +327,16 @@ class AssistantViewModel : ViewModel() {
                 "📝 للانضمام كفني أو متجر في الدليل، استخدم شاشة 'طلب الانضمام' في القائمة الرئيسية."
             }
             isPriceInfo -> {
-                "💰 استخدام تطبيق دليل خدمات اليمن مجاني تماماً وبدون أي عمولات."
+                "💰 استخدام تطبيق دليل خدمات اليمن مجاني تماماً، وأسعار المعاينة والصيانة تبدأ من 3,000 ريال يمني حسب التخصص."
             }
             isMapFeature -> {
                 "🗺️ يمكنك النقر على 'خريطة الخدمات' لعرض التغطية الجغرافية والفنيين الأقرب لك."
             }
+            isProviderSearch -> {
+                "🔧 طلبك واضح! يمكنك استعراض قسم الفنيين المختصين أو الضغط على '⚡ اطلب خدمتك الآن' لإرسال طلب فوري لأقرب فني معتمد."
+            }
             else -> {
-                "أهلاً بك! يمكنك سؤالي عن أي خدمة أو فني (كهرباء، سباكة، تكييف) أو الضغط على '⚡ اطلب خدمتك الآن'."
+                "عذراً، لم أتمكن من فهم استفسارك بدقة (\"$prompt\"). يمكنك كتابة اسم الخدمة المطلوبة بوضوح مثل: (أحتاج سباك، كهربائي، صيانة غسالة، مطعم، عقار) أو الضغط على '⚡ اطلب خدمتك الآن'."
             }
         }
         return Pair(textResult, emptyList())
@@ -336,5 +349,10 @@ class AssistantViewModel : ViewModel() {
         str = str.replace("ى", "ي")
         str = str.replace("ة", "ه")
         return str
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        cachedResponses.clear()
     }
 }

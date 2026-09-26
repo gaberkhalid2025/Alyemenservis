@@ -235,7 +235,7 @@ fun updateBackdoorSettings(
             bookingLabelArea = bookingLabelArea,
             bookingLabelService = bookingLabelService,
             adminUsername = adminUsername,
-            adminPassword = "",
+            ownerPassword = "",
             customPrimaryHex = customPrimaryHex,
             customSecondaryHex = customSecondaryHex,
             customBackgroundHex = customBackgroundHex,
@@ -253,7 +253,7 @@ fun updateBackdoorSettings(
     }
 
 fun updateAdminSettings(newSettings: AdminSettingsEntity) {
-        val sanitized = newSettings.copy(adminPassword = "")
+        val sanitized = newSettings.copy(ownerPassword = "")
         _settings.value = sanitized
         db.collection("settings").document("main_settings").set(sanitized)
             .addOnSuccessListener {

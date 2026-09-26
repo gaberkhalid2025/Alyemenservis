@@ -98,7 +98,7 @@ object AdminSecurityManager {
 
             val docOwnerPass = snap?.getString("ownerPassword") ?: snap?.getString("owner_password") ?: effectiveSettings?.ownerPassword ?: ""
             val docOwnerEmail = snap?.getString("ownerEmail") ?: snap?.getString("owner_email") ?: effectiveSettings?.ownerEmail ?: ""
-            val docAdminPass = snap?.getString("adminPassword") ?: snap?.getString("admin_password") ?: effectiveSettings?.adminPassword ?: ""
+            val docAdminPass = snap?.getString("adminPassword") ?: snap?.getString("admin_password") ?: ""
             val docAdminUser = snap?.getString("adminUsername") ?: snap?.getString("admin_username") ?: effectiveSettings?.adminUsername ?: ""
 
             if (docOwnerPass.isNotBlank()) {
