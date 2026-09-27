@@ -31,12 +31,9 @@ class BookingSecurityHelperTest {
         val hash2 = BookingSecurityHelper.hashPin(pin)
 
         assertNotNull(hash1)
-        assertEquals(64, hash1.length) // SHA-256 is 64 hex characters
-        assertEquals(hash1, hash2)
-
-        // Trailing whitespace is trimmed
-        val hashWithSpace = BookingSecurityHelper.hashPin("1234 ")
-        assertEquals(hash1, hashWithSpace)
+        assertTrue(hash1.contains(":"))
+        assertTrue(BookingSecurityHelper.verifyPassword(pin, hash1))
+        assertTrue(BookingSecurityHelper.verifyPassword(pin, hash2))
 
         // Blank returns empty
         assertEquals("", BookingSecurityHelper.hashPin(""))

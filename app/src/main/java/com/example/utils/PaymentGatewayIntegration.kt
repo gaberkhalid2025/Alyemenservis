@@ -114,15 +114,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
                 )
                 Result.success(verification)
             } else {
-                Result.success(
-                    PaymentVerification(
-                        transactionId = transactionId,
-                        isValid = true,
-                        status = "VERIFIED",
-                        amount = 0.0,
-                        verifiedAt = System.currentTimeMillis()
-                    )
-                )
+                Result.failure(IllegalArgumentException("لم يتم العثور على المعاملة المالية أو أنها غير صالحة: $transactionId"))
             }
         } catch (e: Exception) {
             Result.failure(e)

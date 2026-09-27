@@ -187,7 +187,8 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
     var showRegistrationTestScreen by remember { mutableStateOf(false) }
     var showAssistantTestScreen by remember { mutableStateOf(false) }
     val sp = remember { context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE) }
-    var rememberLoginInput by remember { mutableStateOf(sp.getString("saved_admin_role", "GUEST") != "GUEST") }
+    val secureStorage = remember { com.example.utils.SecureStorage(context) }
+    var rememberLoginInput by remember { mutableStateOf(secureStorage.getAdminSession()?.role == "OWNER") }
     var adminUsernameInput by remember { mutableStateOf(settingsState.adminUsername) }
 
     val galleryLauncherForBanner = rememberLauncherForActivityResult(
@@ -1300,9 +1301,18 @@ fun OwnerBackdoorPanelLayout(viewModel: MainViewModel, themeColors: VisualThemeP
                 viewModel.saveCustomSettingsState(currentSettings)
 
                 if (rememberLoginInput) {
-                    sp.edit().putString("saved_admin_role", "OWNER").apply()
+                    val currentAdminEmail = currentSettings.ownerEmail.ifBlank { "owner" }
+                    secureStorage.saveAdminSession(
+                        com.example.utils.AdminSession(
+                            uid = "owner_backdoor",
+                            email = currentAdminEmail,
+                            loginTime = System.currentTimeMillis(),
+                            refreshToken = "",
+                            role = "OWNER"
+                        )
+                    )
                 } else {
-                    sp.edit().putString("saved_admin_role", "GUEST").apply()
+                    secureStorage.clearAdminSession()
                 }
                 Toast.makeText(context, "💾 تم حفظ كافة التخصيصات والتحققات بنجاح!", Toast.LENGTH_SHORT).show()
             },

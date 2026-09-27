@@ -90,10 +90,7 @@ fun MainViewModel.authenticateAdmin(context: Context, role: String, remember: Bo
     if (role == "OWNER") {
         adminViewModel._supervisorPermissions.value = listOf("ALL")
     }
-    if (remember) {
-        val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-        sp.edit().putString("saved_admin_role", role).apply()
-    }
+    // 🎯 إزالة saved_admin_role غير المشفر
 }
 
 fun MainViewModel.logout(context: Context) {

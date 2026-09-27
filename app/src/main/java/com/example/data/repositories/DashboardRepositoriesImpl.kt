@@ -37,7 +37,7 @@ class DashboardRepositoryImpl(
             "RESTAURANT" -> "restaurants"
             "MEDICAL" -> "medical_centers"
             "PROPERTY" -> "properties"
-            "JOB" -> "job_listings"
+            "JOB" -> com.example.utils.AppConstants.COL_JOBS
             else -> "users"
         }
 

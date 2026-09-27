@@ -1,0 +1,12 @@
+{
+  "name": "al-yemen-services-tests",
+  "version": "1.0.0",
+  "description": "Firestore Security Rules Unit Tests",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.0",
+    "firebase-admin": "^12.0.0"
+  },
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore 'jest test/'"
+  }
+}

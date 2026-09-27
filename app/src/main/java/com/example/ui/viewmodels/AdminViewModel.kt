@@ -201,8 +201,6 @@ class AdminViewModel @Inject constructor(
                             loginTime = System.currentTimeMillis(), refreshToken = "ADMIN_SESSION", 
                             role = assignedRole, permissions = perms
                         ))
-                        val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                        sp.edit().putString("saved_admin_role", assignedRole).apply()
                     }
                     _adminRole.value = assignedRole
                     _supervisorPermissions.value = perms
@@ -259,8 +257,6 @@ class AdminViewModel @Inject constructor(
                             loginTime = System.currentTimeMillis(), refreshToken = "OWNER_SESSION", 
                             role = "OWNER", permissions = listOf("ALL")
                         ))
-                        val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                        sp.edit().putString("saved_admin_role", "OWNER").apply()
                     }
                     _adminRole.value = "OWNER"
                     _supervisorPermissions.value = listOf("ALL")
@@ -321,8 +317,6 @@ class AdminViewModel @Inject constructor(
                                 permissions = perms
                             )
                         )
-                        val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                        sp.edit().putString("saved_admin_role", verifiedRole).apply()
                     }
 
                     _adminRole.value = verifiedRole
@@ -348,8 +342,6 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 secureStorage.clearAdminSession()
-                val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                sp.edit().putString("saved_admin_role", "GUEST").apply()
                 com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
                 _adminRole.value = "GUEST"
                 _supervisorPermissions.value = emptyList()
@@ -3250,10 +3242,14 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
                     _supervisorPermissions.value = session.permissions
                 }
             } else {
-                val sp = application.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
-                if (savedRole in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
-                    _adminRole.value = savedRole
+                val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                if (user != null) {
+                    user.getIdToken(false).addOnSuccessListener { token ->
+                        val role = token?.claims?.get("role") as? String
+                        if (role != null && role.uppercase() in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                            _adminRole.value = role.uppercase()
+                        }
+                    }
                 }
             }
         } catch (_: Exception) {}

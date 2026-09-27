@@ -108,8 +108,14 @@ class ChatLocalDataSource(
     }
 
     suspend fun saveChannels(channels: List<ChatChannel>) = withContext(ioDispatcher) {
-        val json = channelsListAdapter.toJson(channels)
-        prefs.edit().putString(KEY_CHANNELS, json).apply()
+        val encryptedChannels = channels.map { ch ->
+            if (ch.lastMessage.isNotBlank()) {
+                ch.copy(lastMessage = SecurityCryptoUtils.encrypt(ch.lastMessage))
+            } else ch
+        }
+        val json = channelsListAdapter.toJson(encryptedChannels)
+        val encryptedPayload = SecurityCryptoUtils.encrypt(json)
+        prefs.edit().putString(KEY_CHANNELS, encryptedPayload).apply()
         channelsMemoryCache.value = channels
     }
 
@@ -142,7 +148,17 @@ class ChatLocalDataSource(
     private fun getCachedChannelsInternal(): List<ChatChannel> {
         val raw = prefs.getString(KEY_CHANNELS, null) ?: return emptyList()
         return try {
-            channelsListAdapter.fromJson(raw) ?: emptyList()
+            val decryptedJson = if (raw.startsWith("{") || raw.startsWith("[")) raw else SecurityCryptoUtils.decrypt(raw)
+            val list = channelsListAdapter.fromJson(decryptedJson) ?: emptyList()
+            list.map { ch ->
+                if (ch.lastMessage.isNotBlank() && (ch.lastMessage.startsWith("enc_gcm::") || ch.lastMessage.startsWith("enc::"))) {
+                    try {
+                        ch.copy(lastMessage = SecurityCryptoUtils.decrypt(ch.lastMessage))
+                    } catch (_: Exception) {
+                        ch
+                    }
+                } else ch
+            }
         } catch (e: Exception) {
             emptyList()
         }

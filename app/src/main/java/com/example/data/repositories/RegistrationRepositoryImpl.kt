@@ -138,7 +138,6 @@ class RegistrationRepositoryImpl(
                 "createdAt" to System.currentTimeMillis(),
                 "updatedAt" to System.currentTimeMillis()
             )
-            firestore.collection("join_requests").document(id).set(requestMap).await()
 
             // Store client data in "users" and "registered_users" collection
             val userMap = mapOf(
@@ -153,8 +152,6 @@ class RegistrationRepositoryImpl(
                 "isBlocked" to false,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("users").document(cleanPhone).set(userMap).await()
-            firestore.collection("registered_users").document(cleanPhone).set(userMap).await()
 
             val pendingMap = mapOf(
                 "id" to id,
@@ -167,7 +164,13 @@ class RegistrationRepositoryImpl(
                 "providerType" to "CLIENT",
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
+            val batch = firestore.batch()
+            batch.set(firestore.collection("join_requests").document(id), requestMap)
+            batch.set(firestore.collection("users").document(cleanPhone), userMap)
+            batch.set(firestore.collection("registered_users").document(cleanPhone), userMap)
+            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "CLIENT")
             Result.success(id)
@@ -205,8 +208,6 @@ class RegistrationRepositoryImpl(
                 updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("join_requests").document(id).set(request).await()
-
             val pendingMap = mapOf(
                 "id" to id,
                 "name" to provider.fullName.trim(),
@@ -220,7 +221,11 @@ class RegistrationRepositoryImpl(
                 "password" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
+            val batch = firestore.batch()
+            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "PROVIDER")
             Result.success(id)
@@ -260,8 +265,6 @@ class RegistrationRepositoryImpl(
                 updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("join_requests").document(id).set(request).await()
-
             val pendingMap = mapOf(
                 "id" to id,
                 "name" to store.storeName.trim(),
@@ -277,7 +280,11 @@ class RegistrationRepositoryImpl(
                 "password" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
+            val batch = firestore.batch()
+            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.businessName, cleanPhone, "STORE")
             Result.success(id)
@@ -317,8 +324,6 @@ class RegistrationRepositoryImpl(
                 updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("join_requests").document(id).set(request).await()
-
             val pendingMap = mapOf(
                 "id" to id,
                 "name" to restaurant.restaurantName.trim(),
@@ -334,7 +339,11 @@ class RegistrationRepositoryImpl(
                 "password" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
+            val batch = firestore.batch()
+            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.businessName, cleanPhone, "RESTAURANT")
             Result.success(id)
@@ -373,8 +382,6 @@ class RegistrationRepositoryImpl(
                 updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("join_requests").document(id).set(request).await()
-
             val pendingMap = mapOf(
                 "id" to id,
                 "name" to medical.centerName.trim(),
@@ -390,7 +397,11 @@ class RegistrationRepositoryImpl(
                 "password" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
+            val batch = firestore.batch()
+            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.businessName, cleanPhone, "MEDICAL")
             Result.success(id)
@@ -431,8 +442,6 @@ class RegistrationRepositoryImpl(
                 updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("join_requests").document(id).set(request).await()
-
             val pendingMap = mapOf(
                 "id" to id,
                 "name" to property.title.trim(),
@@ -448,7 +457,11 @@ class RegistrationRepositoryImpl(
                 "password" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
+            val batch = firestore.batch()
+            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.propertyTitle, cleanPhone, "PROPERTY")
             Result.success(id)
@@ -485,8 +498,6 @@ class RegistrationRepositoryImpl(
                 updatedAt = System.currentTimeMillis()
             )
 
-            firestore.collection("join_requests").document(id).set(request).await()
-
             val pendingMap = mapOf(
                 "id" to id,
                 "name" to job.jobTitle.trim(),
@@ -501,7 +512,11 @@ class RegistrationRepositoryImpl(
                 "password" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("pending_providers").document(id).set(pendingMap).await()
+
+            val batch = firestore.batch()
+            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
+            batch.commit().await()
 
             sendAdminJoinNotification(id, request.jobTitle, cleanPhone, "JOB")
             Result.success(id)

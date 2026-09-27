@@ -14,7 +14,7 @@ class JobRepository @Inject constructor(
     cacheManager: LocalAppCacheManager
 ) {
     fun getJobs(ownerId: String): Flow<List<JobPostItem>> = callbackFlow {
-        val listener = firestore.collection("job_postings")
+        val listener = firestore.collection(com.example.utils.AppConstants.COL_JOBS)
             .whereEqualTo("ownerId", ownerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -48,7 +48,7 @@ class JobRepository @Inject constructor(
                 "applicantsCount" to job.applicantsCount,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("job_postings").document(job.id).set(data).await()
+            firestore.collection(com.example.utils.AppConstants.COL_JOBS).document(job.id).set(data).await()
             Result.success(job.id)
         } catch (e: Exception) {
             Result.failure(e)
@@ -57,7 +57,7 @@ class JobRepository @Inject constructor(
 
     suspend fun deleteJob(id: String): Result<Unit> {
         return try {
-            firestore.collection("job_postings").document(id).delete().await()
+            firestore.collection(com.example.utils.AppConstants.COL_JOBS).document(id).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

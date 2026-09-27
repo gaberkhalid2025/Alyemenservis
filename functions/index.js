@@ -11,6 +11,49 @@ const db = admin.firestore();
 const secretManager = new SecretManagerServiceClient();
 
 /**
+ * تهيئة Claims المالك والأدمن — مرة واحدة فقط.
+ * محمية بمفتاح سري من متغيرات البيئة.
+ * احذفها بعد الاستخدام.
+ */
+exports.initializeAdminClaims = functions.https.onRequest(async (req, res) => {
+    const setupKey = req.query.key || req.headers['x-setup-key'];
+    if (!setupKey || setupKey !== process.env.ADMIN_SETUP_KEY) {
+        return res.status(403).json({ error: "Forbidden" });
+    }
+    
+    const ownerEmail = process.env.OWNER_EMAIL;
+    const adminEmail = process.env.ADMIN_EMAIL;
+    
+    if (!ownerEmail || !adminEmail) {
+        return res.status(500).json({ error: "Env vars missing" });
+    }
+    
+    try {
+        const ownerUser = await admin.auth().getUserByEmail(ownerEmail);
+        const adminUser = await admin.auth().getUserByEmail(adminEmail);
+        
+        await admin.auth().setCustomUserClaims(ownerUser.uid, {
+            role: "OWNER", admin: true, isAdmin: true,
+            isOwner: true, isSuperAdmin: true, registeredAt: Date.now()
+        });
+        
+        await admin.auth().setCustomUserClaims(adminUser.uid, {
+            role: "ADMIN", admin: true, isAdmin: true,
+            isOwner: false, isSuperAdmin: false, registeredAt: Date.now()
+        });
+        
+        res.status(200).json({
+            success: true,
+            owner: { email: ownerUser.email, uid: ownerUser.uid, role: "OWNER" },
+            admin: { email: adminUser.email, uid: adminUser.uid, role: "ADMIN" },
+            message: "Claims set. DELETE this function now."
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * ⚠️ يُستدعى لتعيين Custom Claim للأدمن أو المالك عبر البريد الإلكتروني (getUserByEmail)
  * يوحد كافة حقول المطالبات (admin, isAdmin, isOwner, isSuperAdmin, role) للتوافق التام بين
  * Cloud Functions و firestore.rules وتطبيق الأندرويد.

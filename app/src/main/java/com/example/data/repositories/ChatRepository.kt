@@ -374,15 +374,6 @@ class ChatRepository(
             val confirmedMsg = initialMsg.copy(status = MessageStatus.SENT, syncStatus = SyncStatus.SYNCED)
             channelRef.collection("messages").document(messageId).set(confirmedMsg).await()
 
-            // Update Channel metadata & increment unread counts
-            val updatedUnread = (channel?.unreadCount ?: emptyMap()).toMutableMap()
-            channel?.participants?.forEach { pId ->
-                if (pId != senderId) {
-                    val count = updatedUnread[pId] ?: 0
-                    updatedUnread[pId] = count + 1
-                }
-            }
-
             val displayLast = when (mediaType) {
                 MediaType.IMAGE -> "📷 صورة"
                 MediaType.VIDEO -> "🎥 فيديو"
@@ -393,15 +384,20 @@ class ChatRepository(
                 MediaType.TEXT -> messageText
             }
 
-            channelRef.update(
-                mapOf(
-                    "lastMessage" to displayLast,
-                    "lastMessageTime" to now,
-                    "lastMessageSenderId" to senderId,
-                    "unreadCount" to updatedUnread,
-                    "updatedAt" to now
-                )
-            ).await()
+            val updates = mutableMapOf<String, Any>(
+                "lastMessage" to displayLast,
+                "lastMessageTime" to now,
+                "lastMessageSenderId" to senderId,
+                "updatedAt" to now
+            )
+
+            channel?.participants?.forEach { pId ->
+                if (pId != senderId) {
+                    updates["unreadCount.$pId"] = com.google.firebase.firestore.FieldValue.increment(1)
+                }
+            }
+
+            channelRef.update(updates).await()
 
             // Update local to SENT
             local?.insertOrUpdateMessage(confirmedMsg)

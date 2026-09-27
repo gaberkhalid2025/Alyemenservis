@@ -1237,7 +1237,7 @@ fun requestPasswordRecoveryGeneral(accountName: String, phone: String, accountTy
 
 fun wipeAllDatabaseData(password: String): Boolean {
         if (mainViewModel.verifyAdminOrOwnerPassword(password)) {
-            val collections = listOf("categories", "providers", "pending_providers", "banners", "settings", "reports", "bookings", "notifications", "chat_channels", "cities", "stores", "medical", "restaurants", "job_postings", "job_applications", "properties", "products", "reviews")
+            val collections = listOf("categories", "providers", "pending_providers", "banners", "settings", "reports", "bookings", "notifications", "chat_channels", "cities", "stores", "medical", "restaurants", com.example.utils.AppConstants.COL_JOBS, "job_applications", "properties", "products", "reviews")
             collections.forEach { col ->
                 db.collection(col).get().addOnSuccessListener { snapshot ->
                     snapshot.documents.forEach { doc -> doc.reference.delete() }

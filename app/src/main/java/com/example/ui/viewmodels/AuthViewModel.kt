@@ -158,17 +158,11 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                 }
             } else {
                 secureStorage.clearAdminSession()
-                sp.edit().remove("saved_admin_role").apply()
                 _adminRole.value = "GUEST"
             }
         } else {
-            // لا نثق بـ saved_admin_role غير المشفر إذا لم تكن هناك جلسة صالحة في SecureStorage المشفر
-            val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
-            if (savedRole == "PROVIDER" || savedRole == "STORE_OWNER") {
-                _adminRole.value = savedRole
-            } else {
-                _adminRole.value = "GUEST"
-            }
+            val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+            _adminRole.value = "GUEST"
         }
 
         try {
@@ -201,7 +195,6 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                             putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(prov.name))
                             putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(prov.phone))
                             putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(prov.area))
-                            putString("saved_admin_role", "PROVIDER")
                             apply()
                         }
                     }
@@ -219,7 +212,6 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                                     putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(st.id))
                                     putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(st.name))
                                     putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(st.phone))
-                                    putString("saved_admin_role", "STORE_OWNER")
                                     apply()
                                 }
                             }
@@ -380,10 +372,6 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun authenticateAdmin(context: Context, role: String, remember: Boolean) {
         _adminRole.value = role
-        if (remember) {
-            val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-            sp.edit().putString("saved_admin_role", role).apply()
-        }
         triggerToast("🔓 تم تسجيل الدخول بنجاح بصلاحية: $role")
     }
 
@@ -393,8 +381,6 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         try {
             com.example.utils.SecureStorage(context).clearAdminSession()
         } catch (_: Exception) {}
-        val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-        sp.edit().putString("saved_admin_role", "GUEST").apply()
         triggerToast("🔒 تم تسجيل الخروج بنجاح")
     }
 

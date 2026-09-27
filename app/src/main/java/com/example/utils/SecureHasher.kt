@@ -67,22 +67,24 @@ object SecureHasher {
         val trimmedInput = password.trim()
         val trimmedStored = storedHash.trim()
 
+        // 🎯 أمان: لا نقبل النص الصريح أبداً.
+        // إذا كانت القيمة المخزنة لا تحتوي على الفاصل ":" → رفض.
+        if (!trimmedStored.contains(":")) {
+            return false
+        }
+
         return try {
-            if (trimmedStored.contains(":")) {
-                val parts = trimmedStored.split(":")
-                if (parts.size != 2) return false
-                val salt = base64Decode(parts[0])
-                val expectedHashBytes = base64Decode(parts[1])
-                val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
-                try {
-                    val skf = SecretKeyFactory.getInstance(ALGORITHM)
-                    val actualHashBytes = skf.generateSecret(spec).encoded
-                    MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
-                } finally {
-                    spec.clearPassword()
-                }
-            } else {
-                constantTimeEquals(trimmedInput, trimmedStored)
+            val parts = trimmedStored.split(":")
+            if (parts.size != 2) return false
+            val salt = base64Decode(parts[0])
+            val expectedHashBytes = base64Decode(parts[1])
+            val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
+            try {
+                val skf = SecretKeyFactory.getInstance(ALGORITHM)
+                val actualHashBytes = skf.generateSecret(spec).encoded
+                MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
+            } finally {
+                spec.clearPassword()
             }
         } catch (e: Exception) {
             false
@@ -107,22 +109,24 @@ object SecureHasher {
         val trimmedInput = pin.trim()
         val trimmedStored = storedHash.trim()
 
+        // 🎯 أمان: لا نقبل النص الصريح أبداً للـ PIN.
+        // إذا كانت القيمة المخزنة لا تحتوي على الفاصل ":" → رفض.
+        if (!trimmedStored.contains(":")) {
+            return false
+        }
+
         return try {
-            if (trimmedStored.contains(":")) {
-                val parts = trimmedStored.split(":")
-                if (parts.size != 2) return false
-                val salt = base64Decode(parts[0])
-                val expectedHashBytes = base64Decode(parts[1])
-                val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
-                try {
-                    val skf = SecretKeyFactory.getInstance(ALGORITHM)
-                    val actualHashBytes = skf.generateSecret(spec).encoded
-                    MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
-                } finally {
-                    spec.clearPassword()
-                }
-            } else {
-                constantTimeEquals(trimmedInput, trimmedStored)
+            val parts = trimmedStored.split(":")
+            if (parts.size != 2) return false
+            val salt = base64Decode(parts[0])
+            val expectedHashBytes = base64Decode(parts[1])
+            val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
+            try {
+                val skf = SecretKeyFactory.getInstance(ALGORITHM)
+                val actualHashBytes = skf.generateSecret(spec).encoded
+                MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
+            } finally {
+                spec.clearPassword()
             }
         } catch (e: Exception) {
             false

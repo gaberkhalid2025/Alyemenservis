@@ -219,10 +219,7 @@ fun BackdoorLoginDialog(
                                             val matchingSup = supervisors.find { it.id == trimmedUser || it.name.trim().equals(trimmedUser, ignoreCase = true) }
                                             if (matchingSup != null) {
                                                 viewModel.setSupervisorSession(matchingSup)
-                                                if (rememberMe) {
-                                                    val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                                    sp.edit().putString("saved_admin_role", "SUPERVISOR").apply()
-                                                }
+                                                // 🎯 إزالة saved_admin_role غير المشفر
                                                 onDismiss()
                                                 viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
                                                 viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name} - تم تسجيل الدخول بنجاح!")

@@ -35,15 +35,11 @@ class FullSyncManager(private val context: Context) {
         private const val TAG = "FullSyncManager"
         private const val KEY_LAST_SYNC_TS = "key_last_sync_timestamp"
         private const val KEY_LOCAL_SETTINGS_CACHE = "key_local_admin_settings_cache"
-        private const val COLLECTION_ADMIN_SETTINGS = "admin_settings"
-        private const val DOC_MAIN_CONFIG = "main_config"
+        private const val COLLECTION_ADMIN_SETTINGS = "settings"
+        private const val DOC_MAIN_CONFIG = "main_settings"
         private const val DOC_FORMS_CONFIG = "forms_config"
         private const val DOC_THEME_CONFIG = "theme_config"
         private const val SYNC_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
-    }
-
-    init {
-        startAutoSync()
     }
 
     /**
@@ -135,7 +131,6 @@ class FullSyncManager(private val context: Context) {
             dataToSync["updatedAt"] = System.currentTimeMillis()
         } else {
             dataToSync["updatedAt"] = System.currentTimeMillis()
-            dataToSync["status"] = "PING"
         }
 
         firestore.collection(COLLECTION_ADMIN_SETTINGS)
