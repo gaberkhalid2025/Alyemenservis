@@ -24,6 +24,7 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "SIGNATURE_HASH", "\"\"")
+    buildConfigField("boolean", "IS_PAYMENT_ENABLED", "false")
     val agoraProps = Properties()
     val agoraPropsFile = rootProject.file("local.properties")
     if (agoraPropsFile.exists()) {

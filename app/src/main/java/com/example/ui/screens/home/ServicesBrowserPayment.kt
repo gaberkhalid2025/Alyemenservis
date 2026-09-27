@@ -66,6 +66,9 @@ fun ServicesBrowserPaymentDialog(
         }
     )
 
+    val settingsState by viewModel.settings.collectAsState()
+    val isPaymentEnabled = com.example.BuildConfig.IS_PAYMENT_ENABLED && settingsState.isPaymentEnabled
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
@@ -98,6 +101,34 @@ fun ServicesBrowserPaymentDialog(
                         Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color.Red)
                     }
                 }
+
+                if (!isPaymentEnabled) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFF9800)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "⏳ الدفع الإلكتروني قيد التفعيل",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF9800)
+                            )
+                            Text(
+                                text = "خدمة السداد عبر المحافظ الإلكترونية غير مفرغة حالياً وسيتم إتاحتها رسمياً فور اكتمال التجهيزات مع المحافظ المعتمدة.",
+                                fontSize = 11.5.sp,
+                                color = Color.LightGray,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
 
                 // Booking Info Summary
                 Card(
@@ -272,6 +303,7 @@ fun ServicesBrowserPaymentDialog(
                     } else {
                         Text("تأكيد وإرسال إشعار الدفع 🚀", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
+                }
                 }
             }
         }

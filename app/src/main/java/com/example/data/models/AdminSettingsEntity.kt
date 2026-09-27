@@ -41,9 +41,6 @@ data class AdminSettingsEntity(
     val ownerEmail: String = "",
     @get:com.google.firebase.firestore.Exclude
     val ownerPassword: String = "",
-    val adminEmail: String = "",
-    @get:com.google.firebase.firestore.Exclude
-    val adminPassword: String = "",
     
     // Notifications control
     val isNotificationsEnabled: Boolean = true,
@@ -202,7 +199,7 @@ data class AdminSettingsEntity(
     val hideWebsite: Boolean = false,
     
     // Integrated payment configurations
-    val isPaymentEnabled: Boolean = true,
+    val isPaymentEnabled: Boolean = false,
     val isBookingPaymentRequired: Boolean = false,
     val requireAdvancePayment: Boolean = false,
     val advancePaymentPercent: Float = 0.30f,

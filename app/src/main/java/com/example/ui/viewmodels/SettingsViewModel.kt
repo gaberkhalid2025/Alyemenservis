@@ -195,6 +195,12 @@ fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
         )
     }
 
+    fun updatePaymentEnabled(enabled: Boolean) {
+        val current = _settings.value
+        val updated = current.copy(isPaymentEnabled = enabled)
+        saveCustomSettingsState(updated)
+    }
+
 fun updateBackdoorSettings(
         appName: String, welcomeMsg: String, footerMsg: String, themeId: String,
         supportPhone: String, supportEmail: String, supportWhatsapp: String,

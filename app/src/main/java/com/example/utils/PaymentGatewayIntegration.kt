@@ -3,6 +3,8 @@ package com.example.utils
 import android.content.Context
 import androidx.annotation.Keep
 import java.util.UUID
+import com.example.BuildConfig
+import com.example.data.AdminSettingsEntity
 
 @Keep
 data class Payment(
@@ -58,17 +60,40 @@ data class PaymentMethod(
 )
 
 /**
- * 💳 PaymentGatewayIntegration
- * تكامل الدفع الإلكتروني مع المحافظ الجوالية اليمنية (جيب، الكريمي حاسب، جوالي، يمن كاش، والحوالات البنكية)
+ * ⚠️ ملاحظة مهمة:
+ * هذه الفئة محاكاة داخلية — لا تتصل ببوابة دفع حقيقية.
+ * 
+ * 🎯 حالة التفعيل الحالية:
+ * - افتراضياً: معطّل (isPaymentEnabled = false).
+ * - يمكن للأدمن تفعيله من لوحة التحكم بعد:
+ *   1. الاتفاق مع بوابة دفع يمنية (الكريمي / جوّال باي / فلوسك).
+ *   2. الحصول على API keys.
+ *   3. تخزينها في Firebase Secrets.
+ *   4. تعديل processPayment لاستدعاء API حقيقي.
+ *   5. تعديل verifyPayment للتحقق من Firestore.
+ *   6. تغيير BuildConfig.IS_PAYMENT_ENABLED = true.
+ *   7. تفعيل المفتاح من لوحة التحكم.
+ * 
+ * ⚠️ لا تفعّل المفتاح قبل ربط بوابة حقيقية.
  */
 class PaymentGatewayIntegration(context: Context? = null) {
 
+    private val isPaymentEnabledFromBuild: Boolean = BuildConfig.IS_PAYMENT_ENABLED
     private val activeTransactions = mutableMapOf<String, Payment>()
 
     /**
      * معالجة وتنفيذ عملية الدفع
      */
-    fun processPayment(payment: Payment): Result<PaymentResult> {
+    fun processPayment(payment: Payment, settings: AdminSettingsEntity? = null): Result<PaymentResult> {
+        val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
+        if (!enabled) {
+            return Result.failure(
+                UnsupportedOperationException(
+                    "الدفع الإلكتروني غير مُفعّل حالياً. يرجى التواصل مع الدعم لتفعيله."
+                )
+            )
+        }
+
         return try {
             if (!validatePaymentMethod(payment.method)) {
                 return Result.failure(IllegalArgumentException("طريقة الدفع غير مدعومة: ${payment.method}"))
@@ -101,7 +126,14 @@ class PaymentGatewayIntegration(context: Context? = null) {
     /**
      * التحقق من صحة عملية الدفع ورقم الحوالة
      */
-    fun verifyPayment(transactionId: String): Result<PaymentVerification> {
+    fun verifyPayment(transactionId: String, settings: AdminSettingsEntity? = null): Result<PaymentVerification> {
+        val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
+        if (!enabled) {
+            return Result.failure(
+                UnsupportedOperationException("التحقق من الدفع غير مُفعّل حالياً.")
+            )
+        }
+
         return try {
             val payment = activeTransactions[transactionId]
             if (payment != null) {
@@ -124,7 +156,14 @@ class PaymentGatewayIntegration(context: Context? = null) {
     /**
      * تأكيد استلام المبلغ وإصدار إيصال السداد
      */
-    fun confirmPayment(transactionId: String): Result<PaymentConfirmation> {
+    fun confirmPayment(transactionId: String, settings: AdminSettingsEntity? = null): Result<PaymentConfirmation> {
+        val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
+        if (!enabled) {
+            return Result.failure(
+                UnsupportedOperationException("تأكيد الدفع غير مُفعّل حالياً.")
+            )
+        }
+
         return try {
             val code = "CONF-${(100000..999999).random()}"
             val confirmation = PaymentConfirmation(
