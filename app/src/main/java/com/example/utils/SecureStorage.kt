@@ -28,6 +28,8 @@ data class AdminSession(
 class SecureStorage @Inject constructor(
     private val context: Context
 ) {
+    private var isUsingEncryptedPrefs = false
+
     private val prefs: SharedPreferences by lazy {
         try {
             val masterKey = MasterKey.Builder(context)
@@ -41,11 +43,39 @@ class SecureStorage @Inject constructor(
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
+            isUsingEncryptedPrefs = true
             migrateFromPlainSharedPreferences(encryptedPrefs)
             encryptedPrefs
         } catch (e: Exception) {
-            context.getSharedPreferences("secure_admin_prefs_fallback", Context.MODE_PRIVATE)
+            try {
+                context.deleteSharedPreferences("secure_admin_prefs")
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                val recreatedPrefs = EncryptedSharedPreferences.create(
+                    context,
+                    "secure_admin_prefs",
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+                isUsingEncryptedPrefs = true
+                recreatedPrefs
+            } catch (ex: Exception) {
+                isUsingEncryptedPrefs = false
+                context.getSharedPreferences("secure_admin_prefs_vault_enc", Context.MODE_PRIVATE)
+            }
         }
+    }
+
+    private fun putSecureString(editor: SharedPreferences.Editor, key: String, value: String) {
+        val storedValue = if (isUsingEncryptedPrefs) value else SecurityCryptoUtils.encrypt(value)
+        editor.putString(key, storedValue)
+    }
+
+    private fun getSecureString(key: String): String? {
+        val raw = prefs.getString(key, null) ?: return null
+        return if (isUsingEncryptedPrefs) raw else SecurityCryptoUtils.decrypt(raw)
     }
 
     /**
@@ -83,26 +113,26 @@ class SecureStorage @Inject constructor(
      * 🔐 حفظ جلسة الأدمن بشكل آمن
      */
     fun saveAdminSession(session: AdminSession) {
-        prefs.edit()
-            .putString("admin_uid", session.uid)
-            .putString("admin_email", session.email)
-            .putLong("admin_login_time", session.loginTime)
-            .putString("admin_refresh_token", session.refreshToken)
-            .putString("admin_role", session.role)
-            .putString("admin_permissions", session.permissions.joinToString(","))
-            .apply()
+        val editor = prefs.edit()
+        putSecureString(editor, "admin_uid", session.uid)
+        putSecureString(editor, "admin_email", session.email)
+        editor.putLong("admin_login_time", session.loginTime)
+        putSecureString(editor, "admin_refresh_token", session.refreshToken)
+        putSecureString(editor, "admin_role", session.role)
+        putSecureString(editor, "admin_permissions", session.permissions.joinToString(","))
+        editor.apply()
     }
 
     /**
      * 📖 استرجاع جلسة الأدمن
      */
     fun getAdminSession(): AdminSession? {
-        val uid = prefs.getString("admin_uid", null) ?: return null
-        val email = prefs.getString("admin_email", null) ?: return null
+        val uid = getSecureString("admin_uid") ?: return null
+        val email = getSecureString("admin_email") ?: return null
         val loginTime = prefs.getLong("admin_login_time", 0)
-        val refreshToken = prefs.getString("admin_refresh_token", null) ?: return null
-        val role = prefs.getString("admin_role", "ADMIN") ?: "ADMIN"
-        val permsStr = prefs.getString("admin_permissions", "") ?: ""
+        val refreshToken = getSecureString("admin_refresh_token") ?: return null
+        val role = getSecureString("admin_role") ?: "ADMIN"
+        val permsStr = getSecureString("admin_permissions") ?: ""
         val permissions = if (permsStr.isEmpty()) emptyList() else permsStr.split(",")
 
         return AdminSession(uid, email, loginTime, refreshToken, role, permissions)

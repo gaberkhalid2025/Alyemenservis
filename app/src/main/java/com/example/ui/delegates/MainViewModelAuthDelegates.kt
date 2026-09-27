@@ -58,8 +58,19 @@ fun MainViewModel.registerBackdoorInteraction() {
 
 fun MainViewModel.changeAdminCredentials(newPass: String, newOwnerPass: String = "") {
     val current = _settings.value
+    val hashedOwnerPass = if (newOwnerPass.isNotBlank()) {
+        if (newOwnerPass.contains(":")) newOwnerPass else SecureHasher.hashPassword(newOwnerPass.trim())
+    } else current.ownerPassword
+    val ctx = appContext
+    if (ctx != null) {
+        SecureAdminStorage.storeCredentials(
+            context = ctx,
+            ownerPassword = if (newOwnerPass.isNotBlank()) newOwnerPass.trim() else null,
+            adminPassword = if (newPass.isNotBlank()) newPass.trim() else null
+        )
+    }
     val updated = current.copy(
-        ownerPassword = if (newOwnerPass.isNotBlank()) newOwnerPass else current.ownerPassword
+        ownerPassword = hashedOwnerPass
     )
     _settings.value = updated
     settingsViewModel.updateAdminSettings(updated)

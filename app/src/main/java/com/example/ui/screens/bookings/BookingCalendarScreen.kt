@@ -80,6 +80,16 @@ fun BookingCalendarScreen(
     val clientAddress = uiState.clientAddress
     val isSubmitting = uiState.isSubmitting
 
+    LaunchedEffect(isSubmitting) {
+        if (isSubmitting) {
+            delay(30_000L)
+            if (calendarViewModel.uiState.value.isSubmitting) {
+                calendarViewModel.setSubmitting(false)
+                Toast.makeText(context, "انتهت مهلة الإرسال، يرجى التحقق من الاتصال والمحاولة مجدداً", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val calendar = remember(calendarMonthOffset) {
         Calendar.getInstance().apply {
             add(Calendar.MONTH, calendarMonthOffset)

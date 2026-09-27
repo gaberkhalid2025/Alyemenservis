@@ -32,7 +32,7 @@ object BookingExportHelper {
             val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "YemenServices_Bookings_$timeStamp.csv")
 
-            FileWriter(file).use { writer ->
+            file.bufferedWriter(Charsets.UTF_8).use { writer ->
                 // UTF-8 BOM for Excel Arabic compatibility
                 writer.write("\uFEFF")
                 // Headers

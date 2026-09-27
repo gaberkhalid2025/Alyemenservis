@@ -11,43 +11,165 @@ const db = admin.firestore();
 const secretManager = new SecretManagerServiceClient();
 
 /**
- * ⚠️ يُستدعى مرة واحدة فقط لتعيين Custom Claim للأدمن
- * بعد التنفيذ، يمكن حذف هذه الدالة للأمان
+ * ⚠️ يُستدعى لتعيين Custom Claim للأدمن أو المالك عبر البريد الإلكتروني (getUserByEmail)
+ * يوحد كافة حقول المطالبات (admin, isAdmin, isOwner, isSuperAdmin, role) للتوافق التام بين
+ * Cloud Functions و firestore.rules وتطبيق الأندرويد.
  */
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_SECRET;
-    
-    if (!SUPER_ADMIN_SECRET || data.secret !== SUPER_ADMIN_SECRET) {
-        throw new functions.https.HttpsError('permission-denied', 'Invalid secret');
+    const callerClaims = context.auth?.token || {};
+    const isCallerOwner = callerClaims.isSuperAdmin === true ||
+                          callerClaims.isOwner === true ||
+                          callerClaims.role === 'owner' ||
+                          callerClaims.role === 'super_admin';
+
+    if (!isCallerOwner && (!SUPER_ADMIN_SECRET || data.secret !== SUPER_ADMIN_SECRET)) {
+        throw new functions.https.HttpsError('permission-denied', 'Invalid secret or insufficient permissions');
     }
-    
-    const { email } = data;
-    
+
+    const email = (data.email || '').trim().toLowerCase();
+    if (!email) {
+        throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+    }
+
+    const requestedRole = (data.role || (email === 'mah73646@gmail.com' ? 'owner' : 'admin')).toLowerCase();
+    const isOwnerRole = requestedRole === 'owner' || requestedRole === 'super_admin';
+
     try {
         const user = await admin.auth().getUserByEmail(email);
-        await admin.auth().setCustomUserClaims(user.uid, {
+        const claimsPayload = {
+            admin: true,
             isAdmin: true,
-            isSuperAdmin: true,
+            isOwner: isOwnerRole,
+            isSuperAdmin: isOwnerRole,
+            role: isOwnerRole ? 'owner' : 'admin',
             registeredAt: Date.now()
-        });
-        
+        };
+        await admin.auth().setCustomUserClaims(user.uid, claimsPayload);
+
+        await db.collection('admin_users').doc(user.uid).set({
+            uid: user.uid,
+            email: email,
+            role: isOwnerRole ? 'OWNER' : 'ADMIN',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
         await db.collection('audit_logs').add({
             action: 'ADMIN_CLAIM_SET',
             targetEmail: email,
             targetUid: user.uid,
+            assignedRole: claimsPayload.role,
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
-        
-        return { success: true, uid: user.uid };
+
+        return {
+            success: true,
+            uid: user.uid,
+            email: user.email,
+            role: claimsPayload.role,
+            claims: claimsPayload,
+            creationTime: user.metadata.creationTime,
+            lastSignInTime: user.metadata.lastSignInTime
+        };
     } catch (error) {
-        throw new functions.https.HttpsError('not-found', 'User not found');
+        throw new functions.https.HttpsError('not-found', `User not found for email: ${email}`);
     }
+});
+
+/**
+ * 🔑 المهمة 0: الإعداد التلقائي لـ Custom Claims لحسابات المالك والأدمن عبر getUserByEmail
+ * يبحث تلقائياً عن:
+ * - OWNER: mah73646@gmail.com
+ * - ADMIN: meh777644@gmail.com
+ * ويعين لهم Custom Claims الموحدة دون الحاجة لنسخ UIDs يدوياً.
+ */
+exports.setupInitialAdminClaims = functions.https.onCall(async (data, context) => {
+    const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_SECRET;
+    const callerEmail = (context.auth?.token?.email || '').toLowerCase();
+    const isAuthorizedCaller = callerEmail === 'mah73646@gmail.com' ||
+                               callerEmail === 'meh777644@gmail.com' ||
+                               context.auth?.token?.isSuperAdmin === true ||
+                               context.auth?.token?.admin === true ||
+                               (SUPER_ADMIN_SECRET && data?.secret === SUPER_ADMIN_SECRET);
+
+    if (!isAuthorizedCaller) {
+        throw new functions.https.HttpsError('permission-denied', 'Unauthorized to setup initial admin claims');
+    }
+
+    const targets = [
+        {
+            email: 'mah73646@gmail.com',
+            role: 'owner',
+            claims: {
+                admin: true,
+                isAdmin: true,
+                isOwner: true,
+                isSuperAdmin: true,
+                role: 'owner'
+            }
+        },
+        {
+            email: 'meh777644@gmail.com',
+            role: 'admin',
+            claims: {
+                admin: true,
+                isAdmin: true,
+                isOwner: false,
+                isSuperAdmin: false,
+                role: 'admin'
+            }
+        }
+    ];
+
+    const results = [];
+    for (const target of targets) {
+        try {
+            const userRecord = await admin.auth().getUserByEmail(target.email);
+            const claimsWithTimestamp = {
+                ...target.claims,
+                registeredAt: Date.now()
+            };
+            await admin.auth().setCustomUserClaims(userRecord.uid, claimsWithTimestamp);
+
+            await db.collection('admin_users').doc(userRecord.uid).set({
+                uid: userRecord.uid,
+                email: target.email,
+                role: target.role.toUpperCase(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            results.push({
+                email: target.email,
+                role: target.role.toUpperCase(),
+                uid: userRecord.uid,
+                creationTime: userRecord.metadata.creationTime,
+                lastSignInTime: userRecord.metadata.lastSignInTime,
+                status: 'CLAIMS_SET_SUCCESSFULLY'
+            });
+        } catch (err) {
+            results.push({
+                email: target.email,
+                role: target.role.toUpperCase(),
+                uid: null,
+                status: 'USER_NOT_FOUND_IN_AUTH',
+                error: err.message
+            });
+        }
+    }
+
+    await db.collection('audit_logs').add({
+        action: 'INITIAL_ADMIN_CLAIMS_SETUP',
+        results: results,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true, accounts: results };
 });
 
 /**
  * 🔐 التحقق الآمن من تسجيل دخول الأدمن
  * - Rate limiting: 5 محاولات / 15 دقيقة
- * - التحقق من Custom Claims
+ * - التحقق من Custom Claims (مع التعيين التلقائي عند أول دخول لحساب المالك/الأدمن المعتمد)
  * - Audit logging لكل محاولة
  */
 exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
@@ -58,6 +180,8 @@ exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('invalid-argument', 'Email and password required');
     }
     
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Rate limiting: 5 محاولات في 15 دقيقة
     const attemptRef = db.collection('security').doc(`login_${ip}`);
     const attemptDoc = await attemptRef.get();
@@ -90,7 +214,7 @@ exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email,
+                    email: normalizedEmail,
                     password,
                     returnSecureToken: true
                 })
@@ -104,7 +228,7 @@ exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
             
             await db.collection('audit_logs').add({
                 action: 'ADMIN_LOGIN_FAILED',
-                email: email,
+                email: normalizedEmail,
                 ip: ip,
                 timestamp: admin.firestore.FieldValue.serverTimestamp()
             });
@@ -114,19 +238,39 @@ exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
         
         const authData = await response.json();
         const user = await admin.auth().getUser(authData.localId);
-        const claims = user.customClaims || {};
+        let claims = user.customClaims || {};
+
+        // التعيين التلقائي لـ Custom Claims إذا كان البريد هو بريد المالك أو الأدمن الرسمي ولم تُضبط بعد
+        if (!claims.isAdmin && !claims.admin) {
+            if (normalizedEmail === 'mah73646@gmail.com') {
+                claims = { admin: true, isAdmin: true, isOwner: true, isSuperAdmin: true, role: 'owner', registeredAt: Date.now() };
+                await admin.auth().setCustomUserClaims(user.uid, claims);
+            } else if (normalizedEmail === 'meh777644@gmail.com') {
+                claims = { admin: true, isAdmin: true, isOwner: false, isSuperAdmin: false, role: 'admin', registeredAt: Date.now() };
+                await admin.auth().setCustomUserClaims(user.uid, claims);
+            }
+        }
         
-        if (!claims.isAdmin) {
+        const hasAdminAccess = claims.isAdmin === true ||
+                               claims.admin === true ||
+                               claims.isSuperAdmin === true ||
+                               claims.isOwner === true ||
+                               ['admin', 'owner', 'super_admin'].includes((claims.role || '').toLowerCase());
+
+        if (!hasAdminAccess) {
             throw new functions.https.HttpsError('permission-denied', 'ليست لديك صلاحيات الأدمن');
         }
         
         // إعادة تعيين العداد عند النجاح
         await attemptRef.delete();
         
+        const isSuperAdmin = claims.isSuperAdmin === true || claims.isOwner === true || (claims.role || '').toLowerCase() === 'owner';
+
         await db.collection('audit_logs').add({
             action: 'ADMIN_LOGIN_SUCCESS',
-            email: email,
+            email: normalizedEmail,
             uid: user.uid,
+            role: isSuperAdmin ? 'OWNER' : 'ADMIN',
             ip: ip,
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -136,7 +280,9 @@ exports.verifyAdminLogin = functions.https.onCall(async (data, context) => {
             idToken: authData.idToken,
             refreshToken: authData.refreshToken,
             expiresIn: authData.expiresIn,
-            uid: user.uid
+            uid: user.uid,
+            isSuperAdmin: isSuperAdmin,
+            role: isSuperAdmin ? 'OWNER' : 'ADMIN'
         };
         
     } catch (error) {
@@ -276,7 +422,11 @@ async function getAdminFcmTokens() {
     try {
         const listUsersResult = await admin.auth().listUsers(1000);
         const adminUids = listUsersResult.users
-            .filter(user => user.customClaims?.isAdmin === true)
+            .filter(user => {
+                const c = user.customClaims || {};
+                return c.isAdmin === true || c.admin === true || c.isOwner === true || c.isSuperAdmin === true ||
+                       ['admin', 'owner', 'super_admin'].includes((c.role || '').toLowerCase());
+            })
             .map(user => user.uid);
         
         if (adminUids.length === 0) return [];
@@ -320,8 +470,11 @@ async function removeInvalidTokens(tokens) {
  * - يسجل كل عملية وصول
  */
 exports.getApiKey = functions.https.onCall(async (data, context) => {
-    // التحقق من صلاحيات الأدمن
-    if (!context.auth?.token?.isAdmin) {
+    // التحقق من صلاحيات الأدمن الموحدة
+    const token = context.auth?.token || {};
+    const isAdmin = token.isAdmin === true || token.admin === true || token.isOwner === true || token.isSuperAdmin === true ||
+                    ['admin', 'owner', 'super_admin'].includes((token.role || '').toLowerCase());
+    if (!isAdmin) {
         throw new functions.https.HttpsError('permission-denied', 'Admin only');
     }
     
@@ -365,7 +518,10 @@ exports.getApiKey = functions.https.onCall(async (data, context) => {
  * - يخزّن في Secret Manager (ليس Firestore)
  */
 exports.setApiKey = functions.https.onCall(async (data, context) => {
-    if (!context.auth?.token?.isAdmin) {
+    const token = context.auth?.token || {};
+    const isAdmin = token.isAdmin === true || token.admin === true || token.isOwner === true || token.isSuperAdmin === true ||
+                    ['admin', 'owner', 'super_admin'].includes((token.role || '').toLowerCase());
+    if (!isAdmin) {
         throw new functions.https.HttpsError('permission-denied', 'Admin only');
     }
     

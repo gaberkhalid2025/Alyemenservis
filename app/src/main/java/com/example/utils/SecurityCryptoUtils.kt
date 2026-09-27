@@ -11,6 +11,7 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
@@ -18,15 +19,19 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * Client-Side Encryption & Hashing Utility for Protecting Sensitive Data
  * Ensures sensitive user details, FCM tokens, and internal credentials
- * are securely encrypted using AndroidKeyStore with randomized IVs and PBKDF2 key derivation.
+ * are securely encrypted using AndroidKeyStore with AES/GCM/NoPadding and PBKDF2 key derivation.
  */
 object SecurityCryptoUtils {
     private const val ANDROID_KEYSTORE_PROVIDER = "AndroidKeyStore"
-    private const val KEYSTORE_ALIAS = "WAM_MasterVaultKey"
+    private const val KEYSTORE_ALIAS = "WAM_MasterVaultKey_GCM"
+    private const val LEGACY_KEYSTORE_ALIAS = "WAM_MasterVaultKey"
     private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
     private const val PBKDF2_ITERATIONS = 10000
     private const val KEY_SIZE_BITS = 256
-    private const val CIPHER_TRANSFORMATION = "AES/CBC/PKCS5Padding"
+    private const val CIPHER_TRANSFORMATION = "AES/GCM/NoPadding"
+    private const val LEGACY_CBC_TRANSFORMATION = "AES/CBC/PKCS5Padding"
+    private const val GCM_IV_LENGTH = 12
+    private const val GCM_TAG_LENGTH_BITS = 128
 
     fun getSecretKey(): SecretKey {
         return try {
@@ -45,6 +50,22 @@ object SecurityCryptoUtils {
         }
     }
 
+    private fun getLegacyCbcKey(): SecretKey {
+        return try {
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply {
+                load(null)
+            }
+            if (keyStore.containsAlias(LEGACY_KEYSTORE_ALIAS)) {
+                val entry = keyStore.getEntry(LEGACY_KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
+                entry?.secretKey ?: (keyStore.getKey(LEGACY_KEYSTORE_ALIAS, null) as? SecretKey) ?: deriveFallbackKey()
+            } else {
+                deriveFallbackKey()
+            }
+        } catch (e: Throwable) {
+            deriveFallbackKey()
+        }
+    }
+
     private fun generateAndStoreKey(): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(
             KeyProperties.KEY_ALGORITHM_AES,
@@ -54,8 +75,8 @@ object SecurityCryptoUtils {
             KEYSTORE_ALIAS,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
         )
-            .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
-            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(KEY_SIZE_BITS)
             .setRandomizedEncryptionRequired(false)
             .build()
@@ -69,14 +90,18 @@ object SecurityCryptoUtils {
     private fun deriveFallbackKey(): SecretKeySpec {
         return try {
             val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
-            val salt = KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)
+            val salt = LEGACY_KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)
             val seed = (System.getProperty("os.name") ?: "WAM_Fallback_Entropy").toCharArray()
             val spec = PBEKeySpec(seed, salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
-            val secret = factory.generateSecret(spec)
-            SecretKeySpec(secret.encoded, "AES")
+            try {
+                val secret = factory.generateSecret(spec)
+                SecretKeySpec(secret.encoded, "AES")
+            } finally {
+                spec.clearPassword()
+            }
         } catch (e: Throwable) {
             val digest = MessageDigest.getInstance("SHA-256")
-            SecretKeySpec(digest.digest(KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)), "AES")
+            SecretKeySpec(digest.digest(LEGACY_KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)), "AES")
         }
     }
 
@@ -118,46 +143,73 @@ object SecurityCryptoUtils {
     }
 
     /**
-     * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES cipher text.
-     * Generates a unique, cryptographically secure 16-byte random IV for each operation and prefixes it to the ciphertext.
-     * Any error logs to Crashlytics and throws an exception to prevent leaking plain text.
+     * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES-GCM cipher text.
+     * Generates a unique, cryptographically secure 12-byte random IV for each operation and prefixes it to the ciphertext.
+     * Never returns raw plainText if KeyStore fails; uses fallback derived AES-GCM key instead.
      */
     fun encrypt(plainText: String?): String {
         if (plainText.isNullOrEmpty()) return ""
         return try {
             val key = getSecretKey()
             val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-            val iv = ByteArray(16)
+            val iv = ByteArray(GCM_IV_LENGTH)
             SecureRandom().nextBytes(iv)
-            val ivSpec = IvParameterSpec(iv)
-            cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec)
+            val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
+            cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec)
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
             val combined = iv + encryptedBytes
-            base64Encode(combined)
+            "gcm:" + base64Encode(combined)
         } catch (e: Throwable) {
             try {
                 FirebaseCrashlytics.getInstance().recordException(e)
             } catch (ignored: Throwable) {}
-            plainText
+            try {
+                val fallbackKey = deriveFallbackKey()
+                val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+                val iv = ByteArray(GCM_IV_LENGTH)
+                SecureRandom().nextBytes(iv)
+                val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
+                cipher.init(Cipher.ENCRYPT_MODE, fallbackKey, gcmSpec)
+                val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+                "gcm:" + base64Encode(iv + encryptedBytes)
+            } catch (ex: Throwable) {
+                ""
+            }
         }
     }
 
     /**
-     * Decrypts Base64 encoded AES cipher text back to plain text.
-     * Extracts the 16-byte IV stored at the beginning of the payload.
-     * Returns original string safely if payload cannot be decrypted.
+     * Decrypts Base64 encoded AES-GCM cipher text (or legacy AES-CBC payload) back to plain text.
      */
     fun decrypt(encryptedText: String?): String {
         if (encryptedText.isNullOrEmpty()) return ""
         return try {
+            if (encryptedText.startsWith("gcm:")) {
+                val decodedBytes = base64Decode(encryptedText.removePrefix("gcm:"))
+                if (decodedBytes.size <= GCM_IV_LENGTH) return ""
+                val iv = decodedBytes.copyOfRange(0, GCM_IV_LENGTH)
+                val encrypted = decodedBytes.copyOfRange(GCM_IV_LENGTH, decodedBytes.size)
+                return try {
+                    val key = getSecretKey()
+                    val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+                    cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+                    String(cipher.doFinal(encrypted), Charsets.UTF_8)
+                } catch (_: Throwable) {
+                    val fallbackKey = deriveFallbackKey()
+                    val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+                    cipher.init(Cipher.DECRYPT_MODE, fallbackKey, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+                    String(cipher.doFinal(encrypted), Charsets.UTF_8)
+                }
+            }
+            // التوافق العكسي مع البيانات المشفرة مسبقاً بـ AES/CBC/PKCS5Padding
             val decodedBytes = base64Decode(encryptedText)
             if (decodedBytes.size <= 16) {
                 return encryptedText
             }
             val iv = decodedBytes.copyOfRange(0, 16)
             val encrypted = decodedBytes.copyOfRange(16, decodedBytes.size)
-            val key = getSecretKey()
-            val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+            val key = getLegacyCbcKey()
+            val cipher = Cipher.getInstance(LEGACY_CBC_TRANSFORMATION)
             val ivSpec = IvParameterSpec(iv)
             cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
             val decryptedBytes = cipher.doFinal(encrypted)

@@ -158,12 +158,16 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                 }
             } else {
                 secureStorage.clearAdminSession()
+                sp.edit().remove("saved_admin_role").apply()
                 _adminRole.value = "GUEST"
             }
         } else {
+            // لا نثق بـ saved_admin_role غير المشفر إذا لم تكن هناك جلسة صالحة في SecureStorage المشفر
             val savedRole = sp.getString("saved_admin_role", "GUEST") ?: "GUEST"
-            if (savedRole != "GUEST") {
+            if (savedRole == "PROVIDER" || savedRole == "STORE_OWNER") {
                 _adminRole.value = savedRole
+            } else {
+                _adminRole.value = "GUEST"
             }
         }
 
@@ -480,6 +484,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
         val resetRequest = mapOf(
+            "uid" to currentUid,
             "phone" to cleanPhone,
             "channel" to channel,
             "note" to note,
@@ -575,8 +580,10 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             try {
                 val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
                 val currentTime = System.currentTimeMillis()
+                val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
                 val requestData = mapOf(
                     "id" to cleanPhone,
+                    "uid" to currentUid,
                     "phone" to cleanPhone,
                     "name" to name.ifBlank { "صاحب الحساب ($cleanPhone)" },
                     "accountType" to accountType,

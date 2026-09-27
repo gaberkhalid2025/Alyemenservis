@@ -10,70 +10,102 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
  * 🔐 ChatCryptoManager
- * تشفير وفك تشفير الرسائل بتقنية AES-256-CBC
+ * تشفير وفك تشفير الرسائل بتقنية AES-256-GCM الموثقة
  * لحماية خصوصية المحادثات وضمان التشفير التام (End-to-End Encryption - E2EE)
- *
- * 🛡️ البنية الأمنية:
- * 1. يتم توليد وتخزين مفاتيح التشفير الأساسية في عتاد الجهاز الآمن عبر Android KeyStore.
- * 2. لا توجد أي بذور تشفير (Seeds) أو نصوص سرية مكتوبة بشكل ثابت (Hardcoded) داخل الكود.
- * 3. في حال تمرير roomKey (معرف القناة / الغرفة)، يتم اشتقاق المفتاح الخاص بالقناة ديناميكياً باستخدام خوارزمية PBKDF2WithHmacSHA256.
- *
- * 🚀 الخطة المستقبلية المخططة (Future Roadmap):
- * - إضافة بروتوكول تبادل المفاتيح غير المتماثل (Diffie-Hellman / ECDH Key Exchange) بين طرفي المحادثة.
- * - دعم آلية Double Ratchet (شبيه ببروتوكول Signal) لتجديد مفاتيح الجلسات لكل رسالة بشكل فوري.
+ * مع دعم التوافق العكسي للرسائل القديمة المشفرة بـ AES-CBC
  */
 object ChatCryptoManager {
 
-    private const val ALGORITHM = "AES/CBC/PKCS5Padding"
-    private const val KEYSTORE_ALIAS = "WAM_Chat_E2EE_DeviceKey_2026"
+    private const val ALGORITHM_GCM = "AES/GCM/NoPadding"
+    private const val LEGACY_ALGORITHM_CBC = "AES/CBC/PKCS5Padding"
+    private const val KEYSTORE_ALIAS_GCM = "WAM_Chat_E2EE_DeviceKey_GCM_2026"
+    private const val LEGACY_KEYSTORE_ALIAS = "WAM_Chat_E2EE_DeviceKey_2026"
     private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
     private const val PBKDF2_ITERATIONS = 10000
     private const val KEY_SIZE_BITS = 256
+    private const val GCM_IV_LENGTH = 12
+    private const val GCM_TAG_LENGTH_BITS = 128
 
     /**
-     * الحصول على المفتاح الأساسي من Android KeyStore أو توليده بأمان داخل العتاد
+     * الحصول على المفتاح الأساسي من Android KeyStore (بوضع GCM) أو توليده بأمان داخل العتاد
      */
     private fun getOrCreateKeystoreKey(): SecretKey {
         return try {
             val keyStore = KeyStore.getInstance("AndroidKeyStore")
             keyStore.load(null)
-            if (!keyStore.containsAlias(KEYSTORE_ALIAS)) {
+            if (!keyStore.containsAlias(KEYSTORE_ALIAS_GCM)) {
                 val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
                 val keyGenSpec = KeyGenParameterSpec.Builder(
-                    KEYSTORE_ALIAS,
+                    KEYSTORE_ALIAS_GCM,
                     KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
                 )
-                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                     .setKeySize(KEY_SIZE_BITS)
+                    .setRandomizedEncryptionRequired(false)
                     .build()
                 keyGenerator.init(keyGenSpec)
                 keyGenerator.generateKey()
             } else {
-                val entry = keyStore.getEntry(KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
-                entry?.secretKey ?: deriveKeyFromPassphrase("WAM_Chat_Device_Default")
+                val entry = keyStore.getEntry(KEYSTORE_ALIAS_GCM, null) as? KeyStore.SecretKeyEntry
+                entry?.secretKey ?: SecurityCryptoUtils.getSecretKey()
             }
         } catch (e: Exception) {
-            deriveKeyFromPassphrase("WAM_Chat_Device_Default")
+            SecurityCryptoUtils.getSecretKey()
+        }
+    }
+
+    private fun getLegacyKeystoreKey(): java.security.Key {
+        return try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+            val entry = keyStore.getEntry(LEGACY_KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
+            entry?.secretKey ?: SecurityCryptoUtils.getSecretKey()
+        } catch (e: Exception) {
+            SecurityCryptoUtils.getSecretKey()
         }
     }
 
     /**
-     * توليد مفتاح AES 256 بت من معرف الغرفة أو المعرف المخصص باستخدام PBKDF2
+     * توليد مفتاح AES 256 بت من معرف الغرفة باستخدام PBKDF2
      */
     private fun deriveKeyFromPassphrase(passphrase: String): SecretKeySpec {
         return try {
             val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val salt = digest.digest(("WAM_E2EE_Salt_v2_" + passphrase).toByteArray(Charsets.UTF_8)).copyOfRange(0, 16)
+            val spec = PBEKeySpec(passphrase.toCharArray(), salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
+            try {
+                val tmp = factory.generateSecret(spec)
+                SecretKeySpec(tmp.encoded, "AES")
+            } finally {
+                spec.clearPassword()
+            }
+        } catch (e: Exception) {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val keyBytes = digest.digest(passphrase.toByteArray(Charsets.UTF_8))
+            SecretKeySpec(keyBytes, "AES")
+        }
+    }
+
+    private fun deriveLegacyKeyFromPassphrase(passphrase: String): SecretKeySpec {
+        return try {
+            val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
             val salt = passphrase.toByteArray(Charsets.UTF_8)
             val spec = PBEKeySpec(passphrase.toCharArray(), salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
-            val tmp = factory.generateSecret(spec)
-            SecretKeySpec(tmp.encoded, "AES")
+            try {
+                val tmp = factory.generateSecret(spec)
+                SecretKeySpec(tmp.encoded, "AES")
+            } finally {
+                spec.clearPassword()
+            }
         } catch (e: Exception) {
             val digest = java.security.MessageDigest.getInstance("SHA-256")
             val keyBytes = digest.digest(passphrase.toByteArray(Charsets.UTF_8))
@@ -89,6 +121,14 @@ object ChatCryptoManager {
             deriveKeyFromPassphrase(roomKey)
         } else {
             getOrCreateKeystoreKey()
+        }
+    }
+
+    private fun resolveLegacyKey(roomKey: String?): java.security.Key {
+        return if (!roomKey.isNullOrBlank()) {
+            deriveLegacyKeyFromPassphrase(roomKey)
+        } else {
+            getLegacyKeystoreKey()
         }
     }
 
@@ -109,22 +149,21 @@ object ChatCryptoManager {
     }
 
     /**
-     * تشفير النص العادي إلى Base64 باستخدام IV عشوائي 16 بايت
-     * في حال حدوث أي خطأ يتم تسجيله في Crashlytics ورفع استثناء لمنع تسريب النص الصريح
+     * تشفير النص العادي إلى Base64 باستخدام AES/GCM/NoPadding و IV عشوائي 12 بايت
      */
     fun encrypt(plainText: String, roomKey: String? = null): String {
         if (plainText.isBlank()) return plainText
         return try {
             val key = resolveKey(roomKey)
-            val cipher = Cipher.getInstance(ALGORITHM)
-            val iv = ByteArray(16)
+            val cipher = Cipher.getInstance(ALGORITHM_GCM)
+            val iv = ByteArray(GCM_IV_LENGTH)
             SecureRandom().nextBytes(iv)
-            val ivSpec = IvParameterSpec(iv)
+            val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
 
-            cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec)
+            cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec)
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
             val combined = iv + encryptedBytes
-            "enc::" + base64Encode(combined)
+            "enc::gcm:" + base64Encode(combined)
         } catch (e: Exception) {
             try {
                 FirebaseCrashlytics.getInstance().recordException(e)
@@ -134,40 +173,45 @@ object ChatCryptoManager {
     }
 
     /**
-     * فك تشفير النص المشفر Base64 مع استخراج الـ IV العشوائي المرفق
-     * إذا كان النص لا يبدأ بـ enc:: يتم إرجاعه كما هو.
-     * إذا كان يبدأ بـ enc:: وفشل فك التشفير، يتم رفع استثناء وتسجيله لمنع إرجاع بيانات تالفة أو نص صريح خاطئ.
+     * فك تشفير النص المشفر Base64 مع دعم AES-GCM الحديث والتوافق العكسي لرسائل AES-CBC القديمة
      */
     fun decrypt(cipherText: String, roomKey: String? = null): String {
         if (!cipherText.startsWith("enc::")) return cipherText
         return try {
             val cleanCipher = cipherText.removePrefix("enc::")
-            val combined = base64Decode(cleanCipher)
-            val key = resolveKey(roomKey)
-            val cipher = Cipher.getInstance(ALGORITHM)
-
-            if (combined.size > 16) {
-                try {
-                    val iv = combined.copyOfRange(0, 16)
-                    val encrypted = combined.copyOfRange(16, combined.size)
-                    val ivSpec = IvParameterSpec(iv)
-                    cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
-                    val decryptedBytes = cipher.doFinal(encrypted)
-                    String(decryptedBytes, Charsets.UTF_8)
-                } catch (ex: Exception) {
-                    val iv = ByteArray(16) { 0 }
-                    val ivSpec = IvParameterSpec(iv)
-                    cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
-                    val decryptedBytes = cipher.doFinal(combined)
-                    String(decryptedBytes, Charsets.UTF_8)
+            if (cleanCipher.startsWith("gcm:")) {
+                val combined = base64Decode(cleanCipher.removePrefix("gcm:"))
+                if (combined.size <= GCM_IV_LENGTH) {
+                    throw SecurityException("حمولة GCM قصيرة جداً")
                 }
-            } else {
-                val iv = ByteArray(16) { 0 }
-                val ivSpec = IvParameterSpec(iv)
-                cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
-                val decryptedBytes = cipher.doFinal(combined)
-                String(decryptedBytes, Charsets.UTF_8)
+                val iv = combined.copyOfRange(0, GCM_IV_LENGTH)
+                val encrypted = combined.copyOfRange(GCM_IV_LENGTH, combined.size)
+                return try {
+                    val key = resolveKey(roomKey)
+                    val cipher = Cipher.getInstance(ALGORITHM_GCM)
+                    cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+                    String(cipher.doFinal(encrypted), Charsets.UTF_8)
+                } catch (_: Exception) {
+                    val legacyKey = resolveLegacyKey(roomKey)
+                    val cipher = Cipher.getInstance(ALGORITHM_GCM)
+                    cipher.init(Cipher.DECRYPT_MODE, legacyKey, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+                    String(cipher.doFinal(encrypted), Charsets.UTF_8)
+                }
             }
+
+            // التوافق العكسي للرسائل القديمة المشفرة بـ AES/CBC/PKCS5Padding
+            val combined = base64Decode(cleanCipher)
+            val key = resolveLegacyKey(roomKey)
+            val cipher = Cipher.getInstance(LEGACY_ALGORITHM_CBC)
+            if (combined.size <= 16) {
+                throw SecurityException("حمولة التشفير غير صالحة")
+            }
+            val iv = combined.copyOfRange(0, 16)
+            val encrypted = combined.copyOfRange(16, combined.size)
+            val ivSpec = IvParameterSpec(iv)
+            cipher.init(Cipher.DECRYPT_MODE, key, ivSpec)
+            val decryptedBytes = cipher.doFinal(encrypted)
+            String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
             try {
                 FirebaseCrashlytics.getInstance().recordException(e)

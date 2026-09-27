@@ -1,6 +1,7 @@
 package com.example.utils
 
 import android.util.Base64
+import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
@@ -8,6 +9,7 @@ import javax.crypto.spec.PBEKeySpec
 /**
  * 🔒 SecureHasher
  * المحرك الموحد الآمن لتشفير والتحقق من كلمة المرور والرموز السرية (PBKDF2WithHmacSHA256)
+ * محمي ضد هجمات التوقيت (Timing Attacks) عبر المقارنة الثابتة زمنياً (MessageDigest.isEqual)
  */
 object SecureHasher {
 
@@ -40,32 +42,47 @@ object SecureHasher {
         }
     }
 
+    private fun constantTimeEquals(a: String, b: String): Boolean {
+        return MessageDigest.isEqual(
+            a.toByteArray(Charsets.UTF_8),
+            b.toByteArray(Charsets.UTF_8)
+        )
+    }
+
     fun hashPassword(password: String, salt: ByteArray = generateSalt()): String {
         val spec = PBEKeySpec(password.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
-        val skf = SecretKeyFactory.getInstance(ALGORITHM)
-        val hash = skf.generateSecret(spec).encoded
-        val saltBase64 = base64Encode(salt)
-        val hashBase64 = base64Encode(hash)
-        return "$saltBase64:$hashBase64"
+        return try {
+            val skf = SecretKeyFactory.getInstance(ALGORITHM)
+            val hash = skf.generateSecret(spec).encoded
+            val saltBase64 = base64Encode(salt)
+            val hashBase64 = base64Encode(hash)
+            "$saltBase64:$hashBase64"
+        } finally {
+            spec.clearPassword()
+        }
     }
 
     fun verifyPassword(password: String, storedHash: String): Boolean {
         if (password.isBlank() || storedHash.isBlank()) return false
         val trimmedInput = password.trim()
         val trimmedStored = storedHash.trim()
-        if (trimmedInput == trimmedStored) return true
 
         return try {
             if (trimmedStored.contains(":")) {
                 val parts = trimmedStored.split(":")
+                if (parts.size != 2) return false
                 val salt = base64Decode(parts[0])
-                val expectedHash = parts[1]
+                val expectedHashBytes = base64Decode(parts[1])
                 val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
-                val skf = SecretKeyFactory.getInstance(ALGORITHM)
-                val actualHash = base64Encode(skf.generateSecret(spec).encoded)
-                actualHash == expectedHash
+                try {
+                    val skf = SecretKeyFactory.getInstance(ALGORITHM)
+                    val actualHashBytes = skf.generateSecret(spec).encoded
+                    MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
+                } finally {
+                    spec.clearPassword()
+                }
             } else {
-                trimmedInput == trimmedStored
+                constantTimeEquals(trimmedInput, trimmedStored)
             }
         } catch (e: Exception) {
             false
@@ -75,29 +92,37 @@ object SecureHasher {
     fun hashPin(pin: String, salt: ByteArray = generateSalt()): String {
         val saltBase64 = base64Encode(salt)
         val spec = PBEKeySpec(pin.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
-        val skf = SecretKeyFactory.getInstance(ALGORITHM)
-        val hash = skf.generateSecret(spec).encoded
-        val hashBase64 = base64Encode(hash)
-        return "$saltBase64:$hashBase64"
+        return try {
+            val skf = SecretKeyFactory.getInstance(ALGORITHM)
+            val hash = skf.generateSecret(spec).encoded
+            val hashBase64 = base64Encode(hash)
+            "$saltBase64:$hashBase64"
+        } finally {
+            spec.clearPassword()
+        }
     }
 
     fun verifyPin(pin: String, storedHash: String): Boolean {
         if (pin.isBlank() || storedHash.isBlank()) return false
         val trimmedInput = pin.trim()
         val trimmedStored = storedHash.trim()
-        if (trimmedInput == trimmedStored) return true
 
         return try {
             if (trimmedStored.contains(":")) {
                 val parts = trimmedStored.split(":")
+                if (parts.size != 2) return false
                 val salt = base64Decode(parts[0])
-                val expectedHash = parts[1]
+                val expectedHashBytes = base64Decode(parts[1])
                 val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
-                val skf = SecretKeyFactory.getInstance(ALGORITHM)
-                val actualHash = base64Encode(skf.generateSecret(spec).encoded)
-                actualHash == expectedHash
+                try {
+                    val skf = SecretKeyFactory.getInstance(ALGORITHM)
+                    val actualHashBytes = skf.generateSecret(spec).encoded
+                    MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
+                } finally {
+                    spec.clearPassword()
+                }
             } else {
-                trimmedInput == trimmedStored
+                constantTimeEquals(trimmedInput, trimmedStored)
             }
         } catch (e: Exception) {
             false

@@ -41,6 +41,9 @@ data class AdminSettingsEntity(
     val ownerEmail: String = "",
     @get:com.google.firebase.firestore.Exclude
     val ownerPassword: String = "",
+    val adminEmail: String = "",
+    @get:com.google.firebase.firestore.Exclude
+    val adminPassword: String = "",
     
     // Notifications control
     val isNotificationsEnabled: Boolean = true,

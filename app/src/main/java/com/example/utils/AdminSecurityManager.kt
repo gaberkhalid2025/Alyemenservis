@@ -1,261 +1,163 @@
 package com.example.utils
 
+import android.content.Context
 import com.example.data.AdminSettingsEntity
 import com.example.data.SupervisorEntity
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.tasks.await
 import com.example.data.models.AdminRole
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.tasks.await
 
+/**
+ * 🔒 AdminSecurityManager
+ * المحرك الموحد للتحقق من أوراق اعتماد الإدارة (المالك، الأدمن، المشرفين).
+ * يدعم:
+ * 1. Firebase Authentication + Custom Claims
+ * 2. التحقق الآمن عبر SecureAdminStorage
+ * 3. التوافق الكامل مع كلمات المرور الحالية للمالك (mah73646@gmail.com) والأدمن (meh777644@gmail.com)
+ */
 object AdminSecurityManager {
 
     /**
-     * // ✨ إصلاح المرحلة 1.5: التحقق الآمن عبر Cloud Functions و Firebase Auth
-     * يتحقق من صحة بيانات الدخول (المالك، المدير، أو المشرف)
-     * باستخدام التشفير الآمن والتحقق السحابي عبر Cloud Functions / Firestore
+     * التحقق الشامل من بيانات دخول الإدارة وتحديد الدور بدقة وأمان.
      */
     suspend fun verifyCredentials(
         username: String,
         passwordAttempt: String,
         settings: AdminSettingsEntity? = null,
-        context: android.content.Context? = null,
+        context: Context? = null,
         supervisors: List<SupervisorEntity> = emptyList(),
         preferredRole: String? = null
     ): String? {
-        val trimmedUser = username.trim()
-        val trimmedPass = passwordAttempt.trim()
-        if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
+        val cleanUser = username.trim()
+        val cleanPass = passwordAttempt.trim()
+        if (cleanUser.isBlank() || cleanPass.isBlank()) return null
 
-        // 1. المصادقة الآمنة عبر Firebase Auth المباشر والـ Custom Claims
+        // 1️⃣ محاولة التحقق عبر Firebase Auth إذا كان المدخل بريداً إلكترونياً
         try {
-            if (trimmedUser.contains("@")) {
-                val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-                val authResult = auth.signInWithEmailAndPassword(trimmedUser, trimmedPass).await()
-                val user = authResult.user
-                if (user != null) {
-                    // بمجرد نجاح مصادقة Firebase Auth، نضع الفحوصات الإضافية في try-catch داخلي
-                    // حتى لا يتسبب خطأ PERMISSION_DENIED من Firestore في إلغاء تسجيل الدخول الناجح
-                    try {
-                        val tokenResult = user.getIdToken(true).await()
-                        val claims = tokenResult.claims
+            val auth = FirebaseAuth.getInstance()
+            val authResult = auth.signInWithEmailAndPassword(cleanUser, cleanPass).await()
+            val user = authResult.user
+            if (user != null) {
+                val tokenResult = user.getIdToken(true).await()
+                val claims = tokenResult.claims
 
-                        val isOwnerClaim = claims["isSuperAdmin"] == true ||
-                                claims["isOwner"] == true ||
-                                claims["role"]?.toString()?.uppercase() in listOf("OWNER", "SUPER_ADMIN")
-                        val isAdminClaim = claims["isAdmin"] == true ||
-                                claims["admin"] == true ||
-                                claims["role"]?.toString()?.uppercase() == "ADMIN"
+                val roleClaim = (claims["role"] as? String)?.uppercase()
+                val isOwnerClaim = claims["isSuperAdmin"] == true ||
+                        claims["isOwner"] == true ||
+                        roleClaim == "OWNER" ||
+                        roleClaim == "SUPER_ADMIN"
+                val isAdminClaim = claims["isAdmin"] == true ||
+                        claims["admin"] == true ||
+                        roleClaim == "ADMIN"
+                val isSupervisorClaim = roleClaim == "SUPERVISOR"
 
-                        if (isOwnerClaim) return "OWNER"
-                        if (isAdminClaim && preferredRole != "OWNER") return "ADMIN"
-                    } catch (_: Exception) {}
+                val isExplicitOwnerEmail = cleanUser.equals("mah73646@gmail.com", ignoreCase = true) ||
+                        (settings?.ownerEmail?.isNotBlank() == true && cleanUser.equals(settings.ownerEmail.trim(), ignoreCase = true))
+                val isExplicitAdminEmail = cleanUser.equals("meh777644@gmail.com", ignoreCase = true) ||
+                        (settings?.adminEmail?.isNotBlank() == true && cleanUser.equals(settings.adminEmail.trim(), ignoreCase = true))
 
-                    try {
-                        val db = FirebaseFirestore.getInstance()
-                        val adminDoc = db.collection("admin_users").document(user.uid).get().await()
-                        if (adminDoc.exists()) {
-                            val role = adminDoc.getString("role")?.uppercase() ?: "ADMIN"
-                            return if (role == "OWNER" || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
-                        }
-                    } catch (_: Exception) {}
-
-                    try {
-                        val db = FirebaseFirestore.getInstance()
-                        val adminDoc = db.collection("admins").document(user.uid).get().await()
-                        if (adminDoc.exists()) {
-                            val role = adminDoc.getString("role")?.uppercase() ?: "ADMIN"
-                            return if (role == "OWNER" || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
-                        }
-                    } catch (_: Exception) {}
-
-                    val isExplicitOwnerEmail = trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                            (settings?.ownerEmail?.isNotBlank() == true && trimmedUser.equals(settings.ownerEmail.trim(), ignoreCase = true))
-                    if (isExplicitOwnerEmail) return "OWNER"
-
-                    val isExplicitAdminEmail = settings?.adminUsername?.isNotBlank() == true &&
-                            trimmedUser.equals(settings.adminUsername.trim(), ignoreCase = true)
-                    if (isExplicitAdminEmail && preferredRole != "OWNER") return "ADMIN"
-
-                    return when (preferredRole?.uppercase()) {
-                        "OWNER" -> "OWNER"
-                        "ADMIN" -> "ADMIN"
-                        else -> "OWNER"
-                    }
+                return when {
+                    isOwnerClaim || isExplicitOwnerEmail -> "OWNER"
+                    isAdminClaim || isExplicitAdminEmail -> "ADMIN"
+                    isSupervisorClaim -> "SUPERVISOR"
+                    preferredRole == "OWNER" && isExplicitOwnerEmail -> "OWNER"
+                    preferredRole == "ADMIN" && isExplicitAdminEmail -> "ADMIN"
+                    else -> "ADMIN"
                 }
             }
         } catch (_: Exception) {
-            // الاستمرار في طبقات التحقق التالية عند عدم تطابق Firebase Auth أو عدم توفر اتصال
+            // الاستمرار للتحقق المحلي الآمن في حال عدم توفر اتصال بالشبكة أو خطأ Auth
         }
 
-        // 2. التحقق من بيانات الإعدادات (AdminSettingsEntity) المحملة أو السحابية المباشرة
-        try {
-            val snap = try {
-                FirebaseFirestore.getInstance().collection("settings").document("main_settings").get().await()
-            } catch (_: Exception) {
-                null
-            }
-            val snapObj = snap?.toObject(AdminSettingsEntity::class.java)
-            val effectiveSettings = settings ?: snapObj
-
-            val docOwnerPass = snap?.getString("ownerPassword") ?: snap?.getString("owner_password") ?: effectiveSettings?.ownerPassword ?: ""
-            val docOwnerEmail = snap?.getString("ownerEmail") ?: snap?.getString("owner_email") ?: effectiveSettings?.ownerEmail ?: ""
-            val docAdminPass = snap?.getString("adminPassword") ?: snap?.getString("admin_password") ?: ""
-            val docAdminUser = snap?.getString("adminUsername") ?: snap?.getString("admin_username") ?: effectiveSettings?.adminUsername ?: ""
-
-            if (docOwnerPass.isNotBlank()) {
-                val ownerUserMatches = docOwnerEmail.isBlank() ||
-                        trimmedUser.equals(docOwnerEmail.trim(), ignoreCase = true) ||
-                        trimmedUser.equals("mah73646@gmail.com", ignoreCase = true) ||
-                        trimmedUser.equals("owner", ignoreCase = true) ||
-                        trimmedUser.equals("admin", ignoreCase = true) ||
-                        preferredRole == "OWNER"
-                if (ownerUserMatches && SecurityCryptoUtils.verifyAdminPassword(trimmedPass, docOwnerPass)) {
-                    return "OWNER"
-                }
-            }
-
-            if (docAdminPass.isNotBlank()) {
-                val adminUserMatches = docAdminUser.isBlank() ||
-                        trimmedUser.equals(docAdminUser.trim(), ignoreCase = true) ||
-                        trimmedUser.equals("admin", ignoreCase = true) ||
-                        preferredRole == "ADMIN"
-                if (adminUserMatches && SecurityCryptoUtils.verifyAdminPassword(trimmedPass, docAdminPass)) {
-                    return "ADMIN"
-                }
-            }
-        } catch (_: Exception) {}
-
-        // 3. التحقق من الخزنة المشفرة المحلية (SecureAdminStorage) للوصول الطارئ أو بدون إنترنت
+        // 2️⃣ التحقق من SecureAdminStorage المحلي المشفر
         if (context != null) {
-            try {
-                if (SecureAdminStorage.verifyFallbackCredentials(context, trimmedUser, trimmedPass, "OWNER")) {
-                    return "OWNER"
-                }
-                if (SecureAdminStorage.verifyFallbackCredentials(context, trimmedUser, trimmedPass, "ADMIN")) {
-                    return "ADMIN"
-                }
-            } catch (_: Exception) {}
+            if (SecureAdminStorage.verifyFallbackCredentials(context, cleanUser, cleanPass, "OWNER")) {
+                return "OWNER"
+            }
+            if (SecureAdminStorage.verifyFallbackCredentials(context, cleanUser, cleanPass, "ADMIN")) {
+                return "ADMIN"
+            }
         }
 
-        // 4. التحقق من قائمة المشرفين المحملة في الذاكرة
-        try {
-            if (supervisors.isNotEmpty()) {
-                val matchingSup = supervisors.find {
-                    it.id.equals(trimmedUser, ignoreCase = true) ||
-                            it.name.trim().equals(trimmedUser, ignoreCase = true)
-                }
-                if (matchingSup != null && SecurityCryptoUtils.verifyAdminPassword(trimmedPass, matchingSup.passcode)) {
-                    val r = matchingSup.role.uppercase().trim()
-                    return when {
-                        r.contains("OWNER") || r == "MAIN_ADMIN" || r == "SUPER_ADMIN" -> "OWNER"
-                        r == "ADMIN" -> "ADMIN"
-                        else -> "SUPERVISOR"
-                    }
-                }
-            }
-        } catch (_: Exception) {}
+        // 3️⃣ التحقق من إعدادات المالك (Owner)
+        val ownerEmail = settings?.ownerEmail?.trim() ?: ""
+        val ownerPass = settings?.ownerPassword?.trim() ?: ""
+        val isOwnerUser = cleanUser.equals("mah73646@gmail.com", ignoreCase = true) ||
+                (ownerEmail.isNotBlank() && cleanUser.equals(ownerEmail, ignoreCase = true))
 
-        // 5. محاولة التحقق عبر Cloud Function "verifyAdminLogin" كطبقة إضافية
-        try {
-            if (trimmedUser.contains("@")) {
-                val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
-                val result = functions.getHttpsCallable("verifyAdminLogin")
-                    .call(mapOf("email" to trimmedUser, "password" to trimmedPass))
-                    .await()
-                val data = result.data as? Map<*, *>
-                if (data != null && data["success"] == true) {
-                    val isSuperAdmin = data["isSuperAdmin"] == true
-                    val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-                    val token = try { user?.getIdToken(false)?.await() } catch (_: Exception) { null }
-                    val claims = token?.claims
-                    return when {
-                        isSuperAdmin || claims?.get("isSuperAdmin") == true || claims?.get("isOwner") == true -> "OWNER"
-                        preferredRole == "OWNER" -> "OWNER"
-                        claims?.get("isAdmin") == true -> "ADMIN"
-                        else -> "ADMIN"
-                    }
-                }
-            }
-        } catch (_: Exception) {}
+        if (isOwnerUser && ownerPass.isNotBlank()) {
+            val passMatch = SecureHasher.verifyPassword(cleanPass, ownerPass) ||
+                    SecurityCryptoUtils.verifyAdminPassword(cleanPass, ownerPass) ||
+                    cleanPass == ownerPass
+            if (passMatch) return "OWNER"
+        }
 
-        // 6. التحقق السحابي المباشر من Firestore للمشرفين والمستخدمين الإداريين (كل استعلام مستقل)
-        val db = try { FirebaseFirestore.getInstance() } catch (_: Exception) { return null }
+        // 4️⃣ التحقق من إعدادات الأدمن (Admin)
+        val adminEmail = settings?.adminEmail?.trim() ?: ""
+        val adminPass = settings?.adminPassword?.trim() ?: ""
+        val isAdminUser = cleanUser.equals("meh777644@gmail.com", ignoreCase = true) ||
+                (adminEmail.isNotBlank() && cleanUser.equals(adminEmail, ignoreCase = true))
 
-        // 6.أ: فحص المشرفين عبر المعرف المباشر أو الاسم أو البريد
-        try {
-            var supDoc = db.collection("supervisors").document(trimmedUser).get().await()
-            if (!supDoc.exists()) {
-                val byEmail = db.collection("supervisors").whereEqualTo("email", trimmedUser).limit(1).get().await()
-                if (!byEmail.isEmpty) {
-                    supDoc = byEmail.documents[0]
-                } else {
-                    val byName = db.collection("supervisors").whereEqualTo("name", trimmedUser).limit(1).get().await()
-                    if (!byName.isEmpty) {
-                        supDoc = byName.documents[0]
-                    }
-                }
-            }
-            if (supDoc.exists()) {
-                val storedPass = supDoc.getString("passcode") ?: ""
-                if (AdminCredentialsVault.verifyAndMigrate(supDoc.reference, trimmedPass, storedPass, "passcode")) {
-                    val r = (supDoc.getString("role") ?: "SUPERVISOR").uppercase().trim()
-                    return when {
-                        r.contains("OWNER") || r == "MAIN_ADMIN" || r == "SUPER_ADMIN" -> "OWNER"
-                        r == "ADMIN" -> "ADMIN"
-                        else -> "SUPERVISOR"
-                    }
-                }
-            }
-        } catch (_: Exception) {}
+        if (isAdminUser && adminPass.isNotBlank()) {
+            val passMatch = SecureHasher.verifyPassword(cleanPass, adminPass) ||
+                    SecurityCryptoUtils.verifyAdminPassword(cleanPass, adminPass) ||
+                    cleanPass == adminPass
+            if (passMatch) return "ADMIN"
+        }
 
-        // 6.ب: فحص جدول admin_users
-        try {
-            var adminQuery = db.collection("admin_users").whereEqualTo("email", trimmedUser).limit(1).get().await()
-            if (adminQuery.isEmpty) {
-                adminQuery = db.collection("admin_users").whereEqualTo("username", trimmedUser).limit(1).get().await()
+        // 5️⃣ التحقق من المشرفين (Supervisors)
+        val matchingSup = supervisors.find {
+            it.id.equals(cleanUser, ignoreCase = true) ||
+                    it.name.trim().equals(cleanUser, ignoreCase = true)
+        }
+        if (matchingSup != null && matchingSup.passcode.isNotBlank()) {
+            val storedPass = matchingSup.passcode.trim()
+            val passMatch = SecureHasher.verifyPassword(cleanPass, storedPass) ||
+                    SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedPass) ||
+                    cleanPass == storedPass
+            if (passMatch) {
+                val supRole = matchingSup.role.uppercase().trim()
+                return if (supRole.isNotBlank()) supRole else "SUPERVISOR"
             }
-            if (!adminQuery.isEmpty) {
-                val doc = adminQuery.documents[0]
-                val storedPass = doc.getString("passwordHash") ?: doc.getString("password") ?: doc.getString("passcode") ?: ""
-                val role = (doc.getString("role") ?: "ADMIN").uppercase().trim()
-                val fieldName = if (doc.contains("passwordHash")) "passwordHash" else "password"
-                if (AdminCredentialsVault.verifyAndMigrate(doc.reference, trimmedPass, storedPass, fieldName)) {
-                    return if (role.contains("OWNER") || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
-                }
-            }
-        } catch (_: Exception) {}
-
-        // 6.ج: فحص جدول admins
-        try {
-            var adminsQuery = db.collection("admins").whereEqualTo("email", trimmedUser).limit(1).get().await()
-            if (adminsQuery.isEmpty) {
-                adminsQuery = db.collection("admins").whereEqualTo("username", trimmedUser).limit(1).get().await()
-            }
-            if (!adminsQuery.isEmpty) {
-                val doc = adminsQuery.documents[0]
-                val storedPass = doc.getString("passwordHash") ?: doc.getString("password") ?: doc.getString("passcode") ?: ""
-                val role = (doc.getString("role") ?: "ADMIN").uppercase().trim()
-                val fieldName = if (doc.contains("passwordHash")) "passwordHash" else "password"
-                if (AdminCredentialsVault.verifyAndMigrate(doc.reference, trimmedPass, storedPass, fieldName)) {
-                    return if (role.contains("OWNER") || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
-                }
-            }
-        } catch (_: Exception) {}
+        }
 
         return null
     }
 
-    suspend fun isOwner(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
-        return verifyCredentials(username, passwordAttempt, settings, preferredRole = "OWNER") == "OWNER"
+    /**
+     * واجهة التحقق المباشرة عبر Result<String> للنداءات المباشرة.
+     */
+    suspend fun verifyCredentials(
+        email: String,
+        password: String
+    ): Result<String> {
+        val role = verifyCredentials(
+            username = email,
+            passwordAttempt = password,
+            settings = null,
+            context = null,
+            supervisors = emptyList(),
+            preferredRole = null
+        )
+        return if (role != null) {
+            Result.success(role)
+        } else {
+            Result.failure(SecurityException("بيانات الدخول غير صحيحة أو غير مصرح لك"))
+        }
     }
 
-    suspend fun isAdmin(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
-        val role = verifyCredentials(username, passwordAttempt, settings, preferredRole = "ADMIN")
-        return role == "ADMIN" || role == "OWNER"
+    suspend fun isOwner(email: String, password: String): Boolean {
+        return verifyCredentials(email, password).getOrNull() == "OWNER"
     }
 
-    suspend fun isSupervisor(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
-        val role = verifyCredentials(username, passwordAttempt, settings)
-        return role == "SUPERVISOR" || role == "ADMIN" || role == "OWNER"
+    suspend fun isAdmin(email: String, password: String): Boolean {
+        return verifyCredentials(email, password).getOrNull()?.let {
+            it == "ADMIN" || it == "OWNER"
+        } ?: false
+    }
+
+    suspend fun isSupervisor(email: String, password: String): Boolean {
+        return verifyCredentials(email, password).isSuccess
     }
 
     fun hasOwnerPermission(role: String): Boolean {
@@ -272,7 +174,7 @@ object AdminSecurityManager {
 
     suspend fun getCustomRoles(): List<String> {
         return try {
-            val snapshot = FirebaseFirestore.getInstance()
+            val snapshot = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 .collection("settings")
                 .document("roles")
                 .get()
