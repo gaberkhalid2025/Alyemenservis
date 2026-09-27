@@ -36,6 +36,7 @@ data class ProviderEntity(
     val isChatDisabled: Boolean = false,
     val isNotificationsDisabled: Boolean = false,
     val isPaymentRequired: Boolean = false,
+    @get:com.google.firebase.firestore.Exclude
     val password: String = "",
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
@@ -62,6 +63,7 @@ data class PendingProviderEntity(
     val profession: String = "",
     val specialization: String = "",
     val chatRecipientId: String = "",
+    @get:com.google.firebase.firestore.Exclude
     val password: String = "",
     val providerType: String = "",
     val keywords: List<String> = emptyList()

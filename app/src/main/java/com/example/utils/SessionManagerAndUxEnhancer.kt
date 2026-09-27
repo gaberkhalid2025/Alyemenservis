@@ -1,10 +1,6 @@
 package com.example.utils
 
-import com.example.utils.*
-
 import android.content.Context
-import androidx.compose.animation.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,7 +15,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * ⏱️ Session Management & UX Enhancement Engine
@@ -33,12 +32,27 @@ import com.example.utils.VisualThemePalette
 @Composable
 fun SessionTimeoutWarningModal(
     isVisible: Boolean,
-    remainingSeconds: Int,
+    remainingSeconds: Int = 60,
     onExtendSession: () -> Unit,
     onLogoutNow: () -> Unit,
     themeColors: VisualThemePalette
 ) {
     if (isVisible) {
+        var countdownSeconds by remember(isVisible, remainingSeconds) {
+            mutableIntStateOf(remainingSeconds.coerceAtLeast(0))
+        }
+
+        LaunchedEffect(isVisible, remainingSeconds) {
+            countdownSeconds = remainingSeconds.coerceAtLeast(0)
+            while (countdownSeconds > 0 && isVisible) {
+                delay(1000L)
+                countdownSeconds--
+            }
+            if (countdownSeconds <= 0 && isVisible) {
+                onLogoutNow()
+            }
+        }
+
         AlertDialog(
             onDismissRequest = { /* Modal force choice */ },
             title = {
@@ -61,7 +75,7 @@ fun SessionTimeoutWarningModal(
                         color = Color.LightGray
                     )
                     Text(
-                        text = "$remainingSeconds ثانية",
+                        text = "$countdownSeconds ثانية",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFF59E0B),
@@ -150,19 +164,76 @@ fun OperationProgressModal(
 }
 
 // ==========================================
-// 3. 🧼 Clean Logout Manager
+// 3. 🧼 Clean Logout Manager & Session State Cache
 // ==========================================
+data class SessionState(
+    val isLoggedIn: Boolean = false,
+    val adminLogged: Boolean = false
+)
+
 object CleanLogoutManager {
+
+    private const val PREFS_NAME = "YS_Local_App_Cache_v2026"
+
+    private val _sessionState = MutableStateFlow(SessionState())
+    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+
+    @Volatile
+    private var isCacheInitialized = false
+
+    fun getSessionState(context: Context): StateFlow<SessionState> {
+        if (!isCacheInitialized) {
+            synchronized(this) {
+                if (!isCacheInitialized) {
+                    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    _sessionState.value = SessionState(
+                        isLoggedIn = prefs.getBoolean("USER_LOGGED", false),
+                        adminLogged = prefs.getBoolean("ADMIN_LOGGED", false)
+                    )
+                    isCacheInitialized = true
+                }
+            }
+        }
+        return sessionState
+    }
+
+    fun updateSessionState(context: Context, isLoggedIn: Boolean, adminLogged: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean("USER_LOGGED", isLoggedIn)
+            .putBoolean("ADMIN_LOGGED", adminLogged)
+            .apply()
+        _sessionState.value = SessionState(
+            isLoggedIn = isLoggedIn,
+            adminLogged = adminLogged
+        )
+        isCacheInitialized = true
+    }
 
     fun executeCleanLogout(context: Context, onComplete: () -> Unit) {
         try {
-            // 1. Clear SharedPreferences session tokens
-            val prefs = context.getSharedPreferences("YS_Local_App_Cache_v2026", Context.MODE_PRIVATE)
-            prefs.edit().remove("USER_TOKEN").remove("ADMIN_LOGGED").remove("KEY_OFFLINE_QUEUE").apply()
+            // 1. Clear encrypted admin session in SecureStorage
+            SecureStorage(context).clearAdminSession()
 
-            // 2. Invoke callback to reset ViewModel state and navigate to login
+            // 2. Clear SharedPreferences session tokens and update StateFlow cache
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit()
+                .remove("USER_TOKEN")
+                .remove("USER_LOGGED")
+                .remove("ADMIN_LOGGED")
+                .remove("KEY_OFFLINE_QUEUE")
+                .apply()
+
+            _sessionState.value = SessionState(
+                isLoggedIn = false,
+                adminLogged = false
+            )
+            isCacheInitialized = true
+
+            // 3. Invoke callback to reset ViewModel state and navigate to login
             onComplete()
         } catch (e: Exception) {
+            _sessionState.value = SessionState(isLoggedIn = false, adminLogged = false)
             onComplete()
         }
     }

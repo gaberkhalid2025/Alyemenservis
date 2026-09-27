@@ -29,6 +29,7 @@ data class StoreEntity(
     val deletedAt: Long? = null,
     val paymentEnabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
+    @get:com.google.firebase.firestore.Exclude
     val password: String = "",
     val pdfFileUri: String = "",
     val pdfFileBase64: String = "",

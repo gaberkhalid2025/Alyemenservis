@@ -41,6 +41,7 @@ fun AboutAppDialogView(
             color = themeColors.background,
             modifier = Modifier.fillMaxSize()
         ) {
+            androidx.activity.compose.BackHandler(enabled = true, onBack = onDismiss)
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {

@@ -31,8 +31,10 @@ object ImageUtils {
             val outputStream = ByteArrayOutputStream()
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
 
-            if (scaledBitmap != originalBitmap) originalBitmap.recycle()
-            originalBitmap.recycle()
+            if (scaledBitmap != originalBitmap) {
+                if (!originalBitmap.isRecycled) originalBitmap.recycle()
+            }
+            if (!scaledBitmap.isRecycled) scaledBitmap.recycle()
 
             Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
         } catch (e: Exception) {
@@ -81,6 +83,11 @@ object ImageUtils {
                     currentQuality -= 10
                 } while (compressedBytes.size > maxSizeKB * 1024 && currentQuality >= 20)
                 
+                if (scaledBitmap != bitmap) {
+                    if (!bitmap.isRecycled) bitmap.recycle()
+                }
+                if (!scaledBitmap.isRecycled) scaledBitmap.recycle()
+
                 Base64.encodeToString(compressedBytes, Base64.DEFAULT)
             } catch (e: Exception) {
                 e.printStackTrace()

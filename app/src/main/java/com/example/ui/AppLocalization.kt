@@ -4,10 +4,7 @@ import com.example.utils.*
 import com.example.ui.*
 
 import android.content.Context
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import com.google.firebase.firestore.FirebaseFirestore
@@ -306,12 +303,32 @@ fun LocalizationProvider(
     langCode: String,
     content: @Composable () -> Unit
 ) {
+    val dynamicMap: Map<String, String> by LocaleManager.dynamicTranslations.collectAsState()
     val layoutDirection = if (langCode == "en") LayoutDirection.Ltr else LayoutDirection.Rtl
-    val strings = if (langCode == "en") EnStrings else ArStrings
+    val baseStrings = if (langCode == "en") EnStrings else ArStrings
+
+    val effectiveStrings = remember(baseStrings, dynamicMap, langCode) {
+        if (dynamicMap.isEmpty()) {
+            baseStrings
+        } else {
+            baseStrings.copy(
+                home = dynamicMap["${langCode}_home"] ?: dynamicMap["home"] ?: baseStrings.home,
+                maps = dynamicMap["${langCode}_maps"] ?: dynamicMap["maps"] ?: baseStrings.maps,
+                join = dynamicMap["${langCode}_join"] ?: dynamicMap["join"] ?: baseStrings.join,
+                alerts = dynamicMap["${langCode}_alerts"] ?: dynamicMap["alerts"] ?: baseStrings.alerts,
+                chats = dynamicMap["${langCode}_chats"] ?: dynamicMap["chats"] ?: baseStrings.chats,
+                aboutApp = dynamicMap["${langCode}_aboutApp"] ?: dynamicMap["aboutApp"] ?: baseStrings.aboutApp,
+                bookings = dynamicMap["${langCode}_bookings"] ?: dynamicMap["bookings"] ?: baseStrings.bookings,
+                adminPanel = dynamicMap["${langCode}_adminPanel"] ?: dynamicMap["adminPanel"] ?: baseStrings.adminPanel,
+                settings = dynamicMap["${langCode}_settings"] ?: dynamicMap["settings"] ?: baseStrings.settings,
+                searchPlaceholder = dynamicMap["${langCode}_searchPlaceholder"] ?: dynamicMap["searchPlaceholder"] ?: baseStrings.searchPlaceholder
+            )
+        }
+    }
 
     CompositionLocalProvider(
         LocalLayoutDirection provides layoutDirection,
-        LocalAppStrings provides strings
+        LocalAppStrings provides effectiveStrings
     ) {
         content()
     }

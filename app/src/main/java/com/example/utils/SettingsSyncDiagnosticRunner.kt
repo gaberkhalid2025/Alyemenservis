@@ -23,7 +23,7 @@ data class SettingsFullReport(
     val fieldDiagnostics: List<SettingFieldDiagnostic>
 )
 
-class SettingsSyncDiagnosticRunner(private val context: Context) {
+class SettingsSyncDiagnosticRunner(context: Context) {
 
     private val db = FirebaseFirestore.getInstance()
     private val sandboxDocId = "diagnostic_sandbox_settings"

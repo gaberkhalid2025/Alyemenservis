@@ -4,7 +4,6 @@ import android.content.Context
 import com.example.data.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
 
 object ColorSyncManager {
 

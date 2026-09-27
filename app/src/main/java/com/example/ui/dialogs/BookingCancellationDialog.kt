@@ -41,10 +41,38 @@ fun BookingCancellationDialog(
     onConfirmCancel: (password: String, reason: String) -> Unit,
     viewModel: com.example.ui.viewmodels.BookingViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var passwordInput by remember { mutableStateOf("") }
     var reasonInput by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var attemptsLeft by remember { mutableIntStateOf((3 - booking.cancellationAttempts).coerceAtLeast(0)) }
+    
+    androidx.activity.compose.BackHandler(enabled = true, onBack = onDismiss)
+    
+    val isLockedInitially = remember(booking.id) { com.example.security.BookingSecurityHelper.isBookingLocked(context, booking.id) }
+    var attemptsLeft by remember(booking.id) {
+        val prefs = context.getSharedPreferences("booking_security_vault", android.content.Context.MODE_PRIVATE)
+        val currentAttempts = prefs.getInt("attempts_" + booking.id, 0)
+        mutableIntStateOf((3 - currentAttempts).coerceAtLeast(0))
+    }
+
+    var remainingSeconds by remember { mutableLongStateOf(0L) }
+    
+    LaunchedEffect(isLockedInitially, attemptsLeft) {
+        val isLocked = com.example.security.BookingSecurityHelper.isBookingLocked(context, booking.id)
+        if (isLocked) {
+            while (true) {
+                val secs = com.example.security.BookingSecurityHelper.getRemainingLockoutSeconds(context, booking.id)
+                remainingSeconds = secs
+                if (secs <= 0L) {
+                    attemptsLeft = 3
+                    errorMessage = null
+                    break
+                }
+                errorMessage = "تم قفل الحجز بسبب محاولات خاطئة! متبقي ${secs / 60} دقيقة و ${secs % 60} ثانية."
+                kotlinx.coroutines.delay(1000L)
+            }
+        }
+    }
 
     val canCancelByRule = remember(booking) { BookingStateMachine.canCancel(booking) }
 
@@ -235,12 +263,13 @@ fun BookingCancellationDialog(
 
                             if (userRole == "CLIENT") {
                                 val expectedTarget = if (booking.pinCode.isNotBlank()) booking.pinCode else booking.bookingPassword
-                                if (expectedTarget.isNotBlank() && !com.example.utils.SecureHasher.verifyPin(passwordInput.trim(), expectedTarget)) {
-                                    attemptsLeft--
-                                    if (attemptsLeft <= 0) {
-                                        errorMessage = "تم قفل الحجز بعد 3 محاولات خاطئة!"
-                                        val lockDurationMs = 8 * 60 * 60 * 1000L
-                                        viewModel.lockBookingAfterFailedAttempts(booking.id, lockDurationMs) { success ->
+                                val isValid = com.example.security.BookingSecurityHelper.verifyPassword(passwordInput.trim(), expectedTarget)
+                                if (!isValid) {
+                                    val remaining = com.example.security.BookingSecurityHelper.recordFailedAttempt(context, booking.id)
+                                    attemptsLeft = remaining
+                                    if (remaining <= 0) {
+                                        errorMessage = "تم قفل الحجز بعد 3 محاولات خاطئة! يرجى المحاولة بعد 30 دقيقة."
+                                        viewModel.lockBookingAfterFailedAttempts(booking.id, 30 * 60 * 1000L) { success ->
                                             if (!success) {
                                                 errorMessage = "فشل في قفل الحجز. يرجى التحقق من اتصالك بالإنترنت."
                                             }
@@ -249,6 +278,8 @@ fun BookingCancellationDialog(
                                         errorMessage = "كلمة المرور غير صحيحة! متبقي $attemptsLeft محاولات."
                                     }
                                     return@Button
+                                } else {
+                                    com.example.security.BookingSecurityHelper.resetAttempts(context, booking.id)
                                 }
                             }
 
@@ -259,7 +290,7 @@ fun BookingCancellationDialog(
 
                             onConfirmCancel(passwordInput.trim(), reasonInput.trim())
                         },
-                        enabled = canCancelByRule && (userRole != "CLIENT" || attemptsLeft > 0),
+                        enabled = canCancelByRule && (userRole != "CLIENT" || (!com.example.security.BookingSecurityHelper.isBookingLocked(context, booking.id) && attemptsLeft > 0)),
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFEF4444)

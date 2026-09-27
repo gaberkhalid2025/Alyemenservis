@@ -35,7 +35,7 @@ data class ConflictAuditEntry(
  * ⚖️ ConflictResolver
  * كشف وإدارة وحل التعارضات الناتجة عن التعديل المتزامن محلياً وسحابياً
  */
-class ConflictResolver(private val context: Context) {
+class ConflictResolver(context: Context) {
 
     private val _pendingConflicts = MutableStateFlow<List<Conflict>>(emptyList())
     val pendingConflicts: StateFlow<List<Conflict>> = _pendingConflicts.asStateFlow()

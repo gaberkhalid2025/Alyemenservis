@@ -55,6 +55,14 @@ fun MapScreenContent(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    androidx.activity.compose.BackHandler(enabled = true) {
+        if (state.selectedEntity != null) {
+            state.resetSelection()
+        } else {
+            onBackClick()
+        }
+    }
+
     // Data streams from ViewModel
     val providers by viewModel.providers.collectAsState()
     val stores by viewModel.stores.collectAsState()

@@ -80,6 +80,52 @@ fun RadarRenderer(
         val centerX = widthPx / 2f + panOffset.x
         val centerY = heightPx / 2f + panOffset.y
         val maxRadius = min(widthPx, heightPx) * 0.44f * zoomScale
+        val centerOffset = remember(centerX, centerY) { Offset(centerX, centerY) }
+
+        // Static and key-memoized objects moved out of 60fps Canvas draw loop
+        val dashIntervals = remember { floatArrayOf(12f, 10f) }
+        val ringStroke = remember(dashIntervals) {
+            Stroke(width = 1.2f, pathEffect = PathEffect.dashPathEffect(dashIntervals))
+        }
+        val pulse1Stroke = remember { Stroke(width = 2.2f) }
+        val pulse2Stroke = remember { Stroke(width = 1.8f) }
+        val bgGradientColors = remember {
+            listOf(Color(0xFF0F172A), Color(0xFF060B18), Color(0xFF020617))
+        }
+        val bgBrush = remember(centerOffset, maxRadius, bgGradientColors) {
+            Brush.radialGradient(
+                colors = bgGradientColors,
+                center = centerOffset,
+                radius = (maxRadius * 1.3f).coerceAtLeast(1f)
+            )
+        }
+        val ringRadii = remember(maxRadius) {
+            val rings = 4
+            FloatArray(rings) { i -> maxRadius * ((i + 1).toFloat() / rings) }
+        }
+        val markerTextPaint = remember {
+            android.graphics.Paint().apply {
+                textSize = 28f
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        }
+
+        // Derived state for per-frame animated values
+        val alpha1 by remember {
+            derivedStateOf { ((1.0f - pulseRadius) * 0.35f).coerceIn(0f, 1f) }
+        }
+        val alpha2 by remember {
+            derivedStateOf { ((1.0f - pulseRadius2) * 0.28f).coerceIn(0f, 1f) }
+        }
+        val sweepEndOffset by remember(centerX, centerY, maxRadius) {
+            derivedStateOf {
+                val rad = Math.toRadians(sweepAngle.toDouble())
+                Offset(
+                    x = (centerX + maxRadius * cos(rad)).toFloat(),
+                    y = (centerY + maxRadius * sin(rad)).toFloat()
+                )
+            }
+        }
 
         // Performance Optimization: Cache screen items and clusters so they are NOT recalculated in every 60fps animation frame
         val screenItems = remember(items, centerX, centerY, zoomScale) {
@@ -132,24 +178,18 @@ fun RadarRenderer(
         ) {
             // 1. Dark Background Gradient
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF0F172A), Color(0xFF060B18), Color(0xFF020617)),
-                    center = Offset(centerX, centerY),
-                    radius = maxRadius * 1.3f
-                ),
-                center = Offset(centerX, centerY),
+                brush = bgBrush,
+                center = centerOffset,
                 radius = maxRadius * 1.25f
             )
 
             // 2. Concentric Radar Rings
-            val rings = 4
-            for (i in 1..rings) {
-                val ringRadius = maxRadius * (i.toFloat() / rings)
+            for (ringRadius in ringRadii) {
                 drawCircle(
                     color = pulseColor.copy(alpha = 0.18f),
                     radius = ringRadius,
-                    center = Offset(centerX, centerY),
-                    style = Stroke(width = 1.2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f)))
+                    center = centerOffset,
+                    style = ringStroke
                 )
             }
 
@@ -168,34 +208,29 @@ fun RadarRenderer(
             )
 
             // 4. Expanding Radar Pulses with Alpha Fade-Out
-            val alpha1 = ((1.0f - pulseRadius) * 0.35f).coerceIn(0f, 1f)
             drawCircle(
                 color = pulseColor.copy(alpha = alpha1),
                 radius = maxRadius * pulseRadius,
-                center = Offset(centerX, centerY),
-                style = Stroke(width = 2.2f)
+                center = centerOffset,
+                style = pulse1Stroke
             )
 
-            val alpha2 = ((1.0f - pulseRadius2) * 0.28f).coerceIn(0f, 1f)
             drawCircle(
                 color = pulseColor.copy(alpha = alpha2),
                 radius = maxRadius * pulseRadius2,
-                center = Offset(centerX, centerY),
-                style = Stroke(width = 1.8f)
+                center = centerOffset,
+                style = pulse2Stroke
             )
 
             // 5. Rotating Radar Sweep Line
-            val rad = Math.toRadians(sweepAngle.toDouble())
-            val sweepEndX = (centerX + maxRadius * cos(rad)).toFloat()
-            val sweepEndY = (centerY + maxRadius * sin(rad)).toFloat()
             drawLine(
                 brush = Brush.linearGradient(
                     colors = listOf(pulseColor.copy(alpha = 0.9f), pulseColor.copy(alpha = 0.15f), Color.Transparent),
-                    start = Offset(centerX, centerY),
-                    end = Offset(sweepEndX, sweepEndY)
+                    start = centerOffset,
+                    end = sweepEndOffset
                 ),
-                start = Offset(centerX, centerY),
-                end = Offset(sweepEndX, sweepEndY),
+                start = centerOffset,
+                end = sweepEndOffset,
                 strokeWidth = 3f
             )
 
@@ -208,11 +243,7 @@ fun RadarRenderer(
                 )
             }
 
-            // 7. Cluster & Draw Items (Optimized using cached clusters)
-            val paint = android.graphics.Paint().apply {
-                textSize = 28f
-                textAlign = android.graphics.Paint.Align.CENTER
-            }
+            // 7. Cluster & Draw Items (Optimized using cached clusters & remembered Paint)
             for (cluster in clusters) {
                 val isSelected = cluster.items.any { it.id == selectedItemId }
                 val count = cluster.items.size
@@ -230,8 +261,8 @@ fun RadarRenderer(
                     drawContext.canvas.nativeCanvas.drawText(
                         emoji,
                         center.x,
-                        center.y + (paint.textSize / 3),
-                        paint
+                        center.y + (markerTextPaint.textSize / 3),
+                        markerTextPaint
                     )
                 } else {
                     MarkerRenderer.drawCluster(
@@ -246,17 +277,17 @@ fun RadarRenderer(
             drawCircle(
                 color = Color(0xFF10B981).copy(alpha = 0.25f),
                 radius = 20f,
-                center = Offset(centerX, centerY)
+                center = centerOffset
             )
             drawCircle(
                 color = Color(0xFF10B981),
                 radius = 8f,
-                center = Offset(centerX, centerY)
+                center = centerOffset
             )
             drawCircle(
                 color = Color.White,
                 radius = 3.5f,
-                center = Offset(centerX, centerY)
+                center = centerOffset
             )
         }
     }

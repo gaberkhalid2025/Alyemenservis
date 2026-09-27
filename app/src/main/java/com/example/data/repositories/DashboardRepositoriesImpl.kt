@@ -1,7 +1,6 @@
 package com.example.data.repositories
 
 import android.content.Context
-import android.util.Log
 import com.example.data.LocalAppCacheManager
 import com.example.domain.entities.DashboardStatsEntity
 import com.example.domain.entities.FavoriteItemEntity
@@ -21,7 +20,7 @@ import java.util.UUID
  * Handles stats calculation and dashboard data aggregation with offline fallback.
  */
 class DashboardRepositoryImpl(
-    private val context: Context
+    context: Context
 ) : IDashboardRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -165,7 +164,7 @@ class FavoritesRepositoryImpl(
  * 📦 ProductsRepositoryImpl
  */
 class ProductsRepositoryImpl(
-    private val context: Context
+    context: Context
 ) : IProductsRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -283,7 +282,7 @@ class ProductsRepositoryImpl(
  * 📦 RatingsRepositoryImpl
  */
 class RatingsRepositoryImpl(
-    private val context: Context
+    context: Context
 ) : IRatingsRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -364,7 +363,7 @@ class RatingsRepositoryImpl(
  * 📦 GalleryRepositoryImpl
  */
 class GalleryRepositoryImpl(
-    private val context: Context
+    context: Context
 ) : IGalleryRepository {
 
     private val firestore = FirebaseFirestore.getInstance()

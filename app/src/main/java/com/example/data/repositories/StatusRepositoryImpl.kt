@@ -18,7 +18,7 @@ import kotlinx.coroutines.tasks.await
  * Implements IStatusRepository for system stats, pending join requests, notifications, and system bookings.
  */
 class StatusRepositoryImpl(
-    private val context: Context
+    context: Context
 ) : IStatusRepository {
 
     private val firestore = FirebaseFirestore.getInstance()

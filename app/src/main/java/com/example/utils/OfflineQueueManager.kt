@@ -42,7 +42,8 @@ class OfflineQueueManager(private val context: Context) {
         private const val TAG = "OfflineQueueManager"
         private const val KEY_QUEUE = "key_offline_requests_queue_json"
         private const val MAX_RETRIES = 5
-        private const val RETRY_DELAY_MS = 5000L
+        private const val BASE_RETRY_DELAY_MS = 2000L
+        private const val INTER_REQUEST_DELAY_MS = 2500L
     }
 
     init {
@@ -145,40 +146,54 @@ class OfflineQueueManager(private val context: Context) {
 
         scope.launch {
             _isProcessing.value = true
-            val currentList = _pendingRequests.value.filter { it.status == "PENDING" || it.status == "FAILED" }
+            try {
+                val currentList = _pendingRequests.value.filter { it.status == "PENDING" || it.status == "FAILED" }
+                val remainingList = mutableListOf<OfflineRequest>()
 
-            val remainingList = mutableListOf<OfflineRequest>()
+                for ((index, req) in currentList.withIndex()) {
+                    try {
+                        if (!isOnline()) {
+                            remainingList.add(req)
+                            continue
+                        }
 
-            for (req in currentList) {
-                if (!isOnline()) {
-                    remainingList.add(req)
-                    continue
-                }
+                        // Throttle between consecutive requests (2.5s delay between items) to protect network & quota
+                        if (index > 0) {
+                            delay(INTER_REQUEST_DELAY_MS)
+                        }
 
-                var success = false
-                try {
-                    success = executeRequest(req)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Execution error for request ${req.id}: ${e.message}")
-                }
+                        var success = false
+                        try {
+                            success = executeRequest(req)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Execution error for request ${req.id}: ${e.message}")
+                        }
 
-                if (success) {
-                    onItemProcessed?.invoke(req, true)
-                } else {
-                    val nextRetry = req.retryCount + 1
-                    if (nextRetry < MAX_RETRIES) {
-                        remainingList.add(req.copy(retryCount = nextRetry, status = "FAILED"))
-                        delay(RETRY_DELAY_MS)
-                    } else {
-                        Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
+                        if (success) {
+                            onItemProcessed?.invoke(req, true)
+                        } else {
+                            val nextRetry = req.retryCount + 1
+                            if (nextRetry < MAX_RETRIES) {
+                                remainingList.add(req.copy(retryCount = nextRetry, status = "FAILED"))
+                                // Exponential Backoff: Retry 1 = 2s (2000ms), Retry 2 = 4s (4000ms), Retry 3 = 8s (8000ms)
+                                val backoffDelayMs = BASE_RETRY_DELAY_MS * (1L shl (nextRetry - 1).coerceAtMost(4))
+                                delay(backoffDelayMs)
+                            } else {
+                                Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
+                            }
+                            onItemProcessed?.invoke(req, false)
+                        }
+                    } catch (itemEx: Exception) {
+                        Log.e(TAG, "Unexpected queue item error for ${req.id}: ${itemEx.message}")
+                        remainingList.add(req)
                     }
-                    onItemProcessed?.invoke(req, false)
                 }
-            }
 
-            _pendingRequests.value = remainingList
-            saveQueueToStorage()
-            _isProcessing.value = false
+                _pendingRequests.value = remainingList
+                saveQueueToStorage()
+            } finally {
+                _isProcessing.value = false
+            }
         }
     }
 

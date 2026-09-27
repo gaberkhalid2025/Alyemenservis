@@ -113,6 +113,8 @@ fun UserSubmitPaymentProofDialog(
     var photoInput by remember { mutableStateOf("") }
     var showConfirmSubmitDialog by remember { mutableStateOf(false) }
 
+    BackHandler(enabled = true, onBack = onDismiss)
+
     val requiredAmount = when {
         booking.totalAmount > 0.0 -> booking.totalAmount
         booking.advancePayment > 0.0 -> booking.advancePayment

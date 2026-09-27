@@ -69,6 +69,8 @@ fun BookingCalendarScreen(
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
+    androidx.activity.compose.BackHandler(enabled = true, onBack = onBack)
+
     val uiState by calendarViewModel.uiState.collectAsState()
     val calendarMonthOffset = uiState.calendarMonthOffset
     val selectedDateString = uiState.selectedDateString

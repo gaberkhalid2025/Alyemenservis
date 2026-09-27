@@ -37,7 +37,7 @@ data class ProfileFullReport(
     val details: List<TestDetail>
 )
 
-class ProfileDiagnosticRunner(private val context: Context) {
+class ProfileDiagnosticRunner(context: Context) {
 
     private val db = FirebaseFirestore.getInstance()
 

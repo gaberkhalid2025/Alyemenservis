@@ -1,6 +1,5 @@
 package com.example.utils
 
-import com.example.data.BookingEntity
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId

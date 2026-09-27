@@ -116,6 +116,7 @@ object AnalyticsAndReportingEngine {
             val fileName = "report_${reportTitle.replace(" ", "_")}_${System.currentTimeMillis()}.csv"
             val file = File(context.filesDir, fileName)
             FileWriter(file).use { writer ->
+                writer.write("\uFEFF") // UTF-8 BOM
                 // Header
                 writer.write(headers.joinToString(",") + "\n")
 

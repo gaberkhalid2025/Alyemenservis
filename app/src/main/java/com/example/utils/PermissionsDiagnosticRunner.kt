@@ -20,7 +20,7 @@ data class PermissionFullReport(
     val details: List<TestDetail>
 )
 
-class PermissionsDiagnosticRunner(private val context: Context) {
+class PermissionsDiagnosticRunner(context: Context) {
 
     private val db = FirebaseFirestore.getInstance()
     private val testSupervisorDocId = "test_diag_supervisor_777"

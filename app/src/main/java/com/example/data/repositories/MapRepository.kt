@@ -1,7 +1,5 @@
 package com.example.data.repositories
 
-import com.example.utils.*
-
 import android.content.Context
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity

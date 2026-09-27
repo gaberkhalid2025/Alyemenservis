@@ -36,6 +36,5 @@ data class PaymentEntity(
     val verifiedBy: String = "",
     val verificationStatus: String = "PENDING", // PENDING, VERIFIED, REJECTED, DISPUTED
     val verificationNote: String = "",
-    val adminNote: String = "",
-    val isDeleted: Boolean = false
+    val adminNote: String = ""
 )

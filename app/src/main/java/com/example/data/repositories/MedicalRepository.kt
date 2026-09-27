@@ -7,13 +7,11 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import org.json.JSONArray
-import org.json.JSONObject
 import javax.inject.Inject
 
 class MedicalRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val cacheManager: LocalAppCacheManager
+    cacheManager: LocalAppCacheManager
 ) {
     fun getDoctors(ownerId: String): Flow<List<DoctorItem>> = callbackFlow {
         val listener = firestore.collection("doctors")

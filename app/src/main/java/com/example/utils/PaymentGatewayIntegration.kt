@@ -2,7 +2,6 @@ package com.example.utils
 
 import android.content.Context
 import androidx.annotation.Keep
-import com.example.data.models.Transaction
 import java.util.UUID
 
 @Keep
@@ -62,7 +61,7 @@ data class PaymentMethod(
  * 💳 PaymentGatewayIntegration
  * تكامل الدفع الإلكتروني مع المحافظ الجوالية اليمنية (جيب، الكريمي حاسب، جوالي، يمن كاش، والحوالات البنكية)
  */
-class PaymentGatewayIntegration(private val context: Context? = null) {
+class PaymentGatewayIntegration(context: Context? = null) {
 
     private val activeTransactions = mutableMapOf<String, Payment>()
 

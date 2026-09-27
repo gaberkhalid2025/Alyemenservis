@@ -3,9 +3,12 @@ package com.example.utils
 import android.content.Context
 import androidx.annotation.Keep
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 
 @Keep
@@ -44,7 +47,7 @@ class AiAssistantEngine(private val context: Context) {
 
     private val guidesList = mutableListOf<TroubleshootingGuide>()
     private val faqList = mutableListOf<Pair<List<String>, String>>()
-    private val queryCache = mutableMapOf<String, AiResponse>()
+    private val queryCache = ConcurrentHashMap<String, AiResponse>()
 
     init {
         loadOfflineData()
@@ -61,6 +64,9 @@ class AiAssistantEngine(private val context: Context) {
                 synchronized(guidesList) {
                     guidesList.clear()
                     guidesList.addAll(newGuides)
+                }
+                synchronized(queryCache) {
+                    queryCache.clear()
                 }
             }
         } catch (e: Exception) {
@@ -255,7 +261,7 @@ class AiAssistantEngine(private val context: Context) {
     /**
      * معالجة الاستعلام وفهم السياق ولهجات اليمن مع دعم الكاشينج
      */
-    fun queryAssistant(
+    suspend fun queryAssistant(
         prompt: String,
         currentCity: String = "صنعاء",
         isOnlineAvailable: Boolean = false,
@@ -263,9 +269,11 @@ class AiAssistantEngine(private val context: Context) {
     ) {
         val queryLower = prompt.trim().lowercase(Locale.getDefault())
 
-        if (queryCache.size > 100) {
-            val keysToRemove = queryCache.keys.take(queryCache.size - 100)
-            keysToRemove.forEach { queryCache.remove(it) }
+        synchronized(queryCache) {
+            if (queryCache.size > 100) {
+                val keysToRemove = queryCache.keys.take(queryCache.size - 100)
+                keysToRemove.forEach { queryCache.remove(it) }
+            }
         }
 
         if (queryLower.isBlank()) {
@@ -280,9 +288,9 @@ class AiAssistantEngine(private val context: Context) {
             return
         }
 
-        // Check in-memory cache
-        if (queryCache.containsKey(queryLower)) {
-            onResult(queryCache[queryLower]!!)
+        // Check in-memory cache safely
+        queryCache[queryLower]?.let { cachedResponse ->
+            onResult(cachedResponse)
             return
         }
 
@@ -370,7 +378,7 @@ class AiAssistantEngine(private val context: Context) {
         onResult(defaultResp)
     }
 
-    private fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int {
+    private suspend fun levenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int = withContext(Dispatchers.Default) {
         val lhsLength = lhs.length
         val rhsLength = rhs.length
         var cost = IntArray(lhsLength + 1) { it }
@@ -389,6 +397,6 @@ class AiAssistantEngine(private val context: Context) {
             cost = newCost
             newCost = swap
         }
-        return cost[lhsLength]
+        cost[lhsLength]
     }
 }

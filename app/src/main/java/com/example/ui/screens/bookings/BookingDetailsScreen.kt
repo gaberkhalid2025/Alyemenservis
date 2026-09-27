@@ -56,6 +56,8 @@ fun BookingDetailsScreen(
     var showRateDialog by remember { mutableStateOf(false) }
     var ratingValue by remember { mutableFloatStateOf(5f) }
 
+    androidx.activity.compose.BackHandler(enabled = true, onBack = onBack)
+
     Scaffold(
         topBar = {
             TopAppBar(

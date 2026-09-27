@@ -25,7 +25,7 @@ object ReportExporter {
             val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "Urgent_Requests_$timeStamp.csv")
 
-            FileWriter(file).use { writer ->
+            file.bufferedWriter(Charsets.UTF_8).use { writer ->
                 writer.write("\uFEFF") // UTF-8 BOM
                 writer.write("رمز الطلب,الخدمة,المدينة,الحي,الحالة,العميل,الهاتف,الوقت المتبقي (دقيقة),التاريخ\n")
 
@@ -71,8 +71,8 @@ object ReportExporter {
             val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
             val file = File(exportDir, "Financial_Report_${accountName}_$timeStamp.csv")
 
-            FileWriter(file).use { writer ->
-                writer.write("\uFEFF")
+            file.bufferedWriter(Charsets.UTF_8).use { writer ->
+                writer.write("\uFEFF") // UTF-8 BOM
                 writer.write("تقرير المبيعات والنمو المالي للحساب: $accountName\n")
                 writer.write("إجمالي الإيرادات: $totalIncome $currency\n\n")
                 writer.write("البند / الخدمة,المبلغ ($currency)\n")

@@ -96,7 +96,7 @@ fun SmartAssistantDialogView(
         }
     }
 
-    BackHandler(onBack = onDismiss)
+    BackHandler(enabled = true, onBack = onDismiss)
 
     Surface(
         color = themeColors.background,

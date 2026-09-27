@@ -4,7 +4,6 @@ import com.example.data.LocalAppCacheManager
 import com.example.data.SpecialOfferEntity
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
-import org.json.JSONArray
 import javax.inject.Inject
 import javax.inject.Singleton
 

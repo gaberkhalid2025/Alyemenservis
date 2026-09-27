@@ -6,15 +6,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.annotation.Keep
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.MainActivity
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.Calendar
-import java.util.UUID
 
 @Keep
 data class ScheduledNotification(

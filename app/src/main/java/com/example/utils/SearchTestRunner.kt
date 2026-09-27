@@ -1,7 +1,6 @@
 package com.example.utils
 
 import android.content.Context
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import java.io.File
 import java.text.SimpleDateFormat

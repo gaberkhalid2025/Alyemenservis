@@ -11,7 +11,7 @@ import javax.inject.Inject
 
 class JobRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val cacheManager: LocalAppCacheManager
+    cacheManager: LocalAppCacheManager
 ) {
     fun getJobs(ownerId: String): Flow<List<JobPostItem>> = callbackFlow {
         val listener = firestore.collection("job_postings")

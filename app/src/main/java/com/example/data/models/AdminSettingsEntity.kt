@@ -297,19 +297,6 @@ data class AdminSettingsEntity(
 )
 
 @Keep
-data class AppSettings(
-    val disableChatAll: Boolean = false,
-    val disableChatUsers: Boolean = false,
-    val disableChatProviders: Boolean = false,
-    val allowChatUserToProvider: Boolean = true,
-    val chatDisabledAnnouncement: String = "",
-    val showUserIdInsteadOfNameInChat: Boolean = false,
-    val disableVoiceCalls: Boolean = false,
-    val voiceCallsDisabledAnnouncement: String = "",
-    val appLanguage: String = "ar"
-)
-
-@Keep
 data class DynamicSection(
     val id: String = "",
     val name: String = "",
@@ -325,7 +312,8 @@ data class DynamicSection(
 ) {
     companion object {
         fun parseDynamicSections(serialized: String): List<DynamicSection> {
-            if (serialized.isEmpty()) {
+            val trimmed = serialized.trim()
+            if (trimmed.isEmpty()) {
                 return listOf(
                     DynamicSection("stores", "المحلات والمراكز", "🏪", true, "store", 1, "شروط تسجيل المحل: يرجى إدخال بيانات صحيحة ومطابقة للواقع التجاري وصور واضحة.", 10, true, true, "الاسم,الوصف,الهاتف,الموقع"),
                     DynamicSection("restaurants", "المطاعم والكافيهات", "🍔", true, "store", 2, "شروط تسجيل المطعم: توضيح نوع الوجبات، الأسعار، وساعات العمل وصور الوجبات.", 10, true, true, "الاسم,الوصف,الهاتف,الموقع,المنيو"),
@@ -335,8 +323,35 @@ data class DynamicSection(
                     DynamicSection("services", "المهن والخدمات", "🛠️", false, "store", 6, "شروط تسجيل الفني: تحديد المهنة/التخصص والأسعار التقديرية ونطاق العمل.", 10, true, true, "الاسم,المهنة,الهاتف,المنطقة")
                 )
             }
+            // 1. Try standard JSON parsing
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                try {
+                    val jsonArray = org.json.JSONArray(trimmed)
+                    val list = mutableListOf<DynamicSection>()
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        list.add(
+                            DynamicSection(
+                                id = obj.optString("id", ""),
+                                name = obj.optString("name", ""),
+                                icon = obj.optString("icon", ""),
+                                isEnabled = obj.optBoolean("isEnabled", true),
+                                type = obj.optString("type", "store"),
+                                order = obj.optInt("order", i),
+                                terms = obj.optString("terms", ""),
+                                maxPhotos = obj.optInt("maxPhotos", 5),
+                                showPhotos = obj.optBoolean("showPhotos", true),
+                                allowPdf = obj.optBoolean("allowPdf", true),
+                                requiredFields = obj.optString("requiredFields", "الاسم,الهاتف,الوصف")
+                            )
+                        )
+                    }
+                    if (list.isNotEmpty()) return list.sortedBy { it.order }
+                } catch (_: Exception) {}
+            }
+            // 2. Fallback to legacy delimiter parsing (;; and ||)
             return try {
-                serialized.split(";;").filter { it.isNotEmpty() }.map { sectionStr ->
+                trimmed.split(";;").filter { it.isNotEmpty() }.map { sectionStr ->
                     val parts = sectionStr.split("||")
                     DynamicSection(
                         id = parts.getOrElse(0) { "" },
@@ -358,20 +373,40 @@ data class DynamicSection(
         }
 
         fun serializeDynamicSections(list: List<DynamicSection>): String {
-            return list.joinToString(";;") { sec ->
-                listOf(
-                    sec.id,
-                    sec.name,
-                    sec.icon,
-                    sec.isEnabled.toString(),
-                    sec.type,
-                    sec.order.toString(),
-                    sec.terms,
-                    sec.maxPhotos.toString(),
-                    sec.showPhotos.toString(),
-                    sec.allowPdf.toString(),
-                    sec.requiredFields
-                ).joinToString("||")
+            return try {
+                val jsonArray = org.json.JSONArray()
+                for (sec in list) {
+                    val obj = org.json.JSONObject()
+                    obj.put("id", sec.id)
+                    obj.put("name", sec.name)
+                    obj.put("icon", sec.icon)
+                    obj.put("isEnabled", sec.isEnabled)
+                    obj.put("type", sec.type)
+                    obj.put("order", sec.order)
+                    obj.put("terms", sec.terms)
+                    obj.put("maxPhotos", sec.maxPhotos)
+                    obj.put("showPhotos", sec.showPhotos)
+                    obj.put("allowPdf", sec.allowPdf)
+                    obj.put("requiredFields", sec.requiredFields)
+                    jsonArray.put(obj)
+                }
+                jsonArray.toString()
+            } catch (_: Exception) {
+                list.joinToString(";;") { sec ->
+                    listOf(
+                        sec.id,
+                        sec.name,
+                        sec.icon,
+                        sec.isEnabled.toString(),
+                        sec.type,
+                        sec.order.toString(),
+                        sec.terms,
+                        sec.maxPhotos.toString(),
+                        sec.showPhotos.toString(),
+                        sec.allowPdf.toString(),
+                        sec.requiredFields
+                    ).joinToString("||")
+                }
             }
         }
     }
@@ -392,9 +427,36 @@ data class SpecialOfferEntity(
 ) {
     companion object {
         fun parseList(jsonStr: String): List<SpecialOfferEntity> {
-            if (jsonStr.isBlank()) return emptyList()
+            val trimmed = jsonStr.trim()
+            if (trimmed.isBlank()) return emptyList()
+            // 1. Try standard JSON parsing
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                try {
+                    val jsonArray = org.json.JSONArray(trimmed)
+                    val list = mutableListOf<SpecialOfferEntity>()
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        list.add(
+                            SpecialOfferEntity(
+                                id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                                providerId = obj.optString("providerId", ""),
+                                title = obj.optString("title", ""),
+                                description = obj.optString("description", ""),
+                                discountPercent = obj.optInt("discountPercent", 0),
+                                originalPrice = obj.optDouble("originalPrice", 0.0),
+                                offerPrice = obj.optDouble("offerPrice", 0.0),
+                                expiryDate = obj.optString("expiryDate", ""),
+                                couponCode = obj.optString("couponCode", ""),
+                                isEnabled = obj.optBoolean("isEnabled", true)
+                            )
+                        )
+                    }
+                    if (list.isNotEmpty()) return list
+                } catch (_: Exception) {}
+            }
+            // 2. Fallback to legacy delimiter parsing (;;; and |||)
             return try {
-                jsonStr.split(";;;").filter { it.isNotBlank() }.map { chunk ->
+                trimmed.split(";;;").filter { it.isNotBlank() }.map { chunk ->
                     val p = chunk.split("|||")
                     SpecialOfferEntity(
                         id = p.getOrElse(0) { "" },
@@ -415,19 +477,38 @@ data class SpecialOfferEntity(
         }
 
         fun serializeList(list: List<SpecialOfferEntity>): String {
-            return list.joinToString(";;;") { offer ->
-                listOf(
-                    offer.id,
-                    offer.title,
-                    offer.description,
-                    offer.discountPercent.toString(),
-                    offer.originalPrice.toString(),
-                    offer.offerPrice.toString(),
-                    offer.expiryDate,
-                    offer.isEnabled.toString(),
-                    offer.providerId,
-                    offer.couponCode
-                ).joinToString("|||")
+            return try {
+                val jsonArray = org.json.JSONArray()
+                for (offer in list) {
+                    val obj = org.json.JSONObject()
+                    obj.put("id", offer.id)
+                    obj.put("providerId", offer.providerId)
+                    obj.put("title", offer.title)
+                    obj.put("description", offer.description)
+                    obj.put("discountPercent", offer.discountPercent)
+                    obj.put("originalPrice", offer.originalPrice)
+                    obj.put("offerPrice", offer.offerPrice)
+                    obj.put("expiryDate", offer.expiryDate)
+                    obj.put("couponCode", offer.couponCode)
+                    obj.put("isEnabled", offer.isEnabled)
+                    jsonArray.put(obj)
+                }
+                jsonArray.toString()
+            } catch (_: Exception) {
+                list.joinToString(";;;") { offer ->
+                    listOf(
+                        offer.id,
+                        offer.title,
+                        offer.description,
+                        offer.discountPercent.toString(),
+                        offer.originalPrice.toString(),
+                        offer.offerPrice.toString(),
+                        offer.expiryDate,
+                        offer.isEnabled.toString(),
+                        offer.providerId,
+                        offer.couponCode
+                    ).joinToString("|||")
+                }
             }
         }
     }

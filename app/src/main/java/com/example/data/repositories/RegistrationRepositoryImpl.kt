@@ -2,7 +2,6 @@ package com.example.data.repositories
 
 import android.content.Context
 import android.util.Log
-import com.example.data.LocalAppCacheManager
 import com.example.data.models.JoinRequestEntity
 import com.example.data.NotificationEntity
 import com.example.domain.entities.JoinStatusEntity
@@ -27,7 +26,6 @@ class RegistrationRepositoryImpl(
 ) : IRegistrationRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
-    private val cacheManager = LocalAppCacheManager(context)
     private val deduplicator = NotificationDeduplicator(context)
 
     private suspend fun checkExistingPendingRequest(phone: String): Boolean {

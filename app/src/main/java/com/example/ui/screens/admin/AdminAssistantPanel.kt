@@ -30,6 +30,7 @@ import com.example.ui.MainViewModel
 import com.example.utils.AiAssistantEngine
 import com.example.utils.AiResponse
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 
 /**
  * 🤖 لوحة إدارة المساعد الذكي وقاموس الصيانة اليمني (Admin Assistant Panel)
@@ -42,6 +43,7 @@ fun AdminAssistantPanel(
 ) {
     val context = LocalContext.current
     val aiEngine = remember { AiAssistantEngine(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     var testQuery by remember { mutableStateOf("") }
     var testResult by remember { mutableStateOf<AiResponse?>(null) }
@@ -120,8 +122,10 @@ fun AdminAssistantPanel(
                         IconButton(
                             onClick = {
                                 if (testQuery.isNotBlank()) {
-                                    aiEngine.queryAssistant(testQuery) { resp ->
-                                        testResult = resp
+                                    coroutineScope.launch {
+                                        aiEngine.queryAssistant(testQuery) { resp ->
+                                            testResult = resp
+                                        }
                                     }
                                 }
                             }
@@ -140,8 +144,10 @@ fun AdminAssistantPanel(
                         AssistChip(
                             onClick = {
                                 testQuery = prompt
-                                aiEngine.queryAssistant(prompt) { resp ->
-                                    testResult = resp
+                                coroutineScope.launch {
+                                    aiEngine.queryAssistant(prompt) { resp ->
+                                        testResult = resp
+                                    }
                                 }
                             },
                             label = { Text(prompt, fontSize = 10.sp, color = Color.White) },
