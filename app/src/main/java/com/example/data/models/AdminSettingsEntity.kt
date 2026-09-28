@@ -39,6 +39,7 @@ data class AdminSettingsEntity(
     val supportEmail: String = "",
     val adminUsername: String = "",
     val ownerEmail: String = "",
+    @Deprecated("Use SecureAdminStorage / ownerPasswordHash instead")
     @get:com.google.firebase.firestore.Exclude
     val ownerPassword: String = "",
     
@@ -160,6 +161,7 @@ data class AdminSettingsEntity(
     // About App customization fields
     val aboutCoverType: String = "IMAGE", // IMAGE, VIDEO, TEXT
     val aboutCoverContent: String = "https://images.unsplash.com/photo-1542435503-956c469947f6?auto=format&fit=crop&w=600&q=80",
+    // TODO: Migrate to FirebaseStorageUploader
     val aboutCoverBase64: String = "",
     val aboutCustomInfo: String = "تطبيق دليل خدمات اليمن الذكي هو منصة متكاملة مخصصة لربط المستخدمين والعملاء بأمهر الفنيين، المهندسين، ومقدمي الخدمات في شتى المجالات والصيانة في مختلف محافظات الجمهورية اليمنية بسهولة وسرعة فائقة.",
 
@@ -167,6 +169,7 @@ data class AdminSettingsEntity(
     val bannerEnabled: Boolean = false,
     val bannerType: String = "TEXT", // "TEXT", "IMAGE", "VIDEO"
     val bannerContent: String = "",
+    // TODO: Migrate to FirebaseStorageUploader
     val bannerBase64: String = "",
     val bannerLocation: String = "TOP", // "TOP", "BOTTOM"
     val bannerDurationSeconds: Int = 10, // 0 for persistent, otherwise duration in seconds

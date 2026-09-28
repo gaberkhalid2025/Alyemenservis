@@ -40,7 +40,7 @@ class GetAvailableSlotsUseCase {
     ): List<TimeSlot> {
         val cleanDate = selectedDateString.trim()
         val bookedTimesOnDate = existingBookings
-            .filter { it.providerId == providerId && (it.date == cleanDate || it.dateString == cleanDate) && it.status in listOf("PENDING", "APPROVED") }
+            .filter { it.providerId == providerId && (it.date == cleanDate || it.dateString == cleanDate) && com.example.utils.BookingStateMachine.isSlotOccupiedStatus(it.status) }
             .map { it.time.ifBlank { it.timeString }.trim() }
             .toSet()
 

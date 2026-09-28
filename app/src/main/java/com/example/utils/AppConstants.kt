@@ -28,5 +28,10 @@ object AppConstants {
     const val COL_JOBS = "jobs"
     const val COL_NOTIFICATIONS = "notifications"
     const val COL_USERS = "registered_users"
-    const val COL_PENDING = "pending_approvals"
+    const val COL_PENDING = "pending_providers"
+    const val COL_JOIN_REQUESTS = "join_requests"
+    const val COL_BOOKINGS = "bookings"
+    const val COL_INSTANT_REQUESTS = "instant_requests"
+    const val COL_REVIEWS = "reviews"
+    const val COL_PRODUCTS = "products"
 }

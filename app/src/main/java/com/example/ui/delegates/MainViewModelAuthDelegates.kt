@@ -297,6 +297,10 @@ fun MainViewModel.searchAccountForRestore(cleanPhone: String, onResult: (MainVie
     accountRecoveryHelper.searchAccountForRestore(cleanPhone, onResult)
 }
 
+fun MainViewModel.verifyRestorePassword(cleanPhone: String, accountType: String, passwordInput: String, onResult: (Boolean) -> Unit) {
+    accountRecoveryHelper.verifyRestorePassword(cleanPhone, accountType, passwordInput, onResult)
+}
+
 fun MainViewModel.requestPasswordReset(
     context: Context,
     phone: String,

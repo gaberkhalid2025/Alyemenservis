@@ -49,7 +49,7 @@ class ChatLocalDataSource(
 
     init {
         migrateLegacyChatData()
-        val initialChannels = getCachedChannelsInternal()
+        val initialChannels = kotlinx.coroutines.runBlocking(ioDispatcher) { getCachedChannelsInternal() }
         channelsMemoryCache.value = initialChannels
     }
 
@@ -108,14 +108,28 @@ class ChatLocalDataSource(
     }
 
     suspend fun saveChannels(channels: List<ChatChannel>) = withContext(ioDispatcher) {
-        val encryptedChannels = channels.map { ch ->
-            if (ch.lastMessage.isNotBlank()) {
-                ch.copy(lastMessage = SecurityCryptoUtils.encrypt(ch.lastMessage))
-            } else ch
+        try {
+            val strListAdapter = moshi.adapter<List<String>>(Types.newParameterizedType(List::class.java, String::class.java))
+            val mapAdapter = moshi.adapter<Map<String, Int>>(Types.newParameterizedType(Map::class.java, String::class.java, Int::class.javaObjectType))
+            val roomChannels = channels.map { ch ->
+                val encLastMsg = if (ch.lastMessage.isNotBlank()) SecurityCryptoUtils.encrypt(ch.lastMessage) else ""
+                ChatChannelRoomEntity(
+                    id = ch.id,
+                    title = ch.title,
+                    type = ch.type.name,
+                    participantsJson = strListAdapter.toJson(ch.participants),
+                    lastMessage = if (encLastMsg.isNotEmpty()) encLastMsg else ch.lastMessage,
+                    lastMessageTime = ch.lastMessageTime,
+                    lastMessageSenderId = ch.lastMessageSenderId,
+                    unreadCountJson = mapAdapter.toJson(ch.unreadCount),
+                    syncStatus = ch.syncStatus.name,
+                    updatedAt = ch.updatedAt
+                )
+            }
+            chatDao.insertChannels(roomChannels)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        val json = channelsListAdapter.toJson(encryptedChannels)
-        val encryptedPayload = SecurityCryptoUtils.encrypt(json)
-        prefs.edit().putString(KEY_CHANNELS, encryptedPayload).apply()
         channelsMemoryCache.value = channels
     }
 
@@ -132,9 +146,15 @@ class ChatLocalDataSource(
     }
 
     suspend fun deleteChannel(channelId: String) = withContext(ioDispatcher) {
+        try {
+            chatDao.deleteChannel(channelId)
+            chatDao.deleteMessagesByChannel(channelId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         val current = getCachedChannelsInternal().filter { it.id != channelId }
-        saveChannels(current)
-        prefs.edit().remove(KEY_PREFIX_MESSAGES + channelId).remove(KEY_PREFIX_SYNC_TIME + channelId).apply()
+        channelsMemoryCache.value = current
+        prefs.edit().remove(KEY_PREFIX_SYNC_TIME + channelId).apply()
         messagesMemoryCache.remove(channelId)
     }
 
@@ -145,19 +165,31 @@ class ChatLocalDataSource(
         presenceMemoryCache.clear()
     }
 
-    private fun getCachedChannelsInternal(): List<ChatChannel> {
-        val raw = prefs.getString(KEY_CHANNELS, null) ?: return emptyList()
+    private suspend fun getCachedChannelsInternal(): List<ChatChannel> {
         return try {
-            val decryptedJson = if (raw.startsWith("{") || raw.startsWith("[")) raw else SecurityCryptoUtils.decrypt(raw)
-            val list = channelsListAdapter.fromJson(decryptedJson) ?: emptyList()
-            list.map { ch ->
-                if (ch.lastMessage.isNotBlank() && (ch.lastMessage.startsWith("enc_gcm::") || ch.lastMessage.startsWith("enc::"))) {
-                    try {
-                        ch.copy(lastMessage = SecurityCryptoUtils.decrypt(ch.lastMessage))
-                    } catch (_: Exception) {
-                        ch
-                    }
-                } else ch
+            val roomChannels = chatDao.getAllChannelsList()
+            if (roomChannels.isNotEmpty()) {
+                val strListAdapter = moshi.adapter<List<String>>(Types.newParameterizedType(List::class.java, String::class.java))
+                val mapAdapter = moshi.adapter<Map<String, Int>>(Types.newParameterizedType(Map::class.java, String::class.java, Int::class.javaObjectType))
+                roomChannels.map { entity ->
+                    val decLastMsg = if (entity.lastMessage.isNotBlank()) {
+                        try { SecurityCryptoUtils.decrypt(entity.lastMessage) } catch (_: Exception) { entity.lastMessage }
+                    } else ""
+                    ChatChannel(
+                        id = entity.id,
+                        title = entity.title,
+                        type = try { ChannelType.valueOf(entity.type) } catch (_: Exception) { ChannelType.PRIVATE },
+                        participants = try { strListAdapter.fromJson(entity.participantsJson) ?: emptyList() } catch (_: Exception) { emptyList() },
+                        lastMessage = decLastMsg,
+                        lastMessageTime = entity.lastMessageTime,
+                        lastMessageSenderId = entity.lastMessageSenderId,
+                        unreadCount = try { mapAdapter.fromJson(entity.unreadCountJson) ?: emptyMap() } catch (_: Exception) { emptyMap() },
+                        syncStatus = try { SyncStatus.valueOf(entity.syncStatus) } catch (_: Exception) { SyncStatus.SYNCED },
+                        updatedAt = entity.updatedAt
+                    )
+                }
+            } else {
+                emptyList()
             }
         } catch (e: Exception) {
             emptyList()
@@ -170,7 +202,7 @@ class ChatLocalDataSource(
 
     fun observeMessages(channelId: String): Flow<List<ChatMessage>> {
         val flow = messagesMemoryCache.getOrPut(channelId) {
-            val initial = getCachedMessagesInternal(channelId)
+            val initial = kotlinx.coroutines.runBlocking(ioDispatcher) { getCachedMessagesInternal(channelId) }
             MutableStateFlow(initial)
         }
         return flow.asStateFlow()
@@ -181,12 +213,30 @@ class ChatLocalDataSource(
     }
 
     suspend fun saveMessages(channelId: String, messages: List<ChatMessage>) = withContext(ioDispatcher) {
-        // Sort and decrypt if needed
         val sorted = messages.sortedBy { it.timestamp }
-        val json = messagesListAdapter.toJson(sorted)
-        // Store encrypted payload with randomized IV
-        val encrypted = ChatCryptoManager.encrypt(json, "ChatLocalKey_$channelId")
-        prefs.edit().putString(KEY_PREFIX_MESSAGES + channelId, encrypted).apply()
+        try {
+            val roomMessages = sorted.map { msg ->
+                val encText = if (msg.message.isNotBlank()) SecurityCryptoUtils.encrypt(msg.message) else ""
+                ChatMessageRoomEntity(
+                    id = msg.id,
+                    channelId = msg.channelId.ifBlank { channelId },
+                    senderId = msg.senderId,
+                    senderName = msg.senderName,
+                    senderPhoto = msg.senderPhoto,
+                    message = if (encText.isNotEmpty()) encText else msg.message,
+                    mediaType = msg.mediaType.name,
+                    mediaUrl = msg.mediaUrl,
+                    status = msg.status.name,
+                    isEncrypted = true,
+                    timestamp = msg.timestamp,
+                    syncStatus = msg.syncStatus.name
+                )
+            }
+            chatDao.deleteMessagesByChannel(channelId)
+            chatDao.insertMessages(roomMessages)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // Update in-memory stream
         val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
@@ -215,6 +265,11 @@ class ChatLocalDataSource(
     }
 
     suspend fun deleteMessage(channelId: String, messageId: String) = withContext(ioDispatcher) {
+        try {
+            chatDao.deleteMessage(messageId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         val current = getCachedMessagesInternal(channelId).filter { it.id != messageId }
         saveMessages(channelId, current)
     }
@@ -234,16 +289,31 @@ class ChatLocalDataSource(
         }
     }
 
-    private fun getCachedMessagesInternal(channelId: String): List<ChatMessage> {
-        val rawEncrypted = prefs.getString(KEY_PREFIX_MESSAGES + channelId, null) ?: return emptyList()
+    private suspend fun getCachedMessagesInternal(channelId: String): List<ChatMessage> {
         return try {
-            val decrypted = if (rawEncrypted.startsWith("enc::")) {
-                ChatCryptoManager.decrypt(rawEncrypted, "ChatLocalKey_$channelId")
-            } else {
-                SecurityCryptoUtils.decrypt(rawEncrypted)
-            }
-            if (decrypted.isNotBlank() && decrypted != "[]") {
-                messagesListAdapter.fromJson(decrypted) ?: emptyList()
+            val roomList = chatDao.getMessagesList(channelId)
+            if (roomList.isNotEmpty()) {
+                roomList.map { entity ->
+                    val decText = if (entity.isEncrypted && entity.message.isNotBlank()) {
+                        try { SecurityCryptoUtils.decrypt(entity.message) } catch (_: Exception) { entity.message }
+                    } else {
+                        entity.message
+                    }
+                    ChatMessage(
+                        id = entity.id,
+                        channelId = entity.channelId,
+                        senderId = entity.senderId,
+                        senderName = entity.senderName,
+                        senderPhoto = entity.senderPhoto,
+                        message = decText,
+                        mediaType = try { MediaType.valueOf(entity.mediaType) } catch (_: Exception) { MediaType.TEXT },
+                        mediaUrl = entity.mediaUrl,
+                        status = try { MessageStatus.valueOf(entity.status) } catch (_: Exception) { MessageStatus.SENT },
+                        isEncrypted = entity.isEncrypted,
+                        timestamp = entity.timestamp,
+                        syncStatus = try { SyncStatus.valueOf(entity.syncStatus) } catch (_: Exception) { SyncStatus.SYNCED }
+                    )
+                }
             } else {
                 emptyList()
             }
@@ -257,19 +327,28 @@ class ChatLocalDataSource(
     // ==========================================
 
     suspend fun queuePendingMessage(message: ChatMessage) = withContext(ioDispatcher) {
-        val pending = getPendingMessagesInternal().toMutableList()
-        val index = pending.indexOfFirst { it.id == message.id }
-        if (index >= 0) {
-            pending[index] = message
-        } else {
-            pending.add(message)
+        val pendingMsg = message.copy(status = MessageStatus.PENDING, syncStatus = SyncStatus.PENDING_UPLOAD)
+        try {
+            val encText = if (pendingMsg.message.isNotBlank()) SecurityCryptoUtils.encrypt(pendingMsg.message) else ""
+            val entity = ChatMessageRoomEntity(
+                id = pendingMsg.id,
+                channelId = pendingMsg.channelId,
+                senderId = pendingMsg.senderId,
+                senderName = pendingMsg.senderName,
+                senderPhoto = pendingMsg.senderPhoto,
+                message = if (encText.isNotEmpty()) encText else pendingMsg.message,
+                mediaType = pendingMsg.mediaType.name,
+                mediaUrl = pendingMsg.mediaUrl,
+                status = MessageStatus.PENDING.name,
+                isEncrypted = true,
+                timestamp = pendingMsg.timestamp,
+                syncStatus = SyncStatus.PENDING_UPLOAD.name
+            )
+            chatDao.insertMessage(entity)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        val json = messagesListAdapter.toJson(pending)
-        val encrypted = ChatCryptoManager.encrypt(json, "ChatLocalKey_PENDING")
-        prefs.edit().putString(KEY_OFFLINE_PENDING_MSGS, encrypted).apply()
-
-        // Also add to local channel messages as PENDING
-        insertOrUpdateMessage(message.copy(status = MessageStatus.PENDING, syncStatus = SyncStatus.PENDING_UPLOAD))
+        insertOrUpdateMessage(pendingMsg)
     }
 
     suspend fun getPendingMessages(): List<ChatMessage> = withContext(ioDispatcher) {
@@ -277,24 +356,37 @@ class ChatLocalDataSource(
     }
 
     suspend fun removePendingMessage(messageId: String) = withContext(ioDispatcher) {
-        val pending = getPendingMessagesInternal().filter { it.id != messageId }
-        val json = messagesListAdapter.toJson(pending)
-        val encrypted = ChatCryptoManager.encrypt(json, "ChatLocalKey_PENDING")
-        prefs.edit().putString(KEY_OFFLINE_PENDING_MSGS, encrypted).apply()
+        try {
+            chatDao.updateMessageSyncStatus(messageId, SyncStatus.SYNCED.name)
+            chatDao.updateMessageStatus(messageId, MessageStatus.SENT.name)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
-    private fun getPendingMessagesInternal(): List<ChatMessage> {
-        val rawEncrypted = prefs.getString(KEY_OFFLINE_PENDING_MSGS, null) ?: return emptyList()
+    private suspend fun getPendingMessagesInternal(): List<ChatMessage> {
         return try {
-            val decrypted = if (rawEncrypted.startsWith("enc::")) {
-                ChatCryptoManager.decrypt(rawEncrypted, "ChatLocalKey_PENDING")
-            } else {
-                SecurityCryptoUtils.decrypt(rawEncrypted)
-            }
-            if (decrypted.isNotBlank() && decrypted != "[]") {
-                messagesListAdapter.fromJson(decrypted) ?: emptyList()
-            } else {
-                emptyList()
+            val roomPending = chatDao.getPendingMessagesList(SyncStatus.PENDING_UPLOAD.name, MessageStatus.PENDING.name)
+            roomPending.map { entity ->
+                val decText = if (entity.isEncrypted && entity.message.isNotBlank()) {
+                    try { SecurityCryptoUtils.decrypt(entity.message) } catch (_: Exception) { entity.message }
+                } else {
+                    entity.message
+                }
+                ChatMessage(
+                    id = entity.id,
+                    channelId = entity.channelId,
+                    senderId = entity.senderId,
+                    senderName = entity.senderName,
+                    senderPhoto = entity.senderPhoto,
+                    message = decText,
+                    mediaType = try { MediaType.valueOf(entity.mediaType) } catch (_: Exception) { MediaType.TEXT },
+                    mediaUrl = entity.mediaUrl,
+                    status = try { MessageStatus.valueOf(entity.status) } catch (_: Exception) { MessageStatus.PENDING },
+                    isEncrypted = entity.isEncrypted,
+                    timestamp = entity.timestamp,
+                    syncStatus = try { SyncStatus.valueOf(entity.syncStatus) } catch (_: Exception) { SyncStatus.PENDING_UPLOAD }
+                )
             }
         } catch (e: Exception) {
             emptyList()

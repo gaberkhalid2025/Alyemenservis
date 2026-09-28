@@ -17,16 +17,14 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * 🔐 ChatCryptoManager
- * تشفير وفك تشفير الرسائل بتقنية AES-256-GCM الموثقة
- * لحماية خصوصية المحادثات وضمان التشفير التام (End-to-End Encryption - E2EE)
- * مع دعم التوافق العكسي للرسائل القديمة المشفرة بـ AES-CBC
+ * تشفير وفك تشفير الرسائل بتقنية AES-256-GCM الموثقة لتأمين الرسائل محلياً على الجهاز.
  */
 object ChatCryptoManager {
 
     private const val ALGORITHM_GCM = "AES/GCM/NoPadding"
     private const val LEGACY_ALGORITHM_CBC = "AES/CBC/PKCS5Padding"
-    private const val KEYSTORE_ALIAS_GCM = "WAM_Chat_E2EE_DeviceKey_GCM_2026"
-    private const val LEGACY_KEYSTORE_ALIAS = "WAM_Chat_E2EE_DeviceKey_2026"
+    private const val KEYSTORE_ALIAS_GCM = "WAM_Chat_LocalKey_GCM"
+    private const val LEGACY_KEYSTORE_ALIAS = "WAM_Chat_LocalKey"
     private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
     private const val PBKDF2_ITERATIONS = 10000
     private const val KEY_SIZE_BITS = 256

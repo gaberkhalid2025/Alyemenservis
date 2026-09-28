@@ -7,6 +7,7 @@ import com.example.domain.entities.FavoriteItemEntity
 import com.example.domain.entities.GalleryAlbumEntity
 import com.example.domain.entities.ProductItemEntity
 import com.example.domain.entities.RatingReviewEntity
+import com.example.utils.AppConstants
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.channels.awaitClose
@@ -32,10 +33,8 @@ class DashboardRepositoryImpl(
         }
 
         val collectionName = when (role.uppercase()) {
-            "PROVIDER", "TECHNICIAN" -> "users"
-            "STORE" -> "stores"
-            "RESTAURANT" -> "restaurants"
-            "MEDICAL" -> "medical_centers"
+            "PROVIDER", "TECHNICIAN" -> "providers"
+            "STORE", "RESTAURANT", "MEDICAL" -> "stores"
             "PROPERTY" -> "properties"
             "JOB" -> com.example.utils.AppConstants.COL_JOBS
             else -> "users"
@@ -175,7 +174,7 @@ class ProductsRepositoryImpl(
             return@callbackFlow
         }
 
-        val listener: ListenerRegistration = firestore.collection("products")
+        val listener: ListenerRegistration = firestore.collection(AppConstants.COL_PRODUCTS)
             .whereEqualTo("ownerId", ownerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -203,7 +202,7 @@ class ProductsRepositoryImpl(
     }
 
     override fun getAllAvailableProducts(): Flow<List<ProductItemEntity>> = callbackFlow {
-        val listener: ListenerRegistration = firestore.collection("products")
+        val listener: ListenerRegistration = firestore.collection(AppConstants.COL_PRODUCTS)
             .whereEqualTo("isAvailable", true)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -244,7 +243,7 @@ class ProductsRepositoryImpl(
                 "isAvailable" to product.isAvailable,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("products").document(id).set(map).await()
+            firestore.collection(AppConstants.COL_PRODUCTS).document(id).set(map).await()
             Result.success(id)
         } catch (e: Exception) {
             Result.failure(e)
@@ -261,7 +260,7 @@ class ProductsRepositoryImpl(
                 "imageUrl" to product.imageUrl,
                 "isAvailable" to product.isAvailable
             )
-            firestore.collection("products").document(product.id).update(map).await()
+            firestore.collection(AppConstants.COL_PRODUCTS).document(product.id).update(map).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -270,7 +269,7 @@ class ProductsRepositoryImpl(
 
     override suspend fun deleteProduct(productId: String): Result<Unit> {
         return try {
-            firestore.collection("products").document(productId).delete().await()
+            firestore.collection(AppConstants.COL_PRODUCTS).document(productId).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -331,7 +330,7 @@ class RatingsRepositoryImpl(
 
     override suspend fun addRating(rating: RatingReviewEntity): Result<String> {
         return try {
-            val id = rating.id.ifBlank { UUID.randomUUID().toString() }
+            val id = rating.id.ifBlank { com.example.utils.EntityIdGenerator.generateReviewId() }
             val now = if (rating.dateTimestamp > 0L) rating.dateTimestamp else System.currentTimeMillis()
             val map = mapOf(
                 "id" to id,

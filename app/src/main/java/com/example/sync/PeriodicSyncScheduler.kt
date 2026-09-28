@@ -21,7 +21,11 @@ class PeriodicSyncScheduler(private val context: Context) {
             .setConstraints(constraints)
             .build()
 
-        WorkManager.getInstance(context).enqueue(syncWorkRequest)
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "periodic_sync_work",
+            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            syncWorkRequest
+        )
     }
 }
 

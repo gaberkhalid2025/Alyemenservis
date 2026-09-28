@@ -36,6 +36,7 @@ data class JobApplicationEntity(
     val applicantName: String = "",
     val applicantPhone: String = "",
     val applicantQuals: String = "",
+    // TODO: Migrate to FirebaseStorageUploader
     val cvBase64: String = "",
     val status: String = "PENDING",
     val rejectionReason: String = "",

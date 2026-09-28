@@ -170,7 +170,7 @@ object SecureAdminStorage {
      * 🛡️ التحقق من كلمة المرور عبر البصمة (PBKDF2) وترقية الحسابات القديمة تلقائياً في Firestore
      * عند أول تسجيل دخول ناجح لأي حساب قديم مخزن كنص، يتم تحويله إلى بصمة مشفرة وتحديث Firestore فوراً
      */
-    fun verifyAndMigrate(
+    suspend fun verifyAndMigrate(
         docRef: com.google.firebase.firestore.DocumentReference?,
         inputPassword: String,
         storedPassOrHash: String,
@@ -186,11 +186,25 @@ object SecureAdminStorage {
         if (isValid && docRef != null) {
             // إذا كانت كلمة المرور القديمة نصاً عادياً لا يحتوي على ملوحة (salt separator ":")
             if (!cleanStored.contains(":")) {
-                try {
-                    val newHash = SecureHasher.hashPassword(cleanInput)
-                    docRef.update(fieldName, newHash)
-                } catch (e: Exception) {
-                    android.util.Log.e("SecureAdminStorage", "Automatic hash migration in Firestore failed", e)
+                val newHash = SecureHasher.hashPassword(cleanInput)
+                var attempts = 0
+                var success = false
+                while (attempts < 3 && !success) {
+                    try {
+                        docRef.update(fieldName, newHash).addOnSuccessListener {}.addOnFailureListener {}
+                        // Use Tasks await if available or background coroutine
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            com.google.android.gms.tasks.Tasks.await(docRef.update(fieldName, newHash))
+                        }
+                        success = true
+                    } catch (e: Exception) {
+                        attempts++
+                        if (attempts >= 3) {
+                            android.util.Log.e("SecureAdminStorage", "Automatic hash migration in Firestore failed after $attempts attempts", e)
+                        } else {
+                            kotlinx.coroutines.delay(300L * attempts)
+                        }
+                    }
                 }
             }
         }

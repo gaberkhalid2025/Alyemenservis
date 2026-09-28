@@ -21,7 +21,7 @@ class RegisterProviderUseCase(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(provider.passwordHash)
+        val passCheck = validatePassword(provider.rawPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }

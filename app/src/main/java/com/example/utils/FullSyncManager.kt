@@ -12,12 +12,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
+import javax.inject.Inject
+import javax.inject.Singleton
+
 /**
  * 🔄 FullSyncManager
  * المركز الرئيسي لإدارة المزامنة الشاملة وحفظ واسترجاع إعدادات الأدمن، الثيمات،
  * واستمارات التسجيل وحقولها من وإلى Firebase Firestore مع التخزين المحلي الدائم.
  */
-class FullSyncManager(private val context: Context) {
+@Singleton
+class FullSyncManager @Inject constructor(
+    private val context: Context
+) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val prefs: SharedPreferences = context.getSharedPreferences("app_sync_manager_prefs", Context.MODE_PRIVATE)

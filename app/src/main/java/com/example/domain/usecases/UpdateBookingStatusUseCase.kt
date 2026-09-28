@@ -11,11 +11,17 @@ class UpdateBookingStatusUseCase(private val bookingRepository: BookingRepositor
     operator fun invoke(
         bookingId: String,
         newStatus: String,
+        currentStatus: String = "",
+        userRole: String = "USER",
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
         if (bookingId.isBlank()) {
             onError("معرف الحجز غير صالح")
+            return
+        }
+        if (currentStatus.isNotBlank() && !com.example.utils.BookingStateMachine.canTransition(currentStatus, newStatus)) {
+            onError("انتقال غير مسموح من الحالة ($currentStatus) إلى ($newStatus)")
             return
         }
         bookingRepository.updateBookingStatus(

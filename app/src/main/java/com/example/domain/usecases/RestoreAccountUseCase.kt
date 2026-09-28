@@ -12,7 +12,7 @@ class RestoreAccountUseCase @Inject constructor() {
         phone: String,
         onResult: (RestoreAccountMatch?) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
         recoveryHelper.searchAccountForRestore(cleanPhone, onResult)
     }
 }

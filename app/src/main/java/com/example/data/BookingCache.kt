@@ -4,8 +4,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 🗄️ BookingCache
- * ذاكرة مؤقتة لطلبات الحجوزات مع صلاحية TTL مدتها 5 دقائق لتقليل استعلامات القراءة المفرطة في Firestore
+ * ذاكرة مؤقتة لطلبات الحجوزات (تم تفضيل Room Database كمصدر محلي رئيسي)
  */
+@Deprecated("تم اعتماد Room Database (BookingDao) كمصدر محلي وحيد ودائم للحجوزات")
 class BookingCache {
     private val cache = ConcurrentHashMap<String, Pair<Long, List<BookingEntity>>>()
     private val TTL = 5 * 60 * 1000L // 5 دقائق

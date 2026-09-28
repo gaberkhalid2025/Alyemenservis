@@ -41,6 +41,7 @@ data class FavoriteItemEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Deprecated("استخدم RatingEntity كنموذج موحد للتقييمات", ReplaceWith("RatingEntity"))
 data class RatingReviewEntity(
     val id: String = "",
     val targetId: String = "",

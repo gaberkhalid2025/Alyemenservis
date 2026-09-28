@@ -81,7 +81,7 @@ class RegistrationHelper(
         onJoinRequestPhoneUpdated: (String) -> Unit,
         onNavigateToScreen: (String) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
         val duplicateType = checkDuplicate(cleanPhone)
         if (duplicateType != null) {
             triggerNotification("❌ عذراً! رقم الهاتف ($phone) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
@@ -319,7 +319,7 @@ class RegistrationHelper(
         password: String = "",
         onClientAdded: (Map<String, Any>) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
         val currentAuthUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val hashedPassword = if (password.isNotBlank()) com.example.utils.PasswordHasher.hash(password.trim()) else ""
         val userMap = mapOf(
@@ -349,10 +349,10 @@ class RegistrationHelper(
         onPhoneCleared: () -> Unit,
         onGoBack: () -> Boolean
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
         if (cleanPhone.isNotEmpty()) {
             val matching = pendingProviders.find { 
-                it.phone.trim().replace(" ", "").replace("+", "") == cleanPhone || it.id == cleanPhone || it.id == phone 
+                com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.phone) == cleanPhone || it.id == cleanPhone || it.id == phone 
             }
             matching?.let {
                 onPendingRemoved(it.id)

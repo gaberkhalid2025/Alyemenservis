@@ -25,6 +25,7 @@ data class ProviderEntity(
     val latitude: Double = 15.3694,
     val longitude: Double = 44.1910,
     val subscriptionExpiry: Long = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
+    // TODO: Migrate to FirebaseStorageUploader
     val workPhotosBase64: List<String> = emptyList(),
     val productAttachmentsJson: String = "",
     val specialOffersJson: String = "",
@@ -55,8 +56,11 @@ data class PendingProviderEntity(
     val localNeighborhood: String = "",
     val status: String = "PENDING",
     val reason: String = "",
+    // TODO: Migrate to FirebaseStorageUploader
     val idPhotoBase64: String = "",
+    // TODO: Migrate to FirebaseStorageUploader
     val selfiePhotoBase64: String = "",
+    // TODO: Migrate to FirebaseStorageUploader
     val workPhotosBase64: List<String> = emptyList(),
     val productAttachmentsJson: String = "",
     val customCategoryName: String = "",

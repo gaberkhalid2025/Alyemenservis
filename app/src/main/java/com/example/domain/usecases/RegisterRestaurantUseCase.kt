@@ -35,7 +35,7 @@ class RegisterRestaurantUseCase(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(restaurant.passwordHash)
+        val passCheck = validatePassword(restaurant.rawPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }

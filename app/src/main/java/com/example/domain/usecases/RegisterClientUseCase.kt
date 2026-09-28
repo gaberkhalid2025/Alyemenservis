@@ -21,7 +21,7 @@ class RegisterClientUseCase(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(client.passwordHash)
+        val passCheck = validatePassword(client.rawPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }

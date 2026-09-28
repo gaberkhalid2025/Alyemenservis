@@ -35,7 +35,7 @@ class RegisterJobPosterUseCase(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(job.passwordHash)
+        val passCheck = validatePassword(job.rawPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }

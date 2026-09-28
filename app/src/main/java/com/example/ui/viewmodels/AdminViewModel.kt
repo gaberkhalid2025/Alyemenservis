@@ -2108,7 +2108,14 @@ fun refundPayment(paymentId: String, reason: String) {
 
 fun saveProduct(product: com.example.data.ProductEntity) {
         val targetId = if (product.id.isEmpty()) db.collection("products").document().id else product.id
-        val localProduct = product.copy(id = targetId)
+        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+        val resolvedStoreId = product.storeId.ifEmpty { currentUserId }
+        val resolvedOwnerId = product.ownerId.ifEmpty { currentUserId.ifEmpty { resolvedStoreId } }
+        val localProduct = product.copy(
+            id = targetId,
+            storeId = resolvedStoreId,
+            ownerId = resolvedOwnerId
+        )
         
         // Instant Local State Sync
         val currentProds = _products.value.filter { it.id != targetId }.toMutableList()
@@ -2118,10 +2125,15 @@ fun saveProduct(product: com.example.data.ProductEntity) {
         viewModelScope.launch {
             val ctx = appContext
             val finalImg = if (ctx != null && product.imageUrl.isNotEmpty() && !product.imageUrl.startsWith("http")) {
-                uploadImageStringOrUri(ctx, product.imageUrl, com.example.utils.FirebaseStorageUploader.getStoreProductPath(product.storeId.ifEmpty { "general" }, targetId))
+                uploadImageStringOrUri(ctx, product.imageUrl, com.example.utils.FirebaseStorageUploader.getStoreProductPath(resolvedStoreId.ifEmpty { "general" }, targetId))
             } else product.imageUrl
 
-            val finalProduct = product.copy(id = targetId, imageUrl = finalImg)
+            val finalProduct = product.copy(
+                id = targetId,
+                storeId = resolvedStoreId,
+                ownerId = resolvedOwnerId,
+                imageUrl = finalImg
+            )
             db.collection("products").document(targetId).set(finalProduct)
                 .addOnSuccessListener {
                     mainViewModel.triggerNotification("✅ تم حفظ المنتج بنجاح!")

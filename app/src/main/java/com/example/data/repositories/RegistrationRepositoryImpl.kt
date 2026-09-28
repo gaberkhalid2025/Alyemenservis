@@ -6,7 +6,9 @@ import com.example.data.models.JoinRequestEntity
 import com.example.data.NotificationEntity
 import com.example.domain.entities.JoinStatusEntity
 import com.example.domain.entities.RegistrationEntity
+import com.example.domain.usecases.ValidatePhoneUseCase
 import com.example.security.BookingSecurityHelper
+import com.example.utils.AppConstants
 import com.example.utils.NotificationDeduplicator
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -29,14 +31,39 @@ class RegistrationRepositoryImpl(
     private val deduplicator = NotificationDeduplicator(context)
 
     private suspend fun checkExistingPendingRequest(phone: String): Boolean {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
         if (cleanPhone.isBlank()) return false
-        val snap = firestore.collection("join_requests")
+        
+        // 1. Check join_requests
+        val snap = firestore.collection(AppConstants.COL_JOIN_REQUESTS)
             .whereEqualTo("phone", cleanPhone)
             .whereEqualTo("status", "PENDING")
             .get()
             .await()
-        return !snap.isEmpty
+        if (!snap.isEmpty) return true
+
+        // 2. Check users
+        val userSnap = firestore.collection("users")
+            .document(cleanPhone)
+            .get()
+            .await()
+        if (userSnap.exists()) return true
+
+        // 3. Check providers
+        val providerSnap = firestore.collection("providers")
+            .whereEqualTo("phone", cleanPhone)
+            .get()
+            .await()
+        if (!providerSnap.isEmpty) return true
+
+        // 4. Check stores
+        val storeSnap = firestore.collection("stores")
+            .whereEqualTo("phone", cleanPhone)
+            .get()
+            .await()
+        if (!storeSnap.isEmpty) return true
+
+        return false
     }
 
     private suspend fun sendAdminJoinNotification(requestId: String, applicantName: String, phone: String, type: String) {
@@ -88,8 +115,8 @@ class RegistrationRepositoryImpl(
                 createdAt = System.currentTimeMillis()
             )
 
-            firestore.collection("notifications").document(notifId).set(notification).await()
-            firestore.collection("notifications").document(userNotifId).set(userNotification).await()
+            firestore.collection(AppConstants.COL_NOTIFICATIONS).document(notifId).set(notification).await()
+            firestore.collection(AppConstants.COL_NOTIFICATIONS).document(userNotifId).set(userNotification).await()
             deduplicator.markJoinNotificationSent(requestId, "JOIN_REQUEST")
         } catch (e: Exception) {
             Log.e("RegistrationRepository", "Failed to send join notifications", e)
@@ -98,14 +125,14 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerClient(client: RegistrationEntity.Client): Result<String> {
         return try {
-            val cleanPhone = client.phone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = ValidatePhoneUseCase.normalizePhone(client.phone)
             if (checkExistingPendingRequest(cleanPhone)) {
-                return Result.failure(Exception("يوجد طلب تسجيل قيد المراجعة بالفعل لرقم الهاتف هذا"))
+                return Result.failure(Exception("يوجد طلب تسجيل أو حساب مسجل بالفعل لرقم الهاتف هذا"))
             }
 
-            val id = UUID.randomUUID().toString()
+            val id = "${cleanPhone}_CLIENT"
             val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
-            val hashedPassword = com.example.utils.PasswordHasher.hash(client.passwordHash)
+            val hashedPassword = com.example.utils.PasswordHasher.hash(client.rawPassword)
             val request = JoinRequestEntity(
                 id = id,
                 type = "CLIENT",
@@ -139,20 +166,6 @@ class RegistrationRepositoryImpl(
                 "updatedAt" to System.currentTimeMillis()
             )
 
-            // Store client data in "users" and "registered_users" collection
-            val userMap = mapOf(
-                "id" to cleanPhone,
-                "uid" to currentUid,
-                "userId" to currentUid,
-                "name" to client.fullName.trim(),
-                "phone" to cleanPhone,
-                "city" to client.city.trim(),
-                "role" to "CLIENT",
-                "password" to hashedPassword,
-                "isBlocked" to false,
-                "createdAt" to System.currentTimeMillis()
-            )
-
             val pendingMap = mapOf(
                 "id" to id,
                 "name" to client.fullName.trim(),
@@ -162,15 +175,23 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "CLIENT",
                 "providerType" to "CLIENT",
+                "password" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
-            val batch = firestore.batch()
-            batch.set(firestore.collection("join_requests").document(id), requestMap)
-            batch.set(firestore.collection("users").document(cleanPhone), userMap)
-            batch.set(firestore.collection("registered_users").document(cleanPhone), userMap)
-            batch.set(firestore.collection("pending_providers").document(id), pendingMap)
-            batch.commit().await()
+            firestore.runTransaction { transaction ->
+                val userRef = firestore.collection("users").document(cleanPhone)
+                val userDoc = transaction.get(userRef)
+                if (userDoc.exists()) {
+                    throw Exception("الحساب موجود بالفعل")
+                }
+
+                val reqRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id)
+                val pendRef = firestore.collection("pending_providers").document(id)
+
+                transaction.set(reqRef, requestMap)
+                transaction.set(pendRef, pendingMap)
+            }.await()
 
             sendAdminJoinNotification(id, request.fullName, cleanPhone, "CLIENT")
             Result.success(id)
@@ -182,13 +203,13 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerProvider(provider: RegistrationEntity.Provider): Result<String> {
         return try {
-            val cleanPhone = provider.phone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = ValidatePhoneUseCase.normalizePhone(provider.phone)
             if (checkExistingPendingRequest(cleanPhone)) {
                 return Result.failure(Exception("يوجد طلب انضمام مهني قيد المراجعة بالفعل لرقم الهاتف هذا"))
             }
 
-            val id = UUID.randomUUID().toString()
-            val hashedPassword = com.example.utils.PasswordHasher.hash(provider.passwordHash)
+            val id = "${cleanPhone}_PROVIDER"
+            val hashedPassword = com.example.utils.PasswordHasher.hash(provider.rawPassword)
             val request = JoinRequestEntity(
                 id = id,
                 type = "PROVIDER",
@@ -223,7 +244,7 @@ class RegistrationRepositoryImpl(
             )
 
             val batch = firestore.batch()
-            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id), request)
             batch.set(firestore.collection("pending_providers").document(id), pendingMap)
             batch.commit().await()
 
@@ -237,13 +258,13 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerStore(store: RegistrationEntity.Store): Result<String> {
         return try {
-            val cleanPhone = store.phone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = ValidatePhoneUseCase.normalizePhone(store.phone)
             if (checkExistingPendingRequest(cleanPhone)) {
                 return Result.failure(Exception("يوجد طلب انضمام متجر قيد المراجعة بالفعل لرقم الهاتف هذا"))
             }
 
-            val id = UUID.randomUUID().toString()
-            val hashedPassword = com.example.utils.PasswordHasher.hash(store.passwordHash)
+            val id = "${cleanPhone}_STORE"
+            val hashedPassword = com.example.utils.PasswordHasher.hash(store.rawPassword)
             val request = JoinRequestEntity(
                 id = id,
                 type = "STORE",
@@ -282,7 +303,7 @@ class RegistrationRepositoryImpl(
             )
 
             val batch = firestore.batch()
-            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id), request)
             batch.set(firestore.collection("pending_providers").document(id), pendingMap)
             batch.commit().await()
 
@@ -296,13 +317,13 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerRestaurant(restaurant: RegistrationEntity.Restaurant): Result<String> {
         return try {
-            val cleanPhone = restaurant.phone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = ValidatePhoneUseCase.normalizePhone(restaurant.phone)
             if (checkExistingPendingRequest(cleanPhone)) {
                 return Result.failure(Exception("يوجد طلب انضمام مطعم قيد المراجعة بالفعل لرقم الهاتف هذا"))
             }
 
-            val id = UUID.randomUUID().toString()
-            val hashedPassword = com.example.utils.PasswordHasher.hash(restaurant.passwordHash)
+            val id = "${cleanPhone}_RESTAURANT"
+            val hashedPassword = com.example.utils.PasswordHasher.hash(restaurant.rawPassword)
             val request = JoinRequestEntity(
                 id = id,
                 type = "RESTAURANT",
@@ -341,7 +362,7 @@ class RegistrationRepositoryImpl(
             )
 
             val batch = firestore.batch()
-            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id), request)
             batch.set(firestore.collection("pending_providers").document(id), pendingMap)
             batch.commit().await()
 
@@ -355,13 +376,13 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerMedicalCenter(medical: RegistrationEntity.MedicalCenter): Result<String> {
         return try {
-            val cleanPhone = medical.phone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = ValidatePhoneUseCase.normalizePhone(medical.phone)
             if (checkExistingPendingRequest(cleanPhone)) {
                 return Result.failure(Exception("يوجد طلب انضمام مركز طبي قيد المراجعة بالفعل لرقم الهاتف هذا"))
             }
 
-            val id = UUID.randomUUID().toString()
-            val hashedPassword = com.example.utils.PasswordHasher.hash(medical.passwordHash)
+            val id = "${cleanPhone}_MEDICAL"
+            val hashedPassword = com.example.utils.PasswordHasher.hash(medical.rawPassword)
             val request = JoinRequestEntity(
                 id = id,
                 type = "MEDICAL",
@@ -399,7 +420,7 @@ class RegistrationRepositoryImpl(
             )
 
             val batch = firestore.batch()
-            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id), request)
             batch.set(firestore.collection("pending_providers").document(id), pendingMap)
             batch.commit().await()
 
@@ -413,13 +434,13 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerProperty(property: RegistrationEntity.Property): Result<String> {
         return try {
-            val cleanPhone = property.phone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = ValidatePhoneUseCase.normalizePhone(property.phone)
             if (checkExistingPendingRequest(cleanPhone)) {
                 return Result.failure(Exception("يوجد طلب إضافة عقار قيد المراجعة بالفعل لرقم الهاتف هذا"))
             }
 
-            val id = UUID.randomUUID().toString()
-            val hashedPassword = com.example.utils.PasswordHasher.hash(property.passwordHash)
+            val id = "${cleanPhone}_PROPERTY"
+            val hashedPassword = com.example.utils.PasswordHasher.hash(property.rawPassword)
             val request = JoinRequestEntity(
                 id = id,
                 type = "PROPERTY",
@@ -459,7 +480,7 @@ class RegistrationRepositoryImpl(
             )
 
             val batch = firestore.batch()
-            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id), request)
             batch.set(firestore.collection("pending_providers").document(id), pendingMap)
             batch.commit().await()
 
@@ -473,13 +494,13 @@ class RegistrationRepositoryImpl(
 
     override suspend fun registerJob(job: RegistrationEntity.Job): Result<String> {
         return try {
-            val cleanPhone = job.contactPhone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = ValidatePhoneUseCase.normalizePhone(job.contactPhone)
             if (checkExistingPendingRequest(cleanPhone)) {
                 return Result.failure(Exception("يوجد إعلان توظيف قيد المراجعة بالفعل لرقم الهاتف هذا"))
             }
 
-            val id = UUID.randomUUID().toString()
-            val hashedPassword = com.example.utils.PasswordHasher.hash(job.passwordHash)
+            val id = "${cleanPhone}_JOB"
+            val hashedPassword = com.example.utils.PasswordHasher.hash(job.rawPassword)
             val request = JoinRequestEntity(
                 id = id,
                 type = "JOB",
@@ -514,7 +535,7 @@ class RegistrationRepositoryImpl(
             )
 
             val batch = firestore.batch()
-            batch.set(firestore.collection("join_requests").document(id), request)
+            batch.set(firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(id), request)
             batch.set(firestore.collection("pending_providers").document(id), pendingMap)
             batch.commit().await()
 
@@ -527,13 +548,13 @@ class RegistrationRepositoryImpl(
     }
 
     override fun getJoinStatusFlow(phoneNumber: String): Flow<JoinStatusEntity?> = callbackFlow {
-        val cleanPhone = phoneNumber.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phoneNumber)
         if (cleanPhone.isBlank()) {
             trySend(null)
             return@callbackFlow
         }
 
-        val listener: ListenerRegistration = firestore.collection("join_requests")
+        val listener: ListenerRegistration = firestore.collection(AppConstants.COL_JOIN_REQUESTS)
             .whereEqualTo("phone", cleanPhone)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {

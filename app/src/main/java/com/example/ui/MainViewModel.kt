@@ -544,8 +544,7 @@ class MainViewModel @Inject constructor(
         val name: String,
         val provider: com.example.data.ProviderEntity? = null,
         val store: com.example.data.StoreEntity? = null,
-        val property: com.example.data.PropertyEntity? = null,
-        val savedPassword: String = ""
+        val property: com.example.data.PropertyEntity? = null
     )
 
     /**

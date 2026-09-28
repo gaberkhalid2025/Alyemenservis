@@ -339,6 +339,7 @@ fun getDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double 
     return 6371.0 * c
 }
 
+@Deprecated("Use FirebaseStorageUploader")
 fun convertUriToBase64(context: Context, uri: Uri): String {
     return try {
         val inputStream = context.contentResolver.openInputStream(uri) ?: return uri.toString()

@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
 @Keep
+@Deprecated("استخدم RatingEntity كنموذج موحد للتقييمات", ReplaceWith("RatingEntity"))
 data class Review(
     val id: String = java.util.UUID.randomUUID().toString(),
     val shopId: String = "",
@@ -16,7 +17,18 @@ data class Review(
     val rating: Int = 5,
     val text: String = "",
     val timestamp: Long = System.currentTimeMillis()
-)
+) {
+    fun toRatingEntity(): RatingEntity = RatingEntity(
+        id = id,
+        targetId = shopId,
+        targetType = "STORE",
+        userId = userId,
+        userName = userName,
+        rating = rating.toFloat(),
+        comment = text,
+        timestamp = timestamp
+    )
+}
 
 object DataManager {
     private val firestore = FirebaseFirestore.getInstance()

@@ -6,6 +6,7 @@ import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
 import com.example.data.PendingProviderEntity
 import com.example.data.models.InstantRequestEntity
+import com.example.utils.AppConstants
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.channels.awaitClose
@@ -24,7 +25,7 @@ class StatusRepositoryImpl(
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun getSystemMetrics(): Flow<SystemStatusMetrics> = callbackFlow {
-        val listener: ListenerRegistration = firestore.collection("join_requests")
+        val listener: ListenerRegistration = firestore.collection(AppConstants.COL_JOIN_REQUESTS)
             .whereEqualTo("status", "PENDING")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -62,7 +63,7 @@ class StatusRepositoryImpl(
     override fun getSystemMetricsFlow(): Flow<SystemStatusMetrics> = getSystemMetrics()
 
     override fun getPendingJoinRequests(): Flow<List<PendingProviderEntity>> = callbackFlow {
-        val listener = firestore.collection("join_requests")
+        val listener = firestore.collection(AppConstants.COL_JOIN_REQUESTS)
             .whereEqualTo("status", "PENDING")
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -91,7 +92,7 @@ class StatusRepositoryImpl(
     override fun getPendingJoinRequestsFlow(): Flow<List<PendingProviderEntity>> = getPendingJoinRequests()
 
     override fun getSystemBookings(): Flow<List<BookingEntity>> = callbackFlow {
-        val listener = firestore.collection("bookings")
+        val listener = firestore.collection(AppConstants.COL_BOOKINGS)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -119,7 +120,7 @@ class StatusRepositoryImpl(
     override fun getSystemBookingsFlow(): Flow<List<BookingEntity>> = getSystemBookings()
 
     override fun getInstantRequests(): Flow<List<InstantRequestEntity>> = callbackFlow {
-        val listener = firestore.collection("instant_requests")
+        val listener = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -152,7 +153,7 @@ class StatusRepositoryImpl(
     override fun getInstantRequestsFlow(): Flow<List<InstantRequestEntity>> = getInstantRequests()
 
     override fun getNotifications(): Flow<List<NotificationEntity>> = callbackFlow {
-        val listener = firestore.collection("notifications")
+        val listener = firestore.collection(AppConstants.COL_NOTIFICATIONS)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -178,21 +179,17 @@ class StatusRepositoryImpl(
 
     override suspend fun approveJoinRequest(request: PendingProviderEntity): Result<Unit> {
         return try {
-            val requestDoc = firestore.collection("join_requests").document(request.id).get().await()
+            val requestDoc = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(request.id).get().await()
             val type = requestDoc.getString("type") ?: "PROVIDER"
-            val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+            val ownerId = requestDoc.getString("userId")?.takeIf { it.isNotBlank() }
+                ?: requestDoc.getString("uid")?.takeIf { it.isNotBlank() }
+                ?: request.id
+            val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(request.phone)
             val now = System.currentTimeMillis()
 
             val batch = firestore.batch()
-            val requestRef = firestore.collection("join_requests").document(request.id)
-            batch.update(requestRef, mapOf(
-                "status" to "APPROVED",
-                "approvalStatus" to "APPROVED",
-                "isActive" to true,
-                "approvedAt" to now,
-                "approvedBy" to "ADMIN",
-                "updatedAt" to now
-            ))
+            val requestRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(request.id)
+            batch.delete(requestRef)
 
             // Create Entity in appropriate collection
             when (type.uppercase()) {
@@ -200,6 +197,7 @@ class StatusRepositoryImpl(
                     val provRef = firestore.collection("providers").document(request.id)
                     val provData = mapOf(
                         "id" to request.id,
+                        "ownerId" to ownerId,
                         "name" to request.name,
                         "phone" to cleanPhone,
                         "categoryId" to request.categoryId,
@@ -216,6 +214,7 @@ class StatusRepositoryImpl(
                     val storeRef = firestore.collection("stores").document(request.id)
                     val storeData = mapOf(
                         "id" to request.id,
+                        "ownerId" to ownerId,
                         "name" to (requestDoc.getString("businessName") ?: request.name),
                         "ownerName" to request.name,
                         "phone" to cleanPhone,
@@ -232,6 +231,7 @@ class StatusRepositoryImpl(
                     val propRef = firestore.collection("properties").document(request.id)
                     val propData = mapOf(
                         "id" to request.id,
+                        "ownerId" to ownerId,
                         "title" to (requestDoc.getString("propertyTitle") ?: request.name),
                         "ownerName" to request.name,
                         "phone" to cleanPhone,
@@ -247,6 +247,7 @@ class StatusRepositoryImpl(
                     val jobRef = firestore.collection("jobs").document(request.id)
                     val jobData = mapOf(
                         "id" to request.id,
+                        "ownerId" to ownerId,
                         "jobTitle" to (requestDoc.getString("jobTitle") ?: request.name),
                         "companyName" to (requestDoc.getString("companyName") ?: request.name),
                         "phone" to cleanPhone,
@@ -261,6 +262,7 @@ class StatusRepositoryImpl(
                     val userRef = firestore.collection("users").document(request.id)
                     batch.set(userRef, mapOf(
                         "id" to request.id,
+                        "ownerId" to ownerId,
                         "name" to request.name,
                         "phone" to cleanPhone,
                         "role" to "CLIENT",
@@ -274,6 +276,7 @@ class StatusRepositoryImpl(
             val userRef = firestore.collection("users").document(request.id)
             batch.set(userRef, mapOf(
                 "id" to request.id,
+                "ownerId" to ownerId,
                 "name" to request.name,
                 "phone" to cleanPhone,
                 "role" to type.uppercase(),
@@ -297,7 +300,7 @@ class StatusRepositoryImpl(
 
             // Create notification for user
             val notifId = java.util.UUID.randomUUID().toString()
-            val notifRef = firestore.collection("notifications").document(notifId)
+            val notifRef = firestore.collection(AppConstants.COL_NOTIFICATIONS).document(notifId)
             val notif = NotificationEntity(
                 id = notifId,
                 title = "🎉 تم قبول وتوثيق طلب الانضمام!",
@@ -327,12 +330,12 @@ class StatusRepositoryImpl(
 
     override suspend fun rejectJoinRequest(request: PendingProviderEntity, reason: String): Result<Unit> {
         return try {
-            val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+            val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(request.phone)
             val now = System.currentTimeMillis()
             val finalReason = reason.ifBlank { "لم تستوفِ المستندات أو الشروط المطلوبة" }
 
             val batch = firestore.batch()
-            val requestRef = firestore.collection("join_requests").document(request.id)
+            val requestRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(request.id)
 
             batch.update(requestRef, mapOf(
                 "status" to "REJECTED",
@@ -353,7 +356,7 @@ class StatusRepositoryImpl(
 
             // Create notification for user
             val notifId = java.util.UUID.randomUUID().toString()
-            val notifRef = firestore.collection("notifications").document(notifId)
+            val notifRef = firestore.collection(AppConstants.COL_NOTIFICATIONS).document(notifId)
             val notif = NotificationEntity(
                 id = notifId,
                 title = "❌ حالة طلب الانضمام",

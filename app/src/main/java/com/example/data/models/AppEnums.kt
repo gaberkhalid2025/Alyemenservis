@@ -93,3 +93,25 @@ enum class OrderStatus(val code: String, val labelArabic: String) {
     CANCELLED("CANCELLED", "ملغي")
 }
 
+@Keep
+enum class WalletProvider(val code: String, val displayNameAr: String) {
+    JEEB("jeeb", "محفظة جيب"),
+    ALKARIMI("alKarimi", "الكريمي إكسبرس / حاسب"),
+    JAWALY("jawaly", "جوالي"),
+    FLOOSI("floosi", "ام فلوس / فلوسك"),
+    ONE_CASH("oneCash", "ون كاش"),
+    CASH_EXCHANGE("cashExchange", "صرافة / تحويل"),
+    FOREIGN_CURRENCY("foreignCurrency", "عملات أجنبية"),
+    YEMEN_MOBILE("yemenMobile", "يمن موبايل"),
+    OTHER("other", "أخرى");
+
+    companion object {
+        fun fromCode(code: String): WalletProvider {
+            val clean = code.trim()
+            return entries.firstOrNull { 
+                it.code.equals(clean, ignoreCase = true) || it.displayNameAr.contains(clean, ignoreCase = true) 
+            } ?: OTHER
+        }
+    }
+}
+

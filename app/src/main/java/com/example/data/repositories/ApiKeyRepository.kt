@@ -32,9 +32,6 @@ data class ApiKeysEntity(
 )
 
 interface IApiKeyRepository {
-    fun getApiKeysFlow(): Flow<ApiKeysEntity>
-    suspend fun getApiKeys(): ApiKeysEntity
-    suspend fun saveApiKeys(keys: ApiKeysEntity): Result<Unit>
     suspend fun getApiKey(keyName: String): Result<String>
     suspend fun setApiKey(keyName: String, value: String): Result<Unit>
 }
@@ -42,8 +39,6 @@ interface IApiKeyRepository {
 class ApiKeyRepositoryImpl(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) : IApiKeyRepository {
-
-    private val docRef get() = db.collection("settings").document("api_keys")
 
     /**
      * 🔑 جلب مفتاح API عبر Cloud Function الآمن
@@ -83,63 +78,6 @@ class ApiKeyRepositoryImpl(
                 ))
                 .await()
 
-            Result.success(Unit)
-        } catch (e: Exception) {
-            // Fallback إلى Firestore
-            try {
-                docRef.set(mapOf(keyName to value), com.google.firebase.firestore.SetOptions.merge()).await()
-                Result.success(Unit)
-            } catch (fallbackEx: Exception) {
-                Result.failure(e)
-            }
-        }
-    }
-
-    override fun getApiKeysFlow(): Flow<ApiKeysEntity> = callbackFlow {
-        val listener = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                trySend(ApiKeysEntity())
-                return@addSnapshotListener
-            }
-            if (snapshot != null && snapshot.exists()) {
-                val entity = snapshot.toObject(ApiKeysEntity::class.java) ?: ApiKeysEntity()
-                trySend(entity)
-            } else {
-                trySend(ApiKeysEntity())
-            }
-        }
-        awaitClose { listener.remove() }
-    }
-
-    override suspend fun getApiKeys(): ApiKeysEntity {
-        return try {
-            val snap = docRef.get().await()
-            snap.toObject(ApiKeysEntity::class.java) ?: ApiKeysEntity()
-        } catch (e: Exception) {
-            ApiKeysEntity()
-        }
-    }
-
-    override suspend fun saveApiKeys(keys: ApiKeysEntity): Result<Unit> {
-        return try {
-            val data = mapOf(
-                "geminiApiKey" to keys.geminiApiKey,
-                "openaiApiKey" to keys.openaiApiKey,
-                "selectedAiModel" to keys.selectedAiModel,
-                "googleMapsKey" to keys.googleMapsKey,
-                "mapboxKey" to keys.mapboxKey,
-                "selectedMapEngine" to keys.selectedMapEngine,
-                "kuraimiToken" to keys.kuraimiToken,
-                "jawwalPayKey" to keys.jawwalPayKey,
-                "floosakKey" to keys.floosakKey,
-                "oneCashKey" to keys.oneCashKey,
-                "webhookUrl" to keys.webhookUrl,
-                "whatsappToken" to keys.whatsappToken,
-                "smsGatewayKey" to keys.smsGatewayKey,
-                "customKeys" to keys.customKeys,
-                "updatedAt" to System.currentTimeMillis()
-            )
-            docRef.set(data).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

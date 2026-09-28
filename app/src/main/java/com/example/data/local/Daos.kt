@@ -47,6 +47,15 @@ interface ChatDao {
     @Query("DELETE FROM chat_channels WHERE id = :channelId")
     suspend fun deleteChannel(channelId: String)
 
+    @Query("SELECT * FROM chat_channels ORDER BY lastMessageTime DESC")
+    suspend fun getAllChannelsList(): List<ChatChannelRoomEntity>
+
+    @Query("DELETE FROM chat_messages WHERE channelId = :channelId")
+    suspend fun deleteMessagesByChannel(channelId: String)
+
+    @Query("SELECT * FROM chat_messages WHERE syncStatus = :syncStatus OR status = :status ORDER BY timestamp ASC")
+    suspend fun getPendingMessagesList(syncStatus: String = "PENDING_UPLOAD", status: String = "PENDING"): List<ChatMessageRoomEntity>
+
     @Transaction
     suspend fun replaceChannelWithMessages(channel: ChatChannelRoomEntity, messages: List<ChatMessageRoomEntity>) {
         insertChannel(channel)

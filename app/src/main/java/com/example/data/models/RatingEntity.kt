@@ -46,4 +46,16 @@ data class RatingEntity(
             dateTimestamp = timestamp
         )
     }
+
+    fun toReview(): Review {
+        return Review(
+            id = id,
+            shopId = targetId,
+            userId = userId,
+            userName = userName,
+            rating = rating.toInt(),
+            text = comment,
+            timestamp = timestamp
+        )
+    }
 }

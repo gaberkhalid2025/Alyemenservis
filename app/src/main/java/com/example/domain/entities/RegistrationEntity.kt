@@ -11,9 +11,12 @@ sealed class RegistrationEntity {
         val fullName: String,
         val phone: String,
         val city: String,
-        val passwordHash: String,
+        val rawPassword: String,
         val profileImageUrl: String = ""
-    ) : RegistrationEntity()
+    ) : RegistrationEntity() {
+        override fun toString(): String =
+            "Client(fullName='$fullName', phone='$phone', city='$city', rawPassword=***, profileImageUrl='$profileImageUrl')"
+    }
 
     data class Provider(
         val fullName: String,
@@ -25,8 +28,11 @@ sealed class RegistrationEntity {
         val identityDocumentUrl: String = "",
         val licenseNumber: String = "",
         val workImages: List<String> = emptyList(),
-        val passwordHash: String
-    ) : RegistrationEntity()
+        val rawPassword: String
+    ) : RegistrationEntity() {
+        override fun toString(): String =
+            "Provider(fullName='$fullName', phone='$phone', professionCategory='$professionCategory', city='$city', experienceYears=$experienceYears, bio='$bio', rawPassword=***)"
+    }
 
     data class Store(
         val storeName: String,
@@ -38,8 +44,11 @@ sealed class RegistrationEntity {
         val commercialRegisterNumber: String = "",
         val logoUrl: String = "",
         val storeImages: List<String> = emptyList(),
-        val passwordHash: String
-    ) : RegistrationEntity()
+        val rawPassword: String
+    ) : RegistrationEntity() {
+        override fun toString(): String =
+            "Store(storeName='$storeName', ownerName='$ownerName', phone='$phone', storeCategory='$storeCategory', city='$city', rawPassword=***)"
+    }
 
     data class Restaurant(
         val restaurantName: String,
@@ -50,8 +59,11 @@ sealed class RegistrationEntity {
         val addressDetails: String,
         val logoUrl: String = "",
         val menuImageUrls: List<String> = emptyList(),
-        val passwordHash: String
-    ) : RegistrationEntity()
+        val rawPassword: String
+    ) : RegistrationEntity() {
+        override fun toString(): String =
+            "Restaurant(restaurantName='$restaurantName', ownerName='$ownerName', phone='$phone', cuisineType='$cuisineType', city='$city', rawPassword=***)"
+    }
 
     data class MedicalCenter(
         val centerName: String,
@@ -62,8 +74,11 @@ sealed class RegistrationEntity {
         val addressDetails: String,
         val licenseNumber: String = "",
         val logoUrl: String = "",
-        val passwordHash: String
-    ) : RegistrationEntity()
+        val rawPassword: String
+    ) : RegistrationEntity() {
+        override fun toString(): String =
+            "MedicalCenter(centerName='$centerName', specialtyCategory='$specialtyCategory', doctorName='$doctorName', phone='$phone', city='$city', rawPassword=***)"
+    }
 
     data class Property(
         val title: String,
@@ -76,8 +91,11 @@ sealed class RegistrationEntity {
         val priceYer: Double,
         val description: String,
         val imageUrls: List<String> = emptyList(),
-        val passwordHash: String
-    ) : RegistrationEntity()
+        val rawPassword: String
+    ) : RegistrationEntity() {
+        override fun toString(): String =
+            "Property(title='$title', propertyType='$propertyType', category='$category', ownerName='$ownerName', phone='$phone', priceYer=$priceYer, rawPassword=***)"
+    }
 
     data class Job(
         val jobTitle: String,
@@ -88,8 +106,11 @@ sealed class RegistrationEntity {
         val city: String,
         val requirements: String,
         val salaryRange: String = "",
-        val passwordHash: String
-    ) : RegistrationEntity()
+        val rawPassword: String
+    ) : RegistrationEntity() {
+        override fun toString(): String =
+            "Job(jobTitle='$jobTitle', companyName='$companyName', category='$category', contactPhone='$contactPhone', city='$city', rawPassword=***)"
+    }
 }
 
 data class JoinStatusEntity(

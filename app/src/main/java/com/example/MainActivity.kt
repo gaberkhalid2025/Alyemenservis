@@ -58,7 +58,6 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var locationCallback: com.google.android.gms.location.LocationCallback? = null
     private var lastBackPressTime = 0L
-    private var tts: android.speech.tts.TextToSpeech? = null
     
     private var voiceResultCallback: ((String) -> Unit)? = null
     private val voiceRecognitionLauncher = registerForActivityResult(
@@ -191,14 +190,12 @@ class MainActivity : ComponentActivity() {
             }
             locationCallback = null
             
-            // تحرير TextToSpeech
+            // تحرير TextToSpeech الموحد
             try {
-                tts?.stop()
-                tts?.shutdown()
+                VoiceManager.shutdown()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-            tts = null
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -219,24 +216,24 @@ class MainActivity : ComponentActivity() {
         }
         
         try {
-            com.example.security.SecurityManager.verifyAppSignature(this)
+            if (!com.example.security.SecurityManager.verifyAppSignature(this)) {
+                android.util.Log.e("MainActivity", "SECURITY ERROR: Signature mismatch! Exiting.")
+                finishAffinity()
+                return
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
         
         try {
-            tts = android.speech.tts.TextToSpeech(this) { status ->
-                if (status != android.speech.tts.TextToSpeech.ERROR) {
-                    tts?.language = java.util.Locale("ar")
-                }
-            }
+            VoiceManager.init(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
         VoiceManager.onSpeak = { text ->
             try {
-                tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                VoiceManager.speak(text)
             } catch(e: Exception) {
                 e.printStackTrace()
             }
@@ -322,7 +319,11 @@ class MainActivity : ComponentActivity() {
 
         try {
             // com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
-            com.example.security.SecurityManager.verifyAppSignature(this)
+            if (!com.example.security.SecurityManager.verifyAppSignature(this)) {
+                android.util.Log.e("MainActivity", "SECURITY ERROR: Signature mismatch! Exiting.")
+                finishAffinity()
+                return
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }

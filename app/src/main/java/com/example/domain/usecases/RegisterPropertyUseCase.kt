@@ -35,7 +35,7 @@ class RegisterPropertyUseCase(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(property.passwordHash)
+        val passCheck = validatePassword(property.rawPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }

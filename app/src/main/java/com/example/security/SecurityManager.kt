@@ -2,12 +2,46 @@ package com.example.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 /**
  * 🛡️ SecurityManager - إدارة الأمان والحماية والحد من محاولات الدخول الخاطئة
  */
 class SecurityManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("app_security_prefs", Context.MODE_PRIVATE)
+
+    private val securePrefs: SharedPreferences by lazy {
+        try {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            EncryptedSharedPreferences.create(
+                context,
+                "app_security_secure_prefs",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            try {
+                context.deleteSharedPreferences("app_security_secure_prefs")
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                EncryptedSharedPreferences.create(
+                    context,
+                    "app_security_secure_prefs",
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+            } catch (ex: Exception) {
+                prefs
+            }
+        }
+    }
 
     fun registerFailedAttempt(): Boolean {
         val attempts = prefs.getInt("failed_attempts", 0) + 1
@@ -40,16 +74,17 @@ class SecurityManager(context: Context) {
     }
 
     fun savePinCode(pin: String) {
-        prefs.edit().putString("local_pin", pin).apply()
+        val hashed = com.example.utils.SecureHasher.hashPin(pin)
+        securePrefs.edit().putString("secure_local_pin", hashed).apply()
     }
 
     fun verifyPinCode(inputPin: String): Boolean {
-        val savedPin = prefs.getString("local_pin", null)
-        return savedPin == inputPin
+        val savedPinHash = securePrefs.getString("secure_local_pin", null) ?: return false
+        return com.example.utils.SecureHasher.verifyPin(inputPin, savedPinHash)
     }
 
     fun hasPinCode(): Boolean {
-        return !prefs.getString("local_pin", null).isNullOrEmpty()
+        return !securePrefs.getString("secure_local_pin", null).isNullOrEmpty()
     }
 
     companion object {

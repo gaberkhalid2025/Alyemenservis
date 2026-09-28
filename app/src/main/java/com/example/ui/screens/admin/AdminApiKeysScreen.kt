@@ -85,20 +85,19 @@ fun AdminApiKeysScreenContent(
     var newKeyEndpoint by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
-        val keys = apiKeyRepository.getApiKeys()
-        geminiApiKey = keys.geminiApiKey
-        openaiApiKey = keys.openaiApiKey
-        selectedAiModel = keys.selectedAiModel
-        googleMapsKey = keys.googleMapsKey
-        mapboxKey = keys.mapboxKey
-        selectedMapEngine = keys.selectedMapEngine
-        kuraimiToken = keys.kuraimiToken
-        jawwalPayKey = keys.jawwalPayKey
-        floosakKey = keys.floosakKey
-        oneCashKey = keys.oneCashKey
-        webhookUrl = keys.webhookUrl
-        whatsappToken = keys.whatsappToken
-        smsGatewayKey = keys.smsGatewayKey
+        geminiApiKey = apiKeyRepository.getApiKey("geminiApiKey").getOrDefault("")
+        openaiApiKey = apiKeyRepository.getApiKey("openaiApiKey").getOrDefault("")
+        selectedAiModel = apiKeyRepository.getApiKey("selectedAiModel").getOrDefault("gemini-1.5-flash")
+        googleMapsKey = apiKeyRepository.getApiKey("googleMapsKey").getOrDefault("")
+        mapboxKey = apiKeyRepository.getApiKey("mapboxKey").getOrDefault("")
+        selectedMapEngine = apiKeyRepository.getApiKey("selectedMapEngine").getOrDefault("OPEN_STREET_MAP")
+        kuraimiToken = apiKeyRepository.getApiKey("kuraimiToken").getOrDefault("")
+        jawwalPayKey = apiKeyRepository.getApiKey("jawwalPayKey").getOrDefault("")
+        floosakKey = apiKeyRepository.getApiKey("floosakKey").getOrDefault("")
+        oneCashKey = apiKeyRepository.getApiKey("oneCashKey").getOrDefault("")
+        webhookUrl = apiKeyRepository.getApiKey("webhookUrl").getOrDefault("")
+        whatsappToken = apiKeyRepository.getApiKey("whatsappToken").getOrDefault("")
+        smsGatewayKey = apiKeyRepository.getApiKey("smsGatewayKey").getOrDefault("")
     }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -344,29 +343,26 @@ fun AdminApiKeysScreenContent(
         // زر الحفظ والمزامنة الفورية السحابية
         Button(
             onClick = {
-                val customMapList = customKeys.map { mapOf("name" to it.first, "key" to it.second, "endpoint" to it.third) }
-                val keysEntity = ApiKeysEntity(
-                    geminiApiKey = geminiApiKey,
-                    openaiApiKey = openaiApiKey,
-                    selectedAiModel = selectedAiModel,
-                    googleMapsKey = googleMapsKey,
-                    mapboxKey = mapboxKey,
-                    selectedMapEngine = selectedMapEngine,
-                    kuraimiToken = kuraimiToken,
-                    jawwalPayKey = jawwalPayKey,
-                    floosakKey = floosakKey,
-                    oneCashKey = oneCashKey,
-                    webhookUrl = webhookUrl,
-                    whatsappToken = whatsappToken,
-                    smsGatewayKey = smsGatewayKey,
-                    customKeys = customMapList
-                )
                 scope.launch {
-                    val result = apiKeyRepository.saveApiKeys(keysEntity)
-                    if (result.isSuccess) {
+                    val results = listOf(
+                        apiKeyRepository.setApiKey("geminiApiKey", geminiApiKey),
+                        apiKeyRepository.setApiKey("openaiApiKey", openaiApiKey),
+                        apiKeyRepository.setApiKey("selectedAiModel", selectedAiModel),
+                        apiKeyRepository.setApiKey("googleMapsKey", googleMapsKey),
+                        apiKeyRepository.setApiKey("mapboxKey", mapboxKey),
+                        apiKeyRepository.setApiKey("selectedMapEngine", selectedMapEngine),
+                        apiKeyRepository.setApiKey("kuraimiToken", kuraimiToken),
+                        apiKeyRepository.setApiKey("jawwalPayKey", jawwalPayKey),
+                        apiKeyRepository.setApiKey("floosakKey", floosakKey),
+                        apiKeyRepository.setApiKey("oneCashKey", oneCashKey),
+                        apiKeyRepository.setApiKey("webhookUrl", webhookUrl),
+                        apiKeyRepository.setApiKey("whatsappToken", whatsappToken),
+                        apiKeyRepository.setApiKey("smsGatewayKey", smsGatewayKey)
+                    )
+                    if (results.all { it.isSuccess }) {
                         Toast.makeText(context, "✅ تم حفظ ومزامنة كافة المفاتيح سحابياً فوراً وأمان تام!", Toast.LENGTH_LONG).show()
                     } else {
-                        Toast.makeText(context, "❌ حدث خطأ أثناء حفظ المفاتيح، يرجى المحاولة لاحقاً", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "❌ حدث خطأ أثناء حفظ بعض المفاتيح، يرجى المحاولة لاحقاً", Toast.LENGTH_SHORT).show()
                     }
                 }
             },

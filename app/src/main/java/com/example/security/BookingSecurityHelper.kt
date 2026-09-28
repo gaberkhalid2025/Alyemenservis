@@ -95,7 +95,7 @@ object BookingSecurityHelper {
         if (cleanInput.isEmpty() || cleanTarget.isEmpty()) return false
         
         // Direct match
-        if (cleanInput.equals(cleanTarget, ignoreCase = true)) return true
+        if (cleanInput.equals(cleanTarget)) return true
         
         // PBKDF2 / Salted SHA-256 / Unsalted SHA-256 match via SecureHasher
         return com.example.utils.SecureHasher.verifyPin(cleanInput, cleanTarget) ||

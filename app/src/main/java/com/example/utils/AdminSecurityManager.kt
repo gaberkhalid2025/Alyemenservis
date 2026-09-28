@@ -103,9 +103,9 @@ object AdminSecurityManager {
             val snapObj = snap?.toObject(AdminSettingsEntity::class.java)
             val effectiveSettings = settings ?: snapObj
 
-            val docOwnerPass = snap?.getString("ownerPasswordHash") ?: snap?.getString("ownerPassword") ?: snap?.getString("owner_password") ?: effectiveSettings?.ownerPassword ?: ""
-            val docOwnerEmail = snap?.getString("ownerEmail") ?: snap?.getString("owner_email") ?: effectiveSettings?.ownerEmail ?: ""
-            val docAdminPass = snap?.getString("adminPasswordHash") ?: snap?.getString("adminPassword") ?: snap?.getString("admin_password") ?: ""
+            val docOwnerPass = snap?.getString("ownerPasswordHash") ?: ""
+            val docOwnerEmail = snap?.getString("ownerEmail") ?: effectiveSettings?.ownerEmail ?: ""
+            val docAdminPass = snap?.getString("adminPasswordHash") ?: ""
             val docAdminUser = snap?.getString("adminUsername") ?: snap?.getString("admin_username") ?: effectiveSettings?.adminUsername ?: ""
 
             if (docOwnerPass.isNotBlank()) {
@@ -168,9 +168,10 @@ object AdminSecurityManager {
                     val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
                     val token = try { user?.getIdToken(false)?.await() } catch (_: Exception) { null }
                     val claims = token?.claims
+                    val hasOwnerClaim = claims?.get("isSuperAdmin") == true || claims?.get("isOwner") == true
                     return when {
-                        isSuperAdmin || claims?.get("isSuperAdmin") == true || claims?.get("isOwner") == true -> "OWNER"
-                        preferredRole == "OWNER" -> "OWNER"
+                        isSuperAdmin || hasOwnerClaim -> "OWNER"
+                        preferredRole == "OWNER" && (isSuperAdmin || hasOwnerClaim) -> "OWNER"
                         claims?.get("isAdmin") == true -> "ADMIN"
                         else -> "ADMIN"
                     }

@@ -8,7 +8,10 @@ data class InstantRequestEntity(
     val requestCode: String = "", // e.g. R-942338
     val pinHash: String = "", // PBKDF2 hash of the PIN
     @get:com.google.firebase.firestore.Exclude
-    val secretPin: String = "", // PIN for customer verification
+    val rawPin: String = "", // Raw PIN for customer verification input
+    @Deprecated("استخدم rawPin للمدخلات أو pinHash للتخزين", ReplaceWith("rawPin"))
+    @get:com.google.firebase.firestore.Exclude
+    val secretPin: String = "", // Legacy field for backwards compatibility
     val cancellationPassword: String = "", // 4-digit cancellation code
     val userId: String = "",
     val userName: String = "",

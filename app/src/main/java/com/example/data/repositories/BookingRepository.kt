@@ -7,6 +7,7 @@ import com.example.data.BookingCache
 import com.example.data.LocalAppCacheManager
 import com.example.security.BookingSecurityHelper
 import com.example.utils.AnalyticsEventsHelper
+import com.example.utils.AppConstants
 import com.example.utils.BookingNotificationManager
 import com.example.utils.BookingUtils
 import com.google.firebase.firestore.FirebaseFirestore
@@ -63,7 +64,7 @@ class BookingRepository(
                 list.forEach { booking ->
                     if (booking.isLocked && booking.lockedUntil != null && now > booking.lockedUntil) {
                         try {
-                            firestore.collection("bookings").document(booking.id)
+                            firestore.collection(AppConstants.COL_BOOKINGS).document(booking.id)
                                 .update("isLocked", false, "lockedUntil", null)
                         } catch (e: Exception) {
                             // تجاهل
@@ -132,7 +133,7 @@ class BookingRepository(
             trySend(filtered)
         }
 
-        val collection = firestore.collection("bookings")
+        val collection = firestore.collection(AppConstants.COL_BOOKINGS)
         val query = if (userId.isNotBlank()) {
             if (isProvider) collection.whereEqualTo("providerId", userId)
             else collection.whereEqualTo("clientId", userId)
@@ -182,7 +183,7 @@ class BookingRepository(
                 return
             }
 
-            val docId = if (booking.id.isNotBlank()) booking.id else firestore.collection("bookings").document().id
+            val docId = if (booking.id.isNotBlank()) booking.id else firestore.collection(AppConstants.COL_BOOKINGS).document().id
             val finalCode = if (booking.bookingNumber.isNotBlank()) booking.bookingNumber else BookingUtils.generateBookingNumber()
             val rawPin = if (rawPasswordPin.isNotBlank()) rawPasswordPin else BookingUtils.generateBookingPassword()
             val hashedPin = BookingSecurityHelper.hashPin(rawPin)
@@ -209,21 +210,27 @@ class BookingRepository(
             saveToCache(current)
             AnalyticsEventsHelper.logBookingCreated(context, docId, finalBooking.serviceType.ifBlank { finalBooking.category }, finalBooking.totalAmount)
 
-            // Sync to Firestore
-            firestore.collection("bookings").document(docId)
-                .set(finalBooking)
+            // Sync to Firestore atomically using runTransaction
+            firestore.runTransaction { transaction ->
+                val docRef = firestore.collection(com.example.utils.AppConstants.COL_BOOKINGS).document(docId)
+                val snapshot = transaction.get(docRef)
+                if (snapshot.exists()) {
+                    throw IllegalStateException("الحجز برقم $docId موجود مسبقاً")
+                }
+                transaction.set(docRef, finalBooking)
+            }
                 .addOnSuccessListener {
                     // Write Notification payloads to "notifications" collection
                     val userNotifId = UUID.randomUUID().toString()
                     val userNotif = mapOf(
                         "id" to userNotifId,
                         "title" to "تم استلام طلب حجزك بنجاح",
-                        "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} ورمز المرور: ${rawPin} وهو قيد المراجعة.",
+                        "message" to "مرحباً! تم استلام طلب حجزك برقم #${finalBooking.bookingNumber} بنجاح وهو قيد المراجعة. رمز PIN سيُرسل عبر قناة منفصلة.",
                         "targetType" to "USER",
                         "targetValue" to finalBooking.customerPhone,
                         "timestamp" to System.currentTimeMillis()
                     )
-                    firestore.collection("notifications").document(userNotifId).set(userNotif)
+                    firestore.collection(AppConstants.COL_NOTIFICATIONS).document(userNotifId).set(userNotif)
 
                     // Resolve provider phone if blank
                     if (finalBooking.providerPhone.isBlank() && finalBooking.providerId.isNotBlank()) {
@@ -231,7 +238,7 @@ class BookingRepository(
                             .addOnSuccessListener { pDoc ->
                                 val pPhone = pDoc.getString("phone") ?: ""
                                 if (pPhone.isNotBlank()) {
-                                    firestore.collection("bookings").document(docId).update("providerPhone", pPhone)
+                                    firestore.collection(AppConstants.COL_BOOKINGS).document(docId).update("providerPhone", pPhone)
                                     val provNotifId = UUID.randomUUID().toString()
                                     val provNotif = mapOf(
                                         "id" to provNotifId,
@@ -241,7 +248,7 @@ class BookingRepository(
                                         "targetValue" to pPhone,
                                         "timestamp" to System.currentTimeMillis()
                                     )
-                                    firestore.collection("notifications").document(provNotifId).set(provNotif)
+                                    firestore.collection(AppConstants.COL_NOTIFICATIONS).document(provNotifId).set(provNotif)
                                 }
                             }
                     }
@@ -262,7 +269,7 @@ class BookingRepository(
                             "targetValue" to targetVal,
                             "timestamp" to System.currentTimeMillis()
                         )
-                        firestore.collection("notifications").document(providerNotifId).set(providerNotif)
+                        firestore.collection(AppConstants.COL_NOTIFICATIONS).document(providerNotifId).set(providerNotif)
                     }
 
                     try {
@@ -278,7 +285,7 @@ class BookingRepository(
                         "targetValue" to "ALL",
                         "timestamp" to System.currentTimeMillis()
                     )
-                    firestore.collection("notifications").document(adminNotifId).set(adminNotif)
+                    firestore.collection(AppConstants.COL_NOTIFICATIONS).document(adminNotifId).set(adminNotif)
 
                     AnalyticsEventsHelper.logBookingCreated(context, finalBooking.id, finalBooking.serviceType, finalBooking.totalAmount)
 
@@ -316,6 +323,12 @@ class BookingRepository(
         )
 
         val existingBooking = _cachedBookings.value.find { it.id == bookingId }
+        if (existingBooking != null && existingBooking.status.isNotBlank()) {
+            if (!com.example.utils.BookingStateMachine.canTransition(existingBooking.status, newStatus)) {
+                onError("انتقال غير مسموح من الحالة (${existingBooking.status}) إلى ($newStatus)")
+                return
+            }
+        }
         if (newStatus == "COMPLETED" && (existingBooking == null || existingBooking.completedAt == 0L)) {
             updates["completedAt"] = now
         }
@@ -324,8 +337,9 @@ class BookingRepository(
             AnalyticsEventsHelper.logBookingAccepted(context, bookingId)
         }
 
+        val previousBookings = _cachedBookings.value
         // Optimistic local update
-        val current = _cachedBookings.value.map {
+        val current = previousBookings.map {
             if (it.id == bookingId) {
                 it.copy(
                     status = newStatus,
@@ -336,10 +350,14 @@ class BookingRepository(
         }
         saveToCache(current)
 
-        firestore.collection("bookings").document(bookingId)
+        firestore.collection(AppConstants.COL_BOOKINGS).document(bookingId)
             .update(updates)
             .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onError(it.localizedMessage ?: "فشل تحديث حالة الحجز") }
+            .addOnFailureListener {
+                // Rollback local cache on failure
+                saveToCache(previousBookings)
+                onError(it.localizedMessage ?: "فشل تحديث حالة الحجز")
+            }
     }
 
     /**
@@ -396,8 +414,9 @@ class BookingRepository(
             "updatedAt" to System.currentTimeMillis()
         )
 
+        val previousBookings = _cachedBookings.value
         // Optimistic local update
-        val current = _cachedBookings.value.map {
+        val current = previousBookings.map {
             if (it.id == booking.id) it.copy(
                 status = "CANCELLED",
                 cancellationReason = cancellationReason,
@@ -408,7 +427,7 @@ class BookingRepository(
         }
         saveToCache(current)
 
-        firestore.collection("bookings").document(booking.id)
+        firestore.collection(AppConstants.COL_BOOKINGS).document(booking.id)
             .update(updates)
             .addOnSuccessListener {
                 AnalyticsEventsHelper.logBookingCancelled(context, booking.id, cancellationReason)
@@ -427,7 +446,7 @@ class BookingRepository(
 
                 if (booking.customerPhone.isNotBlank()) {
                     val uId = UUID.randomUUID().toString()
-                    firestore.collection("notifications").document(uId).set(mapOf(
+                    firestore.collection(AppConstants.COL_NOTIFICATIONS).document(uId).set(mapOf(
                         "id" to uId,
                         "title" to userTitle,
                         "message" to userMsg,
@@ -451,7 +470,7 @@ class BookingRepository(
                 val pTarget = booking.providerPhone.ifBlank { booking.providerId }
                 if (pTarget.isNotBlank()) {
                     val pId = UUID.randomUUID().toString()
-                    firestore.collection("notifications").document(pId).set(mapOf(
+                    firestore.collection(AppConstants.COL_NOTIFICATIONS).document(pId).set(mapOf(
                         "id" to pId,
                         "title" to providerTitle,
                         "message" to providerMsg,
@@ -462,7 +481,7 @@ class BookingRepository(
                 }
 
                 val aId = UUID.randomUUID().toString()
-                firestore.collection("notifications").document(aId).set(mapOf(
+                firestore.collection(AppConstants.COL_NOTIFICATIONS).document(aId).set(mapOf(
                     "id" to aId,
                     "title" to "إشعار إداري: إلغاء حجز",
                     "message" to "تم إلغاء الحجز #${booking.bookingNumber} من قبل $cancelledBy. السبب: $cancellationReason",
@@ -472,7 +491,11 @@ class BookingRepository(
                 ))
                 onSuccess()
             }
-            .addOnFailureListener { onError(it.localizedMessage ?: "فشل إلغاء الحجز") }
+            .addOnFailureListener {
+                // Rollback local cache on failure
+                saveToCache(previousBookings)
+                onError(it.localizedMessage ?: "فشل إلغاء الحجز")
+            }
     }
 
     /**
@@ -503,7 +526,7 @@ class BookingRepository(
         }
         saveToCache(current)
 
-        firestore.collection("bookings").document(bookingId)
+        firestore.collection(AppConstants.COL_BOOKINGS).document(bookingId)
             .update(updates)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل إلغاء الحجز") }
@@ -549,7 +572,7 @@ class BookingRepository(
         val current = _cachedBookings.value.map { if (it.id == itemToSave.id) itemToSave else it }
         saveToCache(current)
 
-        firestore.collection("bookings").document(itemToSave.id)
+        firestore.collection(AppConstants.COL_BOOKINGS).document(itemToSave.id)
             .set(itemToSave)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل تحديث البيانات") }
@@ -562,7 +585,7 @@ class BookingRepository(
         val current = _cachedBookings.value.filter { it.id != bookingId }
         saveToCache(current)
 
-        firestore.collection("bookings").document(bookingId)
+        firestore.collection(AppConstants.COL_BOOKINGS).document(bookingId)
             .delete()
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.localizedMessage ?: "فشل حذف الحجز") }
@@ -574,7 +597,7 @@ class BookingRepository(
                 "isLocked" to true,
                 "lockedUntil" to System.currentTimeMillis() + lockDurationMs
             )
-            firestore.collection("bookings").document(bookingId).update(updateData).await()
+            firestore.collection(AppConstants.COL_BOOKINGS).document(bookingId).update(updateData).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

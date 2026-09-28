@@ -43,7 +43,7 @@ class RegistrationFlowTest {
             fullName = "صالح أحمد العبيدي",
             phone = "777111222",
             city = "صنعاء",
-            passwordHash = "123456",
+            rawPassword = "123456",
             profileImageUrl = "https://example.com/profiles/saleh.jpg"
         )
 
@@ -64,7 +64,7 @@ class RegistrationFlowTest {
             experienceYears = 8,
             bio = "فني تمديدات وصيانة كهربائية متكاملة للمنازل والمحلات",
             identityDocumentUrl = "https://example.com/docs/id.jpg",
-            passwordHash = "safe_pass_1"
+            rawPassword = "safe_pass_1"
         )
 
         val result = fakeRepo.registerProvider(provider)
@@ -83,7 +83,7 @@ class RegistrationFlowTest {
             city = "عدن",
             addressDetails = "شارع تسعة، بجانب بنك التضامن",
             commercialRegisterNumber = "CR-90812-Y",
-            passwordHash = "store_pass_2026"
+            rawPassword = "store_pass_2026"
         )
 
         val result = fakeRepo.registerStore(store)
@@ -101,7 +101,7 @@ class RegistrationFlowTest {
             cuisineType = "traditional_yemeni",
             city = "صنعاء",
             addressDetails = "شارع حدة، جولة الرويشان",
-            passwordHash = "cuisine_yem_33"
+            rawPassword = "cuisine_yem_33"
         )
 
         val result = fakeRepo.registerRestaurant(restaurant)
@@ -120,7 +120,7 @@ class RegistrationFlowTest {
             city = "إب",
             addressDetails = "شارع تعز، أمام مستشفى الثورة",
             licenseNumber = "LIC-MED-7711",
-            passwordHash = "med_secure_909"
+            rawPassword = "med_secure_909"
         )
 
         val result = fakeRepo.registerMedicalCenter(medical)
@@ -141,7 +141,7 @@ class RegistrationFlowTest {
             areaDetails = "حي الأصبحي، شارع المقالح المعمّد",
             priceYer = 180000000.0,
             description = "عمارة مريعة 4 أدوار حجر، مشطبة ديلوكس، ومجهزة بمصعد ونظام طاقة شمسية كامل.",
-            passwordHash = "prop_owner_pass"
+            rawPassword = "prop_owner_pass"
         )
 
         val result = fakeRepo.registerProperty(property)
@@ -161,7 +161,7 @@ class RegistrationFlowTest {
             city = "صنعاء",
             requirements = "خبرة لا تقل عن 3 سنوات في تطبيقات الهاتف، وإتقان العمل مع قواعد بيانات Firebase و Room.",
             salaryRange = "1200 - 1500 USD",
-            passwordHash = "tech_hiring_now"
+            rawPassword = "tech_hiring_now"
         )
 
         val result = fakeRepo.registerJob(job)

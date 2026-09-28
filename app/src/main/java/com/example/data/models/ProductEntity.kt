@@ -17,7 +17,8 @@ data class ProductEntity(
     val category: String = "",
     val isOffer: Boolean = false,
     val discountPercent: Int = 0,
-    val oldPrice: Double = 0.0
+    val oldPrice: Double = 0.0,
+    val ownerId: String = ""
 )
 
 @Keep

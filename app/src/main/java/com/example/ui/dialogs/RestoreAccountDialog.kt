@@ -133,60 +133,52 @@ fun RestoreAccountDialog(
                             onClick = {
                                 val cleanPhone = restorePhoneInput.trim().replace(" ", "").replace("+967", "").replace("00967", "")
                                 if (restorePasswordInput.isNotBlank()) {
-                                    val savedPass = match?.savedPassword?.trim() ?: ""
-                                    val isPasswordCorrect = if (savedPass.isNotEmpty()) {
-                                        restorePasswordInput.trim() == savedPass ||
-                                        com.example.utils.PasswordHasher.verifyPassword(restorePasswordInput.trim(), savedPass) ||
-                                        com.example.utils.SecurityCryptoUtils.verifyAdminPassword(restorePasswordInput.trim(), savedPass)
-                                    } else {
-                                        true
+                                    viewModel.verifyRestorePassword(cleanPhone, match?.type ?: "CLIENT", restorePasswordInput.trim()) { isPasswordCorrect ->
+                                        if (!isPasswordCorrect) {
+                                            Toast.makeText(context, "❌ كلمة المرور غير صحيحة! تأكد منها أو اضغط طلب الاستعادة.", Toast.LENGTH_LONG).show()
+                                        } else {
+                                            val provArea = match?.provider?.area ?: match?.store?.cityId ?: "اليمن"
+                                            viewModel.setUserSessionDetails(context, provName, cleanPhone, provArea)
+                                            
+                                            val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                                            sp.edit()
+                                                .putBoolean("is_account_logged_in", true)
+                                                .putString("user_account_type", match?.type ?: "CLIENT")
+                                                .putString("logged_account_id", match?.provider?.id ?: match?.store?.id ?: match?.property?.id ?: "")
+                                                .apply()
+
+                                            viewModel.setJoinRequestPhone(context, cleanPhone)
+
+                                            if (match?.provider != null) {
+                                                if (match.provider.isDeleted) viewModel.restoreProvider(match.provider.id)
+                                                viewModel.selectedProvider = match.provider
+                                                viewModel.selectedStore = null
+                                                viewModel.selectedProperty = null
+                                                viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                            } else if (match?.store != null) {
+                                                if (match.store.isDeleted) viewModel.restoreStore(match.store.id)
+                                                viewModel.selectedStore = match.store
+                                                viewModel.selectedProvider = null
+                                                viewModel.selectedProperty = null
+                                                viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                            } else if (match?.property != null) {
+                                                if (match.property.isDeleted) viewModel.restoreProperty(match.property.id)
+                                                viewModel.selectedProperty = match.property
+                                                viewModel.selectedProvider = null
+                                                viewModel.selectedStore = null
+                                                viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                            } else {
+                                                viewModel.selectedProvider = null
+                                                viewModel.selectedStore = null
+                                                viewModel.selectedProperty = null
+                                                viewModel.selectedJob = null
+                                                viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                                            }
+
+                                            successUserName = provName
+                                            showSuccessState = true
+                                        }
                                     }
-
-                                    if (!isPasswordCorrect) {
-                                        Toast.makeText(context, "❌ كلمة المرور غير صحيحة! تأكد منها أو اضغط طلب الاستعادة.", Toast.LENGTH_LONG).show()
-                                        return@Button
-                                    }
-
-                                    val provArea = match?.provider?.area ?: match?.store?.cityId ?: "اليمن"
-                                    viewModel.setUserSessionDetails(context, provName, cleanPhone, provArea)
-                                    
-                                    val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-                                    sp.edit()
-                                        .putBoolean("is_account_logged_in", true)
-                                        .putString("user_account_type", match?.type ?: "CLIENT")
-                                        .putString("logged_account_id", match?.provider?.id ?: match?.store?.id ?: match?.property?.id ?: "")
-                                        .apply()
-
-                                    viewModel.setJoinRequestPhone(context, cleanPhone)
-
-                                    if (match?.provider != null) {
-                                        if (match.provider.isDeleted) viewModel.restoreProvider(match.provider.id)
-                                        viewModel.selectedProvider = match.provider
-                                        viewModel.selectedStore = null
-                                        viewModel.selectedProperty = null
-                                        viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
-                                    } else if (match?.store != null) {
-                                        if (match.store.isDeleted) viewModel.restoreStore(match.store.id)
-                                        viewModel.selectedStore = match.store
-                                        viewModel.selectedProvider = null
-                                        viewModel.selectedProperty = null
-                                        viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
-                                    } else if (match?.property != null) {
-                                        if (match.property.isDeleted) viewModel.restoreProperty(match.property.id)
-                                        viewModel.selectedProperty = match.property
-                                        viewModel.selectedProvider = null
-                                        viewModel.selectedStore = null
-                                        viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
-                                    } else {
-                                        viewModel.selectedProvider = null
-                                        viewModel.selectedStore = null
-                                        viewModel.selectedProperty = null
-                                        viewModel.selectedJob = null
-                                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
-                                    }
-
-                                    successUserName = provName
-                                    showSuccessState = true
                                 } else {
                                     Toast.makeText(context, "❌ يرجى إدخال كلمة المرور!", Toast.LENGTH_LONG).show()
                                 }

@@ -15,6 +15,7 @@ data class ReportEntity(
     val reason: String = "",
     val explanation: String = "",
     val content: String = "",
+    // TODO: Migrate to FirebaseStorageUploader
     val proofPhotoBase64: String = "",
     val status: String = "PENDING", // PENDING, INVESTIGATING, RESOLVED, REJECTED
     val adminActionNotes: String = "",

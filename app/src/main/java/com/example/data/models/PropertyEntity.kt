@@ -32,6 +32,7 @@ data class PropertyEntity(
     @get:com.google.firebase.firestore.Exclude
     val password: String = "",
     val pdfFileUri: String = "",
+    // TODO: Migrate to FirebaseStorageUploader
     val pdfFileBase64: String = "",
     val pdfStatus: String = "",
     val isApproved: Boolean = false,

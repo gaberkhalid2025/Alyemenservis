@@ -3,9 +3,9 @@ package com.example.domain.usecases
 import com.example.data.repositories.InstantRequestRepository
 import com.example.utils.AppError
 import com.example.utils.AppResult
+import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 class AcceptOfferUseCase @Inject constructor(
     private val repository: InstantRequestRepository
@@ -17,7 +17,7 @@ class AcceptOfferUseCase @Inject constructor(
         providerName: String,
         providerPhone: String,
         acceptedPrice: Double
-    ): AppResult<Unit> = suspendCoroutine { cont ->
+    ): AppResult<Unit> = suspendCancellableCoroutine { cont ->
         try {
             repository.acceptOffer(
                 requestId = requestId,
@@ -26,11 +26,15 @@ class AcceptOfferUseCase @Inject constructor(
                 providerName = providerName,
                 providerPhone = providerPhone,
                 acceptedPrice = acceptedPrice,
-                onSuccess = { cont.resume(AppResult.Success(Unit)) },
-                onError = { cont.resume(AppResult.Error(AppError.UnknownError(it))) }
+                onSuccess = {
+                    if (cont.isActive) cont.resume(AppResult.Success(Unit))
+                },
+                onError = {
+                    if (cont.isActive) cont.resume(AppResult.Error(AppError.UnknownError(it)))
+                }
             )
         } catch (e: Exception) {
-            cont.resume(AppResult.Error(AppError.UnknownError(e.localizedMessage ?: "فشل قبول العرض", e)))
+            if (cont.isActive) cont.resume(AppResult.Error(AppError.UnknownError(e.localizedMessage ?: "فشل قبول العرض", e)))
         }
     }
 }

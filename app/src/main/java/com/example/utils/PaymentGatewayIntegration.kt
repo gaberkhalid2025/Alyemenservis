@@ -85,42 +85,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * معالجة وتنفيذ عملية الدفع
      */
     fun processPayment(payment: Payment, settings: AdminSettingsEntity? = null): Result<PaymentResult> {
-        val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
-        if (!enabled) {
-            return Result.failure(
-                UnsupportedOperationException(
-                    "الدفع الإلكتروني غير مُفعّل حالياً. يرجى التواصل مع الدعم لتفعيله."
-                )
-            )
-        }
-
-        return try {
-            if (!validatePaymentMethod(payment.method)) {
-                return Result.failure(IllegalArgumentException("طريقة الدفع غير مدعومة: ${payment.method}"))
-            }
-
-            val secRes = PaymentSecurityGuard.validateTransaction(
-                amount = payment.amount,
-                receiptNumber = payment.transferId,
-                beneficiary = payment.accountName
-            )
-            if (secRes.isFailure) {
-                return Result.failure(secRes.exceptionOrNull() ?: IllegalArgumentException("فشل فحص أمان العملية المالية"))
-            }
-
-            val transactionId = if (payment.id.isNotBlank()) payment.id else "TXN-${UUID.randomUUID().toString().take(8).uppercase()}"
-            activeTransactions[transactionId] = payment.copy(id = transactionId)
-
-            val result = PaymentResult(
-                success = true,
-                transactionId = transactionId,
-                message = "تمت معالجة الدفع عبر محفظة ${getPaymentMethodName(payment.method)} بنجاح",
-                timestamp = System.currentTimeMillis()
-            )
-            Result.success(result)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
 
     /**
@@ -157,26 +122,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * تأكيد استلام المبلغ وإصدار إيصال السداد
      */
     fun confirmPayment(transactionId: String, settings: AdminSettingsEntity? = null): Result<PaymentConfirmation> {
-        val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
-        if (!enabled) {
-            return Result.failure(
-                UnsupportedOperationException("تأكيد الدفع غير مُفعّل حالياً.")
-            )
-        }
-
-        return try {
-            val code = "CONF-${(100000..999999).random()}"
-            val confirmation = PaymentConfirmation(
-                transactionId = transactionId,
-                isConfirmed = true,
-                confirmedBy = "SYSTEM_PAYMENT_GATEWAY",
-                confirmationCode = code,
-                confirmedAt = System.currentTimeMillis()
-            )
-            Result.success(confirmation)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
 
     /**
@@ -195,12 +141,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * استرداد المبلغ
      */
     fun refundPayment(transactionId: String, amount: Double): Result<Boolean> {
-        return try {
-            if (amount <= 0) return Result.failure(IllegalArgumentException("مبلغ الاسترداد غير صالح"))
-            Result.success(true)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
 
     /**

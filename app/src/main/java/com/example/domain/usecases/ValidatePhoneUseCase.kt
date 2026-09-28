@@ -29,6 +29,35 @@ class ValidatePhoneUseCase {
         return ValidationResult(isValid = true)
     }
 
+    companion object {
+        fun normalizePhone(phone: String): String {
+            if (phone.isBlank()) return phone
+            val digits = phone.filter { it.isDigit() }
+            if (digits.length < 7) return phone
+
+            var processed = digits
+            if (processed.startsWith("00967")) {
+                processed = processed.substring(5)
+            } else if (processed.startsWith("967")) {
+                processed = processed.substring(3)
+            }
+
+            if (processed.startsWith("0") && processed.length == 10) {
+                processed = processed.substring(1)
+            }
+
+            if (processed.length == 9) {
+                return processed
+            }
+
+            if (processed.length > 9) {
+                return processed.takeLast(9)
+            }
+
+            return phone
+        }
+    }
+
     data class ValidationResult(
         val isValid: Boolean,
         val errorMessage: String = ""

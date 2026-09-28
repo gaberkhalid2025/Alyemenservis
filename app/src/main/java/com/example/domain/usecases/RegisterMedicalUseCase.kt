@@ -35,7 +35,7 @@ class RegisterMedicalUseCase(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(medical.passwordHash)
+        val passCheck = validatePassword(medical.rawPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }

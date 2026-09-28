@@ -110,18 +110,31 @@ class ConflictResolver(context: Context) {
     }
 
     /**
-     * دمج التغييرات المحلية والسحابية (دمج الحقول المحدثة)
+     * دمج التغييرات المحلية والسحابية (مقارنة الطوابع الزمنية لكل حقل)
      */
     fun mergeChanges(conflict: Conflict): Map<String, Any?> {
         val merged = HashMap<String, Any?>()
         merged.putAll(conflict.cloudData)
-        // دمج الحقول المحلية غير الفارغة أو الأحدث
+
+        val localTime = (conflict.localData["updatedAt"] as? Number)?.toLong() 
+            ?: (conflict.localData["timestamp"] as? Number)?.toLong() 
+            ?: conflict.timestamp
+
+        val cloudTime = (conflict.cloudData["updatedAt"] as? Number)?.toLong() 
+            ?: (conflict.cloudData["timestamp"] as? Number)?.toLong() 
+            ?: 0L
+
         conflict.localData.forEach { (key, localVal) ->
             if (localVal != null) {
-                if (localVal is String && localVal.isNotBlank()) {
-                    merged[key] = localVal
-                } else if (localVal !is String) {
-                    merged[key] = localVal
+                val fieldLocalTs = (conflict.localData["${key}_updatedAt"] as? Number)?.toLong() ?: localTime
+                val fieldCloudTs = (conflict.cloudData["${key}_updatedAt"] as? Number)?.toLong() ?: cloudTime
+
+                if (fieldLocalTs >= fieldCloudTs) {
+                    if (localVal is String) {
+                        if (localVal.isNotBlank()) merged[key] = localVal
+                    } else {
+                        merged[key] = localVal
+                    }
                 }
             }
         }

@@ -56,6 +56,14 @@ object BookingStateMachine {
     )
 
     /**
+     * الحالات التي تشغل الموعد وتمنع حجز آخر في نفس التوقيت (توحيد APPROVED و ACCEPTED)
+     */
+    fun isSlotOccupiedStatus(status: String): Boolean {
+        val s = status.uppercase(Locale.ROOT)
+        return s in listOf("PENDING", "UNDER_REVIEW", "ACCEPTED", "APPROVED", "IN_PROGRESS")
+    }
+
+    /**
      * 1. التحقق من إمكانية الانتقال من الحالة الحالية للحالة الجديدة
      */
     fun canTransition(currentStatus: String, newStatus: String): Boolean {

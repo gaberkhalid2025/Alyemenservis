@@ -6,6 +6,7 @@ import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.security.BookingSecurityHelper
 import com.example.utils.AnalyticsEventsHelper
+import com.example.utils.AppConstants
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -39,9 +40,10 @@ class InstantRequestRepository(private val context: Context? = null) {
         onError: (String) -> Unit = {}
     ) {
         try {
-            val docId = if (request.id.isNotBlank()) request.id else firestore.collection("instant_requests").document().id
+            val docId = if (request.id.isNotBlank()) request.id else firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document().id
             val requestCode = if (request.requestCode.isNotBlank()) request.requestCode else "URG-${Random.nextInt(100000, 999999)}"
-            val rawPin = if (request.secretPin.isNotBlank()) request.secretPin else "${Random.nextInt(1000, 9999)}"
+            val inputRawPin = request.rawPin.ifBlank { request.secretPin }
+            val rawPin = if (inputRawPin.isNotBlank()) inputRawPin else "${Random.nextInt(1000, 9999)}"
             val pin = if (rawPin.startsWith("$2a$") || rawPin.startsWith("$2b$") || rawPin.contains(":")) {
                 rawPin
             } else {
@@ -59,6 +61,8 @@ class InstantRequestRepository(private val context: Context? = null) {
             val newEntity = request.copy(
                 id = docId,
                 requestCode = requestCode,
+                pinHash = pin,
+                rawPin = rawPin,
                 secretPin = pin,
                 cancellationPassword = cancelPass,
                 status = if (request.status.isBlank()) "WAITING_FOR_OFFERS" else request.status,
@@ -66,7 +70,7 @@ class InstantRequestRepository(private val context: Context? = null) {
                 expiresAt = expiresAt
             )
 
-            firestore.collection("instant_requests").document(docId).set(newEntity)
+            firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(docId).set(newEntity)
                 .addOnSuccessListener {
                     val current = _requests.value.toMutableList()
                     current.removeAll { it.id == docId }
@@ -88,7 +92,7 @@ class InstantRequestRepository(private val context: Context? = null) {
      * 2. تدفق حي لطلبات مستخدم معين (العميل)
      */
     fun getUserInstantRequests(userId: String): Flow<List<InstantRequestEntity>> = callbackFlow {
-        val listener: ListenerRegistration = firestore.collection("instant_requests")
+        val listener: ListenerRegistration = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
             .whereEqualTo("userId", userId)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(50)
@@ -115,7 +119,7 @@ class InstantRequestRepository(private val context: Context? = null) {
      * 3. تدفق حي للطلبات المتاحة للفنيين في مدينة/تصنيف معين
      */
     fun getAvailableInstantRequests(category: String = "", city: String = ""): Flow<List<InstantRequestEntity>> = callbackFlow {
-        val query = firestore.collection("instant_requests")
+        val query = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
             .whereEqualTo("status", "WAITING_FOR_OFFERS")
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(100)
@@ -152,16 +156,16 @@ class InstantRequestRepository(private val context: Context? = null) {
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        val offerId = if (offer.id.isNotBlank()) offer.id else UUID.randomUUID().toString()
+        val offerId = if (offer.id.isNotBlank()) offer.id else com.example.utils.EntityIdGenerator.generateOfferId()
         val finalOffer = offer.copy(id = offerId, createdAt = System.currentTimeMillis())
 
-        val offerRef = firestore.collection("instant_requests")
+        val offerRef = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
             .document(offer.requestId)
             .collection("offers")
             .document(offerId)
 
         val topLevelOfferRef = firestore.collection("request_offers").document(offerId)
-        val requestRef = firestore.collection("instant_requests").document(offer.requestId)
+        val requestRef = firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(offer.requestId)
 
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(requestRef)
@@ -201,10 +205,10 @@ class InstantRequestRepository(private val context: Context? = null) {
             "updatedAt" to System.currentTimeMillis()
         )
 
-        firestore.collection("instant_requests").document(requestId)
+        firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId)
             .update(updates)
             .addOnSuccessListener {
-                firestore.collection("instant_requests").document(requestId)
+                firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId)
                     .collection("offers").document(offerId)
                     .update("status", "ACCEPTED")
                 firestore.collection("request_offers").document(offerId)
@@ -235,7 +239,7 @@ class InstantRequestRepository(private val context: Context? = null) {
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        firestore.collection("instant_requests").document(requestId).get()
+        firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId).get()
             .addOnSuccessListener { doc ->
                 val request = doc.toObject(InstantRequestEntity::class.java)
                 if (request == null) {
@@ -262,7 +266,7 @@ class InstantRequestRepository(private val context: Context? = null) {
                     updates["cancelReason"] = cancelReason
                 }
 
-                firestore.collection("instant_requests").document(requestId).update(updates)
+                firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId).update(updates)
                     .addOnSuccessListener {
                         _requests.value = _requests.value.map {
                             if (it.id == requestId) it.copy(status = "CANCELLED", cancelReason = cancelReason) else it
@@ -288,7 +292,7 @@ class InstantRequestRepository(private val context: Context? = null) {
             "updatedAt" to System.currentTimeMillis()
         )
 
-        firestore.collection("instant_requests").document(requestId).update(updates)
+        firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId).update(updates)
             .addOnSuccessListener {
                 _requests.value = _requests.value.map {
                     if (it.id == requestId) it.copy(status = "COMPLETED") else it

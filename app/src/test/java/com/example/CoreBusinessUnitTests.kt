@@ -93,7 +93,7 @@ class CoreBusinessUnitTests {
             storeCategory = "إلكترونيات",
             city = "صنعاء",
             addressDetails = "شارع حدة",
-            passwordHash = "Pass1234"
+            rawPassword = "Pass1234"
         )
         val result = useCase(invalidStore)
         assertTrue(result.isFailure)
@@ -112,7 +112,7 @@ class CoreBusinessUnitTests {
             cuisineType = "شبيات",
             city = "عدن",
             addressDetails = "كريتر",
-            passwordHash = "Pass1234"
+            rawPassword = "Pass1234"
         )
         val result = useCase(invalidRest)
         assertTrue(result.isFailure)

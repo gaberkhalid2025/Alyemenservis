@@ -261,7 +261,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                     fullName = name.trim(),
                     phone = cleanPhone,
                     city = residence.trim(),
-                    passwordHash = effectivePassword
+                    rawPassword = effectivePassword
                 )
 
                 val repository = com.example.data.repositories.RegistrationRepositoryImpl(context)

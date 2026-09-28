@@ -281,7 +281,7 @@ fun JobApplicationDialog(
                                         contactEmail = "",
                                         city = selectedCity,
                                         requirements = "خبرة: $applicantExperience | ملاحظات: $notes",
-                                        passwordHash = "NO_PASS"
+                                        rawPassword = "NO_PASS"
                                     )
                                     val res = viewModel.registerJobPoster(jobObj)
                                     isSubmitting = false

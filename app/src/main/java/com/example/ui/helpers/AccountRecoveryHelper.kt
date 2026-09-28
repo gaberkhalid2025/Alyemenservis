@@ -23,8 +23,7 @@ class AccountRecoveryHelper(
             val pDoc = providerSnap.documents.firstOrNull()
             val provider = pDoc?.toObject(ProviderEntity::class.java)
             if (provider != null) {
-                val pass = pDoc.getString("password") ?: pDoc.getString("passwordHash") ?: ""
-                onResult(RestoreAccountMatch("PROVIDER", provider.name, provider = provider, savedPassword = pass))
+                onResult(RestoreAccountMatch("PROVIDER", provider.name, provider = provider))
                 return@addOnSuccessListener
             }
 
@@ -32,8 +31,7 @@ class AccountRecoveryHelper(
                 val sDoc = storeSnap.documents.firstOrNull()
                 val store = sDoc?.toObject(StoreEntity::class.java)
                 if (store != null) {
-                    val pass = sDoc.getString("password") ?: sDoc.getString("passwordHash") ?: ""
-                    onResult(RestoreAccountMatch("STORE", store.name, store = store, savedPassword = pass))
+                    onResult(RestoreAccountMatch("STORE", store.name, store = store))
                     return@addOnSuccessListener
                 }
 
@@ -41,8 +39,7 @@ class AccountRecoveryHelper(
                     val prDoc = propSnap.documents.firstOrNull()
                     val property = prDoc?.toObject(PropertyEntity::class.java)
                     if (property != null) {
-                        val pass = prDoc.getString("password") ?: prDoc.getString("passwordHash") ?: ""
-                        onResult(RestoreAccountMatch("PROPERTY", property.title, property = property, savedPassword = pass))
+                        onResult(RestoreAccountMatch("PROPERTY", property.title, property = property))
                         return@addOnSuccessListener
                     }
 
@@ -50,8 +47,7 @@ class AccountRecoveryHelper(
                         val uDoc = userSnap.documents.firstOrNull()
                         if (uDoc != null) {
                             val uName = uDoc.getString("name") ?: "مستخدم مسجل"
-                            val pass = uDoc.getString("password") ?: ""
-                            onResult(RestoreAccountMatch("CLIENT", uName, savedPassword = pass))
+                            onResult(RestoreAccountMatch("CLIENT", uName))
                             return@addOnSuccessListener
                         }
 
@@ -60,8 +56,7 @@ class AccountRecoveryHelper(
                             if (rDoc != null) {
                                 val rName = rDoc.getString("name") ?: "حساب مسجل"
                                 val rType = rDoc.getString("type") ?: "CLIENT"
-                                val pass = rDoc.getString("password") ?: ""
-                                onResult(RestoreAccountMatch(rType, rName, savedPassword = pass))
+                                onResult(RestoreAccountMatch(rType, rName))
                                 return@addOnSuccessListener
                             }
                             onResult(null)
@@ -74,6 +69,37 @@ class AccountRecoveryHelper(
         }
     }
 
+    fun verifyRestorePassword(cleanPhone: String, accountType: String, passwordInput: String, onResult: (Boolean) -> Unit) {
+        if (passwordInput.isBlank()) {
+            onResult(false)
+            return
+        }
+        val col = when (accountType) {
+            "PROVIDER" -> "providers"
+            "STORE" -> "stores"
+            "PROPERTY" -> "properties"
+            "CLIENT" -> "users"
+            else -> "join_requests"
+        }
+        db.collection(col).whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
+            val doc = snap.documents.firstOrNull()
+            if (doc == null) {
+                onResult(false)
+                return@addOnSuccessListener
+            }
+            val storedHash = doc.getString("password") ?: doc.getString("passwordHash") ?: ""
+            if (storedHash.isBlank()) {
+                onResult(false)
+                return@addOnSuccessListener
+            }
+            val isCorrect = com.example.utils.PasswordHasher.verifyPassword(passwordInput.trim(), storedHash) ||
+                    com.example.utils.SecurityCryptoUtils.verifyAdminPassword(passwordInput.trim(), storedHash)
+            onResult(isCorrect)
+        }.addOnFailureListener {
+            onResult(false)
+        }
+    }
+
     fun requestPasswordReset(
         context: Context,
         phone: String,
@@ -83,7 +109,7 @@ class AccountRecoveryHelper(
         triggerNotification: (String) -> Unit,
         onResult: (Boolean) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val reqData = mapOf(
             "id" to cleanPhone,
@@ -132,7 +158,7 @@ class AccountRecoveryHelper(
         newPassword: String,
         onResult: (Boolean) -> Unit
     ) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
         val hashedPassword = com.example.utils.PasswordHasher.hash(newPassword.trim())
         val updates = mapOf(
             "status" to "RESOLVED",

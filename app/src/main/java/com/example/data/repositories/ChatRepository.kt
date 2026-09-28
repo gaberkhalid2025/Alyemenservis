@@ -372,7 +372,6 @@ class ChatRepository(
             }
 
             val confirmedMsg = initialMsg.copy(status = MessageStatus.SENT, syncStatus = SyncStatus.SYNCED)
-            channelRef.collection("messages").document(messageId).set(confirmedMsg).await()
 
             val displayLast = when (mediaType) {
                 MediaType.IMAGE -> "📷 صورة"
@@ -397,7 +396,11 @@ class ChatRepository(
                 }
             }
 
-            channelRef.update(updates).await()
+            // Write message and update channel atomically in a single batch
+            val batch = firestore.batch()
+            batch.set(channelRef.collection("messages").document(messageId), confirmedMsg)
+            batch.update(channelRef, updates)
+            batch.commit().await()
 
             // Update local to SENT
             local?.insertOrUpdateMessage(confirmedMsg)
@@ -467,12 +470,13 @@ class ChatRepository(
                 // If field doesn't exist yet, ignore
             }
 
-            // Update status of incoming messages to READ
-            val unreadSnapshot = channelRef.collection("messages").get().await()
+            // Update status of incoming messages to READ (query unread only)
+            val unreadSnapshot = channelRef.collection("messages")
+                .whereEqualTo("isRead", false)
+                .get().await()
             val unreadDocs = unreadSnapshot.documents.filter { doc ->
                 val senderId = doc.getString("senderId") ?: ""
-                val status = doc.getString("status") ?: ""
-                senderId != currentUserId && status != MessageStatus.READ.name
+                senderId != currentUserId
             }
 
             if (unreadDocs.isNotEmpty()) {
@@ -604,12 +608,15 @@ class ChatRepository(
             local?.deleteChannel(channelId)
             val channelDocRef = channelsCollection.document(channelId)
             val msgsSnapshot = channelDocRef.collection("messages").get().await()
-            val batch = firestore.batch()
-            for (doc in msgsSnapshot.documents) {
-                batch.delete(doc.reference)
+            val docs = msgsSnapshot.documents
+            docs.chunked(400).forEach { chunk ->
+                val batch = firestore.batch()
+                for (doc in chunk) {
+                    batch.delete(doc.reference)
+                }
+                batch.commit().await()
             }
-            batch.delete(channelDocRef)
-            batch.commit().await()
+            channelDocRef.delete().await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
             Log.e("ChatRepository", "deleteChannel error: ${e.message}")
