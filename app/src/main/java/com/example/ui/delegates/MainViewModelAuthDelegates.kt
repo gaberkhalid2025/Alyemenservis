@@ -146,9 +146,9 @@ fun MainViewModel.goBack(): Boolean {
         _screenBackStack.value = updated
         _currentScreen.value = updated.last()
         return true
-    } else if (current.isNotEmpty() && _currentScreen.value != "HOME") {
-        _currentScreen.value = "HOME"
-        _screenBackStack.value = listOf("HOME")
+    } else if (current.isNotEmpty() && _currentScreen.value != AppScreens.USER_BROWSE && _currentScreen.value != "HOME") {
+        _currentScreen.value = AppScreens.USER_BROWSE
+        _screenBackStack.value = listOf(AppScreens.USER_BROWSE)
         return true
     }
     return false

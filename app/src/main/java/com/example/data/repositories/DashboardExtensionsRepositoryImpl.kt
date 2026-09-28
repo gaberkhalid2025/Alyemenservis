@@ -27,21 +27,24 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
 
     // ✨ م2-ج2: دوال العروض الخاصة عبر الـ Repository
     override fun updateSpecialOfferStatus(offerId: String, isEnabled: Boolean) {
+        if (offerId.isBlank()) return
         firestore.collection("special_offers")
             .document(offerId)
             .update("isEnabled", isEnabled)
     }
 
     override fun deleteSpecialOffer(offerId: String) {
+        if (offerId.isBlank()) return
         firestore.collection("special_offers")
             .document(offerId)
             .delete()
     }
 
     override fun addSpecialOffer(offer: SpecialOfferEntity) {
+        val docId = offer.id.ifBlank { java.util.UUID.randomUUID().toString() }
         firestore.collection("special_offers")
-            .document(offer.id)
-            .set(offer)
+            .document(docId)
+            .set(offer.copy(id = docId))
     }
 
     override fun getCoupons(ownerId: String): Flow<List<SpecialOfferEntity>> = callbackFlow {
@@ -52,7 +55,21 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
         }
         val listener = query.addSnapshotListener { snap, _ ->
             if (snap != null) {
-                trySend(snap.documents.mapNotNull { it.toObject(SpecialOfferEntity::class.java)?.copy(id = it.id) })
+                val list = snap.documents.mapNotNull { doc ->
+                    val base = doc.toObject(SpecialOfferEntity::class.java)
+                    if (base != null) {
+                        val code = base.couponCode.ifBlank { doc.getString("code") ?: "" }
+                        val discount = if (base.discountPercent > 0) base.discountPercent else (doc.getDouble("discountPercentage")?.toInt() ?: 0)
+                        val enabled = doc.getBoolean("isEnabled") ?: doc.getBoolean("isActive") ?: base.isEnabled
+                        base.copy(
+                            id = doc.id,
+                            couponCode = code,
+                            discountPercent = discount,
+                            isEnabled = enabled
+                        )
+                    } else null
+                }
+                trySend(list)
             } else {
                 trySend(emptyList())
             }
@@ -62,21 +79,24 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
 
     // ✨ م2-ج2: دوال الكوبونات عبر الـ Repository
     override fun updateCouponStatus(couponId: String, isEnabled: Boolean) {
+        if (couponId.isBlank()) return
         firestore.collection("coupons")
             .document(couponId)
-            .update("isEnabled", isEnabled)
+            .update(mapOf("isEnabled" to isEnabled, "isActive" to isEnabled))
     }
 
     override fun deleteCoupon(couponId: String) {
+        if (couponId.isBlank()) return
         firestore.collection("coupons")
             .document(couponId)
             .delete()
     }
 
     override fun addCoupon(coupon: SpecialOfferEntity) {
+        val docId = coupon.id.ifBlank { java.util.UUID.randomUUID().toString() }
         firestore.collection("coupons")
-            .document(coupon.id)
-            .set(coupon)
+            .document(docId)
+            .set(coupon.copy(id = docId))
     }
 
     override fun getInventory(ownerId: String): Flow<List<InventoryItem>> = callbackFlow {
@@ -97,21 +117,24 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
 
     // ✨ م2-ج2: نقل منطق Firestore لحفظ وإعادة تعديل المخزون
     override fun updateInventoryQuantity(itemId: String, newQty: Int, inStock: Boolean) {
+        if (itemId.isBlank()) return
         firestore.collection("inventory")
             .document(itemId)
             .update("quantity", newQty, "inStock", inStock)
     }
 
     override fun deleteInventoryItem(itemId: String) {
+        if (itemId.isBlank()) return
         firestore.collection("inventory")
             .document(itemId)
             .delete()
     }
 
     override fun addInventoryItem(item: InventoryItem) {
+        val docId = item.id.ifBlank { java.util.UUID.randomUUID().toString() }
         firestore.collection("inventory")
-            .document(item.id)
-            .set(item)
+            .document(docId)
+            .set(item.copy(id = docId))
     }
 
     override fun getLoyaltyPrograms(ownerId: String): Flow<List<LoyaltyProgram>> = callbackFlow {
@@ -132,21 +155,24 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
 
     // ✨ م2-ج2: دوال برامج الولاء عبر الـ Repository
     override fun updateLoyaltyProgramStatus(programId: String, isEnabled: Boolean) {
+        if (programId.isBlank()) return
         firestore.collection("loyalty_programs")
             .document(programId)
             .update("isEnabled", isEnabled)
     }
 
     override fun deleteLoyaltyProgram(programId: String) {
+        if (programId.isBlank()) return
         firestore.collection("loyalty_programs")
             .document(programId)
             .delete()
     }
 
     override fun addLoyaltyProgram(program: LoyaltyProgram) {
+        val docId = program.id.ifBlank { java.util.UUID.randomUUID().toString() }
         firestore.collection("loyalty_programs")
-            .document(program.id)
-            .set(program)
+            .document(docId)
+            .set(program.copy(id = docId))
     }
 
     override fun getStaff(ownerId: String): Flow<List<StaffMember>> = callbackFlow {
@@ -167,14 +193,16 @@ class DashboardExtensionsRepositoryImpl : IDashboardExtensionsRepository {
 
     // ✨ م2-ج2: دوال الموظفين عبر الـ Repository
     override fun deleteStaff(staffId: String) {
+        if (staffId.isBlank()) return
         firestore.collection("staff")
             .document(staffId)
             .delete()
     }
 
     override fun addStaff(staffMember: StaffMember) {
+        val docId = staffMember.id.ifBlank { java.util.UUID.randomUUID().toString() }
         firestore.collection("staff")
-            .document(staffMember.id)
-            .set(staffMember)
+            .document(docId)
+            .set(staffMember.copy(id = docId))
     }
 }

@@ -31,7 +31,17 @@ enum class UserRole(
          */
         fun fromCode(code: String): UserRole {
             val upperCode = code.trim().uppercase()
-            return values().firstOrNull { it.code == upperCode } ?: GUEST
+            entries.firstOrNull { it.code == upperCode }?.let { return it }
+            return when (upperCode) {
+                "PROVIDER" -> TECHNICIAN
+                "STORE" -> STORE_OWNER
+                "RESTAURANT" -> RESTAURANT_OWNER
+                "MEDICAL" -> MEDICAL_CENTER
+                "PROPERTY", "PROPERTY_OWNER" -> REAL_ESTATE
+                "JOB", "EMPLOYER" -> JOB_POSTER
+                "USER", "CUSTOMER" -> CLIENT
+                else -> GUEST
+            }
         }
     }
 }

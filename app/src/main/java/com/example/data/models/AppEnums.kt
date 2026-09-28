@@ -30,7 +30,9 @@ enum class AdminRole(val code: String, val titleArabic: String) {
     companion object {
         fun fromString(value: String): AdminRole {
             val clean = value.trim()
-            return entries.firstOrNull { it.code.equals(clean, ignoreCase = true) } ?: GUEST
+            return entries.firstOrNull {
+                it.code.equals(clean, ignoreCase = true) || it.titleArabic == clean
+            } ?: GUEST
         }
     }
 }

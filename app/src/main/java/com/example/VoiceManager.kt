@@ -2,6 +2,8 @@ package com.example
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -17,64 +19,133 @@ object VoiceManager : TextToSpeech.OnInitListener {
     var onHear: (((String) -> Unit) -> Unit)? = null
 
     private var tts: TextToSpeech? = null
+    @Volatile
     private var isInitialized = false
+    @Volatile
+    private var isInitializing = false
+    @Volatile
+    private var isDispatchingOnSpeak = false
+
+    private var pendingSpeechText: String? = null
+    private var pendingUtteranceId: String = "ai_speech"
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     var isSpeakingCallback: ((Boolean) -> Unit)? = null
 
     fun init(context: Context) {
-        if (tts == null) {
+        if (tts == null && !isInitializing) {
             try {
+                isInitializing = true
                 tts = TextToSpeech(context.applicationContext, this)
             } catch (e: Exception) {
+                isInitializing = false
                 Log.e("VoiceManager", "Error initializing TTS", e)
             }
         }
     }
 
     override fun onInit(status: Int) {
+        isInitializing = false
         if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale("ar")) ?: TextToSpeech.LANG_MISSING_DATA
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                tts?.setLanguage(Locale.getDefault())
+            try {
+                val yemeniLocale = Locale.forLanguageTag("ar-YE")
+                val arabicLocale = Locale.forLanguageTag("ar")
+                var result = tts?.setLanguage(yemeniLocale) ?: TextToSpeech.LANG_MISSING_DATA
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    result = tts?.setLanguage(arabicLocale) ?: TextToSpeech.LANG_MISSING_DATA
+                }
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    tts?.setLanguage(Locale.getDefault())
+                }
+                tts?.setPitch(1.0f)
+                tts?.setSpeechRate(0.95f)
+                isInitialized = true
+
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        mainHandler.post { isSpeakingCallback?.invoke(true) }
+                    }
+
+                    override fun onDone(utteranceId: String?) {
+                        mainHandler.post { isSpeakingCallback?.invoke(false) }
+                    }
+
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        mainHandler.post { isSpeakingCallback?.invoke(false) }
+                    }
+
+                    override fun onError(utteranceId: String?, errorCode: Int) {
+                        mainHandler.post { isSpeakingCallback?.invoke(false) }
+                    }
+                })
+
+                val queuedText = pendingSpeechText
+                val queuedId = pendingUtteranceId
+                pendingSpeechText = null
+                if (!queuedText.isNullOrBlank()) {
+                    val params = Bundle()
+                    tts?.speak(queuedText, TextToSpeech.QUEUE_FLUSH, params, queuedId)
+                }
+            } catch (e: Exception) {
+                Log.e("VoiceManager", "Error configuring TTS onInit", e)
             }
-            tts?.setPitch(1.0f)
-            tts?.setSpeechRate(0.95f)
-            isInitialized = true
-
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    isSpeakingCallback?.invoke(true)
-                }
-
-                override fun onDone(utteranceId: String?) {
-                    isSpeakingCallback?.invoke(false)
-                }
-
-                override fun onError(utteranceId: String?) {
-                    isSpeakingCallback?.invoke(false)
-                }
-            })
+        } else {
+            isInitialized = false
+            pendingSpeechText = null
+            Log.w("VoiceManager", "TTS initialization failed with status: $status")
         }
     }
 
     fun speak(text: String, utteranceId: String = "ai_speech") {
+        if (text.isBlank()) return
         if (isInitialized && tts != null) {
-            val params = Bundle()
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            try {
+                val params = Bundle()
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            } catch (e: Exception) {
+                Log.e("VoiceManager", "Error speaking text", e)
+            }
         } else {
-            onSpeak?.invoke(text)
+            pendingSpeechText = text
+            pendingUtteranceId = utteranceId
+            if (!isDispatchingOnSpeak && tts == null && !isInitializing) {
+                try {
+                    isDispatchingOnSpeak = true
+                    onSpeak?.invoke(text)
+                } finally {
+                    isDispatchingOnSpeak = false
+                }
+            }
         }
     }
 
     fun stop() {
-        tts?.stop()
-        isSpeakingCallback?.invoke(false)
+        try {
+            pendingSpeechText = null
+            tts?.stop()
+        } catch (e: Exception) {
+            Log.e("VoiceManager", "Error stopping TTS", e)
+        }
+        mainHandler.post { isSpeakingCallback?.invoke(false) }
     }
 
     fun shutdown() {
-        tts?.stop()
-        tts?.shutdown()
-        tts = null
-        isInitialized = false
+        try {
+            pendingSpeechText = null
+            tts?.stop()
+            tts?.shutdown()
+        } catch (e: Exception) {
+            Log.e("VoiceManager", "Error shutting down TTS", e)
+        } finally {
+            tts = null
+            isInitialized = false
+            isInitializing = false
+            isDispatchingOnSpeak = false
+            isSpeakingCallback = null
+            onSpeak = null
+            onHear = null
+        }
     }
 
     fun getInstance(context: Context): VoiceManager {

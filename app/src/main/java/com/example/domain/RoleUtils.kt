@@ -20,4 +20,5 @@ fun String.isOwner(): Boolean {
     val role = toAdminRole()
     return role == AdminRole.OWNER || role == AdminRole.MAIN_ADMIN
 }
-fun String.canManageContent(): Boolean = isAdmin() || isSupervisor()
+fun String.canManageContent(): Boolean =
+    isAdmin() || isSupervisor() || toAdminRole() == AdminRole.OPERATIONS

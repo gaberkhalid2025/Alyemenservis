@@ -154,7 +154,29 @@ data class ChatChannel(
      * إلى الحقول القياسية المعتمدة (participants, participantNames, participantPhotos, title, updatedAt, unreadCount).
      */
     fun toCanonicalChannel(): ChatChannel {
-        return this
+        val resolvedTitle = title.ifBlank {
+            targetName.ifBlank {
+                providerName.ifBlank {
+                    customerName.ifBlank {
+                        clientName.ifBlank { userName }
+                    }
+                }
+            }
+        }
+        val resolvedPhone = targetPhone.ifBlank { customerPhone }
+        val resolvedAvatar = groupAvatarUrl.ifBlank { providerPhoto.ifBlank { clientPhoto } }
+        val resolvedTime = when {
+            lastMessageTime > 0L -> lastMessageTime
+            timestamp > 0L -> timestamp
+            else -> updatedAt
+        }
+        return copy(
+            title = resolvedTitle,
+            targetPhone = resolvedPhone,
+            groupAvatarUrl = resolvedAvatar,
+            lastMessageTime = resolvedTime,
+            updatedAt = if (updatedAt > 0L) updatedAt else resolvedTime
+        )
     }
 
     /**

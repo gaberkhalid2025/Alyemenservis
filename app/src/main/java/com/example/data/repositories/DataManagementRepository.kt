@@ -59,17 +59,19 @@ class DataManagementRepositoryImpl(
 
             // Write Audit Log
             try {
+                val now = System.currentTimeMillis()
+                val logDocId = "log_${now}_${java.util.UUID.randomUUID().toString().take(6)}"
                 val auditLog = mapOf(
-                    "logId" to "audit_wipe_${System.currentTimeMillis()}",
+                    "logId" to logDocId,
                     "collection" to collectionName,
                     "targetFirestoreCollection" to targetCol,
                     "sectionFilter" to (sectionFilter ?: ""),
                     "deletedCount" to deletedCount,
                     "performedBy" to performedBy,
-                    "timestamp" to System.currentTimeMillis(),
+                    "timestamp" to now,
                     "status" to "SUCCESS"
                 )
-                db.collection("audit_logs").document("log_${System.currentTimeMillis()}").set(auditLog).await()
+                db.collection("audit_logs").document(logDocId).set(auditLog).await()
             } catch (_: Exception) {
                 // Ignore audit log failure if main deletion succeeded
             }

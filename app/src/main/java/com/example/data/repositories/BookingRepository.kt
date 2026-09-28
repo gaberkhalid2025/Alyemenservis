@@ -59,21 +59,19 @@ class BookingRepository(
                 val adapter = moshi.adapter<List<BookingEntity>>(type)
                 val list = adapter.fromJson(raw) ?: emptyList()
                 
-                // فحص انتهاء مدة قفل الحجوزات
+                // فحص انتهاء مدة قفل الحجوزات محلياً بدون الكتابة في Firestore أثناء القراءة
+                // (تتم الكتابة الفعلية في الخلفية عبر UnlockExpiredBookingsWorker)
                 val now = System.currentTimeMillis()
-                list.forEach { booking ->
+                val normalizedList = list.map { booking ->
                     if (booking.isLocked && booking.lockedUntil != null && now > booking.lockedUntil) {
-                        try {
-                            firestore.collection(AppConstants.COL_BOOKINGS).document(booking.id)
-                                .update("isLocked", false, "lockedUntil", null)
-                        } catch (e: Exception) {
-                            // تجاهل
-                        }
+                        booking.copy(isLocked = false, lockedUntil = null)
+                    } else {
+                        booking
                     }
                 }
 
-                _cachedBookings.value = list
-                list
+                _cachedBookings.value = normalizedList
+                normalizedList
             } else {
                 emptyList()
             }
@@ -127,8 +125,18 @@ class BookingRepository(
         // Emit cache immediately for instant offline rendering
         val local = loadFromCache()
         if (local.isNotEmpty()) {
+            val cleanUser = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(userId).ifBlank { userId.trim() }
             val filtered = if (userId.isNotBlank()) {
-                local.filter { if (isProvider) it.providerId == userId else it.clientId == userId || it.customerPhone.isNotBlank() }
+                local.filter {
+                    if (isProvider) {
+                        it.providerId == userId ||
+                            com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.providerPhone) == cleanUser
+                    } else {
+                        it.clientId == userId ||
+                            it.customerPhone == userId ||
+                            com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.effectiveCustomerPhone) == cleanUser
+                    }
+                }
             } else local
             trySend(filtered)
         }
@@ -447,14 +455,18 @@ class BookingRepository(
                     else -> "قامت الإدارة بإلغاء الحجز #${booking.bookingNumber}. السبب: $cancellationReason"
                 }
 
-                if (booking.customerPhone.isNotBlank()) {
-                    val uId = UUID.randomUUID().toString()
+                val cleanUserPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(booking.effectiveCustomerPhone)
+                if (cleanUserPhone.isNotBlank()) {
+                    val uDedup = "CANCEL_BOOKING_USER_${booking.id}"
+                    val uId = "notif_$uDedup"
                     firestore.collection(AppConstants.COL_NOTIFICATIONS).document(uId).set(mapOf(
                         "id" to uId,
+                        "dedupKey" to uDedup,
                         "title" to userTitle,
                         "message" to userMsg,
                         "targetType" to "USER",
-                        "targetValue" to booking.customerPhone,
+                        "targetValue" to cleanUserPhone,
+                        "bookingId" to booking.id,
                         "timestamp" to notifTime
                     ))
                 }
@@ -470,26 +482,33 @@ class BookingRepository(
                     else -> "قامت الإدارة بإلغاء الحجز #${booking.bookingNumber}. السبب: $cancellationReason"
                 }
 
-                val pTarget = booking.providerPhone.ifBlank { booking.providerId }
+                val pTarget = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(booking.providerPhone)
+                    .ifBlank { booking.providerId.trim() }
                 if (pTarget.isNotBlank()) {
-                    val pId = UUID.randomUUID().toString()
+                    val pDedup = "CANCEL_BOOKING_PROVIDER_${booking.id}"
+                    val pId = "notif_$pDedup"
                     firestore.collection(AppConstants.COL_NOTIFICATIONS).document(pId).set(mapOf(
                         "id" to pId,
+                        "dedupKey" to pDedup,
                         "title" to providerTitle,
                         "message" to providerMsg,
                         "targetType" to "PROVIDER",
                         "targetValue" to pTarget,
+                        "bookingId" to booking.id,
                         "timestamp" to notifTime
                     ))
                 }
 
-                val aId = UUID.randomUUID().toString()
+                val aDedup = "CANCEL_BOOKING_ADMIN_${booking.id}"
+                val aId = "notif_$aDedup"
                 firestore.collection(AppConstants.COL_NOTIFICATIONS).document(aId).set(mapOf(
                     "id" to aId,
+                    "dedupKey" to aDedup,
                     "title" to "إشعار إداري: إلغاء حجز",
                     "message" to "تم إلغاء الحجز #${booking.bookingNumber} من قبل $cancelledBy. السبب: $cancellationReason",
                     "targetType" to "ADMIN_ONLY",
                     "targetValue" to "ALL",
+                    "bookingId" to booking.id,
                     "timestamp" to notifTime
                 ))
                 onSuccess()

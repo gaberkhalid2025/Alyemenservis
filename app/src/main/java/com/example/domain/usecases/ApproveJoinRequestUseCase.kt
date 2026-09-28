@@ -9,7 +9,15 @@ class ApproveJoinRequestUseCase @Inject constructor(
 ) {
 
     suspend operator fun invoke(request: PendingProviderEntity): Result<Unit> {
-        return statusRepository.approveJoinRequest(request)
+        if (request.id.isBlank()) {
+            return Result.failure(IllegalArgumentException("معرف طلب الانضمام غير صالح"))
+        }
+        val normalized = request.copy(
+            id = request.id.trim(),
+            name = request.name.trim(),
+            phone = ValidatePhoneUseCase.normalizePhone(request.phone)
+        )
+        return statusRepository.approveJoinRequest(normalized)
     }
 }
 

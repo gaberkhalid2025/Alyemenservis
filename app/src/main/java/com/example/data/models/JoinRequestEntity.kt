@@ -9,7 +9,6 @@ data class JoinRequestEntity(
     val status: String = "PENDING", // "PENDING" | "APPROVED" | "REJECTED" | "ACTIVE"
     val fullName: String = "",
     val phone: String = "",
-    @get:com.google.firebase.firestore.Exclude
     val passwordHash: String = "",
     val city: String = "",
     val area: String = "",
@@ -37,5 +36,7 @@ data class JoinRequestEntity(
     val rejectedBy: String = "",
     val isActive: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val jobRequirements: String = "",
+    val salaryRange: String = ""
 )

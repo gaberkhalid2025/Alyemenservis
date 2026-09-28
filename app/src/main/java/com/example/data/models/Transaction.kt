@@ -8,6 +8,7 @@ import java.util.UUID
 /**
  * 💳 نوع العملية المالية
  */
+@Keep
 enum class TransactionType {
     DEPOSIT,     // إيداع رصيد
     WITHDRAWAL,  // سحب رصيد
@@ -19,6 +20,7 @@ enum class TransactionType {
 /**
  * 📊 حالة العملية المالية
  */
+@Keep
 enum class TransactionStatus {
     PENDING,    // قيد المراجعة والمعالجة
     COMPLETED,  // مكتملة بنجاح
@@ -54,6 +56,6 @@ data class Transaction(
     val formattedAmount: String
         get() {
             val prefix = if (isCredit) "+" else "-"
-            return "$prefix${String.format("%,.0f", amount)} $currency"
+            return "$prefix${String.format(java.util.Locale.US, "%,.0f", amount)} $currency"
         }
 }

@@ -1,5 +1,6 @@
 package com.example.data.repositories
 
+import androidx.annotation.Keep
 import com.example.data.models.InstantRequestEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -8,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
  * 📌 Architectural Note: Contract Interfaces retained for modular Clean Architecture abstractions
  * and future repository decoupling without impacting runtime stability.
  */
+@Keep
 data class SystemStatusMetrics(
     val providersCount: Int = 0,
     val storesCount: Int = 0,

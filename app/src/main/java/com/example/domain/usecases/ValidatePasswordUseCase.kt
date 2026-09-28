@@ -1,12 +1,14 @@
 package com.example.domain.usecases
 
+import androidx.annotation.Keep
 import com.example.utils.Validators
+import javax.inject.Inject
 
 /**
  * 🔒 ValidatePasswordUseCase
- * Ensures strong password/PIN requirements (minimum 7 characters with letters and numbers).
+ * Ensures strong password/PIN requirements (minimum 8 characters with letters and numbers).
  */
-class ValidatePasswordUseCase {
+class ValidatePasswordUseCase @Inject constructor() {
     operator fun invoke(password: String): ValidationResult {
         val clean = password.trim()
         if (clean.isEmpty()) {
@@ -19,8 +21,9 @@ class ValidatePasswordUseCase {
         )
     }
 
+    @Keep
     data class ValidationResult(
-        val isValid: Boolean,
+        val isValid: Boolean = false,
         val errorMessage: String = ""
     )
 }

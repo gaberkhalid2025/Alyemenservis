@@ -15,7 +15,6 @@ data class UserEntity(
     val totalBookings: Int = 0,
     val rating: Float = 5.0f,
     val createdAt: Long = System.currentTimeMillis(),
-    @get:com.google.firebase.firestore.Exclude
     val passwordHash: String = "",
     val fcmToken: String = "",
     val profileImage: String = "",

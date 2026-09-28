@@ -50,6 +50,12 @@ interface ChatDao {
     @Query("DELETE FROM chat_channels")
     suspend fun deleteAllChannels()
 
+    @Query("DELETE FROM chat_messages")
+    suspend fun deleteAllMessages()
+
+    @Query("DELETE FROM chat_messages WHERE timestamp < :cutoffTimestamp AND syncStatus = 'SYNCED'")
+    suspend fun deleteStaleMessages(cutoffTimestamp: Long)
+
     @Query("SELECT * FROM chat_channels ORDER BY lastMessageTime DESC")
     suspend fun getAllChannelsList(): List<ChatChannelRoomEntity>
 

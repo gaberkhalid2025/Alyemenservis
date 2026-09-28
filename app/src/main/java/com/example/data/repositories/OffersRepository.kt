@@ -33,9 +33,7 @@ class OffersRepository @Inject constructor(
                 }
             }
 
-            if (offers.isNotEmpty()) {
-                cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(offers))
-            }
+            cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(offers))
             Result.success(offers)
         } catch (e: Exception) {
             val fallbackStr = cacheManager.getOffersCacheRaw()
@@ -59,13 +57,15 @@ class OffersRepository @Inject constructor(
 
     suspend fun addOffer(offer: SpecialOfferEntity): Result<Unit> {
         return try {
-            firestore.collection("special_offers").document(offer.id).set(offer).await()
+            val docId = offer.id.ifBlank { java.util.UUID.randomUUID().toString() }
+            val finalOffer = offer.copy(id = docId)
+            firestore.collection("special_offers").document(docId).set(finalOffer).await()
             try {
-                firestore.collection("offers").document(offer.id).set(offer).await()
+                firestore.collection("offers").document(docId).set(finalOffer).await()
             } catch (_: Exception) {}
             val currentOffers = readLocalCache()
-            if (currentOffers.none { it.id == offer.id }) {
-                currentOffers.add(0, offer)
+            if (currentOffers.none { it.id == docId }) {
+                currentOffers.add(0, finalOffer)
             }
             cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(currentOffers))
             Result.success(Unit)
@@ -76,12 +76,14 @@ class OffersRepository @Inject constructor(
 
     suspend fun updateOffer(offer: SpecialOfferEntity): Result<Unit> {
         return try {
-            firestore.collection("special_offers").document(offer.id).set(offer).await()
+            val docId = offer.id.ifBlank { java.util.UUID.randomUUID().toString() }
+            val finalOffer = offer.copy(id = docId)
+            firestore.collection("special_offers").document(docId).set(finalOffer).await()
             try {
-                firestore.collection("offers").document(offer.id).set(offer).await()
+                firestore.collection("offers").document(docId).set(finalOffer).await()
             } catch (_: Exception) {}
             val currentOffers = readLocalCache().map {
-                if (it.id == offer.id) offer else it
+                if (it.id == docId) finalOffer else it
             }
             cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(currentOffers))
             Result.success(Unit)

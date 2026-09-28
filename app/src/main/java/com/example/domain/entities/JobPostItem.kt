@@ -1,9 +1,12 @@
 package com.example.domain.entities
 
+import androidx.annotation.Keep
+
 /**
  * 💼 JobPostItem
  * تم نقلها من JobPosterDashboardViewModel لتكون متاحة للجميع
  */
+@Keep
 data class JobPostItem(
     val id: String = "",
     val title: String = "",

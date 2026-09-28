@@ -2,6 +2,7 @@ package com.example.domain.usecases
 
 import com.example.data.repositories.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
+import javax.inject.Inject
 
 /**
  * 🎯 RegisterPropertyUseCase - منطق عمل تسجيل إعلان العقار أو مكتب العقارات
@@ -10,7 +11,7 @@ import com.example.domain.entities.RegistrationEntity
  * @param validatePhone التحقق من صحة رقم الهاتف
  * @param validatePassword التحقق من كلمة المرور
  */
-class RegisterPropertyUseCase(
+class RegisterPropertyUseCase @Inject constructor(
     private val repository: IRegistrationRepository,
     private val validatePhone: ValidatePhoneUseCase = ValidatePhoneUseCase(),
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
@@ -44,6 +45,21 @@ class RegisterPropertyUseCase(
             return Result.failure(IllegalArgumentException("يرجى تحديد المدينة/المحافظة"))
         }
 
-        return repository.registerProperty(property)
+        if (property.priceYer < 0.0 || property.priceYer.isNaN() || property.priceYer.isInfinite()) {
+            return Result.failure(IllegalArgumentException("سعر العقار غير صالح"))
+        }
+
+        val normalized = property.copy(
+            title = property.title.trim(),
+            propertyType = property.propertyType.trim(),
+            category = property.category.trim(),
+            ownerName = property.ownerName.trim(),
+            phone = ValidatePhoneUseCase.normalizePhone(property.phone),
+            city = property.city.trim(),
+            areaDetails = property.areaDetails.trim(),
+            description = property.description.trim(),
+            rawPassword = property.rawPassword.trim()
+        )
+        return repository.registerProperty(normalized)
     }
 }

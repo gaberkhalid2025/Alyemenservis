@@ -2,6 +2,7 @@ package com.example.domain.usecases
 
 import com.example.data.repositories.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
+import javax.inject.Inject
 
 /**
  * 🎯 RegisterStoreUseCase - منطق عمل تسجيل المتجر التجاري
@@ -10,7 +11,7 @@ import com.example.domain.entities.RegistrationEntity
  * @param validatePhone التحقق من صحة رقم الهاتف
  * @param validatePassword التحقق من كلمة المرور
  */
-class RegisterStoreUseCase(
+class RegisterStoreUseCase @Inject constructor(
     private val repository: IRegistrationRepository,
     private val validatePhone: ValidatePhoneUseCase = ValidatePhoneUseCase(),
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
@@ -48,6 +49,17 @@ class RegisterStoreUseCase(
             return Result.failure(IllegalArgumentException("يرجى اختيار المدينة/المحافظة"))
         }
 
-        return repository.registerStore(store)
+        val normalized = store.copy(
+            storeName = store.storeName.trim(),
+            ownerName = store.ownerName.trim(),
+            phone = ValidatePhoneUseCase.normalizePhone(store.phone),
+            storeCategory = store.storeCategory.trim(),
+            city = store.city.trim(),
+            addressDetails = store.addressDetails.trim(),
+            commercialRegisterNumber = store.commercialRegisterNumber.trim(),
+            logoUrl = store.logoUrl.trim(),
+            rawPassword = store.rawPassword.trim()
+        )
+        return repository.registerStore(normalized)
     }
 }

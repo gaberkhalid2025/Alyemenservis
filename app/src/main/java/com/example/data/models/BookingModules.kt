@@ -49,8 +49,8 @@ data class BookingSecurity(
 
 fun BookingEntity.toCore() = BookingCore(
     id = id,
-    bookingNumber = bookingNumber,
-    bookingCode = bookingCode,
+    bookingNumber = bookingNumber.ifBlank { bookingCode },
+    bookingCode = bookingCode.ifBlank { bookingNumber },
     status = status,
     clientId = clientId,
     customerName = customerName.ifBlank { clientName.ifBlank { fullName } },
@@ -59,12 +59,12 @@ fun BookingEntity.toCore() = BookingCore(
 )
 
 fun BookingEntity.toService() = BookingService(
-    serviceType = serviceType,
-    category = category,
+    serviceType = serviceType.ifBlank { serviceName.ifBlank { category } },
+    category = category.ifBlank { serviceType },
     subCategory = subCategory,
     serviceDetails = serviceDetails,
-    providerId = providerId,
-    providerName = providerName,
+    providerId = providerId.ifBlank { technicianId },
+    providerName = providerName.ifBlank { technicianName },
     providerPhone = providerPhone
 )
 
@@ -75,8 +75,8 @@ fun BookingEntity.toSchedule() = BookingSchedule(
 )
 
 fun BookingEntity.toSecurity() = BookingSecurity(
-    pinCode = pinCode,
-    secretPin = secretPin,
+    pinCode = pinCode.ifBlank { secretPin },
+    secretPin = secretPin.ifBlank { pinCode },
     rejectionReason = rejectionReason
 )
 

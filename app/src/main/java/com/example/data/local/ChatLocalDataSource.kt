@@ -9,10 +9,12 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
@@ -49,8 +51,12 @@ class ChatLocalDataSource(
 
     init {
         migrateLegacyChatData()
-        val initialChannels = kotlinx.coroutines.runBlocking(ioDispatcher) { getCachedChannelsInternal() }
-        channelsMemoryCache.value = initialChannels
+        kotlinx.coroutines.CoroutineScope(ioDispatcher).launch {
+            val initialChannels = getCachedChannelsInternal()
+            if (channelsMemoryCache.value.isEmpty() && initialChannels.isNotEmpty()) {
+                channelsMemoryCache.value = initialChannels
+            }
+        }
     }
 
     /**
@@ -160,6 +166,12 @@ class ChatLocalDataSource(
     }
 
     suspend fun clearAllChannels() = withContext(ioDispatcher) {
+        try {
+            chatDao.deleteAllChannels()
+            chatDao.deleteAllMessages()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         prefs.edit().clear().apply()
         channelsMemoryCache.value = emptyList()
         messagesMemoryCache.clear()
@@ -203,8 +215,14 @@ class ChatLocalDataSource(
 
     fun observeMessages(channelId: String): Flow<List<ChatMessage>> {
         val flow = messagesMemoryCache.getOrPut(channelId) {
-            val initial = kotlinx.coroutines.runBlocking(ioDispatcher) { getCachedMessagesInternal(channelId) }
-            MutableStateFlow(initial)
+            val stateFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
+            kotlinx.coroutines.CoroutineScope(ioDispatcher).launch {
+                val initial = getCachedMessagesInternal(channelId)
+                if (stateFlow.value.isEmpty() && initial.isNotEmpty()) {
+                    stateFlow.value = initial
+                }
+            }
+            stateFlow
         }
         return flow.asStateFlow()
     }
@@ -245,7 +263,27 @@ class ChatLocalDataSource(
     }
 
     suspend fun insertOrUpdateMessage(message: ChatMessage) = withContext(ioDispatcher) {
-        val current = getCachedMessagesInternal(message.channelId).toMutableList()
+        try {
+            val encText = if (message.message.isNotBlank()) SecurityCryptoUtils.encrypt(message.message) else ""
+            val roomEntity = ChatMessageRoomEntity(
+                id = message.id,
+                channelId = message.channelId,
+                senderId = message.senderId,
+                senderName = message.senderName,
+                senderPhoto = message.senderPhoto,
+                message = if (encText.isNotEmpty()) encText else message.message,
+                mediaType = message.mediaType.name,
+                mediaUrl = message.mediaUrl,
+                status = message.status.name,
+                isEncrypted = true,
+                timestamp = message.timestamp,
+                syncStatus = message.syncStatus.name
+            )
+            chatDao.insertMessage(roomEntity)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        val current = (messagesMemoryCache[message.channelId]?.value ?: getCachedMessagesInternal(message.channelId)).toMutableList()
         val index = current.indexOfFirst { it.id == message.id }
         if (index >= 0) {
             current[index] = message
@@ -253,15 +291,22 @@ class ChatLocalDataSource(
             current.add(message)
         }
         val sorted = current.sortedBy { it.timestamp }
-        saveMessages(message.channelId, sorted)
+        val flow = messagesMemoryCache.getOrPut(message.channelId) { MutableStateFlow(emptyList()) }
+        flow.value = sorted
     }
 
     suspend fun updateMessageStatus(channelId: String, messageId: String, status: MessageStatus) = withContext(ioDispatcher) {
-        val current = getCachedMessagesInternal(channelId).toMutableList()
+        try {
+            chatDao.updateMessageStatus(messageId, status.name)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).toMutableList()
         val index = current.indexOfFirst { it.id == messageId }
         if (index >= 0) {
             current[index] = current[index].copy(status = status)
-            saveMessages(channelId, current)
+            val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+            flow.value = current
         }
     }
 
@@ -271,8 +316,9 @@ class ChatLocalDataSource(
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        val current = getCachedMessagesInternal(channelId).filter { it.id != messageId }
-        saveMessages(channelId, current)
+        val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).filter { it.id != messageId }
+        val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+        flow.value = current
     }
 
     suspend fun markMessagesAsRead(channelId: String, currentUserId: String) = withContext(ioDispatcher) {
@@ -282,11 +328,15 @@ class ChatLocalDataSource(
             val msg = current[i]
             if (msg.senderId != currentUserId && msg.status != MessageStatus.READ) {
                 current[i] = msg.copy(status = MessageStatus.READ)
+                try {
+                    chatDao.updateMessageStatus(msg.id, MessageStatus.READ.name)
+                } catch (_: Exception) {}
                 modified = true
             }
         }
         if (modified) {
-            saveMessages(channelId, current)
+            val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
+            flow.value = current
         }
     }
 
@@ -329,26 +379,6 @@ class ChatLocalDataSource(
 
     suspend fun queuePendingMessage(message: ChatMessage) = withContext(ioDispatcher) {
         val pendingMsg = message.copy(status = MessageStatus.PENDING, syncStatus = SyncStatus.PENDING_UPLOAD)
-        try {
-            val encText = if (pendingMsg.message.isNotBlank()) SecurityCryptoUtils.encrypt(pendingMsg.message) else ""
-            val entity = ChatMessageRoomEntity(
-                id = pendingMsg.id,
-                channelId = pendingMsg.channelId,
-                senderId = pendingMsg.senderId,
-                senderName = pendingMsg.senderName,
-                senderPhoto = pendingMsg.senderPhoto,
-                message = if (encText.isNotEmpty()) encText else pendingMsg.message,
-                mediaType = pendingMsg.mediaType.name,
-                mediaUrl = pendingMsg.mediaUrl,
-                status = MessageStatus.PENDING.name,
-                isEncrypted = true,
-                timestamp = pendingMsg.timestamp,
-                syncStatus = SyncStatus.PENDING_UPLOAD.name
-            )
-            chatDao.insertMessage(entity)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
         insertOrUpdateMessage(pendingMsg)
     }
 
@@ -462,6 +492,7 @@ class ChatLocalDataSource(
             if (modified) {
                 editor.apply()
             }
+            chatDao.deleteStaleMessages(now - MAX_CACHE_AGE_MILLIS)
         } catch (e: Exception) {
             e.printStackTrace()
         }

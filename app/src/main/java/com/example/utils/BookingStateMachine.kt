@@ -63,12 +63,17 @@ object BookingStateMachine {
         return s in listOf("PENDING", "UNDER_REVIEW", "ACCEPTED", "APPROVED", "IN_PROGRESS")
     }
 
+    private fun normalizeStatus(status: String): String {
+        val upper = status.trim().uppercase(Locale.ROOT)
+        return if (upper == "APPROVED") "ACCEPTED" else upper
+    }
+
     /**
      * 1. التحقق من إمكانية الانتقال من الحالة الحالية للحالة الجديدة
      */
     fun canTransition(currentStatus: String, newStatus: String): Boolean {
-        val curr = currentStatus.uppercase(Locale.ROOT)
-        val target = newStatus.uppercase(Locale.ROOT)
+        val curr = normalizeStatus(currentStatus)
+        val target = normalizeStatus(newStatus)
         if (curr == target) return true
         val validNext = allowedTransitions[curr] ?: emptyList()
         return validNext.contains(target)
@@ -78,7 +83,7 @@ object BookingStateMachine {
      * 2. الحصول على قائمة الحالات المتاحة للانتقال إليها
      */
     fun getAvailableTransitions(currentStatus: String): List<String> {
-        val curr = currentStatus.uppercase(Locale.ROOT)
+        val curr = normalizeStatus(currentStatus)
         return allowedTransitions[curr] ?: emptyList()
     }
 

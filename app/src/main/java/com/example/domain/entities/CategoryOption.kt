@@ -1,7 +1,13 @@
 package com.example.domain.entities
 
+import androidx.annotation.Keep
+
 /**
  * 🏷️ CategoryOption
  * خيار بسيط للاختيار من قوائم التصنيفات
  */
-data class CategoryOption(val id: String, val label: String)
+@Keep
+data class CategoryOption(
+    val id: String = "",
+    val label: String = ""
+)

@@ -2,6 +2,8 @@ package com.example.domain.usecases
 
 import com.example.data.repositories.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
+import com.example.utils.Validators
+import javax.inject.Inject
 
 /**
  * 🎯 RegisterJobPosterUseCase - منطق عمل تسجيل معلن الوظائف أو الشركات
@@ -10,7 +12,7 @@ import com.example.domain.entities.RegistrationEntity
  * @param validatePhone التحقق من صحة رقم الهاتف
  * @param validatePassword التحقق من كلمة المرور
  */
-class RegisterJobPosterUseCase(
+class RegisterJobPosterUseCase @Inject constructor(
     private val repository: IRegistrationRepository,
     private val validatePhone: ValidatePhoneUseCase = ValidatePhoneUseCase(),
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
@@ -44,6 +46,24 @@ class RegisterJobPosterUseCase(
             return Result.failure(IllegalArgumentException("يرجى تحديد المدينة/المحافظة"))
         }
 
-        return repository.registerJob(job)
+        if (job.contactEmail.isNotBlank()) {
+            val emailCheck = Validators.validateEmail(job.contactEmail)
+            if (!emailCheck.isValid) {
+                return Result.failure(IllegalArgumentException(emailCheck.message))
+            }
+        }
+
+        val normalized = job.copy(
+            jobTitle = job.jobTitle.trim(),
+            companyName = job.companyName.trim(),
+            category = job.category.trim(),
+            contactPhone = ValidatePhoneUseCase.normalizePhone(job.contactPhone),
+            contactEmail = job.contactEmail.trim(),
+            city = job.city.trim(),
+            requirements = job.requirements.trim(),
+            salaryRange = job.salaryRange.trim(),
+            rawPassword = job.rawPassword.trim()
+        )
+        return repository.registerJob(normalized)
     }
 }

@@ -38,15 +38,18 @@ data class ProviderEntity(
     val isChatDisabled: Boolean = false,
     val isNotificationsDisabled: Boolean = false,
     val isPaymentRequired: Boolean = false,
-    @get:com.google.firebase.firestore.Exclude
     val passwordHash: String = "",
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
     val providerType: String = "",
     val createdAt: Long = System.currentTimeMillis()
 ) : com.example.data.models.SupervisedEntity {
+    @get:com.google.firebase.firestore.Exclude
     val password: String get() = passwordHash
+    @get:com.google.firebase.firestore.Exclude
     val portfolioImages: List<String> get() = workPhotosBase64
+    @get:com.google.firebase.firestore.Exclude
+    val hasValidCoordinates: Boolean get() = latitude != 0.0 && longitude != 0.0
 }
 
 @Keep
@@ -70,10 +73,10 @@ data class PendingProviderEntity(
     val profession: String = "",
     val specialization: String = "",
     val chatRecipientId: String = "",
-    @get:com.google.firebase.firestore.Exclude
     val passwordHash: String = "",
     val providerType: String = "",
     val keywords: List<String> = emptyList()
 ) {
+    @get:com.google.firebase.firestore.Exclude
     val password: String get() = passwordHash
 }

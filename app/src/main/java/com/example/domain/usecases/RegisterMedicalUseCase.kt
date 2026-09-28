@@ -2,6 +2,7 @@ package com.example.domain.usecases
 
 import com.example.data.repositories.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
+import javax.inject.Inject
 
 /**
  * 🎯 RegisterMedicalUseCase - منطق عمل تسجيل المركز الطبي أو الطبيب
@@ -10,7 +11,7 @@ import com.example.domain.entities.RegistrationEntity
  * @param validatePhone التحقق من صحة رقم الهاتف
  * @param validatePassword التحقق من كلمة المرور
  */
-class RegisterMedicalUseCase(
+class RegisterMedicalUseCase @Inject constructor(
     private val repository: IRegistrationRepository,
     private val validatePhone: ValidatePhoneUseCase = ValidatePhoneUseCase(),
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
@@ -48,6 +49,17 @@ class RegisterMedicalUseCase(
             return Result.failure(IllegalArgumentException("يرجى اختيار المدينة/المحافظة"))
         }
 
-        return repository.registerMedicalCenter(medical)
+        val normalized = medical.copy(
+            centerName = medical.centerName.trim(),
+            specialtyCategory = medical.specialtyCategory.trim(),
+            doctorName = medical.doctorName.trim(),
+            phone = ValidatePhoneUseCase.normalizePhone(medical.phone),
+            city = medical.city.trim(),
+            addressDetails = medical.addressDetails.trim(),
+            licenseNumber = medical.licenseNumber.trim(),
+            logoUrl = medical.logoUrl.trim(),
+            rawPassword = medical.rawPassword.trim()
+        )
+        return repository.registerMedicalCenter(normalized)
     }
 }

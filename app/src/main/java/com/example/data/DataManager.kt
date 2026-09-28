@@ -50,7 +50,6 @@ object DataManager {
     fun getReviews(shopId: String): Flow<List<Review>> = callbackFlow {
         val listener = firestore.collection("reviews")
             .whereEqualTo("shopId", shopId)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     // Fail gracefully
@@ -64,7 +63,7 @@ object DataManager {
                         } catch (e: Exception) {
                             null
                         }
-                    }
+                    }.sortedByDescending { it.timestamp }
                     trySend(reviewsList)
                 }
             }

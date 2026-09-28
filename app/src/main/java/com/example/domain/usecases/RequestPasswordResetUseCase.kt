@@ -16,11 +16,16 @@ class RequestPasswordResetUseCase @Inject constructor() {
         triggerNotification: (String) -> Unit,
         onResult: (Boolean) -> Unit
     ) {
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
+        if (cleanPhone.isBlank() || cleanPhone.contains("/")) {
+            onResult(false)
+            return
+        }
         recoveryHelper.requestPasswordReset(
             context = context,
-            phone = phone,
-            name = name,
-            accountType = accountType,
+            phone = cleanPhone,
+            name = name.trim(),
+            accountType = accountType.trim().ifBlank { "CLIENT" },
             onPasswordWaitingPhoneSet = onPasswordWaitingPhoneSet,
             triggerNotification = triggerNotification,
             onResult = onResult

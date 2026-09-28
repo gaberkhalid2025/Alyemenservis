@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.utils.*
+import com.example.ui.helpers.AppPreferenceHelper
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,6 +14,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -30,16 +32,22 @@ class FCMService : FirebaseMessagingService() {
             val phone = data["phone"] ?: ""
             val name = data["name"] ?: "غير محدد"
             val accountType = data["accountType"] ?: "حساب"
+            val notificationId = if (requestId.isNotBlank()) {
+                requestId.hashCode()
+            } else {
+                (System.currentTimeMillis() % 100000).toInt()
+            }
 
             val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("navigate_to", "PASSWORD_RECOVERY_PANEL")
+                putExtra("target_screen", "ADMIN_PANEL")
                 putExtra("requestId", requestId)
             }
 
             val pendingIntent = PendingIntent.getActivity(
                 this,
-                requestId.hashCode(),
+                notificationId,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -71,7 +79,7 @@ class FCMService : FirebaseMessagingService() {
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .build()
 
-            notificationManager.notify(requestId.hashCode(), notification)
+            notificationManager.notify(notificationId, notification)
             return
         }
 
@@ -115,7 +123,10 @@ class FCMService : FirebaseMessagingService() {
 
         val title = remoteMessage.notification?.title ?: remoteMessage.data["title"] ?: "تحديث جديد 🔔"
         val body = remoteMessage.notification?.body ?: remoteMessage.data["body"] ?: "لديك إشعار جديد في تطبيق خدمات اليمن."
-        val targetScreen = remoteMessage.data["targetScreen"] ?: "MAIN"
+        val targetScreen = remoteMessage.data["targetScreen"]
+            ?: remoteMessage.data["target_screen"]
+            ?: remoteMessage.data["navigate_to"]
+            ?: "MAIN"
 
         sendLocalNotification(title, body, targetScreen)
     }
@@ -169,58 +180,62 @@ class FCMService : FirebaseMessagingService() {
                         try { SecurityCryptoUtils.decrypt(rawPhone).ifEmpty { rawPhone } } catch (e: Exception) { "" }
                     }
                 } else ""
-                val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+                val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(phone.trim())
 
-                // إنشاء المعاملة
-                val batch = db.batch()
+                val rawRole = sp.getString("user_role", "") ?: ""
+                val resolvedRole = if (rawRole.isNotEmpty()) {
+                    if (rawRole.startsWith("gcm:")) {
+                        try { SecurityCryptoUtils.decrypt(rawRole).ifBlank { "CLIENT" } } catch (e: Exception) { "CLIENT" }
+                    } else {
+                        rawRole.ifBlank { "CLIENT" }
+                    }
+                } else "CLIENT"
+
                 val now = System.currentTimeMillis()
 
-                // 1. تحديث fcm_tokens بدون تخزين رقم الهاتف الخام
+                // 1. تحديث fcm_tokens بشكل مستقل وآمن باستخدام merge لضمان عدم فشل العملية
                 val tokenData = mapOf(
                     "token" to token,
-                    "role" to "CLIENT",
+                    "role" to resolvedRole,
                     "updatedAt" to now
                 )
-                val tokenRef = db.collection("fcm_tokens").document(userId)
-                batch.set(tokenRef, tokenData)
+                db.collection("fcm_tokens").document(userId)
+                    .set(tokenData, SetOptions.merge())
+                    .addOnFailureListener { e ->
+                        android.util.Log.w("FCMService", "Failed to save fcm_tokens document: ${e.message}")
+                    }
 
-                // 2. تحديث registered_users
+                // 2. تحديث registered_users بشكل مستقل (فقط إذا كان المستند موجوداً)
                 try {
-                    val userRef = db.collection("registered_users").document(userId)
-                    batch.update(userRef, "fcmToken", token)
+                    db.collection("registered_users").document(userId)
+                        .update("fcmToken", token)
                 } catch (e: Exception) {
                     android.util.Log.w("FCMService", "Skipped registered_users token update: ${e.message}")
                 }
 
-                // 3. تحديث providers, stores, properties (إذا كان الرقم صالحاً ومفكوك التشفير)
+                // 3. تحديث providers, stores, properties بشكل مستقل لكل مجموعة لتجنب فشل المعاملة عند عدم وجود المستند في إحداها
                 if (cleanPhone.isNotEmpty() && !cleanPhone.startsWith("gcm:") && cleanPhone.length >= 7) {
                     try {
-                        val providerRef = db.collection("providers").document(cleanPhone)
-                        batch.update(providerRef, "fcmToken", token)
+                        db.collection("providers").document(cleanPhone)
+                            .update("fcmToken", token)
                     } catch (e: Exception) {
                         android.util.Log.w("FCMService", "Provider token update skipped: ${e.message}")
                     }
 
                     try {
-                        val storeRef = db.collection("stores").document(cleanPhone)
-                        batch.update(storeRef, "fcmToken", token)
+                        db.collection("stores").document(cleanPhone)
+                            .update("fcmToken", token)
                     } catch (e: Exception) {
                         android.util.Log.w("FCMService", "Store token update skipped: ${e.message}")
                     }
 
                     try {
-                        val propRef = db.collection("properties").document(cleanPhone)
-                        batch.update(propRef, "fcmToken", token)
+                        db.collection("properties").document(cleanPhone)
+                            .update("fcmToken", token)
                     } catch (e: Exception) {
                         android.util.Log.w("FCMService", "Property token update skipped: ${e.message}")
                     }
                 }
-
-                // تنفيذ المعاملة مع معالجة الأخطاء صراحةً
-                batch.commit()
-                    .addOnFailureListener { e ->
-                        android.util.Log.e("FCMService", "Failed to sync FCM token batch", e)
-                    }
 
             } catch (e: Exception) {
                 android.util.Log.e("FCMService", "Error during FCM token sync", e)
@@ -245,17 +260,21 @@ class FCMService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
 
+        val notificationId = (System.currentTimeMillis() % 100000).toInt()
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("target_screen", targetScreen)
+            putExtra("navigate_to", targetScreen)
         }
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            this,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -263,6 +282,6 @@ class FCMService : FirebaseMessagingService() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
 
-        notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+        notificationManager.notify(notificationId, builder.build())
     }
 }

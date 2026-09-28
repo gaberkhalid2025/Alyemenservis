@@ -1,5 +1,6 @@
 package com.example.data.repositories
 
+import androidx.annotation.Keep
 import com.example.domain.entities.DashboardStatsEntity
 import com.example.domain.entities.FavoriteItemEntity
 import com.example.domain.entities.GalleryAlbumEntity
@@ -42,6 +43,7 @@ interface IGalleryRepository {
     suspend fun deleteGalleryAlbum(albumId: String): Result<Unit>
 }
 
+@Keep
 data class InventoryItem(
     val id: String = "",
     val ownerId: String = "",
@@ -53,6 +55,7 @@ data class InventoryItem(
     val inStock: Boolean = true
 )
 
+@Keep
 data class LoyaltyProgram(
     val id: String = "",
     val ownerId: String = "",
@@ -63,6 +66,7 @@ data class LoyaltyProgram(
     val isEnabled: Boolean = true
 )
 
+@Keep
 data class StaffMember(
     val id: String = "",
     val ownerId: String = "",

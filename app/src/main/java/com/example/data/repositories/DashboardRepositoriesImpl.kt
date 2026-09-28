@@ -34,9 +34,9 @@ class DashboardRepositoryImpl(
 
         val collectionName = when (role.uppercase()) {
             "PROVIDER", "TECHNICIAN" -> "providers"
-            "STORE", "RESTAURANT", "MEDICAL" -> "stores"
-            "PROPERTY" -> "properties"
-            "JOB" -> com.example.utils.AppConstants.COL_JOBS
+            "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> "stores"
+            "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> "properties"
+            "JOB", "JOB_POSTER" -> com.example.utils.AppConstants.COL_JOBS
             else -> "users"
         }
 
@@ -68,9 +68,9 @@ class DashboardRepositoryImpl(
         return try {
             val collectionName = when (role.uppercase()) {
                 "PROVIDER", "TECHNICIAN" -> "providers"
-                "STORE", "RESTAURANT", "MEDICAL" -> "stores"
-                "PROPERTY" -> "properties"
-                "JOB" -> com.example.utils.AppConstants.COL_JOBS
+                "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> "stores"
+                "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> "properties"
+                "JOB", "JOB_POSTER" -> com.example.utils.AppConstants.COL_JOBS
                 else -> "users"
             }
             firestore.collection(collectionName).document(ownerId)
@@ -242,17 +242,21 @@ class ProductsRepositoryImpl(
 
     override suspend fun addProduct(product: ProductItemEntity): Result<String> {
         return try {
-            val id = UUID.randomUUID().toString()
+            val id = product.id.ifBlank { UUID.randomUUID().toString() }
+            val createdAt = if (product.createdAt > 0L) product.createdAt else System.currentTimeMillis()
             val map = mapOf(
                 "id" to id,
                 "ownerId" to product.ownerId,
+                "storeId" to product.ownerId,
                 "title" to product.title,
+                "name" to product.title,
                 "description" to product.description,
                 "category" to product.category,
                 "priceYer" to product.priceYer,
+                "price" to product.priceYer,
                 "imageUrl" to product.imageUrl,
                 "isAvailable" to product.isAvailable,
-                "createdAt" to System.currentTimeMillis()
+                "createdAt" to createdAt
             )
             firestore.collection(AppConstants.COL_PRODUCTS).document(id).set(map).await()
             Result.success(id)
@@ -265,9 +269,11 @@ class ProductsRepositoryImpl(
         return try {
             val map = mapOf(
                 "title" to product.title,
+                "name" to product.title,
                 "description" to product.description,
                 "category" to product.category,
                 "priceYer" to product.priceYer,
+                "price" to product.priceYer,
                 "imageUrl" to product.imageUrl,
                 "isAvailable" to product.isAvailable
             )
@@ -411,12 +417,13 @@ class GalleryRepositoryImpl(
     override suspend fun saveGalleryAlbum(album: GalleryAlbumEntity): Result<String> {
         return try {
             val id = if (album.id.isBlank()) UUID.randomUUID().toString() else album.id
+            val createdAt = if (album.createdAt > 0L) album.createdAt else System.currentTimeMillis()
             val map = mapOf(
                 "id" to id,
                 "ownerId" to album.ownerId,
                 "title" to album.title,
                 "imageUrls" to album.imageUrls,
-                "createdAt" to System.currentTimeMillis()
+                "createdAt" to createdAt
             )
             firestore.collection("galleries").document(id).set(map).await()
             Result.success(id)

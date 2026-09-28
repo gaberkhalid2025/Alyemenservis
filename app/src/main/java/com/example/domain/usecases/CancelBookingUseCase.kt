@@ -7,6 +7,15 @@ import javax.inject.Inject
 class CancelBookingUseCase @Inject constructor(
     private val repository: BookingRepository
 ) {
+    operator fun invoke(
+        booking: BookingEntity,
+        inputPin: String,
+        reason: String,
+        cancelledBy: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) = execute(booking, inputPin, reason, cancelledBy, onSuccess, onError)
+
     fun execute(
         booking: BookingEntity,
         inputPin: String,
@@ -15,6 +24,10 @@ class CancelBookingUseCase @Inject constructor(
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        repository.cancelBookingWithSecurity(booking, inputPin, reason, cancelledBy, onSuccess, onError)
+        if (booking.id.isBlank()) {
+            onError("معرف الحجز غير صالح")
+            return
+        }
+        repository.cancelBookingWithSecurity(booking, inputPin.trim(), reason.trim(), cancelledBy.trim(), onSuccess, onError)
     }
 }

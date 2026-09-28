@@ -36,22 +36,24 @@ class MedicalRepository @Inject constructor(
 
     suspend fun addDoctor(ownerId: String, doctor: DoctorItem): Result<String> {
         return try {
+            val docId = doctor.id.ifBlank { java.util.UUID.randomUUID().toString() }
             val data = mapOf(
-                "id" to doctor.id,
+                "id" to docId,
                 "ownerId" to ownerId,
                 "name" to doctor.name,
                 "specialty" to doctor.specialty,
                 "workingHours" to doctor.workingHours,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("doctors").document(doctor.id).set(data).await()
-            Result.success(doctor.id)
+            firestore.collection("doctors").document(docId).set(data).await()
+            Result.success(docId)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     suspend fun deleteDoctor(id: String): Result<Unit> {
+        if (id.isBlank()) return Result.failure(IllegalArgumentException("Doctor ID is blank"))
         return try {
             firestore.collection("doctors").document(id).delete().await()
             Result.success(Unit)

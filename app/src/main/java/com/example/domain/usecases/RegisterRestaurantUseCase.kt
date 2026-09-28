@@ -2,6 +2,7 @@ package com.example.domain.usecases
 
 import com.example.data.repositories.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
+import javax.inject.Inject
 
 /**
  * 🎯 RegisterRestaurantUseCase - منطق عمل تسجيل المطعم/الكافيه
@@ -10,7 +11,7 @@ import com.example.domain.entities.RegistrationEntity
  * @param validatePhone التحقق من صحة رقم الهاتف
  * @param validatePassword التحقق من كلمة المرور
  */
-class RegisterRestaurantUseCase(
+class RegisterRestaurantUseCase @Inject constructor(
     private val repository: IRegistrationRepository,
     private val validatePhone: ValidatePhoneUseCase = ValidatePhoneUseCase(),
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
@@ -48,6 +49,16 @@ class RegisterRestaurantUseCase(
             return Result.failure(IllegalArgumentException("يرجى تحديد المدينة/المحافظة"))
         }
 
-        return repository.registerRestaurant(restaurant)
+        val normalized = restaurant.copy(
+            restaurantName = restaurant.restaurantName.trim(),
+            ownerName = restaurant.ownerName.trim(),
+            phone = ValidatePhoneUseCase.normalizePhone(restaurant.phone),
+            cuisineType = restaurant.cuisineType.trim(),
+            city = restaurant.city.trim(),
+            addressDetails = restaurant.addressDetails.trim(),
+            logoUrl = restaurant.logoUrl.trim(),
+            rawPassword = restaurant.rawPassword.trim()
+        )
+        return repository.registerRestaurant(normalized)
     }
 }

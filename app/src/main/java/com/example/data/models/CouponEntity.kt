@@ -12,4 +12,11 @@ data class CouponEntity(
     val discountPercentage: Int = 0, // percentage discount (e.g. 15 for 15%)
     val maxUsageCount: Int = 100,
     val usedCount: Int = 0
-)
+) {
+    fun isValidCoupon(nowMillis: Long = System.currentTimeMillis()): Boolean {
+        val active = status.equals("ACTIVE", ignoreCase = true)
+        val notExpired = expiryTimestamp <= 0L || nowMillis <= expiryTimestamp
+        val withinQuota = maxUsageCount <= 0 || usedCount < maxUsageCount
+        return active && code.isNotBlank() && notExpired && withinQuota
+    }
+}

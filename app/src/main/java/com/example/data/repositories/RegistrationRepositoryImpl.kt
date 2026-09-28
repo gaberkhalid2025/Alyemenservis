@@ -543,11 +543,14 @@ class RegistrationRepositoryImpl(
                 jobTitle = job.jobTitle.trim(),
                 companyName = job.companyName.trim(),
                 businessName = job.companyName.trim(),
+                jobRequirements = job.requirements.trim(),
+                salaryRange = job.salaryRange.trim(),
                 categoryId = job.category.trim(),
                 categoryName = job.category.trim(),
                 phone = cleanPhone,
                 passwordHash = hashedPassword,
                 city = job.city.trim(),
+                area = job.city.trim(),
                 approvalStatus = "PENDING",
                 submittedAt = System.currentTimeMillis(),
                 createdAt = System.currentTimeMillis(),
@@ -562,6 +565,8 @@ class RegistrationRepositoryImpl(
                 "categoryId" to "JOB",
                 "customCategoryName" to job.category.trim(),
                 "area" to job.city.trim(),
+                "details" to job.requirements.trim(),
+                "salaryRange" to job.salaryRange.trim(),
                 "status" to "PENDING",
                 "profession" to "JOB_POSTER",
                 "providerType" to "JOB_POSTER",
@@ -586,6 +591,8 @@ class RegistrationRepositoryImpl(
         val cleanPhone = ValidatePhoneUseCase.normalizePhone(phoneNumber)
         if (cleanPhone.isBlank()) {
             trySend(null)
+            close()
+            awaitClose { }
             return@callbackFlow
         }
 

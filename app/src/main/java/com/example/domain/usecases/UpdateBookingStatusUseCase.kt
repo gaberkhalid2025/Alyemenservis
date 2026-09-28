@@ -1,12 +1,16 @@
 package com.example.domain.usecases
 
 import com.example.data.repositories.BookingRepository
+import java.util.Locale
+import javax.inject.Inject
 
 /**
  * 🎯 UpdateBookingStatusUseCase
- * Updates the progression state of a booking (APPROVED, IN_PROGRESS, COMPLETED, REJECTED).
+ * Updates the progression state of a booking (ACCEPTED/APPROVED, IN_PROGRESS, COMPLETED, REJECTED).
  */
-class UpdateBookingStatusUseCase(private val bookingRepository: BookingRepository) {
+class UpdateBookingStatusUseCase @Inject constructor(
+    private val bookingRepository: BookingRepository
+) {
 
     operator fun invoke(
         bookingId: String,
@@ -20,13 +24,29 @@ class UpdateBookingStatusUseCase(private val bookingRepository: BookingRepositor
             onError("معرف الحجز غير صالح")
             return
         }
-        if (currentStatus.isNotBlank() && !com.example.utils.BookingStateMachine.canTransition(currentStatus, newStatus)) {
-            onError("انتقال غير مسموح من الحالة ($currentStatus) إلى ($newStatus)")
+        val cleanNewStatus = newStatus.trim().uppercase(Locale.ROOT).let {
+            if (it == "APPROVED") "ACCEPTED" else it
+        }
+        if (cleanNewStatus.isBlank()) {
+            onError("حالة الحجز الجديدة غير صالحة")
+            return
+        }
+
+        val roleUpper = userRole.trim().uppercase(Locale.ROOT)
+        if ((roleUpper == "CLIENT" || roleUpper == "GUEST") &&
+            cleanNewStatus in listOf("ACCEPTED", "IN_PROGRESS", "REJECTED", "CLOSED", "COMPLETED", "PAID")
+        ) {
+            onError("ليس لديك صلاحية لتغيير حالة الحجز إلى ($cleanNewStatus)")
+            return
+        }
+
+        if (currentStatus.isNotBlank() && !com.example.utils.BookingStateMachine.canTransition(currentStatus, cleanNewStatus)) {
+            onError("انتقال غير مسموح من الحالة ($currentStatus) إلى ($cleanNewStatus)")
             return
         }
         bookingRepository.updateBookingStatus(
-            bookingId = bookingId,
-            newStatus = newStatus,
+            bookingId = bookingId.trim(),
+            newStatus = cleanNewStatus,
             onSuccess = onSuccess,
             onError = onError
         )

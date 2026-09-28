@@ -35,6 +35,14 @@ data class NotificationEntity(
                senderId.trim().isNotEmpty() &&
                notificationType.trim().isNotEmpty()
     }
+
+    fun getEffectiveTargetType(): String {
+        return if (targetType.isNotBlank() && targetType != "ALL") targetType else targetAudience
+    }
+
+    fun isExpired(nowMillis: Long = System.currentTimeMillis()): Boolean {
+        return expiryTimestamp > 0L && nowMillis > expiryTimestamp
+    }
 }
 
 fun Map<String, Any?>.isValid(): Boolean {

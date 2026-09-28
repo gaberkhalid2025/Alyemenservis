@@ -1,10 +1,13 @@
 package com.example.domain.entities
 
+import androidx.annotation.Keep
+
 /**
  * 🏛️ Domain Entities for Dashboards, Products, Favorites, Ratings & Gallery
  * Pure Kotlin entities independent of Android dependencies.
  */
 
+@Keep
 data class DashboardStatsEntity(
     val totalViews: Int = 0,
     val activeBookingsCount: Int = 0,
@@ -16,6 +19,7 @@ data class DashboardStatsEntity(
     val pendingRequestsCount: Int = 0
 )
 
+@Keep
 data class ProductItemEntity(
     val id: String = "",
     val ownerId: String = "",
@@ -28,6 +32,7 @@ data class ProductItemEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Keep
 data class FavoriteItemEntity(
     val id: String = "",
     val userId: String = "",
@@ -41,6 +46,7 @@ data class FavoriteItemEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@Keep
 @Deprecated("استخدم RatingEntity كنموذج موحد للتقييمات", ReplaceWith("RatingEntity"))
 data class RatingReviewEntity(
     val id: String = "",
@@ -69,6 +75,7 @@ data class RatingReviewEntity(
     }
 }
 
+@Keep
 data class GalleryAlbumEntity(
     val id: String = "",
     val ownerId: String = "",

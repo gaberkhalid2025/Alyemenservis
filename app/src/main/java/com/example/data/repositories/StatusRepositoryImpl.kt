@@ -179,27 +179,45 @@ class StatusRepositoryImpl(
 
     override suspend fun approveJoinRequest(request: PendingProviderEntity): Result<Unit> {
         return try {
-            val requestDoc = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(request.id).get().await()
+            val reqId = request.id.trim()
+            if (reqId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف طلب الانضمام غير صالح"))
+            }
+            val requestDoc = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(reqId).get().await()
             val type = requestDoc.getString("type") ?: "PROVIDER"
             val ownerId = requestDoc.getString("userId")?.takeIf { it.isNotBlank() }
                 ?: requestDoc.getString("uid")?.takeIf { it.isNotBlank() }
-                ?: request.id
-            val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(request.phone)
+                ?: reqId
+            val rawPhone = request.phone.ifBlank { requestDoc.getString("phone") ?: "" }
+            val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(rawPhone)
+            val passwordHash = requestDoc.getString("passwordHash") ?: requestDoc.getString("password") ?: ""
             val now = System.currentTimeMillis()
 
             val batch = firestore.batch()
-            val requestRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(request.id)
-            batch.delete(requestRef)
+            val requestRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(reqId)
+            batch.set(
+                requestRef,
+                mapOf(
+                    "status" to "APPROVED",
+                    "approvalStatus" to "APPROVED",
+                    "isActive" to true,
+                    "approvedAt" to now,
+                    "updatedAt" to now
+                ),
+                com.google.firebase.firestore.SetOptions.merge()
+            )
 
             // Create Entity in appropriate collection
             when (type.uppercase()) {
                 "PROVIDER" -> {
-                    val provRef = firestore.collection("providers").document(request.id)
+                    val provRef = firestore.collection("providers").document(reqId)
                     val provData = mapOf(
-                        "id" to request.id,
+                        "id" to reqId,
                         "ownerId" to ownerId,
                         "name" to request.name,
                         "phone" to cleanPhone,
+                        "password" to passwordHash,
+                        "passwordHash" to passwordHash,
                         "categoryId" to request.categoryId,
                         "area" to request.area,
                         "isAvailable" to true,
@@ -208,16 +226,18 @@ class StatusRepositoryImpl(
                         "isBlocked" to false,
                         "createdAt" to now
                     )
-                    batch.set(provRef, provData)
+                    batch.set(provRef, provData, com.google.firebase.firestore.SetOptions.merge())
                 }
                 "STORE", "RESTAURANT", "MEDICAL" -> {
-                    val storeRef = firestore.collection("stores").document(request.id)
+                    val storeRef = firestore.collection("stores").document(reqId)
                     val storeData = mapOf(
-                        "id" to request.id,
+                        "id" to reqId,
                         "ownerId" to ownerId,
                         "name" to (requestDoc.getString("businessName") ?: request.name),
                         "ownerName" to request.name,
                         "phone" to cleanPhone,
+                        "password" to passwordHash,
+                        "passwordHash" to passwordHash,
                         "category" to request.categoryId,
                         "city" to request.area,
                         "isActive" to true,
@@ -225,60 +245,73 @@ class StatusRepositoryImpl(
                         "type" to type,
                         "createdAt" to now
                     )
-                    batch.set(storeRef, storeData)
+                    batch.set(storeRef, storeData, com.google.firebase.firestore.SetOptions.merge())
                 }
                 "PROPERTY" -> {
-                    val propRef = firestore.collection("properties").document(request.id)
+                    val propRef = firestore.collection("properties").document(reqId)
                     val propData = mapOf(
-                        "id" to request.id,
+                        "id" to reqId,
                         "ownerId" to ownerId,
                         "title" to (requestDoc.getString("propertyTitle") ?: request.name),
                         "ownerName" to request.name,
                         "phone" to cleanPhone,
+                        "password" to passwordHash,
+                        "passwordHash" to passwordHash,
                         "category" to request.categoryId,
                         "city" to request.area,
                         "isActive" to true,
                         "isApproved" to true,
                         "createdAt" to now
                     )
-                    batch.set(propRef, propData)
+                    batch.set(propRef, propData, com.google.firebase.firestore.SetOptions.merge())
                 }
                 "JOB" -> {
-                    val jobRef = firestore.collection("jobs").document(request.id)
+                    val jobRef = firestore.collection("jobs").document(reqId)
+                    val jobTitle = requestDoc.getString("jobTitle") ?: request.name
+                    val salaryRange = requestDoc.getString("salaryRange") ?: ""
+                    val requirements = requestDoc.getString("jobRequirements") ?: ""
                     val jobData = mapOf(
-                        "id" to request.id,
+                        "id" to reqId,
                         "ownerId" to ownerId,
-                        "jobTitle" to (requestDoc.getString("jobTitle") ?: request.name),
+                        "title" to jobTitle,
+                        "jobTitle" to jobTitle,
                         "companyName" to (requestDoc.getString("companyName") ?: request.name),
+                        "salary" to salaryRange,
+                        "salaryRange" to salaryRange,
+                        "requirements" to requirements,
                         "phone" to cleanPhone,
                         "city" to request.area,
                         "isActive" to true,
                         "isApproved" to true,
                         "createdAt" to now
                     )
-                    batch.set(jobRef, jobData)
+                    batch.set(jobRef, jobData, com.google.firebase.firestore.SetOptions.merge())
                 }
                 else -> {
-                    val userRef = firestore.collection("users").document(request.id)
+                    val userRef = firestore.collection("users").document(reqId)
                     batch.set(userRef, mapOf(
-                        "id" to request.id,
+                        "id" to reqId,
                         "ownerId" to ownerId,
                         "name" to request.name,
                         "phone" to cleanPhone,
+                        "password" to passwordHash,
+                        "passwordHash" to passwordHash,
                         "role" to "CLIENT",
                         "status" to "APPROVED",
                         "createdAt" to now
-                    ))
+                    ), com.google.firebase.firestore.SetOptions.merge())
                 }
             }
 
             // Update/Create User profile and Registered Users document
-            val userRef = firestore.collection("users").document(request.id)
+            val userRef = firestore.collection("users").document(reqId)
             batch.set(userRef, mapOf(
-                "id" to request.id,
+                "id" to reqId,
                 "ownerId" to ownerId,
                 "name" to request.name,
                 "phone" to cleanPhone,
+                "password" to passwordHash,
+                "passwordHash" to passwordHash,
                 "role" to type.uppercase(),
                 "accountType" to type.uppercase(),
                 "status" to "APPROVED",
@@ -286,17 +319,21 @@ class StatusRepositoryImpl(
                 "updatedAt" to now
             ), com.google.firebase.firestore.SetOptions.merge())
 
-            val regUserRef = firestore.collection("registered_users").document(cleanPhone)
-            batch.set(regUserRef, mapOf(
-                "id" to request.id,
-                "name" to request.name,
-                "phone" to cleanPhone,
-                "role" to type.uppercase(),
-                "accountType" to type.uppercase(),
-                "status" to "APPROVED",
-                "isApproved" to true,
-                "updatedAt" to now
-            ), com.google.firebase.firestore.SetOptions.merge())
+            if (cleanPhone.isNotBlank()) {
+                val regUserRef = firestore.collection("registered_users").document(cleanPhone)
+                batch.set(regUserRef, mapOf(
+                    "id" to reqId,
+                    "name" to request.name,
+                    "phone" to cleanPhone,
+                    "password" to passwordHash,
+                    "passwordHash" to passwordHash,
+                    "role" to type.uppercase(),
+                    "accountType" to type.uppercase(),
+                    "status" to "APPROVED",
+                    "isApproved" to true,
+                    "updatedAt" to now
+                ), com.google.firebase.firestore.SetOptions.merge())
+            }
 
             // Create notification for user
             val notifId = java.util.UUID.randomUUID().toString()
@@ -308,7 +345,7 @@ class StatusRepositoryImpl(
                 targetType = "USER",
                 targetValue = cleanPhone,
                 notificationType = "JOIN_APPROVED",
-                relatedRequestId = request.id,
+                relatedRequestId = reqId,
                 isRead = false,
                 fcmSent = false,
                 timestamp = now,
@@ -317,7 +354,7 @@ class StatusRepositoryImpl(
             batch.set(notifRef, notif)
 
             // Delete from pending_providers so that it is removed from waiting list
-            val pendingRef = firestore.collection("pending_providers").document(request.id)
+            val pendingRef = firestore.collection("pending_providers").document(reqId)
             batch.delete(pendingRef)
 
             batch.commit().await()
@@ -330,14 +367,18 @@ class StatusRepositoryImpl(
 
     override suspend fun rejectJoinRequest(request: PendingProviderEntity, reason: String): Result<Unit> {
         return try {
+            val reqId = request.id.trim()
+            if (reqId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف طلب الانضمام غير صالح"))
+            }
             val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(request.phone)
             val now = System.currentTimeMillis()
             val finalReason = reason.ifBlank { "لم تستوفِ المستندات أو الشروط المطلوبة" }
 
             val batch = firestore.batch()
-            val requestRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(request.id)
+            val requestRef = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(reqId)
 
-            batch.update(requestRef, mapOf(
+            batch.set(requestRef, mapOf(
                 "status" to "REJECTED",
                 "approvalStatus" to "REJECTED",
                 "isActive" to false,
@@ -345,10 +386,10 @@ class StatusRepositoryImpl(
                 "rejectedAt" to now,
                 "rejectedBy" to "ADMIN",
                 "updatedAt" to now
-            ))
+            ), com.google.firebase.firestore.SetOptions.merge())
 
             // Update status in pending_providers as well safely with merge
-            val pendingRef = firestore.collection("pending_providers").document(request.id)
+            val pendingRef = firestore.collection("pending_providers").document(reqId)
             batch.set(pendingRef, mapOf(
                 "status" to "REJECTED",
                 "reason" to finalReason

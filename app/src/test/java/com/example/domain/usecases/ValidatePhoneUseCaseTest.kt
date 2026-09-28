@@ -104,4 +104,18 @@ class ValidatePhoneUseCaseTest {
     fun `phone with spaces is valid`() {
         assertTrue(useCase("771 234 567").isValid)
     }
+
+    @Test
+    fun `phone with Arabic-Indic digits is valid and normalized to ASCII`() {
+        assertTrue(useCase("٧٧١٢٣٤٥٦٧").isValid)
+        assertEquals("771234567", ValidatePhoneUseCase.normalizePhone("٧٧١٢٣٤٥٦٧"))
+        assertEquals("771234567", ValidatePhoneUseCase.normalizePhone("+٩٦٧ ٧٧١ ٢٣٤ ٥٦٧"))
+    }
+
+    @Test
+    fun `phone with invisible BiDi formatting marks from WhatsApp or Contacts is valid`() {
+        val pastedFromContacts = "\u202A+967 771 234 567\u202C"
+        assertTrue(useCase(pastedFromContacts).isValid)
+        assertEquals("771234567", ValidatePhoneUseCase.normalizePhone(pastedFromContacts))
+    }
 }

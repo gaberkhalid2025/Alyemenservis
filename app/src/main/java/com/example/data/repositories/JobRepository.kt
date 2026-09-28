@@ -24,10 +24,10 @@ class JobRepository @Inject constructor(
                 val list = snapshot.documents.mapNotNull { doc ->
                     JobPostItem(
                         id = doc.id,
-                        title = doc.getString("title") ?: "",
+                        title = doc.getString("title") ?: doc.getString("jobTitle") ?: "",
                         companyName = doc.getString("companyName") ?: "",
-                        salary = doc.getString("salary") ?: "",
-                        requirements = doc.getString("requirements") ?: "",
+                        salary = doc.getString("salary") ?: doc.getString("salaryRange") ?: "",
+                        requirements = doc.getString("requirements") ?: doc.getString("jobRequirements") ?: "",
                         applicantsCount = doc.getLong("applicantsCount")?.toInt() ?: 0
                     )
                 }
@@ -38,24 +38,28 @@ class JobRepository @Inject constructor(
 
     suspend fun postJob(ownerId: String, job: JobPostItem): Result<String> {
         return try {
+            val docId = job.id.ifBlank { java.util.UUID.randomUUID().toString() }
             val data = mapOf(
-                "id" to job.id,
+                "id" to docId,
                 "ownerId" to ownerId,
                 "title" to job.title,
+                "jobTitle" to job.title,
                 "companyName" to job.companyName,
                 "salary" to job.salary,
+                "salaryRange" to job.salary,
                 "requirements" to job.requirements,
                 "applicantsCount" to job.applicantsCount,
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection(com.example.utils.AppConstants.COL_JOBS).document(job.id).set(data).await()
-            Result.success(job.id)
+            firestore.collection(com.example.utils.AppConstants.COL_JOBS).document(docId).set(data).await()
+            Result.success(docId)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     suspend fun deleteJob(id: String): Result<Unit> {
+        if (id.isBlank()) return Result.failure(IllegalArgumentException("Job ID is blank"))
         return try {
             firestore.collection(com.example.utils.AppConstants.COL_JOBS).document(id).delete().await()
             Result.success(Unit)

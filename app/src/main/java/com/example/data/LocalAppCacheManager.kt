@@ -63,7 +63,10 @@ class LocalAppCacheManager @Inject constructor(
 
     // 4. Save & Load Cached Categories
     fun saveCategoriesCache(rawJsonString: String) {
-        prefs.edit().putString("KEY_CATEGORIES_CACHE", rawJsonString).apply()
+        prefs.edit()
+            .putString("KEY_CATEGORIES_CACHE", rawJsonString)
+            .putLong("KEY_CATEGORIES_TIME", System.currentTimeMillis())
+            .apply()
     }
 
     fun getCategoriesCacheRaw(): String {
@@ -81,7 +84,11 @@ class LocalAppCacheManager @Inject constructor(
     fun queueOfflineAction(action: OfflineSyncAction) {
         val currentQueue = getOfflineQueueRaw()
         try {
-            val jsonArray = JSONArray(currentQueue)
+            val jsonArray = try {
+                JSONArray(currentQueue)
+            } catch (_: Exception) {
+                JSONArray()
+            }
             val obj = JSONObject().apply {
                 put("id", action.id)
                 put("type", action.type)
@@ -107,15 +114,27 @@ class LocalAppCacheManager @Inject constructor(
     fun pruneStaleCache() {
         val now = System.currentTimeMillis()
         val thirtyDaysMs = 30L * 24 * 60 * 60 * 1000
+        val editor = prefs.edit()
+        var modified = false
 
-        val providersTime = prefs.getLong("KEY_PROVIDERS_TIME", 0)
-        if (now - providersTime > thirtyDaysMs) {
-            prefs.edit().remove("KEY_PROVIDERS_CACHE").remove("KEY_PROVIDERS_TIME").apply()
+        val cachePairs = listOf(
+            "KEY_PROVIDERS_CACHE" to "KEY_PROVIDERS_TIME",
+            "KEY_STORES_CACHE" to "KEY_STORES_TIME",
+            "KEY_BOOKINGS_CACHE" to "KEY_BOOKINGS_TIME",
+            "KEY_OFFERS_CACHE" to "KEY_OFFERS_TIME",
+            "KEY_CATEGORIES_CACHE" to "KEY_CATEGORIES_TIME"
+        )
+
+        for ((cacheKey, timeKey) in cachePairs) {
+            val savedTime = prefs.getLong(timeKey, 0L)
+            if (savedTime > 0L && now - savedTime > thirtyDaysMs) {
+                editor.remove(cacheKey).remove(timeKey)
+                modified = true
+            }
         }
 
-        val storesTime = prefs.getLong("KEY_STORES_TIME", 0)
-        if (now - storesTime > thirtyDaysMs) {
-            prefs.edit().remove("KEY_STORES_CACHE").remove("KEY_STORES_TIME").apply()
+        if (modified) {
+            editor.apply()
         }
     }
 }

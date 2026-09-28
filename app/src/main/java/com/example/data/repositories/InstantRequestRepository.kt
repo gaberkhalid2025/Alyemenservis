@@ -10,12 +10,15 @@ import com.example.utils.AppConstants
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.random.Random
 
@@ -251,6 +254,20 @@ class InstantRequestRepository(private val context: Context? = null) {
                     .update("status", "ACCEPTED")
                 firestore.collection("request_offers").document(offerId)
                     .update("status", "ACCEPTED")
+
+                // Mark other competing offers for the same request as REJECTED
+                firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId)
+                    .collection("offers")
+                    .get()
+                    .addOnSuccessListener { snap ->
+                        snap.documents.forEach { doc ->
+                            if (doc.id != offerId && doc.getString("status") == "PENDING") {
+                                doc.reference.update("status", "REJECTED")
+                                firestore.collection("request_offers").document(doc.id).update("status", "REJECTED")
+                            }
+                        }
+                    }
+
                 _requests.value = _requests.value.map {
                     if (it.id == requestId) it.copy(
                         status = "ACCEPTED",
@@ -260,6 +277,14 @@ class InstantRequestRepository(private val context: Context? = null) {
                         acceptedTechnicianPhone = providerPhone,
                         acceptedPrice = acceptedPrice
                     ) else it
+                }
+                context?.let { ctx ->
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            com.example.data.local.AppDatabase.getInstance(ctx).requestDao()
+                                .updateRequestStatus(requestId, "ACCEPTED")
+                        } catch (_: Exception) {}
+                    }
                 }
                 AnalyticsEventsHelper.logOfferAccepted(context, requestId, providerId)
                 onSuccess()

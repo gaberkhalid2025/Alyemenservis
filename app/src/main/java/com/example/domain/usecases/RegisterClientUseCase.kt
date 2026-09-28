@@ -2,11 +2,12 @@ package com.example.domain.usecases
 
 import com.example.data.repositories.IRegistrationRepository
 import com.example.domain.entities.RegistrationEntity
+import javax.inject.Inject
 
 /**
  * 🎯 RegisterClientUseCase
  */
-class RegisterClientUseCase(
+class RegisterClientUseCase @Inject constructor(
     private val repository: IRegistrationRepository,
     private val validatePhone: ValidatePhoneUseCase = ValidatePhoneUseCase(),
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
@@ -30,6 +31,13 @@ class RegisterClientUseCase(
             return Result.failure(IllegalArgumentException("يرجى اختيار المحافظة/المدينة"))
         }
 
-        return repository.registerClient(client)
+        val normalized = client.copy(
+            fullName = client.fullName.trim(),
+            phone = ValidatePhoneUseCase.normalizePhone(client.phone),
+            city = client.city.trim(),
+            rawPassword = client.rawPassword.trim(),
+            profileImageUrl = client.profileImageUrl.trim()
+        )
+        return repository.registerClient(normalized)
     }
 }

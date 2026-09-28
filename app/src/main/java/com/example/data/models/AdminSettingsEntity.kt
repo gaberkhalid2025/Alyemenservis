@@ -326,6 +326,7 @@ data class DynamicSection(
                     DynamicSection("services", "المهن والخدمات", "🛠️", false, "store", 6, "شروط تسجيل الفني: تحديد المهنة/التخصص والأسعار التقديرية ونطاق العمل.", 10, true, true, "الاسم,المهنة,الهاتف,المنطقة")
                 )
             }
+            if (trimmed == "[]") return emptyList()
             // 1. Try standard JSON parsing
             if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
                 try {
@@ -349,7 +350,7 @@ data class DynamicSection(
                             )
                         )
                     }
-                    if (list.isNotEmpty()) return list.sortedBy { it.order }
+                    return list.sortedBy { it.order }
                 } catch (_: Exception) {}
             }
             // 2. Fallback to legacy delimiter parsing (;; and ||)
@@ -431,7 +432,7 @@ data class SpecialOfferEntity(
     companion object {
         fun parseList(jsonStr: String): List<SpecialOfferEntity> {
             val trimmed = jsonStr.trim()
-            if (trimmed.isBlank()) return emptyList()
+            if (trimmed.isBlank() || trimmed == "[]") return emptyList()
             // 1. Try standard JSON parsing
             if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
                 try {
@@ -454,7 +455,7 @@ data class SpecialOfferEntity(
                             )
                         )
                     }
-                    if (list.isNotEmpty()) return list
+                    return list
                 } catch (_: Exception) {}
             }
             // 2. Fallback to legacy delimiter parsing (;;; and |||)

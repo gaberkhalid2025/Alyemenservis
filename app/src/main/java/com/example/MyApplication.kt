@@ -19,9 +19,12 @@ import dagger.hilt.android.HiltAndroidApp
 class MyApplication : Application() {
 
     companion object {
+        @Volatile
         var instance: MyApplication? = null
             private set
+        @Volatile
         private var firebaseAnalytics: FirebaseAnalytics? = null
+        @Volatile
         private var isCrashlyticsReady = false
 
         @JvmStatic
@@ -40,19 +43,25 @@ class MyApplication : Application() {
 
         // ===================== الخطوة 1: تهيئة Firebase بأمان =====================
         try {
-            FirebaseApp.initializeApp(this)
+            if (FirebaseApp.getApps(this).isEmpty()) {
+                FirebaseApp.initializeApp(this)
+            }
             Log.d("MyApplication", "✅ Firebase initialized successfully")
 
-            // 🔐 Firebase App Check - حماية من Abuse
-            val firebaseAppCheck = FirebaseAppCheck.getInstance()
-            firebaseAppCheck.installAppCheckProviderFactory(
-                PlayIntegrityAppCheckProviderFactory.getInstance()
-            )
-            // تفعيل الـ Debug Provider في وضع التطوير
-            if (BuildConfig.DEBUG) {
-                firebaseAppCheck.installAppCheckProviderFactory(
-                    DebugAppCheckProviderFactory.getInstance()
-                )
+            // 🔐 Firebase App Check - حماية من Abuse (اختيار المزود المناسب حسب بيئة البناء)
+            try {
+                val firebaseAppCheck = FirebaseAppCheck.getInstance()
+                if (BuildConfig.DEBUG) {
+                    firebaseAppCheck.installAppCheckProviderFactory(
+                        DebugAppCheckProviderFactory.getInstance()
+                    )
+                } else {
+                    firebaseAppCheck.installAppCheckProviderFactory(
+                        PlayIntegrityAppCheckProviderFactory.getInstance()
+                    )
+                }
+            } catch (appCheckEx: Exception) {
+                Log.w("MyApplication", "⚠️ AppCheck initialization note: ${appCheckEx.message}")
             }
 
             // محاولة تسجيل الدخول كمجهول بأمان دون تعطيل مسار التطبيق
@@ -88,14 +97,9 @@ class MyApplication : Application() {
             firestore.firestoreSettings = settings
             Log.d("MyApplication", "✅ FirebaseFirestore settings initialized successfully")
         } catch (e: Exception) {
-            // تجاهل — قد تكون مهيأة مسبقاً
+            // تجاهل بأمان — قد تكون إعدادات Firestore مهيأة مسبقاً
             try {
-                val firestore = FirebaseFirestore.getInstance()
-                val settings = FirebaseFirestoreSettings.Builder()
-                    .setPersistenceEnabled(true)
-                    .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
-                    .build()
-                firestore.firestoreSettings = settings
+                Log.w("MyApplication", "⚠️ Firestore settings already initialized: ${e.message}")
             } catch (e2: Exception) {
                 e2.printStackTrace()
             }
@@ -204,7 +208,12 @@ class MyApplication : Application() {
                 Log.e("MyApplication", "Failed to record exception: ${e.message}")
             }
         } else {
-            Log.e("MyApplication", "Crashlytics not ready: ${throwable.message}")
+            try {
+                FirebaseCrashlytics.getInstance().recordException(throwable)
+                isCrashlyticsReady = true
+            } catch (e: Exception) {
+                Log.e("MyApplication", "Crashlytics not ready: ${throwable.message}")
+            }
         }
     }
 }

@@ -334,29 +334,30 @@ class ChatRepository(
         replyToText: String?,
         attachment: ChatAttachment?
     ): AppResult<ChatMessage> = withContext(Dispatchers.IO) {
+        if (channelId.isBlank() || senderId.isBlank()) {
+            return@withContext AppResult.Error(AppError.ValidationError("message", "بيانات الرسالة غير مكتملة"))
+        }
+
+        val messageId = channelsCollection.document(channelId).collection("messages").document().id
+        val now = System.currentTimeMillis()
+
+        val initialMsg = ChatMessage(
+            id = messageId,
+            channelId = channelId,
+            senderId = senderId,
+            senderName = senderName,
+            message = messageText,
+            mediaType = mediaType,
+            mediaUrl = mediaUrl,
+            attachment = attachment,
+            replyToId = replyToId,
+            replyToText = replyToText,
+            status = MessageStatus.SENDING,
+            timestamp = now,
+            syncStatus = SyncStatus.PENDING_UPLOAD
+        )
+
         try {
-            if (channelId.isBlank() || senderId.isBlank()) {
-                return@withContext AppResult.Error(AppError.ValidationError("message", "بيانات الرسالة غير مكتملة"))
-            }
-
-            val messageId = channelsCollection.document(channelId).collection("messages").document().id
-            val now = System.currentTimeMillis()
-
-            val initialMsg = ChatMessage(
-                id = messageId,
-                channelId = channelId,
-                senderId = senderId,
-                senderName = senderName,
-                message = messageText,
-                mediaType = mediaType,
-                mediaUrl = mediaUrl,
-                attachment = attachment,
-                replyToId = replyToId,
-                replyToText = replyToText,
-                status = MessageStatus.SENDING,
-                timestamp = now,
-                syncStatus = SyncStatus.PENDING_UPLOAD
-            )
 
             // 1. Immediately store in local cache with SENDING state for instant UI
             local?.insertOrUpdateMessage(initialMsg)
@@ -407,20 +408,9 @@ class ChatRepository(
             AppResult.Success(confirmedMsg)
         } catch (e: Exception) {
             Log.e("ChatRepository", "sendMessage failed, saving to offline queue: ${e.message}")
-            // Fallback: Queue message offline
-            val offlineMsg = ChatMessage(
-                id = java.util.UUID.randomUUID().toString(),
-                channelId = channelId,
-                senderId = senderId,
-                senderName = senderName,
-                message = messageText,
-                mediaType = mediaType,
-                mediaUrl = mediaUrl,
-                attachment = attachment,
-                replyToId = replyToId,
-                replyToText = replyToText,
+            // Fallback: Queue the same message ID offline without creating a duplicate record
+            val offlineMsg = initialMsg.copy(
                 status = MessageStatus.PENDING,
-                timestamp = System.currentTimeMillis(),
                 syncStatus = SyncStatus.PENDING_UPLOAD
             )
             local?.queuePendingMessage(offlineMsg)
@@ -434,6 +424,8 @@ class ChatRepository(
             var successCount = 0
 
             for (msg in pending) {
+                // Remove old pending entry first so sendMessage does not create a duplicate
+                local?.deleteMessage(msg.channelId, msg.id)
                 val sendResult = sendMessage(
                     channelId = msg.channelId,
                     senderId = msg.senderId,
@@ -445,8 +437,7 @@ class ChatRepository(
                     replyToText = msg.replyToText,
                     attachment = msg.attachment
                 )
-                if (sendResult is AppResult.Success) {
-                    local?.removePendingMessage(msg.id)
+                if (sendResult is AppResult.Success && sendResult.data.status == MessageStatus.SENT) {
                     successCount++
                 }
             }
@@ -554,10 +545,8 @@ class ChatRepository(
     ): AppResult<Unit> = withContext(Dispatchers.IO) {
         if (channelId.isBlank() || messageId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
-            // Local update
-            if (forEveryone) {
-                local?.deleteMessage(channelId, messageId)
-            }
+            // Local update for immediate UI feedback
+            local?.deleteMessage(channelId, messageId)
 
             // Remote update
             val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)

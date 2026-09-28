@@ -57,6 +57,9 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var locationCallback: com.google.android.gms.location.LocationCallback? = null
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+    private var fallbackSpeechRecognizer: android.speech.SpeechRecognizer? = null
+    private val pendingNavigationIntent = kotlinx.coroutines.flow.MutableStateFlow<Intent?>(null)
     private var lastBackPressTime = 0L
     
     private var voiceResultCallback: ((String) -> Unit)? = null
@@ -70,6 +73,12 @@ class MainActivity : ComponentActivity() {
                 voiceResultCallback?.invoke(matches[0])
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingNavigationIntent.value = intent
     }
 
     fun startVoiceInput(onResult: (String) -> Unit) {
@@ -107,7 +116,11 @@ class MainActivity : ComponentActivity() {
             } catch (e: Exception) {
                 e.printStackTrace()
                 try {
+                    try {
+                        fallbackSpeechRecognizer?.destroy()
+                    } catch (_: Exception) {}
                     val recognizer = android.speech.SpeechRecognizer.createSpeechRecognizer(this@MainActivity)
+                    fallbackSpeechRecognizer = recognizer
                     recognizer.setRecognitionListener(object : android.speech.RecognitionListener {
                         override fun onReadyForSpeech(p0: Bundle?) {}
                         override fun onBeginningOfSpeech() {}
@@ -116,13 +129,21 @@ class MainActivity : ComponentActivity() {
                         override fun onEndOfSpeech() {}
                         override fun onError(error: Int) {
                             runOnUiThread {
+                                try {
+                                    recognizer.destroy()
+                                    if (fallbackSpeechRecognizer === recognizer) fallbackSpeechRecognizer = null
+                                } catch (_: Exception) {}
                                 Toast.makeText(this@MainActivity, "لم يتم التعرف على الصوت، يرجى المحاولة مجدداً بصوت مسموع", Toast.LENGTH_SHORT).show()
                             }
                         }
                         override fun onResults(results: Bundle?) {
                             val matchesList = results?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)
-                            if (!matchesList.isNullOrEmpty()) {
-                                runOnUiThread {
+                            runOnUiThread {
+                                try {
+                                    recognizer.destroy()
+                                    if (fallbackSpeechRecognizer === recognizer) fallbackSpeechRecognizer = null
+                                } catch (_: Exception) {}
+                                if (!matchesList.isNullOrEmpty()) {
                                     onResult(matchesList[0])
                                 }
                             }
@@ -152,6 +173,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
+                locationCallback?.let { existingCallback ->
+                    try {
+                        fusedLocationClient.removeLocationUpdates(existingCallback)
+                    } catch (_: Exception) {}
+                }
+
                 val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
                     com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 5000L
                 ).setMinUpdateIntervalMillis(3000L).build()
@@ -189,6 +216,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
             locationCallback = null
+
+            // إلغاء تسجيل مستمع الشبكة لمنع تسريب الذاكرة
+            networkCallback?.let { cb ->
+                try {
+                    val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                    cm?.unregisterNetworkCallback(cb)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            networkCallback = null
+
+            // تحرير محرك التعرف الصوتي الاحتياطي إن وجد
+            try {
+                fallbackSpeechRecognizer?.destroy()
+                fallbackSpeechRecognizer = null
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             
             // تحرير TextToSpeech الموحد
             try {
@@ -205,6 +251,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        pendingNavigationIntent.value = intent
         
         // 🔐 تهيئة Vault إذا لزم الأمر
         initializeAdminVaultIfNeeded()
@@ -233,6 +280,7 @@ class MainActivity : ComponentActivity() {
 
         VoiceManager.onSpeak = { text ->
             try {
+                VoiceManager.init(this@MainActivity)
                 VoiceManager.speak(text)
             } catch(e: Exception) {
                 e.printStackTrace()
@@ -249,20 +297,20 @@ class MainActivity : ComponentActivity() {
         try {
             if (com.google.firebase.FirebaseApp.getApps(this).isEmpty()) {
                 com.google.firebase.FirebaseApp.initializeApp(this)
-            }
-            try {
-                val firebaseAppCheck = com.google.firebase.appcheck.FirebaseAppCheck.getInstance()
-                if (BuildConfig.DEBUG) {
-                    firebaseAppCheck.installAppCheckProviderFactory(
-                        com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
-                    )
-                } else {
-                    firebaseAppCheck.installAppCheckProviderFactory(
-                        com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory.getInstance()
-                    )
+                try {
+                    val firebaseAppCheck = com.google.firebase.appcheck.FirebaseAppCheck.getInstance()
+                    if (BuildConfig.DEBUG) {
+                        firebaseAppCheck.installAppCheckProviderFactory(
+                            com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
+                        )
+                    } else {
+                        firebaseAppCheck.installAppCheckProviderFactory(
+                            com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory.getInstance()
+                        )
+                    }
+                } catch (appCheckEx: Exception) {
+                    appCheckEx.printStackTrace()
                 }
-            } catch (appCheckEx: Exception) {
-                appCheckEx.printStackTrace()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -272,12 +320,12 @@ class MainActivity : ComponentActivity() {
             val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
             val docRef = firestore.collection("settings").document("main_settings")
             docRef.get().addOnSuccessListener { snapshot ->
-                if (!snapshot.exists()) {
+                if (snapshot != null && !snapshot.exists() && com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null) {
                     val initSettings = com.example.data.AdminSettingsEntity(
                         isStoresEnabled = true,
                         isPropertiesEnabled = true
                     )
-                    docRef.set(initSettings)
+                    docRef.set(initSettings, com.google.firebase.firestore.SetOptions.merge())
                 }
             }
         } catch (e: Exception) {
@@ -336,17 +384,23 @@ class MainActivity : ComponentActivity() {
                         val capabilities = cm.getNetworkCapabilities(activeNetwork)
                         viewModel.updateOnlineStatus(capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true)
 
+                        networkCallback?.let { oldCb ->
+                            try { cm.unregisterNetworkCallback(oldCb) } catch (_: Exception) {}
+                        }
+
                         val request = android.net.NetworkRequest.Builder()
                             .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
                             .build()
-                        cm.registerNetworkCallback(request, object : android.net.ConnectivityManager.NetworkCallback() {
+                        val newCb = object : android.net.ConnectivityManager.NetworkCallback() {
                             override fun onAvailable(network: android.net.Network) {
                                 viewModel.updateOnlineStatus(true)
                             }
                             override fun onLost(network: android.net.Network) {
                                 viewModel.updateOnlineStatus(false)
                             }
-                        })
+                        }
+                        networkCallback = newCb
+                        cm.registerNetworkCallback(request, newCb)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -360,7 +414,7 @@ class MainActivity : ComponentActivity() {
             val permissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestMultiplePermissions()
             ) { results ->
-                val granted = results.values.all { it }
+                val granted = results.values.any { it }
                 if (granted) {
                     viewModel.triggerNotification("📌 تم تفعيل تحديد الموقع التلقائي بدقة عالية!")
                     startFusedLocationUpdates(this@MainActivity, viewModel)
@@ -387,6 +441,43 @@ class MainActivity : ComponentActivity() {
 
             val isInitialized by viewModel.isInitialized.collectAsState()
             val currentLang by viewModel.currentLanguage.collectAsState()
+            val navIntent by pendingNavigationIntent.collectAsState()
+
+            LaunchedEffect(isInitialized, navIntent) {
+                val activeIntent = navIntent
+                if (isInitialized && activeIntent != null) {
+                    try {
+                        val openChatId = activeIntent.getStringExtra("openChatChannelId")
+                        val openUrgentCode = activeIntent.getStringExtra("openUrgentRequestCode")
+                        val navigateTo = activeIntent.getStringExtra("navigate_to")
+                        val targetScreen = activeIntent.getStringExtra("target_screen")
+
+                        when {
+                            !openChatId.isNullOrBlank() -> {
+                                viewModel.targetChatChannelId = openChatId
+                                viewModel.navigateToScreen(AppScreens.CHAT_DIRECT)
+                            }
+                            !openUrgentCode.isNullOrBlank() -> {
+                                viewModel.selectedRequestId = openUrgentCode
+                                viewModel.navigateToScreen(AppScreens.URGENT_REQUEST_DETAILS)
+                            }
+                            navigateTo == "PASSWORD_RECOVERY_PANEL" || navigateTo == "ADMIN_PANEL" || targetScreen == "ADMIN_PANEL" -> {
+                                viewModel.navigateToScreen(AppScreens.ADMIN_PANEL)
+                            }
+                            !targetScreen.isNullOrBlank() && targetScreen != "MAIN" && targetScreen != "HOME" -> {
+                                viewModel.navigateToScreen(targetScreen)
+                            }
+                            !navigateTo.isNullOrBlank() && navigateTo != "MAIN" && navigateTo != "HOME" -> {
+                                viewModel.navigateToScreen(navigateTo)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        pendingNavigationIntent.value = null
+                    }
+                }
+            }
 
             BackHandler {
                 val handled = viewModel.goBack()
