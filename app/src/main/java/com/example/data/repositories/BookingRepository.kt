@@ -418,7 +418,7 @@ class BookingRepository(
         // Optimistic local update
         val current = previousBookings.map {
             if (it.id == booking.id) it.copy(
-                status = "CANCELLED",
+                status = com.example.utils.BookingStatus.CANCELLED.code,
                 cancellationReason = cancellationReason,
                 cancelledAt = System.currentTimeMillis(),
                 cancelledBy = cancelledBy,
@@ -517,7 +517,7 @@ class BookingRepository(
         )
         val current = _cachedBookings.value.map {
             if (it.id == bookingId) it.copy(
-                status = "CANCELLED",
+                status = com.example.utils.BookingStatus.CANCELLED.code,
                 cancellationReason = cancellationReason,
                 cancelledAt = System.currentTimeMillis(),
                 cancelledBy = cancelledBy,

@@ -126,6 +126,7 @@ class ChatLocalDataSource(
                     updatedAt = ch.updatedAt
                 )
             }
+            chatDao.deleteAllChannels()
             chatDao.insertChannels(roomChannels)
         } catch (e: Exception) {
             e.printStackTrace()

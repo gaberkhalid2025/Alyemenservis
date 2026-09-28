@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import com.example.data.isValid
 import com.example.ui.helpers.AppState
 
 import com.example.ui.MainViewModel
@@ -629,7 +630,7 @@ fun approveRequest(request: PendingProviderEntity) {
                 isApproved = true,
                 isPinned = false,
                 isDeleted = false,
-                password = request.password,
+                passwordHash = request.password,
                 pdfFileBase64 = request.idPhotoBase64
             )
             if (request.id != storeId) {
@@ -682,7 +683,7 @@ fun approveRequest(request: PendingProviderEntity) {
                 isApproved = true,
                 isPinned = false,
                 isDeleted = false,
-                password = request.password,
+                passwordHash = request.password,
                 price = propPrice,
                 pdfFileBase64 = request.idPhotoBase64
             )
@@ -791,7 +792,7 @@ fun approveRequest(request: PendingProviderEntity) {
                 rating = 5.0f,
                 isBlocked = false,
                 customCategoryName = request.customCategoryName,
-                password = request.password,
+                passwordHash = request.password,
                 isDeleted = false,
                 deletedAt = null
             )
@@ -882,7 +883,7 @@ fun approveTechnician(providerId: String) {
                 rating = 5.0f,
                 subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
                 workPhotosBase64 = it.workPhotosBase64,
-                password = it.password,
+                passwordHash = it.passwordHash,
                 isDeleted = false,
                 deletedAt = null
             )
@@ -906,7 +907,7 @@ fun approveTechnician(providerId: String) {
             try {
                 db.collection("pending_providers").document(providerId).delete()
                 db.collection("providers").document(finalId).set(p)
-                db.collection("notifications").document(notification.id).set(notification)
+                if (notification.isValid()) db.collection("notifications").document(notification.id).set(notification)
             } catch (e: Exception) {}
         }
     }
@@ -929,7 +930,7 @@ fun rejectTechnician(providerId: String, reason: String = "لم يستوفِ ا�
 
             try {
                 db.collection("pending_providers").document(providerId).set(updated)
-                db.collection("notifications").document(notification.id).set(notification)
+                if (notification.isValid()) db.collection("notifications").document(notification.id).set(notification)
             } catch (e: Exception) {}
         }
     }
@@ -984,7 +985,7 @@ fun approvePendingProvider(pending: PendingProviderEntity) {
             profession = pending.profession,
             specialization = pending.specialization,
             customCategoryName = pending.customCategoryName,
-            password = pending.password,
+            passwordHash = pending.passwordHash,
             providerType = pending.providerType
         )
         db.collection("providers").document(provider.id).set(provider)
@@ -1094,7 +1095,7 @@ fun saveStore(store: com.example.data.StoreEntity) {
                             timestamp = System.currentTimeMillis()
                         )
                         try {
-                            db.collection("notifications").document(adminNotif.id).set(adminNotif)
+                            if (adminNotif.isValid()) db.collection("notifications").document(adminNotif.id).set(adminNotif)
                         } catch (e: Exception) {}
                     }
                     mainViewModel.triggerNotification("✅ تم حفظ وتأكيد بيانات الطلب بنجاح!")
@@ -1191,7 +1192,7 @@ fun setStoreActive(storeId: String, isActive: Boolean) {
                 timestamp = System.currentTimeMillis()
             )
             _notifications.value = listOf(notification) + _notifications.value
-            try { db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
+            try { if (notification.isValid()) db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
         }
 
         db.collection("stores").document(docId).update(updates)
@@ -1392,7 +1393,7 @@ fun saveProperty(property: com.example.data.PropertyEntity) {
                             timestamp = System.currentTimeMillis()
                         )
                         try {
-                            db.collection("notifications").document(adminNotif.id).set(adminNotif)
+                            if (adminNotif.isValid()) db.collection("notifications").document(adminNotif.id).set(adminNotif)
                         } catch (e: Exception) {}
                     }
                     mainViewModel.triggerNotification("✅ تم تسجيل بيانات العقار بنجاح!")
@@ -1489,7 +1490,7 @@ fun setPropertyActive(propertyId: String, isActive: Boolean) {
                 timestamp = System.currentTimeMillis()
             )
             _notifications.value = listOf(notification) + _notifications.value
-            try { db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
+            try { if (notification.isValid()) db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
         }
 
         db.collection("properties").document(docId).update(updates)
@@ -1683,7 +1684,7 @@ fun setJobApproved(jobId: String, isApproved: Boolean) {
                 timestamp = System.currentTimeMillis()
             )
             _notifications.value = listOf(notification) + _notifications.value
-            try { db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
+            try { if (notification.isValid()) db.collection("notifications").document(notification.id).set(notification) } catch(e: Exception) {}
         }
         db.collection("jobs").document(jobId).update(updates)
             .addOnSuccessListener {
@@ -2973,7 +2974,7 @@ fun sendNotificationToApplicants(title: String, message: String, jobId: String =
             targetValue = jobId,
             timestamp = System.currentTimeMillis()
         )
-        db.collection("notifications").document(notif.id).set(notif)
+        if (notif.isValid()) db.collection("notifications").document(notif.id).set(notif)
             .addOnSuccessListener {
                 mainViewModel.triggerNotification("🔔 تم إرسال الإشعار لجميع المتقدمين للوظائف بنجاح!")
             }
@@ -3093,7 +3094,7 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
                     workPhotosBase64 = req.workImages,
                     customCategoryName = req.categoryName,
                     profession = requestProfession,
-                    password = req.passwordHash,
+                    passwordHash = req.passwordHash,
                     providerType = requestProfession
                 )
                 approveRequest(pendingProvider)

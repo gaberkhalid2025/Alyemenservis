@@ -60,14 +60,9 @@ fun AppHeaderBar(
             emptyList()
         } else {
             chatChannels.filter { ch ->
-                val isMySupport = (cleanUserId.isNotEmpty() && ch.id == "support_$cleanUserId") ||
-                                  (cleanUserPhone.isNotEmpty() && ch.id == "support_$cleanUserPhone") ||
-                                  (ch.channelType == "SUPPORT" && ((cleanUserId.isNotEmpty() && (ch.customerId == cleanUserId || ch.clientId == cleanUserId)) || (cleanUserPhone.isNotEmpty() && ch.customerPhone == cleanUserPhone)))
-                val isMyUser = (cleanUserId.isNotEmpty() && ch.id.contains(cleanUserId)) ||
-                               (cleanUserPhone.isNotEmpty() && ch.id.contains(cleanUserPhone)) ||
-                               (cleanUserId.isNotEmpty() && ch.customerId == cleanUserId) ||
-                               (cleanUserPhone.isNotEmpty() && ch.customerPhone == cleanUserPhone)
-                val isMyProvider = myProvider != null && (ch.id.contains("chat_p_${myProvider.id}_") || ch.id.contains("_u_${myProvider.id}") || ch.targetId == myProvider.id)
+                val isMySupport = ch.id.startsWith("support_") || (cleanUserId.isNotEmpty() && ch.participants.contains(cleanUserId))
+                val isMyUser = cleanUserId.isNotEmpty() && ch.participants.contains(cleanUserId)
+                val isMyProvider = myProvider != null && ch.participants.contains(myProvider.id)
 
                 isMySupport || isMyUser || isMyProvider
             }

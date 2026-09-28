@@ -1,4 +1,5 @@
 package com.example.ui.helpers
+import com.example.data.isValid
 
 import android.content.Context
 import com.example.ui.*
@@ -134,7 +135,7 @@ class AccountRecoveryHelper(
                 timestamp = System.currentTimeMillis(),
                 dedupKey = "PWD_RESET_${cleanPhone}"
             )
-            try { db.collection("notifications").document(adminNotif.id).set(adminNotif) } catch (e: Exception) {}
+            try { if (adminNotif.isValid()) db.collection("notifications").document(adminNotif.id).set(adminNotif) } catch (e: Exception) {}
             
             // Log in activity_logs
             val logId = db.collection("activity_logs").document().id
@@ -210,7 +211,7 @@ class AccountRecoveryHelper(
                 "timestamp" to System.currentTimeMillis(),
                 "dedupKey" to "PWD_RESOLVE_$cleanPhone"
             )
-            db.collection("notifications").document(notifId).set(notif)
+            if (notif.isValid()) db.collection("notifications").document(notifId).set(notif)
             onResult(true)
         }.addOnFailureListener {
             onResult(false)

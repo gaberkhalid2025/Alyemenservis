@@ -17,9 +17,9 @@ data class RequestOfferEntity(
     val estimatedDuration: String = "ساعتان",
     val notes: String = "",
     val status: String = "PENDING", // PENDING, ACCEPTED, REJECTED
-    val technicianLatitude: Double = 15.3694,
-    val technicianLongitude: Double = 44.1910,
-    val distanceKm: Double = 2.5,
+    val technicianLatitude: Double? = null,
+    val technicianLongitude: Double? = null,
+    val distanceKm: Double? = null,
     val isAvailable: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 )

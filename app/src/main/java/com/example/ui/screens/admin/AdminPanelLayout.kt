@@ -4734,7 +4734,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                          }.joinToString(" + ")
                                          Text("الصلاحيات الممنوحة: $displayRoles (${if (sup.permissions.isEmpty()) "كاملة/افتراضية" else "${sup.permissions.size}/538 مخصصة"})", fontSize = 10.sp, color = themeColors.accent)
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("رمز الدخول (Passcode): ${if (showSupPasscode) sup.passcode else "••••••••"}", fontSize = 11.sp, color = themeColors.textSecondary)
+                                            Text("رمز الدخول (Passcode): ${if (showSupPasscode) sup.passcodeHash else "••••••••"}", fontSize = 11.sp, color = themeColors.textSecondary)
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text(
                                                 text = if (showSupPasscode) "🔒 إخفاء" else "👁️ إظهار",
@@ -8804,7 +8804,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
     editingSupervisorObj?.let { supervisor ->
         var editSupName by rememberSaveable(supervisor.id) { mutableStateOf(supervisor.name) }
         var editSupRole by rememberSaveable(supervisor.id) { mutableStateOf(supervisor.role) }
-        var editSupPasscode by rememberSaveable(supervisor.id) { mutableStateOf(supervisor.passcode) }
+        var editSupPasscode by rememberSaveable(supervisor.id) { mutableStateOf(supervisor.passcodeHash) }
         var editSupPermissions by remember(supervisor.id) { mutableStateOf(supervisor.permissions) }
 
         Dialog(onDismissRequest = { editingSupervisorObj = null }) {

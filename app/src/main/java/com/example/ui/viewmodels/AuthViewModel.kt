@@ -1,4 +1,5 @@
 package com.example.ui.viewmodels
+import com.example.data.isValid
 import kotlinx.coroutines.tasks.await
 
 import android.content.Context
@@ -393,7 +394,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             return true
         }
         val matchSup = _supervisors.value.find {
-            it.passcode.isNotBlank() && com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcode)
+            it.passcodeHash.isNotBlank() && com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, it.passcodeHash)
         }
         return matchSup != null
     }
@@ -436,7 +437,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val nextId = "sup_" + UUID.randomUUID().toString().take(6)
         // ✨ م2: تشفير كلمة المرور (Hashing) قبل التخزين لحماية المشرفين
         val hashedPass = com.example.utils.SecureHasher.hashPassword(passcode.trim())
-        val newSup = SupervisorEntity(nextId, name, role, hashedPass, permissions)
+        val newSup = SupervisorEntity(id = nextId, name = name, role = role, passcodeHash = hashedPass, permissions = permissions)
         db.collection("supervisors").document(nextId).set(newSup)
         triggerToast("🔑 تم إضافة المشرف $name وتعيين ${permissions.size} صلاحية بنجاح")
     }
@@ -444,7 +445,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     fun editSupervisor(id: String, name: String, role: String, passcode: String, permissions: List<String> = emptyList()) {
         // ✨ م2: تشفير كلمة المرور في حال التعديل لضمان الأمان
         val finalPass = if (passcode.contains(":")) passcode else com.example.utils.SecureHasher.hashPassword(passcode.trim())
-        val updatedSup = SupervisorEntity(id, name, role, finalPass, permissions)
+        val updatedSup = SupervisorEntity(id = id, name = name, role = role, passcodeHash = finalPass, permissions = permissions)
         db.collection("supervisors").document(id).set(updatedSup)
         triggerToast("✏️ تم تعديل بيانات وصلاحيات المشرف $name (${permissions.size} صلاحية) بنجاح")
     }
@@ -502,7 +503,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             "timestamp" to currentTime,
             "dedupKey" to "PWD_RESET_$cleanPhone"
         )
-        db.collection("notifications").document(adminNotifId).set(adminNotif)
+        if (adminNotif.isValid()) db.collection("notifications").document(adminNotifId).set(adminNotif)
             .addOnSuccessListener { onComplete(true) }
             .addOnFailureListener { onComplete(false) }
     }
@@ -595,7 +596,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                     "timestamp" to currentTime,
                     "dedupKey" to "PWD_RESET_$cleanPhone"
                 )
-                db.collection("notifications").document(notifDocId).set(adminNotif)
+                if (adminNotif.isValid()) db.collection("notifications").document(notifDocId).set(adminNotif)
                 
                 // Record in activity_logs
                 val logId = db.collection("activity_logs").document().id

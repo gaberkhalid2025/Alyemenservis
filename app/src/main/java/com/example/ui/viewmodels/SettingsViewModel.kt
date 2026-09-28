@@ -997,7 +997,7 @@ fun resetAccountPassword(entityType: String, phoneOrId: String, newPass: String)
                         }
                     }
                 }
-                mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = hashedPass) else it }
+                mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPass) else it }
             }
             "STORE", "RESTAURANT", "MEDICAL", "CENTER" -> {
                 db.collection("stores").get().addOnSuccessListener { qs ->
@@ -1008,7 +1008,7 @@ fun resetAccountPassword(entityType: String, phoneOrId: String, newPass: String)
                         }
                     }
                 }
-                mainViewModel.adminViewModel._stores.value = mainViewModel.adminViewModel._stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = hashedPass) else it }
+                mainViewModel.adminViewModel._stores.value = mainViewModel.adminViewModel._stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPass) else it }
             }
             "JOB" -> {
                 db.collection("jobs").get().addOnSuccessListener { qs ->
@@ -1064,7 +1064,7 @@ fun requestAdminPasswordReset(phone: String) {
             dedupKey = "PWD_RESET_$cleanPhone"
         )
         try {
-            db.collection("notifications").document(notif.id).set(notif)
+            if (notif.isValid()) db.collection("notifications").document(notif.id).set(notif)
         } catch (e: Exception) {}
         mainViewModel.triggerNotification("📩 تم إرسال طلب استعادة وإعادة تعيين كلمة المرور لإدارة التطبيق بنجاح")
     }
@@ -1173,8 +1173,8 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
             )
         } catch (e: Exception) {}
 
-        mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = hashedPassword) else it }
-        mainViewModel.adminViewModel._stores.value = mainViewModel.adminViewModel._stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(password = hashedPassword) else it }
+        mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPassword) else it }
+        mainViewModel.adminViewModel._stores.value = mainViewModel.adminViewModel._stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPassword) else it }
 
         if (mainViewModel._passwordRecoveryWaitingPhone.value.contains(cleanPhone)) {
             mainViewModel._passwordRecoveryWaitingPhone.value = ""

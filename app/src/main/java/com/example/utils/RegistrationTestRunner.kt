@@ -224,7 +224,7 @@ class RegistrationTestRunner(private val context: Context) {
                         phone = phone,
                         categoryId = "electricity",
                         status = "PENDING",
-                        password = hashedPassword,
+                        passwordHash = hashedPassword,
                         area = "صنعاء",
                         localNeighborhood = "حي اختبار"
                     )

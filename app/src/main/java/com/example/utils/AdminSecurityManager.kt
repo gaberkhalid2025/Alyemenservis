@@ -144,7 +144,7 @@ object AdminSecurityManager {
                     it.id.equals(trimmedUser, ignoreCase = true) ||
                             it.name.trim().equals(trimmedUser, ignoreCase = true)
                 }
-                if (matchingSup != null && SecurityCryptoUtils.verifyAdminPassword(trimmedPass, matchingSup.passcode)) {
+                if (matchingSup != null && SecurityCryptoUtils.verifyAdminPassword(trimmedPass, matchingSup.passcodeHash)) {
                     val r = matchingSup.role.uppercase().trim()
                     return when {
                         r.contains("OWNER") || r == "MAIN_ADMIN" || r == "SUPER_ADMIN" -> "OWNER"

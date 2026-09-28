@@ -3580,7 +3580,7 @@ fun StoreCreateEditDialog(
                                 coverImage = coverImageBase64,
                                 isActive = if (adminRole != "GUEST") true else (store?.isActive ?: false), // Auto-approve if added by admin
                                 isApproved = if (adminRole != "GUEST") true else (store?.isApproved ?: false),
-                                password = password,
+                                passwordHash = password,
                                 maxImages = customMaxPhotosInput.toIntOrNull() ?: (store?.maxImages ?: 5),
                                 pdfFileUri = pdfUriText,
                                 pdfFileBase64 = pdfBase64Text,
@@ -4027,7 +4027,7 @@ fun PropertyCreateEditDialog(
                                 propertyType = propertyType,
                                 isActive = if (adminRole != "GUEST") true else (property?.isActive ?: false), // Auto-approve if added by admin
                                 isApproved = if (adminRole != "GUEST") true else (property?.isApproved ?: false),
-                                password = password,
+                                passwordHash = password,
                                 maxImages = customMaxPhotosInput.toIntOrNull() ?: (property?.maxImages ?: 5),
                                 pdfFileUri = pdfUriText,
                                 pdfFileBase64 = pdfBase64Text,

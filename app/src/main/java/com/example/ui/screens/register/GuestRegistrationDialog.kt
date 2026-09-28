@@ -237,7 +237,7 @@ fun GuestRegistrationDialog(
                     )
 
                     com.example.ui.screens.register.forms.UnifiedRegistrationForm(
-                        role = "CLIENT",
+                        role = com.example.data.models.UserRole.CLIENT.code,
                         themeColors = themeColors,
                         onRegistrationSuccess = { data ->
                             val cleanName = data["entityName"] ?: ""

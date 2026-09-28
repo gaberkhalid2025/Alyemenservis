@@ -37,13 +37,9 @@ data class NotificationEntity(
     }
 }
 
-@Keep
-sealed class AppNotification(open val base: NotificationEntity) {
-    data class BookingNotification(override val base: NotificationEntity, val bookingId: String) : AppNotification(base)
-    data class ChatNotification(override val base: NotificationEntity, val channelId: String) : AppNotification(base)
-    data class JoinRequestNotification(override val base: NotificationEntity, val requestId: String) : AppNotification(base)
-    data class UrgentRequestNotification(override val base: NotificationEntity, val urgentId: String) : AppNotification(base)
-    data class SystemNotification(override val base: NotificationEntity) : AppNotification(base)
-    data class AdminNotification(override val base: NotificationEntity) : AppNotification(base)
+fun Map<String, Any?>.isValid(): Boolean {
+    val id = this["id"] as? String
+    val title = this["title"] as? String
+    val message = this["message"] as? String
+    return !id.isNullOrBlank() && !title.isNullOrBlank() && !message.isNullOrBlank()
 }
-

@@ -91,8 +91,8 @@ fun MainViewModel.openChatChannel(channel: ChatChannelEntity?) {
     val currentUserName = authViewModel.currentUserName.value.ifBlank { "العميل" }
     val currentUserPhoto = ""
     
-    val otherUserId = if (channel.customerId == currentUserId) channel.targetId else channel.customerId
-    val otherUserName = if (channel.customerId == currentUserId) channel.targetName else channel.customerName
+    val otherUserId = channel.participants.firstOrNull { it != currentUserId } ?: ""
+    val otherUserName = channel.participantNames[otherUserId] ?: channel.title
     
     viewModelScope.launch {
         val result = chatRepo.getOrCreateChannel(

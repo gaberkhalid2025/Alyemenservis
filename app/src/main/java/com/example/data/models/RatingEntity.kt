@@ -24,16 +24,12 @@ data class RatingEntity(
     val replyTimestamp: Long? = null,
     val helpfulCount: Int = 0,
     val unhelpfulCount: Int = 0,
-    val helpfulUserIds: List<String> = emptyList(),
-    val unhelpfulUserIds: List<String> = emptyList(),
+    @get:com.google.firebase.firestore.Exclude val helpfulUserIds: List<String> = emptyList(),
+    @get:com.google.firebase.firestore.Exclude val unhelpfulUserIds: List<String> = emptyList(),
     val isReported: Boolean = false,
     val reportReason: String = ""
 ) {
     val providerId: String get() = targetId
-    val customerName: String get() = userName
-    val authorName: String get() = userName
-    val authorPhone: String get() = userPhone
-    val dateTimestamp: Long get() = timestamp
 
     fun toReviewEntity(): com.example.domain.entities.RatingReviewEntity {
         return com.example.domain.entities.RatingReviewEntity(

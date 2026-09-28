@@ -395,7 +395,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
                                 status = doc.getString("status") ?: "PENDING",
                                 profession = doc.getString("profession") ?: "",
                                 customCategoryName = doc.getString("customCategoryName") ?: "",
-                                password = doc.getString("password") ?: ""
+                                passwordHash = doc.getString("passwordHash") ?: doc.getString("password") ?: ""
                             )
                         } catch (ex: Exception) {
                             null

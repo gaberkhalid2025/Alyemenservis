@@ -47,6 +47,9 @@ interface ChatDao {
     @Query("DELETE FROM chat_channels WHERE id = :channelId")
     suspend fun deleteChannel(channelId: String)
 
+    @Query("DELETE FROM chat_channels")
+    suspend fun deleteAllChannels()
+
     @Query("SELECT * FROM chat_channels ORDER BY lastMessageTime DESC")
     suspend fun getAllChannelsList(): List<ChatChannelRoomEntity>
 

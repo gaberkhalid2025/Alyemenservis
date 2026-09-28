@@ -163,7 +163,7 @@ class RegistrationHelper(
                 idPhotoBase64 = encIdCard,
                 workPhotosBase64 = finalWorkPhotos,
                 customCategoryName = customCategoryName,
-                password = securedPasswordHash,
+                passwordHash = securedPasswordHash,
                 productAttachmentsJson = productAttachmentsJson,
                 profession = requestProfession,
                 providerType = requestProfession
@@ -273,7 +273,7 @@ class RegistrationHelper(
                         timestamp = System.currentTimeMillis()
                     )
                     try {
-                        db.collection("notifications").document(adminNotif.id).set(adminNotif)
+                        if (adminNotif.isValid()) db.collection("notifications").document(adminNotif.id).set(adminNotif)
                     } catch (e: Exception) {}
                 }
                 .addOnFailureListener { e ->

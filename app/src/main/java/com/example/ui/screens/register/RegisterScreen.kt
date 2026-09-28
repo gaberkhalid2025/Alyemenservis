@@ -572,7 +572,7 @@ fun RegisterScreen(
                             }
                             RegistrationType.CLIENT, null -> {
                                 UnifiedRegistrationForm(
-                                    role = "CLIENT",
+                                    role = com.example.data.models.UserRole.CLIENT.code,
                                     themeColors = themeColors,
                                     onRegistrationSuccess = { map ->
                                         handleFormSubmit(map, RegistrationType.CLIENT)

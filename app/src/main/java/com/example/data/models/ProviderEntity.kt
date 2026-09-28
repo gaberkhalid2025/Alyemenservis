@@ -33,16 +33,18 @@ data class ProviderEntity(
     val profession: String = "",
     val specialization: String = "",
     val chatRecipientId: String = "",
-    val isBlocked: Boolean = false,
+    override val isBlocked: Boolean = false,
+    override val blockReason: String = "",
     val isChatDisabled: Boolean = false,
     val isNotificationsDisabled: Boolean = false,
     val isPaymentRequired: Boolean = false,
     @get:com.google.firebase.firestore.Exclude
-    val password: String = "",
+    val passwordHash: String = "",
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
     val providerType: String = ""
-) {
+) : com.example.data.models.SupervisedEntity {
+    val password: String get() = passwordHash
     val portfolioImages: List<String> get() = workPhotosBase64
 }
 
@@ -68,7 +70,9 @@ data class PendingProviderEntity(
     val specialization: String = "",
     val chatRecipientId: String = "",
     @get:com.google.firebase.firestore.Exclude
-    val password: String = "",
+    val passwordHash: String = "",
     val providerType: String = "",
     val keywords: List<String> = emptyList()
-)
+) {
+    val password: String get() = passwordHash
+}

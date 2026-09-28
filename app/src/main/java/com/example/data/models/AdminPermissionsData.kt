@@ -17,7 +17,7 @@ enum class PermissionCategory(
     val iconEmoji: String,
     val expectedCount: Int
 ) {
-    BACKDOOR("BACKDOOR", "البوابة الخلفية (BACKDOOR)", "⚙️", 45),
+    OWNER_CONTROL("OWNER_CONTROL", "التحكم الكامل والمالك (OWNER_CONTROL)", "⚙️", 45),
     REG_REQ("REG_REQ", "طلبات الانضمام والاعتماد", "⌛", 18),
     MANUAL_ADD("MANUAL_ADD", "الإضافة اليدوية", "➕", 15),
     STORES("STORES", "المحلات والمراكز التجارية", "🏪", 18),
@@ -92,9 +92,9 @@ object AdminPermissionsRegistry {
             }
         }
 
-        // 1. البوابة الخلفية (BACKDOOR) - 45 صلاحية
+        // 1. التحكم الكامل والمالك (OWNER_CONTROL) - 45 صلاحية
         addGroup(
-            PermissionCategory.BACKDOOR,
+            PermissionCategory.OWNER_CONTROL,
             PermissionLevel.SENSITIVE,
             listOf(
                 "BD_APP_NAME" to ("تغيير اسم التطبيق" to "تغيير الاسم الذي يظهر للمستخدمين في التطبيق"),

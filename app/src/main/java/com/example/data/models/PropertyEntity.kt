@@ -30,7 +30,7 @@ data class PropertyEntity(
     val paymentEnabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     @get:com.google.firebase.firestore.Exclude
-    val password: String = "",
+    val passwordHash: String = "", // Secure salted PBKDF2 hash of the password
     val pdfFileUri: String = "",
     // TODO: Migrate to FirebaseStorageUploader
     val pdfFileBase64: String = "",
@@ -43,9 +43,8 @@ data class PropertyEntity(
     val isChatDisabled: Boolean = false,
     val isNotificationsDisabled: Boolean = false,
     val productAttachmentsJson: String = "",
-    val isBlocked: Boolean = false,
-    val blockReason: String = ""
-) {
-    val address: String get() = localNeighborhood
-    val area: String get() = localNeighborhood
+    override val isBlocked: Boolean = false,
+    override val blockReason: String = ""
+) : com.example.data.models.SupervisedEntity {
+    val password: String get() = passwordHash
 }

@@ -120,88 +120,33 @@ data class ChatChannel(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val channelType: String = "PROVIDER",
-    val targetId: String = "",
     val targetName: String = "",
     val targetPhone: String = "",
     val targetCategory: String = "",
     val userName: String = "",
     val customerName: String = "",
     val customerPhone: String = "",
-    val customerId: String = "",
     val isProvider: Boolean = false,
     val timestamp: Long = 0L,
     val unreadCountUser: Int = 0,
     val unreadCountTarget: Int = 0,
-    val providerId: String = "",
     val providerName: String = "",
     val providerPhoto: String = "",
-    val clientId: String = "",
     val clientName: String = "",
     val clientPhoto: String = "",
     val messages: List<ChatMessage> = emptyList()
 ) : Serializable {
+    val clientId: String get() = participants.firstOrNull() ?: ""
+    val customerId: String get() = participants.firstOrNull() ?: ""
+    val providerId: String get() = participants.getOrNull(1) ?: ""
+    val targetId: String get() = participants.getOrNull(1) ?: ""
 
     /**
      * يوحّد الحقول المهجورة والقديمة (providerId, clientId, targetName, customerName, timestamp, unreadCountUser...)
      * إلى الحقول القياسية المعتمدة (participants, participantNames, participantPhotos, title, updatedAt, unreadCount).
      */
     fun toCanonicalChannel(): ChatChannel {
-        val resolvedParticipants = if (participants.isNotEmpty()) {
-            participants
-        } else {
-            listOf(providerId, clientId, targetId, customerId).map { it.trim() }.filter { it.isNotBlank() }.distinct()
-        }
-
-        val resolvedNames = participantNames.toMutableMap()
-        if (providerId.isNotBlank() && providerName.isNotBlank() && !resolvedNames.containsKey(providerId)) {
-            resolvedNames[providerId] = providerName
-        }
-        if (targetId.isNotBlank() && targetName.isNotBlank() && !resolvedNames.containsKey(targetId)) {
-            resolvedNames[targetId] = targetName
-        }
-        val effectiveClientId = clientId.ifBlank { customerId }
-        val effectiveClientName = clientName.ifBlank { customerName.ifBlank { userName } }
-        if (effectiveClientId.isNotBlank() && effectiveClientName.isNotBlank() && !resolvedNames.containsKey(effectiveClientId)) {
-            resolvedNames[effectiveClientId] = effectiveClientName
-        }
-
-        val resolvedPhotos = participantPhotos.toMutableMap()
-        if (providerId.isNotBlank() && providerPhoto.isNotBlank() && !resolvedPhotos.containsKey(providerId)) {
-            resolvedPhotos[providerId] = providerPhoto
-        }
-        if (effectiveClientId.isNotBlank() && clientPhoto.isNotBlank() && !resolvedPhotos.containsKey(effectiveClientId)) {
-            resolvedPhotos[effectiveClientId] = clientPhoto
-        }
-
-        val resolvedUnread = unreadCount.toMutableMap()
-        if (effectiveClientId.isNotBlank() && unreadCountUser > 0 && !resolvedUnread.containsKey(effectiveClientId)) {
-            resolvedUnread[effectiveClientId] = unreadCountUser
-        }
-        val effectiveTargetId = targetId.ifBlank { providerId }
-        if (effectiveTargetId.isNotBlank() && unreadCountTarget > 0 && !resolvedUnread.containsKey(effectiveTargetId)) {
-            resolvedUnread[effectiveTargetId] = unreadCountTarget
-        }
-
-        val resolvedTitle = title.ifBlank {
-            targetName.ifBlank { providerName.ifBlank { customerName.ifBlank { clientName.ifBlank { userName } } } }
-        }
-        val resolvedAvatar = groupAvatarUrl.ifBlank { providerPhoto.ifBlank { clientPhoto } }
-        val resolvedTime = when {
-            lastMessageTime > 0L -> lastMessageTime
-            timestamp > 0L -> timestamp
-            else -> updatedAt
-        }
-
-        return copy(
-            participants = resolvedParticipants,
-            participantNames = resolvedNames,
-            participantPhotos = resolvedPhotos,
-            unreadCount = resolvedUnread,
-            title = resolvedTitle,
-            groupAvatarUrl = resolvedAvatar,
-            lastMessageTime = resolvedTime,
-            updatedAt = if (updatedAt > 0L) updatedAt else resolvedTime
-        )
+        return this
     }
 
     /**

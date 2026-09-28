@@ -23,3 +23,6 @@ data class PaymentCoreModel(
     val externalGatewayWallet: ExternalPaymentGatewayWallet get() = wallet
     val userBalanceWallet: UserBalanceWallet get() = internalWallet
 }
+
+typealias UnifiedBooking = com.example.data.BookingEntity
+typealias UnifiedRating = com.example.data.RatingEntity
