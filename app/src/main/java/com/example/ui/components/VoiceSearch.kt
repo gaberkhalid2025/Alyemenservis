@@ -24,11 +24,7 @@ import kotlinx.coroutines.delay
 
 /**
  * 🎙️ VoiceSearch (واجهة البحث الصوتي الذكي)
- * تدعم التعرف على الصوت باللغة العربية مع موجات صوتية متحركة واقتراحات فورية.
- *
- * ⚠️ PLACEHOLDER: هذه محاكاة للعرض التوضيحي
- * TODO: استبدالها بـ VoiceManager الحقيقي
- * لا تحذف هذه الدالة — قد تُستخدم في المستقبل
+ * تدعم التعرف على الصوت الحقيقي باللغة العربية عبر VoiceManager.onHear مع موجات صوتية متحركة واقتراحات فورية.
  */
 @Composable
 fun VoiceSearchDialog(
@@ -40,7 +36,28 @@ fun VoiceSearchDialog(
     if (!isVisible) return
 
     var isListening by remember { mutableStateOf(true) }
-    var recognizedText by remember { mutableStateOf("") }
+    var recognizedText by remember { mutableStateOf("جاري الاستماع...") }
+
+    val startRealListening = remember {
+        {
+            isListening = true
+            recognizedText = "جاري الاستماع..."
+            val hearHandler = com.example.VoiceManager.onHear
+            if (hearHandler != null) {
+                hearHandler.invoke { spokenText ->
+                    if (spokenText.isNotBlank()) {
+                        recognizedText = spokenText.trim()
+                    } else {
+                        recognizedText = "لم يتم التقاط صوت واضح، اضغط على الميكروفون للمحاولة مجدداً"
+                    }
+                    isListening = false
+                }
+            } else {
+                recognizedText = "يرجى التحدث أو اختيار أحد الاقتراحات السريعة أدناه"
+                isListening = false
+            }
+        }
+    }
 
     // Pulsing animation for microphone
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -54,14 +71,10 @@ fun VoiceSearchDialog(
         label = "pulse_scale"
     )
 
-    // Simulate voice recognition progress for demo/fallback
+    // Trigger real voice recognition via VoiceManager.onHear when dialog opens
     LaunchedEffect(isVisible) {
         if (isVisible) {
-            recognizedText = "جاري الاستماع..."
-            delay(1500)
-            recognizedText = "سباك في صنعاء شارع حدة"
-            delay(1000)
-            isListening = false
+            startRealListening()
         }
     }
 
@@ -83,10 +96,12 @@ fun VoiceSearchDialog(
                     color = Color.White
                 )
 
-                // Pulsing Mic Circle
+                // Pulsing Mic Circle (clickable to retry listening)
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(100.dp)
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clickable { startRealListening() }
                 ) {
                     Box(
                         modifier = Modifier

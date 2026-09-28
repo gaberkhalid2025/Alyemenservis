@@ -81,6 +81,7 @@ fun UrgentRequestScreen(
     }
 
     var createdRequestCode by remember { mutableStateOf<String?>(null) }
+    var createdPinCode by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var expandedCategoryDropdown by remember { mutableStateOf(false) }
 
@@ -349,13 +350,14 @@ fun UrgentRequestScreen(
                             serviceTitle = serviceTitle,
                             description = if (uploadedImageUrl.isNotBlank()) "$serviceDetails\n[مرفق صورة: $uploadedImageUrl]" else serviceDetails,
                             customPin = pinCode,
-                            onResult = { success, msg, _ ->
+                            onResult = { success, returnedCodeOrMsg, returnedPin ->
                                 isSubmitting = false
                                 if (success) {
-                                    createdRequestCode = "URG-${(1000..9999).random()}"
+                                    createdRequestCode = returnedCodeOrMsg.ifBlank { "URG-XXXX" }
+                                    createdPinCode = returnedPin.ifBlank { pinCode }
                                     showSuccessDialog = true
                                 } else {
-                                    scope.launch { snackbarHostState.showSnackbar(msg) }
+                                    scope.launch { snackbarHostState.showSnackbar(returnedCodeOrMsg) }
                                 }
                             }
                         )
@@ -421,6 +423,7 @@ fun UrgentRequestScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("تم تعميم طلبك على الفنيين المتاحين فوراً.")
                     Text("رمز الطلب: ${createdRequestCode ?: "URG-XXXX"}", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+                    Text("رمز PIN السري (للإلغاء والتحكم): ${createdPinCode ?: pinCode}", fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                     Text("⏳ ستبدأ العروض بالظهور خلال 30 دقيقة عبر قائمة الطلبات العاجلة.", fontSize = 13.sp)
                 }
             },

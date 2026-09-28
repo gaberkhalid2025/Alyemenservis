@@ -9,6 +9,13 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel.RestoreAccountMatch
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import java.util.UUID
 
 /**
@@ -19,54 +26,73 @@ class AccountRecoveryHelper(
     private val preferenceHelper: AppPreferenceHelper
 ) {
 
+    private val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
     fun searchAccountForRestore(cleanPhone: String, onResult: (RestoreAccountMatch?) -> Unit) {
-        db.collection("providers").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { providerSnap ->
-            val pDoc = providerSnap.documents.firstOrNull()
-            val provider = pDoc?.toObject(ProviderEntity::class.java)
-            if (provider != null) {
-                onResult(RestoreAccountMatch("PROVIDER", provider.name, provider = provider))
-                return@addOnSuccessListener
-            }
-
-            db.collection("stores").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { storeSnap ->
-                val sDoc = storeSnap.documents.firstOrNull()
-                val store = sDoc?.toObject(StoreEntity::class.java)
-                if (store != null) {
-                    onResult(RestoreAccountMatch("STORE", store.name, store = store))
-                    return@addOnSuccessListener
-                }
-
-                db.collection("properties").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { propSnap ->
-                    val prDoc = propSnap.documents.firstOrNull()
-                    val property = prDoc?.toObject(PropertyEntity::class.java)
-                    if (property != null) {
-                        onResult(RestoreAccountMatch("PROPERTY", property.title, property = property))
-                        return@addOnSuccessListener
+        recoveryScope.launch {
+            try {
+                val match = supervisorScope {
+                    val providerDef = async(Dispatchers.IO) {
+                        runCatching {
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("providers").whereEqualTo("phone", cleanPhone).limit(1).get()
+                            )
+                            snap.documents.firstOrNull()?.toObject(ProviderEntity::class.java)?.let {
+                                RestoreAccountMatch("PROVIDER", it.name, provider = it)
+                            }
+                        }.getOrNull()
                     }
-
-                    db.collection("users").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { userSnap ->
-                        val uDoc = userSnap.documents.firstOrNull()
-                        if (uDoc != null) {
-                            val uName = uDoc.getString("name") ?: "مستخدم مسجل"
-                            onResult(RestoreAccountMatch("CLIENT", uName))
-                            return@addOnSuccessListener
-                        }
-
-                        db.collection("join_requests").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { reqSnap ->
-                            val rDoc = reqSnap.documents.firstOrNull()
-                            if (rDoc != null) {
+                    val storeDef = async(Dispatchers.IO) {
+                        runCatching {
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("stores").whereEqualTo("phone", cleanPhone).limit(1).get()
+                            )
+                            snap.documents.firstOrNull()?.toObject(StoreEntity::class.java)?.let {
+                                RestoreAccountMatch("STORE", it.name, store = it)
+                            }
+                        }.getOrNull()
+                    }
+                    val propDef = async(Dispatchers.IO) {
+                        runCatching {
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("properties").whereEqualTo("phone", cleanPhone).limit(1).get()
+                            )
+                            snap.documents.firstOrNull()?.toObject(PropertyEntity::class.java)?.let {
+                                RestoreAccountMatch("PROPERTY", it.title, property = it)
+                            }
+                        }.getOrNull()
+                    }
+                    val userDef = async(Dispatchers.IO) {
+                        runCatching {
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("users").whereEqualTo("phone", cleanPhone).limit(1).get()
+                            )
+                            snap.documents.firstOrNull()?.let { uDoc ->
+                                val uName = uDoc.getString("name") ?: "مستخدم مسجل"
+                                RestoreAccountMatch("CLIENT", uName)
+                            }
+                        }.getOrNull()
+                    }
+                    val joinReqDef = async(Dispatchers.IO) {
+                        runCatching {
+                            val snap = com.google.android.gms.tasks.Tasks.await(
+                                db.collection("join_requests").whereEqualTo("phone", cleanPhone).limit(1).get()
+                            )
+                            snap.documents.firstOrNull()?.let { rDoc ->
                                 val rName = rDoc.getString("name") ?: "حساب مسجل"
                                 val rType = rDoc.getString("type") ?: "CLIENT"
-                                onResult(RestoreAccountMatch(rType, rName))
-                                return@addOnSuccessListener
+                                RestoreAccountMatch(rType, rName)
                             }
-                            onResult(null)
-                        }.addOnFailureListener { onResult(null) }
-                    }.addOnFailureListener { onResult(null) }
-                }.addOnFailureListener { onResult(null) }
-            }.addOnFailureListener { onResult(null) }
-        }.addOnFailureListener {
-            onResult(null)
+                        }.getOrNull()
+                    }
+
+                    val results = awaitAll(providerDef, storeDef, propDef, userDef, joinReqDef)
+                    results.firstOrNull { it != null }
+                }
+                onResult(match)
+            } catch (e: Exception) {
+                onResult(null)
+            }
         }
     }
 

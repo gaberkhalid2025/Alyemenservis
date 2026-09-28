@@ -91,22 +91,24 @@ object AdminSecurityManager {
 
         // 2. التحقق من خزنة بيانات الاعتماد (admin_secrets/credentials) أو الإعدادات السحابية (settings/main_settings)
         try {
-            val db = FirebaseFirestore.getInstance()
+            val db = try { FirebaseFirestore.getInstance() } catch (_: Exception) { null }
             val secretSnap = try {
-                db.collection("admin_secrets").document("credentials").get().await()
+                db?.collection("admin_secrets")?.document("credentials")?.get()?.await()
             } catch (_: Exception) {
                 null
             }
             val mainSnap = try {
-                db.collection("settings").document("main_settings").get().await()
+                db?.collection("settings")?.document("main_settings")?.get()?.await()
             } catch (_: Exception) {
                 null
             }
             val snapObj = mainSnap?.toObject(AdminSettingsEntity::class.java)
             val effectiveSettings = settings ?: snapObj
 
+            @Suppress("DEPRECATION")
             val docOwnerPass = secretSnap?.getString("ownerPasswordHash")?.takeIf { it.isNotBlank() }
-                ?: mainSnap?.getString("ownerPasswordHash").orEmpty()
+                ?: mainSnap?.getString("ownerPasswordHash")?.takeIf { it.isNotBlank() }
+                ?: effectiveSettings?.ownerPassword.orEmpty()
             val docOwnerEmail = secretSnap?.getString("ownerEmail")?.takeIf { it.isNotBlank() }
                 ?: mainSnap?.getString("ownerEmail")?.takeIf { it.isNotBlank() }
                 ?: effectiveSettings?.ownerEmail.orEmpty()

@@ -98,7 +98,7 @@ class AdminSecurityManagerTest {
         val sup = SupervisorEntity(
             id = "sup_001",
             name = "Supervisor One",
-            passcode = hashedPass,
+            passcodeHash = hashedPass,
             role = "SUPERVISOR"
         )
 

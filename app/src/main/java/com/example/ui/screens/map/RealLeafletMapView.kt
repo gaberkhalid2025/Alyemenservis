@@ -1,5 +1,6 @@
 package com.example.ui.screens.map
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -28,14 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -50,7 +47,8 @@ import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.screens.map.components.MapBottomSheet
 import com.example.ui.screens.map.components.MapErrorOverlay
-import com.example.ui.screens.map.components.OfflineInteractiveMap
+import com.example.ui.screens.map.components.OfflineInteractiveMap as ComponentOfflineInteractiveMap
+import com.example.ui.screens.map.components.RadarRenderer as ComponentRadarRenderer
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
@@ -65,10 +63,55 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
+data class MapMarker(
+    val id: String,
+    val name: String,
+    val lat: Double,
+    val lng: Double,
+    val type: String = "PROVIDER",
+    val rating: Float = 0f
+)
+
+@Composable
+fun RadarRenderer(
+    markers: List<MapMarker>,
+    centerLat: Double = 15.3694,
+    centerLng: Double = 44.1910,
+    onMarkerClick: (MapMarker) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    ComponentRadarRenderer(
+        markers = markers,
+        centerLat = centerLat,
+        centerLng = centerLng,
+        onMarkerClick = onMarkerClick,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun OfflineInteractiveMap(
+    markers: List<MapMarker>,
+    centerLat: Double = 15.3694,
+    centerLng: Double = 44.1910,
+    onMarkerClick: (MapMarker) -> Unit = {},
+    onSwitchToOnline: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    ComponentOfflineInteractiveMap(
+        markers = markers,
+        centerLat = centerLat,
+        centerLng = centerLng,
+        onMarkerClick = onMarkerClick,
+        onSwitchToOnline = onSwitchToOnline,
+        modifier = modifier
+    )
+}
+
 /**
  * ⚡ MapAssetMemoryCache
  * Keeps the compiled self-contained Leaflet HTML in memory after the first async read
- * so subsequent map opens and cache tests complete in < 5ms (well under 1 second).
+ * so subsequent map opens and cache tests complete in < 5ms.
  */
 object MapAssetMemoryCache {
     @Volatile
@@ -117,10 +160,220 @@ object MapAssetMemoryCache {
 }
 
 /**
- * 🗺️ RealLeafletMapView
- * Real-world interactive Leaflet GIS map with OpenStreetMap & CartoDB tile layers,
- * disk tile caching, async asset loading, and zero-black-screen fallback to OfflineInteractiveMap.
+ * 🗺️ RealLeafletMapView – الحل الجذري للشاشة السوداء (Radar First)
+ * - الرادار هو الافتراضي دائماً (forceRadar = true)
+ * - WebView يُحمّل فقط عند الطلب أو بعد نجاح التحميل الفعلي
+ * - مهلة 3 ثوانٍ → fallback فوري للرادار + MapErrorOverlay (محاولة إعادة واحدة فقط)
  */
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun RealLeafletMapView(
+    markers: List<MapMarker>,
+    centerLat: Double = 15.3694,
+    centerLng: Double = 44.1910,
+    forceRadar: Boolean = true,
+    onMapReady: () -> Unit = {},
+    onError: () -> Unit = {},
+    onMarkerClick: (MapMarker) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var isRadarMode by remember(forceRadar) { mutableStateOf(forceRadar) }
+    var webViewLoaded by remember { mutableStateOf(false) }
+    var hasError by remember { mutableStateOf(false) }
+    var retryCount by remember { mutableIntStateOf(0) }
+
+    val safeLat = if (centerLat == 0.0 || centerLat.isNaN()) 15.3694 else centerLat
+    val safeLng = if (centerLng == 0.0 || centerLng.isNaN()) 44.1910 else centerLng
+
+    // مهلة 3 ثوانٍ → fallback تلقائي فوري إلى الرادار
+    LaunchedEffect(isRadarMode, retryCount) {
+        if (!isRadarMode) {
+            val isOnline = try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { false }
+            if (!isOnline) {
+                isRadarMode = true
+                hasError = true
+                onError()
+                return@LaunchedEffect
+            }
+            delay(3000L)
+            if (!webViewLoaded) {
+                isRadarMode = true
+                hasError = true
+                onError()
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        // ========== الطبقة الأساسية الدائمة: الرادار المحلي (يمنع الشاشة السوداء 100%) ==========
+        OfflineInteractiveMap(
+            markers = markers,
+            centerLat = safeLat,
+            centerLng = safeLng,
+            onMarkerClick = onMarkerClick,
+            onSwitchToOnline = {
+                isRadarMode = false
+                hasError = false
+                webViewLoaded = false
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // ========== محاولة تحميل Leaflet (ثانوية فقط عند طلب المستخدم صراحة) ==========
+        if (!isRadarMode && !hasError) {
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = true
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                webViewLoaded = true
+                                onMapReady()
+                                evaluateJavascript(
+                                    "if(window.updateMapMarkers) window.updateMapMarkers(${markersToJson(markers)});",
+                                    null
+                                )
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView?,
+                                errorCode: Int,
+                                description: String?,
+                                failingUrl: String?
+                            ) {
+                                isRadarMode = true
+                                hasError = true
+                                onError()
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                error: WebResourceError?
+                            ) {
+                                super.onReceivedError(view, request, error)
+                                if (request?.isForMainFrame == true) {
+                                    isRadarMode = true
+                                    hasError = true
+                                    onError()
+                                }
+                            }
+                        }
+
+                        loadDataWithBaseURL(
+                            "https://local.map/",
+                            getSelfContainedMapHtml(safeLat, safeLng),
+                            "text/html",
+                            "UTF-8",
+                            null
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (webViewLoaded) 1f else 0f),
+                update = { webView ->
+                    if (webViewLoaded) {
+                        webView.evaluateJavascript(
+                            "if(window.updateMapMarkers) window.updateMapMarkers(${markersToJson(markers)});",
+                            null
+                        )
+                    }
+                }
+            )
+        }
+
+        // ========== إشعار الخطأ مع زر إعادة المحاولة (محاولة واحدة فقط) ==========
+        if (hasError) {
+            MapErrorOverlay(
+                retryAvailable = retryCount < 1,
+                onRetry = if (retryCount < 1) {
+                    {
+                        retryCount++
+                        hasError = false
+                        webViewLoaded = false
+                        isRadarMode = false
+                    }
+                } else null,
+                onSwitchToRadar = {
+                    hasError = false
+                    isRadarMode = true
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 110.dp)
+            )
+        }
+    }
+}
+
+private fun markersToJson(markers: List<MapMarker>): String {
+    return markers.joinToString(prefix = "[", postfix = "]") {
+        val cleanName = it.name.replace("\"", "\\\"").replace("\n", " ")
+        """{"id":"${it.id}","name":"$cleanName","lat":${it.lat},"lng":${it.lng},"type":"${it.type}"}"""
+    }
+}
+
+private fun getSelfContainedMapHtml(lat: Double, lng: Double): String {
+    val safeLat = if (lat == 0.0 || lat.isNaN()) 15.3694 else lat
+    val safeLng = if (lng == 0.0 || lng.isNaN()) 44.1910 else lng
+
+    return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                html, body, #map { height: 100%; margin: 0; background: #0F172A; }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <script>
+                var map = L.map('map').setView([$safeLat, $safeLng], 13);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '© OpenStreetMap',
+                    maxZoom: 19
+                }).addTo(map);
+
+                var markersLayer = L.layerGroup().addTo(map);
+                window.updateMapMarkers = function(markers) {
+                    if (!markersLayer) return;
+                    markersLayer.clearLayers();
+                    if (Array.isArray(markers)) {
+                        markers.forEach(function(m) {
+                            if (m.lat && m.lng) {
+                                L.circleMarker([m.lat, m.lng], {
+                                    radius: 8,
+                                    fillColor: '#00E5FF',
+                                    color: '#FFFFFF',
+                                    weight: 2,
+                                    fillOpacity: 0.9
+                                }).bindPopup(m.name || '').addTo(markersLayer);
+                            }
+                        });
+                    }
+                };
+                window.updateMapCenter = function(lat, lng) {
+                    map.setView([lat, lng], map.getZoom());
+                };
+            </script>
+        </body>
+        </html>
+    """.trimIndent()
+}
+
+/**
+ * 🗺️ RealLeafletMapView (التوقيع المتقدم المتوافق مع الكيانات الكاملة)
+ */
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun RealLeafletMapView(
     userCoords: Pair<Double, Double>,
@@ -145,16 +398,17 @@ fun RealLeafletMapView(
 ) {
     val context = LocalContext.current
     val isOnline = remember(context) {
-        try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { true }
+        try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { false }
     }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var currentSelectedEntity by remember(selectedEntity) { mutableStateOf<Any?>(selectedEntity) }
     var isMapReady by remember { mutableStateOf(false) }
+    var isTilesLoaded by remember { mutableStateOf(false) }
     var isMapError by remember { mutableStateOf(false) }
+    var retryCount by remember { mutableIntStateOf(0) }
     var asyncHtmlContent by remember { mutableStateOf<String?>(if (MapAssetMemoryCache.isCached()) MapAssetMemoryCache.getOrLoadSync(context) else null) }
-    var useOfflineInteractiveFallback by remember { mutableStateOf(!isOnline && OfflineMapManager.getTileCacheDir(context).listFiles().isNullOrEmpty()) }
+    var useOfflineInteractiveFallback by remember { mutableStateOf(!isOnline) }
 
-    // Load Leaflet HTML asynchronously so main thread never blocks
     LaunchedEffect(Unit) {
         OfflineMapManager.purgeCacheIfNeeded(context)
         if (asyncHtmlContent == null) {
@@ -167,17 +421,23 @@ fun RealLeafletMapView(
         }
     }
 
-    // Timeout guard: if WebView does not signal ready within 4.5s and device is offline, seamlessly keep OfflineInteractiveMap active
-    LaunchedEffect(isMapReady, isOnline) {
-        if (!isMapReady) {
-            delay(4500L)
-            if (!isMapReady && !isOnline) {
-                useOfflineInteractiveFallback = true
-            }
+    // مهلة زمنية صارمة 3 ثوانٍ (3000ms) -> fallback فوري للرادار + إظهار MapErrorOverlay
+    LaunchedEffect(retryCount, isOnline) {
+        if (!isOnline) {
+            useOfflineInteractiveFallback = true
+            isMapError = true
+            onMapLoadFailed?.invoke()
+            return@LaunchedEffect
+        }
+        delay(3000L)
+        if (!isMapReady || !isTilesLoaded) {
+            useOfflineInteractiveFallback = true
+            isMapError = true
+            onMapLoadFailed?.invoke()
         }
     }
 
-    androidx.compose.runtime.DisposableEffect(Unit) {
+    DisposableEffect(Unit) {
         onDispose {
             webViewInstance?.apply {
                 stopLoading()
@@ -189,11 +449,9 @@ fun RealLeafletMapView(
         }
     }
 
-    // Safe default user coordinates (Sana'a defaults: 15.3694, 44.1910)
     val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3694
     val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1910
 
-    // Determine target center coordinates based on selected governorate
     val (targetLat, targetLng) = remember(selectedCity, safeUserLat, safeUserLng) {
         when {
             selectedCity.contains("تعز") -> Pair(13.5789, 44.0195)
@@ -207,13 +465,12 @@ fun RealLeafletMapView(
         }
     }
 
-    // Serialize providers, stores, restaurants, medical centers, and properties into JSON array for Leaflet markers
     val markersJsonArray = remember(nearbyProviders, nearbyStores, nearbyProperties, targetLat, targetLng) {
         val jsonArray = JSONArray()
 
         nearbyProviders.forEachIndexed { index, provider ->
-            val lat = provider.latitude.takeIf { it != 0.0 } ?: (targetLat + (index % 5 - 2) * 0.012)
-            val lng = provider.longitude.takeIf { it != 0.0 } ?: (targetLng + (index % 4 - 2) * 0.012)
+            val lat = provider.latitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLat + (index % 5 - 2) * 0.012)
+            val lng = provider.longitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLng + (index % 4 - 2) * 0.012)
             val specText = provider.customCategoryName.ifEmpty { provider.specialization.ifEmpty { provider.profession.ifEmpty { "فني صيانة معتمد" } } }
             val obj = JSONObject().apply {
                 put("type", "PROVIDER")
@@ -233,8 +490,8 @@ fun RealLeafletMapView(
         }
 
         nearbyStores.forEachIndexed { index, store ->
-            val lat = store.latitude.takeIf { it != 0.0 } ?: (targetLat + (index % 4 - 1) * 0.015)
-            val lng = store.longitude.takeIf { it != 0.0 } ?: (targetLng + (index % 3 - 1) * 0.015)
+            val lat = store.latitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLat + (index % 4 - 1) * 0.015)
+            val lng = store.longitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLng + (index % 3 - 1) * 0.015)
             val specText = store.description.ifEmpty { store.workingHours }
 
             val isRestaurant = store.sectionId.contains("restaurant", ignoreCase = true) ||
@@ -269,8 +526,8 @@ fun RealLeafletMapView(
         }
 
         nearbyProperties.forEachIndexed { index, prop ->
-            val lat = prop.latitude.takeIf { it != 0.0 } ?: (targetLat + (index % 3 - 1) * 0.018)
-            val lng = prop.longitude.takeIf { it != 0.0 } ?: (targetLng + (index % 4 - 2) * 0.018)
+            val lat = prop.latitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLat + (index % 3 - 1) * 0.018)
+            val lng = prop.longitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLng + (index % 4 - 2) * 0.018)
             val specText = "${prop.type} - ${prop.price} ${prop.currency}"
             val obj = JSONObject().apply {
                 put("type", "PROPERTY")
@@ -292,7 +549,6 @@ fun RealLeafletMapView(
         jsonArray.toString()
     }
 
-    // Push updates to Leaflet map whenever center or markers change
     LaunchedEffect(targetLat, targetLng, markersJsonArray, webViewInstance) {
         webViewInstance?.let { webView ->
             val updateScript = """
@@ -306,48 +562,48 @@ fun RealLeafletMapView(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0B1528))
+            .background(Color(0xFF0F172A))
     ) {
-        // 1. Always-ready native OfflineInteractiveMap base layer (prevents any black screen while loading or on failure)
-        if (!isMapReady || isMapError || useOfflineInteractiveFallback) {
-            OfflineInteractiveMap(
-                userCoords = Pair(safeUserLat, safeUserLng),
-                nearbyProviders = nearbyProviders,
-                nearbyStores = nearbyStores,
-                nearbyProperties = nearbyProperties,
-                dynamicOffsets = dynamicOffsets,
-                selectedCity = selectedCity,
-                zoomScale = zoomScale,
-                onZoomScaleChange = onZoomScaleChange,
-                panOffset = panOffset,
-                onPanOffsetChange = onPanOffsetChange,
-                selectedEntity = currentSelectedEntity,
-                onProviderSelected = {
-                    currentSelectedEntity = it
-                    onProviderSelected(it)
-                },
-                onStoreSelected = {
-                    currentSelectedEntity = it
-                    onStoreSelected(it)
-                },
-                onPropertySelected = {
-                    currentSelectedEntity = it
-                    onPropertySelected(it)
-                },
-                onDeselect = {
-                    currentSelectedEntity = null
-                    onDeselect()
-                },
-                onSwitchToRadar = onSwitchToRadar,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        // 1. الطبقة الأساسية الدائمة (تمنع أي شاشة سوداء نهائياً)
+        ComponentOfflineInteractiveMap(
+            userCoords = Pair(safeUserLat, safeUserLng),
+            nearbyProviders = nearbyProviders,
+            nearbyStores = nearbyStores,
+            nearbyProperties = nearbyProperties,
+            dynamicOffsets = dynamicOffsets,
+            selectedCity = selectedCity,
+            zoomScale = zoomScale,
+            onZoomScaleChange = onZoomScaleChange,
+            panOffset = panOffset,
+            onPanOffsetChange = onPanOffsetChange,
+            selectedEntity = currentSelectedEntity,
+            onProviderSelected = {
+                currentSelectedEntity = it
+                onProviderSelected(it)
+            },
+            onStoreSelected = {
+                currentSelectedEntity = it
+                onStoreSelected(it)
+            },
+            onPropertySelected = {
+                currentSelectedEntity = it
+                onPropertySelected(it)
+            },
+            onDeselect = {
+                currentSelectedEntity = null
+                onDeselect()
+            },
+            onSwitchToRadar = onSwitchToRadar,
+            modifier = Modifier.fillMaxSize()
+        )
 
-        // 2. High-Performance Leaflet OpenStreetMap WebView with Disk Tile Cache
+        // 2. طبقة Leaflet WebView (تظهر فقط بعد نجاح تحميل الصفحات والبلاطات فعلياً)
         val readyHtml = asyncHtmlContent
         if (readyHtml != null && !useOfflineInteractiveFallback && !isMapError) {
             AndroidView(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (isMapReady && isTilesLoaded) 1f else 0f),
                 factory = { ctx ->
                     WebView(ctx).apply {
                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
@@ -390,24 +646,30 @@ fun RealLeafletMapView(
                                         val safeFileName = urlStr.substringAfter("://").replace(Regex("[^a-zA-Z0-9._-]"), "_")
                                         val cachedFile = File(tileCacheDir, safeFileName)
                                         if (cachedFile.exists() && cachedFile.length() > 0L) {
+                                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                isTilesLoaded = true
+                                            }
                                             return WebResourceResponse("image/png", "UTF-8", FileInputStream(cachedFile))
                                         }
                                         if (NetworkUtils.isNetworkAvailable(ctx)) {
                                             val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                                                connectTimeout = 4000
-                                                readTimeout = 4000
+                                                connectTimeout = 2500
+                                                readTimeout = 2500
                                                 setRequestProperty("User-Agent", "YemenServicesGuide/2.2026")
                                             }
                                             if (conn.responseCode == HttpURLConnection.HTTP_OK) {
                                                 val bytes = conn.inputStream.use { it.readBytes() }
                                                 if (bytes.isNotEmpty()) {
                                                     FileOutputStream(cachedFile).use { it.write(bytes) }
+                                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                        isTilesLoaded = true
+                                                    }
                                                     return WebResourceResponse("image/png", "UTF-8", bytes.inputStream())
                                                 }
                                             }
                                         }
                                     } catch (_: Exception) {
-                                        // Fall through to WebView default handling or offline fallback
+                                        // Fallback handled by 3s timer
                                     }
                                 }
                                 return super.shouldInterceptRequest(view, request)
@@ -428,9 +690,9 @@ fun RealLeafletMapView(
                             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                                 super.onReceivedError(view, request, error)
                                 if (request?.isForMainFrame == true) {
-                                    Log.w("LeafletWebView", "Main frame error, activating OfflineInteractiveMap fallback")
                                     isMapError = true
                                     useOfflineInteractiveFallback = true
+                                    onMapLoadFailed?.invoke()
                                 }
                             }
                         }
@@ -460,6 +722,7 @@ fun RealLeafletMapView(
                             fun onMapReady() {
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                                     isMapReady = true
+                                    isTilesLoaded = true
                                     evaluateJavascript(
                                         """
                                         if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }
@@ -473,8 +736,9 @@ fun RealLeafletMapView(
                             @android.webkit.JavascriptInterface
                             fun onMapLoadFailed(reason: String?) {
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    Log.w("LeafletWebView", "JS map notice: $reason -> switching to OfflineInteractiveMap")
+                                    isMapError = true
                                     useOfflineInteractiveFallback = true
+                                    onMapLoadFailed?.invoke()
                                 }
                             }
 
@@ -532,7 +796,6 @@ fun RealLeafletMapView(
             )
         }
 
-        // Sync zoom scale changes with Leaflet map instance
         LaunchedEffect(zoomScale, webViewInstance) {
             webViewInstance?.let { webView ->
                 val zoomLevel = (14 + (zoomScale - 1.0f) * 2).coerceIn(6f, 19f).toInt()
@@ -540,9 +803,9 @@ fun RealLeafletMapView(
             }
         }
 
-        // 3. Non-blocking Loading Banner while OSM tiles initialize (Zero Black Screen)
+        // 3. شريط جاري التحميل أثناء مهلة الـ 3 ثوانٍ
         AnimatedVisibility(
-            visible = !isMapReady && !useOfflineInteractiveFallback && !isMapError,
+            visible = (!isMapReady || !isTilesLoaded) && !useOfflineInteractiveFallback && !isMapError,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -575,7 +838,30 @@ fun RealLeafletMapView(
             }
         }
 
-        // 4. Detail Bottom Sheet when tapping any pin
+        // 4. MapErrorOverlay عند انتهاء مهلة الـ 3 ثوانٍ مع محاولة إعادة واحدة فقط
+        if (isMapError) {
+            MapErrorOverlay(
+                retryAvailable = retryCount < 1,
+                onRetry = if (retryCount < 1) {
+                    {
+                        retryCount++
+                        isMapError = false
+                        useOfflineInteractiveFallback = false
+                        isMapReady = false
+                        isTilesLoaded = false
+                    }
+                } else null,
+                onSwitchToRadar = {
+                    isMapError = false
+                    onSwitchToRadar?.invoke()
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 110.dp)
+            )
+        }
+
+        // 5. Detail Bottom Sheet when tapping any pin
         currentSelectedEntity?.let { entity ->
             MapBottomSheet(
                 entity = entity,

@@ -616,34 +616,42 @@ fun approveRequest(request: PendingProviderEntity) {
                 else -> "محلات ومراكز تجارية"
             }
             val resolvedSectionId = if (request.categoryId.uppercase() == "RESTAURANT") "restaurants" else if (request.categoryId.uppercase() == "MEDICAL") "medical" else "stores"
-            val newStore = com.example.data.StoreEntity(
-                id = storeId,
-                name = request.name,
-                description = request.specialization.ifBlank { "محل تجاري معتمد وموثق" },
-                ownerId = request.phone,
-                ownerName = request.name,
-                phone = request.phone,
-                localNeighborhood = request.localNeighborhood,
-                cityId = finalCityId,
-                sectionId = resolvedSectionId,
-                categoryId = resolvedCategory,
-                isActive = true,
-                isApproved = true,
-                isPinned = false,
-                isDeleted = false,
-                passwordHash = request.password,
-                pdfFileBase64 = request.idPhotoBase64
-            )
-            if (request.id != storeId) {
-                db.collection("stores").document(request.id).delete()
+            viewModelScope.launch {
+                val resolvedStoreDocUrl = if (request.idPhotoBase64.isNotBlank()) {
+                    com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        request.idPhotoBase64,
+                        "stores/$storeId/verification_doc.pdf"
+                    )
+                } else ""
+                val newStore = com.example.data.StoreEntity(
+                    id = storeId,
+                    name = request.name,
+                    description = request.specialization.ifBlank { "محل تجاري معتمد وموثق" },
+                    ownerId = request.phone,
+                    ownerName = request.name,
+                    phone = request.phone,
+                    localNeighborhood = request.localNeighborhood,
+                    cityId = finalCityId,
+                    sectionId = resolvedSectionId,
+                    categoryId = resolvedCategory,
+                    isActive = true,
+                    isApproved = true,
+                    isPinned = false,
+                    isDeleted = false,
+                    passwordHash = request.password,
+                    pdfFileBase64 = resolvedStoreDocUrl
+                )
+                if (request.id != storeId) {
+                    db.collection("stores").document(request.id).delete()
+                }
+                if (cleanPhone.isNotEmpty() && cleanPhone != storeId) {
+                    db.collection("stores").document(cleanPhone).delete()
+                }
+                db.collection("stores").document(storeId).set(newStore)
+                
+                // Instant Local Sync for stores
+                _stores.value = _stores.value.filter { it.id != storeId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newStore
             }
-            if (cleanPhone.isNotEmpty() && cleanPhone != storeId) {
-                db.collection("stores").document(cleanPhone).delete()
-            }
-            db.collection("stores").document(storeId).set(newStore)
-            
-            // Instant Local Sync for stores
-            _stores.value = _stores.value.filter { it.id != storeId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newStore
 
             val (approvalTitle, approvalMsg, toastMsg) = when (request.categoryId.uppercase()) {
                 "RESTAURANT" -> Triple(
@@ -673,31 +681,39 @@ fun approveRequest(request: PendingProviderEntity) {
         } else if (request.profession == "PROPERTY_OWNER" || request.categoryId.uppercase() == "PROPERTY") {
             val propId = "prop_" + cleanPhone
             val propPrice = try { request.chatRecipientId.toDouble() } catch(e: Exception) { 0.0 }
-            val newProp = com.example.data.PropertyEntity(
-                id = propId,
-                title = request.name,
-                description = request.specialization.ifBlank { "عقار معلن وموثق" },
-                phone = request.phone,
-                localNeighborhood = request.localNeighborhood,
-                cityId = finalCityId,
-                isActive = true,
-                isApproved = true,
-                isPinned = false,
-                isDeleted = false,
-                passwordHash = request.password,
-                price = propPrice,
-                pdfFileBase64 = request.idPhotoBase64
-            )
-            if (request.id != propId) {
-                db.collection("properties").document(request.id).delete()
+            viewModelScope.launch {
+                val resolvedPropDocUrl = if (request.idPhotoBase64.isNotBlank()) {
+                    com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                        request.idPhotoBase64,
+                        "properties/$propId/verification_doc.pdf"
+                    )
+                } else ""
+                val newProp = com.example.data.PropertyEntity(
+                    id = propId,
+                    title = request.name,
+                    description = request.specialization.ifBlank { "عقار معلن وموثق" },
+                    phone = request.phone,
+                    localNeighborhood = request.localNeighborhood,
+                    cityId = finalCityId,
+                    isActive = true,
+                    isApproved = true,
+                    isPinned = false,
+                    isDeleted = false,
+                    passwordHash = request.password,
+                    price = propPrice,
+                    pdfFileBase64 = resolvedPropDocUrl
+                )
+                if (request.id != propId) {
+                    db.collection("properties").document(request.id).delete()
+                }
+                if (cleanPhone.isNotEmpty() && cleanPhone != propId) {
+                    db.collection("properties").document(cleanPhone).delete()
+                }
+                db.collection("properties").document(propId).set(newProp)
+                
+                // Instant Local Sync for properties
+                _properties.value = _properties.value.filter { it.id != propId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newProp
             }
-            if (cleanPhone.isNotEmpty() && cleanPhone != propId) {
-                db.collection("properties").document(cleanPhone).delete()
-            }
-            db.collection("properties").document(propId).set(newProp)
-            
-            // Instant Local Sync for properties
-            _properties.value = _properties.value.filter { it.id != propId && it.id != request.id && it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone } + newProp
 
             mainViewModel.addNotification(
                 title = "🎉 تهانينا! تم تفعيل إعلان عقارك بنجاح",
@@ -1065,18 +1081,38 @@ fun saveStore(store: com.example.data.StoreEntity) {
 
         viewModelScope.launch {
             val ctx = appContext
-            val finalLogo = if (ctx != null) uploadImageStringOrUri(ctx, finalStore.logoImage, com.example.utils.FirebaseStorageUploader.getStoreLogoPath(targetId)) else finalStore.logoImage
-            val finalCover = if (ctx != null) uploadImageStringOrUri(ctx, finalStore.coverImage, com.example.utils.FirebaseStorageUploader.getStoreCoverPath(targetId)) else finalStore.coverImage
-            val finalImages = if (ctx != null) {
-                finalStore.images.mapIndexed { idx, img ->
-                    uploadImageStringOrUri(ctx, img, com.example.utils.FirebaseStorageUploader.getStorePhotoPath(targetId, idx))
+            val logoPath = com.example.utils.FirebaseStorageUploader.getStoreLogoPath(targetId)
+            val coverPath = com.example.utils.FirebaseStorageUploader.getStoreCoverPath(targetId)
+            val finalLogo = if (ctx != null) {
+                uploadImageStringOrUri(ctx, finalStore.logoImage, logoPath)
+            } else {
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(finalStore.logoImage, logoPath)
+            }
+            val finalCover = if (ctx != null) {
+                uploadImageStringOrUri(ctx, finalStore.coverImage, coverPath)
+            } else {
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(finalStore.coverImage, coverPath)
+            }
+            val finalImages = finalStore.images.mapIndexed { idx, img ->
+                val photoPath = com.example.utils.FirebaseStorageUploader.getStorePhotoPath(targetId, idx)
+                if (ctx != null) {
+                    uploadImageStringOrUri(ctx, img, photoPath)
+                } else {
+                    com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(img, photoPath)
                 }
-            } else finalStore.images
+            }
+            val finalPdfUrl = if (finalStore.pdfFileBase64.isNotBlank()) {
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                    finalStore.pdfFileBase64,
+                    "stores/$targetId/catalog.pdf"
+                )
+            } else ""
 
             val uploadedStore = finalStore.copy(
                 logoImage = finalLogo,
                 coverImage = finalCover,
-                images = finalImages
+                images = finalImages,
+                pdfFileBase64 = finalPdfUrl
             )
 
             val currentList = _stores.value.filter { it.id != targetId }.toMutableList()
@@ -1371,13 +1407,25 @@ fun saveProperty(property: com.example.data.PropertyEntity) {
 
         viewModelScope.launch {
             val ctx = appContext
-            val finalImages = if (ctx != null) {
-                finalProp.images.mapIndexed { idx, img ->
-                    uploadImageStringOrUri(ctx, img, com.example.utils.FirebaseStorageUploader.getPropertyPhotoPath(targetId, idx))
+            val finalImages = finalProp.images.mapIndexed { idx, img ->
+                val photoPath = com.example.utils.FirebaseStorageUploader.getPropertyPhotoPath(targetId, idx)
+                if (ctx != null) {
+                    uploadImageStringOrUri(ctx, img, photoPath)
+                } else {
+                    com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(img, photoPath)
                 }
-            } else finalProp.images
+            }
+            val finalPdfUrl = if (finalProp.pdfFileBase64.isNotBlank()) {
+                com.example.utils.FirebaseStorageUploader.resolveBase64ToStorageUrl(
+                    finalProp.pdfFileBase64,
+                    "properties/$targetId/deed.pdf"
+                )
+            } else ""
 
-            val uploadedProp = finalProp.copy(images = finalImages)
+            val uploadedProp = finalProp.copy(
+                images = finalImages,
+                pdfFileBase64 = finalPdfUrl
+            )
             val currentList = _properties.value.filter { it.id != targetId }.toMutableList()
             currentList.add(uploadedProp)
             _properties.value = currentList

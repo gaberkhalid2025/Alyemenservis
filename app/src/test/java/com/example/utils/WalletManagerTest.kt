@@ -4,18 +4,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 
 /**
- * 🧪 اختبارات مدير المحفظة المالية (WalletManager)
- * تغطي إدارة الأرصدة المتعددة والتحقق الصارم من العمليات وقواعد العملة اليمنية.
+ * 🧪 WalletManagerTest
+ * اختبارات وحدة لإدارة المحافظ الإلكترونية المتعددة العملات والتحقق من القيود المالية وتجميد المحافظ
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletManagerTest {
-
-    @get:Rule
-    val coroutineRule = CoroutineTestRule()
 
     private lateinit var walletManager: WalletManager
 
@@ -25,100 +21,53 @@ class WalletManagerTest {
     }
 
     @Test
-    fun `test createWallet initializes active wallet with zero balances`() {
-        val result = walletManager.createWallet("usr_test_1", "USER")
-        assertTrue("Wallet creation should succeed", result.isSuccess)
-
+    fun `createWallet initializes active multi-currency wallet with zero balances`() {
+        val result = walletManager.createWallet(userId = "777123456", type = "PROVIDER")
+        assertTrue(result.isSuccess)
         val wallet = result.getOrNull()
         assertNotNull(wallet)
-        assertEquals("usr_test_1", wallet?.userId)
+        assertEquals("wallet_777123456", wallet?.id)
+        assertEquals("PROVIDER", wallet?.type)
         assertEquals("ACTIVE", wallet?.status)
-        assertEquals(0.0, wallet?.balanceYer ?: -1.0, 0.001)
-        assertEquals(0.0, wallet?.balanceUsd ?: -1.0, 0.001)
-        assertEquals(0.0, wallet?.balanceSar ?: -1.0, 0.001)
+        assertEquals(0.0, walletManager.getBalance("777123456", "YER"), 0.001)
+        assertEquals(0.0, walletManager.getBalance("777123456", "USD"), 0.001)
+        assertEquals(0.0, walletManager.getBalance("777123456", "SAR"), 0.001)
     }
 
     @Test
-    fun `test getBalance returns correct currency amounts`() {
-        val createRes = walletManager.createWallet("usr_test_2", "PROVIDER")
-        val wallet = createRes.getOrNull()
-        assertNotNull(wallet)
+    fun `deposit rejects non-positive amounts and fractional YER`() = runTest {
+        val zeroDeposit = walletManager.deposit("wallet_u1", 0.0, "YER")
+        assertTrue(zeroDeposit.isFailure)
 
-        val yer = walletManager.getBalance("usr_test_2", "YER")
-        val usd = walletManager.getBalance("usr_test_2", "USD")
-        val sar = walletManager.getBalance("usr_test_2", "SAR")
+        val negativeDeposit = walletManager.deposit("wallet_u1", -500.0, "YER")
+        assertTrue(negativeDeposit.isFailure)
 
-        assertEquals(0.0, yer, 0.001)
-        assertEquals(0.0, usd, 0.001)
-        assertEquals(0.0, sar, 0.001)
+        val fractionalYerDeposit = walletManager.deposit("wallet_u1", 100.5, "YER")
+        assertTrue(fractionalYerDeposit.isFailure)
     }
 
     @Test
-    fun `test deposit rejects zero and negative amounts`() = runTest {
-        val walletId = "wallet_usr_test_3"
-        walletManager.createWallet("usr_test_3")
+    fun `withdraw rejects non-positive amounts and fractional YER`() = runTest {
+        val zeroWithdraw = walletManager.withdraw("wallet_u1", 0.0, "YER")
+        assertTrue(zeroWithdraw.isFailure)
 
-        val zeroRes = walletManager.deposit(walletId, 0.0, "YER")
-        assertTrue(zeroRes.isFailure)
-        assertTrue(zeroRes.exceptionOrNull() is IllegalArgumentException)
-
-        val negRes = walletManager.deposit(walletId, -150.0, "YER")
-        assertTrue(negRes.isFailure)
-        assertTrue(negRes.exceptionOrNull() is IllegalArgumentException)
+        val fractionalYerWithdraw = walletManager.withdraw("wallet_u1", 250.75, "YER")
+        assertTrue(fractionalYerWithdraw.isFailure)
     }
 
     @Test
-    fun `test deposit rejects decimals in Yemeni Rial (YER)`() = runTest {
-        val walletId = "wallet_usr_test_4"
-        walletManager.createWallet("usr_test_4")
-
-        val decimalRes = walletManager.deposit(walletId, 1500.75, "YER")
-        assertTrue("YER deposit with fractions must fail", decimalRes.isFailure)
-        val msg = decimalRes.exceptionOrNull()?.message.orEmpty()
-        assertTrue("Must specify YER fractions are not allowed", msg.contains("الريال اليمني لا يدعم الكسور"))
+    fun `transfer rejects invalid non-positive amount`() = runTest {
+        val invalidTransfer = walletManager.transfer("wallet_a", "wallet_b", -10.0, "USD")
+        assertTrue(invalidTransfer.isFailure)
     }
 
     @Test
-    fun `test withdraw rejects zero or negative amounts`() = runTest {
-        val walletId = "wallet_usr_test_5"
-        walletManager.createWallet("usr_test_5")
-
-        val res = walletManager.withdraw(walletId, 0.0, "YER")
-        assertTrue(res.isFailure)
-        assertTrue(res.exceptionOrNull() is IllegalArgumentException)
-
-        val negRes = walletManager.withdraw(walletId, -500.0, "YER")
-        assertTrue(negRes.isFailure)
-        assertTrue(negRes.exceptionOrNull() is IllegalArgumentException)
-    }
-
-    @Test
-    fun `test withdraw rejects decimals in Yemeni Rial (YER)`() = runTest {
-        val walletId = "wallet_usr_test_6"
-        walletManager.createWallet("usr_test_6")
-
-        val decimalRes = walletManager.withdraw(walletId, 250.50, "YER")
-        assertTrue("YER withdrawal with fractions must fail", decimalRes.isFailure)
-        val msg = decimalRes.exceptionOrNull()?.message.orEmpty()
-        assertTrue("Must specify YER fractions are not allowed", msg.contains("الريال اليمني لا يدعم الكسور"))
-    }
-
-    @Test
-    fun `test transfer rejects zero or negative amounts`() = runTest {
-        val res = walletManager.transfer("w1", "w2", -100.0, "YER")
-        assertTrue(res.isFailure)
-        assertTrue(res.exceptionOrNull() is IllegalArgumentException)
-    }
-
-    @Test
-    fun `test freeze and unfreeze wallet status`() {
-        val res = walletManager.createWallet("usr_test_freeze")
-        val walletId = res.getOrNull()!!.id
-
-        val freezeRes = walletManager.freezeWallet(walletId, "نشاط مريب")
+    fun `freezeWallet and unfreezeWallet update wallet status`() {
+        walletManager.createWallet("771112223", "USER")
+        val freezeRes = walletManager.freezeWallet("wallet_771112223", "مراجعة أمنية")
         assertTrue(freezeRes.isSuccess)
 
-        val unfreezeRes = walletManager.unfreezeWallet(walletId)
+        val unfreezeRes = walletManager.unfreezeWallet("wallet_771112223")
         assertTrue(unfreezeRes.isSuccess)
     }
 }

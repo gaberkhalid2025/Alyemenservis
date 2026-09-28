@@ -616,3 +616,25 @@ exports.setApiKey = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to save key');
     }
 });
+
+/**
+ * 10. حذف قناة محادثة مع جميع رسائلها الفرعية دفعة واحدة (Recursive Bulk Delete)
+ */
+exports.deleteChatChannel = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول لحذف المحادثة.');
+    }
+    const channelId = (data && data.channelId ? String(data.channelId) : '').trim();
+    if (!channelId) {
+        throw new functions.https.HttpsError('invalid-argument', 'معرّف القناة مطلوب.');
+    }
+    try {
+        const channelRef = db.collection('chat_channels').doc(channelId);
+        await db.recursiveDelete(channelRef);
+        return { success: true, channelId };
+    } catch (error) {
+        console.error(`Error in recursiveDelete for channel ${channelId}:`, error);
+        throw new functions.https.HttpsError('internal', 'تعذر حذف المحادثة.');
+    }
+});
+

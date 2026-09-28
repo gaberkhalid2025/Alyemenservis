@@ -116,20 +116,57 @@ class InstantRequestRepository(private val context: Context? = null) {
     }
 
     /**
-     * 3. تدفق حي للطلبات المتاحة للفنيين في مدينة/تصنيف معين
+     * 3. تدفق حي للطلبات المتاحة للفنيين في مدينة/تصنيف معين (فلترة على السيرفر)
      */
     fun getAvailableInstantRequests(category: String = "", city: String = ""): Flow<List<InstantRequestEntity>> = callbackFlow {
-        val query = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
+        val now = System.currentTimeMillis()
+        var query: Query = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
             .whereEqualTo("status", "WAITING_FOR_OFFERS")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(100)
+            .whereGreaterThan("expiresAt", now)
 
+        if (city.isNotBlank()) {
+            query = query.whereEqualTo("userCity", city.trim())
+        }
+        if (category.isNotBlank()) {
+            query = query.whereEqualTo("categoryName", category.trim())
+        }
+
+        query = query.orderBy("expiresAt", Query.Direction.DESCENDING).limit(50)
+
+        var fallbackRegistration: ListenerRegistration? = null
         val listener: ListenerRegistration = query.addSnapshotListener { snapshot, error ->
-            if (error != null || snapshot == null) {
+            if (error != null) {
+                // Fallback query if composite index is still building in Firestore
+                if (fallbackRegistration == null) {
+                    fallbackRegistration = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
+                        .whereEqualTo("status", "WAITING_FOR_OFFERS")
+                        .whereGreaterThan("expiresAt", System.currentTimeMillis())
+                        .limit(50)
+                        .addSnapshotListener { fbSnap, fbErr ->
+                            if (fbErr != null || fbSnap == null) {
+                                trySend(emptyList())
+                                return@addSnapshotListener
+                            }
+                            val currentMillis = System.currentTimeMillis()
+                            val fbList = fbSnap.documents.mapNotNull { doc ->
+                                runCatching { doc.toObject(InstantRequestEntity::class.java)?.copy(id = doc.id) }.getOrNull()
+                            }.filter { item ->
+                                (category.isBlank() || item.categoryName.contains(category, ignoreCase = true) || item.serviceTitle.contains(category, ignoreCase = true)) &&
+                                    (city.isBlank() || item.userCity.contains(city, ignoreCase = true)) &&
+                                    (item.expiresAt > currentMillis)
+                            }
+                            trySend(fbList)
+                        }
+                }
+                return@addSnapshotListener
+            }
+
+            if (snapshot == null) {
                 trySend(emptyList())
                 return@addSnapshotListener
             }
 
+            val currentMillis = System.currentTimeMillis()
             val list = snapshot.documents.mapNotNull { doc ->
                 try {
                     doc.toObject(InstantRequestEntity::class.java)?.copy(id = doc.id)
@@ -137,15 +174,16 @@ class InstantRequestRepository(private val context: Context? = null) {
                     null
                 }
             }.filter { item ->
-                (category.isBlank() || item.categoryName.contains(category, ignoreCase = true) || item.serviceTitle.contains(category, ignoreCase = true)) &&
-                (city.isBlank() || item.userCity.contains(city, ignoreCase = true)) &&
-                (item.expiresAt > System.currentTimeMillis())
+                item.expiresAt > currentMillis
             }
 
             trySend(list)
         }
 
-        awaitClose { listener.remove() }
+        awaitClose {
+            listener.remove()
+            fallbackRegistration?.remove()
+        }
     }
 
     /**

@@ -16,12 +16,14 @@ import androidx.compose.ui.unit.sp
 
 /**
  * 📡 MapErrorOverlay
- * Fallback UI overlay displayed when map tiles fail to load over network.
+ * Fallback UI overlay displayed when map tiles fail to load over network (within 3s timeout).
+ * Supports single-retry enforcement (retryAvailable).
  */
 @Composable
 fun MapErrorOverlay(
     onRetry: (() -> Unit)? = null,
     onSwitchToRadar: (() -> Unit)? = null,
+    retryAvailable: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -48,14 +50,18 @@ fun MapErrorOverlay(
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "⚠️ تعذر تحميل الخريطة، يرجى التحقق من الاتصال بالإنترنت",
+                    text = "⚠️ تعذر تحميل الخريطة، تم التفعيل التلقائي للرادار المحلي",
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
             Text(
-                text = "تعذر الاتصال بقمة خريطة OpenStreetMap، يمكنك إعادة المحاولة أو التبديل للرادار المحلي.",
+                text = if (retryAvailable) {
+                    "استغرق تحميل خريطة الشبكة أكثر من 3 ثوانٍ. يعمل الرادار المحلي الآن بكفاءة 100% أو يمكنك إعادة المحاولة مرة واحدة."
+                } else {
+                    "تم استنفاد محاولة الاتصال بالخريطة السحابية. يعمل الآن الرادار المحلي التفاعلي بدون إنترنت."
+                },
                 color = Color(0xFF94A3B8),
                 fontSize = 11.sp
             )
@@ -63,7 +69,7 @@ fun MapErrorOverlay(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
             ) {
-                if (onRetry != null) {
+                if (onRetry != null && retryAvailable) {
                     Button(
                         onClick = onRetry,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
@@ -91,4 +97,3 @@ fun MapErrorOverlay(
         }
     }
 }
-

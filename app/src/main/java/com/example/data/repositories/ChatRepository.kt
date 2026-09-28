@@ -607,16 +607,16 @@ class ChatRepository(
         try {
             local?.deleteChannel(channelId)
             val channelDocRef = channelsCollection.document(channelId)
-            val msgsSnapshot = channelDocRef.collection("messages").get().await()
-            val docs = msgsSnapshot.documents
-            docs.chunked(400).forEach { chunk ->
-                val batch = firestore.batch()
-                for (doc in chunk) {
-                    batch.delete(doc.reference)
-                }
-                batch.commit().await()
+            try {
+                // Bulk recursive delete via Cloud Function (avoids reading/deleting messages one-by-one on client)
+                com.google.firebase.functions.FirebaseFunctions.getInstance()
+                    .getHttpsCallable("deleteChatChannel")
+                    .call(mapOf("channelId" to channelId))
+                    .await()
+            } catch (_: Exception) {
+                // Deleting the channel document directly also triggers server-side onChatChannelDeleted (db.recursiveDelete)
+                channelDocRef.delete().await()
             }
-            channelDocRef.delete().await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
             Log.e("ChatRepository", "deleteChannel error: ${e.message}")
@@ -628,11 +628,16 @@ class ChatRepository(
         if (channelsList.isEmpty()) return@withContext AppResult.Success(Unit)
         try {
             local?.clearAllChannels()
-            val batch = firestore.batch()
-            channelsList.forEach { ch ->
-                batch.delete(channelsCollection.document(ch.id))
+            channelsList.chunked(400).forEach { chunk ->
+                val batch = firestore.batch()
+                chunk.forEach { ch ->
+                    if (ch.id.isNotBlank()) {
+                        // Deleting channel document triggers onChatChannelDeleted recursiveDelete on server
+                        batch.delete(channelsCollection.document(ch.id))
+                    }
+                }
+                batch.commit().await()
             }
-            batch.commit().await()
             AppResult.Success(Unit)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))

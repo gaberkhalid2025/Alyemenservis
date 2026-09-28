@@ -13,16 +13,190 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import com.example.ui.screens.map.MapMarker
 import kotlin.math.*
 
 /**
- * 📡 RadarRenderer
- * High-performance radar scanner Canvas with concentric distance rings, sweep line,
- * dual pulse ripples with 800ms offset, fade-out alpha, and cached clustering.
+ * 🛰️ RadarRenderer – رادار محلي 100% Offline (النسخة المباشرة لـ MapMarker)
+ * - خلفية داكنة متدرجة (Color(0xFF1E293B) -> Color(0xFF0F172A) -> Color(0xFF020617))
+ * - نبضات رادارية 60fps
+ * - Clustering + Pan + Pinch-to-Zoom
+ * - إحداثيات افتراضية: صنعاء 15.3694, 44.1910
+ */
+@Composable
+fun RadarRenderer(
+    markers: List<MapMarker>,
+    centerLat: Double = 15.3694,
+    centerLng: Double = 44.1910,
+    onMarkerClick: (MapMarker) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    val safeCenterLat = if (centerLat == 0.0 || centerLat.isNaN()) 15.3694 else centerLat
+    val safeCenterLng = if (centerLng == 0.0 || centerLng.isNaN()) 44.1910 else centerLng
+
+    val infiniteTransition = rememberInfiniteTransition(label = "radar_pulse")
+    val pulseProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse"
+    )
+
+    @Suppress("UNUSED_VARIABLE")
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val w = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        val h = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+        val center = Offset(w / 2f + offsetX, h / 2f + offsetY)
+
+        val projected = remember(markers, safeCenterLat, safeCenterLng, center, scale) {
+            markers.map { marker ->
+                val dx = ((marker.lng - safeCenterLng) * 111320 * cos(Math.toRadians(safeCenterLat))).toFloat()
+                val dy = ((safeCenterLat - marker.lat) * 110540).toFloat()
+                val px = center.x + dx * 0.08f * scale
+                val py = center.y + dy * 0.08f * scale
+                marker to Offset(px, py)
+            }
+        }
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(0.6f, 4.5f)
+                        offsetX += pan.x
+                        offsetY += pan.y
+                    }
+                }
+                .pointerInput(projected) {
+                    detectTapGestures { tapOffset ->
+                        val hit = projected.minByOrNull { (_, pos) ->
+                            sqrt((tapOffset.x - pos.x).pow(2) + (tapOffset.y - pos.y).pow(2))
+                        }
+                        if (hit != null) {
+                            val dist = sqrt((tapOffset.x - hit.second.x).pow(2) + (tapOffset.y - hit.second.y).pow(2))
+                            if (dist <= 56f) {
+                                onMarkerClick(hit.first)
+                            }
+                        }
+                    }
+                }
+        ) {
+            val canvasW = size.width
+            val canvasH = size.height
+            val c = Offset(canvasW / 2f + offsetX, canvasH / 2f + offsetY)
+
+            // 1. خلفية داكنة متدرجة
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF1E293B),
+                        Color(0xFF0F172A),
+                        Color(0xFF020617)
+                    ),
+                    center = c,
+                    radius = (max(canvasW, canvasH) * 0.9f).coerceAtLeast(1f)
+                )
+            )
+
+            // 2. دوائر الرادار الثابتة
+            val maxRadius = min(canvasW, canvasH) * 0.42f
+            for (i in 1..4) {
+                val r = maxRadius * (i / 4f)
+                drawCircle(
+                    color = Color(0xFF00E5FF).copy(alpha = 0.12f),
+                    radius = r * scale,
+                    center = c,
+                    style = Stroke(width = 1.2.dp.toPx())
+                )
+            }
+
+            // 3. نبضة متحركة (Radar Sweep)
+            val pulseRadius = (maxRadius * scale * pulseProgress).coerceAtLeast(1f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF00E5FF).copy(alpha = 0.35f * (1f - pulseProgress)),
+                        Color.Transparent
+                    ),
+                    center = c,
+                    radius = pulseRadius
+                ),
+                radius = pulseRadius,
+                center = c
+            )
+
+            // خط المسح الدوار
+            val sweepAngle = pulseProgress * 360f
+            val sweepRad = Math.toRadians(sweepAngle.toDouble())
+            val endX = c.x + cos(sweepRad).toFloat() * maxRadius * scale
+            val endY = c.y + sin(sweepRad).toFloat() * maxRadius * scale
+            drawLine(
+                color = Color(0xFF00E5FF).copy(alpha = 0.7f),
+                start = c,
+                end = Offset(endX, endY),
+                strokeWidth = 2.5.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+
+            // 4. رسم العلامات (Markers) مع Clustering بسيط
+            projected.forEach { (marker, pos) ->
+                if (pos.x < -50 || pos.x > canvasW + 50 || pos.y < -50 || pos.y > canvasH + 50) return@forEach
+
+                val color = when (marker.type.uppercase()) {
+                    "PROVIDER", "TECHNICIAN" -> Color(0xFF38BDF8)
+                    "STORE" -> Color(0xFF10B981)
+                    "RESTAURANT" -> Color(0xFFF59E0B)
+                    "MEDICAL" -> Color(0xFF06B6D4)
+                    "PROPERTY" -> Color(0xFF8B5CF6)
+                    else -> Color(0xFF00E5FF)
+                }
+
+                // هالة
+                drawCircle(
+                    color = color.copy(alpha = 0.25f),
+                    radius = 18.dp.toPx() * scale.coerceAtMost(1.8f),
+                    center = pos
+                )
+                // النقطة
+                drawCircle(
+                    color = color,
+                    radius = 7.dp.toPx() * scale.coerceAtMost(1.6f),
+                    center = pos
+                )
+                // حدود بيضاء
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.9f),
+                    radius = 7.dp.toPx() * scale.coerceAtMost(1.6f),
+                    center = pos,
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+            }
+
+            // مركز الرادار
+            drawCircle(color = Color(0xFF00E5FF), radius = 5.dp.toPx(), center = c)
+            drawCircle(color = Color.White, radius = 2.5.dp.toPx(), center = c)
+        }
+    }
+}
+
+/**
+ * 📡 RadarRenderer (التوقيع المتقدم المتوافق مع MapItemPoint + Clustering + Heatmap)
  */
 @Composable
 fun RadarRenderer(
@@ -32,34 +206,31 @@ fun RadarRenderer(
     isHeatmapActive: Boolean,
     maxRangeKm: Float,
     pulseColor: Color = Color(0xFF00E5FF),
-    pulseCycleDurationMs: Int = 2500,
+    pulseCycleDurationMs: Int = 2200,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "radar_anim")
-    
-    // Rotating sweep line (3.5s cycle)
+
     val sweepAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3500, easing = LinearEasing),
+            animation = tween(2200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "sweep_angle"
     )
 
-    // Pulse 1: Primary expanding wave (2.5s cycle with FastOutSlowInEasing)
     val pulseRadius by infiniteTransition.animateFloat(
         initialValue = 0.05f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(pulseCycleDurationMs, easing = FastOutSlowInEasing),
+            animation = tween(pulseCycleDurationMs, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "pulse_radius_1"
     )
 
-    // Pulse 2: Secondary wave with exactly 800ms offset
     val pulseRadius2 by infiniteTransition.animateFloat(
         initialValue = 0.05f,
         targetValue = 1.0f,
@@ -74,29 +245,28 @@ fun RadarRenderer(
     var panOffset by remember { mutableStateOf(Offset.Zero) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val widthPx = constraints.maxWidth.toFloat()
-        val heightPx = constraints.maxHeight.toFloat()
+        val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        val heightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
 
         val centerX = widthPx / 2f + panOffset.x
         val centerY = heightPx / 2f + panOffset.y
-        val maxRadius = min(widthPx, heightPx) * 0.44f * zoomScale
+        val maxRadius = min(widthPx, heightPx) * 0.42f * zoomScale
         val centerOffset = remember(centerX, centerY) { Offset(centerX, centerY) }
 
-        // Static and key-memoized objects moved out of 60fps Canvas draw loop
         val dashIntervals = remember { floatArrayOf(12f, 10f) }
         val ringStroke = remember(dashIntervals) {
-            Stroke(width = 1.2f, pathEffect = PathEffect.dashPathEffect(dashIntervals))
+            Stroke(width = 1.5f, pathEffect = PathEffect.dashPathEffect(dashIntervals))
         }
         val pulse1Stroke = remember { Stroke(width = 2.2f) }
         val pulse2Stroke = remember { Stroke(width = 1.8f) }
         val bgGradientColors = remember {
-            listOf(Color(0xFF0F172A), Color(0xFF060B18), Color(0xFF020617))
+            listOf(Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF020617))
         }
-        val bgBrush = remember(centerOffset, maxRadius, bgGradientColors) {
+        val bgBrush = remember(centerOffset, widthPx, heightPx, bgGradientColors) {
             Brush.radialGradient(
                 colors = bgGradientColors,
                 center = centerOffset,
-                radius = (maxRadius * 1.3f).coerceAtLeast(1f)
+                radius = (max(widthPx, heightPx) * 0.9f).coerceAtLeast(1f)
             )
         }
         val ringRadii = remember(maxRadius) {
@@ -105,12 +275,12 @@ fun RadarRenderer(
         }
         val markerTextPaint = remember {
             android.graphics.Paint().apply {
-                textSize = 28f
+                textSize = 26f
                 textAlign = android.graphics.Paint.Align.CENTER
+                isAntiAlias = true
             }
         }
 
-        // Derived state for per-frame animated values
         val alpha1 by remember {
             derivedStateOf { ((1.0f - pulseRadius) * 0.35f).coerceIn(0f, 1f) }
         }
@@ -127,7 +297,6 @@ fun RadarRenderer(
             }
         }
 
-        // Performance Optimization: Cache screen items and clusters so they are NOT recalculated in every 60fps animation frame
         val screenItems = remember(items, centerX, centerY, zoomScale) {
             items.map { item ->
                 item.copy(
@@ -158,7 +327,7 @@ fun RadarRenderer(
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
-                        zoomScale = (zoomScale * zoom).coerceIn(0.5f, 3.5f)
+                        zoomScale = (zoomScale * zoom).coerceIn(0.6f, 4.5f)
                         panOffset += pan
                     }
                 }
@@ -176,65 +345,70 @@ fun RadarRenderer(
                     }
                 }
         ) {
-            // 1. Dark Background Gradient
-            drawCircle(
-                brush = bgBrush,
-                center = centerOffset,
-                radius = maxRadius * 1.25f
-            )
+            // 1. خلفية داكنة متدرجة تغطي الشاشة بالكامل (لا شاشة سوداء أبداً)
+            drawRect(brush = bgBrush)
 
-            // 2. Concentric Radar Rings
+            // 2. دوائر الرادار الثابتة
             for (ringRadius in ringRadii) {
                 drawCircle(
-                    color = pulseColor.copy(alpha = 0.18f),
+                    color = pulseColor.copy(alpha = 0.16f),
                     radius = ringRadius,
                     center = centerOffset,
                     style = ringStroke
                 )
             }
 
-            // 3. Crosshairs
+            // 3. محاور التقاطع (Crosshairs)
             drawLine(
-                color = pulseColor.copy(alpha = 0.22f),
+                color = pulseColor.copy(alpha = 0.20f),
                 start = Offset(centerX - maxRadius, centerY),
                 end = Offset(centerX + maxRadius, centerY),
                 strokeWidth = 1f
             )
             drawLine(
-                color = pulseColor.copy(alpha = 0.22f),
+                color = pulseColor.copy(alpha = 0.20f),
                 start = Offset(centerX, centerY - maxRadius),
                 end = Offset(centerX, centerY + maxRadius),
                 strokeWidth = 1f
             )
 
-            // 4. Expanding Radar Pulses with Alpha Fade-Out
+            // 4. نبضات رادارية متحركة 60fps
+            val activePulseR = (maxRadius * pulseRadius).coerceAtLeast(1f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        pulseColor.copy(alpha = alpha1),
+                        Color.Transparent
+                    ),
+                    center = centerOffset,
+                    radius = activePulseR
+                ),
+                radius = activePulseR,
+                center = centerOffset
+            )
             drawCircle(
                 color = pulseColor.copy(alpha = alpha1),
-                radius = maxRadius * pulseRadius,
+                radius = activePulseR,
                 center = centerOffset,
                 style = pulse1Stroke
             )
-
             drawCircle(
                 color = pulseColor.copy(alpha = alpha2),
-                radius = maxRadius * pulseRadius2,
+                radius = (maxRadius * pulseRadius2).coerceAtLeast(1f),
                 center = centerOffset,
                 style = pulse2Stroke
             )
 
-            // 5. Rotating Radar Sweep Line
+            // 5. خط المسح الدوار
             drawLine(
-                brush = Brush.linearGradient(
-                    colors = listOf(pulseColor.copy(alpha = 0.9f), pulseColor.copy(alpha = 0.15f), Color.Transparent),
-                    start = centerOffset,
-                    end = sweepEndOffset
-                ),
+                color = pulseColor.copy(alpha = 0.75f),
                 start = centerOffset,
                 end = sweepEndOffset,
-                strokeWidth = 3f
+                strokeWidth = 2.5.dp.toPx(),
+                cap = StrokeCap.Round
             )
 
-            // 6. Heatmap Layer (if enabled)
+            // 6. الخريطة الحرارية (إذا كانت مفعلة)
             if (isHeatmapActive && weightedPoints.isNotEmpty()) {
                 HeatmapRenderer.drawHeatmapLayer(
                     drawScope = this,
@@ -243,25 +417,43 @@ fun RadarRenderer(
                 )
             }
 
-            // 7. Cluster & Draw Items (Optimized using cached clusters & remembered Paint)
+            // 7. رسم العلامات والـ Clusters بألوان واضحة حسب النوع
             for (cluster in clusters) {
                 val isSelected = cluster.items.any { it.id == selectedItemId }
                 val count = cluster.items.size
                 val center = Offset(cluster.centerX, cluster.centerY)
-                
+
+                if (center.x < -50 || center.x > size.width + 50 || center.y < -50 || center.y > size.height + 50) continue
+
                 if (count == 1) {
                     val item = cluster.items.first()
                     val emoji = MarkerRenderer.getEmojiForType(item.type)
                     val color = MarkerRenderer.getColorForType(item.type)
-                    
-                    if (isSelected) {
-                        drawCircle(color = color.copy(alpha = 0.4f), radius = 24f, center = center)
-                    }
-                    
+
+                    // هالة خارجية
+                    drawCircle(
+                        color = color.copy(alpha = if (isSelected) 0.45f else 0.25f),
+                        radius = (if (isSelected) 24.dp.toPx() else 18.dp.toPx()) * zoomScale.coerceAtMost(1.8f),
+                        center = center
+                    )
+                    // النقطة الملونة
+                    drawCircle(
+                        color = color,
+                        radius = 8.dp.toPx() * zoomScale.coerceAtMost(1.6f),
+                        center = center
+                    )
+                    // حدود بيضاء
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.9f),
+                        radius = 8.dp.toPx() * zoomScale.coerceAtMost(1.6f),
+                        center = center,
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+
                     drawContext.canvas.nativeCanvas.drawText(
                         emoji,
                         center.x,
-                        center.y + (markerTextPaint.textSize / 3),
+                        center.y - 14.dp.toPx(),
                         markerTextPaint
                     )
                 } else {
@@ -273,20 +465,20 @@ fun RadarRenderer(
                 }
             }
 
-            // 8. User Center Point (Glowing Green Beacon)
+            // 8. مركز الرادار (صنعاء / موقع المستخدم)
             drawCircle(
-                color = Color(0xFF10B981).copy(alpha = 0.25f),
-                radius = 20f,
+                color = Color(0xFF00E5FF).copy(alpha = 0.28f),
+                radius = 16.dp.toPx(),
                 center = centerOffset
             )
             drawCircle(
-                color = Color(0xFF10B981),
-                radius = 8f,
+                color = Color(0xFF00E5FF),
+                radius = 5.dp.toPx(),
                 center = centerOffset
             )
             drawCircle(
                 color = Color.White,
-                radius = 3.5f,
+                radius = 2.5.dp.toPx(),
                 center = centerOffset
             )
         }

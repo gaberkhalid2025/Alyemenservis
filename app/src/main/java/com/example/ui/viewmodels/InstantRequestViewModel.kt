@@ -197,14 +197,15 @@ class InstantRequestViewModel @Inject constructor(
         repository.createInstantRequest(
             request = req,
             onSuccess = { createdReq ->
+                val resolvedPin = createdReq.rawPin.ifBlank { customPin }
                 _uiState.value = InstantUiState.Success("تم تقديم الطلب الفوري بنجاح بنظام الكود: ${createdReq.requestCode}")
                 sendUrgentRequestNotificationToNearbyProviders(createdReq, 10)
-                onResult(true, createdReq.requestCode, createdReq.secretPin)
+                onResult(true, createdReq.requestCode, resolvedPin)
             },
             onError = { err ->
                 _uiState.value = InstantUiState.Success("تم حفظ الطلب محلياً بنظام الكود: ${req.requestCode}")
                 triggerNotification?.invoke("⚠️ تم حفظ الطلب محلياً، سيتم المزامنة تلقائياً عند استقرار الاتصال")
-                onResult(true, req.requestCode, req.secretPin)
+                onResult(true, req.requestCode, customPin)
             }
         )
     }

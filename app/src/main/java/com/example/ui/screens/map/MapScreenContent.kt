@@ -28,7 +28,6 @@ import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
-import com.example.ui.createBookingDirectly
 import com.example.ui.dialogs.BookingDialog
 import com.example.ui.screens.map.components.*
 import com.example.ui.screens.map.utils.OfflineMapManager
@@ -37,8 +36,36 @@ import com.example.utils.resolveThemePalette
 import kotlinx.coroutines.launch
 
 /**
+ * 🗺️ MapScreenContent – يجبر الوضع على الرادار أولاً (MapMarker Overload)
+ */
+@Composable
+fun MapScreenContent(
+    markers: List<MapMarker>,
+    centerLat: Double = 15.3694,
+    centerLng: Double = 44.1910,
+    onMarkerClick: (MapMarker) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    // الحالة الابتدائية دائماً رادار
+    var isRadarMode by remember { mutableStateOf(true) }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        RealLeafletMapView(
+            markers = markers,
+            centerLat = centerLat,
+            centerLng = centerLng,
+            forceRadar = isRadarMode,
+            onMapReady = { /* نجح التحميل */ },
+            onError = { isRadarMode = true },
+            onMarkerClick = onMarkerClick,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+/**
  * 🗺️ MapScreenContent
- * Primary presentation composable for the Map & Radar screen.
+ * Primary presentation composable for the Map & Radar screen (Radar-First 100%).
  */
 @Composable
 fun MapScreenContent(
@@ -54,6 +81,14 @@ fun MapScreenContent(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // فرض الوضع الابتدائي رادار دائماً عند فتح الشاشة لمنع أي شاشة سوداء
+    var showMapErrorOverlay by remember { mutableStateOf(false) }
+    var mapRetryCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        state.isRadarMode = true
+    }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (state.selectedEntity != null) {
@@ -71,8 +106,8 @@ fun MapScreenContent(
     val userLatState by viewModel.userLatitude.collectAsState()
     val userLngState by viewModel.userLongitude.collectAsState()
 
-    val safeUserLat = if (userLatState != 0.0) userLatState else 15.3694
-    val safeUserLng = if (userLngState != 0.0) userLngState else 44.1910
+    val safeUserLat = if (userLatState != 0.0 && !userLatState.isNaN()) userLatState else 15.3694
+    val safeUserLng = if (userLngState != 0.0 && !userLngState.isNaN()) userLngState else 44.1910
 
     // Location Permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -125,7 +160,7 @@ fun MapScreenContent(
     }
 
     Scaffold(
-        containerColor = Color(0xFF020617),
+        containerColor = Color(0xFF0F172A),
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
                 Snackbar(
@@ -141,25 +176,46 @@ fun MapScreenContent(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color(0xFF0F172A))
                 .padding(paddingValues)
         ) {
-            // Main Map View (Leaflet OpenStreetMap View or Radar Canvas)
+            // Main Map View (Radar-First 100% by default; WebView only on explicit user toggle)
             if (state.isRadarMode) {
-                RadarRenderer(
-                    items = radarPoints,
-                    selectedItemId = when (val ent = state.selectedEntity) {
-                        is ProviderEntity -> ent.id
-                        is StoreEntity -> ent.id
-                        is PropertyEntity -> ent.id
-                        else -> null
-                    },
-                    onItemSelected = { item ->
-                        state.selectedEntity = item.originalItem
-                    },
-                    isHeatmapActive = state.isHeatmapActive,
-                    maxRangeKm = state.maxRangeKm,
-                    modifier = Modifier.fillMaxSize()
-                )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    RadarRenderer(
+                        items = radarPoints,
+                        selectedItemId = when (val ent = state.selectedEntity) {
+                            is ProviderEntity -> ent.id
+                            is StoreEntity -> ent.id
+                            is PropertyEntity -> ent.id
+                            else -> null
+                        },
+                        onItemSelected = { item ->
+                            state.selectedEntity = item.originalItem
+                        },
+                        isHeatmapActive = state.isHeatmapActive,
+                        maxRangeKm = state.maxRangeKm,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // زر التبديل الاختياري إلى الخريطة الكاملة (Leaflet) في الأسفل عند عدم وجود عنصر محدد
+                    if (state.selectedEntity == null) {
+                        Button(
+                            onClick = {
+                                showMapErrorOverlay = false
+                                state.isRadarMode = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(bottom = 24.dp)
+                        ) {
+                            Text("تبديل إلى الخريطة الكاملة (Leaflet)", color = Color.White, fontSize = 12.sp)
+                        }
+                    }
+                }
             } else {
                 RealLeafletMapView(
                     userCoords = Pair(safeUserLat, safeUserLng),
@@ -177,14 +233,37 @@ fun MapScreenContent(
                     onStoreSelected = { state.selectedEntity = it },
                     onPropertySelected = { state.selectedEntity = it },
                     onDeselect = { state.selectedEntity = null },
-                    onSwitchToRadar = { 
+                    onSwitchToRadar = {
                         state.isRadarMode = true
                     },
-                    onMapLoadFailed = { // FIXED: Fall back to radar automatically on map error
+                    onMapLoadFailed = {
+                        // مهلة 3 ثوانٍ انتهت أو فشل التحميل -> عودة فورية للرادار + إظهار MapErrorOverlay
                         state.isRadarMode = true
+                        showMapErrorOverlay = true
                     },
                     themeColors = themeColors,
                     modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // MapErrorOverlay عند التحويل التلقائي للرادار بعد مهلة الـ 3 ثوانٍ (محاولة واحدة فقط)
+            if (showMapErrorOverlay) {
+                MapErrorOverlay(
+                    retryAvailable = mapRetryCount < 1,
+                    onRetry = if (mapRetryCount < 1) {
+                        {
+                            mapRetryCount++
+                            showMapErrorOverlay = false
+                            state.isRadarMode = false
+                        }
+                    } else null,
+                    onSwitchToRadar = {
+                        showMapErrorOverlay = false
+                        state.isRadarMode = true
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 115.dp)
                 )
             }
 
@@ -218,7 +297,7 @@ fun MapScreenContent(
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
                             }
                             Text(
-                                if (state.isRadarMode) "📡 رادار الخدمات الذكي" else "🗺️ خريطة دليل اليمن المباشرة",
+                                if (state.isRadarMode) "🛰️ رادار الخدمات المحلي (أوفلاين)" else "🗺️ خريطة دليل اليمن المباشرة",
                                 color = Color.White,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
@@ -263,7 +342,10 @@ fun MapScreenContent(
             // Map Controls (Right / Floating)
             MapControls(
                 isRadarMode = state.isRadarMode,
-                onToggleRadarMode = { state.isRadarMode = !state.isRadarMode },
+                onToggleRadarMode = {
+                    showMapErrorOverlay = false
+                    state.isRadarMode = !state.isRadarMode
+                },
                 isHeatmapActive = state.isHeatmapActive,
                 onToggleHeatmap = {
                     state.isHeatmapActive = !state.isHeatmapActive

@@ -120,24 +120,32 @@ data class ChatChannel(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val channelType: String = "PROVIDER",
+    @Deprecated("استخدم title أو participantNames بدلاً منها", ReplaceWith("title"))
     val targetName: String = "",
     val targetPhone: String = "",
     val targetCategory: String = "",
+    @Deprecated("استخدم title أو participantNames بدلاً منها", ReplaceWith("title"))
     val userName: String = "",
+    @Deprecated("استخدم title أو participantNames بدلاً منها", ReplaceWith("title"))
     val customerName: String = "",
+    @Deprecated("استخدم targetPhone بدلاً منها", ReplaceWith("targetPhone"))
     val customerPhone: String = "",
     val isProvider: Boolean = false,
     val timestamp: Long = 0L,
     val unreadCountUser: Int = 0,
     val unreadCountTarget: Int = 0,
+    @Deprecated("استخدم title أو participantNames بدلاً منها", ReplaceWith("title"))
     val providerName: String = "",
     val providerPhoto: String = "",
+    @Deprecated("استخدم title أو participantNames بدلاً منها", ReplaceWith("title"))
     val clientName: String = "",
     val clientPhoto: String = "",
     val messages: List<ChatMessage> = emptyList()
 ) : Serializable {
+    @Deprecated("استخدم participants بدلاً منها")
     val clientId: String get() = participants.firstOrNull() ?: ""
     val customerId: String get() = participants.firstOrNull() ?: ""
+    @Deprecated("استخدم participants بدلاً منها")
     val providerId: String get() = participants.getOrNull(1) ?: ""
     val targetId: String get() = participants.getOrNull(1) ?: ""
 

@@ -20,7 +20,7 @@ sealed class MapScreenUiState {
         val radarPoints: List<MarkerRenderer.MapItemPoint> = emptyList(),
         val userLat: Double = 15.3694,
         val userLng: Double = 44.1910,
-        val isRadarMode: Boolean = false,
+        val isRadarMode: Boolean = true,
         val isHeatmapActive: Boolean = false,
         val selectedCategory: String = "ALL",
         val selectedCity: String = "الكل",

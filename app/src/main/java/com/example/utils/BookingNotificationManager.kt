@@ -95,7 +95,7 @@ class BookingNotificationManager(
     }
 
     /**
-     * حفظ الإشعار في Firestore للمزامنة مع الأجهزة الأخرى
+     * حفظ الإشعار في Firestore للمزامنة مع الأجهزة الأخرى مع مفتاح منع التكرار الموحد (dedupKey)
      */
     fun persistNotificationToCloud(
         targetUserId: String,
@@ -105,21 +105,36 @@ class BookingNotificationManager(
         bookingId: String,
         type: String
     ) {
+        val normalizedId = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(targetUserId)
+        val canonicalTarget: String = if (targetRole == "ADMIN") "ALL" else normalizedId.ifBlank { targetUserId.trim() }
+        if (canonicalTarget.isBlank()) return
+        val unifiedDedupKey = if (bookingId.isNotBlank()) "${type}_${bookingId}_${targetRole}_$canonicalTarget" else "${type}_${canonicalTarget}_${title.hashCode()}"
+        if (!shouldDeliverNotification(unifiedDedupKey)) return
+
         scope.launch {
             try {
-                val docId = UUID.randomUUID().toString()
+                val safeDocId = if (bookingId.isNotBlank()) {
+                    "notif_${type}_${bookingId}_${targetRole}".replace(Regex("[^A-Za-z0-9_-]"), "_")
+                } else {
+                    UUID.randomUUID().toString()
+                }
                 val notificationData = hashMapOf(
-                    "id" to docId,
-                    "targetUserId" to targetUserId,
+                    "id" to safeDocId,
+                    "dedupKey" to unifiedDedupKey,
+                    "targetUserId" to canonicalTarget,
+                    "targetValue" to canonicalTarget,
                     "targetRole" to targetRole,
+                    "targetType" to targetRole,
                     "title" to title,
                     "body" to body,
+                    "message" to body,
                     "bookingId" to bookingId,
                     "type" to type,
                     "isRead" to false,
-                    "createdAt" to System.currentTimeMillis()
+                    "createdAt" to System.currentTimeMillis(),
+                    "timestamp" to System.currentTimeMillis()
                 )
-                firestore.collection("notifications").document(docId).set(notificationData)
+                firestore.collection("notifications").document(safeDocId).set(notificationData)
             } catch (e: Exception) {
                 Log.w(TAG, "Cloud notification push failed: ${e.message}")
             }
@@ -144,10 +159,12 @@ class BookingNotificationManager(
     fun notifyBookingCreated(booking: BookingEntity) {
         val title = "📅 حجز جديد #${booking.bookingNumber.ifEmpty { booking.id.take(8) }}"
         val body = "طلب حجز جديد من ${booking.customerName.ifEmpty { booking.clientName }} لخدمة ${booking.serviceType} في ${booking.customerArea.ifEmpty { booking.clientAddress }}."
+        val normPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(booking.providerPhone)
+        val canonicalProviderTarget: String = normPhone.ifBlank { booking.providerId }
 
         showLocalNotification(title, body)
-        persistNotificationToCloud(booking.providerId, "PROVIDER", title, body, booking.id, "BOOKING_CREATED")
-        persistNotificationToCloud("admin", "ADMIN", title, body, booking.id, "BOOKING_CREATED")
+        persistNotificationToCloud(canonicalProviderTarget, "PROVIDER", title, body, booking.id, "NEW_BOOKING")
+        persistNotificationToCloud("admin", "ADMIN", title, body, booking.id, "NEW_BOOKING")
     }
 
     /**

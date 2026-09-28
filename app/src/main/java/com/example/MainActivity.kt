@@ -317,16 +317,7 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
 
-        try {
-            // com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
-            if (!com.example.security.SecurityManager.verifyAppSignature(this)) {
-                android.util.Log.e("MainActivity", "SECURITY ERROR: Signature mismatch! Exiting.")
-                finishAffinity()
-                return
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // com.example.utils.FirestoreLocalBackupWorker.schedulePeriodicBackup(this)
 
         enableEdgeToEdge()
         setContent {

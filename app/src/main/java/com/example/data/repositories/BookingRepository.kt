@@ -239,34 +239,24 @@ class BookingRepository(
                                 val pPhone = pDoc.getString("phone") ?: ""
                                 if (pPhone.isNotBlank()) {
                                     firestore.collection(AppConstants.COL_BOOKINGS).document(docId).update("providerPhone", pPhone)
-                                    val provNotifId = UUID.randomUUID().toString()
-                                    val provNotif = mapOf(
-                                        "id" to provNotifId,
-                                        "title" to "طلب حجز جديد برقم #${finalBooking.bookingNumber}",
-                                        "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName.ifEmpty { finalBooking.clientName }}.",
-                                        "targetType" to "PROVIDER",
-                                        "targetValue" to pPhone,
-                                        "timestamp" to System.currentTimeMillis()
-                                    )
-                                    firestore.collection(AppConstants.COL_NOTIFICATIONS).document(provNotifId).set(provNotif)
                                 }
                             }
                     }
 
-                    val targetPhones = setOf(
-                        finalBooking.providerPhone,
-                        finalBooking.providerPhone.filter { it.isDigit() }.takeLast(9),
-                        finalBooking.providerId
-                    ).filter { it.isNotBlank() }
-
-                    targetPhones.forEach { targetVal ->
-                        val providerNotifId = UUID.randomUUID().toString()
+                    val normalizedProviderPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(finalBooking.providerPhone)
+                    val canonicalProviderTarget = normalizedProviderPhone.ifBlank { finalBooking.providerId.trim() }
+                    if (canonicalProviderTarget.isNotBlank()) {
+                        val dedupKey = "NEW_BOOKING_${finalBooking.id}"
+                        val providerNotifId = "notif_${dedupKey}"
                         val providerNotif = mapOf(
                             "id" to providerNotifId,
+                            "dedupKey" to dedupKey,
                             "title" to "طلب حجز جديد برقم #${finalBooking.bookingNumber}",
                             "message" to "لديك طلب حجز جديد برقم #${finalBooking.bookingNumber} من العميل ${finalBooking.customerName.ifEmpty { finalBooking.clientName }}.",
                             "targetType" to "PROVIDER",
-                            "targetValue" to targetVal,
+                            "targetValue" to canonicalProviderTarget,
+                            "targetPhone" to normalizedProviderPhone,
+                            "bookingId" to finalBooking.id,
                             "timestamp" to System.currentTimeMillis()
                         )
                         firestore.collection(AppConstants.COL_NOTIFICATIONS).document(providerNotifId).set(providerNotif)
@@ -276,13 +266,15 @@ class BookingRepository(
                         BookingNotificationManager(context, firestore).notifyBookingCreated(finalBooking)
                     } catch (e: Exception) {}
 
-                    val adminNotifId = UUID.randomUUID().toString()
+                    val adminNotifId = "notif_admin_NEW_BOOKING_${finalBooking.id}"
                     val adminNotif = mapOf(
                         "id" to adminNotifId,
+                        "dedupKey" to "ADMIN_NEW_BOOKING_${finalBooking.id}",
                         "title" to "إشعار للإدارة بالحجز الجديد",
                         "message" to "تم إنشاء حجز جديد #${finalBooking.bookingNumber} للخدمة ${finalBooking.serviceName}.",
                         "targetType" to "ADMIN_ONLY",
                         "targetValue" to "ALL",
+                        "bookingId" to finalBooking.id,
                         "timestamp" to System.currentTimeMillis()
                     )
                     firestore.collection(AppConstants.COL_NOTIFICATIONS).document(adminNotifId).set(adminNotif)
@@ -292,15 +284,26 @@ class BookingRepository(
                     onSuccess(finalBooking)
                 }
                 .addOnFailureListener { ex ->
-                    // Queue for offline sync
-                    cacheManager.queueOfflineAction(
-                        LocalAppCacheManager.OfflineSyncAction(
-                            type = "CREATE_BOOKING",
-                            payloadJson = moshi.adapter(BookingEntity::class.java).toJson(finalBooking)
+                    val firestoreEx = ex as? com.google.firebase.firestore.FirebaseFirestoreException
+                    val isOffline = firestoreEx?.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.UNAVAILABLE ||
+                        ex.message?.contains("offline", ignoreCase = true) == true ||
+                        ex.message?.contains("network", ignoreCase = true) == true
+
+                    if (isOffline) {
+                        // Queue for offline sync and notify caller that cloud sync is pending
+                        cacheManager.queueOfflineAction(
+                            LocalAppCacheManager.OfflineSyncAction(
+                                type = "CREATE_BOOKING",
+                                payloadJson = moshi.adapter(BookingEntity::class.java).toJson(finalBooking)
+                            )
                         )
-                    )
-                    // Still treat as locally created
-                    onSuccess(finalBooking)
+                        onError("تعذر الاتصال بالخادم حالياً؛ تم حفظ الحجز محلياً في طابور المزامنة وسيتم إرساله تلقائياً فور عودة الإنترنت.")
+                    } else {
+                        // Rollback optimistic local cache on permanent server rejection
+                        val rolledBack = _cachedBookings.value.filterNot { it.id == finalBooking.id }
+                        saveToCache(rolledBack)
+                        onError(ex.localizedMessage ?: "فشل إنشاء الحجز في الخادم، يرجى المحاولة مرة أخرى.")
+                    }
                 }
         } catch (e: Exception) {
             onError(e.localizedMessage ?: "فشل إنشاء الحجز")

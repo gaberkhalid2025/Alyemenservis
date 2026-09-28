@@ -12,7 +12,10 @@ import com.example.utils.AppConstants
 import com.example.utils.NotificationDeduplicator
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
@@ -30,40 +33,72 @@ class RegistrationRepositoryImpl(
     private val firestore = FirebaseFirestore.getInstance()
     private val deduplicator = NotificationDeduplicator(context)
 
-    private suspend fun checkExistingPendingRequest(phone: String): Boolean {
+    private suspend fun checkExistingPendingRequest(phone: String): Boolean = coroutineScope {
         val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
-        if (cleanPhone.isBlank()) return false
-        
-        // 1. Check join_requests
-        val snap = firestore.collection(AppConstants.COL_JOIN_REQUESTS)
-            .whereEqualTo("phone", cleanPhone)
-            .whereEqualTo("status", "PENDING")
-            .get()
-            .await()
-        if (!snap.isEmpty) return true
+        if (cleanPhone.isBlank()) return@coroutineScope false
 
-        // 2. Check users
-        val userSnap = firestore.collection("users")
-            .document(cleanPhone)
-            .get()
-            .await()
-        if (userSnap.exists()) return true
+        val joinReqDeferred = async {
+            runCatching {
+                !firestore.collection(AppConstants.COL_JOIN_REQUESTS)
+                    .whereEqualTo("phone", cleanPhone)
+                    .whereEqualTo("status", "PENDING")
+                    .limit(1)
+                    .get()
+                    .await()
+                    .isEmpty
+            }.getOrDefault(false)
+        }
 
-        // 3. Check providers
-        val providerSnap = firestore.collection("providers")
-            .whereEqualTo("phone", cleanPhone)
-            .get()
-            .await()
-        if (!providerSnap.isEmpty) return true
+        val userDeferred = async {
+            runCatching {
+                firestore.collection("users")
+                    .document(cleanPhone)
+                    .get()
+                    .await()
+                    .exists()
+            }.getOrDefault(false)
+        }
 
-        // 4. Check stores
-        val storeSnap = firestore.collection("stores")
-            .whereEqualTo("phone", cleanPhone)
-            .get()
-            .await()
-        if (!storeSnap.isEmpty) return true
+        val providerDeferred = async {
+            runCatching {
+                !firestore.collection("providers")
+                    .whereEqualTo("phone", cleanPhone)
+                    .limit(1)
+                    .get()
+                    .await()
+                    .isEmpty
+            }.getOrDefault(false)
+        }
 
-        return false
+        val storeDeferred = async {
+            runCatching {
+                !firestore.collection("stores")
+                    .whereEqualTo("phone", cleanPhone)
+                    .limit(1)
+                    .get()
+                    .await()
+                    .isEmpty
+            }.getOrDefault(false)
+        }
+
+        val propDeferred = async {
+            runCatching {
+                !firestore.collection("properties")
+                    .whereEqualTo("phone", cleanPhone)
+                    .limit(1)
+                    .get()
+                    .await()
+                    .isEmpty
+            }.getOrDefault(false)
+        }
+
+        awaitAll(
+            joinReqDeferred,
+            userDeferred,
+            providerDeferred,
+            storeDeferred,
+            propDeferred
+        ).any { it }
     }
 
     private suspend fun sendAdminJoinNotification(requestId: String, applicantName: String, phone: String, type: String) {
