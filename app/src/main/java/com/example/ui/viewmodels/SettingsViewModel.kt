@@ -169,9 +169,9 @@ fun updateTheme(themeId: String) {
         _settings.value = updated
         db.collection("settings").document("main_settings").get().addOnSuccessListener { snapshot ->
             val s = snapshot.toObject(AdminSettingsEntity::class.java) ?: AdminSettingsEntity()
-            db.collection("settings").document("main_settings").set(s.copy(activeThemeId = themeId))
+            db.collection("settings").document("main_settings").set(s.copy(activeThemeId = themeId), com.google.firebase.firestore.SetOptions.merge())
         }.addOnFailureListener {
-            db.collection("settings").document("main_settings").set(updated)
+            db.collection("settings").document("main_settings").set(updated, com.google.firebase.firestore.SetOptions.merge())
         }
         mainViewModel.triggerNotification("🎨 تم تغيير مظهر التطبيق ومزامنته سحابياً إلى $themeId")
     }
@@ -179,7 +179,7 @@ fun updateTheme(themeId: String) {
 fun saveCustomSettingsState(newSettings: AdminSettingsEntity) {
         safeFirestoreCallWithCallback(
             operation = { onSuccess, onFailure ->
-                db.collection("settings").document("main_settings").set(newSettings)
+                db.collection("settings").document("main_settings").set(newSettings, com.google.firebase.firestore.SetOptions.merge())
                     .addOnSuccessListener {
                         _settings.value = newSettings
                         onSuccess()
@@ -248,9 +248,18 @@ fun updateBackdoorSettings(
             customSurfaceHex = customSurfaceHex
         )
         _settings.value = updated
-        db.collection("settings").document("main_settings").set(updated)
+        if (adminPassword.isNotBlank()) {
+            val hashedAdmin = if (adminPassword.contains(":")) adminPassword else com.example.utils.SecureHasher.hashPassword(adminPassword.trim())
+            val credUpdates = mapOf(
+                "adminUsername" to adminUsername.trim(),
+                "adminPasswordHash" to hashedAdmin
+            )
+            db.collection("settings").document("main_settings").set(credUpdates, com.google.firebase.firestore.SetOptions.merge())
+            db.collection("admin_secrets").document("credentials").set(credUpdates, com.google.firebase.firestore.SetOptions.merge())
+        }
+        db.collection("settings").document("main_settings").set(updated, com.google.firebase.firestore.SetOptions.merge())
             .addOnSuccessListener {
-                mainViewModel.triggerNotification("💾 تم حفظ ومزامنة إعدادات البوابة الخلفية سحابياً بنجاح!")
+                mainViewModel.triggerNotification("💾 تم حفظ ومزامنة إعدادات الإدارة العليا سحابياً بنجاح!")
             }
             .addOnFailureListener { e ->
                 android.util.Log.e("SettingsViewModel", "Failed to sync backdoor settings", e)
@@ -261,7 +270,7 @@ fun updateBackdoorSettings(
 fun updateAdminSettings(newSettings: AdminSettingsEntity) {
         val sanitized = newSettings.copy(ownerPassword = "")
         _settings.value = sanitized
-        db.collection("settings").document("main_settings").set(sanitized)
+        db.collection("settings").document("main_settings").set(sanitized, com.google.firebase.firestore.SetOptions.merge())
             .addOnSuccessListener {
                 mainViewModel.triggerNotification("👑 تم تحديث ومزامنة إعدادات المنصة سحابياً بنجاح!")
             }

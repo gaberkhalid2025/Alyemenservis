@@ -179,10 +179,12 @@ object SecureAdminStorage {
         if (inputPassword.isBlank() || storedPassOrHash.isBlank()) return false
         val cleanInput = inputPassword.trim()
         val cleanStored = storedPassOrHash.trim()
-        
-        val isValid = SecureHasher.verifyPassword(cleanInput, cleanStored) ||
+
+        val isLegacyPlainMatch = !cleanStored.contains(":") && constantTimeEquals(cleanInput, cleanStored)
+        val isValid = isLegacyPlainMatch ||
+                SecureHasher.verifyPassword(cleanInput, cleanStored) ||
                 SecurityCryptoUtils.verifyAdminPassword(cleanInput, cleanStored)
-                
+
         if (isValid && docRef != null) {
             // إذا كانت كلمة المرور القديمة نصاً عادياً لا يحتوي على ملوحة (salt separator ":")
             if (!cleanStored.contains(":")) {
@@ -191,8 +193,6 @@ object SecureAdminStorage {
                 var success = false
                 while (attempts < 3 && !success) {
                     try {
-                        docRef.update(fieldName, newHash).addOnSuccessListener {}.addOnFailureListener {}
-                        // Use Tasks await if available or background coroutine
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             com.google.android.gms.tasks.Tasks.await(docRef.update(fieldName, newHash))
                         }

@@ -12,13 +12,14 @@ class OpenSupportChatUseCase @Inject constructor(
     suspend operator fun invoke(
         userId: String,
         userName: String,
-        userPhone: String
+        userPhone: String,
+        supportAgentId: String = "support_official"
     ): AppResult<ChatChannel> {
         return chatRepository.getOrCreateChannel(
             currentUserId = userId,
             currentUserName = userName,
             currentUserPhoto = "",
-            otherUserId = "ADMIN",
+            otherUserId = supportAgentId,
             otherUserName = "الدعم الفني للإدارة",
             otherUserPhoto = "",
             type = ChannelType.SUPPORT,

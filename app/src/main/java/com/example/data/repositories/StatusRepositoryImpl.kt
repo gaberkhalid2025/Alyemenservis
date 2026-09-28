@@ -382,6 +382,17 @@ class StatusRepositoryImpl(
 
     override suspend fun clearNotifications(): Result<Unit> {
         return try {
+            val snap = firestore.collection(AppConstants.COL_NOTIFICATIONS)
+                .limit(200)
+                .get()
+                .await()
+            if (!snap.isEmpty) {
+                val batch = firestore.batch()
+                snap.documents.forEach { doc ->
+                    batch.update(doc.reference, "isRead", true)
+                }
+                batch.commit().await()
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -389,6 +400,13 @@ class StatusRepositoryImpl(
     }
 
     override suspend fun refreshSystemStatus(): Result<Unit> {
-        return Result.success(Unit)
+        return try {
+            firestore.collection("system_stats").document("system_counters")
+                .get(com.google.firebase.firestore.Source.SERVER)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

@@ -297,7 +297,8 @@ class AdminViewModel @Inject constructor(
                     passwordAttempt = trimmedPass,
                     settings = currentSettings,
                     context = application,
-                    supervisors = supervisorsList
+                    supervisors = supervisorsList,
+                    preferredRole = "SUPERVISOR"
                 )
 
                 if (verifiedRole != null && verifiedRole != "GUEST") {

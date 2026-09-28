@@ -60,18 +60,36 @@ fun MainViewModel.changeAdminCredentials(newPass: String, newOwnerPass: String =
     val current = _settings.value
     val hashedOwnerPass = if (newOwnerPass.isNotBlank()) {
         if (newOwnerPass.contains(":")) newOwnerPass else SecureHasher.hashPassword(newOwnerPass.trim())
-    } else current.ownerPassword
+    } else ""
+    val hashedAdminPass = if (newPass.isNotBlank()) {
+        if (newPass.contains(":")) newPass else SecureHasher.hashPassword(newPass.trim())
+    } else ""
     val ctx = appContext
     if (ctx != null) {
         SecureAdminStorage.storeCredentials(
             context = ctx,
+            ownerEmail = current.ownerEmail.takeIf { it.isNotBlank() },
             ownerPassword = if (newOwnerPass.isNotBlank()) newOwnerPass.trim() else null,
+            adminEmail = current.adminUsername.takeIf { it.isNotBlank() },
             adminPassword = if (newPass.isNotBlank()) newPass.trim() else null
         )
     }
-    val updated = current.copy(
-        ownerPassword = hashedOwnerPass
-    )
+    val hashUpdates = mutableMapOf<String, Any>()
+    if (hashedOwnerPass.isNotBlank()) {
+        hashUpdates["ownerPasswordHash"] = hashedOwnerPass
+        if (current.ownerEmail.isNotBlank()) hashUpdates["ownerEmail"] = current.ownerEmail
+    }
+    if (hashedAdminPass.isNotBlank()) {
+        hashUpdates["adminPasswordHash"] = hashedAdminPass
+        if (current.adminUsername.isNotBlank()) hashUpdates["adminUsername"] = current.adminUsername
+    }
+    if (hashUpdates.isNotEmpty()) {
+        db.collection("settings").document("main_settings")
+            .set(hashUpdates, com.google.firebase.firestore.SetOptions.merge())
+        db.collection("admin_secrets").document("credentials")
+            .set(hashUpdates, com.google.firebase.firestore.SetOptions.merge())
+    }
+    val updated = current.copy(ownerPassword = "")
     _settings.value = updated
     settingsViewModel.updateAdminSettings(updated)
 }

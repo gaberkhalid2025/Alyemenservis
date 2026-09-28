@@ -42,7 +42,8 @@ data class ProviderEntity(
     val passwordHash: String = "",
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null,
-    val providerType: String = ""
+    val providerType: String = "",
+    val createdAt: Long = System.currentTimeMillis()
 ) : com.example.data.models.SupervisedEntity {
     val password: String get() = passwordHash
     val portfolioImages: List<String> get() = workPhotosBase64

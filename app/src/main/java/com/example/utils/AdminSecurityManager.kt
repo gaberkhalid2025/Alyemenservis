@@ -89,24 +89,34 @@ object AdminSecurityManager {
             // الاستمرار في طبقات التحقق التالية عند عدم تطابق Firebase Auth أو عدم توفر اتصال
         }
 
-        // 2. التحقق من بيانات الإعدادات (AdminSettingsEntity) المحملة أو السحابية المباشرة
-        // 🎯 أمان: البريد/اسم المستخدم يأتي من الإعدادات (settings/main_settings) فقط.
-        // لا يوجد أي بريد أو اسم ثابت في الكود.
-        // المالك يضبط ownerEmail من لوحة التحكم.
-        // الأدمن يضبط adminUsername من لوحة التحكم.
+        // 2. التحقق من خزنة بيانات الاعتماد (admin_secrets/credentials) أو الإعدادات السحابية (settings/main_settings)
         try {
-            val snap = try {
-                FirebaseFirestore.getInstance().collection("settings").document("main_settings").get().await()
+            val db = FirebaseFirestore.getInstance()
+            val secretSnap = try {
+                db.collection("admin_secrets").document("credentials").get().await()
             } catch (_: Exception) {
                 null
             }
-            val snapObj = snap?.toObject(AdminSettingsEntity::class.java)
+            val mainSnap = try {
+                db.collection("settings").document("main_settings").get().await()
+            } catch (_: Exception) {
+                null
+            }
+            val snapObj = mainSnap?.toObject(AdminSettingsEntity::class.java)
             val effectiveSettings = settings ?: snapObj
 
-            val docOwnerPass = snap?.getString("ownerPasswordHash") ?: ""
-            val docOwnerEmail = snap?.getString("ownerEmail") ?: effectiveSettings?.ownerEmail ?: ""
-            val docAdminPass = snap?.getString("adminPasswordHash") ?: ""
-            val docAdminUser = snap?.getString("adminUsername") ?: snap?.getString("admin_username") ?: effectiveSettings?.adminUsername ?: ""
+            val docOwnerPass = secretSnap?.getString("ownerPasswordHash")?.takeIf { it.isNotBlank() }
+                ?: mainSnap?.getString("ownerPasswordHash").orEmpty()
+            val docOwnerEmail = secretSnap?.getString("ownerEmail")?.takeIf { it.isNotBlank() }
+                ?: mainSnap?.getString("ownerEmail")?.takeIf { it.isNotBlank() }
+                ?: effectiveSettings?.ownerEmail.orEmpty()
+
+            val docAdminPass = secretSnap?.getString("adminPasswordHash")?.takeIf { it.isNotBlank() }
+                ?: mainSnap?.getString("adminPasswordHash").orEmpty()
+            val docAdminUser = secretSnap?.getString("adminUsername")?.takeIf { it.isNotBlank() }
+                ?: mainSnap?.getString("adminUsername")?.takeIf { it.isNotBlank() }
+                ?: mainSnap?.getString("admin_username")?.takeIf { it.isNotBlank() }
+                ?: effectiveSettings?.adminUsername.orEmpty()
 
             if (docOwnerPass.isNotBlank()) {
                 val ownerUserMatches = docOwnerEmail.isNotBlank() &&
@@ -171,7 +181,6 @@ object AdminSecurityManager {
                     val hasOwnerClaim = claims?.get("isSuperAdmin") == true || claims?.get("isOwner") == true
                     return when {
                         isSuperAdmin || hasOwnerClaim -> "OWNER"
-                        preferredRole == "OWNER" && (isSuperAdmin || hasOwnerClaim) -> "OWNER"
                         claims?.get("isAdmin") == true -> "ADMIN"
                         else -> "ADMIN"
                     }

@@ -25,6 +25,7 @@ class RealtimeSyncRepository(context: Context) {
         var previousCount = -1
         val listener: ListenerRegistration = firestore.collection("providers")
             .whereEqualTo("isDeleted", false)
+            .limit(200)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     val cached = mapDatabase.mapDao.getProviders()
@@ -38,10 +39,10 @@ class RealtimeSyncRepository(context: Context) {
                     } catch (e: Exception) {
                         null
                     }
-                }
+                }.sortedByDescending { it.createdAt }
 
                 if (previousCount in 0 until list.size) {
-                    val newest = list.lastOrNull()
+                    val newest = list.maxByOrNull { it.createdAt }
                     if (newest != null) {
                         onNewItemDetected?.invoke("فني جديد: ${newest.name}")
                     }
@@ -59,6 +60,7 @@ class RealtimeSyncRepository(context: Context) {
         var previousCount = -1
         val listener: ListenerRegistration = firestore.collection("stores")
             .whereEqualTo("isDeleted", false)
+            .limit(200)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     val cached = mapDatabase.mapDao.getStores()
@@ -72,10 +74,10 @@ class RealtimeSyncRepository(context: Context) {
                     } catch (e: Exception) {
                         null
                     }
-                }
+                }.sortedByDescending { it.createdAt }
 
                 if (previousCount in 0 until list.size) {
-                    val newest = list.lastOrNull()
+                    val newest = list.maxByOrNull { it.createdAt }
                     if (newest != null) {
                         val isRest = newest.sectionId.contains("restaurant", ignoreCase = true) ||
                                 newest.name.contains("مطعم") || newest.name.contains("كافيه")
@@ -96,6 +98,7 @@ class RealtimeSyncRepository(context: Context) {
         var previousCount = -1
         val listener: ListenerRegistration = firestore.collection("properties")
             .whereEqualTo("isDeleted", false)
+            .limit(200)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     val cached = mapDatabase.mapDao.getProperties()
@@ -109,10 +112,10 @@ class RealtimeSyncRepository(context: Context) {
                     } catch (e: Exception) {
                         null
                     }
-                }
+                }.sortedByDescending { it.createdAt }
 
                 if (previousCount in 0 until list.size) {
-                    val newest = list.lastOrNull()
+                    val newest = list.maxByOrNull { it.createdAt }
                     if (newest != null) {
                         onNewItemDetected?.invoke("عقار جديد: ${newest.title}")
                     }

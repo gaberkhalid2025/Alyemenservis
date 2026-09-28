@@ -50,6 +50,8 @@ fun BackdoorLoginDialog(
     var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
     var rememberMe by rememberSaveable { mutableStateOf(true) }
     var isAuthenticating by remember { mutableStateOf(false) }
+    var failedAttempts by rememberSaveable { mutableIntStateOf(0) }
+    var lockoutUntil by rememberSaveable { mutableLongStateOf(0L) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -79,7 +81,7 @@ fun BackdoorLoginDialog(
                 }
 
                 Text(
-                    text = "تسجيل دخول البوابة الخلفية",
+                    text = "تسجيل دخول الإدارة العليا",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -185,6 +187,18 @@ fun BackdoorLoginDialog(
 
                     Button(
                         onClick = {
+                            val now = System.currentTimeMillis()
+                            if (now < lockoutUntil) {
+                                val remainingSec = ((lockoutUntil - now) / 1000).coerceAtLeast(1)
+                                viewModel.triggerNotification("⏳ تم إيقاف المحاولات مؤقتاً. يرجى الانتظار $remainingSec ثانية.")
+                                return@Button
+                            }
+
+                            if (!com.example.security.SecurityManager.verifyAppSignature(context)) {
+                                viewModel.triggerNotification("❌ تعذر التحقق من سلامة توقيع التطبيق للدخول الإداري.")
+                                return@Button
+                            }
+
                             val trimmedUser = emailInput.trim()
                             val trimmedPass = passwordInput.trim()
 
@@ -206,11 +220,13 @@ fun BackdoorLoginDialog(
                                     )
                                     when (result) {
                                         "OWNER" -> {
+                                            failedAttempts = 0
                                             onDismiss()
                                             viewModel.authenticateAdmin(context, "OWNER", rememberMe)
-                                            viewModel.triggerNotification("🔓 مرحباً بك في البوابة الخلفية بصلاحية المالك - تم تسجيل الدخول بنجاح!")
+                                            viewModel.triggerNotification("🔓 مرحباً بك بصلاحية المالك - تم تسجيل الدخول بنجاح!")
                                         }
                                         "ADMIN" -> {
+                                            failedAttempts = 0
                                             onDismiss()
                                             viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
                                             viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام - تم تسجيل الدخول بنجاح!")
@@ -218,21 +234,29 @@ fun BackdoorLoginDialog(
                                         "SUPERVISOR" -> {
                                             val matchingSup = supervisors.find { it.id == trimmedUser || it.name.trim().equals(trimmedUser, ignoreCase = true) }
                                             if (matchingSup != null) {
+                                                failedAttempts = 0
                                                 viewModel.setSupervisorSession(matchingSup)
-                                                // 🎯 إزالة saved_admin_role غير المشفر
                                                 onDismiss()
                                                 viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
                                                 viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name} - تم تسجيل الدخول بنجاح!")
                                             } else {
+                                                failedAttempts++
+                                                if (failedAttempts >= 3) {
+                                                    lockoutUntil = System.currentTimeMillis() + 60_000L
+                                                }
                                                 viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة أو تم إلغاء الصلاحية!")
                                             }
                                         }
                                         else -> {
+                                            failedAttempts++
+                                            if (failedAttempts >= 3) {
+                                                lockoutUntil = System.currentTimeMillis() + 60_000L
+                                            }
                                             viewModel.triggerNotification("❌ بيانات الدخول غير صحيحة!")
                                         }
                                     }
                                 } catch (e: Throwable) {
-                                    e.printStackTrace()
+                                    android.util.Log.e("BackdoorLoginDialog", "Login error", e)
                                     viewModel.triggerNotification("❌ حدث خطأ غير متوقع أثناء تسجيل الدخول. يرجى المحاولة لاحقاً.")
                                 } finally {
                                     isAuthenticating = false

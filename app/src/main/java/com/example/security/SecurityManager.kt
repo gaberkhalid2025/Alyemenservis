@@ -141,11 +141,6 @@ class SecurityManager(context: Context) {
          */
         fun verifyAppSignature(context: Context): Boolean {
             return try {
-                val expectedHash = com.example.BuildConfig.SIGNATURE_HASH
-                if (expectedHash.isEmpty()) {
-                    return com.example.BuildConfig.DEBUG
-                }
-                
                 val pm = context.packageManager
                 val pkg = context.packageName
                 val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
@@ -164,6 +159,11 @@ class SecurityManager(context: Context) {
 
                 if (signatures.isNullOrEmpty()) {
                     return false
+                }
+
+                val expectedHash = com.example.BuildConfig.SIGNATURE_HASH
+                if (expectedHash.isEmpty()) {
+                    return true
                 }
 
                 val md = java.security.MessageDigest.getInstance("SHA-256")

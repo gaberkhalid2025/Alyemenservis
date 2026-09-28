@@ -48,13 +48,22 @@ class OffersRepository @Inject constructor(
         }
     }
 
+    private fun readLocalCache(): MutableList<SpecialOfferEntity> {
+        val raw = cacheManager.getOffersCacheRaw()
+        return if (raw.isNotBlank() && raw != "[]") {
+            SpecialOfferEntity.parseList(raw).toMutableList()
+        } else {
+            mutableListOf()
+        }
+    }
+
     suspend fun addOffer(offer: SpecialOfferEntity): Result<Unit> {
         return try {
             firestore.collection("special_offers").document(offer.id).set(offer).await()
             try {
                 firestore.collection("offers").document(offer.id).set(offer).await()
             } catch (_: Exception) {}
-            val currentOffers = getOffers().getOrDefault(emptyList()).toMutableList()
+            val currentOffers = readLocalCache()
             if (currentOffers.none { it.id == offer.id }) {
                 currentOffers.add(0, offer)
             }
@@ -71,7 +80,7 @@ class OffersRepository @Inject constructor(
             try {
                 firestore.collection("offers").document(offer.id).set(offer).await()
             } catch (_: Exception) {}
-            val currentOffers = getOffers().getOrDefault(emptyList()).map {
+            val currentOffers = readLocalCache().map {
                 if (it.id == offer.id) offer else it
             }
             cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(currentOffers))
@@ -80,14 +89,14 @@ class OffersRepository @Inject constructor(
             Result.failure(e)
         }
     }
-    
+
     suspend fun deleteOffer(offerId: String): Result<Unit> {
         return try {
             firestore.collection("special_offers").document(offerId).delete().await()
             try {
                 firestore.collection("offers").document(offerId).delete().await()
             } catch (_: Exception) {}
-            val currentOffers = getOffers().getOrDefault(emptyList()).filter { it.id != offerId }
+            val currentOffers = readLocalCache().filter { it.id != offerId }
             cacheManager.saveOffersCache(SpecialOfferEntity.serializeList(currentOffers))
             Result.success(Unit)
         } catch (e: Exception) {

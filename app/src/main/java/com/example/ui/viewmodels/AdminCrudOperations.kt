@@ -6,6 +6,42 @@ import kotlinx.coroutines.tasks.await
 
 class AdminCrudOperations(private val db: FirebaseFirestore) {
 
+    companion object {
+        val ALLOWED_COLLECTIONS = setOf(
+            "providers",
+            "pending_providers",
+            "join_requests",
+            "stores",
+            "properties",
+            "jobs",
+            "job_listings",
+            "bookings",
+            "instant_requests",
+            "special_offers",
+            "offers",
+            "coupons",
+            "notifications",
+            "supervisors",
+            "users",
+            "registered_users",
+            "ratings",
+            "reviews",
+            "reports",
+            "banners",
+            "categories",
+            "settings",
+            "activity_logs",
+            "payment_wallets",
+            "transactions"
+        )
+    }
+
+    private fun validateCollection(collection: String) {
+        require(collection in ALLOWED_COLLECTIONS) {
+            "Unauthorized or unknown Firestore collection: $collection"
+        }
+    }
+
     suspend fun <T : Any> saveEntity(
         collection: String,
         id: String,
@@ -14,6 +50,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
         onError: (Exception) -> Unit = {}
     ) {
         try {
+            validateCollection(collection)
             db.collection(collection).document(id).set(data).await()
             onSuccess()
         } catch (e: Exception) {
@@ -30,6 +67,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
         onError: (Exception) -> Unit = {}
     ) {
         try {
+            validateCollection(collection)
             if (softDelete) {
                 db.collection(collection).document(id)
                     .update("isDeleted", true, "deletedAt", System.currentTimeMillis())
@@ -53,6 +91,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
         onError: (Exception) -> Unit = {}
     ) {
         try {
+            validateCollection(collection)
             db.collection(collection).document(id).update(field, value).await()
             onSuccess()
         } catch (e: Exception) {
@@ -69,6 +108,7 @@ class AdminCrudOperations(private val db: FirebaseFirestore) {
         onError: (Exception) -> Unit = {}
     ) {
         try {
+            validateCollection(collection)
             db.collection(collection).document(id).update(fields).await()
             onSuccess()
         } catch (e: Exception) {

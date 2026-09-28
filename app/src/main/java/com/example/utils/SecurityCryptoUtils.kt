@@ -173,7 +173,10 @@ object SecurityCryptoUtils {
                 val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
                 "gcm:" + base64Encode(iv + encryptedBytes)
             } catch (ex: Throwable) {
-                ""
+                try {
+                    FirebaseCrashlytics.getInstance().recordException(ex)
+                } catch (_: Throwable) {}
+                throw IllegalStateException("Encryption failed critically", ex)
             }
         }
     }
@@ -204,7 +207,7 @@ object SecurityCryptoUtils {
             // التوافق العكسي مع البيانات المشفرة مسبقاً بـ AES/CBC/PKCS5Padding
             val decodedBytes = base64Decode(encryptedText)
             if (decodedBytes.size <= 16) {
-                return encryptedText
+                return ""
             }
             val iv = decodedBytes.copyOfRange(0, 16)
             val encrypted = decodedBytes.copyOfRange(16, decodedBytes.size)
@@ -218,7 +221,7 @@ object SecurityCryptoUtils {
             try {
                 FirebaseCrashlytics.getInstance().recordException(e)
             } catch (ignored: Throwable) {}
-            encryptedText
+            ""
         }
     }
 
@@ -233,13 +236,18 @@ object SecurityCryptoUtils {
     fun decryptFcmToken(encryptedToken: String?): String = decrypt(encryptedToken)
 
     /**
-     * Sanitizes user inputs to prevent injection attacks and script execution.
+     * Sanitizes and HTML-encodes user inputs for safe display context.
      */
     fun sanitizeInput(input: String?): String {
         if (input.isNullOrEmpty()) return ""
-        return input.replace(Regex("<[^>]*>"), "")
-            .replace("script", "", ignoreCase = true)
+        return input
+            .replace(Regex("<[^>]*>"), "")
             .replace("javascript:", "", ignoreCase = true)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#x27;")
             .trim()
     }
 

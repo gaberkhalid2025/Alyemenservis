@@ -60,8 +60,9 @@ object VoiceManager : TextToSpeech.OnInitListener {
         if (isInitialized && tts != null) {
             val params = Bundle()
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        } else {
+            onSpeak?.invoke(text)
         }
-        onSpeak?.invoke(text)
     }
 
     fun stop() {

@@ -64,7 +64,18 @@ class DashboardRepositoryImpl(
     }
 
     override suspend fun refreshDashboardStats(ownerId: String, role: String): Result<Unit> {
+        if (ownerId.isBlank()) return Result.failure(IllegalArgumentException("ownerId cannot be blank"))
         return try {
+            val collectionName = when (role.uppercase()) {
+                "PROVIDER", "TECHNICIAN" -> "providers"
+                "STORE", "RESTAURANT", "MEDICAL" -> "stores"
+                "PROPERTY" -> "properties"
+                "JOB" -> com.example.utils.AppConstants.COL_JOBS
+                else -> "users"
+            }
+            firestore.collection(collectionName).document(ownerId)
+                .get(com.google.firebase.firestore.Source.SERVER)
+                .await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

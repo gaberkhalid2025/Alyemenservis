@@ -147,74 +147,83 @@ class FCMService : FirebaseMessagingService() {
                 val db = FirebaseFirestore.getInstance()
                 val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
                 
-                // جلب بيانات المستخدم
+                // جلب بيانات المستخدم مع التحقق الصارم من نجاح فك التشفير
                 val rawUserId = sp.getString("user_id", "") ?: ""
                 val userId = if (rawUserId.isNotEmpty() && rawUserId != "guest") {
-                    try { SecurityCryptoUtils.decrypt(rawUserId) } catch (e: Exception) { rawUserId }
+                    if (rawUserId.startsWith("gcm:")) {
+                        try { SecurityCryptoUtils.decrypt(rawUserId) } catch (e: Exception) { "" }
+                    } else {
+                        try { SecurityCryptoUtils.decrypt(rawUserId).ifEmpty { rawUserId } } catch (e: Exception) { "" }
+                    }
                 } else rawUserId
-                
-                if (userId.isEmpty() || userId == "guest") {
+
+                if (userId.isEmpty() || userId == "guest" || userId.startsWith("gcm:")) {
                     return@postDelayed
                 }
-                
+
                 val rawPhone = sp.getString("user_phone", "") ?: ""
                 val phone = if (rawPhone.isNotEmpty()) {
-                    try { SecurityCryptoUtils.decrypt(rawPhone) } catch (e: Exception) { rawPhone }
-                } else rawPhone
+                    if (rawPhone.startsWith("gcm:")) {
+                        try { SecurityCryptoUtils.decrypt(rawPhone) } catch (e: Exception) { "" }
+                    } else {
+                        try { SecurityCryptoUtils.decrypt(rawPhone).ifEmpty { rawPhone } } catch (e: Exception) { "" }
+                    }
+                } else ""
                 val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
-                
+
                 // إنشاء المعاملة
                 val batch = db.batch()
                 val now = System.currentTimeMillis()
-                
-                // 1. تحديث fcm_tokens
+
+                // 1. تحديث fcm_tokens بدون تخزين رقم الهاتف الخام
                 val tokenData = mapOf(
                     "token" to token,
-                    "phone" to cleanPhone,
                     "role" to "CLIENT",
                     "updatedAt" to now
                 )
                 val tokenRef = db.collection("fcm_tokens").document(userId)
                 batch.set(tokenRef, tokenData)
-                
+
                 // 2. تحديث registered_users
                 try {
                     val userRef = db.collection("registered_users").document(userId)
                     batch.update(userRef, "fcmToken", token)
                 } catch (e: Exception) {
-                    // قد لا يكون المستند موجوداً، نتجاوز
+                    android.util.Log.w("FCMService", "Skipped registered_users token update: ${e.message}")
                 }
-                
-                // 3. تحديث providers, stores, properties (إذا كان الرقم موجوداً)
-                if (cleanPhone.isNotEmpty() && cleanPhone.length >= 7) {
+
+                // 3. تحديث providers, stores, properties (إذا كان الرقم صالحاً ومفكوك التشفير)
+                if (cleanPhone.isNotEmpty() && !cleanPhone.startsWith("gcm:") && cleanPhone.length >= 7) {
                     try {
                         val providerRef = db.collection("providers").document(cleanPhone)
                         batch.update(providerRef, "fcmToken", token)
-                    } catch (e: Exception) { /* تجاهل */ }
-                    
+                    } catch (e: Exception) {
+                        android.util.Log.w("FCMService", "Provider token update skipped: ${e.message}")
+                    }
+
                     try {
                         val storeRef = db.collection("stores").document(cleanPhone)
                         batch.update(storeRef, "fcmToken", token)
-                    } catch (e: Exception) { /* تجاهل */ }
-                    
+                    } catch (e: Exception) {
+                        android.util.Log.w("FCMService", "Store token update skipped: ${e.message}")
+                    }
+
                     try {
                         val propRef = db.collection("properties").document(cleanPhone)
                         batch.update(propRef, "fcmToken", token)
-                    } catch (e: Exception) { /* تجاهل */ }
+                    } catch (e: Exception) {
+                        android.util.Log.w("FCMService", "Property token update skipped: ${e.message}")
+                    }
                 }
-                
-                // تنفيذ المعاملة مع معالجة الأخطاء
+
+                // تنفيذ المعاملة مع معالجة الأخطاء صراحةً
                 batch.commit()
-                    .addOnSuccessListener {
-                        // نجاح المزامنة
-                    }
                     .addOnFailureListener { e ->
-                        // فشل المزامنة - سنحاول مرة أخرى في المرة القادمة
-                        e.printStackTrace()
+                        android.util.Log.e("FCMService", "Failed to sync FCM token batch", e)
                     }
-                    
+
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("FCMService", "Error during FCM token sync", e)
             }
         }, 3000) // تأخير 3 ثواني لضمان تهيئة Firebase بالكامل
     }
