@@ -1,11 +1,14 @@
 package com.example.di
 
+import android.content.Context
+import com.example.security.SecurityManager
+import com.example.utils.SecureStorage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreSettings
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -27,7 +30,13 @@ object FirebaseModule {
 
     @Provides
     @Singleton
-    fun provideSecureStorage(@dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context): com.example.utils.SecureStorage {
-        return com.example.utils.SecureStorage(context)
+    fun provideSecureStorage(@ApplicationContext context: Context): SecureStorage {
+        return SecureStorage(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSecurityManager(@ApplicationContext context: Context): SecurityManager {
+        return SecurityManager(context)
     }
 }

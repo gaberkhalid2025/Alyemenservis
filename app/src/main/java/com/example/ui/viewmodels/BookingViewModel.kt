@@ -166,7 +166,7 @@ open class BookingViewModel @Inject constructor(
 
     private fun createRecurringBookings(baseBooking: BookingEntity, onResult: (Boolean) -> Unit) {
         val parentId = java.util.UUID.randomUUID().toString()
-        val dates = com.example.utils.ScheduleManager.calculateRecurringDates(baseBooking.dateString, baseBooking.recurrenceRule)
+        val dates = com.example.utils.ScheduleManager.calculateRecurringDates(baseBooking.effectiveDate, baseBooking.recurrenceRule)
         
         val batch = db.batch()
         val newBookings = mutableListOf<BookingEntity>()
@@ -197,8 +197,8 @@ open class BookingViewModel @Inject constructor(
                 batch.commit().addOnSuccessListener {
                     _bookings.value = _bookings.value + newBookings
                     
-                    val custPhone = baseBooking.customerPhone.ifEmpty { baseBooking.clientPhone }
-                    val custName = baseBooking.customerName.ifEmpty { baseBooking.clientName.ifEmpty { "العميل" } }
+                    val custPhone = baseBooking.effectiveCustomerPhone
+                    val custName = baseBooking.effectiveCustomerName
                     val provPhone = baseBooking.providerPhone.ifEmpty {
                         getProviders?.invoke()?.find { it.id == baseBooking.providerId || it.name.trim() == baseBooking.providerName.trim() }?.phone?.trim() ?: baseBooking.providerId
                     }
@@ -293,9 +293,9 @@ open class BookingViewModel @Inject constructor(
         // 2. Duplication & Overlap prevention scan
         val isTimeSlotTaken = _bookings.value.any {
             it.providerId == providerId &&
-            it.dateString.trim() == dateString.trim() &&
-            it.timeString.trim() == timeString.trim() &&
-            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "IN_PROGRESS")
+            it.effectiveDate.trim() == dateString.trim() &&
+            it.effectiveTime.trim() == timeString.trim() &&
+            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "ACCEPTED" || it.status == "IN_PROGRESS")
         }
         if (isTimeSlotTaken) {
             triggerNotificationCallback?.invoke("⚠️ عذراً، هذا الموعد ($dateString في $timeString) محجوز مسبقاً لدى هذا الفني. يرجى اختيار وقت آخر!")
@@ -536,7 +536,7 @@ open class BookingViewModel @Inject constructor(
         triggerNotificationCallback?.invoke("🗑️ تم حذف الحجز من السجلات")
 
         val bkCode = b?.bookingCode?.ifBlank { b.bookingNumber.ifBlank { bookingId } } ?: bookingId
-        val custName = b?.fullName?.ifBlank { b.clientName.ifBlank { b.customerName.ifBlank { "عميل" } } } ?: "عميل"
+        val custName = b?.effectiveCustomerName ?: "عميل"
         onAddNotification?.invoke(
             "🗑️ إشعار إداري: حذف حجز",
             "نوع العملية: (حذف) | رقم الحجز: $bkCode | اسم العميل: $custName",
@@ -571,7 +571,7 @@ open class BookingViewModel @Inject constructor(
         triggerNotificationCallback?.invoke("💾 تم تحديث بيانات الحجز بنجاح")
 
         val bkCode = booking.bookingCode.ifBlank { booking.bookingNumber.ifBlank { booking.id } }
-        val custName = booking.fullName.ifBlank { booking.clientName.ifBlank { booking.customerName.ifBlank { "عميل" } } }
+        val custName = booking.effectiveCustomerName
         onAddNotification?.invoke(
             "✏️ إشعار إداري: تعديل حجز",
             "نوع العملية: (تعديل) | رقم الحجز: $bkCode | اسم العميل: $custName",
@@ -615,9 +615,9 @@ open class BookingViewModel @Inject constructor(
         val isTimeSlotTaken = _bookings.value.any {
             it.id != bookingId &&
             it.providerId == targetProviderId &&
-            it.dateString.trim() == newDate.trim() &&
-            it.timeString.trim() == newTime.trim() &&
-            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "IN_PROGRESS")
+            it.effectiveDate.trim() == newDate.trim() &&
+            it.effectiveTime.trim() == newTime.trim() &&
+            (it.status == "PENDING" || it.status == "APPROVED" || it.status == "ACCEPTED" || it.status == "IN_PROGRESS")
         }
         if (isTimeSlotTaken) {
             triggerToast("❌ عذراً! هذا الوقت (${newTime}) وتاريخ (${newDate}) محجوز بالفعل لدى مقدم الخدمة. يرجى اختيار موعد آخر.")
@@ -625,6 +625,8 @@ open class BookingViewModel @Inject constructor(
         }
 
         val updates = mutableMapOf<String, Any>(
+            "date" to newDate,
+            "time" to newTime,
             "dateString" to newDate,
             "timeString" to newTime,
             "serviceType" to newServiceType,

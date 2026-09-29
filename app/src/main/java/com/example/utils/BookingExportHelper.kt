@@ -42,16 +42,16 @@ object BookingExportHelper {
                     val line = listOf(
                         "\"${b.bookingCode.ifBlank { b.id }}\"",
                         "\"${b.serviceName}\"",
-                        "\"${b.userName}\"",
-                        "\"${b.userPhone}\"",
+                        "\"${b.effectiveCustomerName}\"",
+                        "\"${b.effectiveCustomerPhone}\"",
                         "\"${b.providerName}\"",
-                        "\"${b.userCity} - ${b.userNeighborhood}\"",
-                        "\"${b.date}\"",
-                        "\"${b.time}\"",
+                        "\"${listOf(b.userCity, b.effectiveCustomerArea).filter { it.isNotBlank() }.joinToString(" - ")}\"",
+                        "\"${b.effectiveDate}\"",
+                        "\"${b.effectiveTime}\"",
                         "\"${b.price}\"",
                         "\"${b.currency.ifBlank { "YER" }}\"",
                         "\"${b.status}\"",
-                        "\"${b.secretPin}\""
+                        "\"${b.effectivePin}\""
                     ).joinToString(",")
                     writer.write(line + "\n")
                 }
@@ -115,7 +115,7 @@ object BookingExportHelper {
             bookings.take(maxRowsPerPage).forEachIndexed { idx, b ->
                 canvas.drawText("${idx + 1}. [${b.bookingCode.ifBlank { b.id }}] ${b.serviceName}", 40f, yPos, headerPaint)
                 yPos += 14f
-                val details = "العميل: ${b.userName} (${b.userPhone}) | المزود: ${b.providerName} | التاريخ: ${b.date} ${b.time}"
+                val details = "العميل: ${b.effectiveCustomerName} (${b.effectiveCustomerPhone}) | المزود: ${b.providerName} | التاريخ: ${b.effectiveDate} ${b.effectiveTime}"
                 canvas.drawText(details, 40f, yPos, textPaint)
                 yPos += 14f
                 val statusPrice = "الحالة: ${b.status} | المبلغ: ${b.price} ${b.currency.ifBlank { "YER" }}"
@@ -161,12 +161,12 @@ object BookingExportHelper {
                     writer.write("<tr>")
                     writer.write("<td>${b.bookingCode.ifBlank { b.id }}</td>")
                     writer.write("<td>${b.serviceName}</td>")
-                    writer.write("<td>${b.userName}</td>")
-                    writer.write("<td>${b.userPhone}</td>")
+                    writer.write("<td>${b.effectiveCustomerName}</td>")
+                    writer.write("<td>${b.effectiveCustomerPhone}</td>")
                     writer.write("<td>${b.providerName}</td>")
-                    writer.write("<td>${b.userCity}</td>")
-                    writer.write("<td>${b.date}</td>")
-                    writer.write("<td>${b.time}</td>")
+                    writer.write("<td>${b.userCity.ifBlank { b.effectiveCustomerArea }}</td>")
+                    writer.write("<td>${b.effectiveDate}</td>")
+                    writer.write("<td>${b.effectiveTime}</td>")
                     writer.write("<td>${b.price}</td>")
                     writer.write("<td>${b.currency.ifBlank { "YER" }}</td>")
                     writer.write("<td>${b.status}</td>")

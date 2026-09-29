@@ -107,7 +107,9 @@ fun UserSubmitPaymentProofDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
-    var selectedWallet by remember { mutableStateOf(paymentWallets.firstOrNull { it.status == "active" }) }
+    var selectedWallet by remember(paymentWallets) { 
+        mutableStateOf(paymentWallets.firstOrNull { it.status == "active" && it.isVisibleToUsers && (it.walletType == "DEPOSIT" || it.walletType == "BOTH") } ?: paymentWallets.firstOrNull { it.status == "active" }) 
+    }
     var transferIdInput by remember { mutableStateOf("") }
     var accountNameInput by remember { mutableStateOf("") }
     var photoInput by remember { mutableStateOf("") }

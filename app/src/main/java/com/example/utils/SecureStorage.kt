@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 🔐 نموذج جلسة الأدمن
@@ -24,8 +22,7 @@ data class AdminSession(
  * تخزين مشفر وآمن لجلسات الأدمن والبيانات الحساسة
  * باستخدام EncryptedSharedPreferences و Android KeyStore
  */
-@Singleton
-class SecureStorage @Inject constructor(
+class SecureStorage(
     private val context: Context
 ) {
     private var isUsingEncryptedPrefs = false

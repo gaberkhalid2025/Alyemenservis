@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +23,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class FullSyncManager @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
@@ -49,17 +50,45 @@ class FullSyncManager @Inject constructor(
     }
 
     /**
-     * بدء المزامنة التلقائية كل 5 دقائق
+     * بدء المزامنة التلقائية كل 5 دقائق (استرجاع آمن من السحابة للكاش المحلي دون الكتابة العشوائية)
      */
     fun startAutoSync() {
         autoSyncJob?.cancel()
         autoSyncJob = scope.launch {
             while (isActive) {
                 if (isSyncRequired()) {
-                    syncAllSettings()
+                    pullRemoteSettingsToLocalCache()
                 }
                 delay(SYNC_INTERVAL_MS)
             }
+        }
+    }
+
+    /**
+     * سحب الإعدادات من السحابة وتحديث الكاش المحلي بأمان (مخصص للمزامنة الدورية في الخلفية)
+     * لا يقوم بالكتابة على Firestore، مما يحمي إعدادات الأدمن ويتجنب أخطاء PERMISSION_DENIED لدى العملاء.
+     */
+    suspend fun pullRemoteSettingsToLocalCache(): Boolean = withContext(Dispatchers.IO) {
+        _isSyncing.value = true
+        try {
+            val remoteData = restoreAllSettings()
+            val now = System.currentTimeMillis()
+            if (remoteData != null) {
+                val jsonStr = org.json.JSONObject(remoteData).toString()
+                prefs.edit()
+                    .putString(KEY_LOCAL_SETTINGS_CACHE, jsonStr)
+                    .putLong(KEY_LAST_SYNC_TS, now)
+                    .apply()
+            } else {
+                prefs.edit().putLong(KEY_LAST_SYNC_TS, now).apply()
+            }
+            _lastSyncTimestamp.value = now
+            _isSyncing.value = false
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Background pullRemoteSettingsToLocalCache note: ${e.message}")
+            _isSyncing.value = false
+            false
         }
     }
 

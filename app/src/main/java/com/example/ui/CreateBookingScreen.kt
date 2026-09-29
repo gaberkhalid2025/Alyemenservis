@@ -127,7 +127,7 @@ fun CreateBookingScreen(
     }
 
     LaunchedEffect(selectedDepartment) {
-        if (preselectedService.isEmpty()) {
+        if (preselectedService.isEmpty() && !currentSubCategories.contains(serviceType)) {
             serviceType = currentSubCategories.firstOrNull() ?: "صيانة عامة"
         }
     }

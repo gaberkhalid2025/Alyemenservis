@@ -2,93 +2,154 @@ package com.example.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.SystemClock
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.io.File
+import java.security.MessageDigest
 
 /**
  * 🛡️ SecurityManager - إدارة الأمان والحماية والحد من محاولات الدخول الخاطئة
  */
 class SecurityManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("app_security_prefs", Context.MODE_PRIVATE)
+    private val appContext: Context = context.applicationContext ?: context
 
-    private val securePrefs: SharedPreferences by lazy {
-        try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-
-            EncryptedSharedPreferences.create(
-                context,
-                "app_security_secure_prefs",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            try {
-                context.deleteSharedPreferences("app_security_secure_prefs")
-                val masterKey = MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                EncryptedSharedPreferences.create(
-                    context,
-                    "app_security_secure_prefs",
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
-            } catch (ex: Exception) {
-                prefs
-            }
-        }
-    }
+    private val securePrefs: SharedPreferences
+        get() = getOrCreateSecurePrefs(appContext)
 
     fun registerFailedAttempt(): Boolean {
-        val attempts = prefs.getInt("failed_attempts", 0) + 1
-        prefs.edit().putInt("failed_attempts", attempts).apply()
+        val existingLockTime = securePrefs.getLong(KEY_LOCKOUT_TIMESTAMP, 0L)
+        if (existingLockTime != 0L && !isLockedOut()) {
+            resetAttempts()
+        }
 
-        if (attempts >= 5) {
-            val lockTime = System.currentTimeMillis() + (30 * 60 * 1000) // قفل لمدة 30 دقيقة
-            prefs.edit().putLong("lockout_timestamp", lockTime).apply()
+        val attempts = securePrefs.getInt(KEY_FAILED_ATTEMPTS, 0) + 1
+        val editor = securePrefs.edit().putInt(KEY_FAILED_ATTEMPTS, attempts)
+
+        if (attempts >= MAX_ATTEMPTS) {
+            val lockTime = System.currentTimeMillis() + LOCKOUT_DURATION_MS
+            val currentElapsed = try {
+                SystemClock.elapsedRealtime()
+            } catch (e: Exception) {
+                0L
+            }
+            editor.putLong(KEY_LOCKOUT_TIMESTAMP, lockTime)
+            if (currentElapsed > 0L) {
+                editor.putLong(KEY_LOCKOUT_ELAPSED, currentElapsed + LOCKOUT_DURATION_MS)
+            }
+            editor.apply()
             return true // تم القفل
         }
+        editor.apply()
         return false
     }
 
     fun isLockedOut(): Boolean {
-        val lockTime = prefs.getLong("lockout_timestamp", 0L)
-        if (System.currentTimeMillis() < lockTime) {
-            return true
-        } else if (lockTime != 0L) {
-            // انقضى وقت القفل
-            resetAttempts()
+        val lockTime = securePrefs.getLong(KEY_LOCKOUT_TIMESTAMP, 0L)
+        if (lockTime == 0L) return false
+
+        val wallActive = System.currentTimeMillis() < lockTime
+        val lockElapsed = securePrefs.getLong(KEY_LOCKOUT_ELAPSED, 0L)
+        val currentElapsed = try {
+            SystemClock.elapsedRealtime()
+        } catch (e: Exception) {
+            0L
         }
+        val elapsedActive = lockElapsed > 0L &&
+            currentElapsed > 0L &&
+            currentElapsed >= (lockElapsed - LOCKOUT_DURATION_MS) &&
+            currentElapsed < lockElapsed
+
+        if (wallActive || elapsedActive) {
+            return true
+        }
+
+        // انقضى وقت القفل
+        resetAttempts()
         return false
     }
 
     fun resetAttempts() {
-        prefs.edit()
-            .putInt("failed_attempts", 0)
-            .putLong("lockout_timestamp", 0L)
+        securePrefs.edit()
+            .remove(KEY_FAILED_ATTEMPTS)
+            .remove(KEY_LOCKOUT_TIMESTAMP)
+            .remove(KEY_LOCKOUT_ELAPSED)
             .apply()
     }
 
     fun savePinCode(pin: String) {
-        val hashed = com.example.utils.SecureHasher.hashPin(pin)
-        securePrefs.edit().putString("secure_local_pin", hashed).apply()
+        val cleanPin = pin.trim()
+        if (cleanPin.isEmpty()) return
+        val hashed = com.example.utils.SecureHasher.hashPin(cleanPin)
+        securePrefs.edit().putString(KEY_SECURE_PIN, hashed).apply()
     }
 
     fun verifyPinCode(inputPin: String): Boolean {
-        val savedPinHash = securePrefs.getString("secure_local_pin", null) ?: return false
-        return com.example.utils.SecureHasher.verifyPin(inputPin, savedPinHash)
+        val cleanPin = inputPin.trim()
+        if (cleanPin.isEmpty()) return false
+        val savedPinHash = securePrefs.getString(KEY_SECURE_PIN, null) ?: return false
+        return com.example.utils.SecureHasher.verifyPin(cleanPin, savedPinHash)
     }
 
     fun hasPinCode(): Boolean {
-        return !securePrefs.getString("secure_local_pin", null).isNullOrEmpty()
+        return !securePrefs.getString(KEY_SECURE_PIN, null).isNullOrEmpty()
     }
 
     companion object {
         private const val TAG = "SecurityManager"
+        private const val PREFS_FALLBACK_NAME = "app_security_prefs"
+        private const val PREFS_SECURE_NAME = "app_security_secure_prefs"
+        private const val KEY_FAILED_ATTEMPTS = "failed_attempts"
+        private const val KEY_LOCKOUT_TIMESTAMP = "lockout_timestamp"
+        private const val KEY_LOCKOUT_ELAPSED = "lockout_elapsed"
+        private const val KEY_SECURE_PIN = "secure_local_pin"
+        private const val MAX_ATTEMPTS = 5
+        private const val LOCKOUT_DURATION_MS = 30 * 60 * 1000L // 30 minutes
+
+        @Volatile
+        private var cachedSecurePrefs: SharedPreferences? = null
+
+        private fun getOrCreateSecurePrefs(appContext: Context): SharedPreferences {
+            cachedSecurePrefs?.let { return it }
+            synchronized(SecurityManager::class.java) {
+                cachedSecurePrefs?.let { return it }
+                val resolved = try {
+                    val masterKey = MasterKey.Builder(appContext)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build()
+
+                    EncryptedSharedPreferences.create(
+                        appContext,
+                        PREFS_SECURE_NAME,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    )
+                } catch (e: Exception) {
+                    try {
+                        appContext.deleteSharedPreferences(PREFS_SECURE_NAME)
+                        val masterKey = MasterKey.Builder(appContext)
+                            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                            .build()
+                        EncryptedSharedPreferences.create(
+                            appContext,
+                            PREFS_SECURE_NAME,
+                            masterKey,
+                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                        )
+                    } catch (ex: Exception) {
+                        Log.w(TAG, "EncryptedSharedPreferences unavailable; falling back to private preferences: ${ex.message}")
+                        appContext.getSharedPreferences(PREFS_FALLBACK_NAME, Context.MODE_PRIVATE)
+                    }
+                }
+                cachedSecurePrefs = resolved
+                return resolved
+            }
+        }
 
         /**
          * Checks if the device is rooted or running in a compromised environment.
@@ -100,17 +161,21 @@ class SecurityManager(context: Context) {
                     "/sbin/su",
                     "/system/bin/su",
                     "/system/xbin/su",
+                    "/system/xbin/daemonsu",
                     "/data/local/xbin/su",
                     "/data/local/bin/su",
                     "/system/sd/xbin/su",
                     "/system/bin/failsafe/su",
-                    "/data/local/su"
+                    "/data/local/su",
+                    "/sbin/.magisk",
+                    "/cache/.disable_magisk",
+                    "/dev/.magisk.unblock"
                 )
                 for (file in rootFiles) {
-                    if (java.io.File(file).exists()) return true
+                    if (File(file).exists()) return true
                 }
 
-                if (android.os.Build.TAGS?.contains("test-keys") == true) return true
+                if (Build.TAGS?.contains("test-keys") == true) return true
 
                 false
             } catch (e: Exception) {
@@ -125,15 +190,32 @@ class SecurityManager(context: Context) {
             return try {
                 val checkPaths = listOf(
                     "/data/local/tmp/frida-server",
-                    "/system/framework/XposedBridge.jar"
+                    "/system/framework/XposedBridge.jar",
+                    "/system/lib/libsubstrate.so",
+                    "/system/lib64/libsubstrate.so"
                 )
                 for (p in checkPaths) {
-                    if (java.io.File(p).exists()) return true
+                    if (File(p).exists()) return true
+                }
+
+                val mapsFile = File("/proc/self/maps")
+                if (mapsFile.exists() && mapsFile.canRead()) {
+                    val mapsContent = mapsFile.readText()
+                    if (mapsContent.contains("frida-agent") || mapsContent.contains("XposedBridge.jar")) {
+                        return true
+                    }
                 }
                 false
             } catch (e: Exception) {
                 false
             }
+        }
+
+        /**
+         * Unified helper to check if the runtime environment shows signs of root or hooking.
+         */
+        fun isDeviceCompromised(): Boolean {
+            return isDeviceRooted() || isHookingFrameworkDetected()
         }
 
         /**
@@ -143,8 +225,21 @@ class SecurityManager(context: Context) {
             return try {
                 val pm = context.packageManager
                 val pkg = context.packageName
-                val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                    val signingInfo = pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES).signingInfo
+                val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val signingInfo = pm.getPackageInfo(
+                        pkg,
+                        PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES.toLong())
+                    ).signingInfo
+                    if (signingInfo != null) {
+                        if (signingInfo.hasMultipleSigners()) {
+                            signingInfo.apkContentsSigners
+                        } else {
+                            signingInfo.signingCertificateHistory
+                        }
+                    } else null
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    @Suppress("DEPRECATION")
+                    val signingInfo = pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo
                     if (signingInfo != null) {
                         if (signingInfo.hasMultipleSigners()) {
                             signingInfo.apkContentsSigners
@@ -154,19 +249,22 @@ class SecurityManager(context: Context) {
                     } else null
                 } else {
                     @Suppress("DEPRECATION")
-                    pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SIGNATURES).signatures
+                    pm.getPackageInfo(pkg, PackageManager.GET_SIGNATURES).signatures
                 }
 
                 if (signatures.isNullOrEmpty()) {
                     return false
                 }
 
-                val expectedHash = com.example.BuildConfig.SIGNATURE_HASH
+                val expectedHash = com.example.BuildConfig.SIGNATURE_HASH.trim()
                 if (expectedHash.isEmpty()) {
+                    if (!com.example.BuildConfig.DEBUG) {
+                        Log.w(TAG, "SIGNATURE_HASH is empty in non-debug build; signature pinning is not enforced.")
+                    }
                     return true
                 }
 
-                val md = java.security.MessageDigest.getInstance("SHA-256")
+                val md = MessageDigest.getInstance("SHA-256")
                 for (sig in signatures) {
                     val digest = md.digest(sig.toByteArray())
                     val hash = digest.joinToString("") { "%02x".format(it) }
@@ -174,10 +272,10 @@ class SecurityManager(context: Context) {
                         return true
                     }
                 }
-                android.util.Log.e(TAG, "Signature mismatch!")
+                Log.e(TAG, "Signature mismatch!")
                 false
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "Exception during signature verification: ${e.message}")
+                Log.e(TAG, "Exception during signature verification: ${e.message}")
                 false
             }
         }

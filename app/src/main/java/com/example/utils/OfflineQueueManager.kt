@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +13,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.coroutines.resume
 
 data class OfflineRequest(
     val id: String = UUID.randomUUID().toString(),
@@ -27,7 +31,10 @@ data class OfflineRequest(
  * 📦 OfflineQueueManager
  * إدارة وتخزين الطلبات في وضع الأوفلاين وإعادة جدولتها ومعالجتها تلقائياً عند استعادة الاتصال بالإنترنت.
  */
-class OfflineQueueManager(private val context: Context) {
+@Singleton
+class OfflineQueueManager @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("app_offline_queue_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -139,61 +146,81 @@ class OfflineQueueManager(private val context: Context) {
     }
 
     /**
-     * 3. معالجة قائمة الانتظار وإرسال الطلبات للسيرفر
+     * 3. معالجة قائمة الانتظار وإرسال الطلبات للسيرفر (غير معلقة للاستدعاء من الواجهة)
      */
     fun processQueue(onItemProcessed: ((OfflineRequest, Boolean) -> Unit)? = null) {
         if (!isOnline() || _isProcessing.value) return
-
         scope.launch {
-            _isProcessing.value = true
-            try {
-                val currentList = _pendingRequests.value.filter { it.status == "PENDING" || it.status == "FAILED" }
-                val remainingList = mutableListOf<OfflineRequest>()
+            processQueueSuspend(onItemProcessed)
+        }
+    }
 
-                for ((index, req) in currentList.withIndex()) {
-                    try {
-                        if (!isOnline()) {
-                            remainingList.add(req)
-                            continue
-                        }
+    /**
+     * 3-ب. معالجة قائمة الانتظار بشكل معلّق (Suspend) متوافق مع WorkManager (`SyncWorker`)
+     * يعيد `true` إذا تمت معالجة جميع الطلبات بنجاح أو كانت القائمة فارغة، و `false` إذا بقيت طلبات معلقة لإعادة المحاولة.
+     */
+    suspend fun processQueueSuspend(
+        onItemProcessed: ((OfflineRequest, Boolean) -> Unit)? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!isOnline()) return@withContext _pendingRequests.value.isEmpty()
+        if (!_isProcessing.compareAndSet(expect = false, update = true)) {
+            return@withContext true
+        }
 
-                        // Throttle between consecutive requests (2.5s delay between items) to protect network & quota
-                        if (index > 0) {
-                            delay(INTER_REQUEST_DELAY_MS)
-                        }
+        try {
+            val currentList = _pendingRequests.value.filter { it.status == "PENDING" || it.status == "FAILED" }
+            if (currentList.isEmpty()) return@withContext true
 
-                        var success = false
-                        try {
-                            success = executeRequest(req)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Execution error for request ${req.id}: ${e.message}")
-                        }
+            val completedOrDroppedIds = mutableSetOf<String>()
+            val updatedFailedItems = mutableMapOf<String, OfflineRequest>()
 
-                        if (success) {
-                            onItemProcessed?.invoke(req, true)
-                        } else {
-                            val nextRetry = req.retryCount + 1
-                            if (nextRetry < MAX_RETRIES) {
-                                remainingList.add(req.copy(retryCount = nextRetry, status = "FAILED"))
-                                // Exponential Backoff: Retry 1 = 2s (2000ms), Retry 2 = 4s (4000ms), Retry 3 = 8s (8000ms)
-                                val backoffDelayMs = BASE_RETRY_DELAY_MS * (1L shl (nextRetry - 1).coerceAtMost(4))
-                                delay(backoffDelayMs)
-                            } else {
-                                Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
-                            }
-                            onItemProcessed?.invoke(req, false)
-                        }
-                    } catch (itemEx: Exception) {
-                        Log.e(TAG, "Unexpected queue item error for ${req.id}: ${itemEx.message}")
-                        remainingList.add(req)
+            for ((index, req) in currentList.withIndex()) {
+                try {
+                    if (!isOnline()) {
+                        continue
                     }
-                }
 
-                _pendingRequests.value = remainingList
-                saveQueueToStorage()
-            } finally {
-                _isProcessing.value = false
+                    // Throttle between consecutive requests (2.5s delay between items) to protect network & quota
+                    if (index > 0) {
+                        delay(INTER_REQUEST_DELAY_MS)
+                    }
+
+                    val success = try {
+                        executeRequest(req)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Execution error for request ${req.id}: ${e.message}")
+                        false
+                    }
+
+                    if (success) {
+                        completedOrDroppedIds.add(req.id)
+                        onItemProcessed?.invoke(req, true)
+                    } else {
+                        val nextRetry = req.retryCount + 1
+                        if (nextRetry < MAX_RETRIES) {
+                            updatedFailedItems[req.id] = req.copy(retryCount = nextRetry, status = "FAILED")
+                            val backoffDelayMs = BASE_RETRY_DELAY_MS * (1L shl (nextRetry - 1).coerceAtMost(4))
+                            delay(backoffDelayMs)
+                        } else {
+                            Log.w(TAG, "Request ${req.id} exceeded max retries and will be dropped.")
+                            completedOrDroppedIds.add(req.id)
+                        }
+                        onItemProcessed?.invoke(req, false)
+                    }
+                } catch (itemEx: Exception) {
+                    Log.e(TAG, "Unexpected queue item error for ${req.id}: ${itemEx.message}")
+                }
             }
+
+            val mergedList = _pendingRequests.value
+                .filterNot { it.id in completedOrDroppedIds }
+                .map { updatedFailedItems[it.id] ?: it }
+                .sortedBy { it.priority }
+            _pendingRequests.value = mergedList
+            saveQueueToStorage()
+            mergedList.none { it.status == "PENDING" || it.status == "FAILED" }
+        } finally {
+            _isProcessing.value = false
         }
     }
 
@@ -213,24 +240,19 @@ class OfflineQueueManager(private val context: Context) {
                 req.id
             }
 
-            var finished = false
-            var isOk = false
-            db.collection(collection).document(targetDoc).set(req.data, com.google.firebase.firestore.SetOptions.merge())
-                .addOnSuccessListener {
-                    isOk = true
-                    finished = true
+            withTimeoutOrNull(8000L) {
+                suspendCancellableCoroutine { continuation ->
+                    db.collection(collection)
+                        .document(targetDoc)
+                        .set(req.data, com.google.firebase.firestore.SetOptions.merge())
+                        .addOnSuccessListener {
+                            if (continuation.isActive) continuation.resume(true)
+                        }
+                        .addOnFailureListener {
+                            if (continuation.isActive) continuation.resume(false)
+                        }
                 }
-                .addOnFailureListener {
-                    isOk = false
-                    finished = true
-                }
-
-            var waitMs = 0
-            while (!finished && waitMs < 4000) {
-                delay(100)
-                waitMs += 100
-            }
-            isOk
+            } ?: false
         } catch (e: Exception) {
             false
         }

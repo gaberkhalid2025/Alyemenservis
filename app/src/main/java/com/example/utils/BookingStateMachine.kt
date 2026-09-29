@@ -132,7 +132,7 @@ object BookingStateMachine {
         }
 
         // فحص قاعدة الـ 8 ساعات قبل موعد الحجز
-        val appointmentTime = parseAppointmentTimestamp(booking.dateString.ifEmpty { booking.date }, booking.timeString.ifEmpty { booking.time })
+        val appointmentTime = parseAppointmentTimestamp(booking.effectiveDate, booking.effectiveTime)
         if (appointmentTime > 0) {
             val diffMs = appointmentTime - System.currentTimeMillis()
             val eightHoursMs = 8 * 60 * 60 * 1000L

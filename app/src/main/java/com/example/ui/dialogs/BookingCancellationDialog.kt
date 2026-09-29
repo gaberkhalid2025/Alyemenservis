@@ -57,7 +57,7 @@ fun BookingCancellationDialog(
 
     var remainingSeconds by remember { mutableLongStateOf(0L) }
     
-    LaunchedEffect(isLockedInitially, attemptsLeft) {
+    LaunchedEffect(isLockedInitially, attemptsLeft, booking.id) {
         val isLocked = com.example.security.BookingSecurityHelper.isBookingLocked(context, booking.id)
         if (isLocked) {
             while (true) {
@@ -144,7 +144,7 @@ fun BookingCancellationDialog(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "🗓️ الموعد: ${booking.dateString.ifEmpty { booking.date }} - ${booking.timeString.ifEmpty { booking.time }}",
+                            text = "🗓️ الموعد: ${booking.effectiveDate} - ${booking.effectiveTime}",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

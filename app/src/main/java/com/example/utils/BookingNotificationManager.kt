@@ -158,7 +158,7 @@ class BookingNotificationManager(
      */
     fun notifyBookingCreated(booking: BookingEntity) {
         val title = "📅 حجز جديد #${booking.bookingNumber.ifEmpty { booking.id.take(8) }}"
-        val body = "طلب حجز جديد من ${booking.customerName.ifEmpty { booking.clientName }} لخدمة ${booking.serviceType} في ${booking.customerArea.ifEmpty { booking.clientAddress }}."
+        val body = "طلب حجز جديد من ${booking.effectiveCustomerName} لخدمة ${booking.serviceType} في ${booking.effectiveCustomerArea}."
         val normPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(booking.providerPhone)
         val canonicalProviderTarget: String = normPhone.ifBlank { booking.providerId }
 
@@ -172,7 +172,7 @@ class BookingNotificationManager(
      */
     fun notifyBookingAccepted(booking: BookingEntity) {
         val title = "✅ تم قبول حجزك بنجاح!"
-        val body = "وافق الفني ${booking.providerName} على حجزك لموعد ${booking.dateString.ifEmpty { booking.date }} ${booking.timeString.ifEmpty { booking.time }}."
+        val body = "وافق الفني ${booking.providerName} على حجزك لموعد ${booking.effectiveDate} ${booking.effectiveTime}."
 
         showLocalNotification(title, body)
         persistNotificationToCloud(booking.clientId.ifEmpty { booking.customerPhone }, "CLIENT", title, body, booking.id, "BOOKING_ACCEPTED")
@@ -243,7 +243,7 @@ class BookingNotificationManager(
      */
     fun notifyBookingReminder(booking: BookingEntity, hoursBefore: Int) {
         val title = "⏰ تذكير بموعدك القادم ($hoursBefore ${if (hoursBefore == 1) "ساعة" else "ساعات"})"
-        val body = "موعد خدمتك (${booking.serviceType}) مع ${booking.providerName} سيحين في ${booking.dateString.ifEmpty { booking.date }} ${booking.timeString.ifEmpty { booking.time }}."
+        val body = "موعد خدمتك (${booking.serviceType}) مع ${booking.providerName} سيحين في ${booking.effectiveDate} ${booking.effectiveTime}."
 
         showLocalNotification(title, body)
         persistNotificationToCloud(booking.clientId.ifEmpty { booking.customerPhone }, "CLIENT", title, body, booking.id, "BOOKING_REMINDER")

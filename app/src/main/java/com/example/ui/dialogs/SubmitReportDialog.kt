@@ -42,8 +42,8 @@ fun SubmitReportDialog(
     val currentUserName by viewModel.currentUserName.collectAsState()
     val currentUserPhone by viewModel.currentUserPhone.collectAsState()
 
-    var reporterName by remember { mutableStateOf(currentUserName) }
-    var reporterPhone by remember { mutableStateOf(currentUserPhone) }
+    var reporterName by remember(currentUserName) { mutableStateOf(currentUserName) }
+    var reporterPhone by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
     var selectedReason by remember { mutableStateOf("سلوك غير لائق أو إخلال بالمواعيد") }
     var explanation by remember { mutableStateOf("") }
     var isSubmitted by remember { mutableStateOf(false) }

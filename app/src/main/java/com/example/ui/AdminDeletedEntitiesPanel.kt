@@ -84,7 +84,7 @@ fun AdminDeletedEntitiesPanel(
             }
         }
 
-        Divider(color = themeColors.accent.copy(alpha = 0.3f))
+        HorizontalDivider(color = themeColors.accent.copy(alpha = 0.3f))
 
         Text(
             "📋 السجلات المحذوفة ناعماً (يمكن استعادتها بضغطة زر أو حذفها نهائياً):",
@@ -112,6 +112,7 @@ fun AdminDeletedEntitiesPanel(
                                     Toast.makeText(context, "🔄 تم استعادة المحل (${store.name}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(store.id, "STORE", store.name)
                                 }
                             )
@@ -126,12 +127,13 @@ fun AdminDeletedEntitiesPanel(
                             DeletedItemRow(
                                 title = provider.name,
                                 subtitle = "الهاتف: ${provider.phone} • المهنة: ${provider.profession}",
-                                deletedAt = provider.deletedAt ?: System.currentTimeMillis(),
+                                deletedAt = provider.deletedAt ?: provider.createdAt,
                                 onRestore = {
                                     viewModel.restoreProvider(provider.id)
                                     Toast.makeText(context, "🔄 تم استعادة حساب الفني (${provider.name}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(provider.id, "PROVIDER", provider.name)
                                 }
                             )
@@ -152,6 +154,7 @@ fun AdminDeletedEntitiesPanel(
                                     Toast.makeText(context, "🔄 تم استعادة العقار (${prop.title}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(prop.id, "PROPERTY", prop.title)
                                 }
                             )
@@ -172,6 +175,7 @@ fun AdminDeletedEntitiesPanel(
                                     Toast.makeText(context, "🔄 تم استعادة الإعلان الوظيفي (${job.title}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(job.id, "JOB", job.title)
                                 }
                             )
@@ -185,7 +189,10 @@ fun AdminDeletedEntitiesPanel(
     // Permanent Delete Modal Dialog
     showPermanentDeleteConfirmDialog?.let { (entityId, entityType, entityName) ->
         AlertDialog(
-            onDismissRequest = { showPermanentDeleteConfirmDialog = null },
+            onDismissRequest = {
+                showPermanentDeleteConfirmDialog = null
+                deleteReasonInput = ""
+            },
             title = {
                 Text("⚠️ تأكيد الحذف النهائي الشامل", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
             },
@@ -227,7 +234,10 @@ fun AdminDeletedEntitiesPanel(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPermanentDeleteConfirmDialog = null }) {
+                TextButton(onClick = {
+                    showPermanentDeleteConfirmDialog = null
+                    deleteReasonInput = ""
+                }) {
                     Text("إلغاء", fontSize = 11.sp, color = Color.LightGray)
                 }
             }

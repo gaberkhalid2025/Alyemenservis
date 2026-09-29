@@ -1,16 +1,25 @@
 package com.example.sync
 
 import android.content.Context
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.WorkRequest
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * 🔄 PeriodicSyncScheduler - جدولة المزامنة الدورية الذكية لتوفير استهلاك بيانات الإنترنت والبطارية
  */
-class PeriodicSyncScheduler(private val context: Context) {
+@Singleton
+class PeriodicSyncScheduler @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
 
     fun schedulePeriodicSync() {
         val constraints = Constraints.Builder()
@@ -19,14 +28,22 @@ class PeriodicSyncScheduler(private val context: Context) {
 
         val syncWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(2, TimeUnit.HOURS)
             .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
+            .addTag(SyncWorker.WORK_NAME)
             .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "periodic_sync_work",
-            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            SyncWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
             syncWorkRequest
         )
     }
-}
 
-typealias BackgroundSyncScheduler = PeriodicSyncScheduler
+    fun cancelPeriodicSync() {
+        WorkManager.getInstance(context).cancelUniqueWork(SyncWorker.WORK_NAME)
+    }
+}

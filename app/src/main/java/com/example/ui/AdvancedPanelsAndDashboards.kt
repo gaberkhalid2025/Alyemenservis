@@ -90,7 +90,7 @@ fun AdvancedAnalyticsDashboardComposable(
                 }
             }
 
-            Divider(color = Color.DarkGray)
+            HorizontalDivider(color = Color.DarkGray)
 
             if (isSystemAdmin) {
                 // Admin KPIs Grid
@@ -174,11 +174,12 @@ fun AdvancedAnalyticsDashboardComposable(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
+                            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
                             val headers = listOf("المعيار", "القيمة", "التاريخ")
                             val rows = listOf(
-                                listOf("الحجوزات", "${businessMetrics.totalBookingsThisMonth}", "2026-07-30"),
-                                listOf("الإيرادات (YER)", "${businessMetrics.totalRevenueThisMonthYER}", "2026-07-30"),
-                                listOf("نسبة التكرار", "${businessMetrics.customerRepeatRatePercent}%", "2026-07-30")
+                                listOf("الحجوزات", "${businessMetrics.totalBookingsThisMonth}", currentDate),
+                                listOf("الإيرادات (YER)", "${businessMetrics.totalRevenueThisMonthYER}", currentDate),
+                                listOf("نسبة التكرار", "${businessMetrics.customerRepeatRatePercent}%", currentDate)
                             )
                             val file = AnalyticsAndReportingEngine.exportReportToCSV(context, "Performance_$businessName", headers, rows)
                             if (file != null) {
@@ -199,7 +200,15 @@ fun AdvancedAnalyticsDashboardComposable(
                     Button(
                         onClick = {
                             val summary = AnalyticsAndReportingEngine.exportPrintableSummaryText(businessName, businessMetrics)
-                            Toast.makeText(context, "تم تجهيز التقرير الطباعي الموثق بنجاح!", Toast.LENGTH_LONG).show()
+                            try {
+                                val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    putExtra(android.content.Intent.EXTRA_TEXT, summary)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(android.content.Intent.createChooser(sendIntent, "مشاركة تقرير الأداء"))
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "تم تجهيز التقرير الطباعي الموثق بنجاح!", Toast.LENGTH_LONG).show()
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                         shape = RoundedCornerShape(10.dp),
@@ -280,16 +289,17 @@ fun AdvancedMultiFilterBottomSheet(
                 }
             }
 
-            Divider(color = Color.DarkGray)
+            HorizontalDivider(color = Color.DarkGray)
 
             // 1. City Filter
             Text("المحافظة / المدينة:", fontSize = 12.sp, color = Color.LightGray, fontWeight = FontWeight.Bold)
             val cities = listOf("الكل", "صنعاء", "عدن", "تعز", "الحديدة", "إب", "حضرموت (المكلا)", "مأرب")
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 cities.take(4).forEach { c ->
+                    val isSelected = if (c == "الكل") city.isEmpty() || city == "الكل" else city == c
                     FilterChip(
-                        selected = (city == c),
-                        onClick = { city = if (city == c) "" else c },
+                        selected = isSelected,
+                        onClick = { city = if (c == "الكل" || city == c) "" else c },
                         label = { Text(c, fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = themeColors.accent,

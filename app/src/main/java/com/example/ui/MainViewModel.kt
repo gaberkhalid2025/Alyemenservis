@@ -438,11 +438,6 @@ class MainViewModel @Inject constructor(
             )
         }
         try {
-            com.example.ui.helpers.FirestoreSeedHelper(db).seedFirestoreIfEmpty()
-        } catch (e: Exception) {
-            android.util.Log.e("MainViewModel", "❌ Error in initializeFirestoreCollections", e)
-        }
-        try {
             authViewModel.initializeUserIdentity(context) { savedFavs ->
                 _favoriteIds.value = savedFavs
                 checkAndTriggerFavoriteOffersNotifications()

@@ -1468,6 +1468,9 @@ fun PropertyListItemCard(
     onClick: () -> Unit,
     viewModel: MainViewModel
 ) {
+    val context = LocalContext.current
+    val settingsState by viewModel.settings.collectAsState()
+
     Card(
         colors = CardDefaults.cardColors(containerColor = themeColors.surface),
         shape = RoundedCornerShape(8.dp),
@@ -1603,13 +1606,11 @@ fun PropertyListItemCard(
                     }
                 }
 
-                Divider(color = Color.Gray.copy(alpha = 0.2f), modifier = Modifier.padding(top = 8.dp))
+                HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f), modifier = Modifier.padding(top = 8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val settingsState = viewModel?.settings?.collectAsState()?.value ?: AdminSettingsEntity()
-                    val context = androidx.compose.ui.platform.LocalContext.current
                     if (settingsState.showCallButton) {
                         Button(
                             onClick = {

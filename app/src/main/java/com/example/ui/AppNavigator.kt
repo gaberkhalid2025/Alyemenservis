@@ -57,8 +57,9 @@ fun AppNavigator(
     val providers by viewModel.providers.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedCategory by viewModel.selectedCategoryId.collectAsState()
+    val requestOffers by viewModel.requestOffers.collectAsState()
 
-    if (settingsState.isMaintenanceActive && viewModel.adminRole.collectAsState().value == "GUEST") {
+    if (settingsState.isMaintenanceActive && adminRole == "GUEST") {
         MaintenanceSplashView(settingsState = settingsState, themeColors = themeColors, viewModel = viewModel)
         return
     }
@@ -237,7 +238,7 @@ fun AppNavigator(
                     onNavigateBack = { viewModel.goBack() }
                 )
                 AppScreens.OFFERS_LIST -> UrgentOffersList(
-                    offers = viewModel.requestOffers.collectAsState().value,
+                    offers = requestOffers,
                     isOwner = viewModel.isProviderUser,
                     onAcceptOffer = { _ -> },
                     onContactProvider = { offer ->
