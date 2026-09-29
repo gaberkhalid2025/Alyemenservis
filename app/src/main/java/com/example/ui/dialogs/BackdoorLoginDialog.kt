@@ -45,6 +45,9 @@ fun BackdoorLoginDialog(
     val settingsState by viewModel.settings.collectAsState()
     val supervisors by viewModel.supervisors.collectAsState()
 
+    val coroutineScope = rememberCoroutineScope()
+    val securityManager = remember(context) { com.example.security.SecurityManager(context) }
+
     var emailInput by rememberSaveable { mutableStateOf("") }
     var passwordInput by rememberSaveable { mutableStateOf("") }
     var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
@@ -188,8 +191,11 @@ fun BackdoorLoginDialog(
                     Button(
                         onClick = {
                             val now = System.currentTimeMillis()
-                            if (now < lockoutUntil) {
-                                val remainingSec = ((lockoutUntil - now) / 1000).coerceAtLeast(1)
+                            if (securityManager.isLockedOut() || now < lockoutUntil) {
+                                val remainingSec = maxOf(
+                                    securityManager.getRemainingLockoutSeconds(),
+                                    ((lockoutUntil - now) / 1000).coerceAtLeast(1)
+                                )
                                 viewModel.triggerNotification("⏳ تم إيقاف المحاولات مؤقتاً. يرجى الانتظار $remainingSec ثانية.")
                                 return@Button
                             }
@@ -208,7 +214,7 @@ fun BackdoorLoginDialog(
                             }
 
                             isAuthenticating = true
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            coroutineScope.launch {
                                 try {
                                     val result = com.example.utils.AdminSecurityManager.verifyCredentials(
                                         username = trimmedUser,
@@ -221,26 +227,33 @@ fun BackdoorLoginDialog(
                                     when (result) {
                                         "OWNER" -> {
                                             failedAttempts = 0
+                                            securityManager.resetAttempts()
                                             onDismiss()
                                             viewModel.authenticateAdmin(context, "OWNER", rememberMe)
                                             viewModel.triggerNotification("🔓 مرحباً بك بصلاحية المالك - تم تسجيل الدخول بنجاح!")
                                         }
                                         "ADMIN" -> {
                                             failedAttempts = 0
+                                            securityManager.resetAttempts()
                                             onDismiss()
                                             viewModel.authenticateAdmin(context, "ADMIN", rememberMe)
                                             viewModel.triggerNotification("🔓 مرحباً بك بصلاحية مدير النظام - تم تسجيل الدخول بنجاح!")
                                         }
                                         "SUPERVISOR" -> {
-                                            val matchingSup = supervisors.find { it.id == trimmedUser || it.name.trim().equals(trimmedUser, ignoreCase = true) }
+                                            val matchingSup = supervisors.find {
+                                                it.id.equals(trimmedUser, ignoreCase = true) ||
+                                                    it.name.trim().equals(trimmedUser, ignoreCase = true)
+                                            }
                                             if (matchingSup != null) {
                                                 failedAttempts = 0
+                                                securityManager.resetAttempts()
                                                 viewModel.setSupervisorSession(matchingSup)
                                                 onDismiss()
                                                 viewModel.authenticateAdmin(context, "SUPERVISOR", rememberMe)
                                                 viewModel.triggerNotification("🔓 مرحباً بك المشرف: ${matchingSup.name} - تم تسجيل الدخول بنجاح!")
                                             } else {
                                                 failedAttempts++
+                                                securityManager.registerFailedAttempt()
                                                 if (failedAttempts >= 3) {
                                                     lockoutUntil = System.currentTimeMillis() + 60_000L
                                                 }
@@ -249,6 +262,7 @@ fun BackdoorLoginDialog(
                                         }
                                         else -> {
                                             failedAttempts++
+                                            securityManager.registerFailedAttempt()
                                             if (failedAttempts >= 3) {
                                                 lockoutUntil = System.currentTimeMillis() + 60_000L
                                             }

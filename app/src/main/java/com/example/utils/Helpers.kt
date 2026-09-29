@@ -279,9 +279,9 @@ fun getProviderCoords(provider: ProviderEntity): Pair<Double, Double> {
         else -> "صنعاء"
     }
     val base = getAreaCoords(baseStr)
-    val hash = (provider.id.ifEmpty { provider.name }).hashCode()
-    val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
-    val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
+    val hash = (provider.id.ifEmpty { provider.name }).hashCode() and Int.MAX_VALUE
+    val offsetLat = ((hash % 100) - 50) / 2500.0
+    val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
     return Pair(base.first + offsetLat, base.second + offsetLng)
 }
 
@@ -295,9 +295,9 @@ fun getStoreCoords(store: StoreEntity): Pair<Double, Double> {
         else -> "صنعاء"
     }
     val base = getAreaCoords(baseStr)
-    val hash = (store.id.ifEmpty { store.name }).hashCode()
-    val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
-    val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
+    val hash = (store.id.ifEmpty { store.name }).hashCode() and Int.MAX_VALUE
+    val offsetLat = ((hash % 100) - 50) / 2500.0
+    val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
     return Pair(base.first + offsetLat, base.second + offsetLng)
 }
 
@@ -311,9 +311,9 @@ fun getPropertyCoords(property: PropertyEntity): Pair<Double, Double> {
         else -> "صنعاء"
     }
     val base = getAreaCoords(baseStr)
-    val hash = (property.id.ifEmpty { property.title }).hashCode()
-    val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
-    val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
+    val hash = (property.id.ifEmpty { property.title }).hashCode() and Int.MAX_VALUE
+    val offsetLat = ((hash % 100) - 50) / 2500.0
+    val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
     return Pair(base.first + offsetLat, base.second + offsetLng)
 }
 
@@ -321,9 +321,9 @@ fun getProviderCoords(providerId: String): Pair<Double, Double> {
     return when (providerId) {
         "p_amin" -> Pair(15.3694, 44.1910)
         else -> {
-            val hash = providerId.hashCode()
-            val offsetLat = ((Math.abs(hash) % 100) - 50) / 2500.0
-            val offsetLng = (((Math.abs(hash) / 100) % 100) - 50) / 2500.0
+            val hash = providerId.hashCode() and Int.MAX_VALUE
+            val offsetLat = ((hash % 100) - 50) / 2500.0
+            val offsetLng = (((hash / 100) % 100) - 50) / 2500.0
             Pair(15.3694 + offsetLat, 44.1910 + offsetLng)
         }
     }
@@ -336,10 +336,10 @@ fun getDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double 
 @Deprecated("Use FirebaseStorageUploader")
 fun convertUriToBase64(context: Context, uri: Uri): String {
     return try {
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return uri.toString()
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeStream(inputStream, null, options)
-        inputStream.close()
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream, null, options)
+        } ?: return uri.toString()
 
         val reqWidth = 1024
         val reqHeight = 1024
@@ -353,17 +353,17 @@ fun convertUriToBase64(context: Context, uri: Uri): String {
         }
 
         val finalOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
-        val nextInputStream = context.contentResolver.openInputStream(uri) ?: return uri.toString()
-        val decodedBitmap = BitmapFactory.decodeStream(nextInputStream, null, finalOptions)
-        nextInputStream.close()
+        val decodedBitmap = context.contentResolver.openInputStream(uri)?.use { nextInputStream ->
+            BitmapFactory.decodeStream(nextInputStream, null, finalOptions)
+        }
 
         if (decodedBitmap != null) {
             val scaledBitmap = if (decodedBitmap.width > reqWidth || decodedBitmap.height > reqHeight) {
                 val ratio = Math.min(reqWidth.toFloat() / decodedBitmap.width, reqHeight.toFloat() / decodedBitmap.height)
                 Bitmap.createScaledBitmap(
                     decodedBitmap,
-                    (decodedBitmap.width * ratio).toInt(),
-                    (decodedBitmap.height * ratio).toInt(),
+                    (decodedBitmap.width * ratio).toInt().coerceAtLeast(1),
+                    (decodedBitmap.height * ratio).toInt().coerceAtLeast(1),
                     true
                 )
             } else {
@@ -372,6 +372,10 @@ fun convertUriToBase64(context: Context, uri: Uri): String {
 
             val outputStream = ByteArrayOutputStream()
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, outputStream)
+            if (scaledBitmap !== decodedBitmap) {
+                scaledBitmap.recycle()
+            }
+            decodedBitmap.recycle()
             val bytes = outputStream.toByteArray()
             Base64.encodeToString(bytes, Base64.NO_WRAP)
         } else uri.toString()

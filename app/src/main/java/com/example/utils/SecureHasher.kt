@@ -42,21 +42,26 @@ object SecureHasher {
         }
     }
 
-    private fun constantTimeEquals(a: String, b: String): Boolean {
-        return MessageDigest.isEqual(
-            a.toByteArray(Charsets.UTF_8),
-            b.toByteArray(Charsets.UTF_8)
-        )
-    }
-
     fun hashPassword(password: String, salt: ByteArray = generateSalt()): String {
-        val spec = PBEKeySpec(password.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
+        val cleanPassword = password.trim()
+        val spec = PBEKeySpec(cleanPassword.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
         return try {
             val skf = SecretKeyFactory.getInstance(ALGORITHM)
             val hash = skf.generateSecret(spec).encoded
             val saltBase64 = base64Encode(salt)
             val hashBase64 = base64Encode(hash)
             "$saltBase64:$hashBase64"
+        } finally {
+            spec.clearPassword()
+        }
+    }
+
+    private fun verifyWithIterations(input: String, salt: ByteArray, expectedHashBytes: ByteArray, iterations: Int): Boolean {
+        val spec = PBEKeySpec(input.toCharArray(), salt, iterations, KEY_LENGTH)
+        return try {
+            val skf = SecretKeyFactory.getInstance(ALGORITHM)
+            val actualHashBytes = skf.generateSecret(spec).encoded
+            MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
         } finally {
             spec.clearPassword()
         }
@@ -78,22 +83,17 @@ object SecureHasher {
             if (parts.size != 2) return false
             val salt = base64Decode(parts[0])
             val expectedHashBytes = base64Decode(parts[1])
-            val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
-            try {
-                val skf = SecretKeyFactory.getInstance(ALGORITHM)
-                val actualHashBytes = skf.generateSecret(spec).encoded
-                MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
-            } finally {
-                spec.clearPassword()
-            }
+            verifyWithIterations(trimmedInput, salt, expectedHashBytes, ITERATIONS_PASSWORD) ||
+                verifyWithIterations(trimmedInput, salt, expectedHashBytes, ITERATIONS_PIN)
         } catch (e: Exception) {
             false
         }
     }
 
     fun hashPin(pin: String, salt: ByteArray = generateSalt()): String {
+        val cleanPin = pin.trim()
         val saltBase64 = base64Encode(salt)
-        val spec = PBEKeySpec(pin.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
+        val spec = PBEKeySpec(cleanPin.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
         return try {
             val skf = SecretKeyFactory.getInstance(ALGORITHM)
             val hash = skf.generateSecret(spec).encoded
@@ -120,15 +120,26 @@ object SecureHasher {
             if (parts.size != 2) return false
             val salt = base64Decode(parts[0])
             val expectedHashBytes = base64Decode(parts[1])
-            val spec = PBEKeySpec(trimmedInput.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
-            try {
-                val skf = SecretKeyFactory.getInstance(ALGORITHM)
-                val actualHashBytes = skf.generateSecret(spec).encoded
-                MessageDigest.isEqual(actualHashBytes, expectedHashBytes)
-            } finally {
-                spec.clearPassword()
-            }
+            verifyWithIterations(trimmedInput, salt, expectedHashBytes, ITERATIONS_PIN) ||
+                verifyWithIterations(trimmedInput, salt, expectedHashBytes, ITERATIONS_PASSWORD)
         } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * التحقق من أن النص المخزن يمثل تجزئة مشفرة صالحة بصيغة saltBase64:hashBase64
+     */
+    fun isValidHash(storedHash: String): Boolean {
+        val trimmed = storedHash.trim()
+        if (!trimmed.contains(":")) return false
+        val parts = trimmed.split(":")
+        if (parts.size != 2 || parts[0].isBlank() || parts[1].isBlank()) return false
+        return try {
+            val salt = base64Decode(parts[0])
+            val hash = base64Decode(parts[1])
+            salt.isNotEmpty() && hash.isNotEmpty()
+        } catch (e: Throwable) {
             false
         }
     }

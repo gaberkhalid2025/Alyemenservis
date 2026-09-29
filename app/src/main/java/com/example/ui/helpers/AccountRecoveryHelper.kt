@@ -29,13 +29,18 @@ class AccountRecoveryHelper(
     private val recoveryScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     fun searchAccountForRestore(cleanPhone: String, onResult: (RestoreAccountMatch?) -> Unit) {
+        val normalizedPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(cleanPhone).ifBlank { cleanPhone.trim() }
+        if (normalizedPhone.isBlank()) {
+            onResult(null)
+            return
+        }
         recoveryScope.launch {
             try {
                 val match = supervisorScope {
                     val providerDef = async(Dispatchers.IO) {
                         runCatching {
                             val snap = com.google.android.gms.tasks.Tasks.await(
-                                db.collection("providers").whereEqualTo("phone", cleanPhone).limit(1).get()
+                                db.collection("providers").whereEqualTo("phone", normalizedPhone).limit(1).get()
                             )
                             snap.documents.firstOrNull()?.toObject(ProviderEntity::class.java)?.let {
                                 RestoreAccountMatch("PROVIDER", it.name, provider = it)
@@ -45,17 +50,22 @@ class AccountRecoveryHelper(
                     val storeDef = async(Dispatchers.IO) {
                         runCatching {
                             val snap = com.google.android.gms.tasks.Tasks.await(
-                                db.collection("stores").whereEqualTo("phone", cleanPhone).limit(1).get()
+                                db.collection("stores").whereEqualTo("phone", normalizedPhone).limit(1).get()
                             )
                             snap.documents.firstOrNull()?.toObject(StoreEntity::class.java)?.let {
-                                RestoreAccountMatch("STORE", it.name, store = it)
+                                val resolvedType = when (it.sectionId.lowercase().trim()) {
+                                    "restaurants", "restaurant" -> "RESTAURANT"
+                                    "medical" -> "MEDICAL"
+                                    else -> "STORE"
+                                }
+                                RestoreAccountMatch(resolvedType, it.name, store = it)
                             }
                         }.getOrNull()
                     }
                     val propDef = async(Dispatchers.IO) {
                         runCatching {
                             val snap = com.google.android.gms.tasks.Tasks.await(
-                                db.collection("properties").whereEqualTo("phone", cleanPhone).limit(1).get()
+                                db.collection("properties").whereEqualTo("phone", normalizedPhone).limit(1).get()
                             )
                             snap.documents.firstOrNull()?.toObject(PropertyEntity::class.java)?.let {
                                 RestoreAccountMatch("PROPERTY", it.title, property = it)
@@ -65,10 +75,17 @@ class AccountRecoveryHelper(
                     val userDef = async(Dispatchers.IO) {
                         runCatching {
                             val snap = com.google.android.gms.tasks.Tasks.await(
-                                db.collection("users").whereEqualTo("phone", cleanPhone).limit(1).get()
+                                db.collection("users").whereEqualTo("phone", normalizedPhone).limit(1).get()
                             )
-                            snap.documents.firstOrNull()?.let { uDoc ->
-                                val uName = uDoc.getString("name") ?: "مستخدم مسجل"
+                            val doc = snap.documents.firstOrNull() ?: runCatching {
+                                com.google.android.gms.tasks.Tasks.await(
+                                    db.collection("registered_users").whereEqualTo("phone", normalizedPhone).limit(1).get()
+                                ).documents.firstOrNull()
+                            }.getOrNull()
+                            doc?.let { uDoc ->
+                                val uName = uDoc.getString("name")?.takeIf { it.isNotBlank() }
+                                    ?: uDoc.getString("fullName")?.takeIf { it.isNotBlank() }
+                                    ?: "مستخدم مسجل"
                                 RestoreAccountMatch("CLIENT", uName)
                             }
                         }.getOrNull()
@@ -76,10 +93,15 @@ class AccountRecoveryHelper(
                     val joinReqDef = async(Dispatchers.IO) {
                         runCatching {
                             val snap = com.google.android.gms.tasks.Tasks.await(
-                                db.collection("join_requests").whereEqualTo("phone", cleanPhone).limit(1).get()
+                                db.collection("join_requests").whereEqualTo("phone", normalizedPhone).limit(1).get()
                             )
                             snap.documents.firstOrNull()?.let { rDoc ->
-                                val rName = rDoc.getString("name") ?: "حساب مسجل"
+                                val rName = rDoc.getString("fullName")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("businessName")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("propertyTitle")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("jobTitle")?.takeIf { it.isNotBlank() }
+                                    ?: rDoc.getString("name")?.takeIf { it.isNotBlank() }
+                                    ?: "حساب مسجل"
                                 val rType = rDoc.getString("type") ?: "CLIENT"
                                 RestoreAccountMatch(rType, rName)
                             }
@@ -97,33 +119,50 @@ class AccountRecoveryHelper(
     }
 
     fun verifyRestorePassword(cleanPhone: String, accountType: String, passwordInput: String, onResult: (Boolean) -> Unit) {
-        if (passwordInput.isBlank()) {
+        val trimmedInput = passwordInput.trim()
+        val normalizedPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(cleanPhone).ifBlank { cleanPhone.trim() }
+        if (trimmedInput.isBlank() || normalizedPhone.isBlank()) {
             onResult(false)
             return
         }
-        val col = when (accountType) {
+        val primaryCol = when (accountType.uppercase().trim()) {
             "PROVIDER" -> "providers"
-            "STORE" -> "stores"
+            "STORE", "RESTAURANT", "MEDICAL" -> "stores"
             "PROPERTY" -> "properties"
+            "JOB" -> "jobs"
             "CLIENT" -> "users"
             else -> "join_requests"
         }
-        db.collection(col).whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { snap ->
-            val doc = snap.documents.firstOrNull()
-            if (doc == null) {
+        recoveryScope.launch {
+            try {
+                val isVerified = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    val candidateCols = listOf(primaryCol, "join_requests", "pending_providers", "registered_users", "users").distinct()
+                    val phoneVariants = listOf(normalizedPhone, cleanPhone.trim()).filter { it.isNotBlank() }.distinct()
+                    for (col in candidateCols) {
+                        for (ph in phoneVariants) {
+                            val snap = runCatching {
+                                com.google.android.gms.tasks.Tasks.await(
+                                    db.collection(col).whereEqualTo("phone", ph).get()
+                                )
+                            }.getOrNull() ?: continue
+                            for (doc in snap.documents) {
+                                val storedHash = doc.getString("passwordHash")?.takeIf { it.isNotBlank() }
+                                    ?: doc.getString("password")?.takeIf { it.isNotBlank() }
+                                    ?: ""
+                                if (storedHash.isNotBlank()) {
+                                    val matched = com.example.utils.PasswordHasher.verifyPassword(trimmedInput, storedHash) ||
+                                        com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmedInput, storedHash)
+                                    if (matched) return@withContext true
+                                }
+                            }
+                        }
+                    }
+                    false
+                }
+                onResult(isVerified)
+            } catch (e: Exception) {
                 onResult(false)
-                return@addOnSuccessListener
             }
-            val storedHash = doc.getString("password") ?: doc.getString("passwordHash") ?: ""
-            if (storedHash.isBlank()) {
-                onResult(false)
-                return@addOnSuccessListener
-            }
-            val isCorrect = com.example.utils.PasswordHasher.verifyPassword(passwordInput.trim(), storedHash) ||
-                    com.example.utils.SecurityCryptoUtils.verifyAdminPassword(passwordInput.trim(), storedHash)
-            onResult(isCorrect)
-        }.addOnFailureListener {
-            onResult(false)
         }
     }
 
@@ -137,7 +176,12 @@ class AccountRecoveryHelper(
         onResult: (Boolean) -> Unit
     ) {
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
+        if (cleanPhone.isBlank()) {
+            onResult(false)
+            return
+        }
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+        val now = System.currentTimeMillis()
         val reqData = mapOf(
             "id" to cleanPhone,
             "uid" to currentUid,
@@ -145,7 +189,8 @@ class AccountRecoveryHelper(
             "name" to name,
             "accountType" to accountType,
             "status" to "PENDING",
-            "requestedAt" to System.currentTimeMillis(),
+            "requestedAt" to now,
+            "timestamp" to now,
             "newPassword" to "",
             "adminNotes" to ""
         )
@@ -158,7 +203,7 @@ class AccountRecoveryHelper(
                 message = "قدم $name ($accountType) ذو الرقم $cleanPhone طلباً لاستعادة وتعيين كلمة المرور.",
                 targetType = "SUPERVISOR",
                 targetValue = "ALL",
-                timestamp = System.currentTimeMillis(),
+                timestamp = now,
                 dedupKey = "PWD_RESET_${cleanPhone}"
             )
             try { if (adminNotif.isValid()) db.collection("notifications").document(adminNotif.id).set(adminNotif) } catch (e: Exception) {}
@@ -168,7 +213,7 @@ class AccountRecoveryHelper(
             val log = com.example.data.ActivityLogEntity(
                 id = logId,
                 action = "🔑 طلب استعادة كلمة مرور للحساب: $name ($cleanPhone - $accountType)",
-                timestamp = System.currentTimeMillis()
+                timestamp = now
             )
             db.collection("activity_logs").document(logId).set(log)
 
@@ -186,61 +231,74 @@ class AccountRecoveryHelper(
         onResult: (Boolean) -> Unit
     ) {
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
+        if (cleanPhone.isBlank() || newPassword.isBlank()) {
+            onResult(false)
+            return
+        }
+        val now = System.currentTimeMillis()
         val hashedPassword = com.example.utils.PasswordHasher.hash(newPassword.trim())
         val updates = mapOf(
+            "id" to cleanPhone,
+            "phone" to cleanPhone,
             "status" to "RESOLVED",
             "newPassword" to hashedPassword,
-            "resolvedAt" to System.currentTimeMillis()
+            "resolvedAt" to now,
+            "timestamp" to now
         )
-        db.collection("password_recovery_requests").document(cleanPhone).update(updates).addOnSuccessListener {
-            db.collection("password_resets").document(cleanPhone).update(
-                mapOf(
-                    "status" to "APPROVED",
-                    "newPassword" to hashedPassword,
-                    "tempPassword" to hashedPassword
+        db.collection("password_recovery_requests").document(cleanPhone)
+            .set(updates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                db.collection("password_resets").document(cleanPhone).set(
+                    mapOf(
+                        "phone" to cleanPhone,
+                        "status" to "APPROVED",
+                        "newPassword" to hashedPassword,
+                        "tempPassword" to hashedPassword,
+                        "resolvedAt" to now
+                    ),
+                    com.google.firebase.firestore.SetOptions.merge()
                 )
-            )
-            val passUpdate = mapOf(
-                "password" to hashedPassword,
-                "passwordHash" to hashedPassword
-            )
-            val phoneQueries = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone").distinct()
-            val collections = listOf("providers", "stores", "properties", "users", "registered_users", "join_requests")
-            
-            for (col in collections) {
-                for (ph in phoneQueries) {
-                    db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { snaps ->
-                        for (doc in snaps.documents) {
-                            doc.reference.update(passUpdate)
+                val passUpdate = mapOf(
+                    "password" to hashedPassword,
+                    "passwordHash" to hashedPassword
+                )
+                val phoneQueries = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone").distinct()
+                val collections = listOf("providers", "stores", "properties", "users", "registered_users", "join_requests", "pending_providers")
+                
+                for (col in collections) {
+                    for (ph in phoneQueries) {
+                        db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { snaps ->
+                            for (doc in snaps.documents) {
+                                doc.reference.update(passUpdate)
+                            }
                         }
                     }
                 }
+
+                // Log sensitive admin operation in activity_logs
+                val logId = db.collection("activity_logs").document().id
+                val log = com.example.data.ActivityLogEntity(
+                    id = logId,
+                    action = "🔑 إعادة تعيين كلمة المرور برقم الهاتف: $cleanPhone بواسطة الإدارة",
+                    timestamp = now
+                )
+                db.collection("activity_logs").document(logId).set(log)
+
+                val notifId = "PWD_RESOLVE_$cleanPhone"
+                val notif = mapOf(
+                    "id" to notifId,
+                    "title" to "🔑 تم إعادة تعيين كلمة المرور",
+                    "message" to "تم إعادة تعيين كلمة مرور حسابك بنجاح من قبل الإدارة.",
+                    "targetPhone" to cleanPhone,
+                    "targetType" to "USER",
+                    "targetValue" to cleanPhone,
+                    "timestamp" to now,
+                    "dedupKey" to "PWD_RESOLVE_$cleanPhone"
+                )
+                if (notif.isValid()) db.collection("notifications").document(notifId).set(notif)
+                onResult(true)
+            }.addOnFailureListener {
+                onResult(false)
             }
-
-            // Log sensitive admin operation in activity_logs
-            val logId = db.collection("activity_logs").document().id
-            val log = com.example.data.ActivityLogEntity(
-                id = logId,
-                action = "🔑 إعادة تعيين كلمة المرور برقم الهاتف: $cleanPhone بواسطة الإدارة",
-                timestamp = System.currentTimeMillis()
-            )
-            db.collection("activity_logs").document(logId).set(log)
-
-            val notifId = "PWD_RESOLVE_$cleanPhone"
-            val notif = mapOf(
-                "id" to notifId,
-                "title" to "🔑 تم إعادة تعيين كلمة المرور",
-                "message" to "تم إعادة تعيين كلمة مرور حسابك بنجاح من قبل الإدارة.",
-                "targetPhone" to cleanPhone,
-                "targetType" to "USER",
-                "targetValue" to cleanPhone,
-                "timestamp" to System.currentTimeMillis(),
-                "dedupKey" to "PWD_RESOLVE_$cleanPhone"
-            )
-            if (notif.isValid()) db.collection("notifications").document(notifId).set(notif)
-            onResult(true)
-        }.addOnFailureListener {
-            onResult(false)
-        }
     }
 }

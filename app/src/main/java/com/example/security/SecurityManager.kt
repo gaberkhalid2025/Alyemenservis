@@ -48,28 +48,46 @@ class SecurityManager(context: Context) {
     }
 
     fun isLockedOut(): Boolean {
-        val lockTime = securePrefs.getLong(KEY_LOCKOUT_TIMESTAMP, 0L)
-        if (lockTime == 0L) return false
+        val remainingMs = getRemainingLockoutMs()
+        if (remainingMs > 0L) {
+            return true
+        }
+        if (securePrefs.getLong(KEY_LOCKOUT_TIMESTAMP, 0L) != 0L) {
+            resetAttempts()
+        }
+        return false
+    }
 
-        val wallActive = System.currentTimeMillis() < lockTime
+    fun getRemainingLockoutSeconds(): Long {
+        val ms = getRemainingLockoutMs()
+        return if (ms > 0L) ((ms + 999L) / 1000L) else 0L
+    }
+
+    private fun getRemainingLockoutMs(): Long {
+        val lockTime = securePrefs.getLong(KEY_LOCKOUT_TIMESTAMP, 0L)
+        if (lockTime == 0L) return 0L
+
+        val wallDiff = lockTime - System.currentTimeMillis()
         val lockElapsed = securePrefs.getLong(KEY_LOCKOUT_ELAPSED, 0L)
         val currentElapsed = try {
             SystemClock.elapsedRealtime()
         } catch (e: Exception) {
             0L
         }
-        val elapsedActive = lockElapsed > 0L &&
-            currentElapsed > 0L &&
-            currentElapsed >= (lockElapsed - LOCKOUT_DURATION_MS) &&
-            currentElapsed < lockElapsed
 
-        if (wallActive || elapsedActive) {
-            return true
+        if (lockElapsed > 0L && currentElapsed > 0L) {
+            val elapsedStart = lockElapsed - LOCKOUT_DURATION_MS
+            if (currentElapsed >= elapsedStart) {
+                val elapsedDiff = lockElapsed - currentElapsed
+                return if (elapsedDiff > 0L) {
+                    maxOf(wallDiff, elapsedDiff).coerceAtMost(LOCKOUT_DURATION_MS)
+                } else {
+                    0L
+                }
+            }
         }
 
-        // انقضى وقت القفل
-        resetAttempts()
-        return false
+        return if (wallDiff > 0L) wallDiff.coerceAtMost(LOCKOUT_DURATION_MS) else 0L
     }
 
     internal fun resetAttempts() {

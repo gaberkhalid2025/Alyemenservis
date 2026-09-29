@@ -18,4 +18,19 @@ class RestoreAccountUseCase @Inject constructor() {
         }
         recoveryHelper.searchAccountForRestore(cleanPhone, onResult)
     }
+
+    fun verifyPassword(
+        recoveryHelper: AccountRecoveryHelper,
+        phone: String,
+        accountType: String,
+        passwordInput: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
+        if (cleanPhone.isBlank() || cleanPhone.length < 7 || passwordInput.isBlank()) {
+            onResult(false)
+            return
+        }
+        recoveryHelper.verifyRestorePassword(cleanPhone, accountType, passwordInput.trim(), onResult)
+    }
 }

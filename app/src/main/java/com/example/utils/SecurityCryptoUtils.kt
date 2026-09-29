@@ -241,9 +241,9 @@ object SecurityCryptoUtils {
     fun sanitizeInput(input: String?): String {
         if (input.isNullOrEmpty()) return ""
         return input
-            .replace(Regex("<[^>]*>"), "")
+            .replace(Regex("</?[a-zA-Z][^>]*>"), "")
             .replace("javascript:", "", ignoreCase = true)
-            .replace("&", "&amp;")
+            .replace(Regex("&(?!amp;|lt;|gt;|quot;|#x27;)"), "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
             .replace("\"", "&quot;")

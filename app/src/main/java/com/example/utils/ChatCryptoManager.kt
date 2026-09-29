@@ -30,6 +30,11 @@ object ChatCryptoManager {
     private const val KEY_SIZE_BITS = 256
     private const val GCM_IV_LENGTH = 12
     private const val GCM_TAG_LENGTH_BITS = 128
+    private const val MAX_CACHED_KEYS = 64
+
+    private val secureRandom = SecureRandom()
+    private val derivedKeyCache = java.util.concurrent.ConcurrentHashMap<String, SecretKeySpec>()
+    private val legacyDerivedKeyCache = java.util.concurrent.ConcurrentHashMap<String, SecretKeySpec>()
 
     /**
      * الحصول على المفتاح الأساسي من Android KeyStore (بوضع GCM) أو توليده بأمان داخل العتاد
@@ -72,10 +77,11 @@ object ChatCryptoManager {
     }
 
     /**
-     * توليد مفتاح AES 256 بت من معرف الغرفة باستخدام PBKDF2
+     * توليد مفتاح AES 256 بت من معرف الغرفة باستخدام PBKDF2 مع تخزين مؤقت آمن في الذاكرة
      */
     private fun deriveKeyFromPassphrase(passphrase: String): SecretKeySpec {
-        return try {
+        derivedKeyCache[passphrase]?.let { return it }
+        val derived = try {
             val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
             val digest = java.security.MessageDigest.getInstance("SHA-256")
             val salt = digest.digest(("WAM_E2EE_Salt_v2_" + passphrase).toByteArray(Charsets.UTF_8)).copyOfRange(0, 16)
@@ -91,10 +97,16 @@ object ChatCryptoManager {
             val keyBytes = digest.digest(passphrase.toByteArray(Charsets.UTF_8))
             SecretKeySpec(keyBytes, "AES")
         }
+        if (derivedKeyCache.size >= MAX_CACHED_KEYS) {
+            derivedKeyCache.clear()
+        }
+        derivedKeyCache[passphrase] = derived
+        return derived
     }
 
     private fun deriveLegacyKeyFromPassphrase(passphrase: String): SecretKeySpec {
-        return try {
+        legacyDerivedKeyCache[passphrase]?.let { return it }
+        val derived = try {
             val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
             val salt = passphrase.toByteArray(Charsets.UTF_8)
             val spec = PBEKeySpec(passphrase.toCharArray(), salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
@@ -109,6 +121,11 @@ object ChatCryptoManager {
             val keyBytes = digest.digest(passphrase.toByteArray(Charsets.UTF_8))
             SecretKeySpec(keyBytes, "AES")
         }
+        if (legacyDerivedKeyCache.size >= MAX_CACHED_KEYS) {
+            legacyDerivedKeyCache.clear()
+        }
+        legacyDerivedKeyCache[passphrase] = derived
+        return derived
     }
 
     /**
@@ -116,7 +133,7 @@ object ChatCryptoManager {
      */
     private fun resolveKey(roomKey: String?): java.security.Key {
         return if (!roomKey.isNullOrBlank()) {
-            deriveKeyFromPassphrase(roomKey)
+            deriveKeyFromPassphrase(roomKey.trim())
         } else {
             getOrCreateKeystoreKey()
         }
@@ -124,7 +141,7 @@ object ChatCryptoManager {
 
     private fun resolveLegacyKey(roomKey: String?): java.security.Key {
         return if (!roomKey.isNullOrBlank()) {
-            deriveLegacyKeyFromPassphrase(roomKey)
+            deriveLegacyKeyFromPassphrase(roomKey.trim())
         } else {
             getLegacyKeystoreKey()
         }
@@ -139,10 +156,11 @@ object ChatCryptoManager {
     }
 
     private fun base64Decode(str: String): ByteArray {
+        val clean = str.trim()
         return try {
-            Base64.decode(str, Base64.NO_WRAP)
+            Base64.decode(clean, Base64.DEFAULT)
         } catch (e: Throwable) {
-            java.util.Base64.getDecoder().decode(str)
+            java.util.Base64.getMimeDecoder().decode(clean)
         }
     }
 
@@ -155,7 +173,7 @@ object ChatCryptoManager {
             val key = resolveKey(roomKey)
             val cipher = Cipher.getInstance(ALGORITHM_GCM)
             val iv = ByteArray(GCM_IV_LENGTH)
-            SecureRandom().nextBytes(iv)
+            secureRandom.nextBytes(iv)
             val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
 
             cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec)

@@ -25,6 +25,8 @@ object AdminSecurityManager {
         val trimmedPass = passwordAttempt.trim()
         if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
 
+        var fallbackAuthRole: String? = null
+
         // 1. المصادقة الآمنة عبر Firebase Auth المباشر والـ Custom Claims
         try {
             if (trimmedUser.contains("@")) {
@@ -40,13 +42,16 @@ object AdminSecurityManager {
 
                         val isOwnerClaim = claims["isSuperAdmin"] == true ||
                                 claims["isOwner"] == true ||
-                                claims["role"]?.toString()?.uppercase() in listOf("OWNER", "SUPER_ADMIN")
+                                claims["role"]?.toString()?.uppercase() in listOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
                         val isAdminClaim = claims["isAdmin"] == true ||
                                 claims["admin"] == true ||
                                 claims["role"]?.toString()?.uppercase() == "ADMIN"
 
                         if (isOwnerClaim) return "OWNER"
-                        if (isAdminClaim && preferredRole != "OWNER") return "ADMIN"
+                        if (isAdminClaim) {
+                            if (preferredRole != "OWNER") return "ADMIN"
+                            fallbackAuthRole = "ADMIN"
+                        }
                     } catch (_: Exception) {}
 
                     try {
@@ -54,7 +59,7 @@ object AdminSecurityManager {
                         val adminDoc = db.collection("admin_users").document(user.uid).get().await()
                         if (adminDoc.exists()) {
                             val role = adminDoc.getString("role")?.uppercase() ?: "ADMIN"
-                            return if (role == "OWNER" || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
+                            return if (role == "OWNER" || role == "SUPER_ADMIN" || role == "MAIN_ADMIN") "OWNER" else "ADMIN"
                         }
                     } catch (_: Exception) {}
 
@@ -63,7 +68,7 @@ object AdminSecurityManager {
                         val adminDoc = db.collection("admins").document(user.uid).get().await()
                         if (adminDoc.exists()) {
                             val role = adminDoc.getString("role")?.uppercase() ?: "ADMIN"
-                            return if (role == "OWNER" || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
+                            return if (role == "OWNER" || role == "SUPER_ADMIN" || role == "MAIN_ADMIN") "OWNER" else "ADMIN"
                         }
                     } catch (_: Exception) {}
 
@@ -71,7 +76,7 @@ object AdminSecurityManager {
                     // لا حاجة لاستدعاء Cloud Function من التطبيق.
                     // نقرأ Claims من ID Token مباشرة.
                     val tokenClaims = try { user.getIdToken(false).await().claims } catch (_: Exception) { emptyMap() }
-                    val isOwner = tokenClaims["role"]?.toString()?.uppercase() in listOf("OWNER", "SUPER_ADMIN") ||
+                    val isOwner = tokenClaims["role"]?.toString()?.uppercase() in listOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN") ||
                             tokenClaims["isOwner"] == true ||
                             tokenClaims["isSuperAdmin"] == true
 
@@ -80,7 +85,10 @@ object AdminSecurityManager {
                             tokenClaims["admin"] == true
 
                     if (isOwner) return "OWNER"
-                    if (isAdmin && preferredRole != "OWNER") return "ADMIN"
+                    if (isAdmin) {
+                        if (preferredRole != "OWNER") return "ADMIN"
+                        fallbackAuthRole = "ADMIN"
+                    }
 
                     // إذا لا Claims، نكمل للطبقات 2-6 كما هو.
                 }
@@ -156,7 +164,8 @@ object AdminSecurityManager {
                     it.id.equals(trimmedUser, ignoreCase = true) ||
                             it.name.trim().equals(trimmedUser, ignoreCase = true)
                 }
-                if (matchingSup != null && SecurityCryptoUtils.verifyAdminPassword(trimmedPass, matchingSup.passcodeHash)) {
+                val storedSupPass = matchingSup?.passcodeHash.orEmpty()
+                if (matchingSup != null && storedSupPass.isNotBlank() && SecurityCryptoUtils.verifyAdminPassword(trimmedPass, storedSupPass)) {
                     val r = matchingSup.role.uppercase().trim()
                     return when {
                         r.contains("OWNER") || r == "MAIN_ADMIN" || r == "SUPER_ADMIN" -> "OWNER"
@@ -191,7 +200,7 @@ object AdminSecurityManager {
         } catch (_: Exception) {}
 
         // 6. التحقق السحابي المباشر من Firestore للمشرفين والمستخدمين الإداريين (كل استعلام مستقل)
-        val db = try { FirebaseFirestore.getInstance() } catch (_: Exception) { return null }
+        val db = try { FirebaseFirestore.getInstance() } catch (_: Exception) { return fallbackAuthRole }
 
         // 6.أ: فحص المشرفين عبر المعرف المباشر أو الاسم أو البريد
         try {
@@ -208,8 +217,11 @@ object AdminSecurityManager {
                 }
             }
             if (supDoc.exists()) {
-                val storedPass = supDoc.getString("passcode") ?: ""
-                if (AdminCredentialsVault.verifyAndMigrate(supDoc.reference, trimmedPass, storedPass, "passcode")) {
+                val storedPass = supDoc.getString("passcodeHash")?.takeIf { it.isNotBlank() }
+                    ?: supDoc.getString("passcode")
+                    ?: ""
+                val fieldName = if (!supDoc.getString("passcodeHash").isNullOrBlank()) "passcodeHash" else "passcode"
+                if (AdminCredentialsVault.verifyAndMigrate(supDoc.reference, trimmedPass, storedPass, fieldName)) {
                     val r = (supDoc.getString("role") ?: "SUPERVISOR").uppercase().trim()
                     return when {
                         r.contains("OWNER") || r == "MAIN_ADMIN" || r == "SUPER_ADMIN" -> "OWNER"
@@ -232,7 +244,7 @@ object AdminSecurityManager {
                 val role = (doc.getString("role") ?: "ADMIN").uppercase().trim()
                 val fieldName = if (doc.contains("passwordHash")) "passwordHash" else "password"
                 if (AdminCredentialsVault.verifyAndMigrate(doc.reference, trimmedPass, storedPass, fieldName)) {
-                    return if (role.contains("OWNER") || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
+                    return if (role.contains("OWNER") || role == "SUPER_ADMIN" || role == "MAIN_ADMIN") "OWNER" else "ADMIN"
                 }
             }
         } catch (_: Exception) {}
@@ -249,12 +261,12 @@ object AdminSecurityManager {
                 val role = (doc.getString("role") ?: "ADMIN").uppercase().trim()
                 val fieldName = if (doc.contains("passwordHash")) "passwordHash" else "password"
                 if (AdminCredentialsVault.verifyAndMigrate(doc.reference, trimmedPass, storedPass, fieldName)) {
-                    return if (role.contains("OWNER") || role == "SUPER_ADMIN") "OWNER" else "ADMIN"
+                    return if (role.contains("OWNER") || role == "SUPER_ADMIN" || role == "MAIN_ADMIN") "OWNER" else "ADMIN"
                 }
             }
         } catch (_: Exception) {}
 
-        return null
+        return fallbackAuthRole
     }
 
     suspend fun isOwner(username: String, passwordAttempt: String, settings: AdminSettingsEntity? = null): Boolean {
@@ -272,15 +284,18 @@ object AdminSecurityManager {
     }
 
     fun hasOwnerPermission(role: String): Boolean {
-        return role == "OWNER"
+        val normalized = role.uppercase().trim()
+        return normalized == "OWNER" || normalized == "SUPER_ADMIN" || normalized == "MAIN_ADMIN"
     }
 
     fun hasAdminPermission(role: String): Boolean {
-        return role == "OWNER" || role == "ADMIN"
+        val normalized = role.uppercase().trim()
+        return hasOwnerPermission(normalized) || normalized == "ADMIN"
     }
 
     fun hasSupervisorPermission(role: String): Boolean {
-        return role == "OWNER" || role == "ADMIN" || role == "SUPERVISOR"
+        val normalized = role.uppercase().trim()
+        return hasAdminPermission(normalized) || normalized == "SUPERVISOR"
     }
 
     suspend fun getCustomRoles(): List<String> {

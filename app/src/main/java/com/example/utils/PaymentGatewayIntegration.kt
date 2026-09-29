@@ -79,12 +79,15 @@ data class PaymentMethod(
 class PaymentGatewayIntegration(context: Context? = null) {
 
     private val isPaymentEnabledFromBuild: Boolean = BuildConfig.IS_PAYMENT_ENABLED
-    private val activeTransactions = mutableMapOf<String, Payment>()
+    private val activeTransactions = java.util.concurrent.ConcurrentHashMap<String, Payment>()
 
     /**
      * معالجة وتنفيذ عملية الدفع
      */
     fun processPayment(payment: Payment, settings: AdminSettingsEntity? = null): Result<PaymentResult> {
+        if (payment.amount <= 0.0) {
+            return Result.failure(IllegalArgumentException("مبلغ الدفع يجب أن يكون أكبر من الصفر."))
+        }
         return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
 
@@ -92,6 +95,9 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * التحقق من صحة عملية الدفع ورقم الحوالة
      */
     fun verifyPayment(transactionId: String, settings: AdminSettingsEntity? = null): Result<PaymentVerification> {
+        if (transactionId.isBlank()) {
+            return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
+        }
         val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
         if (!enabled) {
             return Result.failure(
@@ -100,10 +106,10 @@ class PaymentGatewayIntegration(context: Context? = null) {
         }
 
         return try {
-            val payment = activeTransactions[transactionId]
+            val payment = activeTransactions[transactionId.trim()]
             if (payment != null) {
                 val verification = PaymentVerification(
-                    transactionId = transactionId,
+                    transactionId = transactionId.trim(),
                     isValid = true,
                     status = "VERIFIED",
                     amount = payment.amount,
@@ -122,6 +128,9 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * تأكيد استلام المبلغ وإصدار إيصال السداد
      */
     fun confirmPayment(transactionId: String, settings: AdminSettingsEntity? = null): Result<PaymentConfirmation> {
+        if (transactionId.isBlank()) {
+            return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
+        }
         return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
 
@@ -129,8 +138,11 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * إلغاء عملية الدفع
      */
     fun cancelPayment(transactionId: String, reason: String): Result<Boolean> {
+        if (transactionId.isBlank()) {
+            return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
+        }
         return try {
-            activeTransactions.remove(transactionId)
+            activeTransactions.remove(transactionId.trim())
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -141,6 +153,9 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * استرداد المبلغ
      */
     fun refundPayment(transactionId: String, amount: Double): Result<Boolean> {
+        if (transactionId.isBlank() || amount <= 0.0) {
+            return Result.failure(IllegalArgumentException("بيانات الاسترداد غير صالحة."))
+        }
         return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
 
@@ -227,7 +242,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
     }
 
     private fun getPaymentMethodName(type: String): String {
-        return when (type.uppercase()) {
+        return when (type.trim().uppercase(java.util.Locale.ROOT)) {
             "JEEB" -> "محفظة جيب"
             "ALKARIMI" -> "الكريمي"
             "JAWALY" -> "جوالي"

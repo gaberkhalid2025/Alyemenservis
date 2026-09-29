@@ -44,11 +44,15 @@ class ApiKeyRepositoryImpl(
      * 🔑 جلب مفتاح API عبر Cloud Function الآمن
      */
     override suspend fun getApiKey(keyName: String): Result<String> {
+        val cleanName = keyName.trim()
+        if (cleanName.isBlank()) {
+            return Result.failure(IllegalArgumentException("Key name must not be blank"))
+        }
         return try {
             val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
             val result = functions
                 .getHttpsCallable("getApiKey")
-                .call(mapOf("keyName" to keyName))
+                .call(mapOf("keyName" to cleanName))
                 .await()
 
             val data = result.data as? Map<*, *>
@@ -57,7 +61,7 @@ class ApiKeyRepositoryImpl(
             if (value != null && value.isNotBlank()) {
                 Result.success(value)
             } else {
-                Result.failure(Exception("Key not found: $keyName"))
+                Result.failure(Exception("Key not found: $cleanName"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -68,12 +72,16 @@ class ApiKeyRepositoryImpl(
      * 💾 حفظ مفتاح API عبر Cloud Function الآمن في Secret Manager
      */
     override suspend fun setApiKey(keyName: String, value: String): Result<Unit> {
+        val cleanName = keyName.trim()
+        if (cleanName.isBlank()) {
+            return Result.failure(IllegalArgumentException("Key name must not be blank"))
+        }
         return try {
             val functions = com.google.firebase.functions.FirebaseFunctions.getInstance()
             functions
                 .getHttpsCallable("setApiKey")
                 .call(mapOf(
-                    "keyName" to keyName,
+                    "keyName" to cleanName,
                     "value" to value
                 ))
                 .await()

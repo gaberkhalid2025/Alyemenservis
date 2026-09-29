@@ -75,6 +75,16 @@ object BookingSecurityHelper {
     }
 
     /**
+     * Checks whether a given string is already a hashed PIN/password (PBKDF2, salted SHA-256, or 64-char hex SHA-256).
+     */
+    fun isSha256Hash(value: String): Boolean {
+        val clean = value.trim()
+        if (clean.isEmpty()) return false
+        if (com.example.utils.SecureHasher.isValidHash(clean)) return true
+        return clean.length == 64 && clean.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+    }
+
+    /**
      * Checks if a booking is currently locked out from cancellation/modification attempts.
      * Uses both wall-clock time and monotonic elapsedRealtime to prevent manual clock tampering.
      */
@@ -122,10 +132,14 @@ object BookingSecurityHelper {
             val elapsedStart = lockElapsed - LOCKOUT_DURATION_MS
             if (currentElapsed >= elapsedStart) {
                 val elapsedDiff = lockElapsed - currentElapsed
-                return maxOf(wallDiff, elapsedDiff).coerceAtMost(LOCKOUT_DURATION_MS)
+                return if (elapsedDiff > 0L) {
+                    maxOf(wallDiff, elapsedDiff).coerceAtMost(LOCKOUT_DURATION_MS)
+                } else {
+                    0L
+                }
             }
         }
-        return wallDiff.coerceAtMost(LOCKOUT_DURATION_MS)
+        return if (wallDiff > 0L) wallDiff.coerceAtMost(LOCKOUT_DURATION_MS) else 0L
     }
 
     /**
@@ -225,7 +239,7 @@ object BookingSecurityHelper {
         val len = clean.length
         if (len < 6) return "***"
         
-        val prefixLen = if (len >= 9) 3 else 2
+        val prefixLen = if (len >= 10) 3 else 2
         val suffixLen = if (len >= 9) 3 else 2
         val maskLen = (len - prefixLen - suffixLen).coerceAtLeast(2)
         

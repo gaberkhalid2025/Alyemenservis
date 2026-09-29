@@ -108,17 +108,27 @@ class BookingRepository(
     /**
      * Realtime flow of all bookings for a user with offline fallback.
      */
-    override fun getUserBookings(userId: String, pageLimit: Long): Flow<List<BookingEntity>> = getBookingsFlow(userId, isProvider = false)
+    override fun getUserBookings(userId: String, pageLimit: Long): Flow<List<BookingEntity>> =
+        getBookingsFlowInternal(userId, isProvider = false, pageLimit = pageLimit)
 
     /**
      * Realtime flow of all bookings for a provider with offline fallback.
      */
-    override fun getProviderBookings(providerId: String, pageLimit: Long): Flow<List<BookingEntity>> = getBookingsFlow(providerId, isProvider = true)
+    override fun getProviderBookings(providerId: String, pageLimit: Long): Flow<List<BookingEntity>> =
+        getBookingsFlowInternal(providerId, isProvider = true, pageLimit = pageLimit)
 
     /**
      * Realtime flow of all bookings for a user or provider with offline fallback.
      */
-    override fun getBookingsFlow(userId: String, isProvider: Boolean): Flow<List<BookingEntity>> = callbackFlow {
+    override fun getBookingsFlow(userId: String, isProvider: Boolean): Flow<List<BookingEntity>> =
+        getBookingsFlowInternal(userId, isProvider = isProvider, pageLimit = 100L)
+
+    private fun getBookingsFlowInternal(
+        userId: String,
+        isProvider: Boolean,
+        pageLimit: Long
+    ): Flow<List<BookingEntity>> = callbackFlow {
+        val safeLimit = pageLimit.coerceIn(1L, 500L)
         val cacheKey = if (userId.isNotBlank()) "${if (isProvider) "provider" else "user"}_$userId" else "all_bookings"
         val inMemory = memoryCache.getBookings(cacheKey)
         if (inMemory != null && inMemory.isNotEmpty()) {
@@ -126,10 +136,10 @@ class BookingRepository(
         }
         // Emit cache immediately for instant offline rendering
         val local = loadFromCache()
-        if (local.isNotEmpty()) {
-            val cleanUser = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(userId).ifBlank { userId.trim() }
-            val filtered = if (userId.isNotBlank()) {
-                local.filter {
+        val cleanUser = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(userId).ifBlank { userId.trim() }
+        fun filterLocal(items: List<BookingEntity>): List<BookingEntity> {
+            return if (userId.isNotBlank()) {
+                items.filter {
                     if (isProvider) {
                         it.providerId == userId ||
                             com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.providerPhone) == cleanUser
@@ -139,22 +149,26 @@ class BookingRepository(
                             com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.effectiveCustomerPhone) == cleanUser
                     }
                 }
-            } else local
-            trySend(filtered)
+            } else items
+        }
+
+        if (local.isNotEmpty()) {
+            trySend(filterLocal(local))
         }
 
         val collection = firestore.collection(AppConstants.COL_BOOKINGS)
         val query = if (userId.isNotBlank()) {
-            if (isProvider) collection.whereEqualTo("providerId", userId)
+            val baseQuery = if (isProvider) collection.whereEqualTo("providerId", userId)
             else collection.whereEqualTo("clientId", userId)
+            baseQuery.limit(safeLimit)
         } else {
-            collection.orderBy("createdAt", Query.Direction.DESCENDING).limit(100)
+            collection.orderBy("createdAt", Query.Direction.DESCENDING).limit(safeLimit)
         }
 
         val listener: ListenerRegistration = query.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 Log.w("BookingRepository", "Firestore listener failed: ${error.message}")
-                trySend(loadFromCache())
+                trySend(filterLocal(loadFromCache()))
                 return@addSnapshotListener
             }
 
@@ -167,7 +181,13 @@ class BookingRepository(
                     }
                 }
                 memoryCache.putBookings(cacheKey, list)
-                saveToCache(list)
+                if (userId.isBlank()) {
+                    saveToCache(list)
+                } else {
+                    val fetchedIds = list.map { it.id }.toSet()
+                    val merged = list + _cachedBookings.value.filterNot { it.id in fetchedIds }
+                    saveToCache(merged)
+                }
                 trySend(list)
             }
         }
@@ -532,20 +552,22 @@ class BookingRepository(
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
+        val now = System.currentTimeMillis()
         val updates = mapOf(
             "status" to "CANCELLED",
             "cancellationReason" to cancellationReason,
-            "cancelledAt" to System.currentTimeMillis(),
+            "cancelledAt" to now,
             "cancelledBy" to cancelledBy,
-            "updatedAt" to System.currentTimeMillis()
+            "updatedAt" to now
         )
-        val current = _cachedBookings.value.map {
+        val previousBookings = _cachedBookings.value
+        val current = previousBookings.map {
             if (it.id == bookingId) it.copy(
                 status = com.example.utils.BookingStatus.CANCELLED.code,
                 cancellationReason = cancellationReason,
-                cancelledAt = System.currentTimeMillis(),
+                cancelledAt = now,
                 cancelledBy = cancelledBy,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = now
             ) else it
         }
         saveToCache(current)
@@ -553,7 +575,10 @@ class BookingRepository(
         firestore.collection(AppConstants.COL_BOOKINGS).document(bookingId)
             .update(updates)
             .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onError(it.localizedMessage ?: "فشل إلغاء الحجز") }
+            .addOnFailureListener {
+                saveToCache(previousBookings)
+                onError(it.localizedMessage ?: "فشل إلغاء الحجز")
+            }
     }
 
     /**
@@ -571,17 +596,18 @@ class BookingRepository(
             return
         }
 
+        val existingBooking = _cachedBookings.value.find { it.id == updatedBooking.id } ?: updatedBooking
         val canModify = BookingUtils.canModifyOrCancelBooking(
-            scheduledAtTimestamp = updatedBooking.scheduledAt,
-            dateString = updatedBooking.date.ifBlank { updatedBooking.dateString },
-            timeString = updatedBooking.time.ifBlank { updatedBooking.timeString }
+            scheduledAtTimestamp = existingBooking.scheduledAt,
+            dateString = existingBooking.date.ifBlank { existingBooking.dateString },
+            timeString = existingBooking.time.ifBlank { existingBooking.timeString }
         )
         if (!canModify) {
             onError("لا يمكن تعديل الحجز عند بقاء أقل من 8 ساعات على الموعد.")
             return
         }
 
-        val expectedTarget = if (updatedBooking.pinCode.isNotBlank()) updatedBooking.pinCode else updatedBooking.bookingPassword
+        val expectedTarget = if (existingBooking.pinCode.isNotBlank()) existingBooking.pinCode else existingBooking.bookingPassword
         val isVerified = BookingSecurityHelper.verifyPassword(inputPin, expectedTarget)
 
         if (!isVerified) {
@@ -592,27 +618,51 @@ class BookingRepository(
 
         BookingSecurityHelper.resetAttempts(context, updatedBooking.id)
 
-        val itemToSave = updatedBooking.copy(updatedAt = System.currentTimeMillis())
-        val current = _cachedBookings.value.map { if (it.id == itemToSave.id) itemToSave else it }
+        val newDate = updatedBooking.date.ifBlank { updatedBooking.dateString }
+        val newTime = updatedBooking.time.ifBlank { updatedBooking.timeString }
+        val recomputedScheduledAt = BookingUtils.parseScheduledTimestamp(newDate, newTime)
+            .takeIf { it > 0L } ?: updatedBooking.scheduledAt
+        val resolvedPinHash = when {
+            updatedBooking.pinCode.isNotBlank() && BookingSecurityHelper.isSha256Hash(updatedBooking.pinCode) -> updatedBooking.pinCode
+            existingBooking.pinCode.isNotBlank() && BookingSecurityHelper.isSha256Hash(existingBooking.pinCode) -> existingBooking.pinCode
+            inputPin.isNotBlank() -> BookingSecurityHelper.hashPin(inputPin)
+            else -> updatedBooking.pinCode
+        }
+
+        val itemToSave = updatedBooking.copy(
+            scheduledAt = recomputedScheduledAt,
+            pinCode = resolvedPinHash,
+            bookingPassword = "",
+            updatedAt = System.currentTimeMillis()
+        )
+        val previousBookings = _cachedBookings.value
+        val current = previousBookings.map { if (it.id == itemToSave.id) itemToSave else it }
         saveToCache(current)
 
         firestore.collection(AppConstants.COL_BOOKINGS).document(itemToSave.id)
             .set(itemToSave)
             .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onError(it.localizedMessage ?: "فشل تحديث البيانات") }
+            .addOnFailureListener {
+                saveToCache(previousBookings)
+                onError(it.localizedMessage ?: "فشل تحديث البيانات")
+            }
     }
 
     /**
      * Deletes booking from database.
      */
     override fun deleteBooking(bookingId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val current = _cachedBookings.value.filter { it.id != bookingId }
+        val previousBookings = _cachedBookings.value
+        val current = previousBookings.filter { it.id != bookingId }
         saveToCache(current)
 
         firestore.collection(AppConstants.COL_BOOKINGS).document(bookingId)
             .delete()
             .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onError(it.localizedMessage ?: "فشل حذف الحجز") }
+            .addOnFailureListener {
+                saveToCache(previousBookings)
+                onError(it.localizedMessage ?: "فشل حذف الحجز")
+            }
     }
 
     suspend fun lockBooking(bookingId: String, lockDurationMs: Long): Result<Unit> {

@@ -21,6 +21,22 @@ import com.google.firebase.messaging.RemoteMessage
 
 class FCMService : FirebaseMessagingService() {
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    companion object {
+        private val notificationSeq = java.util.concurrent.atomic.AtomicInteger(1000)
+        private fun nextNotificationId(): Int {
+            val base = (System.currentTimeMillis() % 100000).toInt()
+            val offset = notificationSeq.incrementAndGet() % 10000
+            return kotlin.math.abs(base * 10 + offset)
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
+    }
+
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
@@ -36,7 +52,7 @@ class FCMService : FirebaseMessagingService() {
             val notificationId = if (requestId.isNotBlank()) {
                 requestId.hashCode()
             } else {
-                (System.currentTimeMillis() % 100000).toInt()
+                nextNotificationId()
             }
 
             val intent = Intent(this, MainActivity::class.java).apply {
@@ -95,7 +111,7 @@ class FCMService : FirebaseMessagingService() {
 
             ChatNotificationHelper.showChatMessageNotification(
                 context = this,
-                notificationId = (System.currentTimeMillis() % 100000).toInt(),
+                notificationId = nextNotificationId(),
                 channelId = channelId,
                 senderId = senderId,
                 senderName = senderName,
@@ -114,7 +130,7 @@ class FCMService : FirebaseMessagingService() {
 
             ChatNotificationHelper.showUrgentRequestNotification(
                 context = this,
-                notificationId = (System.currentTimeMillis() % 100000).toInt(),
+                notificationId = nextNotificationId(),
                 requestCode = requestCode,
                 title = title,
                 description = description,
@@ -135,22 +151,22 @@ class FCMService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
+        if (token.isBlank()) return
         
-        // 🔒 الخطوة 1: حفظ التوكن في التخزين المشفر فوراً (H-03: Encrypted token storage)
+        // 🔒 الخطوة 1: حفظ التوكن في التخزين المشفر فوراً (H-03: Encrypted token storage) مع حفظ النسخة الاحتياطية المتوافقة
         try {
             val secureStorage = com.example.utils.SecureStorage(this)
             secureStorage.saveSecureString("fcm_token_backup", token)
         } catch (e: Exception) {
-            e.printStackTrace()
-            // تراجع آمن في حال تعذر التوافق
-            try {
-                val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-                sp.edit().putString("fcm_token_backup", token).apply()
-            } catch (_: Exception) {}
+            android.util.Log.w("FCMService", "SecureStorage token save fallback: ${e.message}")
         }
+        try {
+            val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+            sp.edit().putString("fcm_token_backup", token).apply()
+        } catch (_: Exception) {}
         
-        // 🔄 الخطوة 2: مزامنة مع Firestore باستخدام Coroutines لتجنب Race Condition (M-11)
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        // 🔄 الخطوة 2: مزامنة مع Firestore باستخدام serviceScope المدار لمنع تسريب الخيوط و Race Condition (M-11)
+        serviceScope.launch {
             try {
                 kotlinx.coroutines.delay(1000) // تأخير آمن غير معطل للخيوط لضمان تهيئة Firebase
                 
@@ -167,7 +183,11 @@ class FCMService : FirebaseMessagingService() {
                 val db = FirebaseFirestore.getInstance()
                 
                 // 🔑 جلب المعرف الموثوق من FirebaseAuth كمرجع أمان أساسي (H-05) مع التراجع الآمن
-                val firebaseUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                val firebaseUid = try {
+                    com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                } catch (_: Exception) {
+                    null
+                }
                 
                 val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
                 val rawUserId = sp.getString("user_id", "") ?: ""
@@ -175,7 +195,7 @@ class FCMService : FirebaseMessagingService() {
                     if (rawUserId.startsWith("gcm:")) {
                         try { SecurityCryptoUtils.decrypt(rawUserId) } catch (e: Exception) { "" }
                     } else {
-                        try { SecurityCryptoUtils.decrypt(rawUserId).ifEmpty { rawUserId } } catch (e: Exception) { "" }
+                        try { SecurityCryptoUtils.decrypt(rawUserId).ifEmpty { rawUserId } } catch (e: Exception) { rawUserId }
                     }
                 } else rawUserId
 
@@ -190,7 +210,7 @@ class FCMService : FirebaseMessagingService() {
                     if (rawPhone.startsWith("gcm:")) {
                         try { SecurityCryptoUtils.decrypt(rawPhone) } catch (e: Exception) { "" }
                     } else {
-                        try { SecurityCryptoUtils.decrypt(rawPhone).ifEmpty { rawPhone } } catch (e: Exception) { "" }
+                        try { SecurityCryptoUtils.decrypt(rawPhone).ifEmpty { rawPhone } } catch (e: Exception) { rawPhone }
                     }
                 } else ""
                 val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(phone.trim())
@@ -223,11 +243,12 @@ class FCMService : FirebaseMessagingService() {
                         android.util.Log.d("FCMService", "Main FCM token synced successfully.")
                     }
 
-                // ب: التحديث في مجموعة الأجهزة الفرعية لمنع حذف التوكنات للأجهزة المتعددة (M-12: Support Multi-Device)
+                // ب: التحديث في مجموعة الأجهزة الفرعية باستخدام SHA-256 لمنع حذف التوكنات للأجهزة المتعددة (M-12: Support Multi-Device)
                 try {
-                    val tokenHash = java.security.MessageDigest.getInstance("MD5")
-                        .digest(token.toByteArray())
+                    val tokenHash = java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(token.toByteArray(Charsets.UTF_8))
                         .joinToString("") { "%02x".format(it) }
+                        .take(32)
                     
                     db.collection("fcm_tokens").document(userId)
                         .collection("devices").document(tokenHash)
@@ -239,7 +260,7 @@ class FCMService : FirebaseMessagingService() {
                             android.util.Log.d("FCMService", "FCM token device document synced successfully ($tokenHash).")
                         }
                 } catch (hashEx: Exception) {
-                    android.util.Log.w("FCMService", "MD5 token hashing skipped: ${hashEx.message}")
+                    android.util.Log.w("FCMService", "SHA-256 token hashing skipped: ${hashEx.message}")
                 }
 
                 // 2. تحديث registered_users بشكل مستقل (فقط إذا كان المستند موجوداً ومع التحقق الكامل H-04)
@@ -252,25 +273,31 @@ class FCMService : FirebaseMessagingService() {
                         android.util.Log.d("FCMService", "registered_users token updated successfully.")
                     }
 
-                // 3. تحديث providers, stores, properties بشكل مستقل لكل مجموعة (مع معالجة الفشل الكاملة H-04)
+                // 3. تحديث providers, stores, properties بشكل مستقل لكل مجموعة (مع دعم المعرفات القياسية المسبوقة بـ prov_ / store_ / prop_)
                 if (cleanPhone.isNotEmpty() && !cleanPhone.startsWith("gcm:") && cleanPhone.length >= 7) {
-                    db.collection("providers").document(cleanPhone)
-                        .update("fcmToken", token)
-                        .addOnFailureListener { e ->
-                            android.util.Log.w("FCMService", "Provider token update skipped (document might not exist): ${e.message}")
-                        }
+                    listOf("prov_$cleanPhone", cleanPhone).distinct().forEach { docId ->
+                        db.collection("providers").document(docId)
+                            .update("fcmToken", token)
+                            .addOnFailureListener { e ->
+                                android.util.Log.w("FCMService", "Provider token update skipped ($docId): ${e.message}")
+                            }
+                    }
                     
-                    db.collection("stores").document(cleanPhone)
-                        .update("fcmToken", token)
-                        .addOnFailureListener { e ->
-                            android.util.Log.w("FCMService", "Store token update skipped (document might not exist): ${e.message}")
-                        }
+                    listOf("store_$cleanPhone", cleanPhone).distinct().forEach { docId ->
+                        db.collection("stores").document(docId)
+                            .update("fcmToken", token)
+                            .addOnFailureListener { e ->
+                                android.util.Log.w("FCMService", "Store token update skipped ($docId): ${e.message}")
+                            }
+                    }
 
-                    db.collection("properties").document(cleanPhone)
-                        .update("fcmToken", token)
-                        .addOnFailureListener { e ->
-                            android.util.Log.w("FCMService", "Property token update skipped (document might not exist): ${e.message}")
-                        }
+                    listOf("prop_$cleanPhone", cleanPhone).distinct().forEach { docId ->
+                        db.collection("properties").document(docId)
+                            .update("fcmToken", token)
+                            .addOnFailureListener { e ->
+                                android.util.Log.w("FCMService", "Property token update skipped ($docId): ${e.message}")
+                            }
+                    }
                 }
 
             } catch (e: Exception) {
@@ -296,9 +323,9 @@ class FCMService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val notificationId = (System.currentTimeMillis() % 100000).toInt()
+        val notificationId = nextNotificationId()
         val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("target_screen", targetScreen)
             putExtra("navigate_to", targetScreen)
         }

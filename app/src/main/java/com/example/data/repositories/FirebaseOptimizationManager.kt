@@ -38,7 +38,9 @@ object FirebaseOptimizationManager {
      * Helper to verify if cache is still valid based on TTL
      */
     fun isCacheValid(lastSyncedAt: Long, ttlMillis: Long): Boolean {
-        return (System.currentTimeMillis() - lastSyncedAt) < ttlMillis
+        if (lastSyncedAt <= 0L || ttlMillis <= 0L) return false
+        val elapsed = System.currentTimeMillis() - lastSyncedAt
+        return elapsed in 0 until ttlMillis
     }
 
     /**
@@ -46,7 +48,7 @@ object FirebaseOptimizationManager {
      */
     suspend fun compressImageToWebP(bitmap: Bitmap, maxSizeBytes: Long = 150 * 1024L): String = withContext(Dispatchers.IO) {
         var quality = 80
-        var outputStream = ByteArrayOutputStream()
+        val outputStream = ByteArrayOutputStream()
         
         val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Bitmap.CompressFormat.WEBP_LOSSY
@@ -57,14 +59,14 @@ object FirebaseOptimizationManager {
 
         bitmap.compress(format, quality, outputStream)
         
-        while (outputStream.toByteArray().size > maxSizeBytes && quality > 20) {
+        while (outputStream.size() > maxSizeBytes && quality > 20) {
             outputStream.reset()
             quality -= 15
             bitmap.compress(format, quality, outputStream)
         }
 
         val byteArray = outputStream.toByteArray()
-        Base64.encodeToString(byteArray, Base64.DEFAULT)
+        Base64.encodeToString(byteArray, Base64.NO_WRAP)
     }
 
     /**
@@ -77,7 +79,11 @@ object FirebaseOptimizationManager {
             val bytes = Base64.decode(cleanStr, Base64.DEFAULT)
             if (bytes.size > 150 * 1024) { // Larger than 150KB
                 val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@withContext base64Str
-                compressImageToWebP(bitmap)
+                try {
+                    compressImageToWebP(bitmap)
+                } finally {
+                    bitmap.recycle()
+                }
             } else {
                 base64Str
             }
@@ -90,9 +96,11 @@ object FirebaseOptimizationManager {
      * Generic pagination helper for lists
      */
     fun <T> paginateList(sourceList: List<T>, pageIndex: Int, pageSize: Int = CHAT_PAGE_SIZE): List<T> {
-        val fromIndex = pageIndex * pageSize
+        if (sourceList.isEmpty() || pageIndex < 0 || pageSize <= 0) return emptyList()
+        val fromIndex = pageIndex.toLong() * pageSize.toLong()
         if (fromIndex >= sourceList.size) return emptyList()
-        val toIndex = kotlin.math.min(fromIndex + pageSize, sourceList.size)
-        return sourceList.subList(fromIndex, toIndex)
+        val start = fromIndex.toInt()
+        val toIndex = kotlin.math.min(start + pageSize, sourceList.size)
+        return sourceList.subList(start, toIndex)
     }
 }

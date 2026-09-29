@@ -32,9 +32,32 @@ fun RestoreAccountDialog(
     var restorePasswordInput by remember { mutableStateOf("") }
     var restoreStep by remember { mutableStateOf(1) }
     var isSearchingAccount by remember { mutableStateOf(false) }
+    var isVerifyingPassword by remember { mutableStateOf(false) }
+    var isRequestingReset by remember { mutableStateOf(false) }
     var matchResult by remember { mutableStateOf<MainViewModel.RestoreAccountMatch?>(null) }
     var showSuccessState by remember { mutableStateOf(false) }
     var successUserName by remember { mutableStateOf("") }
+    var targetSuccessScreen by remember { mutableStateOf(AppScreens.USER_BROWSE) }
+
+    // ⏳ حماية زمنية (30 ثانية) لمنع تعليق أزرار التحميل والإرسال (القاعدة 7)
+    LaunchedEffect(isSearchingAccount) {
+        if (isSearchingAccount) {
+            kotlinx.coroutines.delay(30_000L)
+            isSearchingAccount = false
+        }
+    }
+    LaunchedEffect(isVerifyingPassword) {
+        if (isVerifyingPassword) {
+            kotlinx.coroutines.delay(30_000L)
+            isVerifyingPassword = false
+        }
+    }
+    LaunchedEffect(isRequestingReset) {
+        if (isRequestingReset) {
+            kotlinx.coroutines.delay(30_000L)
+            isRequestingReset = false
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -60,14 +83,14 @@ fun RestoreAccountDialog(
 
                         Button(
                             onClick = {
-                                viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                                viewModel.navigateToScreen(targetSuccessScreen)
                                 onDismiss()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("موافق (الانتقال للشاشة الرئيسية) 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("موافق (الانتقال للحساب) 🚀", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                     }
                 } else if (restoreStep == 1) {
@@ -85,7 +108,7 @@ fun RestoreAccountDialog(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
-                                val cleanPhone = restorePhoneInput.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+                                val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(restorePhoneInput)
                                 if (cleanPhone.length >= 7) {
                                     isSearchingAccount = true
                                     viewModel.searchAccountForRestore(cleanPhone) { match ->
@@ -131,13 +154,15 @@ fun RestoreAccountDialog(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
-                                val cleanPhone = restorePhoneInput.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+                                val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(restorePhoneInput)
                                 if (restorePasswordInput.isNotBlank()) {
+                                    isVerifyingPassword = true
                                     viewModel.verifyRestorePassword(cleanPhone, match?.type ?: "CLIENT", restorePasswordInput.trim()) { isPasswordCorrect ->
+                                        isVerifyingPassword = false
                                         if (!isPasswordCorrect) {
                                             Toast.makeText(context, "❌ كلمة المرور غير صحيحة! تأكد منها أو اضغط طلب الاستعادة.", Toast.LENGTH_LONG).show()
                                         } else {
-                                            val provArea = match?.provider?.area ?: match?.store?.cityId ?: "اليمن"
+                                            val provArea = match?.provider?.area ?: match?.store?.cityId ?: match?.property?.cityId ?: "اليمن"
                                             viewModel.setUserSessionDetails(context, provName, cleanPhone, provArea)
                                             
                                             val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
@@ -154,25 +179,25 @@ fun RestoreAccountDialog(
                                                 viewModel.selectedProvider = match.provider
                                                 viewModel.selectedStore = null
                                                 viewModel.selectedProperty = null
-                                                viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                                targetSuccessScreen = AppScreens.DYNAMIC_PROFILE
                                             } else if (match?.store != null) {
                                                 if (match.store.isDeleted) viewModel.restoreStore(match.store.id)
                                                 viewModel.selectedStore = match.store
                                                 viewModel.selectedProvider = null
                                                 viewModel.selectedProperty = null
-                                                viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                                targetSuccessScreen = AppScreens.DYNAMIC_PROFILE
                                             } else if (match?.property != null) {
                                                 if (match.property.isDeleted) viewModel.restoreProperty(match.property.id)
                                                 viewModel.selectedProperty = match.property
                                                 viewModel.selectedProvider = null
                                                 viewModel.selectedStore = null
-                                                viewModel.navigateToScreen(AppScreens.DYNAMIC_PROFILE)
+                                                targetSuccessScreen = AppScreens.DYNAMIC_PROFILE
                                             } else {
                                                 viewModel.selectedProvider = null
                                                 viewModel.selectedStore = null
                                                 viewModel.selectedProperty = null
                                                 viewModel.selectedJob = null
-                                                viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                                                targetSuccessScreen = AppScreens.USER_BROWSE
                                             }
 
                                             successUserName = provName
@@ -184,19 +209,27 @@ fun RestoreAccountDialog(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            enabled = !isVerifyingPassword && !isRequestingReset
                         ) {
-                            Text("تأكيد ودخول 🔓", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(if (isVerifyingPassword) "جاري التحقق..." else "تأكيد ودخول 🔓", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
-                        Button(onClick = { restoreStep = 1 }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray), modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { restoreStep = 1 },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                            modifier = Modifier.weight(1f),
+                            enabled = !isVerifyingPassword && !isRequestingReset
+                        ) {
                             Text("رجوع", color = Color.White, fontSize = 11.sp)
                         }
                     }
 
                     Button(
                         onClick = {
-                            val cleanPhone = restorePhoneInput.trim().replace(" ", "").replace("+967", "").replace("00967", "")
+                            val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(restorePhoneInput)
+                            isRequestingReset = true
                             viewModel.requestPasswordReset(context, cleanPhone, provName, match?.type ?: "USER") { success ->
+                                isRequestingReset = false
                                 if (success) {
                                     Toast.makeText(context, "⏳ تم إرسال طلب استعادة كلمة المرور للإدارة بنجاح!", Toast.LENGTH_LONG).show()
                                     viewModel.navigateToScreen(AppScreens.PASSWORD_RESET_WAITING)
@@ -207,9 +240,15 @@ fun RestoreAccountDialog(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.secondary),
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        enabled = !isRequestingReset && !isVerifyingPassword
                     ) {
-                        Text("💬 نسيت كلمة المرور؟ طلب الاستعادة من الأدمن", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isRequestingReset) "جاري إرسال الطلب..." else "💬 نسيت كلمة المرور؟ طلب الاستعادة من الأدمن",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

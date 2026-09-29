@@ -306,7 +306,9 @@ class AdminViewModel @Inject constructor(
                         it.id.equals(trimmedUser, ignoreCase = true) ||
                                 it.name.trim().equals(trimmedUser, ignoreCase = true)
                     }
-                    val perms = matchingSup?.permissions ?: if (verifiedRole == "OWNER") listOf("ALL") else emptyList()
+                    val perms = matchingSup?.permissions?.ifEmpty {
+                        listOf("MANAGE_PROVIDERS", "MANAGE_BOOKINGS", "MANAGE_REQUESTS")
+                    } ?: if (verifiedRole == "OWNER") listOf("ALL") else emptyList()
 
                     if (rememberMe) {
                         secureStorage.saveAdminSession(
@@ -575,7 +577,16 @@ fun approveRequest(request: PendingProviderEntity) {
             else -> "ye_san"
         }
 
-        val cleanPhone = request.phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(request.phone)
+            .ifBlank { request.phone.trim().replace(" ", "").replace("+", "") }
+        val resolvedPasswordHash = request.passwordHash.ifBlank { request.password }.let { rawOrHash ->
+            val trimmed = rawOrHash.trim()
+            if (trimmed.isNotBlank() && !trimmed.contains(":")) {
+                com.example.utils.PasswordHasher.hash(trimmed)
+            } else {
+                trimmed
+            }
+        }
         
         // Helper to remove from pending_providers permanently
         val clearPendingFromDbAndState = {
@@ -589,7 +600,7 @@ fun approveRequest(request: PendingProviderEntity) {
                 }
             }
             _pendingProviders.value = _pendingProviders.value.filter { 
-                it.id != request.id && it.id != cleanPhone && (cleanPhone.isEmpty() || it.phone.trim().replace(" ", "").replace("+", "") != cleanPhone)
+                it.id != request.id && it.id != cleanPhone && (cleanPhone.isEmpty() || com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.phone).ifBlank { it.phone.trim().replace(" ", "").replace("+", "") } != cleanPhone)
             }
         }
 
@@ -627,9 +638,9 @@ fun approveRequest(request: PendingProviderEntity) {
                     id = storeId,
                     name = request.name,
                     description = request.specialization.ifBlank { "محل تجاري معتمد وموثق" },
-                    ownerId = request.phone,
+                    ownerId = cleanPhone.ifBlank { request.phone },
                     ownerName = request.name,
-                    phone = request.phone,
+                    phone = cleanPhone.ifBlank { request.phone },
                     localNeighborhood = request.localNeighborhood,
                     cityId = finalCityId,
                     sectionId = resolvedSectionId,
@@ -638,7 +649,7 @@ fun approveRequest(request: PendingProviderEntity) {
                     isApproved = true,
                     isPinned = false,
                     isDeleted = false,
-                    passwordHash = request.password,
+                    passwordHash = resolvedPasswordHash,
                     pdfFileBase64 = resolvedStoreDocUrl
                 )
                 if (request.id != storeId) {
@@ -692,14 +703,15 @@ fun approveRequest(request: PendingProviderEntity) {
                     id = propId,
                     title = request.name,
                     description = request.specialization.ifBlank { "عقار معلن وموثق" },
-                    phone = request.phone,
+                    phone = cleanPhone.ifBlank { request.phone },
+                    ownerId = cleanPhone.ifBlank { request.phone },
                     localNeighborhood = request.localNeighborhood,
                     cityId = finalCityId,
                     isActive = true,
                     isApproved = true,
                     isPinned = false,
                     isDeleted = false,
-                    passwordHash = request.password,
+                    passwordHash = resolvedPasswordHash,
                     price = propPrice,
                     pdfFileBase64 = resolvedPropDocUrl
                 )
@@ -728,7 +740,7 @@ fun approveRequest(request: PendingProviderEntity) {
                 id = jobId,
                 title = request.customCategoryName.ifBlank { "وظيفة - " + request.name },
                 companyName = request.name,
-                phone = request.phone,
+                phone = cleanPhone.ifBlank { request.phone },
                 cityId = finalCityId,
                 address = request.localNeighborhood,
                 description = request.specialization.ifBlank { "إعلان وظيفة معتمد وموثق" },
@@ -776,15 +788,21 @@ fun approveRequest(request: PendingProviderEntity) {
             )
             mainViewModel.triggerNotification("✅ تم اعتماد ملف المتقدم ${request.name}")
         } else if (request.profession == "CLIENT" || request.categoryId.uppercase() == "CLIENT") {
-            val userMap = mapOf(
-                "id" to request.id,
+            val userMap = mutableMapOf<String, Any>(
+                "id" to cleanPhone.ifBlank { request.id },
                 "name" to request.name,
                 "phone" to cleanPhone,
                 "residence" to request.area,
                 "isApproved" to true,
                 "createdAt" to System.currentTimeMillis()
             )
-            db.collection("users").document(request.id).set(userMap)
+            if (resolvedPasswordHash.isNotBlank()) {
+                userMap["passwordHash"] = resolvedPasswordHash
+            }
+            db.collection("users").document(request.id).set(userMap, SetOptions.merge())
+            if (cleanPhone.isNotEmpty() && cleanPhone != request.id) {
+                db.collection("users").document(cleanPhone).set(userMap, SetOptions.merge())
+            }
             
             mainViewModel.addNotification(
                 title = "🎉 تهانينا! تم تفعيل حسابك بنجاح",
@@ -798,7 +816,7 @@ fun approveRequest(request: PendingProviderEntity) {
             val approvedProvider = ProviderEntity(
                 id = providerId,
                 name = request.name,
-                phone = request.phone,
+                phone = cleanPhone.ifBlank { request.phone },
                 categoryId = request.categoryId,
                 area = request.area,
                 isVip = false,
@@ -809,7 +827,7 @@ fun approveRequest(request: PendingProviderEntity) {
                 rating = 5.0f,
                 isBlocked = false,
                 customCategoryName = request.customCategoryName,
-                passwordHash = request.password,
+                passwordHash = resolvedPasswordHash,
                 isDeleted = false,
                 deletedAt = null
             )
@@ -882,11 +900,21 @@ fun approveTechnician(providerId: String) {
                 lowerArea.contains("الحديدة") || lowerArea.contains("hodeidah") -> "ye_hod"
                 else -> "ye_san"
             }
-            val finalId = "prov_" + it.phone.trim().replace(" ", "").replace("+", "")
+            val cleanTechPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.phone)
+                .ifBlank { it.phone.trim().replace(" ", "").replace("+", "") }
+            val finalId = "prov_" + cleanTechPhone
+            val resolvedTechHash = it.passwordHash.ifBlank { it.password }.let { rawOrHash ->
+                val trimmed = rawOrHash.trim()
+                if (trimmed.isNotBlank() && !trimmed.contains(":")) {
+                    com.example.utils.PasswordHasher.hash(trimmed)
+                } else {
+                    trimmed
+                }
+            }
             val p = ProviderEntity(
                 id = finalId,
                 name = it.name,
-                phone = it.phone,
+                phone = cleanTechPhone.ifBlank { it.phone },
                 categoryId = it.categoryId,
                 area = it.area,
                 localNeighborhood = it.localNeighborhood,
@@ -900,7 +928,7 @@ fun approveTechnician(providerId: String) {
                 rating = 5.0f,
                 subscriptionExpiry = System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000),
                 workPhotosBase64 = it.workPhotosBase64,
-                passwordHash = it.passwordHash,
+                passwordHash = resolvedTechHash,
                 isDeleted = false,
                 deletedAt = null
             )
@@ -990,10 +1018,17 @@ fun loadPendingTechnicians() {
 
 fun approvePendingProvider(pending: PendingProviderEntity) {
         db.collection("pending_providers").document(pending.id).delete()
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(pending.phone)
+            .ifBlank { pending.phone.trim().replace(" ", "").replace("+", "") }
+        val resolvedHash = when {
+            pending.passwordHash.isNotBlank() && com.example.utils.SecureHasher.isValidHash(pending.passwordHash) -> pending.passwordHash
+            pending.passwordHash.isNotBlank() -> com.example.utils.SecureHasher.hashPassword(pending.passwordHash.trim())
+            else -> ""
+        }
         val provider = ProviderEntity(
-            id = if (pending.id.isNotBlank()) pending.id else "p_" + pending.phone,
+            id = if (pending.id.isNotBlank()) pending.id else "p_" + cleanPhone.ifBlank { pending.phone },
             name = pending.name,
-            phone = pending.phone,
+            phone = cleanPhone.ifBlank { pending.phone },
             categoryId = pending.categoryId,
             area = pending.area,
             localNeighborhood = pending.localNeighborhood,
@@ -1002,7 +1037,7 @@ fun approvePendingProvider(pending: PendingProviderEntity) {
             profession = pending.profession,
             specialization = pending.specialization,
             customCategoryName = pending.customCategoryName,
-            passwordHash = pending.passwordHash,
+            passwordHash = resolvedHash,
             providerType = pending.providerType
         )
         db.collection("providers").document(provider.id).set(provider)
@@ -1052,7 +1087,8 @@ fun deleteRegisteredUser(userId: String, userName: String = "") {
     }
 
 fun saveStore(store: com.example.data.StoreEntity) {
-        val cleanPhone = store.phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(store.phone)
+            .ifBlank { store.phone.trim().replace(" ", "").replace("+", "") }
         val duplicateType = checkAndGetDuplicateAccountType(cleanPhone, store.id)
         if (duplicateType != null) {
             mainViewModel.triggerNotification("❌ عذراً! رقم الهاتف (${store.phone}) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
@@ -1060,10 +1096,17 @@ fun saveStore(store: com.example.data.StoreEntity) {
             return
         }
         val targetId = if (store.id.isEmpty()) db.collection("stores").document().id else store.id
+        val rawPassword = store.passwordHash.trim()
+        val resolvedPasswordHash = when {
+            rawPassword.isNotBlank() && com.example.utils.SecureHasher.isValidHash(rawPassword) -> rawPassword
+            rawPassword.isNotBlank() -> com.example.utils.SecureHasher.hashPassword(rawPassword)
+            else -> ""
+        }
         val finalStore = store.copy(
             id = targetId,
             phone = cleanPhone,
-            ownerId = if (store.ownerId.isEmpty()) cleanPhone else store.ownerId
+            ownerId = if (store.ownerId.isEmpty()) cleanPhone else store.ownerId,
+            passwordHash = resolvedPasswordHash
         )
 
         // Instant Local State Update (Solves retry/delay bug)
@@ -1071,10 +1114,10 @@ fun saveStore(store: com.example.data.StoreEntity) {
         updatedStores.add(finalStore)
         _stores.value = updatedStores
 
-        if (store.password.isNotEmpty()) {
+        if (rawPassword.isNotEmpty() && !com.example.utils.SecureHasher.isValidHash(rawPassword)) {
             try {
                 val authEmail = getAuthEmailForPhone(cleanPhone)
-                auth.createUserWithEmailAndPassword(authEmail, store.password.trim())
+                auth.createUserWithEmailAndPassword(authEmail, rawPassword)
                     .addOnFailureListener { /* account exists */ }
             } catch (e: Exception) {}
         }
@@ -1378,7 +1421,8 @@ fun approveStorePdf(storeId: String, approve: Boolean) {
     }
 
 fun saveProperty(property: com.example.data.PropertyEntity) {
-        val cleanPhone = property.phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(property.phone)
+            .ifBlank { property.phone.trim().replace(" ", "").replace("+", "") }
         val duplicateType = checkAndGetDuplicateAccountType(cleanPhone, property.id)
         if (duplicateType != null) {
             mainViewModel.triggerNotification("❌ عذراً! رقم الهاتف (${property.phone}) مسجل بالفعل كـ ($duplicateType). لا يُسمح بتكرار الحسابات.")
@@ -1386,10 +1430,17 @@ fun saveProperty(property: com.example.data.PropertyEntity) {
             return
         }
         val targetId = if (property.id.isEmpty()) db.collection("properties").document().id else property.id
+        val rawPassword = property.passwordHash.trim()
+        val resolvedPasswordHash = when {
+            rawPassword.isNotBlank() && com.example.utils.SecureHasher.isValidHash(rawPassword) -> rawPassword
+            rawPassword.isNotBlank() -> com.example.utils.SecureHasher.hashPassword(rawPassword)
+            else -> ""
+        }
         val finalProp = property.copy(
             id = targetId,
             phone = cleanPhone,
-            ownerId = if (property.ownerId.isEmpty()) cleanPhone else property.ownerId
+            ownerId = if (property.ownerId.isEmpty()) cleanPhone else property.ownerId,
+            passwordHash = resolvedPasswordHash
         )
 
         // Instant Local State Update
@@ -1397,10 +1448,10 @@ fun saveProperty(property: com.example.data.PropertyEntity) {
         updatedProps.add(finalProp)
         _properties.value = updatedProps
 
-        if (property.password.isNotEmpty()) {
+        if (rawPassword.isNotEmpty() && !com.example.utils.SecureHasher.isValidHash(rawPassword)) {
             try {
                 val authEmail = getAuthEmailForPhone(cleanPhone)
-                auth.createUserWithEmailAndPassword(authEmail, property.password.trim())
+                auth.createUserWithEmailAndPassword(authEmail, rawPassword)
                     .addOnFailureListener { /* account exists */ }
             } catch (e: Exception) {}
         }
@@ -3320,7 +3371,6 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
     private fun listenToPasswordRecoveryRequests() {
         passwordRecoveryListenerRegistration?.remove()
         passwordRecoveryListenerRegistration = db.collection("password_recovery_requests")
-            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snap, err ->
                 if (err == null && snap != null) {
                     try {
@@ -3328,6 +3378,10 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
                             val m = doc.data?.toMutableMap() ?: return@mapNotNull null
                             m["id"] = doc.id
                             m
+                        }.sortedByDescending {
+                            (it["timestamp"] as? Number)?.toLong()
+                                ?: (it["createdAt"] as? Number)?.toLong()
+                                ?: 0L
                         }
                         _passwordRecoveryRequests.value = requests
                     } catch (e: Throwable) {

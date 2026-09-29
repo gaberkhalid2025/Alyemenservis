@@ -45,13 +45,14 @@ class ChatLocalDataSource(
     private val presenceAdapter = moshi.adapter(UserPresence::class.java)
 
     // Memory Cache for ultra-fast UI rendering
+    private val dataSourceScope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + ioDispatcher)
     private val channelsMemoryCache = MutableStateFlow<List<ChatChannel>>(emptyList())
     private val messagesMemoryCache = ConcurrentHashMap<String, MutableStateFlow<List<ChatMessage>>>()
     private val presenceMemoryCache = ConcurrentHashMap<String, MutableStateFlow<UserPresence?>>()
 
     init {
         migrateLegacyChatData()
-        kotlinx.coroutines.CoroutineScope(ioDispatcher).launch {
+        dataSourceScope.launch {
             val initialChannels = getCachedChannelsInternal()
             if (channelsMemoryCache.value.isEmpty() && initialChannels.isNotEmpty()) {
                 channelsMemoryCache.value = initialChannels
@@ -132,8 +133,12 @@ class ChatLocalDataSource(
                     updatedAt = ch.updatedAt
                 )
             }
-            chatDao.deleteAllChannels()
+            val existingIds = chatDao.getAllChannelsList().map { it.id }.toSet()
+            val newIds = roomChannels.map { it.id }.toSet()
             chatDao.insertChannels(roomChannels)
+            for (removedId in (existingIds - newIds)) {
+                chatDao.deleteChannel(removedId)
+            }
         } catch (e: Exception) {
             android.util.Log.e("ChatLocalDataSource", "Error in saveChannels: ${e.message}", e)
         }
@@ -216,7 +221,7 @@ class ChatLocalDataSource(
     fun observeMessages(channelId: String): Flow<List<ChatMessage>> {
         val flow = messagesMemoryCache.getOrPut(channelId) {
             val stateFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
-            kotlinx.coroutines.CoroutineScope(ioDispatcher).launch {
+            dataSourceScope.launch {
                 val initial = getCachedMessagesInternal(channelId)
                 if (stateFlow.value.isEmpty() && initial.isNotEmpty()) {
                     stateFlow.value = initial
@@ -390,6 +395,18 @@ class ChatLocalDataSource(
         try {
             chatDao.updateMessageSyncStatus(messageId, SyncStatus.SYNCED.name)
             chatDao.updateMessageStatus(messageId, MessageStatus.SENT.name)
+            messagesMemoryCache.forEach { (_, flow) ->
+                val list = flow.value
+                val idx = list.indexOfFirst { it.id == messageId }
+                if (idx >= 0) {
+                    val updated = list.toMutableList()
+                    updated[idx] = updated[idx].copy(
+                        status = MessageStatus.SENT,
+                        syncStatus = SyncStatus.SYNCED
+                    )
+                    flow.value = updated
+                }
+            }
         } catch (e: Exception) {
             android.util.Log.e("ChatLocalDataSource", "Error in removePendingMessage: ${e.message}", e)
         }

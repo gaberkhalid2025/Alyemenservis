@@ -51,44 +51,44 @@ class RegistrationRepositoryImpl(
 
         val userDeferred = async {
             runCatching {
-                firestore.collection("users")
-                    .document(cleanPhone)
-                    .get()
-                    .await()
-                    .exists()
+                firestore.collection("users").document(cleanPhone).get().await().exists() ||
+                    firestore.collection("users").document("u_$cleanPhone").get().await().exists()
             }.getOrDefault(false)
         }
 
         val providerDeferred = async {
             runCatching {
-                !firestore.collection("providers")
-                    .whereEqualTo("phone", cleanPhone)
-                    .limit(1)
-                    .get()
-                    .await()
-                    .isEmpty
+                firestore.collection("providers").document("p_$cleanPhone").get().await().exists() ||
+                    !firestore.collection("providers")
+                        .whereEqualTo("phone", cleanPhone)
+                        .limit(1)
+                        .get()
+                        .await()
+                        .isEmpty
             }.getOrDefault(false)
         }
 
         val storeDeferred = async {
             runCatching {
-                !firestore.collection("stores")
-                    .whereEqualTo("phone", cleanPhone)
-                    .limit(1)
-                    .get()
-                    .await()
-                    .isEmpty
+                firestore.collection("stores").document("s_$cleanPhone").get().await().exists() ||
+                    !firestore.collection("stores")
+                        .whereEqualTo("phone", cleanPhone)
+                        .limit(1)
+                        .get()
+                        .await()
+                        .isEmpty
             }.getOrDefault(false)
         }
 
         val propDeferred = async {
             runCatching {
-                !firestore.collection("properties")
-                    .whereEqualTo("phone", cleanPhone)
-                    .limit(1)
-                    .get()
-                    .await()
-                    .isEmpty
+                firestore.collection("properties").document("prop_$cleanPhone").get().await().exists() ||
+                    !firestore.collection("properties")
+                        .whereEqualTo("phone", cleanPhone)
+                        .limit(1)
+                        .get()
+                        .await()
+                        .isEmpty
             }.getOrDefault(false)
         }
 
@@ -210,7 +210,8 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "CLIENT",
                 "providerType" to "CLIENT",
-                "password" to hashedPassword,
+                "password" to "",
+                "passwordHash" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
@@ -274,7 +275,8 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "PROVIDER",
                 "providerType" to "PROVIDER",
-                "password" to hashedPassword,
+                "password" to "",
+                "passwordHash" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
@@ -333,7 +335,8 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "STORE_OWNER",
                 "providerType" to "STORE_OWNER",
-                "password" to hashedPassword,
+                "password" to "",
+                "passwordHash" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
@@ -392,7 +395,8 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "STORE_OWNER",
                 "providerType" to "STORE_OWNER",
-                "password" to hashedPassword,
+                "password" to "",
+                "passwordHash" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
@@ -450,7 +454,8 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "STORE_OWNER",
                 "providerType" to "STORE_OWNER",
-                "password" to hashedPassword,
+                "password" to "",
+                "passwordHash" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
@@ -510,7 +515,8 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "PROPERTY_OWNER",
                 "providerType" to "PROPERTY_OWNER",
-                "password" to hashedPassword,
+                "password" to "",
+                "passwordHash" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
@@ -570,7 +576,8 @@ class RegistrationRepositoryImpl(
                 "status" to "PENDING",
                 "profession" to "JOB_POSTER",
                 "providerType" to "JOB_POSTER",
-                "password" to hashedPassword,
+                "password" to "",
+                "passwordHash" to hashedPassword,
                 "createdAt" to System.currentTimeMillis()
             )
 
