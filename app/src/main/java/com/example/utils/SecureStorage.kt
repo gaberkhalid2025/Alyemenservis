@@ -148,4 +148,20 @@ class SecureStorage(
             .remove("admin_permissions")
             .apply()
     }
+
+    /**
+     * 🔐 حفظ أي نص بشكل مشفر وآمن
+     */
+    fun saveSecureString(key: String, value: String) {
+        val editor = prefs.edit()
+        putSecureString(editor, key, value)
+        editor.apply()
+    }
+
+    /**
+     * 📖 استرجاع أي نص مشفر بشكل آمن
+     */
+    fun getSecureStringPublic(key: String, defaultValue: String? = null): String? {
+        return getSecureString(key) ?: defaultValue
+    }
 }

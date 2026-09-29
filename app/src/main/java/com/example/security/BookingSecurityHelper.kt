@@ -55,6 +55,9 @@ object BookingSecurityHelper {
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                     )
                 } catch (ex: Exception) {
+                    if (!com.example.BuildConfig.DEBUG) {
+                        throw SecurityException("EncryptedSharedPreferences is unavailable for booking security and unencrypted fallback is prohibited in release builds: ${ex.message}", ex)
+                    }
                     appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 }
             }
@@ -219,9 +222,16 @@ object BookingSecurityHelper {
      */
     fun maskPhoneNumber(phone: String): String {
         val clean = phone.trim()
-        if (clean.length < 6) return "***"
-        val prefix = clean.take(2)
-        val suffix = clean.takeLast(3)
-        return "$prefix****$suffix"
+        val len = clean.length
+        if (len < 6) return "***"
+        
+        val prefixLen = if (len >= 9) 3 else 2
+        val suffixLen = if (len >= 9) 3 else 2
+        val maskLen = (len - prefixLen - suffixLen).coerceAtLeast(2)
+        
+        val prefix = clean.take(prefixLen)
+        val suffix = clean.takeLast(suffixLen)
+        val stars = "*".repeat(maskLen)
+        return "$prefix$stars$suffix"
     }
 }

@@ -180,8 +180,8 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
-                    com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 5000L
-                ).setMinUpdateIntervalMillis(3000L).build()
+                    com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY, 60000L // 🚨 M-14: 60-second interval to prevent battery drain
+                ).setMinUpdateIntervalMillis(30000L).build()
                 
                 locationCallback = object : com.google.android.gms.location.LocationCallback() {
                     override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
@@ -257,12 +257,6 @@ class MainActivity : ComponentActivity() {
         initializeAdminVaultIfNeeded()
         
         try {
-            com.example.utils.NotificationHelper.createNotificationChannels(this)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        
-        try {
             if (!com.example.security.SecurityManager.verifyAppSignature(this)) {
                 android.util.Log.e("MainActivity", "SECURITY ERROR: Signature mismatch! Exiting.")
                 finishAffinity()
@@ -294,28 +288,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        try {
-            if (com.google.firebase.FirebaseApp.getApps(this).isEmpty()) {
-                com.google.firebase.FirebaseApp.initializeApp(this)
-                try {
-                    val firebaseAppCheck = com.google.firebase.appcheck.FirebaseAppCheck.getInstance()
-                    if (BuildConfig.DEBUG) {
-                        firebaseAppCheck.installAppCheckProviderFactory(
-                            com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
-                        )
-                    } else {
-                        firebaseAppCheck.installAppCheckProviderFactory(
-                            com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory.getInstance()
-                        )
-                    }
-                } catch (appCheckEx: Exception) {
-                    appCheckEx.printStackTrace()
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        
         try {
             val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
             val docRef = firestore.collection("settings").document("main_settings")
@@ -612,5 +584,28 @@ class MainActivity : ComponentActivity() {
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         // لا تفعل شيئاً - منع إعادة الإنشاء
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            101 -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "🎙️ تم تفعيل الميكروفون بنجاح!", Toast.LENGTH_SHORT).show()
+                    voiceResultCallback?.let { callback ->
+                        startVoiceInput(callback)
+                    }
+                } else {
+                    Toast.makeText(this, "❌ تم رفض إذن الميكروفون. يمكنك البحث بالكتابة.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            102 -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "🔔 تم تفعيل الإشعارات بنجاح!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "⚠️ تم رفض الإشعارات. لن تتلقى تنبيهات بالرسائل الجديدة.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 }

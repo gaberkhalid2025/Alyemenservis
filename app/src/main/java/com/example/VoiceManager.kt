@@ -89,10 +89,16 @@ object VoiceManager : TextToSpeech.OnInitListener {
                 }
             } catch (e: Exception) {
                 Log.e("VoiceManager", "Error configuring TTS onInit", e)
+                isInitialized = false
+                pendingSpeechText = null
+                try { tts?.shutdown() } catch (_: Exception) {}
+                tts = null
             }
         } else {
             isInitialized = false
             pendingSpeechText = null
+            try { tts?.shutdown() } catch (_: Exception) {}
+            tts = null
             Log.w("VoiceManager", "TTS initialization failed with status: $status")
         }
     }

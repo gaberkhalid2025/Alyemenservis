@@ -61,24 +61,12 @@ fun ProductDetailsDialog(
                         .background(Color.DarkGray),
                     contentAlignment = Alignment.Center
                 ) {
-                    val pBitmap = rememberBase64Bitmap(product.imageUrl)
-                    if (pBitmap != null) {
-                        Image(
-                            bitmap = pBitmap,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else if (product.imageUrl.startsWith("http")) {
-                        AsyncImage(
-                            model = product.imageUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Text("📦", fontSize = 64.sp)
-                    }
+                    com.example.ui.components.SmartAsyncImage(
+                        model = product.imageUrl,
+                        contentDescription = product.name,
+                        modifier = Modifier.fillMaxSize(),
+                        fallbackEmoji = "📦"
+                    )
                 }
 
                 Text(

@@ -41,6 +41,8 @@ class BookingRepository(
     private val memoryCache: BookingCache = BookingCache()
 ) : IBookingRepository {
 
+    private val repositoryScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
     private val cacheManager = LocalAppCacheManager(context)
     private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
 
@@ -92,7 +94,7 @@ class BookingRepository(
             try {
                 val bookingDao = com.example.data.local.AppDatabase.getInstance(context).bookingDao()
                 val roomList = list.map { it.toRoomEntity() }
-                CoroutineScope(Dispatchers.IO).launch {
+                repositoryScope.launch {
                     bookingDao.insertBookings(roomList)
                 }
             } catch (e: Exception) {

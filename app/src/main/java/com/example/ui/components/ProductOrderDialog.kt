@@ -51,8 +51,10 @@ fun StoreProductOrderDialog(
         stores.find { it.id == product.storeId }
     }
 
-    var customerName by remember { mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotEmpty()) "عميل ($currentUserPhone)" else "" }) }
-    var customerPhone by remember { mutableStateOf(currentUserPhone) }
+    var customerName by remember(currentUserName, currentUserPhone) { 
+        mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotEmpty()) "عميل ($currentUserPhone)" else "" }) 
+    }
+    var customerPhone by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
     var customerArea by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf(1) }
     var notes by remember { mutableStateOf("") }

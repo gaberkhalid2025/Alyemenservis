@@ -92,7 +92,7 @@ class MyApplication : Application() {
             val firestore = FirebaseFirestore.getInstance()
             val settings = FirebaseFirestoreSettings.Builder()
                 .setPersistenceEnabled(true)
-                .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
+                .setCacheSizeBytes(100 * 1024 * 1024L) // 🚨 M-06: 100MB limit to prevent storage bloat
                 .build()
             firestore.firestoreSettings = settings
             Log.d("MyApplication", "✅ FirebaseFirestore settings initialized successfully")
@@ -161,25 +161,24 @@ class MyApplication : Application() {
             return
         }
 
-        // استخدام Handler للتأخير
-        Handler(Looper.getMainLooper()).postDelayed({
+        try {
+            val crashlytics = FirebaseCrashlytics.getInstance()
+            // 🚨 M-10: التحقق من موافقة المستخدم الإحصائية والتشخيصية للامتثال لسياسات الخصوصية
+            val prefs = getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+            val isConsentGranted = prefs.getBoolean("user_diagnostics_consent", true)
+            crashlytics.setCrashlyticsCollectionEnabled(isConsentGranted)
+            isCrashlyticsReady = true
+            Log.d("MyApplication", "✅ Firebase Crashlytics initialized successfully (Immediate, Consent=$isConsentGranted)")
+            
             try {
-                val crashlytics = FirebaseCrashlytics.getInstance()
-                crashlytics.setCrashlyticsCollectionEnabled(true)
-                isCrashlyticsReady = true
-                Log.d("MyApplication", "✅ Firebase Crashlytics initialized successfully")
-                
-                try {
-                    crashlytics.log("Crashlytics initialized successfully")
-                } catch (e: Exception) { /* تجاهل */ }
-                
-            } catch (e: Exception) {
-                Log.e("MyApplication", "❌ Firebase Crashlytics initialization failed: ${e.message}")
-                e.printStackTrace()
-                // محاولة بديلة
-                tryAlternativeCrashlyticsInit()
-            }
-        }, 3000)
+                crashlytics.log("Crashlytics initialized successfully")
+            } catch (e: Exception) { /* تجاهل */ }
+            
+        } catch (e: Exception) {
+            Log.e("MyApplication", "❌ Firebase Crashlytics initialization failed: ${e.message}")
+            // محاولة بديلة
+            tryAlternativeCrashlyticsInit()
+        }
     }
 
     /**

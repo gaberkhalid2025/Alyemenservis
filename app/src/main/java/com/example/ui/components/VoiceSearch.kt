@@ -116,11 +116,9 @@ fun VoiceSearchDialog(
                         modifier = Modifier.size(60.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Phone,
-                                contentDescription = "Mic",
-                                tint = Color(0xFF0F172A),
-                                modifier = Modifier.size(28.dp)
+                            Text(
+                                text = if (isListening) "🎙️" else "✅",
+                                fontSize = 26.sp
                             )
                         }
                     }

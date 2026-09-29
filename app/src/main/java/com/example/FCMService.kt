@@ -2,6 +2,7 @@ package com.example
 
 import com.example.utils.*
 import com.example.ui.helpers.AppPreferenceHelper
+import kotlinx.coroutines.*
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -77,6 +78,7 @@ class FCMService : FirebaseMessagingService() {
                 .setContentIntent(pendingIntent)
                 .setVibrate(longArrayOf(0, 500, 200, 500))
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE) // 🚨 H-06: إخفاء البيانات الحساسة على شاشة القفل لضمان الخصوصية والأمان
                 .build()
 
             notificationManager.notify(notificationId, notification)
@@ -134,33 +136,42 @@ class FCMService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         
-        // الخطوة 1: حفظ التوكن في SharedPreferences فوراً (آمن 100%)
+        // 🔒 الخطوة 1: حفظ التوكن في التخزين المشفر فوراً (H-03: Encrypted token storage)
         try {
-            val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-            sp.edit().putString("fcm_token_backup", token).apply()
+            val secureStorage = com.example.utils.SecureStorage(this)
+            secureStorage.saveSecureString("fcm_token_backup", token)
         } catch (e: Exception) {
             e.printStackTrace()
+            // تراجع آمن في حال تعذر التوافق
+            try {
+                val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+                sp.edit().putString("fcm_token_backup", token).apply()
+            } catch (_: Exception) {}
         }
         
-        // الخطوة 2: مزامنة مع Firestore بعد تأخير (لضمان تهيئة Firebase)
-        Handler(Looper.getMainLooper()).postDelayed({
+        // 🔄 الخطوة 2: مزامنة مع Firestore باستخدام Coroutines لتجنب Race Condition (M-11)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             try {
+                kotlinx.coroutines.delay(1000) // تأخير آمن غير معطل للخيوط لضمان تهيئة Firebase
+                
                 // التحقق من تهيئة Firebase
-                if (FirebaseApp.getApps(this).isEmpty()) {
+                if (FirebaseApp.getApps(this@FCMService).isEmpty()) {
                     try {
-                        FirebaseApp.initializeApp(this)
+                        FirebaseApp.initializeApp(this@FCMService)
                     } catch (e: Exception) {
-                        e.printStackTrace()
-                        return@postDelayed
+                        android.util.Log.e("FCMService", "FirebaseApp init failed: ${e.message}")
+                        return@launch
                     }
                 }
                 
                 val db = FirebaseFirestore.getInstance()
-                val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
                 
-                // جلب بيانات المستخدم مع التحقق الصارم من نجاح فك التشفير
+                // 🔑 جلب المعرف الموثوق من FirebaseAuth كمرجع أمان أساسي (H-05) مع التراجع الآمن
+                val firebaseUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                
+                val sp = getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
                 val rawUserId = sp.getString("user_id", "") ?: ""
-                val userId = if (rawUserId.isNotEmpty() && rawUserId != "guest") {
+                val localUserId = if (rawUserId.isNotEmpty() && rawUserId != "guest") {
                     if (rawUserId.startsWith("gcm:")) {
                         try { SecurityCryptoUtils.decrypt(rawUserId) } catch (e: Exception) { "" }
                     } else {
@@ -168,8 +179,10 @@ class FCMService : FirebaseMessagingService() {
                     }
                 } else rawUserId
 
+                val userId = if (!firebaseUid.isNullOrBlank()) firebaseUid else localUserId
+                
                 if (userId.isEmpty() || userId == "guest" || userId.startsWith("gcm:")) {
-                    return@postDelayed
+                    return@launch
                 }
 
                 val rawPhone = sp.getString("user_phone", "") ?: ""
@@ -199,48 +212,71 @@ class FCMService : FirebaseMessagingService() {
                     "role" to resolvedRole,
                     "updatedAt" to now
                 )
+                
+                // أ: التحديث في المستند الأساسي للتوافقية الكاملة
                 db.collection("fcm_tokens").document(userId)
                     .set(tokenData, SetOptions.merge())
                     .addOnFailureListener { e ->
-                        android.util.Log.w("FCMService", "Failed to save fcm_tokens document: ${e.message}")
+                        android.util.Log.w("FCMService", "Failed to sync main fcm_tokens document: ${e.message}")
+                    }
+                    .addOnSuccessListener {
+                        android.util.Log.d("FCMService", "Main FCM token synced successfully.")
                     }
 
-                // 2. تحديث registered_users بشكل مستقل (فقط إذا كان المستند موجوداً)
+                // ب: التحديث في مجموعة الأجهزة الفرعية لمنع حذف التوكنات للأجهزة المتعددة (M-12: Support Multi-Device)
                 try {
-                    db.collection("registered_users").document(userId)
-                        .update("fcmToken", token)
-                } catch (e: Exception) {
-                    android.util.Log.w("FCMService", "Skipped registered_users token update: ${e.message}")
+                    val tokenHash = java.security.MessageDigest.getInstance("MD5")
+                        .digest(token.toByteArray())
+                        .joinToString("") { "%02x".format(it) }
+                    
+                    db.collection("fcm_tokens").document(userId)
+                        .collection("devices").document(tokenHash)
+                        .set(tokenData, SetOptions.merge())
+                        .addOnFailureListener { e ->
+                            android.util.Log.w("FCMService", "Failed to sync fcm_tokens device document: ${e.message}")
+                        }
+                        .addOnSuccessListener {
+                            android.util.Log.d("FCMService", "FCM token device document synced successfully ($tokenHash).")
+                        }
+                } catch (hashEx: Exception) {
+                    android.util.Log.w("FCMService", "MD5 token hashing skipped: ${hashEx.message}")
                 }
 
-                // 3. تحديث providers, stores, properties بشكل مستقل لكل مجموعة لتجنب فشل المعاملة عند عدم وجود المستند في إحداها
+                // 2. تحديث registered_users بشكل مستقل (فقط إذا كان المستند موجوداً ومع التحقق الكامل H-04)
+                db.collection("registered_users").document(userId)
+                    .update("fcmToken", token)
+                    .addOnFailureListener { e ->
+                        android.util.Log.w("FCMService", "Skipped registered_users token update (document might not exist): ${e.message}")
+                    }
+                    .addOnSuccessListener {
+                        android.util.Log.d("FCMService", "registered_users token updated successfully.")
+                    }
+
+                // 3. تحديث providers, stores, properties بشكل مستقل لكل مجموعة (مع معالجة الفشل الكاملة H-04)
                 if (cleanPhone.isNotEmpty() && !cleanPhone.startsWith("gcm:") && cleanPhone.length >= 7) {
-                    try {
-                        db.collection("providers").document(cleanPhone)
-                            .update("fcmToken", token)
-                    } catch (e: Exception) {
-                        android.util.Log.w("FCMService", "Provider token update skipped: ${e.message}")
-                    }
+                    db.collection("providers").document(cleanPhone)
+                        .update("fcmToken", token)
+                        .addOnFailureListener { e ->
+                            android.util.Log.w("FCMService", "Provider token update skipped (document might not exist): ${e.message}")
+                        }
+                    
+                    db.collection("stores").document(cleanPhone)
+                        .update("fcmToken", token)
+                        .addOnFailureListener { e ->
+                            android.util.Log.w("FCMService", "Store token update skipped (document might not exist): ${e.message}")
+                        }
 
-                    try {
-                        db.collection("stores").document(cleanPhone)
-                            .update("fcmToken", token)
-                    } catch (e: Exception) {
-                        android.util.Log.w("FCMService", "Store token update skipped: ${e.message}")
-                    }
-
-                    try {
-                        db.collection("properties").document(cleanPhone)
-                            .update("fcmToken", token)
-                    } catch (e: Exception) {
-                        android.util.Log.w("FCMService", "Property token update skipped: ${e.message}")
-                    }
+                    db.collection("properties").document(cleanPhone)
+                        .update("fcmToken", token)
+                        .addOnFailureListener { e ->
+                            android.util.Log.w("FCMService", "Property token update skipped (document might not exist): ${e.message}")
+                        }
                 }
 
             } catch (e: Exception) {
                 android.util.Log.e("FCMService", "Error during FCM token sync", e)
             }
-        }, 3000) // تأخير 3 ثواني لضمان تهيئة Firebase بالكامل
+        }
     }
 
     private fun sendLocalNotification(title: String, body: String, targetScreen: String = "MAIN") {

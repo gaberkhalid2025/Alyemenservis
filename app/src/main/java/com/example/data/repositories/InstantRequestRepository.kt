@@ -29,6 +29,8 @@ import kotlin.random.Random
  */
 class InstantRequestRepository(private val context: Context? = null) {
 
+    private val repositoryScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
     private val _requests = MutableStateFlow<List<InstantRequestEntity>>(emptyList())
@@ -279,7 +281,7 @@ class InstantRequestRepository(private val context: Context? = null) {
                     ) else it
                 }
                 context?.let { ctx ->
-                    CoroutineScope(Dispatchers.IO).launch {
+                    repositoryScope.launch {
                         try {
                             com.example.data.local.AppDatabase.getInstance(ctx).requestDao()
                                 .updateRequestStatus(requestId, "ACCEPTED")

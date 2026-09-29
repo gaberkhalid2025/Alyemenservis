@@ -72,7 +72,7 @@ class SecurityManager(context: Context) {
         return false
     }
 
-    fun resetAttempts() {
+    internal fun resetAttempts() {
         securePrefs.edit()
             .remove(KEY_FAILED_ATTEMPTS)
             .remove(KEY_LOCKOUT_TIMESTAMP)
@@ -142,6 +142,9 @@ class SecurityManager(context: Context) {
                             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                         )
                     } catch (ex: Exception) {
+                        if (!com.example.BuildConfig.DEBUG) {
+                            throw SecurityException("EncryptedSharedPreferences is unavailable and unencrypted fallback is prohibited in release builds: ${ex.message}", ex)
+                        }
                         Log.w(TAG, "EncryptedSharedPreferences unavailable; falling back to private preferences: ${ex.message}")
                         appContext.getSharedPreferences(PREFS_FALLBACK_NAME, Context.MODE_PRIVATE)
                     }
@@ -200,9 +203,12 @@ class SecurityManager(context: Context) {
 
                 val mapsFile = File("/proc/self/maps")
                 if (mapsFile.exists() && mapsFile.canRead()) {
-                    val mapsContent = mapsFile.readText()
-                    if (mapsContent.contains("frida-agent") || mapsContent.contains("XposedBridge.jar")) {
-                        return true
+                    mapsFile.useLines { lines ->
+                        for (line in lines) {
+                            if (line.contains("frida-agent") || line.contains("XposedBridge.jar")) {
+                                return true
+                            }
+                        }
                     }
                 }
                 false
@@ -260,6 +266,7 @@ class SecurityManager(context: Context) {
                 if (expectedHash.isEmpty()) {
                     if (!com.example.BuildConfig.DEBUG) {
                         Log.w(TAG, "SIGNATURE_HASH is empty in non-debug build; signature pinning is not enforced.")
+                        return false
                     }
                     return true
                 }

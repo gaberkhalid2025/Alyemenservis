@@ -56,10 +56,14 @@ fun UrgentRequestScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserName by viewModel.currentUserName.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
     val uiState by instantViewModel.uiState.collectAsState()
 
-    var customerPhone by remember { mutableStateOf("") }
-    var customerName by remember { mutableStateOf("") }
+    var customerPhone by remember(currentUserPhone) { mutableStateOf(currentUserPhone) }
+    var customerName by remember(currentUserName, currentUserPhone) { 
+        mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotEmpty()) "عميل ($currentUserPhone)" else "" }) 
+    }
     var selectedDepartment by remember { mutableStateOf("خدمات وفنيين") }
     var selectedCategory by remember { mutableStateOf("سباكة طارئة") }
     var serviceTitle by remember { mutableStateOf("") }

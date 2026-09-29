@@ -36,7 +36,7 @@ class SyncWorker(
                     SyncWorkerEntryPoint::class.java
                 )
                 entryPoint.fullSyncManager() to entryPoint.offlineQueueManager()
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
                 FullSyncManager(applicationContext) to OfflineQueueManager(applicationContext)
             }
 
@@ -46,10 +46,14 @@ class SyncWorker(
             // 2. معالجة طابور وضع عدم الاتصال (Offline Queue) والانتظار الفعلي حتى اكتمال الإرسال
             val queueSuccess = offlineQueue.processQueueSuspend()
 
-            if (!queueSuccess && runAttemptCount < MAX_RETRY_ATTEMPTS) {
-                Result.retry()
-            } else {
+            if (queueSuccess) {
                 Result.success()
+            } else {
+                if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
+                    Result.retry()
+                } else {
+                    Result.failure()
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Background sync worker failed: ${e.message}", e)

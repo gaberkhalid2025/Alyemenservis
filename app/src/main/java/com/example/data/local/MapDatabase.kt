@@ -21,7 +21,7 @@ class MapDao(private val context: Context) {
             val adapter = moshi.adapter<List<ProviderEntity>>(type)
             cacheManager.saveProvidersCache(adapter.toJson(providers))
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("MapDao", "Error saving providers cache: ${e.message}", e)
         }
     }
 
@@ -43,7 +43,7 @@ class MapDao(private val context: Context) {
             val adapter = moshi.adapter<List<StoreEntity>>(type)
             cacheManager.saveStoresCache(adapter.toJson(stores))
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("MapDao", "Error saving stores cache: ${e.message}", e)
         }
     }
 
@@ -67,7 +67,7 @@ class MapDao(private val context: Context) {
             context.getSharedPreferences("YS_Properties_Cache", Context.MODE_PRIVATE)
                 .edit().putString("KEY_PROPERTIES_CACHE", raw).apply()
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("MapDao", "Error saving properties cache: ${e.message}", e)
         }
     }
 

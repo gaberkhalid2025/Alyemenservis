@@ -77,7 +77,7 @@ class ChatLocalDataSource(
                 legacyPrefs.edit().clear().apply()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in migrateLegacyChatData: ${e.message}", e)
         }
     }
 
@@ -135,7 +135,7 @@ class ChatLocalDataSource(
             chatDao.deleteAllChannels()
             chatDao.insertChannels(roomChannels)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in saveChannels: ${e.message}", e)
         }
         channelsMemoryCache.value = channels
     }
@@ -157,7 +157,7 @@ class ChatLocalDataSource(
             chatDao.deleteChannel(channelId)
             chatDao.deleteMessagesByChannel(channelId)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in deleteChannel: ${e.message}", e)
         }
         val current = getCachedChannelsInternal().filter { it.id != channelId }
         channelsMemoryCache.value = current
@@ -170,7 +170,7 @@ class ChatLocalDataSource(
             chatDao.deleteAllChannels()
             chatDao.deleteAllMessages()
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in clearAllChannels: ${e.message}", e)
         }
         prefs.edit().clear().apply()
         channelsMemoryCache.value = emptyList()
@@ -254,7 +254,7 @@ class ChatLocalDataSource(
             chatDao.deleteMessagesByChannel(channelId)
             chatDao.insertMessages(roomMessages)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in saveMessages: ${e.message}", e)
         }
 
         // Update in-memory stream
@@ -281,7 +281,7 @@ class ChatLocalDataSource(
             )
             chatDao.insertMessage(roomEntity)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in insertOrUpdateMessage: ${e.message}", e)
         }
         val current = (messagesMemoryCache[message.channelId]?.value ?: getCachedMessagesInternal(message.channelId)).toMutableList()
         val index = current.indexOfFirst { it.id == message.id }
@@ -299,7 +299,7 @@ class ChatLocalDataSource(
         try {
             chatDao.updateMessageStatus(messageId, status.name)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in updateMessageStatus: ${e.message}", e)
         }
         val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).toMutableList()
         val index = current.indexOfFirst { it.id == messageId }
@@ -314,7 +314,7 @@ class ChatLocalDataSource(
         try {
             chatDao.deleteMessage(messageId)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in deleteMessage: ${e.message}", e)
         }
         val current = (messagesMemoryCache[channelId]?.value ?: getCachedMessagesInternal(channelId)).filter { it.id != messageId }
         val flow = messagesMemoryCache.getOrPut(channelId) { MutableStateFlow(emptyList()) }
@@ -391,7 +391,7 @@ class ChatLocalDataSource(
             chatDao.updateMessageSyncStatus(messageId, SyncStatus.SYNCED.name)
             chatDao.updateMessageStatus(messageId, MessageStatus.SENT.name)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in removePendingMessage: ${e.message}", e)
         }
     }
 
@@ -494,7 +494,7 @@ class ChatLocalDataSource(
             }
             chatDao.deleteStaleMessages(now - MAX_CACHE_AGE_MILLIS)
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("ChatLocalDataSource", "Error in pruneStaleCache: ${e.message}", e)
         }
     }
 }
