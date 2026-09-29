@@ -26,12 +26,17 @@ object VoiceManager : TextToSpeech.OnInitListener {
     @Volatile
     private var isDispatchingOnSpeak = false
 
+    @Volatile
     private var pendingSpeechText: String? = null
+    @Volatile
     private var pendingUtteranceId: String = "ai_speech"
+    @Volatile
+    private var activeUtteranceId: String = "ai_speech"
     private val mainHandler = Handler(Looper.getMainLooper())
 
     var isSpeakingCallback: ((Boolean) -> Unit)? = null
 
+    @Synchronized
     fun init(context: Context) {
         if (tts == null && !isInitializing) {
             try {
@@ -63,20 +68,27 @@ object VoiceManager : TextToSpeech.OnInitListener {
 
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
+                        if (utteranceId != null) activeUtteranceId = utteranceId
                         mainHandler.post { isSpeakingCallback?.invoke(true) }
                     }
 
                     override fun onDone(utteranceId: String?) {
-                        mainHandler.post { isSpeakingCallback?.invoke(false) }
+                        if (utteranceId == null || utteranceId == activeUtteranceId) {
+                            mainHandler.post { isSpeakingCallback?.invoke(false) }
+                        }
                     }
 
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
-                        mainHandler.post { isSpeakingCallback?.invoke(false) }
+                        if (utteranceId == null || utteranceId == activeUtteranceId) {
+                            mainHandler.post { isSpeakingCallback?.invoke(false) }
+                        }
                     }
 
                     override fun onError(utteranceId: String?, errorCode: Int) {
-                        mainHandler.post { isSpeakingCallback?.invoke(false) }
+                        if (utteranceId == null || utteranceId == activeUtteranceId) {
+                            mainHandler.post { isSpeakingCallback?.invoke(false) }
+                        }
                     }
                 })
 
@@ -84,6 +96,7 @@ object VoiceManager : TextToSpeech.OnInitListener {
                 val queuedId = pendingUtteranceId
                 pendingSpeechText = null
                 if (!queuedText.isNullOrBlank()) {
+                    activeUtteranceId = queuedId
                     val params = Bundle()
                     tts?.speak(queuedText, TextToSpeech.QUEUE_FLUSH, params, queuedId)
                 }
@@ -105,6 +118,7 @@ object VoiceManager : TextToSpeech.OnInitListener {
 
     fun speak(text: String, utteranceId: String = "ai_speech") {
         if (text.isBlank()) return
+        activeUtteranceId = utteranceId
         if (isInitialized && tts != null) {
             try {
                 val params = Bundle()

@@ -21,26 +21,28 @@ import java.util.UUID
  * Handles stats calculation and dashboard data aggregation with offline fallback.
  */
 class DashboardRepositoryImpl(
-    context: Context
+    @Suppress("UNUSED_PARAMETER") context: Context? = null
 ) : IDashboardRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun getDashboardStats(ownerId: String, role: String): Flow<DashboardStatsEntity> = callbackFlow {
-        if (ownerId.isBlank()) {
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) {
             trySend(DashboardStatsEntity())
+            close()
             return@callbackFlow
         }
 
-        val collectionName = when (role.uppercase()) {
-            "PROVIDER", "TECHNICIAN" -> "providers"
-            "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> "stores"
-            "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> "properties"
-            "JOB", "JOB_POSTER" -> com.example.utils.AppConstants.COL_JOBS
-            else -> "users"
+        val collectionName = when (role.trim().uppercase()) {
+            "PROVIDER", "TECHNICIAN" -> AppConstants.COL_PROVIDERS
+            "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> AppConstants.COL_STORES
+            "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> AppConstants.COL_PROPERTIES
+            "JOB", "JOB_POSTER" -> AppConstants.COL_JOBS
+            else -> AppConstants.COL_USER_PROFILES
         }
 
-        val listener: ListenerRegistration = firestore.collection(collectionName).document(ownerId)
+        val listener: ListenerRegistration = firestore.collection(collectionName).document(cleanOwnerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null || !snapshot.exists()) {
                     trySend(DashboardStatsEntity())
@@ -64,16 +66,17 @@ class DashboardRepositoryImpl(
     }
 
     override suspend fun refreshDashboardStats(ownerId: String, role: String): Result<Unit> {
-        if (ownerId.isBlank()) return Result.failure(IllegalArgumentException("ownerId cannot be blank"))
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) return Result.failure(IllegalArgumentException("ownerId cannot be blank"))
         return try {
-            val collectionName = when (role.uppercase()) {
-                "PROVIDER", "TECHNICIAN" -> "providers"
-                "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> "stores"
-                "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> "properties"
-                "JOB", "JOB_POSTER" -> com.example.utils.AppConstants.COL_JOBS
-                else -> "users"
+            val collectionName = when (role.trim().uppercase()) {
+                "PROVIDER", "TECHNICIAN" -> AppConstants.COL_PROVIDERS
+                "STORE", "STORE_OWNER", "RESTAURANT", "RESTAURANT_OWNER", "MEDICAL", "MEDICAL_CENTER" -> AppConstants.COL_STORES
+                "PROPERTY", "REAL_ESTATE", "PROPERTY_OWNER" -> AppConstants.COL_PROPERTIES
+                "JOB", "JOB_POSTER" -> AppConstants.COL_JOBS
+                else -> AppConstants.COL_USER_PROFILES
             }
-            firestore.collection(collectionName).document(ownerId)
+            firestore.collection(collectionName).document(cleanOwnerId)
                 .get(com.google.firebase.firestore.Source.SERVER)
                 .await()
             Result.success(Unit)
@@ -87,19 +90,20 @@ class DashboardRepositoryImpl(
  * 📦 FavoritesRepositoryImpl
  */
 class FavoritesRepositoryImpl(
-    private val context: Context
+    @Suppress("UNUSED_PARAMETER") context: Context? = null
 ) : IFavoritesRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun getUserFavorites(userId: String): Flow<List<FavoriteItemEntity>> = callbackFlow {
-        if (userId.isBlank()) {
+        val cleanUserId = userId.trim()
+        if (cleanUserId.isBlank()) {
             trySend(emptyList())
             return@callbackFlow
         }
 
         val listener: ListenerRegistration = firestore.collection("users")
-            .document(userId)
+            .document(cleanUserId)
             .collection("favorites")
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
@@ -110,7 +114,7 @@ class FavoritesRepositoryImpl(
                 val list = snapshot.documents.mapNotNull { doc ->
                     FavoriteItemEntity(
                         id = doc.id,
-                        userId = userId,
+                        userId = cleanUserId,
                         targetId = doc.getString("targetId") ?: "",
                         targetType = doc.getString("targetType") ?: "PROVIDER",
                         title = doc.getString("title") ?: "",
@@ -129,18 +133,22 @@ class FavoritesRepositoryImpl(
 
     override suspend fun addFavorite(favorite: FavoriteItemEntity): Result<Unit> {
         return try {
-            val favId = if (favorite.id.isBlank()) favorite.targetId else favorite.id
+            val cleanUserId = favorite.userId.trim()
+            val favId = favorite.id.trim().ifBlank { favorite.targetId.trim() }
+            if (cleanUserId.isBlank() || favId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف المستخدم أو العنصر المفضل غير صالح"))
+            }
             val map = mapOf(
-                "targetId" to favorite.targetId,
-                "targetType" to favorite.targetType,
-                "title" to favorite.title,
-                "category" to favorite.category,
-                "city" to favorite.city,
-                "imageUrl" to favorite.imageUrl,
-                "rating" to favorite.rating,
+                "targetId" to favorite.targetId.trim(),
+                "targetType" to favorite.targetType.trim().ifBlank { "PROVIDER" },
+                "title" to favorite.title.trim(),
+                "category" to favorite.category.trim(),
+                "city" to favorite.city.trim(),
+                "imageUrl" to favorite.imageUrl.trim(),
+                "rating" to favorite.rating.coerceIn(0.0, 5.0),
                 "createdAt" to System.currentTimeMillis()
             )
-            firestore.collection("users").document(favorite.userId)
+            firestore.collection("users").document(cleanUserId)
                 .collection("favorites").document(favId).set(map).await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -150,8 +158,13 @@ class FavoritesRepositoryImpl(
 
     override suspend fun removeFavorite(userId: String, targetId: String): Result<Unit> {
         return try {
-            firestore.collection("users").document(userId)
-                .collection("favorites").document(targetId).delete().await()
+            val cleanUserId = userId.trim()
+            val cleanTargetId = targetId.trim()
+            if (cleanUserId.isBlank() || cleanTargetId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف المستخدم أو العنصر المفضل غير صالح"))
+            }
+            firestore.collection("users").document(cleanUserId)
+                .collection("favorites").document(cleanTargetId).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -159,10 +172,12 @@ class FavoritesRepositoryImpl(
     }
 
     override suspend fun isFavorite(userId: String, targetId: String): Boolean {
-        if (userId.isBlank() || targetId.isBlank()) return false
+        val cleanUserId = userId.trim()
+        val cleanTargetId = targetId.trim()
+        if (cleanUserId.isBlank() || cleanTargetId.isBlank()) return false
         return try {
-            val doc = firestore.collection("users").document(userId)
-                .collection("favorites").document(targetId).get().await()
+            val doc = firestore.collection("users").document(cleanUserId)
+                .collection("favorites").document(cleanTargetId).get().await()
             doc.exists()
         } catch (e: Exception) {
             false
@@ -174,19 +189,20 @@ class FavoritesRepositoryImpl(
  * 📦 ProductsRepositoryImpl
  */
 class ProductsRepositoryImpl(
-    context: Context
+    context: Context? = null
 ) : IProductsRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun getOwnerProducts(ownerId: String): Flow<List<ProductItemEntity>> = callbackFlow {
-        if (ownerId.isBlank()) {
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) {
             trySend(emptyList())
             return@callbackFlow
         }
 
         val listener: ListenerRegistration = firestore.collection(AppConstants.COL_PRODUCTS)
-            .whereEqualTo("ownerId", ownerId)
+            .whereEqualTo("ownerId", cleanOwnerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -196,7 +212,7 @@ class ProductsRepositoryImpl(
                 val items = snapshot.documents.mapNotNull { doc ->
                     ProductItemEntity(
                         id = doc.id,
-                        ownerId = doc.getString("ownerId") ?: ownerId,
+                        ownerId = doc.getString("ownerId") ?: cleanOwnerId,
                         title = doc.getString("title") ?: doc.getString("name") ?: "",
                         description = doc.getString("description") ?: "",
                         category = doc.getString("category") ?: "",
@@ -242,19 +258,20 @@ class ProductsRepositoryImpl(
 
     override suspend fun addProduct(product: ProductItemEntity): Result<String> {
         return try {
-            val id = product.id.ifBlank { UUID.randomUUID().toString() }
+            val id = product.id.trim().ifBlank { UUID.randomUUID().toString() }
             val createdAt = if (product.createdAt > 0L) product.createdAt else System.currentTimeMillis()
+            val safePrice = if (product.priceYer.isNaN() || product.priceYer.isInfinite() || product.priceYer < 0.0) 0.0 else product.priceYer
             val map = mapOf(
                 "id" to id,
-                "ownerId" to product.ownerId,
-                "storeId" to product.ownerId,
-                "title" to product.title,
-                "name" to product.title,
-                "description" to product.description,
-                "category" to product.category,
-                "priceYer" to product.priceYer,
-                "price" to product.priceYer,
-                "imageUrl" to product.imageUrl,
+                "ownerId" to product.ownerId.trim(),
+                "storeId" to product.ownerId.trim(),
+                "title" to product.title.trim(),
+                "name" to product.title.trim(),
+                "description" to product.description.trim(),
+                "category" to product.category.trim(),
+                "priceYer" to safePrice,
+                "price" to safePrice,
+                "imageUrl" to product.imageUrl.trim(),
                 "isAvailable" to product.isAvailable,
                 "createdAt" to createdAt
             )
@@ -267,17 +284,22 @@ class ProductsRepositoryImpl(
 
     override suspend fun updateProduct(product: ProductItemEntity): Result<Unit> {
         return try {
+            val cleanId = product.id.trim()
+            if (cleanId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف المنتج غير صالح"))
+            }
+            val safePrice = if (product.priceYer.isNaN() || product.priceYer.isInfinite() || product.priceYer < 0.0) 0.0 else product.priceYer
             val map = mapOf(
-                "title" to product.title,
-                "name" to product.title,
-                "description" to product.description,
-                "category" to product.category,
-                "priceYer" to product.priceYer,
-                "price" to product.priceYer,
-                "imageUrl" to product.imageUrl,
+                "title" to product.title.trim(),
+                "name" to product.title.trim(),
+                "description" to product.description.trim(),
+                "category" to product.category.trim(),
+                "priceYer" to safePrice,
+                "price" to safePrice,
+                "imageUrl" to product.imageUrl.trim(),
                 "isAvailable" to product.isAvailable
             )
-            firestore.collection(AppConstants.COL_PRODUCTS).document(product.id).update(map).await()
+            firestore.collection(AppConstants.COL_PRODUCTS).document(cleanId).update(map).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -286,7 +308,11 @@ class ProductsRepositoryImpl(
 
     override suspend fun deleteProduct(productId: String): Result<Unit> {
         return try {
-            firestore.collection(AppConstants.COL_PRODUCTS).document(productId).delete().await()
+            val cleanId = productId.trim()
+            if (cleanId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف المنتج غير صالح"))
+            }
+            firestore.collection(AppConstants.COL_PRODUCTS).document(cleanId).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -298,19 +324,20 @@ class ProductsRepositoryImpl(
  * 📦 RatingsRepositoryImpl
  */
 class RatingsRepositoryImpl(
-    context: Context
+    context: Context? = null
 ) : IRatingsRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun getTargetRatings(targetId: String): Flow<List<RatingReviewEntity>> = callbackFlow {
-        if (targetId.isBlank()) {
+        val cleanTargetId = targetId.trim()
+        if (cleanTargetId.isBlank()) {
             trySend(emptyList())
             return@callbackFlow
         }
 
-        val listener: ListenerRegistration = firestore.collection("ratings")
-            .whereEqualTo("targetId", targetId)
+        val listener: ListenerRegistration = firestore.collection(AppConstants.COL_RATINGS)
+            .whereEqualTo("targetId", cleanTargetId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -325,7 +352,7 @@ class RatingsRepositoryImpl(
                     }
                     RatingReviewEntity(
                         id = doc.id,
-                        targetId = targetId,
+                        targetId = cleanTargetId,
                         authorName = doc.getString("userName")?.takeIf { it.isNotBlank() }
                             ?: doc.getString("authorName")?.takeIf { it.isNotBlank() }
                             ?: entity?.userName?.takeIf { it.isNotBlank() }
@@ -347,27 +374,39 @@ class RatingsRepositoryImpl(
 
     override suspend fun addRating(rating: RatingReviewEntity): Result<String> {
         return try {
-            val id = rating.id.ifBlank { com.example.utils.EntityIdGenerator.generateReviewId() }
+            val cleanTargetId = rating.targetId.trim()
+            if (cleanTargetId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف الجهة المقيمة غير صالح"))
+            }
+            val id = rating.id.trim().ifBlank { com.example.utils.EntityIdGenerator.generateReviewId() }
             val now = if (rating.dateTimestamp > 0L) rating.dateTimestamp else System.currentTimeMillis()
+            val safeRating = if (rating.rating.isNaN() || rating.rating.isInfinite()) 5.0 else rating.rating.coerceIn(1.0, 5.0)
+            val inferredTargetType = when {
+                cleanTargetId.startsWith("p_", ignoreCase = true) || cleanTargetId.endsWith("_PROVIDER", ignoreCase = true) -> "PROVIDER"
+                cleanTargetId.startsWith("prop_", ignoreCase = true) || cleanTargetId.endsWith("_PROPERTY", ignoreCase = true) -> "PROPERTY"
+                cleanTargetId.endsWith("_RESTAURANT", ignoreCase = true) -> "RESTAURANT"
+                cleanTargetId.endsWith("_MEDICAL", ignoreCase = true) -> "MEDICAL"
+                else -> "STORE"
+            }
             val map = mapOf(
                 "id" to id,
-                "targetId" to rating.targetId,
-                "targetType" to "STORE",
-                "userName" to rating.authorName,
-                "authorName" to rating.authorName,
-                "userPhone" to rating.authorPhone,
-                "authorPhone" to rating.authorPhone,
-                "rating" to rating.rating,
-                "qualityRating" to rating.rating,
-                "speedRating" to rating.rating,
-                "professionalismRating" to rating.rating,
-                "priceFairnessRating" to rating.rating,
-                "comment" to rating.comment,
+                "targetId" to cleanTargetId,
+                "targetType" to inferredTargetType,
+                "userName" to rating.authorName.trim().ifBlank { "عميل" },
+                "authorName" to rating.authorName.trim().ifBlank { "عميل" },
+                "userPhone" to rating.authorPhone.trim(),
+                "authorPhone" to rating.authorPhone.trim(),
+                "rating" to safeRating,
+                "qualityRating" to safeRating,
+                "speedRating" to safeRating,
+                "professionalismRating" to safeRating,
+                "priceFairnessRating" to safeRating,
+                "comment" to rating.comment.trim(),
                 "isApproved" to true,
                 "timestamp" to now,
                 "dateTimestamp" to now
             )
-            firestore.collection("ratings").document(id).set(map).await()
+            firestore.collection(AppConstants.COL_RATINGS).document(id).set(map).await()
             Result.success(id)
         } catch (e: Exception) {
             Result.failure(e)
@@ -379,19 +418,20 @@ class RatingsRepositoryImpl(
  * 📦 GalleryRepositoryImpl
  */
 class GalleryRepositoryImpl(
-    context: Context
+    context: Context? = null
 ) : IGalleryRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun getOwnerGallery(ownerId: String): Flow<List<GalleryAlbumEntity>> = callbackFlow {
-        if (ownerId.isBlank()) {
+        val cleanOwnerId = ownerId.trim()
+        if (cleanOwnerId.isBlank()) {
             trySend(emptyList())
             return@callbackFlow
         }
 
         val listener: ListenerRegistration = firestore.collection("galleries")
-            .whereEqualTo("ownerId", ownerId)
+            .whereEqualTo("ownerId", cleanOwnerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -402,7 +442,7 @@ class GalleryRepositoryImpl(
                     @Suppress("UNCHECKED_CAST")
                     GalleryAlbumEntity(
                         id = doc.id,
-                        ownerId = ownerId,
+                        ownerId = cleanOwnerId,
                         title = doc.getString("title") ?: "معرض الصور",
                         imageUrls = (doc.get("imageUrls") as? List<String>) ?: emptyList(),
                         createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
@@ -416,13 +456,13 @@ class GalleryRepositoryImpl(
 
     override suspend fun saveGalleryAlbum(album: GalleryAlbumEntity): Result<String> {
         return try {
-            val id = if (album.id.isBlank()) UUID.randomUUID().toString() else album.id
+            val id = album.id.trim().ifBlank { UUID.randomUUID().toString() }
             val createdAt = if (album.createdAt > 0L) album.createdAt else System.currentTimeMillis()
             val map = mapOf(
                 "id" to id,
-                "ownerId" to album.ownerId,
-                "title" to album.title,
-                "imageUrls" to album.imageUrls,
+                "ownerId" to album.ownerId.trim(),
+                "title" to album.title.trim().ifBlank { "معرض الصور" },
+                "imageUrls" to album.imageUrls.filter { it.isNotBlank() },
                 "createdAt" to createdAt
             )
             firestore.collection("galleries").document(id).set(map).await()
@@ -434,7 +474,11 @@ class GalleryRepositoryImpl(
 
     override suspend fun deleteGalleryAlbum(albumId: String): Result<Unit> {
         return try {
-            firestore.collection("galleries").document(albumId).delete().await()
+            val cleanId = albumId.trim()
+            if (cleanId.isBlank()) {
+                return Result.failure(IllegalArgumentException("معرف الألبوم غير صالح"))
+            }
+            firestore.collection("galleries").document(cleanId).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

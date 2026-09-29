@@ -47,7 +47,7 @@ class GetAvailableSlotsUseCase @Inject constructor() {
         val matchingBookingsOnDate = existingBookings.filter { booking ->
             val bProvider = booking.providerId.ifBlank { booking.technicianId }.trim()
             val bDate = normalizeDateString(booking.date.ifBlank { booking.dateString })
-            (cleanProviderId.isBlank() || bProvider.isBlank() || bProvider == cleanProviderId) &&
+            (cleanProviderId.isBlank() || bProvider == cleanProviderId) &&
                 bDate == cleanDate &&
                 com.example.utils.BookingStateMachine.isSlotOccupiedStatus(booking.status)
         }
@@ -123,9 +123,13 @@ class GetAvailableSlotsUseCase @Inject constructor() {
             val p2 = parts[2].toIntOrNull()
             if (p0 != null && p1 != null && p2 != null) {
                 return if (p0 > 31) {
-                    String.format(Locale.US, "%04d-%02d-%02d", p0, p1, p2)
+                    val month = if (p1 > 12 && p2 <= 12) p2 else p1
+                    val day = if (p1 > 12 && p2 <= 12) p1 else p2
+                    String.format(Locale.US, "%04d-%02d-%02d", p0, month, day)
                 } else if (p2 > 31) {
-                    String.format(Locale.US, "%04d-%02d-%02d", p2, p1, p0)
+                    val month = if (p1 > 12 && p0 <= 12) p0 else p1
+                    val day = if (p1 > 12 && p0 <= 12) p1 else p0
+                    String.format(Locale.US, "%04d-%02d-%02d", p2, month, day)
                 } else {
                     latin
                 }

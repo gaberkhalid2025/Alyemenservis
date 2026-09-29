@@ -23,12 +23,20 @@ class RegisterPropertyUseCase @Inject constructor(
      * @return [Result] يحوي المعرف أو الاستثناء
      */
     suspend operator fun invoke(property: RegistrationEntity.Property): Result<String> {
-        if (property.title.isBlank()) {
+        val cleanTitle = property.title.trim()
+        if (cleanTitle.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال عنوان الإعلان العقاري"))
         }
+        if (cleanTitle.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل عنوان العقار عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
+        }
 
-        if (property.ownerName.isBlank()) {
+        val cleanOwnerName = property.ownerName.trim()
+        if (cleanOwnerName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم صاحب العقار/الوكيل"))
+        }
+        if (cleanOwnerName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم المالك/الوكيل عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
         }
 
         val phoneCheck = validatePhone(property.phone)
@@ -36,12 +44,14 @@ class RegisterPropertyUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(property.rawPassword)
+        val cleanPassword = property.rawPassword.trim()
+        val passCheck = validatePassword(cleanPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }
 
-        if (property.city.isBlank()) {
+        val cleanCity = property.city.trim()
+        if (cleanCity.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى تحديد المدينة/المحافظة"))
         }
 
@@ -50,15 +60,16 @@ class RegisterPropertyUseCase @Inject constructor(
         }
 
         val normalized = property.copy(
-            title = property.title.trim(),
+            title = cleanTitle,
             propertyType = property.propertyType.trim(),
             category = property.category.trim(),
-            ownerName = property.ownerName.trim(),
+            ownerName = cleanOwnerName,
             phone = ValidatePhoneUseCase.normalizePhone(property.phone),
-            city = property.city.trim(),
+            city = cleanCity,
             areaDetails = property.areaDetails.trim(),
             description = property.description.trim(),
-            rawPassword = property.rawPassword.trim()
+            imageUrls = property.imageUrls.map { it.trim() }.filter { it.isNotBlank() },
+            rawPassword = cleanPassword
         )
         return repository.registerProperty(normalized)
     }

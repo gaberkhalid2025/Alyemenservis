@@ -1079,8 +1079,8 @@ fun requestAdminPasswordReset(phone: String) {
     }
 
 fun requestPasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
-        if (cleanPhone.length < 9) {
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        if (cleanPhone.length < 7) {
             onResult(false, "رقم الهاتف غير صالح")
             return
         }
@@ -1090,103 +1090,132 @@ fun requestPasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
     }
 
 fun approvePasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
-        db.collection("password_recovery_requests").document(cleanPhone).update("status", "APPROVED")
-        db.collection("password_resets").document(cleanPhone).update("status", "APPROVED")
-        
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        if (cleanPhone.length < 7) {
+            onResult(false, "رقم الهاتف غير صالح")
+            return
+        }
+
         // Generate temporary password
         val chars = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         val tempPassword = (1..8).map { chars.random() }.joinToString("")
-        val hashedPassword = com.example.utils.PasswordHasher.createSaltedHash(tempPassword)
-        
-        val batch = db.batch()
-        
-        // Check registered_users
-        db.collection("registered_users").whereEqualTo("phone", cleanPhone).get()
-            .addOnSuccessListener { qs ->
-                val doc = qs.documents.firstOrNull()
-                if (doc != null) {
-                    batch.update(doc.reference, "password", hashedPassword)
-                    batch.update(doc.reference, "passwordHash", hashedPassword)
-                }
-                
-                // Check mainViewModel.homeViewModel.providers
-                db.collection("providers").whereEqualTo("phone", cleanPhone).get()
-                    .addOnSuccessListener { pQs ->
-                        val pDoc = pQs.documents.firstOrNull()
-                        if (pDoc != null) {
-                            batch.update(pDoc.reference, "password", hashedPassword)
-                            batch.update(pDoc.reference, "passwordHash", hashedPassword)
-                        }
-                        
-                        // Send notification
-                        val notifId = java.util.UUID.randomUUID().toString()
-                        val notifRef = db.collection("notifications").document(notifId)
-                        val notif = NotificationEntity(
-                            id = notifId,
-                            title = "🔑 تم إعادة تعيين كلمة المرور",
-                            message = "تمت الموافقة على طلبك لإعادة تعيين كلمة المرور. كلمة المرور المؤقتة الجديدة هي: $tempPassword  يرجى تغييرها بعد تسجيل الدخول حفاظاً على خصوصيتك.",
-                            targetType = "USER",
-                            targetValue = cleanPhone,
-                            notificationType = "PASSWORD_RESET_APPROVED",
-                            timestamp = System.currentTimeMillis(),
-                            dedupKey = "PWD_RESET_APPROVED_$cleanPhone"
-                        )
-                        batch.set(notifRef, notif)
+        val hashedPassword = com.example.utils.SecureHasher.hashPassword(tempPassword)
+        val encryptedTempPass = com.example.utils.SecurityCryptoUtils.encryptCrossDevice(tempPassword)
+        val now = System.currentTimeMillis()
 
-                        // Activity log
-                        val logId = db.collection("activity_logs").document().id
-                        val log = com.example.data.ActivityLogEntity(
-                            id = logId,
-                            action = "🔑 الموافقة على إعادة تعيين كلمة المرور للهاتف: $cleanPhone",
-                            timestamp = System.currentTimeMillis()
-                        )
-                        batch.set(db.collection("activity_logs").document(logId), log)
+        val statusPayload = mapOf(
+            "status" to "APPROVED",
+            "newPassword" to encryptedTempPass,
+            "passwordHash" to hashedPassword,
+            "resolvedAt" to now
+        )
+        db.collection("password_recovery_requests").document(cleanPhone)
+            .set(statusPayload, com.google.firebase.firestore.SetOptions.merge())
+        db.collection("password_resets").document(cleanPhone)
+            .set(statusPayload, com.google.firebase.firestore.SetOptions.merge())
 
-                        batch.commit()
-                            .addOnSuccessListener {
-                                mainViewModel.triggerNotification("🔑 تم الموافقة على طلب إعادة تعيين كلمة المرور للهاتف ($cleanPhone)")
-                                onResult(true, "تم إعادة التعيين بنجاح. كلمة المرور المؤقتة هي: $tempPassword")
-                            }
-                            .addOnFailureListener {
-                                onResult(false, "فشل حفظ التحديثات: ${it.localizedMessage}")
-                            }
-                    }
-            }
-    }
-
-fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: String, customerName: String) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
-        val hashedPassword = com.example.utils.PasswordHasher.hash(newPassword.trim())
-        val passUpdate = mapOf("password" to hashedPassword, "passwordHash" to hashedPassword)
-
+        val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone").distinct()
+        val passUpdate = mapOf("password" to "", "passwordHash" to hashedPassword)
         val collections = listOf("providers", "pending_providers", "stores", "properties", "registered_users", "users", "join_requests")
         for (col in collections) {
-            db.collection(col).get().addOnSuccessListener { snap ->
-                for (doc in snap.documents) {
-                    val p = doc.getString("phone") ?: ""
-                    if (p.contains(cleanPhone)) {
-                        db.collection(col).document(doc.id).update(passUpdate)
+            for (ph in phoneVariants) {
+                db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { qs ->
+                    for (doc in qs.documents) {
+                        doc.reference.update(passUpdate)
                     }
+                }
+            }
+            db.collection(col).document(cleanPhone).get().addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    doc.reference.update(passUpdate)
                 }
             }
         }
 
+        val batch = db.batch()
+        val notifId = java.util.UUID.randomUUID().toString()
+        val notifRef = db.collection("notifications").document(notifId)
+        val notif = NotificationEntity(
+            id = notifId,
+            title = "🔑 تم إعادة تعيين كلمة المرور",
+            message = "تمت الموافقة على طلبك لإعادة تعيين كلمة المرور. كلمة المرور المؤقتة الجديدة هي: $tempPassword  يرجى تغييرها بعد تسجيل الدخول حفاظاً على خصوصيتك.",
+            targetType = "USER",
+            targetValue = cleanPhone,
+            notificationType = "PASSWORD_RESET_APPROVED",
+            timestamp = now,
+            dedupKey = "PWD_RESET_APPROVED_$cleanPhone"
+        )
+        batch.set(notifRef, notif)
+
+        val logId = db.collection("activity_logs").document().id
+        val log = com.example.data.ActivityLogEntity(
+            id = logId,
+            action = "🔑 الموافقة على إعادة تعيين كلمة المرور للهاتف: $cleanPhone",
+            timestamp = now
+        )
+        batch.set(db.collection("activity_logs").document(logId), log)
+
+        batch.commit()
+            .addOnSuccessListener {
+                mainViewModel.triggerNotification("🔑 تم الموافقة على طلب إعادة تعيين كلمة المرور للهاتف ($cleanPhone)")
+                onResult(true, "تم إعادة التعيين بنجاح. كلمة المرور المؤقتة هي: $tempPassword")
+            }
+            .addOnFailureListener {
+                onResult(false, "فشل حفظ التحديثات: ${it.localizedMessage}")
+            }
+    }
+
+fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: String, customerName: String) {
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        val cleanNewPass = newPassword.trim()
+        if (cleanPhone.length < 7 || cleanNewPass.isBlank()) {
+            mainViewModel.triggerNotification("❌ يرجى التأكد من رقم الهاتف وكلمة المرور الجديدة")
+            return
+        }
+        val hashedPassword = com.example.utils.SecureHasher.hashPassword(cleanNewPass)
+        val encryptedNewPass = com.example.utils.SecurityCryptoUtils.encryptCrossDevice(cleanNewPass)
+        val passUpdate = mapOf("password" to "", "passwordHash" to hashedPassword)
+        val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone").distinct()
+
+        val collections = listOf("providers", "pending_providers", "stores", "properties", "registered_users", "users", "join_requests")
+        for (col in collections) {
+            for (ph in phoneVariants) {
+                db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { snap ->
+                    for (doc in snap.documents) {
+                        doc.reference.update(passUpdate)
+                    }
+                }
+            }
+            db.collection(col).document(cleanPhone).get().addOnSuccessListener { doc ->
+                if (doc != null && doc.exists()) {
+                    doc.reference.update(passUpdate)
+                }
+            }
+        }
+
+        val now = System.currentTimeMillis()
+        val resolvePayload = mapOf(
+            "status" to "RESOLVED",
+            "newPassword" to encryptedNewPass,
+            "passwordHash" to hashedPassword,
+            "resolvedAt" to now
+        )
         try {
-            db.collection("password_recovery_requests").document(cleanPhone).update(
-                mapOf(
-                    "status" to "RESOLVED",
-                    "newPassword" to hashedPassword,
-                    "resolvedAt" to System.currentTimeMillis()
-                )
-            )
-        } catch (e: Exception) {}
+            db.collection("password_recovery_requests").document(cleanPhone)
+                .set(resolvePayload, com.google.firebase.firestore.SetOptions.merge())
+            db.collection("password_resets").document(cleanPhone)
+                .set(resolvePayload, com.google.firebase.firestore.SetOptions.merge())
+        } catch (_: Exception) {}
 
-        mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map { if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPassword) else it }
-        mainViewModel.adminViewModel._stores.value = mainViewModel.adminViewModel._stores.value.map { if (it.phone.contains(cleanPhone)) it.copy(passwordHash = hashedPassword) else it }
-
-        if (mainViewModel._passwordRecoveryWaitingPhone.value.contains(cleanPhone)) {
-            mainViewModel._passwordRecoveryWaitingPhone.value = ""
+        mainViewModel.homeViewModel._providers.value = mainViewModel.homeViewModel._providers.value.map {
+            if (com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.phone).filter { c -> c.isDigit() } == cleanPhone) {
+                it.copy(passwordHash = hashedPassword)
+            } else it
+        }
+        mainViewModel.adminViewModel._stores.value = mainViewModel.adminViewModel._stores.value.map {
+            if (com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(it.phone).filter { c -> c.isDigit() } == cleanPhone) {
+                it.copy(passwordHash = hashedPassword)
+            } else it
         }
 
         // Log in activity_logs
@@ -1194,7 +1223,7 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
         val log = com.example.data.ActivityLogEntity(
             id = logId,
             action = "🔑 إعادة تعيين كلمة المرور للحساب: $customerName ($cleanPhone) - الإجراء: $notifyAction",
-            timestamp = System.currentTimeMillis()
+            timestamp = now
         )
         db.collection("activity_logs").document(logId).set(log)
 
@@ -1224,7 +1253,7 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
             message = message,
             targetType = "USER",
             targetValue = cleanPhone,
-            timestamp = System.currentTimeMillis(),
+            timestamp = now,
             dedupKey = "PWD_RESET_${cleanPhone}"
         )
         db.collection("notifications").document(notifId).set(userNotif).addOnSuccessListener {
@@ -1233,19 +1262,19 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
     }
 
 fun requestPasswordRecoveryForStore(name: String, phone: String, password: String) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         mainViewModel.setPasswordRecoveryWaitingPhone(cleanPhone)
         mainViewModel.requestPasswordRecovery(cleanPhone, name, "STORE")
     }
 
 fun requestPasswordRecoveryForProperty(title: String, phone: String, password: String) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         mainViewModel.setPasswordRecoveryWaitingPhone(cleanPhone)
         mainViewModel.requestPasswordRecovery(cleanPhone, title, "PROPERTY")
     }
 
 fun requestPasswordRecoveryGeneral(accountName: String, phone: String, accountType: String, currentPassword: String) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         mainViewModel.setPasswordRecoveryWaitingPhone(cleanPhone)
         mainViewModel.requestPasswordRecovery(cleanPhone, accountName, accountType)
     }

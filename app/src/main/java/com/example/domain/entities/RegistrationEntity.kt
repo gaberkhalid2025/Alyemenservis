@@ -142,4 +142,7 @@ data class AuthUserEntity(
     val role: String = "CLIENT",
     val token: String = "",
     val isVerified: Boolean = false
-)
+) {
+    override fun toString(): String =
+        "AuthUserEntity(uid='$uid', name='$name', phone='$phone', role='$role', token=***, isVerified=$isVerified)"
+}

@@ -23,12 +23,20 @@ class RegisterStoreUseCase @Inject constructor(
      * @return [Result] يحوي المعرف المولد أو رسالة الخطأ
      */
     suspend operator fun invoke(store: RegistrationEntity.Store): Result<String> {
-        if (store.storeName.isBlank()) {
+        val cleanStoreName = store.storeName.trim()
+        if (cleanStoreName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم المتجر/المحل التجاري"))
         }
+        if (cleanStoreName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم المتجر عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
+        }
 
-        if (store.ownerName.isBlank()) {
+        val cleanOwnerName = store.ownerName.trim()
+        if (cleanOwnerName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم صاحب المتجر"))
+        }
+        if (cleanOwnerName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم صاحب المتجر عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
         }
 
         val phoneCheck = validatePhone(store.phone)
@@ -36,29 +44,33 @@ class RegisterStoreUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(store.rawPassword)
+        val cleanPassword = store.rawPassword.trim()
+        val passCheck = validatePassword(cleanPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }
 
-        if (store.storeCategory.isBlank()) {
+        val cleanCategory = store.storeCategory.trim()
+        if (cleanCategory.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى اختيار تصنيف نشاط المتجر"))
         }
 
-        if (store.city.isBlank()) {
+        val cleanCity = store.city.trim()
+        if (cleanCity.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى اختيار المدينة/المحافظة"))
         }
 
         val normalized = store.copy(
-            storeName = store.storeName.trim(),
-            ownerName = store.ownerName.trim(),
+            storeName = cleanStoreName,
+            ownerName = cleanOwnerName,
             phone = ValidatePhoneUseCase.normalizePhone(store.phone),
-            storeCategory = store.storeCategory.trim(),
-            city = store.city.trim(),
+            storeCategory = cleanCategory,
+            city = cleanCity,
             addressDetails = store.addressDetails.trim(),
             commercialRegisterNumber = store.commercialRegisterNumber.trim(),
             logoUrl = store.logoUrl.trim(),
-            rawPassword = store.rawPassword.trim()
+            storeImages = store.storeImages.map { it.trim() }.filter { it.isNotBlank() },
+            rawPassword = cleanPassword
         )
         return repository.registerStore(normalized)
     }

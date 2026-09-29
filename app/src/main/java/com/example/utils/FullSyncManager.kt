@@ -74,7 +74,13 @@ class FullSyncManager @Inject constructor(
             val remoteData = restoreAllSettings()
             val now = System.currentTimeMillis()
             if (remoteData != null) {
-                val jsonStr = org.json.JSONObject(remoteData).toString()
+                val safeMap = remoteData.mapValues { (_, v) ->
+                    when (v) {
+                        null, is Boolean, is Number, is String -> v
+                        else -> v.toString()
+                    }
+                }
+                val jsonStr = org.json.JSONObject(safeMap).toString()
                 prefs.edit()
                     .putString(KEY_LOCAL_SETTINGS_CACHE, jsonStr)
                     .putLong(KEY_LAST_SYNC_TS, now)
@@ -83,12 +89,12 @@ class FullSyncManager @Inject constructor(
                 prefs.edit().putLong(KEY_LAST_SYNC_TS, now).apply()
             }
             _lastSyncTimestamp.value = now
-            _isSyncing.value = false
             true
         } catch (e: Exception) {
             Log.w(TAG, "Background pullRemoteSettingsToLocalCache note: ${e.message}")
-            _isSyncing.value = false
             false
+        } finally {
+            _isSyncing.value = false
         }
     }
 
@@ -114,12 +120,12 @@ class FullSyncManager @Inject constructor(
                 _lastSyncTimestamp.value = now
                 Log.d(TAG, "All settings synchronized successfully to Firestore.")
             }
-            _isSyncing.value = false
             success
         } catch (e: Exception) {
             Log.e(TAG, "Error in syncAllSettings: ${e.message}", e)
-            _isSyncing.value = false
             false
+        } finally {
+            _isSyncing.value = false
         }
     }
 
@@ -194,11 +200,11 @@ class FullSyncManager @Inject constructor(
 
     private suspend fun syncThemeSettingsInternal(themeId: String? = null, primaryHex: String? = null, secondaryHex: String? = null): Boolean = suspendCancellableCoroutine { continuation ->
         val themeMap = hashMapOf<String, Any>(
-            "activeThemeId" to (themeId ?: "EMERALD_YEMEN"),
-            "customPrimaryHex" to (primaryHex ?: "#059669"),
-            "customSecondaryHex" to (secondaryHex ?: "#115E59"),
             "updatedAt" to System.currentTimeMillis()
         )
+        if (!themeId.isNullOrBlank()) themeMap["activeThemeId"] = themeId.trim()
+        if (!primaryHex.isNullOrBlank()) themeMap["customPrimaryHex"] = primaryHex.trim()
+        if (!secondaryHex.isNullOrBlank()) themeMap["customSecondaryHex"] = secondaryHex.trim()
 
         firestore.collection(COLLECTION_ADMIN_SETTINGS)
             .document(DOC_THEME_CONFIG)
@@ -224,13 +230,11 @@ class FullSyncManager @Inject constructor(
     }
 
     private suspend fun syncFormSettingsInternal(formsData: Map<String, Any>? = null): Boolean = suspendCancellableCoroutine { continuation ->
-        val data = formsData ?: mapOf(
-            "services_form" to "الاسم الثلاثي|Mandatory,رقم الهاتف|Mandatory,القسم|Mandatory,المدينة|Mandatory,الحي|Optional",
-            "restaurants_form" to "اسم المطعم|Mandatory,رقم الهاتف|Mandatory,النوع|Mandatory,المدينة|Mandatory",
-            "stores_form" to "اسم المتجر|Mandatory,رقم الهاتف|Mandatory,النشاط|Mandatory,المدينة|Mandatory",
-            "medical_form" to "اسم المركز الطبي|Mandatory,رقم الهاتف|Mandatory,التخصص|Mandatory,المدينة|Mandatory",
-            "updatedAt" to System.currentTimeMillis()
-        )
+        val data = if (!formsData.isNullOrEmpty()) {
+            HashMap(formsData).apply { put("updatedAt", System.currentTimeMillis()) }
+        } else {
+            mapOf("updatedAt" to System.currentTimeMillis())
+        }
 
         firestore.collection(COLLECTION_ADMIN_SETTINGS)
             .document(DOC_FORMS_CONFIG)
@@ -276,14 +280,14 @@ class FullSyncManager @Inject constructor(
                 .get()
                 .addOnSuccessListener { snapshot ->
                     if (snapshot.exists()) {
-                        continuation.resume(snapshot.data) {}
+                        if (continuation.isActive) continuation.resume(snapshot.data) {}
                     } else {
-                        continuation.resume(null) {}
+                        if (continuation.isActive) continuation.resume(null) {}
                     }
                 }
                 .addOnFailureListener { err ->
                     Log.e(TAG, "Failed to restore settings: ${err.message}")
-                    continuation.resume(null) {}
+                    if (continuation.isActive) continuation.resume(null) {}
                 }
         }
     }
@@ -303,7 +307,9 @@ class FullSyncManager @Inject constructor(
      */
     fun isSyncRequired(): Boolean {
         val lastTs = prefs.getLong(KEY_LAST_SYNC_TS, 0L)
-        return (System.currentTimeMillis() - lastTs) >= SYNC_INTERVAL_MS
+        if (lastTs <= 0L) return true
+        val elapsed = System.currentTimeMillis() - lastTs
+        return elapsed < 0L || elapsed >= SYNC_INTERVAL_MS
     }
 
     /**

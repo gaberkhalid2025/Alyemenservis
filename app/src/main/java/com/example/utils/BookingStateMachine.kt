@@ -32,7 +32,10 @@ enum class BookingStatus(
 
     companion object {
         fun fromCode(code: String): BookingStatus {
-            return values().firstOrNull { it.code == code.uppercase() } ?: PENDING
+            val clean = code.trim().uppercase(Locale.ROOT).let {
+                if (it == "APPROVED") "ACCEPTED" else it
+            }
+            return values().firstOrNull { it.code == clean } ?: PENDING
         }
     }
 }
@@ -46,10 +49,10 @@ object BookingStateMachine {
     private val allowedTransitions = mapOf(
         "PENDING" to listOf("UNDER_REVIEW", "ACCEPTED", "REJECTED", "CANCELLED"),
         "UNDER_REVIEW" to listOf("ACCEPTED", "REJECTED", "CANCELLED", "PENDING"),
-        "ACCEPTED" to listOf("IN_PROGRESS", "CANCELLED"),
-        "IN_PROGRESS" to listOf("COMPLETED", "CANCELLED"),
+        "ACCEPTED" to listOf("IN_PROGRESS", "COMPLETED", "PAID", "CANCELLED"),
+        "IN_PROGRESS" to listOf("COMPLETED", "PAID", "CANCELLED"),
         "COMPLETED" to listOf("PAID", "CLOSED"),
-        "PAID" to listOf("CLOSED"),
+        "PAID" to listOf("COMPLETED", "CLOSED"),
         "CLOSED" to emptyList(),
         "CANCELLED" to emptyList(),
         "REJECTED" to emptyList()
@@ -59,13 +62,17 @@ object BookingStateMachine {
      * الحالات التي تشغل الموعد وتمنع حجز آخر في نفس التوقيت (توحيد APPROVED و ACCEPTED)
      */
     fun isSlotOccupiedStatus(status: String): Boolean {
-        val s = status.uppercase(Locale.ROOT)
-        return s in listOf("PENDING", "UNDER_REVIEW", "ACCEPTED", "APPROVED", "IN_PROGRESS")
+        val s = normalizeStatus(status)
+        return s in listOf("PENDING", "UNDER_REVIEW", "ACCEPTED", "IN_PROGRESS")
     }
 
     private fun normalizeStatus(status: String): String {
-        val upper = status.trim().uppercase(Locale.ROOT)
-        return if (upper == "APPROVED") "ACCEPTED" else upper
+        return when (val upper = status.trim().uppercase(Locale.ROOT)) {
+            "APPROVED", "CONFIRMED" -> "ACCEPTED"
+            "IN_PREPARATION", "READY" -> "IN_PROGRESS"
+            "DELIVERED" -> "COMPLETED"
+            else -> upper
+        }
     }
 
     /**
@@ -91,11 +98,12 @@ object BookingStateMachine {
      * 3. الحصول على المسمى العربي للحالة
      */
     fun getStatusLabel(status: String): String {
+        val norm = normalizeStatus(status)
         return try {
-            BookingStatus.valueOf(status.uppercase(Locale.ROOT)).label
+            BookingStatus.valueOf(norm).label
         } catch (e: Exception) {
-            when (status.uppercase(Locale.ROOT)) {
-                "APPROVED" -> "مقبول"
+            when (norm) {
+                "ACCEPTED" -> "مقبول"
                 "REJECTED" -> "مرفوض"
                 else -> status
             }
@@ -106,8 +114,9 @@ object BookingStateMachine {
      * 4. الحصول على كود اللون للحالة
      */
     fun getStatusColor(status: String): String {
+        val norm = normalizeStatus(status)
         return try {
-            BookingStatus.valueOf(status.uppercase(Locale.ROOT)).colorHex
+            BookingStatus.valueOf(norm).colorHex
         } catch (e: Exception) {
             "#F59E0B"
         }
@@ -117,7 +126,7 @@ object BookingStateMachine {
      * 5. هل الحالة نهائية لا تقبل التعديل
      */
     fun isTerminalStatus(status: String): Boolean {
-        val s = status.uppercase(Locale.ROOT)
+        val s = normalizeStatus(status)
         return s == "CLOSED" || s == "CANCELLED" || s == "REJECTED"
     }
 
@@ -126,14 +135,19 @@ object BookingStateMachine {
      */
     fun canCancel(booking: BookingEntity): Boolean {
         if (booking.isLocked) return false
-        if (isTerminalStatus(booking.status)) return false
-        if (booking.status.uppercase(Locale.ROOT) == "IN_PROGRESS" || booking.status.uppercase(Locale.ROOT) == "COMPLETED") {
+        val normStatus = normalizeStatus(booking.status)
+        if (isTerminalStatus(normStatus)) return false
+        if (normStatus == "IN_PROGRESS" || normStatus == "COMPLETED" || normStatus == "PAID") {
             return false
         }
 
         // فحص قاعدة الـ 8 ساعات قبل موعد الحجز
-        val appointmentTime = parseAppointmentTimestamp(booking.effectiveDate, booking.effectiveTime)
-        if (appointmentTime > 0) {
+        val appointmentTime = if (booking.scheduledAt > 0L) {
+            booking.scheduledAt
+        } else {
+            parseAppointmentTimestamp(booking.effectiveDate, booking.effectiveTime)
+        }
+        if (appointmentTime > 0L) {
             val diffMs = appointmentTime - System.currentTimeMillis()
             val eightHoursMs = 8 * 60 * 60 * 1000L
             if (diffMs in 1..eightHoursMs) {
@@ -152,21 +166,75 @@ object BookingStateMachine {
     }
 
     /**
-     * 8. استخراج توقيت الموعد
+     * 8. استخراج توقيت الموعد بدقة مع دعم الصيغ العربية والإنجليزية (ص/م، AM/PM، 24 ساعة)
      */
     private fun parseAppointmentTimestamp(dateStr: String, timeStr: String): Long {
-        if (dateStr.isBlank()) return 0L
+        val cleanDate = toLatinDigits(dateStr).trim()
+        if (cleanDate.isBlank()) return 0L
         return try {
+            val normalizedDate = normalizeDateIso(cleanDate)
+            val cleanTime = toLatinDigits(timeStr).trim()
+            val (hour24, minute) = parseTimeHourMinute(cleanTime)
+            val normalizedFull = String.format(Locale.US, "%s %02d:%02d", normalizedDate, hour24, minute)
+            val parsedNormalized = DateFormatter.parseCustom(normalizedFull, "yyyy-MM-dd HH:mm")
+            if (parsedNormalized != null && parsedNormalized > 0L) {
+                return parsedNormalized
+            }
+
             val formats = listOf("yyyy-MM-dd HH:mm", "yyyy/MM/dd HH:mm", "dd/MM/yyyy HH:mm", "yyyy-MM-dd")
-            val fullStr = "$dateStr ${timeStr.ifBlank { "00:00" }}".trim()
+            val fullStr = "$cleanDate ${cleanTime.ifBlank { "00:00" }}".trim()
             for (fmt in formats) {
-                // ✨ م2: استخدام DateFormatter الموحد
                 val t = DateFormatter.parseCustom(fullStr, fmt)
                 if (t != null) return t
             }
-            0L
+            DateFormatter.parseCustom(normalizedDate, "yyyy-MM-dd") ?: 0L
         } catch (e: Exception) {
             0L
         }
+    }
+
+    private fun toLatinDigits(input: String): String {
+        if (input.isEmpty()) return input
+        val sb = StringBuilder(input.length)
+        for (ch in input) {
+            when (ch) {
+                in '٠'..'٩' -> sb.append((ch - '٠' + '0'.code).toChar())
+                in '۰'..'۹' -> sb.append((ch - '۰' + '0'.code).toChar())
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun normalizeDateIso(rawDate: String): String {
+        val parts = rawDate.replace('/', '-').split("-")
+        if (parts.size == 3) {
+            val p0 = parts[0].toIntOrNull()
+            val p1 = parts[1].toIntOrNull()
+            val p2 = parts[2].toIntOrNull()
+            if (p0 != null && p1 != null && p2 != null) {
+                if (p0 > 31) {
+                    return String.format(Locale.US, "%04d-%02d-%02d", p0, p1.coerceIn(1, 12), p2.coerceIn(1, 31))
+                } else if (p2 > 31) {
+                    val month = if (p1 > 12 && p0 <= 12) p0 else p1
+                    val day = if (p1 > 12 && p0 <= 12) p1 else p0
+                    return String.format(Locale.US, "%04d-%02d-%02d", p2, month.coerceIn(1, 12), day.coerceIn(1, 31))
+                }
+            }
+        }
+        return rawDate
+    }
+
+    private fun parseTimeHourMinute(rawTime: String): Pair<Int, Int> {
+        if (rawTime.isBlank()) return 0 to 0
+        val upper = rawTime.uppercase(Locale.US)
+        val timeTokens = upper.split(":")
+        var hour = timeTokens.getOrNull(0)?.filter { it in '0'..'9' }?.toIntOrNull() ?: 0
+        val minute = timeTokens.getOrNull(1)?.takeWhile { !it.isLetter() }?.filter { it in '0'..'9' }?.toIntOrNull() ?: 0
+        val isPm = upper.contains("PM") || upper.contains("مساء") || Regex("(^|\\s|\\d)م(\\s|$)").containsMatchIn(upper)
+        val isAm = upper.contains("AM") || upper.contains("صباح") || Regex("(^|\\s|\\d)ص(\\s|$)").containsMatchIn(upper)
+        if (isPm && !isAm && hour < 12) hour += 12
+        if (isAm && !isPm && hour == 12) hour = 0
+        return hour.coerceIn(0, 23) to minute.coerceIn(0, 59)
     }
 }

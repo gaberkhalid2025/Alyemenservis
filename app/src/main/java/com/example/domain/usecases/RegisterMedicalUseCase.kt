@@ -23,12 +23,20 @@ class RegisterMedicalUseCase @Inject constructor(
      * @return [Result] يحوي المعرف أو الاستثناء
      */
     suspend operator fun invoke(medical: RegistrationEntity.MedicalCenter): Result<String> {
-        if (medical.centerName.isBlank()) {
+        val cleanCenterName = medical.centerName.trim()
+        if (cleanCenterName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم العيادة أو المركز الطبي"))
         }
+        if (cleanCenterName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم المركز الطبي عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
+        }
 
-        if (medical.doctorName.isBlank()) {
+        val cleanDoctorName = medical.doctorName.trim()
+        if (cleanDoctorName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم الطبيب المسؤول"))
+        }
+        if (cleanDoctorName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم الطبيب عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
         }
 
         val phoneCheck = validatePhone(medical.phone)
@@ -36,29 +44,32 @@ class RegisterMedicalUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(medical.rawPassword)
+        val cleanPassword = medical.rawPassword.trim()
+        val passCheck = validatePassword(cleanPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }
 
-        if (medical.specialtyCategory.isBlank()) {
+        val cleanSpecialty = medical.specialtyCategory.trim()
+        if (cleanSpecialty.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى تحديد التخصص الطبي الرئيسي"))
         }
 
-        if (medical.city.isBlank()) {
+        val cleanCity = medical.city.trim()
+        if (cleanCity.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى اختيار المدينة/المحافظة"))
         }
 
         val normalized = medical.copy(
-            centerName = medical.centerName.trim(),
-            specialtyCategory = medical.specialtyCategory.trim(),
-            doctorName = medical.doctorName.trim(),
+            centerName = cleanCenterName,
+            specialtyCategory = cleanSpecialty,
+            doctorName = cleanDoctorName,
             phone = ValidatePhoneUseCase.normalizePhone(medical.phone),
-            city = medical.city.trim(),
+            city = cleanCity,
             addressDetails = medical.addressDetails.trim(),
             licenseNumber = medical.licenseNumber.trim(),
             logoUrl = medical.logoUrl.trim(),
-            rawPassword = medical.rawPassword.trim()
+            rawPassword = cleanPassword
         )
         return repository.registerMedicalCenter(normalized)
     }

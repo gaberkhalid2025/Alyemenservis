@@ -13,8 +13,12 @@ class RegisterClientUseCase @Inject constructor(
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
 ) {
     suspend operator fun invoke(client: RegistrationEntity.Client): Result<String> {
-        if (client.fullName.isBlank()) {
+        val cleanName = client.fullName.trim()
+        if (cleanName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال الاسم الكامل"))
+        }
+        if (cleanName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل الاسم عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
         }
 
         val phoneCheck = validatePhone(client.phone)
@@ -22,20 +26,22 @@ class RegisterClientUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(client.rawPassword)
+        val cleanPassword = client.rawPassword.trim()
+        val passCheck = validatePassword(cleanPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }
 
-        if (client.city.isBlank()) {
+        val cleanCity = client.city.trim()
+        if (cleanCity.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى اختيار المحافظة/المدينة"))
         }
 
         val normalized = client.copy(
-            fullName = client.fullName.trim(),
+            fullName = cleanName,
             phone = ValidatePhoneUseCase.normalizePhone(client.phone),
-            city = client.city.trim(),
-            rawPassword = client.rawPassword.trim(),
+            city = cleanCity,
+            rawPassword = cleanPassword,
             profileImageUrl = client.profileImageUrl.trim()
         )
         return repository.registerClient(normalized)

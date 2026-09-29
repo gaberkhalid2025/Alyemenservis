@@ -16,15 +16,26 @@ import javax.inject.Inject
 open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun updateUserFcmToken(userId: String, token: String, currentUserPhone: String) {
-        if (userId.isEmpty() || userId == "guest") return
+        if (userId.isEmpty() || userId == "guest" || token.isBlank()) return
         viewModelScope.launch {
             try {
-                db.collection("registered_users").document(userId).update("fcmToken", token)
-                val cleanPhone = currentUserPhone.trim().replace(" ", "").replace("+", "")
-                if (cleanPhone.isNotEmpty()) {
-                    db.collection("providers").document(cleanPhone).update("fcmToken", token)
-                    db.collection("stores").document(cleanPhone).update("fcmToken", token)
-                    db.collection("properties").document(cleanPhone).update("fcmToken", token)
+                db.collection("registered_users").document(userId).get().addOnSuccessListener { doc ->
+                    if (doc != null && doc.exists()) {
+                        doc.reference.update("fcmToken", token)
+                    }
+                }
+                val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(currentUserPhone).filter { it.isDigit() }
+                if (cleanPhone.length >= 7) {
+                    val phoneVariants = listOf(cleanPhone, "0$cleanPhone", "+967$cleanPhone", "967$cleanPhone", "00967$cleanPhone").distinct()
+                    for (col in listOf("providers", "stores", "properties", "users", "registered_users")) {
+                        for (ph in phoneVariants) {
+                            db.collection(col).whereEqualTo("phone", ph).get().addOnSuccessListener { snaps ->
+                                for (doc in snaps.documents) {
+                                    doc.reference.update("fcmToken", token)
+                                }
+                            }
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("AuthViewModel", "Error updating fcmToken: ", e)
@@ -92,8 +103,8 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun setJoinRequestPhone(context: Context, phone: String) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").removePrefix("0")
-        val finalPhone = if (cleanPhone.length == 9) cleanPhone else phone
+        val normalized = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        val finalPhone = normalized.ifBlank { phone.trim() }
         _joinRequestPhone.value = finalPhone
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         sp.edit().putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone)).apply()
@@ -104,7 +115,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         
         val rawId = sp.getString("user_id", "guest") ?: "guest"
-        var savedId = if (rawId != "guest" && rawId.isNotEmpty()) com.example.utils.SecurityCryptoUtils.decrypt(rawId) else rawId
+        var savedId = if (rawId != "guest" && rawId.isNotEmpty()) com.example.utils.SecurityCryptoUtils.decrypt(rawId).ifBlank { rawId } else rawId
         val savedName = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_name", "") ?: "")
         val savedPhone = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_phone", "") ?: "")
         val savedResidence = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_residence", "") ?: "")
@@ -132,8 +143,23 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         _currentUserPhone.value = savedPhone
         _currentUserResidence.value = savedResidence
         
-        val savedJoinPhone = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("join_request_phone", "") ?: "")
+        val rawJoinPhone = sp.getString("join_request_phone", "") ?: ""
+        val savedJoinPhone = if (rawJoinPhone.isNotBlank()) {
+            com.example.utils.SecurityCryptoUtils.decrypt(rawJoinPhone).ifBlank {
+                if (!rawJoinPhone.startsWith("gcm:") && !rawJoinPhone.startsWith("enc::")) rawJoinPhone else ""
+            }
+        } else ""
         _joinRequestPhone.value = savedJoinPhone
+
+        val rawWaitingPhone = sp.getString("password_recovery_waiting_phone", "") ?: ""
+        if (rawWaitingPhone.isNotBlank()) {
+            val decryptedWaiting = com.example.utils.SecurityCryptoUtils.decrypt(rawWaitingPhone).ifBlank {
+                if (!rawWaitingPhone.startsWith("gcm:") && !rawWaitingPhone.startsWith("enc::")) rawWaitingPhone else ""
+            }
+            if (decryptedWaiting.isNotBlank()) {
+                _passwordRecoveryWaitingPhone.value = decryptedWaiting
+            }
+        }
         
         val secureStorage = com.example.utils.SecureStorage(context)
         val session = secureStorage.getAdminSession()
@@ -141,7 +167,12 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             val isExpired = System.currentTimeMillis() - session.loginTime > 30L * 24 * 60 * 60 * 1000
             if (!isExpired) {
                 _adminRole.value = session.role
-                if (session.role == "SUPERVISOR") {
+                if (session.role == "OWNER") {
+                    _currentSupervisorPermissions.value = listOf("ALL")
+                } else if (session.role == "SUPERVISOR") {
+                    if (session.permissions.isNotEmpty()) {
+                        _currentSupervisorPermissions.value = session.permissions
+                    }
                     // إذا كان مشرفاً، نحاول جلب صلاحياته المخزنة أو الافتراضية
                     viewModelScope.launch {
                         try {
@@ -162,7 +193,6 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                 _adminRole.value = "GUEST"
             }
         } else {
-            val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
             _adminRole.value = "GUEST"
         }
 
@@ -178,18 +208,32 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         autoSyncProviderCredentials(context, savedJoinPhone, savedId, sp)
     }
 
-    private fun autoSyncProviderCredentials(context: Context, savedJoinPhone: String, savedId: String, sp: android.content.SharedPreferences) {
-        val phoneToLookup = savedJoinPhone.ifEmpty { _currentUserPhone.value }
-        if (phoneToLookup.isNotEmpty()) {
+    private fun autoSyncProviderCredentials(
+        @Suppress("UNUSED_PARAMETER") context: Context,
+        savedJoinPhone: String,
+        @Suppress("UNUSED_PARAMETER") savedId: String,
+        sp: android.content.SharedPreferences
+    ) {
+        val phoneToLookup = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(
+            savedJoinPhone.ifEmpty { _currentUserPhone.value }
+        ).filter { it.isDigit() }
+        if (phoneToLookup.length >= 7) {
             db.collection("providers").whereEqualTo("phone", phoneToLookup).get().addOnSuccessListener { snapshot ->
                 if (snapshot != null && !snapshot.isEmpty) {
-                    val prov = snapshot.documents.first().toObject(ProviderEntity::class.java)
+                    val candidates = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(ProviderEntity::class.java)?.let { entity ->
+                            if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
+                        }
+                    }
+                    val prov = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
                     if (prov != null) {
                         _currentUserId.value = prov.id
                         _currentUserName.value = prov.name
                         _currentUserPhone.value = prov.phone
                         _currentUserResidence.value = prov.area
-                        _adminRole.value = "PROVIDER"
+                        if (_adminRole.value !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                            _adminRole.value = "PROVIDER"
+                        }
                         
                         sp.edit().apply {
                             putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(prov.id))
@@ -202,17 +246,25 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                 } else {
                     db.collection("stores").whereEqualTo("phone", phoneToLookup).get().addOnSuccessListener { sSnap ->
                         if (sSnap != null && !sSnap.isEmpty) {
-                            val st = sSnap.documents.first().toObject(com.example.data.StoreEntity::class.java)
+                            val candidates = sSnap.documents.mapNotNull { doc ->
+                                doc.toObject(com.example.data.StoreEntity::class.java)?.let { entity ->
+                                    if (entity.id.isBlank()) entity.copy(id = doc.id) else entity
+                                }
+                            }
+                            val st = candidates.firstOrNull { !it.isDeleted } ?: candidates.firstOrNull()
                             if (st != null) {
                                 _currentUserId.value = st.id
                                 _currentUserName.value = st.name
                                 _currentUserPhone.value = st.phone
                                 _currentUserResidence.value = st.cityId
-                                _adminRole.value = "STORE_OWNER"
+                                if (_adminRole.value !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                                    _adminRole.value = "STORE_OWNER"
+                                }
                                 sp.edit().apply {
                                     putString("user_id", com.example.utils.SecurityCryptoUtils.encrypt(st.id))
                                     putString("user_name", com.example.utils.SecurityCryptoUtils.encrypt(st.name))
                                     putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(st.phone))
+                                    putString("user_residence", com.example.utils.SecurityCryptoUtils.encrypt(st.cityId))
                                     apply()
                                 }
                             }
@@ -245,7 +297,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun registerGuestUser(context: Context, name: String, phone: String, residence: String, password: String = "") {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "").replace("-", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         val effectivePassword = if (password.isBlank()) "yemen_${cleanPhone.takeLast(6)}" else password.trim()
 
         if (password.isNotBlank()) {
@@ -299,8 +351,8 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun setUserSessionDetails(context: Context, name: String, phone: String, residence: String = "اليمن") {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").removePrefix("0")
-        val finalPhone = if (cleanPhone.length == 9) cleanPhone else phone
+        val normalized = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        val finalPhone = normalized.ifBlank { phone.trim() }
         _currentUserName.value = name.ifBlank { "عميل" }
         _currentUserPhone.value = finalPhone
         _currentUserResidence.value = residence.ifBlank { "اليمن" }
@@ -326,40 +378,98 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun loginUserDirectly(context: Context, phone: String, password: String) {
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").removePrefix("0")
-        val finalPhone = if (cleanPhone.length == 9) cleanPhone else phone
-        
+        val finalPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        val cleanPassword = password.trim()
+        if (finalPhone.length < 7 || cleanPassword.isBlank()) {
+            triggerToast("❌ يرجى إدخال رقم الهاتف وكلمة المرور بشكل صحيح")
+            return
+        }
+        val phoneVariants = listOf(finalPhone, "0$finalPhone", "+967$finalPhone", "967$finalPhone", "00967$finalPhone").distinct()
+
         viewModelScope.launch {
             try {
-                db.collection("registered_users")
-                    .whereEqualTo("phone", finalPhone)
-                    .limit(1)
-                    .get()
-                    .addOnSuccessListener { snapshot ->
-                        if (!snapshot.isEmpty) {
-                            val doc = snapshot.documents.first()
-                            val storedHash = doc.getString("passwordHash") ?: ""
-                            if (com.example.utils.SecureHasher.verifyPassword(password, storedHash)) {
-                                _currentUserPhone.value = finalPhone
-                                _joinRequestPhone.value = finalPhone
-                                val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
-                                sp.edit().apply {
-                                    putBoolean("is_account_logged_in", true)
-                                    putString("user_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
-                                    putString("join_request_phone", com.example.utils.SecurityCryptoUtils.encrypt(finalPhone))
-                                    apply()
-                                }
-                                triggerToast("✅ تم تسجيل الدخول بنجاح")
-                            } else {
-                                triggerToast("❌ كلمة المرور غير صحيحة")
+                var matchedDoc: com.google.firebase.firestore.DocumentSnapshot? = null
+                var fallbackDoc: com.google.firebase.firestore.DocumentSnapshot? = null
+                for (col in listOf("registered_users", "users")) {
+                    for (ph in phoneVariants) {
+                        val snap = runCatching {
+                            db.collection(col).whereEqualTo("phone", ph).get().await()
+                        }.getOrNull()
+                        val docs = snap?.documents.orEmpty().toMutableList()
+                        runCatching {
+                            val direct = db.collection(col).document(ph).get().await()
+                            if (direct.exists() && docs.none { it.id == direct.id }) {
+                                docs.add(direct)
                             }
-                        } else {
-                            triggerToast("❌ الحساب غير موجود")
                         }
+                        for (doc in docs) {
+                            if (fallbackDoc == null) fallbackDoc = doc
+                            val hasCredential = !doc.getString("passwordHash").isNullOrBlank() || !doc.getString("password").isNullOrBlank()
+                            if (hasCredential) {
+                                matchedDoc = doc
+                                break
+                            }
+                        }
+                        if (matchedDoc != null) break
                     }
-                    .addOnFailureListener { e ->
-                        triggerToast("❌ حدث خطأ أثناء التحقق: ${e.message}")
+                    if (matchedDoc != null) break
+                }
+                val targetDoc = matchedDoc ?: fallbackDoc
+
+                if (targetDoc != null) {
+                    val storedHash = targetDoc.getString("passwordHash")?.trim().orEmpty()
+                        .ifBlank { targetDoc.getString("password")?.trim().orEmpty() }
+                    val fieldUsed = if (!targetDoc.getString("passwordHash").isNullOrBlank()) "passwordHash" else "password"
+                    val isVerified = com.example.utils.SecureHasher.verifyPassword(cleanPassword, storedHash) ||
+                        com.example.utils.PasswordHasher.verifyPassword(cleanPassword, storedHash) ||
+                        com.example.utils.SecureAdminStorage.verifyAndMigrate(
+                            docRef = targetDoc.reference,
+                            inputPassword = cleanPassword,
+                            storedPassOrHash = storedHash,
+                            fieldName = fieldUsed
+                        )
+                    if (isVerified) {
+                        val userName = targetDoc.getString("name")?.takeIf { it.isNotBlank() }
+                            ?: targetDoc.getString("fullName")?.takeIf { it.isNotBlank() }
+                            ?: "عميل"
+                        val userCity = targetDoc.getString("city")?.takeIf { it.isNotBlank() }
+                            ?: targetDoc.getString("area")?.takeIf { it.isNotBlank() }
+                            ?: "اليمن"
+                        setUserSessionDetails(context, userName, finalPhone, userCity)
+                        val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+                        sp.edit().apply {
+                            putBoolean("is_account_logged_in", true)
+                            putString("user_account_type", "CLIENT")
+                            putString("logged_account_id", targetDoc.id)
+                            apply()
+                        }
+                        runCatching {
+                            val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+                                .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                                .build()
+                            val secureSp = androidx.security.crypto.EncryptedSharedPreferences.create(
+                                context,
+                                "yemen_service_secure_prefs",
+                                masterKey,
+                                androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                                androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                            )
+                            secureSp.edit()
+                                .putBoolean("is_account_logged_in", true)
+                                .putString("user_account_type", "CLIENT")
+                                .putString("logged_account_id", targetDoc.id)
+                                .apply()
+                        }
+                        if (_adminRole.value !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                            _adminRole.value = "GUEST"
+                        }
+                        triggerToast("✅ تم تسجيل الدخول بنجاح")
+                    } else {
+                        triggerToast("❌ كلمة المرور غير صحيحة")
                     }
+                } else {
+                    triggerToast("❌ الحساب غير موجود")
+                }
             } catch (e: Exception) {
                 triggerToast("❌ حدث خطأ أثناء التحقق: ${e.message}")
             }
@@ -368,11 +478,35 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun authenticateAdmin(role: String) {
         _adminRole.value = role
+        if (role == "OWNER") {
+            _currentSupervisorPermissions.value = listOf("ALL")
+        }
         triggerToast("🔓 تم تسجيل الدخول بنجاح بصلاحية: $role")
     }
 
     fun authenticateAdmin(context: Context, role: String, remember: Boolean) {
         _adminRole.value = role
+        if (role == "OWNER") {
+            _currentSupervisorPermissions.value = listOf("ALL")
+        }
+        try {
+            val secureStorage = com.example.utils.SecureStorage(context)
+            if (remember) {
+                val perms = if (role == "OWNER") listOf("ALL") else _currentSupervisorPermissions.value
+                secureStorage.saveAdminSession(
+                    com.example.utils.AdminSession(
+                        uid = "${role.lowercase()}_${System.currentTimeMillis()}",
+                        email = role,
+                        loginTime = System.currentTimeMillis(),
+                        refreshToken = "${role}_SESSION",
+                        role = role,
+                        permissions = perms
+                    )
+                )
+            } else {
+                secureStorage.clearAdminSession()
+            }
+        } catch (_: Exception) {}
         triggerToast("🔓 تم تسجيل الدخول بنجاح بصلاحية: $role")
     }
 
@@ -434,20 +568,40 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun addSupervisor(name: String, role: String, passcode: String, permissions: List<String> = emptyList()) {
+        val cleanName = name.trim()
+        val cleanPasscode = passcode.trim()
+        if (cleanName.isBlank() || cleanPasscode.isBlank()) {
+            triggerToast("❌ يرجى إدخال اسم المشرف والرمز السري")
+            return
+        }
         val nextId = "sup_" + UUID.randomUUID().toString().take(6)
         // ✨ م2: تشفير كلمة المرور (Hashing) قبل التخزين لحماية المشرفين
-        val hashedPass = com.example.utils.SecureHasher.hashPassword(passcode.trim())
-        val newSup = SupervisorEntity(id = nextId, name = name, role = role, passcodeHash = hashedPass, permissions = permissions)
+        val hashedPass = if (com.example.utils.SecureHasher.isValidHash(cleanPasscode)) {
+            cleanPasscode
+        } else {
+            com.example.utils.SecureHasher.hashPassword(cleanPasscode)
+        }
+        val newSup = SupervisorEntity(id = nextId, name = cleanName, role = role, passcodeHash = hashedPass, permissions = permissions)
         db.collection("supervisors").document(nextId).set(newSup)
-        triggerToast("🔑 تم إضافة المشرف $name وتعيين ${permissions.size} صلاحية بنجاح")
+        triggerToast("🔑 تم إضافة المشرف $cleanName وتعيين ${permissions.size} صلاحية بنجاح")
     }
 
     fun editSupervisor(id: String, name: String, role: String, passcode: String, permissions: List<String> = emptyList()) {
+        val cleanName = name.trim()
+        val cleanPasscode = passcode.trim()
+        if (id.isBlank() || cleanName.isBlank() || cleanPasscode.isBlank()) {
+            triggerToast("❌ بيانات المشرف غير مكتملة")
+            return
+        }
         // ✨ م2: تشفير كلمة المرور في حال التعديل لضمان الأمان
-        val finalPass = if (passcode.contains(":")) passcode else com.example.utils.SecureHasher.hashPassword(passcode.trim())
-        val updatedSup = SupervisorEntity(id = id, name = name, role = role, passcodeHash = finalPass, permissions = permissions)
+        val finalPass = if (com.example.utils.SecureHasher.isValidHash(cleanPasscode)) {
+            cleanPasscode
+        } else {
+            com.example.utils.SecureHasher.hashPassword(cleanPasscode)
+        }
+        val updatedSup = SupervisorEntity(id = id, name = cleanName, role = role, passcodeHash = finalPass, permissions = permissions)
         db.collection("supervisors").document(id).set(updatedSup)
-        triggerToast("✏️ تم تعديل بيانات وصلاحيات المشرف $name (${permissions.size} صلاحية) بنجاح")
+        triggerToast("✏️ تم تعديل بيانات وصلاحيات المشرف $cleanName (${permissions.size} صلاحية) بنجاح")
     }
 
     fun updateSupervisorPermissions(id: String, permissions: List<String>) {
@@ -466,7 +620,11 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         note: String,
         onComplete: (Boolean) -> Unit = {}
     ) {
-        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        if (cleanPhone.length < 7) {
+            onComplete(false)
+            return
+        }
         val currentTime = System.currentTimeMillis()
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
@@ -476,6 +634,8 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             "channel" to channel,
             "note" to note,
             "status" to "PENDING",
+            "newPassword" to "",
+            "passwordHash" to "",
             "createdAt" to currentTime
         )
         db.collection("password_resets").document(cleanPhone).set(resetRequest)
@@ -489,23 +649,30 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             "status" to "PENDING",
             "timestamp" to currentTime,
             "newPassword" to "",
+            "passwordHash" to "",
             "adminNotes" to "القناة: $channel | ملاحظة: $note"
         )
-        db.collection("password_recovery_requests").document(cleanPhone).set(adminRecoveryRequest)
-
-        val adminNotifId = "PWD_RESET_ADMIN_$cleanPhone"
-        val adminNotif = mapOf(
-            "id" to adminNotifId,
-            "title" to "🔑 طلب استعادة حساب جديد",
-            "message" to "ورد طلب استعادة حساب للرقم: $cleanPhone عبر قناة $channel",
-            "targetType" to "ADMIN_ONLY",
-            "targetValue" to "ALL",
-            "timestamp" to currentTime,
-            "dedupKey" to "PWD_RESET_$cleanPhone"
-        )
-        if (adminNotif.isValid()) db.collection("notifications").document(adminNotifId).set(adminNotif)
-            .addOnSuccessListener { onComplete(true) }
-            .addOnFailureListener { onComplete(false) }
+        db.collection("password_recovery_requests").document(cleanPhone)
+            .set(adminRecoveryRequest)
+            .addOnSuccessListener {
+                val adminNotifId = "PWD_RESET_ADMIN_$cleanPhone"
+                val adminNotif = mapOf(
+                    "id" to adminNotifId,
+                    "title" to "🔑 طلب استعادة حساب جديد",
+                    "message" to "ورد طلب استعادة حساب للرقم: $cleanPhone عبر قناة $channel",
+                    "targetType" to "ADMIN_ONLY",
+                    "targetValue" to "ALL",
+                    "timestamp" to currentTime,
+                    "dedupKey" to "PWD_RESET_$cleanPhone"
+                )
+                if (adminNotif.isValid()) {
+                    db.collection("notifications").document(adminNotifId).set(adminNotif)
+                }
+                onComplete(true)
+            }
+            .addOnFailureListener {
+                onComplete(false)
+            }
     }
 
     data class PasswordRecoveryStatus(val status: String = "", val tempPassword: String = "")
@@ -517,13 +684,24 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun listenToPasswordRecoveryStatus(phone: String) {
         passwordRecoveryStatusListener?.remove()
-        val cleanPhone = phone.trim().replace(" ", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        if (cleanPhone.length < 7) return
         passwordRecoveryStatusListener = db.collection("password_resets").document(cleanPhone)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
                 if (snapshot != null && snapshot.exists()) {
                     val status = snapshot.getString("status") ?: "PENDING"
-                    val temp = snapshot.getString("tempPassword") ?: snapshot.getString("newPassword") ?: ""
+                    val rawPass = (snapshot.getString("newPassword") ?: snapshot.getString("tempPassword") ?: "").trim()
+                    val temp = when {
+                        rawPass.isEmpty() -> ""
+                        rawPass.startsWith("gcmx:") -> com.example.utils.SecurityCryptoUtils.decryptCrossDevice(rawPass)
+                        rawPass.startsWith("gcm:") || rawPass.startsWith("enc::") ->
+                            com.example.utils.SecurityCryptoUtils.decrypt(rawPass).ifBlank {
+                                com.example.utils.SecurityCryptoUtils.decryptCrossDevice(rawPass)
+                            }
+                        com.example.utils.SecureHasher.isValidHash(rawPass) -> ""
+                        else -> rawPass
+                    }
                     _passwordRecoveryStatus.value = PasswordRecoveryStatus(status, temp)
                 }
             }
@@ -539,14 +717,26 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         onUpdate: (status: String, newPassword: String, accountName: String, accountType: String) -> Unit
     ): com.google.firebase.firestore.ListenerRegistration? {
         if (phone.isBlank()) return null
-        val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        if (cleanPhone.length < 7) return null
         return try {
             db.collection("password_recovery_requests")
                 .document(cleanPhone)
-                .addSnapshotListener { snapshot, _ ->
+                .addSnapshotListener { snapshot, e ->
+                    if (e != null) return@addSnapshotListener
                     if (snapshot != null && snapshot.exists()) {
                         val status = snapshot.getString("status") ?: "PENDING"
-                        val newPassword = snapshot.getString("newPassword") ?: snapshot.getString("tempPassword") ?: ""
+                        val rawPass = (snapshot.getString("newPassword") ?: snapshot.getString("tempPassword") ?: "").trim()
+                        val newPassword = when {
+                            rawPass.isEmpty() -> ""
+                            rawPass.startsWith("gcmx:") -> com.example.utils.SecurityCryptoUtils.decryptCrossDevice(rawPass)
+                            rawPass.startsWith("gcm:") || rawPass.startsWith("enc::") ->
+                                com.example.utils.SecurityCryptoUtils.decrypt(rawPass).ifBlank {
+                                    com.example.utils.SecurityCryptoUtils.decryptCrossDevice(rawPass)
+                                }
+                            com.example.utils.SecureHasher.isValidHash(rawPass) -> ""
+                            else -> rawPass
+                        }
                         val accountName = snapshot.getString("name") ?: "صاحب الحساب"
                         val accountType = snapshot.getString("accountType") ?: "حساب معتمد"
                         onUpdate(status, newPassword, accountName, accountType)
@@ -565,7 +755,11 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                val cleanPhone = phone.trim().replace(" ", "").replace("+967", "").replace("967", "").replace("+", "")
+                val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+                if (cleanPhone.length < 7) {
+                    triggerToast("❌ رقم الهاتف غير صالح")
+                    return@launch
+                }
                 val currentTime = System.currentTimeMillis()
                 val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
                 val requestData = mapOf(
@@ -577,6 +771,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                     "status" to "PENDING",
                     "requestedAt" to currentTime,
                     "newPassword" to "",
+                    "passwordHash" to "",
                     "adminNotes" to "",
                     "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                 )

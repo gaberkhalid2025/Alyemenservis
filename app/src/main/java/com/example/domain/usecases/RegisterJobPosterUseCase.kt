@@ -24,12 +24,20 @@ class RegisterJobPosterUseCase @Inject constructor(
      * @return [Result] يحوي معرف الطلب المولد أو الاستثناء
      */
     suspend operator fun invoke(job: RegistrationEntity.Job): Result<String> {
-        if (job.jobTitle.isBlank()) {
+        val cleanTitle = job.jobTitle.trim()
+        if (cleanTitle.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال المسمى الوظيفي المطلوب"))
         }
+        if (cleanTitle.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل المسمى الوظيفي عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
+        }
 
-        if (job.companyName.isBlank()) {
+        val cleanCompany = job.companyName.trim()
+        if (cleanCompany.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم الشركة أو معلن الوظيفة"))
+        }
+        if (cleanCompany.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم الشركة عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
         }
 
         val phoneCheck = validatePhone(job.contactPhone)
@@ -37,32 +45,35 @@ class RegisterJobPosterUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(job.rawPassword)
+        val cleanPassword = job.rawPassword.trim()
+        val passCheck = validatePassword(cleanPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }
 
-        if (job.city.isBlank()) {
+        val cleanCity = job.city.trim()
+        if (cleanCity.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى تحديد المدينة/المحافظة"))
         }
 
-        if (job.contactEmail.isNotBlank()) {
-            val emailCheck = Validators.validateEmail(job.contactEmail)
+        val cleanEmail = job.contactEmail.trim()
+        if (cleanEmail.isNotBlank()) {
+            val emailCheck = Validators.validateEmail(cleanEmail)
             if (!emailCheck.isValid) {
                 return Result.failure(IllegalArgumentException(emailCheck.message))
             }
         }
 
         val normalized = job.copy(
-            jobTitle = job.jobTitle.trim(),
-            companyName = job.companyName.trim(),
+            jobTitle = cleanTitle,
+            companyName = cleanCompany,
             category = job.category.trim(),
             contactPhone = ValidatePhoneUseCase.normalizePhone(job.contactPhone),
-            contactEmail = job.contactEmail.trim(),
-            city = job.city.trim(),
+            contactEmail = cleanEmail,
+            city = cleanCity,
             requirements = job.requirements.trim(),
             salaryRange = job.salaryRange.trim(),
-            rawPassword = job.rawPassword.trim()
+            rawPassword = cleanPassword
         )
         return repository.registerJob(normalized)
     }

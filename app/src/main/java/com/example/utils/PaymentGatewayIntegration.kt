@@ -22,7 +22,7 @@ data class Payment(
 
 @Keep
 data class PaymentResult(
-    val success: Boolean = true,
+    val success: Boolean = false,
     val transactionId: String? = null,
     val message: String = "",
     val timestamp: Long = System.currentTimeMillis()
@@ -31,8 +31,8 @@ data class PaymentResult(
 @Keep
 data class PaymentVerification(
     val transactionId: String = "",
-    val isValid: Boolean = true,
-    val status: String = "VERIFIED", // "VERIFIED", "PENDING", "REJECTED"
+    val isValid: Boolean = false,
+    val status: String = "PENDING", // "VERIFIED", "PENDING", "REJECTED"
     val amount: Double = 0.0,
     val verifiedAt: Long = System.currentTimeMillis()
 )
@@ -40,7 +40,7 @@ data class PaymentVerification(
 @Keep
 data class PaymentConfirmation(
     val transactionId: String = "",
-    val isConfirmed: Boolean = true,
+    val isConfirmed: Boolean = false,
     val confirmedBy: String = "SYSTEM",
     val confirmationCode: String = "",
     val confirmedAt: Long = System.currentTimeMillis()
@@ -76,7 +76,7 @@ data class PaymentMethod(
  * 
  * ⚠️ لا تفعّل المفتاح قبل ربط بوابة حقيقية.
  */
-class PaymentGatewayIntegration(context: Context? = null) {
+class PaymentGatewayIntegration(@Suppress("UNUSED_PARAMETER") context: Context? = null) {
 
     private val isPaymentEnabledFromBuild: Boolean = BuildConfig.IS_PAYMENT_ENABLED
     private val activeTransactions = java.util.concurrent.ConcurrentHashMap<String, Payment>()
@@ -85,8 +85,28 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * معالجة وتنفيذ عملية الدفع
      */
     fun processPayment(payment: Payment, settings: AdminSettingsEntity? = null): Result<PaymentResult> {
-        if (payment.amount <= 0.0) {
-            return Result.failure(IllegalArgumentException("مبلغ الدفع يجب أن يكون أكبر من الصفر."))
+        if (!payment.amount.isFinite() || payment.amount <= 0.0) {
+            return Result.failure(IllegalArgumentException("مبلغ الدفع يجب أن يكون رقماً صالحاً أكبر من الصفر."))
+        }
+        if (payment.method.isBlank() || !validatePaymentMethod(payment.method)) {
+            return Result.failure(IllegalArgumentException("وسيلة الدفع غير صالحة أو غير مدعومة: ${payment.method}"))
+        }
+        val matchedMethod = getAvailablePaymentMethods().find { it.id.equals(payment.method.trim(), ignoreCase = true) }
+        if (matchedMethod != null) {
+            if (!matchedMethod.isActive) {
+                return Result.failure(IllegalStateException("وسيلة الدفع المختارة متوقفة مؤقتاً: ${matchedMethod.nameAr}"))
+            }
+            if (payment.amount < matchedMethod.minAmount || payment.amount > matchedMethod.maxAmount) {
+                return Result.failure(
+                    IllegalArgumentException("المبلغ خارج النطاق المسموح لوسيلة الدفع (${matchedMethod.minAmount} - ${matchedMethod.maxAmount}).")
+                )
+            }
+        } else if (payment.amount > 10_000_000.0) {
+            return Result.failure(IllegalArgumentException("المبلغ يتجاوز الحد الأقصى المسموح به للعملية الواحدة."))
+        }
+        val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
+        if (!enabled) {
+            return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
         }
         return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
@@ -95,7 +115,8 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * التحقق من صحة عملية الدفع ورقم الحوالة
      */
     fun verifyPayment(transactionId: String, settings: AdminSettingsEntity? = null): Result<PaymentVerification> {
-        if (transactionId.isBlank()) {
+        val cleanTxId = transactionId.trim()
+        if (cleanTxId.isBlank()) {
             return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
         }
         val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
@@ -106,10 +127,10 @@ class PaymentGatewayIntegration(context: Context? = null) {
         }
 
         return try {
-            val payment = activeTransactions[transactionId.trim()]
-            if (payment != null) {
+            val payment = activeTransactions[cleanTxId]
+            if (payment != null && payment.amount.isFinite() && payment.amount > 0.0) {
                 val verification = PaymentVerification(
-                    transactionId = transactionId.trim(),
+                    transactionId = cleanTxId,
                     isValid = true,
                     status = "VERIFIED",
                     amount = payment.amount,
@@ -117,7 +138,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
                 )
                 Result.success(verification)
             } else {
-                Result.failure(IllegalArgumentException("لم يتم العثور على المعاملة المالية أو أنها غير صالحة: $transactionId"))
+                Result.failure(IllegalArgumentException("لم يتم العثور على المعاملة المالية أو أنها غير صالحة: $cleanTxId"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -131,6 +152,10 @@ class PaymentGatewayIntegration(context: Context? = null) {
         if (transactionId.isBlank()) {
             return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
         }
+        val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
+        if (!enabled) {
+            return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
+        }
         return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
     }
 
@@ -138,11 +163,12 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * إلغاء عملية الدفع
      */
     fun cancelPayment(transactionId: String, reason: String): Result<Boolean> {
-        if (transactionId.isBlank()) {
+        val cleanTxId = transactionId.trim()
+        if (cleanTxId.isBlank()) {
             return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
         }
         return try {
-            activeTransactions.remove(transactionId.trim())
+            activeTransactions.remove(cleanTxId)
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -153,7 +179,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * استرداد المبلغ
      */
     fun refundPayment(transactionId: String, amount: Double): Result<Boolean> {
-        if (transactionId.isBlank() || amount <= 0.0) {
+        if (transactionId.isBlank() || !amount.isFinite() || amount <= 0.0) {
             return Result.failure(IllegalArgumentException("بيانات الاسترداد غير صالحة."))
         }
         return Result.failure(UnsupportedOperationException("Payment gateway not implemented"))
@@ -163,9 +189,11 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * الحصول على سجل المعاملات لمستخدم معين
      */
     fun getTransactionHistory(userId: String): List<Transaction> {
-        if (userId.isBlank()) return emptyList()
+        val cleanUserId = userId.trim()
+        if (cleanUserId.isBlank()) return emptyList()
         return activeTransactions.values
-            .filter { it.userId == userId }
+            .filter { it.userId == cleanUserId }
+            .sortedByDescending { it.timestamp }
             .map { p ->
                 Transaction(
                     id = p.id,
@@ -184,6 +212,7 @@ class PaymentGatewayIntegration(context: Context? = null) {
      * التحقق من نوع وسيلة الدفع
      */
     fun validatePaymentMethod(method: String): Boolean {
+        if (method.isBlank()) return false
         val validMethods = listOf("JEEB", "ALKARIMI", "JAWALY", "YEMENCASH", "BANK", "CASH")
         return validMethods.any { it.equals(method.trim(), ignoreCase = true) }
     }
@@ -237,6 +266,15 @@ class PaymentGatewayIntegration(context: Context? = null) {
                 description = "تحويل مصرفي مباشر عبر البنوك اليمنية المعتمدة",
                 minAmount = 5000.0,
                 maxAmount = 10000000.0
+            ),
+            PaymentMethod(
+                id = "CASH",
+                nameAr = "دفع نقدي مباشر",
+                nameEn = "Cash Payment",
+                type = "CASH",
+                description = "دفع نقدي مباشر عند إنجاز الخدمة أو التسليم",
+                minAmount = 100.0,
+                maxAmount = 5000000.0
             )
         )
     }
@@ -248,7 +286,8 @@ class PaymentGatewayIntegration(context: Context? = null) {
             "JAWALY" -> "جوالي"
             "YEMENCASH" -> "يمن كاش"
             "BANK" -> "حوالة بنكية"
-            else -> "نقدي"
+            "CASH" -> "نقدي"
+            else -> "غير محدد"
         }
     }
 }

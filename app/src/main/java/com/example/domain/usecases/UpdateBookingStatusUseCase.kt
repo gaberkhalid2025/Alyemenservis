@@ -16,11 +16,12 @@ class UpdateBookingStatusUseCase @Inject constructor(
         bookingId: String,
         newStatus: String,
         currentStatus: String = "",
-        userRole: String = "USER",
+        userRole: String = "PROVIDER",
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        if (bookingId.isBlank()) {
+        val cleanId = bookingId.trim()
+        if (cleanId.isBlank()) {
             onError("معرف الحجز غير صالح")
             return
         }
@@ -33,19 +34,24 @@ class UpdateBookingStatusUseCase @Inject constructor(
         }
 
         val roleUpper = userRole.trim().uppercase(Locale.ROOT)
-        if ((roleUpper == "CLIENT" || roleUpper == "GUEST") &&
+        if (roleUpper in listOf("CLIENT", "GUEST", "USER", "CUSTOMER") &&
             cleanNewStatus in listOf("ACCEPTED", "IN_PROGRESS", "REJECTED", "CLOSED", "COMPLETED", "PAID")
         ) {
             onError("ليس لديك صلاحية لتغيير حالة الحجز إلى ($cleanNewStatus)")
             return
         }
 
-        if (currentStatus.isNotBlank() && !com.example.utils.BookingStateMachine.canTransition(currentStatus, cleanNewStatus)) {
-            onError("انتقال غير مسموح من الحالة ($currentStatus) إلى ($cleanNewStatus)")
+        val resolvedCurrentStatus = currentStatus.trim().ifBlank {
+            bookingRepository.cachedBookings?.value?.find { it.id == cleanId }?.status.orEmpty()
+        }
+        if (resolvedCurrentStatus.isNotBlank() &&
+            !com.example.utils.BookingStateMachine.canTransition(resolvedCurrentStatus, cleanNewStatus)
+        ) {
+            onError("انتقال غير مسموح من الحالة ($resolvedCurrentStatus) إلى ($cleanNewStatus)")
             return
         }
         bookingRepository.updateBookingStatus(
-            bookingId = bookingId.trim(),
+            bookingId = cleanId,
             newStatus = cleanNewStatus,
             onSuccess = onSuccess,
             onError = onError

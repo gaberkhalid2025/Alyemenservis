@@ -19,12 +19,20 @@ class CreateInstantRequestUseCase @Inject constructor(
         if (serviceLabel.isBlank() && request.description.isBlank()) {
             return AppResult.Error(AppError.ValidationError("serviceType", "يرجى تحديد نوع الخدمة أو وصف الطلب"))
         }
+        if (request.acceptedPrice < 0.0 || request.acceptedPrice.isNaN() || request.acceptedPrice.isInfinite()) {
+            return AppResult.Error(AppError.ValidationError("price", "الميزانية أو السعر المحدد غير صالح"))
+        }
         val normalizedPhone = ValidatePhoneUseCase.normalizePhone(request.userPhone)
         val normalizedRequest = request.copy(
+            userId = request.userId.trim(),
+            userName = request.userName.trim(),
             userPhone = normalizedPhone,
+            userCity = request.userCity.trim(),
+            userNeighborhood = request.userNeighborhood.trim(),
             serviceTitle = request.serviceTitle.trim().ifBlank { serviceLabel },
             categoryName = request.categoryName.trim().ifBlank { serviceLabel },
-            description = request.description.trim()
+            description = request.description.trim(),
+            images = request.images.map { it.trim() }.filter { it.isNotBlank() }
         )
 
         return withTimeoutOrNull(30_000L) {

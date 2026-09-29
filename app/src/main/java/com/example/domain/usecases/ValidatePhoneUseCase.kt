@@ -24,7 +24,7 @@ class ValidatePhoneUseCase @Inject constructor() {
         } else if (digitsOnly.startsWith("967") && digitsOnly.length >= 12) {
             digitsOnly = digitsOnly.substring(3)
         }
-        if (digitsOnly.startsWith("0") && digitsOnly.length == 10) {
+        while (digitsOnly.startsWith("0") && digitsOnly.length > 9) {
             digitsOnly = digitsOnly.substring(1)
         }
 
@@ -61,7 +61,8 @@ class ValidatePhoneUseCase @Inject constructor() {
             val latin = toLatinDigits(phone).trim()
             if (latin.isBlank()) return ""
             val digits = latin.filter { it in '0'..'9' }
-            if (digits.length < 7) return latin
+            if (digits.isEmpty()) return latin
+            if (digits.length < 7) return digits
 
             var processed = digits
             if (processed.startsWith("00967")) {
@@ -70,7 +71,7 @@ class ValidatePhoneUseCase @Inject constructor() {
                 processed = processed.substring(3)
             }
 
-            if (processed.startsWith("0") && processed.length == 10) {
+            while (processed.startsWith("0") && processed.length > 9) {
                 processed = processed.substring(1)
             }
 
@@ -85,7 +86,7 @@ class ValidatePhoneUseCase @Inject constructor() {
                 }
             }
 
-            return latin
+            return processed
         }
     }
 

@@ -13,8 +13,12 @@ class RegisterProviderUseCase @Inject constructor(
     private val validatePassword: ValidatePasswordUseCase = ValidatePasswordUseCase()
 ) {
     suspend operator fun invoke(provider: RegistrationEntity.Provider): Result<String> {
-        if (provider.fullName.isBlank()) {
+        val cleanName = provider.fullName.trim()
+        if (cleanName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم الفني الكامل"))
+        }
+        if (cleanName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم الفني عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
         }
 
         val phoneCheck = validatePhone(provider.phone)
@@ -22,16 +26,19 @@ class RegisterProviderUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(provider.rawPassword)
+        val cleanPassword = provider.rawPassword.trim()
+        val passCheck = validatePassword(cleanPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }
 
-        if (provider.professionCategory.isBlank()) {
+        val cleanCategory = provider.professionCategory.trim()
+        if (cleanCategory.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى اختيار تخصص المهنة/الحرفة"))
         }
 
-        if (provider.city.isBlank()) {
+        val cleanCity = provider.city.trim()
+        if (cleanCity.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى تحديد المدينة/المحافظة"))
         }
 
@@ -40,14 +47,15 @@ class RegisterProviderUseCase @Inject constructor(
         }
 
         val normalized = provider.copy(
-            fullName = provider.fullName.trim(),
+            fullName = cleanName,
             phone = ValidatePhoneUseCase.normalizePhone(provider.phone),
-            professionCategory = provider.professionCategory.trim(),
-            city = provider.city.trim(),
+            professionCategory = cleanCategory,
+            city = cleanCity,
             bio = provider.bio.trim(),
             identityDocumentUrl = provider.identityDocumentUrl.trim(),
             licenseNumber = provider.licenseNumber.trim(),
-            rawPassword = provider.rawPassword.trim()
+            workImages = provider.workImages.map { it.trim() }.filter { it.isNotBlank() },
+            rawPassword = cleanPassword
         )
         return repository.registerProvider(normalized)
     }

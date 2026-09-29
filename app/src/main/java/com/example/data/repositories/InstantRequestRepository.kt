@@ -74,8 +74,9 @@ class InstantRequestRepository(private val context: Context? = null) {
                 createdAt = if (request.createdAt > 0) request.createdAt else now,
                 expiresAt = expiresAt
             )
+            val entityForFirestore = newEntity.copy(rawPin = "")
 
-            firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(docId).set(newEntity)
+            firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(docId).set(entityForFirestore)
                 .addOnSuccessListener {
                     val current = _requests.value.toMutableList()
                     current.removeAll { it.id == docId }
@@ -237,6 +238,7 @@ class InstantRequestRepository(private val context: Context? = null) {
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
+        val now = System.currentTimeMillis()
         val updates = mapOf(
             "status" to "ACCEPTED",
             "acceptedOfferId" to offerId,
@@ -244,54 +246,74 @@ class InstantRequestRepository(private val context: Context? = null) {
             "acceptedTechnicianName" to providerName,
             "acceptedTechnicianPhone" to providerPhone,
             "acceptedPrice" to acceptedPrice,
-            "acceptedAt" to System.currentTimeMillis(),
-            "updatedAt" to System.currentTimeMillis()
+            "acceptedAt" to now,
+            "updatedAt" to now
         )
 
-        firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId)
-            .update(updates)
-            .addOnSuccessListener {
-                firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId)
-                    .collection("offers").document(offerId)
-                    .update("status", "ACCEPTED")
-                firestore.collection("request_offers").document(offerId)
-                    .update("status", "ACCEPTED")
+        val requestRef = firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId)
+        val offerRef = requestRef.collection("offers").document(offerId)
+        val topLevelOfferRef = firestore.collection("request_offers").document(offerId)
 
-                // Mark other competing offers for the same request as REJECTED
-                firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document(requestId)
-                    .collection("offers")
-                    .get()
-                    .addOnSuccessListener { snap ->
-                        snap.documents.forEach { doc ->
-                            if (doc.id != offerId && doc.getString("status") == "PENDING") {
-                                doc.reference.update("status", "REJECTED")
-                                firestore.collection("request_offers").document(doc.id).update("status", "REJECTED")
-                            }
+        val onOfferAcceptedSuccess = {
+            offerRef.update("status", "ACCEPTED")
+            topLevelOfferRef.update("status", "ACCEPTED")
+
+            // Mark other competing offers for the same request as REJECTED
+            requestRef.collection("offers")
+                .get()
+                .addOnSuccessListener { snap ->
+                    snap.documents.forEach { doc ->
+                        if (doc.id != offerId && doc.getString("status") == "PENDING") {
+                            doc.reference.update("status", "REJECTED")
+                            firestore.collection("request_offers").document(doc.id).update("status", "REJECTED")
                         }
                     }
-
-                _requests.value = _requests.value.map {
-                    if (it.id == requestId) it.copy(
-                        status = "ACCEPTED",
-                        acceptedOfferId = offerId,
-                        acceptedTechnicianId = providerId,
-                        acceptedTechnicianName = providerName,
-                        acceptedTechnicianPhone = providerPhone,
-                        acceptedPrice = acceptedPrice
-                    ) else it
                 }
-                context?.let { ctx ->
-                    repositoryScope.launch {
-                        try {
-                            com.example.data.local.AppDatabase.getInstance(ctx).requestDao()
-                                .updateRequestStatus(requestId, "ACCEPTED")
-                        } catch (_: Exception) {}
+
+            _requests.value = _requests.value.map {
+                if (it.id == requestId) it.copy(
+                    status = "ACCEPTED",
+                    acceptedOfferId = offerId,
+                    acceptedTechnicianId = providerId,
+                    acceptedTechnicianName = providerName,
+                    acceptedTechnicianPhone = providerPhone,
+                    acceptedPrice = acceptedPrice
+                ) else it
+            }
+            context?.let { ctx ->
+                repositoryScope.launch {
+                    try {
+                        com.example.data.local.AppDatabase.getInstance(ctx).requestDao()
+                            .updateRequestStatus(requestId, "ACCEPTED")
+                    } catch (_: Exception) {}
+                }
+            }
+            AnalyticsEventsHelper.logOfferAccepted(context, requestId, providerId)
+            onSuccess()
+        }
+
+        requestRef.get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot != null && snapshot.exists()) {
+                    val currentStatus = snapshot.getString("status")?.uppercase() ?: "WAITING_FOR_OFFERS"
+                    val currentAcceptedOffer = snapshot.getString("acceptedOfferId") ?: ""
+                    if (currentStatus in setOf("CANCELLED", "COMPLETED", "EXPIRED") ||
+                        (currentStatus == "ACCEPTED" && currentAcceptedOffer.isNotBlank() && currentAcceptedOffer != offerId)
+                    ) {
+                        onError("لا يمكن قبول العرض لأن حالة الطلب الحالية هي: $currentStatus")
+                        return@addOnSuccessListener
                     }
                 }
-                AnalyticsEventsHelper.logOfferAccepted(context, requestId, providerId)
-                onSuccess()
+                requestRef.update(updates)
+                    .addOnSuccessListener { onOfferAcceptedSuccess() }
+                    .addOnFailureListener { onError(it.localizedMessage ?: "فشل قبول العرض") }
             }
-            .addOnFailureListener { onError(it.localizedMessage ?: "فشل قبول العرض") }
+            .addOnFailureListener {
+                // في حال تعذر القراءة المسبقة (أوفلاين) نحاول التحديث المباشر
+                requestRef.update(updates)
+                    .addOnSuccessListener { onOfferAcceptedSuccess() }
+                    .addOnFailureListener { err -> onError(err.localizedMessage ?: "فشل قبول العرض") }
+            }
     }
 
     /**

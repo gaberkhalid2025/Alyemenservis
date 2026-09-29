@@ -399,7 +399,15 @@ val MainViewModel.currentSupervisorPermissions get() = authViewModel.currentSupe
 fun MainViewModel.verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
     val effectiveAdmin = adminPass
     val effectiveOwner = ownerPass.ifEmpty { settings.value.ownerPassword }
-    return authViewModel.verifyAdminOrOwnerPassword(password, effectiveAdmin, effectiveOwner)
+    if (authViewModel.verifyAdminOrOwnerPassword(password, effectiveAdmin, effectiveOwner)) {
+        return true
+    }
+    val ctx = appContext
+    return if (ctx != null) {
+        SecureAdminStorage.verifyStoredPasswordOnly(ctx, password)
+    } else {
+        false
+    }
 }
 
 fun MainViewModel.setUserSessionDetails(context: Context, name: String, phone: String, residence: String = "اليمن") {

@@ -19,10 +19,11 @@ object SecureHasher {
     private const val KEY_LENGTH = 256
     private const val SALT_SIZE = 16
 
+    private val secureRandom = SecureRandom()
+
     fun generateSalt(): ByteArray {
-        val random = SecureRandom()
         val salt = ByteArray(SALT_SIZE)
-        random.nextBytes(salt)
+        secureRandom.nextBytes(salt)
         return salt
     }
 
@@ -35,20 +36,27 @@ object SecureHasher {
     }
 
     private fun base64Decode(str: String): ByteArray {
+        val clean = str.trim()
         return try {
-            Base64.decode(str, Base64.NO_WRAP)
+            Base64.decode(clean, Base64.NO_WRAP)
         } catch (e: Throwable) {
-            java.util.Base64.getDecoder().decode(str)
+            try {
+                Base64.decode(clean, Base64.DEFAULT)
+            } catch (_: Throwable) {
+                java.util.Base64.getDecoder().decode(clean)
+            }
         }
     }
 
     fun hashPassword(password: String, salt: ByteArray = generateSalt()): String {
         val cleanPassword = password.trim()
-        val spec = PBEKeySpec(cleanPassword.toCharArray(), salt, ITERATIONS_PASSWORD, KEY_LENGTH)
+        if (cleanPassword.isEmpty()) return ""
+        val effectiveSalt = if (salt.isNotEmpty()) salt else generateSalt()
+        val spec = PBEKeySpec(cleanPassword.toCharArray(), effectiveSalt, ITERATIONS_PASSWORD, KEY_LENGTH)
         return try {
             val skf = SecretKeyFactory.getInstance(ALGORITHM)
             val hash = skf.generateSecret(spec).encoded
-            val saltBase64 = base64Encode(salt)
+            val saltBase64 = base64Encode(effectiveSalt)
             val hashBase64 = base64Encode(hash)
             "$saltBase64:$hashBase64"
         } finally {
@@ -57,6 +65,7 @@ object SecureHasher {
     }
 
     private fun verifyWithIterations(input: String, salt: ByteArray, expectedHashBytes: ByteArray, iterations: Int): Boolean {
+        if (input.isBlank() || salt.isEmpty() || expectedHashBytes.isEmpty()) return false
         val spec = PBEKeySpec(input.toCharArray(), salt, iterations, KEY_LENGTH)
         return try {
             val skf = SecretKeyFactory.getInstance(ALGORITHM)
@@ -80,7 +89,7 @@ object SecureHasher {
 
         return try {
             val parts = trimmedStored.split(":")
-            if (parts.size != 2) return false
+            if (parts.size != 2 || parts[0].isBlank() || parts[1].isBlank()) return false
             val salt = base64Decode(parts[0])
             val expectedHashBytes = base64Decode(parts[1])
             verifyWithIterations(trimmedInput, salt, expectedHashBytes, ITERATIONS_PASSWORD) ||
@@ -92,8 +101,10 @@ object SecureHasher {
 
     fun hashPin(pin: String, salt: ByteArray = generateSalt()): String {
         val cleanPin = pin.trim()
-        val saltBase64 = base64Encode(salt)
-        val spec = PBEKeySpec(cleanPin.toCharArray(), salt, ITERATIONS_PIN, KEY_LENGTH)
+        if (cleanPin.isEmpty()) return ""
+        val effectiveSalt = if (salt.isNotEmpty()) salt else generateSalt()
+        val saltBase64 = base64Encode(effectiveSalt)
+        val spec = PBEKeySpec(cleanPin.toCharArray(), effectiveSalt, ITERATIONS_PIN, KEY_LENGTH)
         return try {
             val skf = SecretKeyFactory.getInstance(ALGORITHM)
             val hash = skf.generateSecret(spec).encoded
@@ -138,7 +149,7 @@ object SecureHasher {
         return try {
             val salt = base64Decode(parts[0])
             val hash = base64Decode(parts[1])
-            salt.isNotEmpty() && hash.isNotEmpty()
+            salt.size >= 8 && hash.size >= 16
         } catch (e: Throwable) {
             false
         }

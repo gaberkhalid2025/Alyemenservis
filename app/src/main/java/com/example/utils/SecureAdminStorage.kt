@@ -26,25 +26,34 @@ object SecureAdminStorage {
     private const val KEY_VAULT_LAST_SYNC = "vault_last_sync"
     
     private const val SALT_PREFIX = "yemen_admin_v2_"
-    
+
+    @Volatile
+    private var cachedEncryptedPrefs: EncryptedSharedPreferences? = null
+
     private fun getSecurePrefs(context: Context): EncryptedSharedPreferences? {
-        return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            
-            val encryptedPrefs = EncryptedSharedPreferences.create(
-                context.applicationContext,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            ) as EncryptedSharedPreferences
-            migrateLegacyPrefs(context, encryptedPrefs)
-            encryptedPrefs
-        } catch (e: Exception) {
-            android.util.Log.e("SecureAdminStorage", "Failed to init secure storage", e)
-            null
+        cachedEncryptedPrefs?.let { return it }
+        return synchronized(this) {
+            cachedEncryptedPrefs?.let { return@synchronized it }
+            try {
+                val appContext = context.applicationContext ?: context
+                val masterKey = MasterKey.Builder(appContext)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+
+                val encryptedPrefs = EncryptedSharedPreferences.create(
+                    appContext,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                ) as EncryptedSharedPreferences
+                migrateLegacyPrefs(appContext, encryptedPrefs)
+                cachedEncryptedPrefs = encryptedPrefs
+                encryptedPrefs
+            } catch (e: Exception) {
+                android.util.Log.e("SecureAdminStorage", "Failed to init secure storage", e)
+                null
+            }
         }
     }
 
@@ -93,17 +102,19 @@ object SecureAdminStorage {
         return try {
             val editor = prefs.edit()
             
-            ownerEmail?.let {
-                editor.putString(KEY_OWNER_EMAIL, hashValue(it, SALT_PREFIX + "email"))
+            ownerEmail?.trim()?.takeIf { it.isNotEmpty() }?.let { clean ->
+                editor.putString(KEY_OWNER_EMAIL, hashValue(clean.lowercase(java.util.Locale.ROOT), SALT_PREFIX + "email"))
             }
-            ownerPassword?.let {
-                editor.putString(KEY_OWNER_HASH, SecureHasher.hashPassword(it.trim()))
+            ownerPassword?.trim()?.takeIf { it.isNotEmpty() }?.let { clean ->
+                val hash = if (SecureHasher.isValidHash(clean)) clean else SecureHasher.hashPassword(clean)
+                editor.putString(KEY_OWNER_HASH, hash)
             }
-            adminEmail?.let {
-                editor.putString(KEY_ADMIN_EMAIL, hashValue(it, SALT_PREFIX + "email"))
+            adminEmail?.trim()?.takeIf { it.isNotEmpty() }?.let { clean ->
+                editor.putString(KEY_ADMIN_EMAIL, hashValue(clean.lowercase(java.util.Locale.ROOT), SALT_PREFIX + "email"))
             }
-            adminPassword?.let {
-                editor.putString(KEY_ADMIN_HASH, SecureHasher.hashPassword(it.trim()))
+            adminPassword?.trim()?.takeIf { it.isNotEmpty() }?.let { clean ->
+                val hash = if (SecureHasher.isValidHash(clean)) clean else SecureHasher.hashPassword(clean)
+                editor.putString(KEY_ADMIN_HASH, hash)
             }
             
             editor.putBoolean(KEY_VAULT_INITIALIZED, true)
@@ -125,6 +136,10 @@ object SecureAdminStorage {
         password: String,
         role: String
     ): Boolean {
+        val cleanEmail = email.trim()
+        val cleanPass = password.trim()
+        if (cleanEmail.isEmpty() || cleanPass.isEmpty()) return false
+
         val prefs = getSecurePrefs(context) ?: return false
         
         if (!prefs.getBoolean(KEY_VAULT_INITIALIZED, false)) {
@@ -132,36 +147,67 @@ object SecureAdminStorage {
         }
         
         return try {
-            val emailHash = hashValue(email, SALT_PREFIX + "email")
-            val passHash = hashValue(password, SALT_PREFIX + "pass")
-            val cleanEmail = email.trim()
-            val cleanPass = password.trim()
+            val emailLowerHash = hashValue(cleanEmail.lowercase(java.util.Locale.ROOT), SALT_PREFIX + "email")
+            val emailExactHash = hashValue(cleanEmail, SALT_PREFIX + "email")
+            val passHash = hashValue(cleanPass, SALT_PREFIX + "pass")
             
-            when (role.uppercase()) {
+            when (role.trim().uppercase(java.util.Locale.ROOT)) {
                 "OWNER" -> {
-                    val storedEmail = prefs.getString(KEY_OWNER_EMAIL, null) ?: return false
-                    val storedPass = prefs.getString(KEY_OWNER_HASH, null) ?: return false
-                    val emailMatches = constantTimeEquals(storedEmail, emailHash) || 
-                            SecureHasher.verifyPassword(cleanEmail, storedEmail) ||
+                    val storedEmail = prefs.getString(KEY_OWNER_EMAIL, null)?.takeIf { it.isNotBlank() } ?: return false
+                    val storedPass = prefs.getString(KEY_OWNER_HASH, null)?.takeIf { it.isNotBlank() } ?: return false
+                    val emailMatches = constantTimeEquals(storedEmail, emailLowerHash) ||
+                            constantTimeEquals(storedEmail, emailExactHash) ||
                             storedEmail.equals(cleanEmail, ignoreCase = true)
-                    val passMatches = constantTimeEquals(storedPass, passHash) || 
-                            SecureHasher.verifyPassword(cleanPass, storedPass)
+                    val passMatches = constantTimeEquals(storedPass, passHash) ||
+                            SecureHasher.verifyPassword(cleanPass, storedPass) ||
+                            SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedPass)
                     emailMatches && passMatches
                 }
                 "ADMIN" -> {
-                    val storedEmail = prefs.getString(KEY_ADMIN_EMAIL, null) ?: return false
-                    val storedPass = prefs.getString(KEY_ADMIN_HASH, null) ?: return false
-                    val emailMatches = constantTimeEquals(storedEmail, emailHash) || 
-                            SecureHasher.verifyPassword(cleanEmail, storedEmail) ||
+                    val storedEmail = prefs.getString(KEY_ADMIN_EMAIL, null)?.takeIf { it.isNotBlank() } ?: return false
+                    val storedPass = prefs.getString(KEY_ADMIN_HASH, null)?.takeIf { it.isNotBlank() } ?: return false
+                    val emailMatches = constantTimeEquals(storedEmail, emailLowerHash) ||
+                            constantTimeEquals(storedEmail, emailExactHash) ||
                             storedEmail.equals(cleanEmail, ignoreCase = true)
-                    val passMatches = constantTimeEquals(storedPass, passHash) || 
-                            SecureHasher.verifyPassword(cleanPass, storedPass)
+                    val passMatches = constantTimeEquals(storedPass, passHash) ||
+                            SecureHasher.verifyPassword(cleanPass, storedPass) ||
+                            SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedPass)
                     emailMatches && passMatches
                 }
                 else -> false
             }
         } catch (e: Exception) {
             android.util.Log.e("SecureAdminStorage", "Failed to verify credentials", e)
+            false
+        }
+    }
+
+    /**
+     * التحقق من كلمة مرور الأدمن أو المالك المخزنة محلياً في الخزنة المشفرة (لعمليات التأكيد الحساسة بعد تسجيل الدخول)
+     */
+    fun verifyStoredPasswordOnly(context: Context, password: String): Boolean {
+        val cleanPass = password.trim()
+        if (cleanPass.isEmpty()) return false
+        val prefs = getSecurePrefs(context) ?: return false
+        if (!prefs.getBoolean(KEY_VAULT_INITIALIZED, false)) return false
+        return try {
+            val passHash = hashValue(cleanPass, SALT_PREFIX + "pass")
+            val storedOwnerPass = prefs.getString(KEY_OWNER_HASH, null)?.takeIf { it.isNotBlank() }
+            if (storedOwnerPass != null) {
+                val ownerMatches = constantTimeEquals(storedOwnerPass, passHash) ||
+                        SecureHasher.verifyPassword(cleanPass, storedOwnerPass) ||
+                        SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedOwnerPass)
+                if (ownerMatches) return true
+            }
+            val storedAdminPass = prefs.getString(KEY_ADMIN_HASH, null)?.takeIf { it.isNotBlank() }
+            if (storedAdminPass != null) {
+                val adminMatches = constantTimeEquals(storedAdminPass, passHash) ||
+                        SecureHasher.verifyPassword(cleanPass, storedAdminPass) ||
+                        SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedAdminPass)
+                if (adminMatches) return true
+            }
+            false
+        } catch (e: Exception) {
             false
         }
     }
@@ -180,21 +226,30 @@ object SecureAdminStorage {
         val cleanInput = inputPassword.trim()
         val cleanStored = storedPassOrHash.trim()
 
-        val isLegacyPlainMatch = !cleanStored.contains(":") && constantTimeEquals(cleanInput, cleanStored)
+        val isAlreadyHashed = SecureHasher.isValidHash(cleanStored)
+        val isLegacyPlainMatch = !isAlreadyHashed && constantTimeEquals(cleanInput, cleanStored)
         val isValid = isLegacyPlainMatch ||
                 SecureHasher.verifyPassword(cleanInput, cleanStored) ||
                 SecurityCryptoUtils.verifyAdminPassword(cleanInput, cleanStored)
 
         if (isValid && docRef != null) {
-            // إذا كانت كلمة المرور القديمة نصاً عادياً لا يحتوي على ملوحة (salt separator ":")
-            if (!cleanStored.contains(":")) {
+            // إذا كانت كلمة المرور القديمة نصاً عادياً غير مشفر بـ PBKDF2/BCrypt
+            if (!isAlreadyHashed) {
                 val newHash = SecureHasher.hashPassword(cleanInput)
+                val updates = mutableMapOf<String, Any>(fieldName to newHash)
+                if (fieldName == "password" || fieldName == "passwordHash") {
+                    updates["passwordHash"] = newHash
+                    updates["password"] = ""
+                } else if (fieldName == "passcode" || fieldName == "passcodeHash") {
+                    updates["passcodeHash"] = newHash
+                    updates["passcode"] = ""
+                }
                 var attempts = 0
                 var success = false
                 while (attempts < 3 && !success) {
                     try {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            com.google.android.gms.tasks.Tasks.await(docRef.update(fieldName, newHash))
+                            com.google.android.gms.tasks.Tasks.await(docRef.update(updates))
                         }
                         success = true
                     } catch (e: Exception) {
@@ -228,12 +283,16 @@ object SecureAdminStorage {
      * Constant-Time Comparison لتجنب Timing Attacks
      */
     private fun constantTimeEquals(a: String, b: String): Boolean {
-        if (a.length != b.length) return false
-        var result = 0
-        for (i in a.indices) {
-            result = result or (a[i].code xor b[i].code)
+        val aBytes = a.toByteArray(Charsets.UTF_8)
+        val bBytes = b.toByteArray(Charsets.UTF_8)
+        var diff = aBytes.size xor bBytes.size
+        val maxLen = maxOf(aBytes.size, bBytes.size)
+        for (i in 0 until maxLen) {
+            val byteA = if (i < aBytes.size) aBytes[i].toInt() else 0
+            val byteB = if (i < bBytes.size) bBytes[i].toInt() else 0
+            diff = diff or (byteA xor byteB)
         }
-        return result == 0
+        return diff == 0
     }
     
     /**

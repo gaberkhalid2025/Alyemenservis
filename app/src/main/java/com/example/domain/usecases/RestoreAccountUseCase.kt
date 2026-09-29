@@ -11,7 +11,7 @@ class RestoreAccountUseCase @Inject constructor() {
         phone: String,
         onResult: (RestoreAccountMatch?) -> Unit
     ) {
-        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         if (cleanPhone.isBlank() || cleanPhone.length < 7) {
             onResult(null)
             return
@@ -26,11 +26,12 @@ class RestoreAccountUseCase @Inject constructor() {
         passwordInput: String,
         onResult: (Boolean) -> Unit
     ) {
-        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone)
-        if (cleanPhone.isBlank() || cleanPhone.length < 7 || passwordInput.isBlank()) {
+        val cleanPhone = ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
+        val cleanPassword = passwordInput.trim()
+        if (cleanPhone.isBlank() || cleanPhone.length < 7 || cleanPassword.isBlank()) {
             onResult(false)
             return
         }
-        recoveryHelper.verifyRestorePassword(cleanPhone, accountType, passwordInput.trim(), onResult)
+        recoveryHelper.verifyRestorePassword(cleanPhone, accountType.trim().ifBlank { "CLIENT" }, cleanPassword, onResult)
     }
 }

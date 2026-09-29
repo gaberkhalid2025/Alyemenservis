@@ -23,12 +23,20 @@ class RegisterRestaurantUseCase @Inject constructor(
      * @return [Result] يحوي معرف الطلب المولد أو الخطأ
      */
     suspend operator fun invoke(restaurant: RegistrationEntity.Restaurant): Result<String> {
-        if (restaurant.restaurantName.isBlank()) {
+        val cleanRestaurantName = restaurant.restaurantName.trim()
+        if (cleanRestaurantName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم المطعم أو البوفيه"))
         }
+        if (cleanRestaurantName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم المطعم عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
+        }
 
-        if (restaurant.ownerName.isBlank()) {
+        val cleanOwnerName = restaurant.ownerName.trim()
+        if (cleanOwnerName.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى إدخال اسم صاحب المطعم/المدير المسؤول"))
+        }
+        if (cleanOwnerName.length < com.example.utils.AppConstants.MIN_NAME_LENGTH) {
+            return Result.failure(IllegalArgumentException("يجب ألا يقل اسم المالك عن ${com.example.utils.AppConstants.MIN_NAME_LENGTH} أحرف"))
         }
 
         val phoneCheck = validatePhone(restaurant.phone)
@@ -36,28 +44,32 @@ class RegisterRestaurantUseCase @Inject constructor(
             return Result.failure(IllegalArgumentException(phoneCheck.errorMessage))
         }
 
-        val passCheck = validatePassword(restaurant.rawPassword)
+        val cleanPassword = restaurant.rawPassword.trim()
+        val passCheck = validatePassword(cleanPassword)
         if (!passCheck.isValid) {
             return Result.failure(IllegalArgumentException(passCheck.errorMessage))
         }
 
-        if (restaurant.cuisineType.isBlank()) {
+        val cleanCuisine = restaurant.cuisineType.trim()
+        if (cleanCuisine.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى اختيار نوع المأكولات والمطبخ"))
         }
 
-        if (restaurant.city.isBlank()) {
+        val cleanCity = restaurant.city.trim()
+        if (cleanCity.isBlank()) {
             return Result.failure(IllegalArgumentException("يرجى تحديد المدينة/المحافظة"))
         }
 
         val normalized = restaurant.copy(
-            restaurantName = restaurant.restaurantName.trim(),
-            ownerName = restaurant.ownerName.trim(),
+            restaurantName = cleanRestaurantName,
+            ownerName = cleanOwnerName,
             phone = ValidatePhoneUseCase.normalizePhone(restaurant.phone),
-            cuisineType = restaurant.cuisineType.trim(),
-            city = restaurant.city.trim(),
+            cuisineType = cleanCuisine,
+            city = cleanCity,
             addressDetails = restaurant.addressDetails.trim(),
             logoUrl = restaurant.logoUrl.trim(),
-            rawPassword = restaurant.rawPassword.trim()
+            menuImageUrls = restaurant.menuImageUrls.map { it.trim() }.filter { it.isNotBlank() },
+            rawPassword = cleanPassword
         )
         return repository.registerRestaurant(normalized)
     }

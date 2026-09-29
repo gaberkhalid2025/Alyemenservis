@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 data class Conflict(
     val entityId: String,
@@ -35,7 +36,7 @@ data class ConflictAuditEntry(
  * ⚖️ ConflictResolver
  * كشف وإدارة وحل التعارضات الناتجة عن التعديل المتزامن محلياً وسحابياً
  */
-class ConflictResolver(context: Context) {
+class ConflictResolver(@Suppress("UNUSED_PARAMETER") context: Context? = null) {
 
     private val _pendingConflicts = MutableStateFlow<List<Conflict>>(emptyList())
     val pendingConflicts: StateFlow<List<Conflict>> = _pendingConflicts.asStateFlow()
@@ -45,6 +46,7 @@ class ConflictResolver(context: Context) {
 
     companion object {
         private const val TAG = "ConflictResolver"
+        private const val MAX_AUDIT_LOGS = 200
     }
 
     /**
@@ -58,8 +60,9 @@ class ConflictResolver(context: Context) {
         localVer: Int = 1,
         cloudVer: Int = 1
     ): Conflict? {
-        val hasDifference = localData.entries.any { (k, v) ->
-            cloudData.containsKey(k) && cloudData[k] != v
+        val allKeys = localData.keys + cloudData.keys
+        val hasDifference = allKeys.any { k ->
+            localData[k] != cloudData[k]
         }
 
         if (hasDifference && localVer != cloudVer) {
@@ -71,7 +74,9 @@ class ConflictResolver(context: Context) {
                 localData = localData,
                 cloudData = cloudData
             )
-            _pendingConflicts.value = _pendingConflicts.value + conflict
+            _pendingConflicts.update { current ->
+                current.filterNot { it.entityId == entityId && it.entityType == entityType } + conflict
+            }
             return conflict
         }
         return null
@@ -93,16 +98,23 @@ class ConflictResolver(context: Context) {
             Resolution.MERGE -> mergeChanges(conflict)
         }
 
-        // إزالة التعارض من القائمة المعلقة
-        _pendingConflicts.value = _pendingConflicts.value.filterNot { it.entityId == conflict.entityId }
+        // إزالة التعارض من القائمة المعلقة بشكل ذري
+        _pendingConflicts.update { current ->
+            current.filterNot {
+                it.entityId == conflict.entityId && it.entityType == conflict.entityType
+            }
+        }
 
-        // تسجيل في سجل التدقيق
-        _auditLogs.value = _auditLogs.value + ConflictAuditEntry(
+        // تسجيل في سجل التدقيق مع سقف أقصى للذاكرة
+        val auditEntry = ConflictAuditEntry(
             entityId = conflict.entityId,
             entityType = conflict.entityType,
             resolution = resolution,
             notes = "Resolved with $resolution successfully"
         )
+        _auditLogs.update { current ->
+            (current + auditEntry).takeLast(MAX_AUDIT_LOGS)
+        }
 
         Log.d(TAG, "Conflict resolved for ${conflict.entityId} using $resolution")
         onResolved?.invoke(resultData)
@@ -124,6 +136,8 @@ class ConflictResolver(context: Context) {
             ?: (conflict.cloudData["timestamp"] as? Number)?.toLong() 
             ?: 0L
 
+        val isLocalNewerVersion = conflict.localVersion > conflict.cloudVersion
+
         conflict.localData.forEach { (key, localVal) ->
             if (localVal != null) {
                 val fieldLocalTs = (conflict.localData["${key}_updatedAt"] as? Number)?.toLong() ?: localTime
@@ -131,7 +145,9 @@ class ConflictResolver(context: Context) {
 
                 if (fieldLocalTs >= fieldCloudTs) {
                     if (localVal is String) {
-                        if (localVal.isNotBlank()) merged[key] = localVal
+                        if (localVal.isNotBlank() || fieldLocalTs > fieldCloudTs || isLocalNewerVersion || !merged.containsKey(key)) {
+                            merged[key] = localVal
+                        }
                     } else {
                         merged[key] = localVal
                     }
@@ -146,7 +162,8 @@ class ConflictResolver(context: Context) {
      * حل جميع التعارضات باستخدام السحابة
      */
     fun resolveAllWithCloud(onResolved: (List<Pair<Conflict, Map<String, Any?>>>) -> Unit) {
-        val list = _pendingConflicts.value.map { c ->
+        val snapshot = _pendingConflicts.value.toList()
+        val list = snapshot.map { c ->
             Pair(c, resolveConflict(c, Resolution.USE_CLOUD))
         }
         onResolved(list)
@@ -156,7 +173,8 @@ class ConflictResolver(context: Context) {
      * حل جميع التعارضات باستخدام المحلي
      */
     fun resolveAllWithLocal(onResolved: (List<Pair<Conflict, Map<String, Any?>>>) -> Unit) {
-        val list = _pendingConflicts.value.map { c ->
+        val snapshot = _pendingConflicts.value.toList()
+        val list = snapshot.map { c ->
             Pair(c, resolveConflict(c, Resolution.USE_LOCAL))
         }
         onResolved(list)

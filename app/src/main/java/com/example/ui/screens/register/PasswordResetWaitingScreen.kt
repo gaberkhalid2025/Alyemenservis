@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,22 +65,41 @@ fun PasswordResetWaitingScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val sp = remember { context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE) }
+    val sp = remember(context) { context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE) }
     
     val targetPhoneFromVm by viewModel.passwordRecoveryWaitingPhone.collectAsState()
-    val cleanPhone = remember(targetPhoneFromVm) {
-        if (targetPhoneFromVm.isNotBlank()) targetPhoneFromVm
-        else sp.getString("password_recovery_waiting_phone", "") ?: ""
+    val cleanPhone = remember(targetPhoneFromVm, context) {
+        val raw = if (targetPhoneFromVm.isNotBlank()) {
+            targetPhoneFromVm
+        } else {
+            val fromHelper = viewModel.preferenceHelper.getPasswordRecoveryWaitingPhone(context)
+            if (fromHelper.startsWith("gcm:") || fromHelper.startsWith("enc::")) {
+                com.example.utils.SecurityCryptoUtils.decrypt(fromHelper)
+            } else {
+                fromHelper
+            }
+        }
+        com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(raw).filter { it.isDigit() }
     }
 
-    var status by remember { mutableStateOf("PENDING") }
-    var newPassword by remember { mutableStateOf("") }
-    var accountName by remember { mutableStateOf("صاحب الحساب") }
-    var accountType by remember { mutableStateOf("حساب معتمد") }
+    var status by rememberSaveable { mutableStateOf("PENDING") }
+    var newPassword by rememberSaveable { mutableStateOf("") }
+    var accountName by rememberSaveable { mutableStateOf("صاحب الحساب") }
+    var accountType by rememberSaveable { mutableStateOf("حساب معتمد") }
     var isSubmittingLogin by remember { mutableStateOf(false) }
-    var enteredPassword by remember { mutableStateOf("") }
+    var enteredPassword by rememberSaveable { mutableStateOf("") }
     var passwordError by remember { mutableStateOf<String?>(null) }
-    val secureSp = remember { getSecurePrefs(context) }
+    val secureSp = remember(context) { getSecurePrefs(context) }
+    val settingsState by viewModel.settings.collectAsState()
+    val isResolved = status == "RESOLVED" || status == "APPROVED"
+
+    // ⏳ حماية زمنية (30 ثانية) لمنع تعليق زر تسجيل الدخول (القاعدة 7)
+    LaunchedEffect(isSubmittingLogin) {
+        if (isSubmittingLogin) {
+            kotlinx.coroutines.delay(30_000L)
+            isSubmittingLogin = false
+        }
+    }
 
     // Listen in real-time to Firestore for reset completion
     DisposableEffect(cleanPhone) {
@@ -139,7 +159,7 @@ fun PasswordResetWaitingScreen(
                 colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                 border = BorderStroke(
                     1.5.dp,
-                    if (status == "RESOLVED") Color(0xFF10B981) else themeColors.accent.copy(alpha = 0.5f)
+                    if (isResolved) Color(0xFF10B981) else themeColors.accent.copy(alpha = 0.5f)
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
@@ -156,20 +176,20 @@ fun PasswordResetWaitingScreen(
                             .size(72.dp)
                             .clip(CircleShape)
                             .background(
-                                if (status == "RESOLVED") Color(0xFF10B981).copy(alpha = 0.2f)
+                                if (isResolved) Color(0xFF10B981).copy(alpha = 0.2f)
                                 else themeColors.accent.copy(alpha = 0.2f)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (status == "RESOLVED") Icons.Default.CheckCircle else Icons.Default.Lock,
+                            imageVector = if (isResolved) Icons.Default.CheckCircle else Icons.Default.Lock,
                             contentDescription = null,
-                            tint = if (status == "RESOLVED") Color(0xFF10B981) else themeColors.accent,
+                            tint = if (isResolved) Color(0xFF10B981) else themeColors.accent,
                             modifier = Modifier.size(40.dp)
                         )
                     }
 
-                    if (status == "RESOLVED") {
+                    if (isResolved) {
                         Text(
                             text = "🎉 تم إعادة تعيين كلمة المرور بنجاح!",
                             fontSize = 17.sp,
@@ -178,45 +198,51 @@ fun PasswordResetWaitingScreen(
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "مرحباً $accountName، قام مدير المنصة بتعيين كلمة المرور الجديدة لحسابك:",
+                            text = if (newPassword.isNotBlank()) {
+                                "مرحباً $accountName، قام مدير المنصة بتعيين كلمة المرور الجديدة لحسابك:"
+                            } else {
+                                "مرحباً $accountName، تمت الموافقة على إعادة تعيين كلمة المرور لحسابك. يرجى إدخال كلمة المرور الجديدة للدخول:"
+                            },
                             fontSize = 12.sp,
                             color = Color.LightGray,
                             textAlign = TextAlign.Center
                         )
 
-                        // New Password Display Box
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
-                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                        if (newPassword.isNotBlank()) {
+                            // New Password Display Box
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
                             ) {
-                                Column {
-                                    Text("كلمة المرور الجديدة:", fontSize = 10.sp, color = Color.Gray)
-                                    Text(
-                                        text = newPassword,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        letterSpacing = 1.sp
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val clip = ClipData.newPlainText("New Password", newPassword)
-                                        clipboard.setPrimaryClip(clip)
-                                        Toast.makeText(context, "📋 تم نسخ كلمة المرور!", Toast.LENGTH_SHORT).show()
-                                    }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Share, contentDescription = "نسخ", tint = themeColors.accent)
+                                    Column {
+                                        Text("كلمة المرور الجديدة:", fontSize = 10.sp, color = Color.Gray)
+                                        Text(
+                                            text = newPassword,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            letterSpacing = 1.sp
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("New Password", newPassword)
+                                            clipboard.setPrimaryClip(clip)
+                                            Toast.makeText(context, "📋 تم نسخ كلمة المرور!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = themeColors.accent)
+                                    }
                                 }
                             }
                         }
@@ -232,6 +258,7 @@ fun PasswordResetWaitingScreen(
                             visualTransformation = PasswordVisualTransformation(),
                             isError = passwordError != null,
                             supportingText = { passwordError?.let { Text(it) } },
+                            singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
@@ -243,40 +270,81 @@ fun PasswordResetWaitingScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = {
-                                if (enteredPassword.trim() != newPassword.trim() && !com.example.utils.SecureHasher.verifyPassword(enteredPassword.trim(), newPassword.trim())) {
-                                    passwordError = "❌ كلمة المرور غير صحيحة"
+                                val cleanEntered = enteredPassword.trim()
+                                val cleanExpected = newPassword.trim()
+                                if (cleanEntered.isBlank()) {
+                                    passwordError = "❌ يرجى إدخال كلمة المرور الجديدة"
+                                    return@Button
+                                }
+                                if (cleanPhone.length < 7) {
+                                    passwordError = "❌ رقم الهاتف غير صالح، يرجى العودة وإعادة المحاولة"
+                                    return@Button
+                                }
+                                if (cleanExpected.isNotBlank() && cleanEntered != cleanExpected && !com.example.utils.SecureHasher.verifyPassword(cleanEntered, cleanExpected)) {
+                                    passwordError = "❌ كلمة المرور المدخلة غير مطابقة لكلمة المرور الجديدة"
                                     return@Button
                                 }
                                 isSubmittingLogin = true
                                 viewModel.searchAccountForRestore(cleanPhone) { match ->
-                                    isSubmittingLogin = false
-                                    if (match != null) {
-                                        val provArea = match.provider?.area ?: match.store?.cityId ?: "اليمن"
-                                        viewModel.setUserSessionDetails(context, match.name, cleanPhone, provArea)
-                                        
-                                        secureSp.edit()
+                                    val resolvedType = match?.type?.takeIf { it.isNotBlank() } ?: "CLIENT"
+                                    viewModel.verifyRestorePassword(cleanPhone, resolvedType, cleanEntered) { isVerified ->
+                                        isSubmittingLogin = false
+                                        if (!isVerified) {
+                                            passwordError = "❌ كلمة المرور غير صحيحة أو لم تكتمل مزامنة التعيين بعد"
+                                            return@verifyRestorePassword
+                                        }
+                                        val resolvedName = match?.name?.takeIf { it.isNotBlank() } ?: accountName
+                                        val provArea = match?.provider?.area?.takeIf { it.isNotBlank() }
+                                            ?: match?.store?.cityId?.takeIf { it.isNotBlank() }
+                                            ?: match?.property?.cityId?.takeIf { it.isNotBlank() }
+                                            ?: "اليمن"
+                                        viewModel.setUserSessionDetails(context, resolvedName, cleanPhone, provArea)
+                                        viewModel.setJoinRequestPhone(context, cleanPhone)
+                                        val resolvedAccountId = match?.provider?.id ?: match?.store?.id ?: match?.property?.id ?: ""
+
+                                        sp.edit()
                                             .putBoolean("is_account_logged_in", true)
-                                            .putString("user_account_type", match.type)
-                                            .putString("logged_account_id", match.provider?.id ?: match.store?.id ?: match.property?.id ?: "")
+                                            .putString("user_account_type", resolvedType)
+                                            .putString("logged_account_id", resolvedAccountId)
+                                            .remove("password_recovery_waiting_phone")
                                             .apply()
 
-                                        val targetDest = if (match.provider != null) {
+                                        secureSp.edit()
+                                            .putBoolean("is_account_logged_in", true)
+                                            .putString("user_account_type", resolvedType)
+                                            .putString("logged_account_id", resolvedAccountId)
+                                            .apply()
+
+                                        viewModel.setPasswordRecoveryWaitingPhone("")
+
+                                        if (viewModel.adminRole.value !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
+                                            viewModel.authViewModel._adminRole.value = when (resolvedType) {
+                                                "PROVIDER" -> "PROVIDER"
+                                                "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
+                                                else -> "GUEST"
+                                            }
+                                        }
+
+                                        val targetDest = if (match?.provider != null) {
                                             if (match.provider.isDeleted) viewModel.restoreProvider(match.provider.id)
                                             viewModel.selectedProvider = match.provider
                                             viewModel.selectedStore = null
                                             viewModel.selectedProperty = null
+                                            viewModel.selectedJob = null
                                             AppScreens.DYNAMIC_PROFILE
-                                        } else if (match.store != null) {
+                                        } else if (match?.store != null) {
                                             if (match.store.isDeleted) viewModel.restoreStore(match.store.id)
                                             viewModel.selectedStore = match.store
                                             viewModel.selectedProvider = null
                                             viewModel.selectedProperty = null
+                                            viewModel.selectedJob = null
                                             AppScreens.DYNAMIC_PROFILE
-                                        } else if (match.property != null) {
+                                        } else if (match?.property != null) {
                                             if (match.property.isDeleted) viewModel.restoreProperty(match.property.id)
                                             viewModel.selectedProperty = match.property
                                             viewModel.selectedProvider = null
                                             viewModel.selectedStore = null
+                                            viewModel.selectedJob = null
                                             AppScreens.DYNAMIC_PROFILE
                                         } else {
                                             viewModel.selectedProvider = null
@@ -290,11 +358,6 @@ fun PasswordResetWaitingScreen(
                                             screensToRemove = listOf(AppScreens.REGISTER_FORM, AppScreens.PASSWORD_RESET_WAITING, "REGISTER", "REGISTER_FORM", "PASSWORD_RESET_WAITING")
                                         )
                                         Toast.makeText(context, "🔓 أهلاً بك، تم تسجيل الدخول إلى حسابك!", Toast.LENGTH_LONG).show()
-                                    } else {
-                                        viewModel.navigateAndRemoveScreens(
-                                            targetScreen = AppScreens.USER_BROWSE,
-                                            screensToRemove = listOf(AppScreens.REGISTER_FORM, AppScreens.PASSWORD_RESET_WAITING, "REGISTER", "REGISTER_FORM", "PASSWORD_RESET_WAITING")
-                                        )
                                     }
                                 }
                             },
@@ -383,10 +446,21 @@ fun PasswordResetWaitingScreen(
                         // WhatsApp
                         Button(
                             onClick = {
-                                val adminPhone = "967777000000"
+                                val rawSupport = settingsState.supportWhatsapp.trim().ifBlank { "967777000000" }
+                                val adminPhone = if (rawSupport.startsWith("967") || rawSupport.startsWith("+967")) {
+                                    rawSupport.removePrefix("+")
+                                } else if (rawSupport.length == 9) {
+                                    "967$rawSupport"
+                                } else {
+                                    "967777000000"
+                                }
                                 val msg = "مرحباً إدارة دليل خدمات اليمن، أطلب تسريع إعادة تعيين كلمة المرور لحسابي المسجل: $cleanPhone"
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$adminPhone?text=${Uri.encode(msg)}"))
-                                context.startActivity(intent)
+                                runCatching {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$adminPhone?text=${Uri.encode(msg)}"))
+                                    context.startActivity(intent)
+                                }.onFailure {
+                                    Toast.makeText(context, "❌ تعذر فتح تطبيق واتساب على جهازك", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                             shape = RoundedCornerShape(10.dp),
@@ -400,8 +474,12 @@ fun PasswordResetWaitingScreen(
                         // Telegram
                         Button(
                             onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/yemenservices_support"))
-                                context.startActivity(intent)
+                                runCatching {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/yemenservices_support"))
+                                    context.startActivity(intent)
+                                }.onFailure {
+                                    Toast.makeText(context, "❌ تعذر فتح تطبيق تيليجرام على جهازك", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9)),
                             shape = RoundedCornerShape(10.dp),

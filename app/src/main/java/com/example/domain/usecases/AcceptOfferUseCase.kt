@@ -19,7 +19,11 @@ class AcceptOfferUseCase @Inject constructor(
         providerPhone: String,
         acceptedPrice: Double
     ): AppResult<Unit> {
-        if (requestId.isBlank() || offerId.isBlank() || providerId.isBlank()) {
+        val cleanRequestId = requestId.trim()
+        val cleanOfferId = offerId.trim()
+        val cleanProviderId = providerId.trim()
+        val cleanProviderName = providerName.trim().ifBlank { "مزود خدمة" }
+        if (cleanRequestId.isBlank() || cleanOfferId.isBlank() || cleanProviderId.isBlank()) {
             return AppResult.Error(AppError.ValidationError("offer", "بيانات العرض أو الطلب غير مكتملة"))
         }
         if (acceptedPrice < 0.0 || acceptedPrice.isNaN() || acceptedPrice.isInfinite()) {
@@ -30,10 +34,10 @@ class AcceptOfferUseCase @Inject constructor(
             suspendCancellableCoroutine { cont ->
                 try {
                     repository.acceptOffer(
-                        requestId = requestId.trim(),
-                        offerId = offerId.trim(),
-                        providerId = providerId.trim(),
-                        providerName = providerName.trim(),
+                        requestId = cleanRequestId,
+                        offerId = cleanOfferId,
+                        providerId = cleanProviderId,
+                        providerName = cleanProviderName,
                         providerPhone = cleanPhone,
                         acceptedPrice = acceptedPrice,
                         onSuccess = {

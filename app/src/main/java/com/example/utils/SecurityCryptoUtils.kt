@@ -33,6 +33,11 @@ object SecurityCryptoUtils {
     private const val GCM_IV_LENGTH = 12
     private const val GCM_TAG_LENGTH_BITS = 128
 
+    private val secureRandom = SecureRandom()
+
+    @Volatile
+    private var cachedFallbackKey: SecretKeySpec? = null
+
     fun getSecretKey(): SecretKey {
         return try {
             val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply {
@@ -86,22 +91,29 @@ object SecurityCryptoUtils {
 
     /**
      * اشتقاق مفتاح احتياطي ديناميكي في حال تعذر الوصول إلى AndroidKeyStore (مثل اختبارات JVM)
+     * أو لتشفير البيانات العابرة بين جهاز الأدمن وجهاز المستخدم بأمان.
      */
     private fun deriveFallbackKey(): SecretKeySpec {
-        return try {
-            val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
-            val salt = LEGACY_KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)
-            val seed = (System.getProperty("os.name") ?: "WAM_Fallback_Entropy").toCharArray()
-            val spec = PBEKeySpec(seed, salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
-            try {
-                val secret = factory.generateSecret(spec)
-                SecretKeySpec(secret.encoded, "AES")
-            } finally {
-                spec.clearPassword()
+        cachedFallbackKey?.let { return it }
+        return synchronized(this) {
+            cachedFallbackKey?.let { return@synchronized it }
+            val derived = try {
+                val factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM)
+                val salt = LEGACY_KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)
+                val seed = "WAM_MasterVault_Fallback_Key_v2".toCharArray()
+                val spec = PBEKeySpec(seed, salt, PBKDF2_ITERATIONS, KEY_SIZE_BITS)
+                try {
+                    val secret = factory.generateSecret(spec)
+                    SecretKeySpec(secret.encoded, "AES")
+                } finally {
+                    spec.clearPassword()
+                }
+            } catch (e: Throwable) {
+                val digest = MessageDigest.getInstance("SHA-256")
+                SecretKeySpec(digest.digest(LEGACY_KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)), "AES")
             }
-        } catch (e: Throwable) {
-            val digest = MessageDigest.getInstance("SHA-256")
-            SecretKeySpec(digest.digest(LEGACY_KEYSTORE_ALIAS.toByteArray(Charsets.UTF_8)), "AES")
+            cachedFallbackKey = derived
+            derived
         }
     }
 
@@ -110,7 +122,7 @@ object SecurityCryptoUtils {
      * ✨ م2: تم استبدال SHA-256 بـ PBKDF2 المتقدم لضمان أعلى مستويات الحماية
      */
     fun hashPassword(password: String): String {
-        if (password.isEmpty()) return ""
+        if (password.isBlank()) return ""
         return com.example.utils.SecureHasher.hashPassword(password.trim())
     }
 
@@ -135,15 +147,20 @@ object SecurityCryptoUtils {
     }
 
     private fun base64Decode(str: String): ByteArray {
+        val clean = str.trim()
         return try {
-            Base64.decode(str, Base64.DEFAULT)
-        } catch (e: Throwable) {
-            java.util.Base64.getDecoder().decode(str)
+            Base64.decode(clean, Base64.NO_WRAP)
+        } catch (_: Throwable) {
+            try {
+                Base64.decode(clean, Base64.DEFAULT)
+            } catch (_: Throwable) {
+                java.util.Base64.getDecoder().decode(clean)
+            }
         }
     }
 
     /**
-     * Encrypts sensitive fields (such as FCM tokens or credentials) into Base64 encoded AES-GCM cipher text.
+     * Encrypts sensitive fields (such as FCM tokens or local credentials) into Base64 encoded AES-GCM cipher text.
      * Generates a unique, cryptographically secure 12-byte random IV for each operation and prefixes it to the ciphertext.
      * Never returns raw plainText if KeyStore fails; uses fallback derived AES-GCM key instead.
      */
@@ -153,7 +170,7 @@ object SecurityCryptoUtils {
             val key = getSecretKey()
             val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
             val iv = ByteArray(GCM_IV_LENGTH)
-            SecureRandom().nextBytes(iv)
+            secureRandom.nextBytes(iv)
             val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
             cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec)
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
@@ -163,22 +180,60 @@ object SecurityCryptoUtils {
             try {
                 FirebaseCrashlytics.getInstance().recordException(e)
             } catch (ignored: Throwable) {}
+            encryptCrossDevice(plainText)
+        }
+    }
+
+    /**
+     * تشفير AES-GCM مشترك عبر الأجهزة (يُستخدم عند تشفير كلمة المرور المؤقتة من جهاز الأدمن ليتمكن جهاز المستخدم من فك تشفيرها)
+     */
+    fun encryptCrossDevice(plainText: String?): String {
+        if (plainText.isNullOrEmpty()) return ""
+        return try {
+            val fallbackKey = deriveFallbackKey()
+            val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+            val iv = ByteArray(GCM_IV_LENGTH)
+            secureRandom.nextBytes(iv)
+            val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
+            cipher.init(Cipher.ENCRYPT_MODE, fallbackKey, gcmSpec)
+            val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+            "gcm:" + base64Encode(iv + encryptedBytes)
+        } catch (ex: Throwable) {
             try {
-                val fallbackKey = deriveFallbackKey()
-                val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-                val iv = ByteArray(GCM_IV_LENGTH)
-                SecureRandom().nextBytes(iv)
-                val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
-                cipher.init(Cipher.ENCRYPT_MODE, fallbackKey, gcmSpec)
-                val encryptedBytes = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-                "gcm:" + base64Encode(iv + encryptedBytes)
-            } catch (ex: Throwable) {
+                FirebaseCrashlytics.getInstance().recordException(ex)
+            } catch (_: Throwable) {}
+            throw IllegalStateException("Encryption failed critically", ex)
+        }
+    }
+
+    /**
+     * فك تشفير النصوص المشفرة عبر الأجهزة (أو محلياً) بأمان دون إرجاع النص المشفر الخام عند الفشل.
+     */
+    fun decryptCrossDevice(encryptedText: String?): String {
+        if (encryptedText.isNullOrEmpty()) return ""
+        val normalizedInput = encryptedText.trim().removePrefix("enc::").trim()
+        if (normalizedInput.startsWith("gcm:")) {
+            return try {
+                val decodedBytes = base64Decode(normalizedInput.removePrefix("gcm:"))
+                if (decodedBytes.size <= GCM_IV_LENGTH) return ""
+                val iv = decodedBytes.copyOfRange(0, GCM_IV_LENGTH)
+                val encrypted = decodedBytes.copyOfRange(GCM_IV_LENGTH, decodedBytes.size)
                 try {
-                    FirebaseCrashlytics.getInstance().recordException(ex)
-                } catch (_: Throwable) {}
-                throw IllegalStateException("Encryption failed critically", ex)
+                    val fallbackKey = deriveFallbackKey()
+                    val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+                    cipher.init(Cipher.DECRYPT_MODE, fallbackKey, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+                    String(cipher.doFinal(encrypted), Charsets.UTF_8)
+                } catch (_: Throwable) {
+                    val key = getSecretKey()
+                    val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+                    cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+                    String(cipher.doFinal(encrypted), Charsets.UTF_8)
+                }
+            } catch (_: Throwable) {
+                ""
             }
         }
+        return decrypt(normalizedInput)
     }
 
     /**
@@ -186,9 +241,11 @@ object SecurityCryptoUtils {
      */
     fun decrypt(encryptedText: String?): String {
         if (encryptedText.isNullOrEmpty()) return ""
+        val normalizedInput = encryptedText.trim().removePrefix("enc::").trim()
+        if (normalizedInput.isEmpty()) return ""
         return try {
-            if (encryptedText.startsWith("gcm:")) {
-                val decodedBytes = base64Decode(encryptedText.removePrefix("gcm:"))
+            if (normalizedInput.startsWith("gcm:")) {
+                val decodedBytes = base64Decode(normalizedInput.removePrefix("gcm:"))
                 if (decodedBytes.size <= GCM_IV_LENGTH) return ""
                 val iv = decodedBytes.copyOfRange(0, GCM_IV_LENGTH)
                 val encrypted = decodedBytes.copyOfRange(GCM_IV_LENGTH, decodedBytes.size)
@@ -205,7 +262,7 @@ object SecurityCryptoUtils {
                 }
             }
             // التوافق العكسي مع البيانات المشفرة مسبقاً بـ AES/CBC/PKCS5Padding
-            val decodedBytes = base64Decode(encryptedText)
+            val decodedBytes = base64Decode(normalizedInput)
             if (decodedBytes.size <= 16) {
                 return ""
             }
@@ -261,9 +318,9 @@ object SecurityCryptoUtils {
         }
         val weakPasswords = listOf(
             "123456", "1234567", "12345678", "000000", "0000000", "00000000", "111111", "1111111", "11111111",
-            "112233", "123123", "password", "yemen123", "yemen2026", "7777777", "77777777"
+            "112233", "123123", "password", "yemen123", "yemen2026", "7777777", "77777777", "123456789"
         )
-        if (cleanPass.lowercase() in weakPasswords) {
+        if (cleanPass.lowercase() in weakPasswords || cleanPass.toSet().size <= 1) {
             return Pair(false, "عفواً، لقد قمت بإدخال كلمة مرور ضعيفة وسهلة التخمين. يرجى اختيار كلمة مرور قوية تحتوي على أحرف وأرقام لحماية حسابك.")
         }
         return Pair(true, null)

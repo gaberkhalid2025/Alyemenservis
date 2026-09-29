@@ -19,7 +19,7 @@ import kotlinx.coroutines.tasks.await
  * Implements IStatusRepository for system stats, pending join requests, notifications, and system bookings.
  */
 class StatusRepositoryImpl(
-    context: Context
+    @Suppress("UNUSED_PARAMETER") context: Context? = null
 ) : IStatusRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -65,6 +65,7 @@ class StatusRepositoryImpl(
     override fun getPendingJoinRequests(): Flow<List<PendingProviderEntity>> = callbackFlow {
         val listener = firestore.collection(AppConstants.COL_JOIN_REQUESTS)
             .whereEqualTo("status", "PENDING")
+            .limit(100)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -93,6 +94,7 @@ class StatusRepositoryImpl(
 
     override fun getSystemBookings(): Flow<List<BookingEntity>> = callbackFlow {
         val listener = firestore.collection(AppConstants.COL_BOOKINGS)
+            .limit(100)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -100,15 +102,46 @@ class StatusRepositoryImpl(
                 }
 
                 val list = snapshot.documents.mapNotNull { doc ->
+                    val resolvedName = doc.getString("customerName")
+                        ?: doc.getString("clientName")
+                        ?: doc.getString("fullName")
+                        ?: ""
+                    val resolvedPhone = doc.getString("customerPhone")
+                        ?: doc.getString("clientPhone")
+                        ?: doc.getString("userPhone")
+                        ?: ""
+                    val resolvedArea = doc.getString("customerArea")
+                        ?: doc.getString("clientAddress")
+                        ?: doc.getString("fullAddress")
+                        ?: ""
+                    val resolvedDate = doc.getString("date")
+                        ?: doc.getString("scheduledDate")
+                        ?: doc.getString("dateString")
+                        ?: ""
+                    val resolvedTime = doc.getString("time")
+                        ?: doc.getString("timeString")
+                        ?: ""
+                    val resolvedAmount = doc.getDouble("totalAmount")
+                        ?: doc.getDouble("priceYer")
+                        ?: doc.getDouble("price")
+                        ?: 0.0
                     BookingEntity(
                         id = doc.id,
                         bookingCode = doc.getString("bookingCode") ?: doc.id.take(8).uppercase(),
                         serviceType = doc.getString("serviceTitle") ?: doc.getString("serviceType") ?: "خدمة عامة",
+                        providerId = doc.getString("providerId") ?: "",
                         providerName = doc.getString("providerName") ?: "",
-                        clientName = doc.getString("clientName") ?: doc.getString("customerName") ?: "",
+                        customerName = resolvedName,
+                        customerPhone = resolvedPhone,
+                        customerArea = resolvedArea,
+                        clientName = resolvedName,
                         status = doc.getString("status") ?: "PENDING",
-                        dateString = doc.getString("scheduledDate") ?: doc.getString("dateString") ?: "",
-                        totalAmount = doc.getDouble("priceYer") ?: doc.getDouble("totalAmount") ?: 0.0
+                        date = resolvedDate,
+                        time = resolvedTime,
+                        dateString = resolvedDate,
+                        timeString = resolvedTime,
+                        totalAmount = resolvedAmount,
+                        price = resolvedAmount
                     )
                 }
                 trySend(list)
@@ -121,6 +154,7 @@ class StatusRepositoryImpl(
 
     override fun getInstantRequests(): Flow<List<InstantRequestEntity>> = callbackFlow {
         val listener = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
+            .limit(100)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -154,6 +188,7 @@ class StatusRepositoryImpl(
 
     override fun getNotifications(): Flow<List<NotificationEntity>> = callbackFlow {
         val listener = firestore.collection(AppConstants.COL_NOTIFICATIONS)
+            .limit(100)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())
@@ -184,13 +219,31 @@ class StatusRepositoryImpl(
                 return Result.failure(IllegalArgumentException("معرف طلب الانضمام غير صالح"))
             }
             val requestDoc = firestore.collection(AppConstants.COL_JOIN_REQUESTS).document(reqId).get().await()
-            val type = requestDoc.getString("type") ?: "PROVIDER"
+            if (!requestDoc.exists() && request.name.isBlank() && request.phone.isBlank()) {
+                return Result.failure(IllegalStateException("طلب الانضمام غير موجود"))
+            }
+            val type = (requestDoc.getString("type") ?: "PROVIDER").trim().ifBlank { "PROVIDER" }
+            val resolvedRole = type.uppercase(java.util.Locale.ROOT)
             val ownerId = requestDoc.getString("userId")?.takeIf { it.isNotBlank() }
                 ?: requestDoc.getString("uid")?.takeIf { it.isNotBlank() }
                 ?: reqId
             val rawPhone = request.phone.ifBlank { requestDoc.getString("phone") ?: "" }
             val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(rawPhone)
-            val passwordHash = requestDoc.getString("passwordHash") ?: requestDoc.getString("password") ?: ""
+            val rawOrHashedPassword = (requestDoc.getString("passwordHash") ?: requestDoc.getString("password") ?: "").trim()
+            val passwordHash = when {
+                rawOrHashedPassword.isBlank() -> ""
+                com.example.utils.SecureHasher.isValidHash(rawOrHashedPassword) -> rawOrHashedPassword
+                else -> com.example.utils.SecureHasher.hashPassword(rawOrHashedPassword)
+            }
+            val resolvedName = request.name.ifBlank {
+                requestDoc.getString("fullName") ?: requestDoc.getString("name") ?: ""
+            }.trim()
+            val resolvedCategory = request.categoryId.ifBlank {
+                requestDoc.getString("professionCategory") ?: requestDoc.getString("category") ?: ""
+            }.trim()
+            val resolvedArea = request.area.ifBlank {
+                requestDoc.getString("city") ?: requestDoc.getString("area") ?: ""
+            }.trim()
             val now = System.currentTimeMillis()
 
             val batch = firestore.batch()
@@ -208,18 +261,18 @@ class StatusRepositoryImpl(
             )
 
             // Create Entity in appropriate collection
-            when (type.uppercase()) {
+            when (resolvedRole) {
                 "PROVIDER" -> {
                     val provRef = firestore.collection("providers").document(reqId)
                     val provData = mapOf(
                         "id" to reqId,
                         "ownerId" to ownerId,
-                        "name" to request.name,
+                        "name" to resolvedName,
                         "phone" to cleanPhone,
-                        "password" to passwordHash,
+                        "password" to "",
                         "passwordHash" to passwordHash,
-                        "categoryId" to request.categoryId,
-                        "area" to request.area,
+                        "categoryId" to resolvedCategory,
+                        "area" to resolvedArea,
                         "isAvailable" to true,
                         "subscriptionStatus" to "APPROVED",
                         "rating" to 5.0f,
@@ -230,19 +283,25 @@ class StatusRepositoryImpl(
                 }
                 "STORE", "RESTAURANT", "MEDICAL" -> {
                     val storeRef = firestore.collection("stores").document(reqId)
+                    val sectionId = when (resolvedRole) {
+                        "RESTAURANT" -> "restaurants"
+                        "MEDICAL" -> "medical"
+                        else -> "stores"
+                    }
                     val storeData = mapOf(
                         "id" to reqId,
                         "ownerId" to ownerId,
-                        "name" to (requestDoc.getString("businessName") ?: request.name),
-                        "ownerName" to request.name,
+                        "name" to (requestDoc.getString("businessName") ?: resolvedName),
+                        "ownerName" to resolvedName,
                         "phone" to cleanPhone,
-                        "password" to passwordHash,
+                        "password" to "",
                         "passwordHash" to passwordHash,
-                        "category" to request.categoryId,
-                        "city" to request.area,
+                        "category" to resolvedCategory,
+                        "sectionId" to sectionId,
+                        "city" to resolvedArea,
                         "isActive" to true,
                         "isApproved" to true,
-                        "type" to type,
+                        "type" to resolvedRole,
                         "createdAt" to now
                     )
                     batch.set(storeRef, storeData, com.google.firebase.firestore.SetOptions.merge())
@@ -252,13 +311,13 @@ class StatusRepositoryImpl(
                     val propData = mapOf(
                         "id" to reqId,
                         "ownerId" to ownerId,
-                        "title" to (requestDoc.getString("propertyTitle") ?: request.name),
-                        "ownerName" to request.name,
+                        "title" to (requestDoc.getString("propertyTitle") ?: resolvedName),
+                        "ownerName" to resolvedName,
                         "phone" to cleanPhone,
-                        "password" to passwordHash,
+                        "password" to "",
                         "passwordHash" to passwordHash,
-                        "category" to request.categoryId,
-                        "city" to request.area,
+                        "category" to resolvedCategory,
+                        "city" to resolvedArea,
                         "isActive" to true,
                         "isApproved" to true,
                         "createdAt" to now
@@ -267,7 +326,7 @@ class StatusRepositoryImpl(
                 }
                 "JOB" -> {
                     val jobRef = firestore.collection("jobs").document(reqId)
-                    val jobTitle = requestDoc.getString("jobTitle") ?: request.name
+                    val jobTitle = requestDoc.getString("jobTitle") ?: resolvedName
                     val salaryRange = requestDoc.getString("salaryRange") ?: ""
                     val requirements = requestDoc.getString("jobRequirements") ?: ""
                     val jobData = mapOf(
@@ -275,31 +334,17 @@ class StatusRepositoryImpl(
                         "ownerId" to ownerId,
                         "title" to jobTitle,
                         "jobTitle" to jobTitle,
-                        "companyName" to (requestDoc.getString("companyName") ?: request.name),
+                        "companyName" to (requestDoc.getString("companyName") ?: resolvedName),
                         "salary" to salaryRange,
                         "salaryRange" to salaryRange,
                         "requirements" to requirements,
                         "phone" to cleanPhone,
-                        "city" to request.area,
+                        "city" to resolvedArea,
                         "isActive" to true,
                         "isApproved" to true,
                         "createdAt" to now
                     )
                     batch.set(jobRef, jobData, com.google.firebase.firestore.SetOptions.merge())
-                }
-                else -> {
-                    val userRef = firestore.collection("users").document(reqId)
-                    batch.set(userRef, mapOf(
-                        "id" to reqId,
-                        "ownerId" to ownerId,
-                        "name" to request.name,
-                        "phone" to cleanPhone,
-                        "password" to passwordHash,
-                        "passwordHash" to passwordHash,
-                        "role" to "CLIENT",
-                        "status" to "APPROVED",
-                        "createdAt" to now
-                    ), com.google.firebase.firestore.SetOptions.merge())
                 }
             }
 
@@ -308,12 +353,12 @@ class StatusRepositoryImpl(
             batch.set(userRef, mapOf(
                 "id" to reqId,
                 "ownerId" to ownerId,
-                "name" to request.name,
+                "name" to resolvedName,
                 "phone" to cleanPhone,
-                "password" to passwordHash,
+                "password" to "",
                 "passwordHash" to passwordHash,
-                "role" to type.uppercase(),
-                "accountType" to type.uppercase(),
+                "role" to resolvedRole,
+                "accountType" to resolvedRole,
                 "status" to "APPROVED",
                 "isApproved" to true,
                 "updatedAt" to now
@@ -323,12 +368,12 @@ class StatusRepositoryImpl(
                 val regUserRef = firestore.collection("registered_users").document(cleanPhone)
                 batch.set(regUserRef, mapOf(
                     "id" to reqId,
-                    "name" to request.name,
+                    "name" to resolvedName,
                     "phone" to cleanPhone,
-                    "password" to passwordHash,
+                    "password" to "",
                     "passwordHash" to passwordHash,
-                    "role" to type.uppercase(),
-                    "accountType" to type.uppercase(),
+                    "role" to resolvedRole,
+                    "accountType" to resolvedRole,
                     "status" to "APPROVED",
                     "isApproved" to true,
                     "updatedAt" to now
@@ -405,7 +450,7 @@ class StatusRepositoryImpl(
                 targetType = "USER",
                 targetValue = cleanPhone,
                 notificationType = "JOIN_REJECTED",
-                relatedRequestId = request.id,
+                relatedRequestId = reqId,
                 isRead = false,
                 fcmSent = false,
                 timestamp = now,
@@ -423,13 +468,21 @@ class StatusRepositoryImpl(
 
     override suspend fun clearNotifications(): Result<Unit> {
         return try {
-            val snap = firestore.collection(AppConstants.COL_NOTIFICATIONS)
-                .limit(200)
-                .get()
-                .await()
-            if (!snap.isEmpty) {
+            val unreadSnap = try {
+                firestore.collection(AppConstants.COL_NOTIFICATIONS)
+                    .whereEqualTo("isRead", false)
+                    .limit(200)
+                    .get()
+                    .await()
+            } catch (_: Exception) {
+                firestore.collection(AppConstants.COL_NOTIFICATIONS)
+                    .limit(200)
+                    .get()
+                    .await()
+            }
+            if (!unreadSnap.isEmpty) {
                 val batch = firestore.batch()
-                snap.documents.forEach { doc ->
+                unreadSnap.documents.forEach { doc ->
                     batch.update(doc.reference, "isRead", true)
                 }
                 batch.commit().await()

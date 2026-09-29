@@ -19,10 +19,12 @@ class DataManagementRepositoryImpl(
 ) : IDataManagementRepository {
 
     override suspend fun countDocuments(collectionName: String, sectionFilter: String?): Int {
+        val cleanCollection = collectionName.trim()
+        if (cleanCollection.isBlank()) return 0
         return try {
-            val targetCol = if (collectionName == "restaurants" || collectionName == "medical") "stores" else collectionName
+            val targetCol = if (cleanCollection == "restaurants" || cleanCollection == "medical") "stores" else cleanCollection
             val snapshot = db.collection(targetCol).get().await()
-            filterDocuments(snapshot, collectionName, sectionFilter).size
+            filterDocuments(snapshot, cleanCollection, sectionFilter).size
         } catch (e: Exception) {
             0
         }
@@ -34,10 +36,14 @@ class DataManagementRepositoryImpl(
         performedBy: String,
         onProgress: (deleted: Int, total: Int) -> Unit
     ): Result<Int> {
+        val cleanCollection = collectionName.trim()
+        if (cleanCollection.isBlank()) {
+            return Result.failure(IllegalArgumentException("اسم المجموعة فارغ"))
+        }
         return try {
-            val targetCol = if (collectionName == "restaurants" || collectionName == "medical") "stores" else collectionName
+            val targetCol = if (cleanCollection == "restaurants" || cleanCollection == "medical") "stores" else cleanCollection
             val snapshot = db.collection(targetCol).get().await()
-            val docsToDelete = filterDocuments(snapshot, collectionName, sectionFilter)
+            val docsToDelete = filterDocuments(snapshot, cleanCollection, sectionFilter)
             val total = docsToDelete.size
             var deletedCount = 0
 
@@ -63,7 +69,7 @@ class DataManagementRepositoryImpl(
                 val logDocId = "log_${now}_${java.util.UUID.randomUUID().toString().take(6)}"
                 val auditLog = mapOf(
                     "logId" to logDocId,
-                    "collection" to collectionName,
+                    "collection" to cleanCollection,
                     "targetFirestoreCollection" to targetCol,
                     "sectionFilter" to (sectionFilter ?: ""),
                     "deletedCount" to deletedCount,
@@ -82,11 +88,38 @@ class DataManagementRepositoryImpl(
         }
     }
 
-    private fun filterDocuments(snapshot: QuerySnapshot, collectionName: String, sectionFilter: String?): List<com.google.firebase.firestore.DocumentSnapshot> {
+    private fun isRestaurantDoc(doc: com.google.firebase.firestore.DocumentSnapshot): Boolean {
+        val sectionId = (doc.getString("sectionId") ?: "").trim()
+        val type = (doc.getString("type") ?: "").trim()
+        return sectionId.equals("restaurants", ignoreCase = true) ||
+            type.equals("RESTAURANT", ignoreCase = true)
+    }
+
+    private fun isMedicalDoc(doc: com.google.firebase.firestore.DocumentSnapshot): Boolean {
+        val sectionId = (doc.getString("sectionId") ?: "").trim()
+        val type = (doc.getString("type") ?: "").trim()
+        return sectionId.equals("medical", ignoreCase = true) ||
+            type.equals("MEDICAL", ignoreCase = true)
+    }
+
+    private fun filterDocuments(
+        snapshot: QuerySnapshot,
+        collectionName: String,
+        sectionFilter: String?
+    ): List<com.google.firebase.firestore.DocumentSnapshot> {
+        val cleanFilter = sectionFilter?.trim().orEmpty()
         return when {
-            collectionName == "restaurants" -> snapshot.documents.filter { (it.getString("sectionId") ?: "") == "restaurants" }
-            collectionName == "medical" -> snapshot.documents.filter { (it.getString("sectionId") ?: "") == "medical" }
-            sectionFilter != null && sectionFilter.isNotBlank() -> snapshot.documents.filter { (it.getString("sectionId") ?: "") == sectionFilter }
+            collectionName.equals("restaurants", ignoreCase = true) ->
+                snapshot.documents.filter { isRestaurantDoc(it) }
+            collectionName.equals("medical", ignoreCase = true) ->
+                snapshot.documents.filter { isMedicalDoc(it) }
+            cleanFilter.isNotBlank() ->
+                snapshot.documents.filter {
+                    val docSection = (it.getString("sectionId") ?: "").trim()
+                    docSection.equals(cleanFilter, ignoreCase = true)
+                }
+            collectionName.equals("stores", ignoreCase = true) ->
+                snapshot.documents.filter { !isRestaurantDoc(it) && !isMedicalDoc(it) }
             else -> snapshot.documents
         }
     }
