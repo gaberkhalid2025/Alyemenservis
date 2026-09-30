@@ -404,8 +404,8 @@ fun ChatScreen(
     }
 
     // Message options dialog
-    if (selectedMessageForAction != null) {
-        val targetMsg = selectedMessageForAction!!
+    val targetMsg = selectedMessageForAction
+    if (targetMsg != null) {
         val isMe = targetMsg.senderId == currentUserId
 
         AlertDialog(

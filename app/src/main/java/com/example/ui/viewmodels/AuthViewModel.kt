@@ -309,14 +309,16 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun registerGuestUser(context: Context, name: String, phone: String, residence: String, password: String = "") {
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
-        val effectivePassword = if (password.isBlank()) "yemen_${cleanPhone.takeLast(6)}" else password.trim()
+        val cleanPassword = password.trim()
+        if (cleanPhone.length < 7) {
+            triggerToast("⚠️ يرجى إدخال رقم هاتف صحيح")
+            return
+        }
 
-        if (password.isNotBlank()) {
-            val valResult = com.example.utils.SecurityCryptoUtils.validatePasswordPolicy(password)
-            if (!valResult.first) {
-                triggerToast("⚠️ ${valResult.second}")
-                return
-            }
+        val valResult = com.example.utils.SecurityCryptoUtils.validatePasswordPolicy(cleanPassword)
+        if (!valResult.first) {
+            triggerToast("⚠️ ${valResult.second ?: "يرجى إدخال كلمة مرور قوية لحماية حسابك"}")
+            return
         }
 
         viewModelScope.launch {
@@ -325,7 +327,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                     fullName = name.trim(),
                     phone = cleanPhone,
                     city = residence.trim(),
-                    rawPassword = effectivePassword
+                    rawPassword = cleanPassword
                 )
 
                 val repository = com.example.data.repositories.RegistrationRepositoryImpl(context)
@@ -656,6 +658,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
         val resetRequest = mapOf(
+            "id" to cleanPhone,
             "uid" to currentUid,
             "phone" to cleanPhone,
             "channel" to channel,
@@ -663,7 +666,9 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             "status" to "PENDING",
             "newPassword" to "",
             "passwordHash" to "",
-            "createdAt" to currentTime
+            "createdAt" to currentTime,
+            "requestedAt" to currentTime,
+            "timestamp" to currentTime
         )
         db.collection("password_resets").document(cleanPhone).set(resetRequest)
 
@@ -674,6 +679,8 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
             "name" to "طلب استعادة ($cleanPhone)",
             "accountType" to "مسترجع",
             "status" to "PENDING",
+            "createdAt" to currentTime,
+            "requestedAt" to currentTime,
             "timestamp" to currentTime,
             "newPassword" to "",
             "passwordHash" to "",
@@ -713,7 +720,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         passwordRecoveryStatusListener?.remove()
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         if (cleanPhone.length < 7) return
-        passwordRecoveryStatusListener = db.collection("password_resets").document(cleanPhone)
+        passwordRecoveryStatusListener = db.collection("password_recovery_requests").document(cleanPhone)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
                 if (snapshot != null && snapshot.exists()) {
@@ -796,11 +803,12 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                     "name" to name.ifBlank { "صاحب الحساب ($cleanPhone)" },
                     "accountType" to accountType,
                     "status" to "PENDING",
+                    "createdAt" to currentTime,
                     "requestedAt" to currentTime,
+                    "timestamp" to currentTime,
                     "newPassword" to "",
                     "passwordHash" to "",
-                    "adminNotes" to "",
-                    "timestamp" to currentTime
+                    "adminNotes" to ""
                 )
                 
                 db.collection("password_recovery_requests")
@@ -811,12 +819,15 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                 runCatching {
                     db.collection("password_resets").document(cleanPhone).set(
                         mapOf(
+                            "id" to cleanPhone,
                             "uid" to currentUid,
                             "phone" to cleanPhone,
                             "status" to "PENDING",
                             "newPassword" to "",
                             "passwordHash" to "",
-                            "createdAt" to currentTime
+                            "createdAt" to currentTime,
+                            "requestedAt" to currentTime,
+                            "timestamp" to currentTime
                         ),
                         com.google.firebase.firestore.SetOptions.merge()
                     )

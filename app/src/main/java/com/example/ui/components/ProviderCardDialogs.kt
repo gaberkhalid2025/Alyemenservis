@@ -555,14 +555,16 @@ fun ProviderDetailsDialog(
                     .clickable { selectedPreviewImage = null },
                 contentAlignment = Alignment.Center
             ) {
-                SmartAsyncImage(
-                    model = selectedPreviewImage!!,
-                    contentDescription = "Full photo preview",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                )
+                selectedPreviewImage?.let { previewImg ->
+                    SmartAsyncImage(
+                        model = previewImg,
+                        contentDescription = "Full photo preview",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
 
                 IconButton(
                     onClick = { selectedPreviewImage = null },

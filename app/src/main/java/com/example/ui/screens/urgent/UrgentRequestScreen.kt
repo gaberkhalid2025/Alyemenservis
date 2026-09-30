@@ -65,7 +65,7 @@ fun UrgentRequestScreen(
         mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotEmpty()) "عميل ($currentUserPhone)" else "" }) 
     }
     var selectedDepartment by remember { mutableStateOf("خدمات وفنيين") }
-    var selectedCategory by remember { mutableStateOf("سباكة طارئة") }
+    var selectedCategory by remember { mutableStateOf(UrgentConstants.getSubCategories("خدمات وفنيين").first()) }
     var serviceTitle by remember { mutableStateOf("") }
     var serviceDetails by remember { mutableStateOf("") }
     var selectedCity by remember { mutableStateOf("صنعاء") }
@@ -334,12 +334,16 @@ fun UrgentRequestScreen(
             Button(
                 onClick = {
                     if (isSubmitting || isLoading) return@Button
+                    if (currentUserId.isBlank()) {
+                        scope.launch { snackbarHostState.showSnackbar("يرجى تسجيل الدخول أو تفعيل الهوية أولاً") }
+                        return@Button
+                    }
                     if (customerPhone.isBlank() || serviceTitle.isBlank() || serviceDetails.isBlank() || selectedArea.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("يرجى تعبئة كافة الحقول الإجبارية (*)") }
                         return@Button
                     }
-                    val cleanPhone = customerPhone.trim().replace(" ", "").replace("+", "")
-                    val isValidPhone = cleanPhone.length == 9 && listOf("77", "73", "71", "70", "78").any { cleanPhone.startsWith(it) }
+                    val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(customerPhone).trim()
+                    val isValidPhone = cleanPhone.length == 9 && cleanPhone.all { it.isDigit() } && listOf("77", "73", "71", "70", "78").any { cleanPhone.startsWith(it) }
                     if (!isValidPhone) {
                         scope.launch { snackbarHostState.showSnackbar("رقم الهاتف غير صحيح! يجب أن يكون 9 أرقام ويبدأ بـ 77/73/71/70/78") }
                         return@Button
@@ -352,48 +356,56 @@ fun UrgentRequestScreen(
                     isSubmitting = true
 
                     val executeCreateRequest: (String) -> Unit = { uploadedImageUrl ->
-                        instantViewModel.createInstantRequest(
-                            userId = currentUserId,
-                            userName = customerName,
-                            userPhone = customerPhone,
-                            userCity = selectedCity,
-                            userNeighborhood = selectedArea,
-                            categoryId = selectedDepartment,
-                            categoryName = selectedCategory,
-                            serviceTitle = serviceTitle,
-                            description = if (uploadedImageUrl.isNotBlank()) "$serviceDetails\n[مرفق صورة: $uploadedImageUrl]" else serviceDetails,
-                            customPin = pinCode,
-                            onResult = { success, returnedCodeOrMsg, returnedPin ->
-                                isSubmitting = false
-                                if (success) {
-                                    createdRequestCode = returnedCodeOrMsg.ifBlank { "URG-XXXX" }
-                                    createdPinCode = returnedPin.ifBlank { pinCode }
-                                    showSuccessDialog = true
-                                } else {
-                                    scope.launch { snackbarHostState.showSnackbar(returnedCodeOrMsg) }
+                        try {
+                            instantViewModel.createInstantRequest(
+                                userId = currentUserId,
+                                userName = customerName,
+                                userPhone = cleanPhone,
+                                userCity = selectedCity,
+                                userNeighborhood = selectedArea,
+                                categoryId = selectedDepartment,
+                                categoryName = selectedCategory,
+                                serviceTitle = serviceTitle,
+                                description = if (uploadedImageUrl.isNotBlank()) "$serviceDetails\n[مرفق صورة: $uploadedImageUrl]" else serviceDetails,
+                                customPin = pinCode,
+                                onResult = { success, returnedCodeOrMsg, returnedPin ->
+                                    isSubmitting = false
+                                    if (success) {
+                                        createdRequestCode = returnedCodeOrMsg.ifBlank { "URG-XXXX" }
+                                        createdPinCode = returnedPin.ifBlank { pinCode }
+                                        showSuccessDialog = true
+                                    } else {
+                                        scope.launch { snackbarHostState.showSnackbar(returnedCodeOrMsg) }
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        } catch (e: Exception) {
+                            isSubmitting = false
+                            scope.launch { snackbarHostState.showSnackbar("حدث خطأ أثناء إرسال الطلب") }
+                        }
                     }
 
-                    if (attachedImageUri != null) {
+                    val uriToUpload = attachedImageUri
+                    if (uriToUpload != null) {
                         isUploadingImage = true
                         scope.launch {
+                            var uploadedUrl = ""
                             try {
                                 val path = "urgent_requests/req_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(6)}.webp"
                                 val result = FirebaseStorageUploader.uploadImageUri(
                                     context = context,
-                                    uri = attachedImageUri!!,
+                                    uri = uriToUpload,
                                     storagePath = path,
                                     maxDimension = 800,
                                     maxSizeBytes = 300 * 1024L
                                 )
+                                uploadedUrl = result.getOrDefault("")
+                            } catch (_: Exception) {
+                                uploadedUrl = ""
+                            } finally {
                                 isUploadingImage = false
-                                executeCreateRequest(result.getOrDefault(""))
-                            } catch (e: Exception) {
-                                isUploadingImage = false
-                                executeCreateRequest("")
                             }
+                            executeCreateRequest(uploadedUrl)
                         }
                     } else {
                         executeCreateRequest("")

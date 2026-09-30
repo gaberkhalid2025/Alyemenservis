@@ -132,11 +132,12 @@ fun AssistantTestScreen(
                             }
                         }
 
-                        if (report != null) {
+                        val currentReportTop = report
+                        if (currentReportTop != null) {
                             IconButton(
                                 onClick = {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val text = runner.formatReportText(report!!)
+                                    val text = runner.formatReportText(currentReportTop)
                                     clipboard.setPrimaryClip(ClipData.newPlainText("AssistantTestReport", text))
                                     Toast.makeText(context, "📋 تم نسخ تقرير اختبار المساعد الذكي بالكامل!", Toast.LENGTH_SHORT).show()
                                 },
@@ -240,11 +241,12 @@ fun AssistantTestScreen(
                                 }
                             }
 
-                            if (report != null) {
+                            val currentReportBottom = report
+                            if (currentReportBottom != null) {
                                 OutlinedButton(
                                     onClick = {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val text = runner.formatReportText(report!!)
+                                        val text = runner.formatReportText(currentReportBottom)
                                         clipboard.setPrimaryClip(ClipData.newPlainText("AssistantTestReport", text))
                                         Toast.makeText(context, "📋 تم نسخ التقرير للحافظة!", Toast.LENGTH_SHORT).show()
                                     },

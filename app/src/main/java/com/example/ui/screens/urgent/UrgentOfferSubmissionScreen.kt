@@ -44,6 +44,8 @@ fun UrgentOfferSubmissionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val currentUserId by viewModel.currentUserId.collectAsState()
+    val currentUserPhone by viewModel.currentUserPhone.collectAsState()
+    val currentUserName by viewModel.currentUserName.collectAsState()
     val request by instantViewModel.selectedRequest.collectAsState()
     val uiState by instantViewModel.uiState.collectAsState()
 
@@ -195,6 +197,14 @@ fun UrgentOfferSubmissionScreen(
             val isSubmitting = uiState is InstantUiState.Loading
             Button(
                 onClick = {
+                    if (currentUserId.isBlank()) {
+                        scope.launch { snackbarHostState.showSnackbar("يرجى تسجيل الدخول أولاً لتقديم عرض") }
+                        return@Button
+                    }
+                    if (currentReq.expiresAt > 0 && currentReq.expiresAt <= System.currentTimeMillis()) {
+                        scope.launch { snackbarHostState.showSnackbar("عذراً، انتهت مهلة تقديم العروض لهذا الطلب") }
+                        return@Button
+                    }
                     val price = priceText.toDoubleOrNull()
                     if (price == null || price <= 0.0) {
                         scope.launch { snackbarHostState.showSnackbar("السعر يجب أن يكون أكبر من 0") }
@@ -209,8 +219,8 @@ fun UrgentOfferSubmissionScreen(
                         requestId = currentReq.id,
                         requestCode = currentReq.requestCode,
                         technicianId = currentUserId,
-                        technicianName = "فني طوارئ معتمد",
-                        technicianPhone = currentUserId,
+                        technicianName = currentUserName.ifBlank { "فني طوارئ معتمد" },
+                        technicianPhone = currentUserPhone.ifBlank { currentUserId },
                         technicianAvatar = "",
                         technicianRating = 5.0f,
                         price = price,

@@ -51,9 +51,16 @@ fun UrgentRequestsListScreen(
         instantViewModel.observeInstantRequests(currentUserId, isProvider)
     }
 
-    val now = System.currentTimeMillis()
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(15_000L)
+            now = System.currentTimeMillis()
+        }
+    }
+
     val filteredList = requestsList.filter { req ->
-        val isExpired = req.expiresAt > 0 && req.expiresAt < now && req.status == "OPEN"
+        val isExpired = req.expiresAt > 0 && req.expiresAt < now && (req.status == "WAITING_FOR_OFFERS" || req.status == "OPEN")
         val remainingMinutes = ((req.expiresAt - now) / 1000) / 60
         val matchesTimeFilter = if (onlyUnder10MinFilter) remainingMinutes in 0..10 else true
         val matchesSearch = searchQuery.isBlank() ||
@@ -129,7 +136,8 @@ fun UrgentRequestsListScreen(
                 isProvider = isProvider,
                 themeColors = themeColors,
                 onNavigateToDetails = onNavigateToDetails,
-                onNavigateToSubmitUrgentOffer = onNavigateToSubmitUrgentOffer
+                onNavigateToSubmitUrgentOffer = onNavigateToSubmitUrgentOffer,
+                now = now
             )
         }
     }

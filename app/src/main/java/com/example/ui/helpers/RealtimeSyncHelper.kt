@@ -474,6 +474,7 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             appState._customProfileTabs.value = loadCustomProfileTabs()
             appState._colorPalettes.value = loadColorThemes()
             appState._products.value = loadProducts(ON_DEMAND_FETCH_LIMIT)
+            appState._jobListings.value = loadJobListings(ON_DEMAND_FETCH_LIMIT)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -496,28 +497,54 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadInternalWallets(limit: Long = ON_DEMAND_FETCH_LIMIT): List<InternalWalletEntity> {
+    suspend fun loadInternalWallets(
+        limit: Long = ON_DEMAND_FETCH_LIMIT,
+        userId: String = "",
+        customerPhone: String = ""
+    ): List<InternalWalletEntity> {
         return try {
-            db.collection("internal_wallets")
+            val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(customerPhone)
+            val all = db.collection("internal_wallets")
                 .limit(limit)
                 .get()
                 .await()
                 .documents
                 .mapNotNull { it.toObject(InternalWalletEntity::class.java) }
+            if (userId.isBlank() && cleanPhone.isBlank()) {
+                all
+            } else {
+                all.filter { w ->
+                    (userId.isNotBlank() && w.id == userId) ||
+                        (cleanPhone.isNotBlank() && (AppPreferenceHelper.normalizePhoneNumber(w.ownerPhone) == cleanPhone || AppPreferenceHelper.normalizePhoneNumber(w.id) == cleanPhone))
+                }
+            }
         } catch (e: Exception) {
             emptyList()
         }
     }
 
-    suspend fun loadWalletTransactions(limit: Long = ON_DEMAND_FETCH_LIMIT): List<WalletTransactionEntity> {
+    suspend fun loadWalletTransactions(
+        limit: Long = ON_DEMAND_FETCH_LIMIT,
+        userId: String = "",
+        customerPhone: String = ""
+    ): List<WalletTransactionEntity> {
         return try {
-            db.collection("wallet_transactions")
+            val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(customerPhone)
+            val all = db.collection("wallet_transactions")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(limit)
                 .get()
                 .await()
                 .documents
                 .mapNotNull { it.toObject(WalletTransactionEntity::class.java) }
+            if (userId.isBlank() && cleanPhone.isBlank()) {
+                all
+            } else {
+                all.filter { tx ->
+                    (userId.isNotBlank() && tx.walletId == userId) ||
+                        (cleanPhone.isNotBlank() && AppPreferenceHelper.normalizePhoneNumber(tx.walletId) == cleanPhone)
+                }
+            }
         } catch (e: Exception) {
             emptyList()
         }
@@ -630,6 +657,31 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
     suspend fun loadJobs(limit: Long = ON_DEMAND_FETCH_LIMIT): List<JobEntity> {
         return try {
             db.collection("jobs")
+                .limit(limit)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(JobEntity::class.java)
+                        if (obj != null) {
+                            val isDel = doc.getBoolean("isDeleted") == true || doc.getBoolean("deleted") == true
+                            val act = doc.getBoolean("isActive") ?: doc.getBoolean("active") ?: true
+                            val pin = doc.getBoolean("isPinned") == true || doc.getBoolean("pinned") == true
+                            obj.copy(id = doc.id, isDeleted = isDel, isActive = act, isPinned = pin)
+                        } else null
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun loadJobListings(limit: Long = ON_DEMAND_FETCH_LIMIT): List<JobEntity> {
+        return try {
+            db.collection("job_listings")
                 .limit(limit)
                 .get()
                 .await()
@@ -773,15 +825,28 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun loadPayments(limit: Long = ON_DEMAND_FETCH_LIMIT): List<PaymentEntity> {
+    suspend fun loadPayments(
+        limit: Long = ON_DEMAND_FETCH_LIMIT,
+        userId: String = "",
+        customerPhone: String = ""
+    ): List<PaymentEntity> {
         return try {
-            db.collection("payments")
+            val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(customerPhone)
+            val all = db.collection("payments")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(limit)
                 .get()
                 .await()
                 .documents
                 .mapNotNull { it.toObject(PaymentEntity::class.java)?.copy(id = it.id) }
+            if (userId.isBlank() && cleanPhone.isBlank()) {
+                all
+            } else {
+                all.filter { p ->
+                    (userId.isNotBlank() && (p.userId == userId || p.providerId == userId)) ||
+                        (cleanPhone.isNotBlank() && (AppPreferenceHelper.normalizePhoneNumber(p.userId) == cleanPhone || AppPreferenceHelper.normalizePhoneNumber(p.walletNumber) == cleanPhone))
+                }
+            }
         } catch (e: Exception) {
             emptyList()
         }

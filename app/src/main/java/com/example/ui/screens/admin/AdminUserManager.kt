@@ -186,9 +186,10 @@ fun AdminUserManager(
         }
     }
 
-    if (resetPasswordTargetUser != null) {
+    val targetUserForReset = resetPasswordTargetUser
+    if (targetUserForReset != null) {
         PasswordResetDialog(
-            userMap = resetPasswordTargetUser!!,
+            userMap = targetUserForReset,
             newPasswordInput = newTempPasswordInput,
             onPasswordChange = { newTempPasswordInput = it },
             onDismiss = { resetPasswordTargetUser = null },
@@ -217,8 +218,9 @@ fun AdminUserManager(
         )
     }
 
-    if (generatedPasswordSuccess != null) {
-        val (targetName, plainPass) = generatedPasswordSuccess!!
+    val genPassSuccess = generatedPasswordSuccess
+    if (genPassSuccess != null) {
+        val (targetName, plainPass) = genPassSuccess
         val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
         AlertDialog(
             onDismissRequest = { generatedPasswordSuccess = null },

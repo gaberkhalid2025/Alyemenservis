@@ -1107,7 +1107,8 @@ fun approvePasswordReset(phone: String, onResult: (Boolean, String) -> Unit) {
             "status" to "APPROVED",
             "newPassword" to encryptedTempPass,
             "passwordHash" to hashedPassword,
-            "resolvedAt" to now
+            "resolvedAt" to now,
+            "timestamp" to now
         )
         db.collection("password_recovery_requests").document(cleanPhone)
             .set(statusPayload, com.google.firebase.firestore.SetOptions.merge())
@@ -1198,7 +1199,8 @@ fun adminResetAccountPassword(phone: String, newPassword: String, notifyAction: 
             "status" to "RESOLVED",
             "newPassword" to encryptedNewPass,
             "passwordHash" to hashedPassword,
-            "resolvedAt" to now
+            "resolvedAt" to now,
+            "timestamp" to now
         )
         try {
             db.collection("password_recovery_requests").document(cleanPhone)

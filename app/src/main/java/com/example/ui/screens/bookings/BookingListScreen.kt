@@ -325,9 +325,10 @@ fun BookingListScreen(
     }
 
     // Edit Dialog
-    if (bookingToEdit != null) {
+    val currentBookingToEdit = bookingToEdit
+    if (currentBookingToEdit != null) {
         BookingEditDialog(
-            booking = bookingToEdit!!,
+            booking = currentBookingToEdit,
             isAdmin = isAdmin,
             onDismiss = { bookingToEdit = null },
             onConfirmEdit = { updatedBooking, pass ->
@@ -339,8 +340,9 @@ fun BookingListScreen(
     }
 
     // Cancellation Dialog
-    if (bookingToCancel != null) {
-        val bk = bookingToCancel!!
+    val bkCancel = bookingToCancel
+    if (bkCancel != null) {
+        val bk = bkCancel
         BookingCancellationDialog(
             booking = bk,
             onDismiss = { bookingToCancel = null },
@@ -353,8 +355,9 @@ fun BookingListScreen(
     }
 
     // Delete Confirmation Dialog
-    if (bookingToDelete != null) {
-        val bk = bookingToDelete!!
+    val bkDelete = bookingToDelete
+    if (bkDelete != null) {
+        val bk = bkDelete
         AlertDialog(
             onDismissRequest = { bookingToDelete = null },
             title = { Text("تأكيد حذف الحجز النهائي", fontWeight = FontWeight.Bold) },

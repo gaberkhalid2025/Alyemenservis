@@ -11,3 +11,17 @@ fun MainViewModel.updatePropertyEntity(property: PropertyEntity) {
 
 fun MainViewModel.setPropertyBlocked(propertyId: String, isBlocked: Boolean, reason: String = "") =
     adminViewModel.setPropertyBlocked(propertyId, isBlocked, reason)
+
+fun MainViewModel.toggleBlockProperty(propertyId: String) {
+    val prop = _properties.value.find { it.id == propertyId }
+    if (prop != null) {
+        adminViewModel.setPropertyBlocked(propertyId, !prop.isBlocked)
+    } else if (propertyId.isNotBlank()) {
+        db.collection("properties").document(propertyId).get().addOnSuccessListener { doc ->
+            if (doc != null && doc.exists()) {
+                val currentlyBlocked = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
+                adminViewModel.setPropertyBlocked(propertyId, !currentlyBlocked)
+            }
+        }
+    }
+}

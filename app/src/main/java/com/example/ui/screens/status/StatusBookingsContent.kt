@@ -82,6 +82,16 @@ fun StatusBookingsContent(
                                 color = themeColors.textSecondary
                             )
                         }
+                        val arabicStatus = when (req.status.uppercase()) {
+                            "WAITING_FOR_OFFERS", "OPEN", "PENDING" -> "بانتظار العروض ⏳"
+                            "REVIEWING_OFFERS" -> "مراجعة العروض 🔍"
+                            "ACCEPTED", "APPROVED" -> "تم القبول ✅"
+                            "IN_PROGRESS" -> "قيد التنفيذ 🔧"
+                            "COMPLETED" -> "مكتمل 🎉"
+                            "CANCELLED", "REJECTED" -> "ملغي ❌"
+                            "EXPIRED" -> "منتهي الصلاحية ⌛"
+                            else -> req.status
+                        }
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
@@ -89,7 +99,7 @@ fun StatusBookingsContent(
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = req.status,
+                                text = arabicStatus,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFDC2626)
@@ -101,12 +111,12 @@ fun StatusBookingsContent(
         }
 
         item {
-            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = "📋 الحجوزات المؤكدة (${bookings.size})",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = themeColors.textPrimary
+                color = themeColors.textPrimary,
+                modifier = Modifier.padding(top = 10.dp)
             )
         }
 
@@ -144,7 +154,7 @@ fun StatusBookingsContent(
                                 color = themeColors.textPrimary
                             )
                             Text(
-                                text = "${booking.totalAmount.toInt()} ر.ي",
+                                text = "${String.format(java.util.Locale.US, "%,.0f", booking.totalAmount)} ر.ي",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF10B981)

@@ -621,8 +621,9 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
     }
 
     // 🔒 Confirm Individual Order Deletion Code Dialog
-    if (selectedOrderForDeletion != null) {
-        val order = selectedOrderForDeletion!!
+    val orderToDelete = selectedOrderForDeletion
+    if (orderToDelete != null) {
+        val order = orderToDelete
         val correctCode = (order.id.hashCode().let { kotlin.math.abs(it) } % 9000 + 1000).toString()
 
         Dialog(onDismissRequest = { selectedOrderForDeletion = null }) {

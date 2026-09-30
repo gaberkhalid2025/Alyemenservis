@@ -170,6 +170,10 @@ class RegistrationHelper(
                 profession = requestProfession,
                 providerType = requestProfession
             )
+            val coordParts = gpsCoords.split(",")
+            val parsedLat = coordParts.getOrNull(0)?.trim()?.toDoubleOrNull() ?: 15.3694
+            val parsedLng = coordParts.getOrNull(1)?.trim()?.toDoubleOrNull() ?: 44.1910
+
             // Push to Cloud
             val pendingDataMap = mapOf(
                 "id" to requestDocId,
@@ -179,6 +183,9 @@ class RegistrationHelper(
                 "categoryId" to catId,
                 "area" to area,
                 "localNeighborhood" to neighborhood,
+                "gpsCoords" to gpsCoords,
+                "latitude" to parsedLat,
+                "longitude" to parsedLng,
                 "status" to "PENDING",
                 "selfiePhotoBase64" to encSelfie,
                 "idPhotoBase64" to encIdCard,
@@ -191,31 +198,6 @@ class RegistrationHelper(
                 "providerType" to requestProfession
             )
             db.collection("pending_providers").document(requestDocId).set(pendingDataMap)
-            val unifiedJoinRequest = JoinRequestEntity(
-                id = requestDocId,
-                type = requestType,
-                status = "PENDING",
-                fullName = name,
-                phone = cleanPhone,
-                passwordHash = securedPasswordHash,
-                city = area,
-                area = neighborhood,
-                neighborhood = neighborhood,
-                categoryId = catId,
-                categoryName = customCategoryName.ifBlank { catId },
-                businessName = if (requestType == "STORE" || requestType == "RESTAURANT" || requestType == "MEDICAL") name else "",
-                ownerName = name,
-                propertyTitle = if (requestType == "PROPERTY") (if (customCategoryName.isNotBlank()) "$customCategoryName ($name)" else "مكتب/عقار ($name)") else "",
-                jobTitle = if (requestType == "JOB") customCategoryName.ifBlank { name } else "",
-                companyName = if (requestType == "JOB") name else "",
-                profileImage = finalSelfie,
-                idCardImage = finalIdCard,
-                workImages = finalWorkPhotos,
-                approvalStatus = "PENDING",
-                submittedAt = System.currentTimeMillis(),
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
-            )
             val joinRequestMap = mapOf(
                 "id" to requestDocId,
                 "uid" to currentAuthUid,
@@ -225,10 +207,14 @@ class RegistrationHelper(
                 "approvalStatus" to "PENDING",
                 "fullName" to name,
                 "phone" to cleanPhone,
+                "password" to securedPasswordHash,
                 "passwordHash" to securedPasswordHash,
                 "city" to area,
                 "area" to neighborhood,
                 "neighborhood" to neighborhood,
+                "gpsCoords" to gpsCoords,
+                "latitude" to parsedLat,
+                "longitude" to parsedLng,
                 "categoryId" to catId,
                 "categoryName" to customCategoryName.ifBlank { catId },
                 "businessName" to (if (requestType == "STORE" || requestType == "RESTAURANT" || requestType == "MEDICAL") name else ""),

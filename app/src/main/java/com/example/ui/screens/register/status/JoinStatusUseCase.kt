@@ -96,17 +96,19 @@ class JoinStatusUseCase {
         // 5. Check Active Client
         val matchingClient = registeredUsersList.find {
             val p = (it["phone"] as? String) ?: ""
-            AppPreferenceHelper.normalizePhoneNumber(p) == cleanPhone && (it["isApproved"] == true || it["status"] == "APPROVED" || it["approvalStatus"] == "APPROVED")
+            val st = (it["status"] as? String)?.uppercase() ?: ""
+            val appSt = (it["approvalStatus"] as? String)?.uppercase() ?: ""
+            AppPreferenceHelper.normalizePhoneNumber(p) == cleanPhone && (it["isApproved"] == true || st == "APPROVED" || st == "ACCEPTED" || appSt == "APPROVED" || appSt == "ACCEPTED")
         }
         if (matchingClient != null) {
             return JoinStatus.ActiveClient(matchingClient)
         }
 
-        // 6. Check Pending entity with APPROVED status
+        // 6. Check Pending entity with APPROVED or ACCEPTED status
         val matchingPending = pendingProviders.find { 
             AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone 
         }
-        if (matchingPending != null && matchingPending.status == "APPROVED") {
+        if (matchingPending != null && (matchingPending.status.equals("APPROVED", ignoreCase = true) || matchingPending.status.equals("ACCEPTED", ignoreCase = true))) {
             val cat = matchingPending.categoryId.uppercase()
             val custom = matchingPending.customCategoryName
             val prof = matchingPending.profession.uppercase()

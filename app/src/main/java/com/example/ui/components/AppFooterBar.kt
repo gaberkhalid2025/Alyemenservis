@@ -58,17 +58,20 @@ fun AppFooterBar(viewModel: MainViewModel, themeColors: VisualThemePalette, onIn
             val currentUserPhone by viewModel.currentUserPhone.collectAsState()
             val providers by viewModel.providers.collectAsState()
 
-            val matchingProvider = remember(providers, currentUserPhone) {
-                providers.find { it.phone.trim() == currentUserPhone.trim() && currentUserPhone.isNotEmpty() }
+            val activeStatuses = remember { setOf("PENDING", "ACCEPTED", "APPROVED", "IN_PROGRESS", "STARTED") }
+            val cleanUserPhone = remember(currentUserPhone) { com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserPhone) }
+
+            val matchingProvider = remember(providers, cleanUserPhone) {
+                providers.find { com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanUserPhone && cleanUserPhone.isNotEmpty() }
             }
 
-            val unreadCount = remember(bookings, currentUserPhone, matchingProvider) {
+            val unreadCount = remember(bookings, cleanUserPhone, matchingProvider) {
                 val custCount = bookings.count { b ->
-                    b.customerPhone.trim() == currentUserPhone.trim() && currentUserPhone.isNotEmpty() && (b.status == "PENDING" || b.status == "APPROVED" || b.status == "STARTED")
+                    com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(b.customerPhone) == cleanUserPhone && cleanUserPhone.isNotEmpty() && b.status.uppercase() in activeStatuses
                 }
                 val provCount = if (matchingProvider != null) {
                     bookings.count { b ->
-                        b.providerId == matchingProvider.id && (b.status == "PENDING" || b.status == "APPROVED" || b.status == "STARTED")
+                        b.providerId == matchingProvider.id && b.status.uppercase() in activeStatuses
                     }
                 } else 0
                 custCount + provCount

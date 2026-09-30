@@ -92,8 +92,12 @@ open class HomeViewModel @Inject constructor(
         val phoneName = _phoneOrNameFilter.value.trim().lowercase()
         val currentCityOnly = _filterByCurrentCityOnly.value
 
+        val radiusKm = _maxKmRadius.value
+        val userLat = _userLatitude.value
+        val userLng = _userLongitude.value
+
         val cacheKey = generateCacheKey(
-            allProviders.size,
+            allProviders.hashCode(),
             selectedCat,
             query,
             vipOnly,
@@ -102,7 +106,10 @@ open class HomeViewModel @Inject constructor(
             neighborhood,
             phoneName,
             currentCityOnly,
-            userResidence
+            userResidence,
+            radiusKm,
+            userLat,
+            userLng
         )
 
         cachedFilteredResults[cacheKey]?.let {
@@ -127,7 +134,7 @@ open class HomeViewModel @Inject constructor(
             }
         }
         if (vipOnly) {
-            filtered = filtered.filter { it.isVip || it.subscriptionStatus == "APPROVED" }
+            filtered = filtered.filter { it.isVip || it.subscriptionStatus == "APPROVED" || it.subscriptionStatus == "ACCEPTED" }
         }
         if (availOnly) {
             filtered = filtered.filter { it.isAvailable }
@@ -138,10 +145,12 @@ open class HomeViewModel @Inject constructor(
         val cleanResidence = userResidence.trim().lowercase()
         if (_filterByCurrentCityOnly.value && cleanResidence.isNotEmpty() && cleanResidence != "الكل" && cleanResidence != "اليمن") {
             filtered = filtered.filter { p ->
-                p.area.lowercase().contains(cleanResidence) ||
-                p.cityId.lowercase().contains(cleanResidence) ||
-                p.localNeighborhood.lowercase().contains(cleanResidence) ||
-                cleanResidence.contains(p.area.lowercase())
+                val pArea = p.area.trim().lowercase()
+                val pCity = p.cityId.trim().lowercase()
+                val pNeigh = p.localNeighborhood.trim().lowercase()
+                (pArea.isNotEmpty() && (pArea.contains(cleanResidence) || cleanResidence.contains(pArea))) ||
+                (pCity.isNotEmpty() && pCity.contains(cleanResidence)) ||
+                (pNeigh.isNotEmpty() && pNeigh.contains(cleanResidence))
             }
         }
         if (neighborhood.isNotEmpty()) {
@@ -151,6 +160,16 @@ open class HomeViewModel @Inject constructor(
             filtered = filtered.filter { 
                 it.name.lowercase().contains(phoneName) || 
                 it.phone.contains(phoneName) 
+            }
+        }
+        if (radiusKm in 1..499 && userLat != 0.0 && userLng != 0.0) {
+            filtered = filtered.filter { p ->
+                if (p.latitude == 0.0 && p.longitude == 0.0) {
+                    true
+                } else {
+                    val distMeters = com.example.utils.calculateDistanceInMeters(userLat, userLng, p.latitude, p.longitude)
+                    (distMeters / 1000.0) <= radiusKm.toDouble()
+                }
             }
         }
 
@@ -335,20 +354,33 @@ open class HomeViewModel @Inject constructor(
     }
 
     fun openExternalDirections(context: android.content.Context, destLat: Double, destLng: Double, label: String = "الوجهة") {
+        val encodedLabel = android.net.Uri.encode(label.ifBlank { "الوجهة" })
         try {
-            val gmapsUri = android.net.Uri.parse("google.navigation:q=$destLat,$destLng")
+            val gmapsUri = android.net.Uri.parse("geo:$destLat,$destLng?q=$destLat,$destLng($encodedLabel)")
             val mapIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, gmapsUri).apply {
                 setPackage("com.google.android.apps.maps")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             if (mapIntent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(mapIntent)
             } else {
                 val browserUri = android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$destLat,$destLng")
-                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, browserUri))
+                val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, browserUri).apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(browserIntent)
             }
         } catch (e: Exception) {
-            val fallbackUri = android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$destLat,$destLng")
-            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, fallbackUri))
+            try {
+                val fallbackUri = android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$destLat,$destLng")
+                val fallbackIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, fallbackUri).apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(fallbackIntent)
+            } catch (ex: Exception) {
+                android.util.Log.e("HomeViewModel", "Failed to open external directions", ex)
+                triggerToast("❌ تعذر فتح تطبيق الخرائط على هذا الجهاز")
+            }
         }
     }
 }

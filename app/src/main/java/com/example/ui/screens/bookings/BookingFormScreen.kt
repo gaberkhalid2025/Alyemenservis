@@ -536,8 +536,8 @@ fun BookingFormScreen(
     }
 
     // Success Dialog showing code and password
-    if (showSuccessDialog && createdBookingResult != null) {
-        val bk = createdBookingResult!!
+    val bk = createdBookingResult
+    if (showSuccessDialog && bk != null) {
         AlertDialog(
             onDismissRequest = {},
             title = {

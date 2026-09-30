@@ -578,7 +578,7 @@ fun ProfileOwnerAdminControlBar(
                 }
                 var editOffer by remember {
                     mutableStateOf(
-                        if (!provider?.specialOffersJson.isNullOrBlank()) provider!!.specialOffersJson else "خصم 15% للمعاينة الأولى وخدمات الصيانة"
+                        provider?.specialOffersJson?.takeIf { it.isNotBlank() } ?: "خصم 15% للمعاينة الأولى وخدمات الصيانة"
                     )
                 }
 

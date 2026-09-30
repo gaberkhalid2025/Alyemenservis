@@ -38,9 +38,12 @@ class PaymentManagementViewModel @Inject constructor(
     var onTriggerNotification: ((String) -> Unit)? = null
 
     fun saveInternalWallet(wallet: InternalWalletEntity) {
+        val targetId = wallet.id.ifBlank { UUID.randomUUID().toString() }
+        val finalWallet = if (wallet.id.isBlank()) wallet.copy(id = targetId) else wallet
         viewModelScope.launch {
-            crud.saveEntity("internal_wallets", wallet.id, wallet,
-                onSuccess = { onTriggerNotification?.invoke("✅ تم تحديث المحفظة بنجاح") }
+            crud.saveEntity("internal_wallets", targetId, finalWallet,
+                onSuccess = { onTriggerNotification?.invoke("✅ تم تحديث المحفظة بنجاح") },
+                onError = { onTriggerNotification?.invoke("❌ فشل تحديث المحفظة: ${it.message}") }
             )
         }
     }
@@ -71,28 +74,38 @@ class PaymentManagementViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
-            crud.saveEntity("wallet_transactions", tx.id, tx)
             crud.updateFields("internal_wallets", walletId, mapOf(
                 "balance" to newBalance,
                 "lastTransactionAt" to System.currentTimeMillis()
             ), onSuccess = {
+                viewModelScope.launch {
+                    crud.saveEntity("wallet_transactions", tx.id, tx)
+                }
                 onTriggerNotification?.invoke("تم تنفيذ حركة مالية ($type) بمبلغ $amount بنجاح")
+            }, onError = {
+                onTriggerNotification?.invoke("❌ فشل تنفيذ الحركة المالية: ${it.message}")
             })
         }
     }
 
     fun addPaymentWallet(wallet: PaymentWalletEntity) {
+        val targetId = wallet.id.ifBlank { UUID.randomUUID().toString() }
+        val finalWallet = if (wallet.id.isBlank()) wallet.copy(id = targetId) else wallet
         viewModelScope.launch {
-            crud.saveEntity("payment_wallets", wallet.id, wallet,
-                onSuccess = { onTriggerNotification?.invoke("✅ تم إضافة المحفظة المالية بنجاح") }
+            crud.saveEntity("payment_wallets", targetId, finalWallet,
+                onSuccess = { onTriggerNotification?.invoke("✅ تم إضافة المحفظة المالية بنجاح") },
+                onError = { onTriggerNotification?.invoke("❌ فشل إضافة المحفظة: ${it.message}") }
             )
         }
     }
 
     fun updatePaymentWallet(wallet: PaymentWalletEntity) {
+        val targetId = wallet.id.ifBlank { UUID.randomUUID().toString() }
+        val finalWallet = if (wallet.id.isBlank()) wallet.copy(id = targetId) else wallet
         viewModelScope.launch {
-            crud.saveEntity("payment_wallets", wallet.id, wallet,
-                onSuccess = { onTriggerNotification?.invoke("✏️ تم تحديث بيانات المحفظة بنجاح") }
+            crud.saveEntity("payment_wallets", targetId, finalWallet,
+                onSuccess = { onTriggerNotification?.invoke("✏️ تم تحديث بيانات المحفظة بنجاح") },
+                onError = { onTriggerNotification?.invoke("❌ فشل تحديث المحفظة: ${it.message}") }
             )
         }
     }
@@ -112,10 +125,13 @@ class PaymentManagementViewModel @Inject constructor(
     }
 
     fun createPayment(payment: PaymentEntity) {
+        val targetId = payment.id.ifBlank { UUID.randomUUID().toString() }
+        val finalPayment = if (payment.id.isBlank()) payment.copy(id = targetId) else payment
         viewModelScope.launch {
-            AnalyticsEventsHelper.logPaymentInitiated(null, payment.id, payment.method, payment.amount)
-            crud.saveEntity("payments", payment.id, payment,
-                onSuccess = { onTriggerNotification?.invoke("💳 تم تسجيل عملية الدفع بنجاح") }
+            AnalyticsEventsHelper.logPaymentInitiated(null, targetId, finalPayment.method, finalPayment.amount)
+            crud.saveEntity("payments", targetId, finalPayment,
+                onSuccess = { onTriggerNotification?.invoke("💳 تم تسجيل عملية الدفع بنجاح") },
+                onError = { onTriggerNotification?.invoke("❌ فشل تسجيل الدفع: ${it.message}") }
             )
         }
     }

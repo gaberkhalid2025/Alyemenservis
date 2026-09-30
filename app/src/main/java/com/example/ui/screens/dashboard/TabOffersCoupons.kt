@@ -138,8 +138,8 @@ fun TabOffersCoupons(
         }
     }
 
-    if (itemToDelete != null) {
-        val target = itemToDelete!!
+    val target = itemToDelete
+    if (target != null) {
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
             title = { Text("تأكيد حذف العرض 🗑️", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White) },

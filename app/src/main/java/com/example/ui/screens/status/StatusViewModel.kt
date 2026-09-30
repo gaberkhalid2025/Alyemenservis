@@ -1,6 +1,7 @@
 package com.example.ui.screens.status
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.BookingEntity
@@ -9,6 +10,7 @@ import com.example.data.PendingProviderEntity
 import com.example.data.models.InstantRequestEntity
 import com.example.data.repositories.IStatusRepository
 import com.example.data.repositories.SystemStatusMetrics
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -18,7 +20,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * 📊 StatusUiState
@@ -52,6 +57,16 @@ class StatusViewModel(
     private val statusRepository: IStatusRepository
 ) : ViewModel() {
 
+    companion object {
+        fun provideFactory(repository: IStatusRepository): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return StatusViewModel(repository) as T
+                }
+            }
+    }
+
     private val _uiState = MutableStateFlow(StatusUiState())
     val uiState: StateFlow<StatusUiState> = _uiState.asStateFlow()
 
@@ -60,6 +75,8 @@ class StatusViewModel(
 
     private var autoRefreshJob: Job? = null
     private var loadDataJob: Job? = null
+    private val refreshMutex = Mutex()
+    private val isRefreshingGuard = AtomicBoolean(false)
 
     init {
         loadStatusData()
@@ -70,38 +87,69 @@ class StatusViewModel(
         _uiState.value = _uiState.value.copy(selectedTab = tab)
     }
 
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
     fun loadStatusData() {
-        loadDataJob?.cancel()
-        loadDataJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                loadDataJob?.cancel()
+                loadDataJob = viewModelScope.launch {
+                    _uiState.value = _uiState.value.copy(isLoading = _uiState.value.metrics.providersCount == 0 && !_uiState.value.isRefreshing)
 
-            launch {
-                statusRepository.getSystemMetricsFlow().collect { metrics ->
-                    _uiState.value = _uiState.value.copy(metrics = metrics, isLoading = false)
-                }
-            }
+                    launch {
+                        statusRepository.getSystemMetricsFlow()
+                            .catch { e ->
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    errorMessage = e.localizedMessage ?: "خطأ في تحميل مؤشرات النظام"
+                                )
+                            }
+                            .collect { metrics ->
+                                _uiState.value = _uiState.value.copy(metrics = metrics, isLoading = false)
+                            }
+                    }
 
-            launch {
-                statusRepository.getPendingJoinRequestsFlow().collect { requests ->
-                    _uiState.value = _uiState.value.copy(pendingJoinRequests = requests)
-                }
-            }
+                    launch {
+                        statusRepository.getPendingJoinRequestsFlow()
+                            .catch { e ->
+                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                            }
+                            .collect { requests ->
+                                _uiState.value = _uiState.value.copy(pendingJoinRequests = requests, isLoading = false)
+                            }
+                    }
 
-            launch {
-                statusRepository.getSystemBookingsFlow().collect { bookings ->
-                    _uiState.value = _uiState.value.copy(systemBookings = bookings)
-                }
-            }
+                    launch {
+                        statusRepository.getSystemBookingsFlow()
+                            .catch { e ->
+                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                            }
+                            .collect { bookings ->
+                                _uiState.value = _uiState.value.copy(systemBookings = bookings, isLoading = false)
+                            }
+                    }
 
-            launch {
-                statusRepository.getInstantRequestsFlow().collect { instantReqs ->
-                    _uiState.value = _uiState.value.copy(instantRequests = instantReqs)
-                }
-            }
+                    launch {
+                        statusRepository.getInstantRequestsFlow()
+                            .catch { e ->
+                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                            }
+                            .collect { instantReqs ->
+                                _uiState.value = _uiState.value.copy(instantRequests = instantReqs, isLoading = false)
+                            }
+                    }
 
-            launch {
-                statusRepository.getNotificationsFlow().collect { notifs ->
-                    _uiState.value = _uiState.value.copy(notifications = notifs)
+                    launch {
+                        statusRepository.getNotificationsFlow()
+                            .catch { e ->
+                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                            }
+                            .collect { notifs ->
+                                _uiState.value = _uiState.value.copy(notifications = notifs, isLoading = false)
+                            }
+                    }
                 }
             }
         }
@@ -109,14 +157,19 @@ class StatusViewModel(
 
     fun refreshData() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRefreshing = true)
-            val result = statusRepository.refreshSystemStatus()
-            loadStatusData()
-            _uiState.value = _uiState.value.copy(isRefreshing = false)
-            if (result.isSuccess) {
-                _eventFlow.emit(StatusEvent.ShowSnackbar("🔄 تم تحديث حالات وبيانات المنصة"))
-            } else {
-                _eventFlow.emit(StatusEvent.ShowToast("تعذر التحديث: ${result.exceptionOrNull()?.localizedMessage}"))
+            if (!isRefreshingGuard.compareAndSet(false, true)) return@launch
+            try {
+                _uiState.value = _uiState.value.copy(isRefreshing = true)
+                val result = statusRepository.refreshSystemStatus()
+                loadStatusData()
+                _uiState.value = _uiState.value.copy(isRefreshing = false, isLoading = false)
+                if (result.isSuccess) {
+                    _eventFlow.emit(StatusEvent.ShowSnackbar("🔄 تم تحديث حالات وبيانات المنصة"))
+                } else {
+                    _eventFlow.emit(StatusEvent.ShowToast("تعذر التحديث: ${result.exceptionOrNull()?.localizedMessage}"))
+                }
+            } finally {
+                isRefreshingGuard.set(false)
             }
         }
     }
@@ -152,21 +205,18 @@ class StatusViewModel(
         }
     }
 
-    private var isRefreshingGuard = false
-
     private fun startAutoRefresh() {
         autoRefreshJob?.cancel()
         autoRefreshJob = viewModelScope.launch {
-            while (coroutineContext.isActive) {
+            while (isActive) {
                 delay(30_000L) // 30 seconds auto refresh loop
-                if (!isRefreshingGuard) {
-                    isRefreshingGuard = true
+                if (isRefreshingGuard.compareAndSet(false, true)) {
                     try {
                         statusRepository.refreshSystemStatus()
                     } catch (e: Exception) {
                         // Silent fail on background refresh
                     } finally {
-                        isRefreshingGuard = false
+                        isRefreshingGuard.set(false)
                     }
                 }
             }
@@ -177,5 +227,7 @@ class StatusViewModel(
         super.onCleared()
         autoRefreshJob?.cancel()
         autoRefreshJob = null
+        loadDataJob?.cancel()
+        loadDataJob = null
     }
 }

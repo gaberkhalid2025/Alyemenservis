@@ -27,7 +27,8 @@ fun UrgentListContent(
     themeColors: VisualThemePalette,
     onNavigateToDetails: (requestId: String) -> Unit,
     onNavigateToSubmitUrgentOffer: (requestId: String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    now: Long = System.currentTimeMillis()
 ) {
     if (requests.isEmpty()) {
         Box(
@@ -64,7 +65,8 @@ fun UrgentListContent(
                     isProvider = isProvider,
                     themeColors = themeColors,
                     onNavigateToDetails = { onNavigateToDetails(req.id) },
-                    onNavigateToSubmitOffer = { onNavigateToSubmitUrgentOffer(req.id) }
+                    onNavigateToSubmitOffer = { onNavigateToSubmitUrgentOffer(req.id) },
+                    now = now
                 )
             }
         }

@@ -31,9 +31,10 @@ fun UrgentCard(
     themeColors: VisualThemePalette,
     onNavigateToDetails: (requestId: String) -> Unit,
     onNavigateToSubmitOffer: (requestId: String) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    now: Long = System.currentTimeMillis()
 ) {
-    val remainingMinutes = (((request.expiresAt - System.currentTimeMillis()) / 1000) / 60).coerceAtLeast(0)
+    val remainingMinutes = (((request.expiresAt - now) / 1000) / 60).coerceAtLeast(0)
     val isCritical = remainingMinutes < 5
     val isUrgent = remainingMinutes < 10
 

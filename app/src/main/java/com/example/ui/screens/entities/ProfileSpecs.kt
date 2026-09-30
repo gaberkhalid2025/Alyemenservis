@@ -63,7 +63,7 @@ fun TechnicianSpecificSpecsView(provider: ProviderEntity?, themeColors: VisualTh
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 SpecBadge("التوثيق:", if (provider?.isVerified == true) "موثق بالهوية ✅" else "قيد التدقيق", Icons.Default.Star)
-                SpecBadge("المدينة:", if (!provider?.cityId.isNullOrEmpty()) provider?.cityId!! else "صنعاء", Icons.Default.LocationOn)
+                SpecBadge("المدينة:", provider?.cityId?.takeIf { it.isNotEmpty() } ?: "صنعاء", Icons.Default.LocationOn)
             }
         }
     }
@@ -85,7 +85,7 @@ fun StoreSpecificSpecsView(store: StoreEntity?, products: List<ProductEntity>, t
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 SpecBadge("طرق الدفع:", "محافظ إلكترونية + نقد", Icons.Default.Star)
-                SpecBadge("السجل التجاري:", if (!store?.commercialRegisterNo.isNullOrEmpty()) store?.commercialRegisterNo!! else "معتمد بالمنصة", Icons.Default.CheckCircle)
+                SpecBadge("السجل التجاري:", store?.commercialRegisterNo?.takeIf { it.isNotEmpty() } ?: "معتمد بالمنصة", Icons.Default.CheckCircle)
             }
         }
     }
@@ -150,7 +150,7 @@ fun RealEstateSpecificSpecsView(property: PropertyEntity?, themeColors: VisualTh
                 SpecBadge("السعر:", "${property?.price?.toInt() ?: 0} ${property?.currency ?: "YER"}", Icons.Default.Star)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("تصنيف العقار:", if (!property?.propertyType.isNullOrEmpty()) property?.propertyType!! else "شقة سكنية", Icons.Default.LocationOn)
+                SpecBadge("تصنيف العقار:", property?.propertyType?.takeIf { it.isNotEmpty() } ?: "شقة سكنية", Icons.Default.LocationOn)
                 SpecBadge("المعاينة:", "متاحة بالتنسيق المباشر 🚶‍♂️", Icons.Default.CheckCircle)
             }
         }
@@ -168,12 +168,12 @@ fun JobSpecificSpecsView(job: JobEntity?, themeColors: VisualThemePalette) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("💼 تفاصيل فرصة العمل", fontWeight = FontWeight.Bold, color = Color(0xFF22D3EE), fontSize = 13.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("نوع الدوام:", if (!job?.jobType.isNullOrEmpty()) job?.jobType!! else "دوام كامل", Icons.Default.AccountBox)
-                SpecBadge("الراتب المتوقع:", if (!job?.salary.isNullOrEmpty()) job?.salary!! else "حسب الاتفاق", Icons.Default.Star)
+                SpecBadge("نوع الدوام:", job?.jobType?.takeIf { it.isNotEmpty() } ?: "دوام كامل", Icons.Default.AccountBox)
+                SpecBadge("الراتب المتوقع:", job?.salary?.takeIf { it.isNotEmpty() } ?: "حسب الاتفاق", Icons.Default.Star)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                SpecBadge("اسم الشركة:", if (!job?.companyName.isNullOrEmpty()) job?.companyName!! else "جهة معتمدة", Icons.Default.CheckCircle)
-                SpecBadge("المدينة:", if (!job?.cityId.isNullOrEmpty()) job?.cityId!! else "صنعاء", Icons.Default.LocationOn)
+                SpecBadge("اسم الشركة:", job?.companyName?.takeIf { it.isNotEmpty() } ?: "جهة معتمدة", Icons.Default.CheckCircle)
+                SpecBadge("المدينة:", job?.cityId?.takeIf { it.isNotEmpty() } ?: "صنعاء", Icons.Default.LocationOn)
             }
         }
     }

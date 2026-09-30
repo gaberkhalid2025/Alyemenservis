@@ -143,13 +143,13 @@ fun MainViewModel.openOrCreateChatChannel(
     val (finalTargetId, finalTargetName, channelType) = when (mode) {
         "ADMIN_ONLY" -> Triple(
             ChatRepository.SUPPORT_ADMIN_ID,
-            "الدعم الفني والإدارة",
+            ChatRepository.SUPPORT_ADMIN_NAME,
             ChannelType.SUPPORT
         )
         else -> Triple(
             targetId.ifBlank { targetPhone.ifBlank { "provider_$targetName" } },
             targetName.ifBlank { "مقدم الخدمة" },
-            ChannelType.PRIVATE
+            if (targetType.equals("SUPPORT", ignoreCase = true)) ChannelType.SUPPORT else ChannelType.PRIVATE
         )
     }
     
@@ -163,13 +163,29 @@ fun MainViewModel.openOrCreateChatChannel(
             otherUserPhoto = "",
             type = channelType,
             relatedEntityId = relatedEntityId.takeIf { it.isNotBlank() },
-            relatedEntityType = relatedEntityType.takeIf { it.isNotBlank() }
+            relatedEntityType = relatedEntityType.ifBlank { targetType }.takeIf { it.isNotBlank() }
         )
         
         if (result is AppResult.Success) {
-            targetChatChannelId = result.data.id
-            val dummy = ChatChannelEntity(id = result.data.id)
-            onCreated(dummy)
+            val ch = result.data
+            targetChatChannelId = ch.id
+            val existingEntity = _chatChannels.value.find { it.id == ch.id }
+            val fullEntity = existingEntity ?: ChatChannelEntity(
+                id = ch.id,
+                title = ch.title.ifBlank { finalTargetName },
+                targetPhone = targetPhone,
+                targetCategory = targetCategory,
+                participants = ch.participants,
+                participantNames = ch.participantNames,
+                participantPhotos = ch.participantPhotos,
+                lastMessage = ch.lastMessage,
+                lastMessageTime = ch.lastMessageTime,
+                relatedEntityId = ch.relatedEntityId ?: relatedEntityId,
+                relatedEntityType = ch.relatedEntityType ?: relatedEntityType.ifBlank { targetType },
+                timestamp = ch.createdAt
+            )
+            _activeChatChannel.value = fullEntity
+            onCreated(fullEntity)
         } else {
             onCreated(null)
         }
@@ -178,8 +194,11 @@ fun MainViewModel.openOrCreateChatChannel(
 
 fun MainViewModel.replyToChatChannel(channelId: String, senderId: String, msgText: String, senderName: String, imageUrl: String = "") {
     if (msgText.trim().isEmpty() && imageUrl.isEmpty()) return
+    val resolvedSenderId = if (senderId.isBlank() || senderId == "ADMIN") {
+        currentUserId.value.takeIf { it.isNotBlank() && it != "guest" } ?: ChatRepository.SUPPORT_ADMIN_ID
+    } else senderId
     viewModelScope.launch {
-        chatRepo.sendMessage(channelId, senderId, senderName, msgText, if (imageUrl.isNotBlank()) MediaType.IMAGE else MediaType.TEXT, imageUrl, null, null, null)
+        chatRepo.sendMessage(channelId, resolvedSenderId, senderName, msgText, if (imageUrl.isNotBlank()) MediaType.IMAGE else MediaType.TEXT, imageUrl, null, null, null)
         triggerToast("تم إرسال الرد بنجاح")
     }
 }
@@ -193,8 +212,8 @@ fun MainViewModel.sendMessageInChat(msgText: String, imageUrl: String = "") {
             currentUserId = currentUserId,
             currentUserName = currentName,
             currentUserPhoto = "",
-            otherUserId = "ADMIN",
-            otherUserName = "الدعم الفني",
+            otherUserId = ChatRepository.SUPPORT_ADMIN_ID,
+            otherUserName = ChatRepository.SUPPORT_ADMIN_NAME,
             otherUserPhoto = "",
             type = ChannelType.SUPPORT
         )

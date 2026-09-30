@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.data.repositories.StatusRepositoryImpl
 import com.example.ui.MainViewModel
 import com.example.utils.VisualThemePalette
@@ -44,14 +45,18 @@ fun StatusScreen(
     themeColors: VisualThemePalette,
     onBackClick: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val uiState by statusViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) {
-        statusViewModel.eventFlow.collectLatest { event ->
-            when (event) {
-                is StatusEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
-                is StatusEvent.ShowToast -> snackbarHostState.showSnackbar(event.message)
+    LaunchedEffect(lifecycleOwner, statusViewModel) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            statusViewModel.eventFlow.collectLatest { event ->
+                when (event) {
+                    is StatusEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+                    is StatusEvent.ShowToast -> android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -59,6 +64,7 @@ fun StatusScreen(
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
             snackbarHostState.showSnackbar(error)
+            statusViewModel.clearError()
         }
     }
 
@@ -108,7 +114,7 @@ fun StatusScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(StatusTab.values()) { tab ->
+                        items(StatusTab.values(), key = { it.name }) { tab ->
                             val isSelected = tab == uiState.selectedTab
                             Box(
                                 modifier = Modifier
@@ -149,7 +155,13 @@ fun StatusScreen(
                 .padding(innerPadding)
                 .padding(14.dp)
         ) {
-            if (uiState.isLoading) {
+            if (uiState.isRefreshing) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    color = themeColors.accent
+                )
+            }
+            if (uiState.isLoading && !uiState.isRefreshing) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -169,7 +181,7 @@ fun StatusScreen(
                             requests = uiState.pendingJoinRequests,
                             themeColors = themeColors,
                             onApprove = { statusViewModel.approveJoinRequest(it) },
-                            onReject = { statusViewModel.rejectJoinRequest(it) }
+                            onReject = { req, reason -> statusViewModel.rejectJoinRequest(req, reason) }
                         )
                     }
                     StatusTab.BOOKINGS -> {
@@ -202,7 +214,10 @@ fun StatusScreen(
     onBackClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val statusViewModel = remember { StatusViewModel(StatusRepositoryImpl(context)) }
+    val repository = remember(context) { StatusRepositoryImpl(context.applicationContext) }
+    val statusViewModel: StatusViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        factory = StatusViewModel.provideFactory(repository)
+    )
     StatusScreen(
         statusViewModel = statusViewModel,
         themeColors = themeColors,

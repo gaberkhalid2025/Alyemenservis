@@ -364,6 +364,7 @@ class AccountRecoveryHelper(
             "name" to safeName,
             "accountType" to safeType,
             "status" to "PENDING",
+            "createdAt" to now,
             "requestedAt" to now,
             "timestamp" to now,
             "newPassword" to "",
@@ -374,12 +375,15 @@ class AccountRecoveryHelper(
             runCatching {
                 db.collection("password_resets").document(cleanPhone).set(
                     mapOf(
+                        "id" to cleanPhone,
                         "uid" to currentUid,
                         "phone" to cleanPhone,
                         "status" to "PENDING",
                         "newPassword" to "",
                         "passwordHash" to "",
-                        "createdAt" to now
+                        "createdAt" to now,
+                        "requestedAt" to now,
+                        "timestamp" to now
                     ),
                     com.google.firebase.firestore.SetOptions.merge()
                 )
@@ -449,12 +453,14 @@ class AccountRecoveryHelper(
                         com.google.android.gms.tasks.Tasks.await(
                             db.collection("password_resets").document(cleanPhone).set(
                                 mapOf(
+                                    "id" to cleanPhone,
                                     "phone" to cleanPhone,
                                     "status" to "APPROVED",
                                     "newPassword" to encryptedDisplayPassword,
                                     "tempPassword" to hashedPassword,
                                     "passwordHash" to hashedPassword,
-                                    "resolvedAt" to now
+                                    "resolvedAt" to now,
+                                    "timestamp" to now
                                 ),
                                 com.google.firebase.firestore.SetOptions.merge()
                             )

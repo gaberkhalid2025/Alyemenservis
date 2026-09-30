@@ -13,6 +13,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,9 +36,12 @@ fun StatusJoinRequestsContent(
     requests: List<PendingProviderEntity>,
     themeColors: VisualThemePalette,
     onApprove: (PendingProviderEntity) -> Unit,
-    onReject: (PendingProviderEntity) -> Unit,
+    onReject: (PendingProviderEntity, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var rejectingRequest by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<PendingProviderEntity?>(null) }
+    var rejectionReason by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+
     if (requests.isEmpty()) {
         Box(
             modifier = modifier.fillMaxSize(),
@@ -106,7 +113,7 @@ fun StatusJoinRequestsContent(
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Text(
-                                text = "📍 ${req.area.ifBlank { "صنعاء" }}",
+                                text = "📍 ${req.area.ifBlank { "غير محدد" }}",
                                 fontSize = 12.sp,
                                 color = themeColors.textSecondary
                             )
@@ -139,7 +146,10 @@ fun StatusJoinRequestsContent(
                                 Text("موافقة وقبول ✅", fontSize = 12.sp, color = Color.White)
                             }
                             OutlinedButton(
-                                onClick = { onReject(req) },
+                                onClick = {
+                                    rejectingRequest = req
+                                    rejectionReason = ""
+                                },
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444)),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f)
@@ -151,5 +161,39 @@ fun StatusJoinRequestsContent(
                 }
             }
         }
+    }
+
+    val targetReject = rejectingRequest
+    if (targetReject != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { rejectingRequest = null },
+            title = { Text("سبب رفض طلب الانضمام", fontWeight = FontWeight.Bold) },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    value = rejectionReason,
+                    onValueChange = { rejectionReason = it },
+                    label = { Text("سبب الرفض (اختياري)") },
+                    singleLine = false,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onReject(targetReject, rejectionReason.trim().ifBlank { "غير مستوفي للشروط" })
+                        rejectingRequest = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("تأكيد الرفض", color = Color.White)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { rejectingRequest = null }) {
+                    Text("إلغاء")
+                }
+            }
+        )
     }
 }

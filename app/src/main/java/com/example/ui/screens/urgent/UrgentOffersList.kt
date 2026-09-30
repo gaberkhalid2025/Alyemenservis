@@ -133,7 +133,7 @@ fun UrgentOffersList(
 
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        text = "${offer.price.toInt()} ر.ي",
+                                        text = "${String.format(java.util.Locale.US, "%,.0f", offer.price)} ر.ي",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF166534)

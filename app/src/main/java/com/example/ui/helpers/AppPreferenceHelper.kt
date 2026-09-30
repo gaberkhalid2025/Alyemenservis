@@ -69,12 +69,17 @@ class AppPreferenceHelper {
 
     // --- Join Request Phone ---
     fun getJoinRequestPhone(context: Context): String {
-        val stored = getYemenServicePrefs(context).getString(KEY_JOIN_REQUEST_PHONE, "") ?: ""
-        if (stored.startsWith("enc::")) {
-            val decrypted = com.example.utils.SecurityCryptoUtils.decrypt(stored.substring(5))
-            return if (decrypted.isNotBlank() && decrypted != stored.substring(5)) decrypted else stored
+        val raw = getYemenServicePrefs(context).getString(KEY_JOIN_REQUEST_PHONE, "") ?: ""
+        if (raw.startsWith("enc::")) {
+            val payload = raw.substring(5)
+            val decrypted = com.example.utils.SecurityCryptoUtils.decrypt(payload)
+            return if (decrypted.isNotBlank() && decrypted != payload && !decrypted.startsWith("gcmx:") && !decrypted.startsWith("enc::")) decrypted else ""
         }
-        return stored
+        if (raw.startsWith("gcmx:")) {
+            val decrypted = com.example.utils.SecurityCryptoUtils.decrypt(raw)
+            return if (decrypted.isNotBlank() && decrypted != raw && !decrypted.startsWith("gcmx:")) decrypted else ""
+        }
+        return if (!raw.startsWith("gcmx:")) raw else ""
     }
 
     fun setJoinRequestPhone(context: Context, phone: String) {
@@ -92,12 +97,17 @@ class AppPreferenceHelper {
 
     // --- Password Recovery Waiting Phone ---
     fun getPasswordRecoveryWaitingPhone(context: Context): String {
-        val stored = getYemenServicePrefs(context).getString(KEY_PASSWORD_RECOVERY_WAITING_PHONE, "") ?: ""
-        if (stored.startsWith("enc::")) {
-            val decrypted = com.example.utils.SecurityCryptoUtils.decrypt(stored.substring(5))
-            return if (decrypted.isNotBlank() && decrypted != stored.substring(5)) decrypted else ""
+        val raw = getYemenServicePrefs(context).getString(KEY_PASSWORD_RECOVERY_WAITING_PHONE, "") ?: ""
+        if (raw.startsWith("enc::")) {
+            val payload = raw.substring(5)
+            val decrypted = com.example.utils.SecurityCryptoUtils.decrypt(payload)
+            return if (decrypted.isNotBlank() && decrypted != payload && !decrypted.startsWith("gcmx:") && !decrypted.startsWith("enc::")) decrypted else ""
         }
-        return stored
+        if (raw.startsWith("gcmx:")) {
+            val decrypted = com.example.utils.SecurityCryptoUtils.decrypt(raw)
+            return if (decrypted.isNotBlank() && decrypted != raw && !decrypted.startsWith("gcmx:")) decrypted else ""
+        }
+        return if (!raw.startsWith("gcmx:")) raw else ""
     }
 
     fun setPasswordRecoveryWaitingPhone(context: Context, phone: String) {

@@ -14,6 +14,13 @@ fun MainViewModel.toggleBlockStore(storeId: String) {
     val store = _stores.value.find { it.id == storeId }
     if (store != null) {
         adminViewModel.toggleStoreBlocked(storeId, !store.isBlocked)
+    } else if (storeId.isNotBlank()) {
+        db.collection("stores").document(storeId).get().addOnSuccessListener { doc ->
+            if (doc != null && doc.exists()) {
+                val currentlyBlocked = doc.getBoolean("isBlocked") == true || doc.getBoolean("blocked") == true
+                adminViewModel.toggleStoreBlocked(storeId, !currentlyBlocked)
+            }
+        }
     }
 }
 

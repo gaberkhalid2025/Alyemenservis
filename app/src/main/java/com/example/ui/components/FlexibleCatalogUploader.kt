@@ -159,9 +159,9 @@ fun FlexibleCatalogUploader(
                 }
             }
 
-            if (errorMessage != null) {
+            errorMessage?.let { msg ->
                 Text(
-                    text = errorMessage!!,
+                    text = msg,
                     fontSize = 10.sp,
                     color = Color.Red,
                     fontWeight = FontWeight.Bold

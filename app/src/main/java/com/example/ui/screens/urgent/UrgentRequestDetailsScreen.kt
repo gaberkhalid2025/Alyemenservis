@@ -161,21 +161,22 @@ fun UrgentRequestDetailsScreen(
         }
     }
 
-    if (showRatingDialog && request != null) {
-        val techId = request!!.acceptedTechnicianId.ifEmpty { request!!.id }
-        val techName = request!!.acceptedTechnicianName.ifEmpty { "الفني المنفذ" }
+    val safeReq = request
+    if (showRatingDialog && safeReq != null) {
+        val techId = safeReq.acceptedTechnicianId.ifEmpty { safeReq.id }
+        val techName = safeReq.acceptedTechnicianName.ifEmpty { "الفني المنفذ" }
         MultiDimensionRatingDialog(
             targetId = techId,
             targetName = techName,
             targetType = "URGENT_PROVIDER",
-            bookingId = request!!.requestCode,
+            bookingId = safeReq.requestCode,
             viewModel = viewModel,
             themeColors = activeTheme,
             onDismiss = { showRatingDialog = false }
         )
     }
 
-    if (showCancelDialog && request != null) {
+    if (showCancelDialog && safeReq != null) {
         AlertDialog(
             onDismissRequest = { showCancelDialog = false },
             title = { Text("إلغاء الطلب العاجل", fontWeight = FontWeight.Bold) },
@@ -196,7 +197,7 @@ fun UrgentRequestDetailsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        instantViewModel.cancelInstantRequest(request!!.id, enteredPin, context) { success, _ ->
+                        instantViewModel.cancelInstantRequest(safeReq.id, enteredPin, context) { success, _ ->
                             showCancelDialog = false
                             if (success) {
                                 onNavigateBack()
