@@ -244,6 +244,7 @@ fun GuestRegistrationDialog(
                             val cleanPhone = data["phone"] ?: ""
                             val cleanResidence = data["city"] ?: ""
                             val cleanPassword = data["password"] ?: ""
+                            val cleanConfirmPassword = data["confirmPassword"] ?: cleanPassword
 
                             val fullPhone = if (cleanPhone.length == 9) cleanPhone else "77$cleanPhone"
                             uiState = GuestAuthUiState.Loading("جاري إنشاء الحساب...")
@@ -252,7 +253,8 @@ fun GuestRegistrationDialog(
                                 name = cleanName,
                                 phone = fullPhone,
                                 residence = cleanResidence,
-                                password = cleanPassword
+                                password = cleanPassword,
+                                confirmPassword = cleanConfirmPassword
                             )
                             onRegisterCompleted(cleanName, fullPhone, cleanResidence, cleanPassword)
                         }

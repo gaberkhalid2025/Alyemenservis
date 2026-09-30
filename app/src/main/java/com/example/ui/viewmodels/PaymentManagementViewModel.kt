@@ -55,36 +55,81 @@ class PaymentManagementViewModel @Inject constructor(
         description: String,
         adminName: String = "الأدمن"
     ) {
-        val currentWallet = _internalWallets.value.find { it.id == walletId } ?: return
-        val newBalance = if (type == "DEPOSIT" || type == "REWARD") {
-            currentWallet.balance + amount
-        } else {
-            (currentWallet.balance - amount).coerceAtLeast(0.0)
+        if (walletId.isBlank() || amount <= 0.0) {
+            onTriggerNotification?.invoke("⚠️ بيانات الحركة المالية غير صالحة")
+            return
+        }
+        val localWallet = _internalWallets.value.find { it.id == walletId }
+        val isCredit = type == "DEPOSIT" || type == "REWARD"
+        if (!isCredit && localWallet != null && amount > localWallet.balance) {
+            onTriggerNotification?.invoke("❌ الرصيد غير كافٍ لإتمام العملية (الرصيد الحالي: ${localWallet.balance})")
+            return
         }
 
-        val tx = WalletTransactionEntity(
-            id = UUID.randomUUID().toString(),
-            walletId = walletId,
-            type = type,
-            amount = amount,
-            balanceAfter = newBalance,
-            note = description,
-            performByAdmin = true,
-            timestamp = System.currentTimeMillis()
-        )
+        val now = System.currentTimeMillis()
+        val txId = UUID.randomUUID().toString()
+        val safeAdminName = adminName.trim().ifBlank { "الأدمن" }
+        val finalNote = if (description.contains(safeAdminName)) description else "$description (بواسطة: $safeAdminName)"
 
-        viewModelScope.launch {
-            crud.updateFields("internal_wallets", walletId, mapOf(
-                "balance" to newBalance,
-                "lastTransactionAt" to System.currentTimeMillis()
-            ), onSuccess = {
-                viewModelScope.launch {
-                    crud.saveEntity("wallet_transactions", tx.id, tx)
-                }
-                onTriggerNotification?.invoke("تم تنفيذ حركة مالية ($type) بمبلغ $amount بنجاح")
-            }, onError = {
-                onTriggerNotification?.invoke("❌ فشل تنفيذ الحركة المالية: ${it.message}")
-            })
+        db.runTransaction { transaction ->
+            val walletRef = db.collection("internal_wallets").document(walletId)
+            val snap = transaction.get(walletRef)
+            val currentBalance = if (snap.exists()) {
+                snap.getDouble("balance") ?: localWallet?.balance ?: 0.0
+            } else {
+                localWallet?.balance ?: 0.0
+            }
+
+            if (!isCredit && amount > currentBalance) {
+                throw IllegalStateException("الرصيد غير كافٍ لإتمام العملية (الرصيد المتاح: $currentBalance)")
+            }
+
+            val newBalance = if (isCredit) {
+                currentBalance + amount
+            } else {
+                currentBalance - amount
+            }
+
+            val tx = WalletTransactionEntity(
+                id = txId,
+                walletId = walletId,
+                type = type,
+                amount = amount,
+                balanceAfter = newBalance,
+                note = finalNote,
+                performByAdmin = true,
+                timestamp = now,
+                adminName = safeAdminName
+            )
+
+            if (snap.exists()) {
+                transaction.update(
+                    walletRef,
+                    mapOf(
+                        "balance" to newBalance,
+                        "updatedAt" to now,
+                        "lastTransactionAt" to now
+                    )
+                )
+            } else if (localWallet != null) {
+                transaction.set(
+                    walletRef,
+                    localWallet.copy(balance = newBalance, updatedAt = now)
+                )
+            } else {
+                throw IllegalStateException("المحفظة المطلوبة غير موجودة")
+            }
+
+            val txRef = db.collection("wallet_transactions").document(txId)
+            transaction.set(txRef, tx)
+            newBalance
+        }.addOnSuccessListener { updatedBalance ->
+            _internalWallets.value = _internalWallets.value.map {
+                if (it.id == walletId) it.copy(balance = updatedBalance, updatedAt = now) else it
+            }
+            onTriggerNotification?.invoke("✅ تم تنفيذ حركة مالية ($type) بمبلغ $amount بنجاح بواسطة $safeAdminName")
+        }.addOnFailureListener { e ->
+            onTriggerNotification?.invoke("❌ فشل تنفيذ الحركة المالية: ${e.message}")
         }
     }
 

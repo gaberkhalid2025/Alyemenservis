@@ -88,12 +88,30 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     private var clickCount = 0
     private var lastBackdoorClickTime = 0L
+    private var cachedAppContext: Context? = null
 
     fun getOrGenerateUserId(): String {
         var current = _currentUserId.value
         if (current.isBlank() || current == "guest") {
-            current = "USR_GUEST_" + (100000..999999).random().toString()
+            val sp = cachedAppContext?.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+            val savedGuest = sp?.getString("persistent_guest_id", "")?.takeIf { it.isNotBlank() }?.let {
+                com.example.utils.SecurityCryptoUtils.decrypt(it).ifBlank {
+                    if (!it.startsWith("gcm:") && !it.startsWith("gcmx:") && !it.startsWith("enc::")) it else ""
+                }
+            }.orEmpty()
+            current = if (savedGuest.isNotBlank() && savedGuest != "guest") {
+                savedGuest
+            } else {
+                "USR_GUEST_" + (100000..999999).random().toString()
+            }
             _currentUserId.value = current
+            if (sp != null) {
+                val enc = com.example.utils.SecurityCryptoUtils.encrypt(current)
+                sp.edit()
+                    .putString("persistent_guest_id", enc)
+                    .putString("user_id", enc)
+                    .apply()
+            }
         }
         return current
     }
@@ -103,6 +121,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun setJoinRequestPhone(context: Context, phone: String) {
+        cachedAppContext = context.applicationContext
         val normalized = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         val finalPhone = normalized.ifBlank { phone.trim() }
         _joinRequestPhone.value = finalPhone
@@ -111,6 +130,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun initializeUserIdentity(context: Context, onFavoritesLoaded: ((Set<String>) -> Unit)? = null) {
+        cachedAppContext = context.applicationContext
         com.example.ui.LocaleManager.init(context)
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         
@@ -307,11 +327,28 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         }
     }
 
-    fun registerGuestUser(context: Context, name: String, phone: String, residence: String, password: String = "") {
+    fun registerGuestUser(
+        context: Context,
+        name: String,
+        phone: String,
+        residence: String,
+        password: String = "",
+        confirmPassword: String = password
+    ) {
+        cachedAppContext = context.applicationContext
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         val cleanPassword = password.trim()
+        val cleanConfirm = confirmPassword.trim()
         if (cleanPhone.length < 7) {
             triggerToast("⚠️ يرجى إدخال رقم هاتف صحيح")
+            return
+        }
+        if (cleanPassword.isBlank()) {
+            triggerToast("⚠️ لا يمكن التسجيل بدون كلمة مرور، يرجى إدخال كلمة مرور صريحة لتأمين حسابك")
+            return
+        }
+        if (cleanPassword != cleanConfirm) {
+            triggerToast("⚠️ كلمة المرور وتأكيد كلمة المرور غير متطابقين")
             return
         }
 

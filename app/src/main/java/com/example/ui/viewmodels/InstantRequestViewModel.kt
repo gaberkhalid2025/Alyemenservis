@@ -140,7 +140,6 @@ class InstantRequestViewModel @Inject constructor(
             .limit(50)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
-                    _requestOffers.value = emptyList()
                     return@addSnapshotListener
                 }
                 val list = snapshot.documents.mapNotNull { doc ->
@@ -150,7 +149,8 @@ class InstantRequestViewModel @Inject constructor(
                         null
                     }
                 }
-                _requestOffers.value = list
+                val others = _requestOffers.value.filter { it.requestId != requestId && it.id !in list.map { o -> o.id } }
+                _requestOffers.value = (others + list).distinctBy { it.id }
             }
     }
 
@@ -173,11 +173,13 @@ class InstantRequestViewModel @Inject constructor(
         _uiState.value = InstantUiState.Loading
         val reqId = UUID.randomUUID().toString()
         val code = "URG-${(1000..9999).random()}"
+        val safePin = customPin.trim().ifBlank { (1000..9999).random().toString() }
         val req = InstantRequestEntity(
             id = reqId,
             requestCode = code,
-            secretPin = customPin,
-            cancellationPassword = customPin,
+            rawPin = safePin,
+            secretPin = safePin,
+            cancellationPassword = safePin,
             userId = if (userId.isNotBlank()) userId else userPhone,
             userName = userName.ifBlank { "عميل" },
             userPhone = userPhone,
@@ -193,19 +195,25 @@ class InstantRequestViewModel @Inject constructor(
             status = "WAITING_FOR_OFFERS",
             createdAt = System.currentTimeMillis()
         )
-        _instantRequests.value = _instantRequests.value + req
         repository.createInstantRequest(
             request = req,
             onSuccess = { createdReq ->
-                val resolvedPin = createdReq.rawPin.ifBlank { customPin }
+                val resolvedPin = createdReq.rawPin.ifBlank { safePin }
+                if (resolvedPin.isBlank()) {
+                    _uiState.value = InstantUiState.Error("فشل توليد رمز الحماية للطلب")
+                    onResult(false, "", "")
+                    return@createInstantRequest
+                }
+                _instantRequests.value = (_instantRequests.value.filter { it.id != createdReq.id } + createdReq)
                 _uiState.value = InstantUiState.Success("تم تقديم الطلب الفوري بنجاح بنظام الكود: ${createdReq.requestCode}")
                 sendUrgentRequestNotificationToNearbyProviders(createdReq, 10)
                 onResult(true, createdReq.requestCode, resolvedPin)
             },
             onError = { err ->
-                _uiState.value = InstantUiState.Success("تم حفظ الطلب محلياً بنظام الكود: ${req.requestCode}")
-                triggerNotification?.invoke("⚠️ تم حفظ الطلب محلياً، سيتم المزامنة تلقائياً عند استقرار الاتصال")
-                onResult(true, req.requestCode, customPin)
+                _instantRequests.value = _instantRequests.value.filter { it.id != reqId }
+                _uiState.value = InstantUiState.Error("فشل حفظ الطلب الفوري: $err")
+                triggerNotification?.invoke("❌ فشل إرسال الطلب الفوري، يرجى التحقق من الاتصال بالإنترنت: $err")
+                onResult(false, "", "")
             }
         )
     }
@@ -234,9 +242,9 @@ class InstantRequestViewModel @Inject constructor(
 
     private fun sendUrgentRequestNotificationToNearbyProviders(
         request: InstantRequestEntity,
-        radiusKm: Int
+        @Suppress("UNUSED_PARAMETER") radiusKm: Int
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 // 1. الحصول على الفنيين القريبين من الفايرستور
                 val snapshot = firestore.collection("providers")
@@ -251,15 +259,36 @@ class InstantRequestViewModel @Inject constructor(
                         null
                     }
                 }.filter { provider ->
-                    provider.isAvailable && provider.subscriptionStatus == "APPROVED"
+                    provider.isAvailable && provider.subscriptionStatus.uppercase() in listOf("APPROVED", "ACCEPTED", "ACTIVE")
                 }
                 
-                // 2. إرسال إشعار لكل فني
+                // 2. إرسال إشعارات FCM ووثائق إشعار حقيقية لكل فني قريب
+                val now = System.currentTimeMillis()
+                val batch = firestore.batch()
                 nearbyProviders.forEach { provider ->
-                    println("FCM Notification sent to nearby provider: ${provider.name}")
+                    val targetPhoneOrId = provider.phone.ifBlank { provider.id }
+                    val notifId = "URG_PROV_${request.id}_${provider.id}"
+                    val notif = NotificationEntity(
+                        id = notifId,
+                        title = "🚨 طلب طوارئ عاجل في ${request.userCity}",
+                        message = "طلب عاجل (${request.requestCode}): ${request.serviceTitle} في ${request.userNeighborhood.ifBlank { request.userCity }}. قدّم عرضك الآن!",
+                        customerPhone = provider.phone,
+                        targetType = "PROVIDER",
+                        targetValue = targetPhoneOrId,
+                        notificationType = "URGENT_REQUEST",
+                        relatedRequestId = request.id,
+                        fcmSent = false,
+                        timestamp = now,
+                        createdAt = now,
+                        dedupKey = notifId
+                    )
+                    batch.set(firestore.collection("notifications").document(notifId), notif)
+                }
+                if (nearbyProviders.isNotEmpty()) {
+                    runCatching { batch.commit().await() }
                 }
                 
-                // 3. تسجيل الإشعارات في Firestore
+                // 3. تسجيل الإشعار العام للفئة في Firestore
                 addNotification?.invoke(
                     "🚨 طلب عاجل جديد",
                     "تم إرسال طلب عاجل في ${request.userCity} - الفئة: ${request.categoryName}",
@@ -267,7 +296,7 @@ class InstantRequestViewModel @Inject constructor(
                     request.categoryId
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("InstantRequestVM", "Failed to notify nearby providers", e)
             }
         }
     }
@@ -461,11 +490,21 @@ class InstantRequestViewModel @Inject constructor(
             return
         }
 
+        if (userPin.isBlank()) {
+            if (context != null) {
+                BookingSecurityHelper.recordFailedAttempt(context, requestId)
+            }
+            val msg = "يرجى إدخال رمز الحماية (PIN) لإلغاء الطلب"
+            _uiState.value = InstantUiState.Error(msg)
+            onResult(false, msg)
+            return
+        }
+
         _uiState.value = InstantUiState.Loading
 
         repository.cancelInstantRequest(
             requestId = requestId,
-            userPin = userPin,
+            userPin = userPin.trim(),
             cancelReason = cancelReason,
             onSuccess = {
                 if (context != null) {
@@ -476,7 +515,7 @@ class InstantRequestViewModel @Inject constructor(
                 onResult(true, "تم إلغاء الطلب بنجاح")
             },
             onError = { err ->
-                if (context != null && userPin.isNotBlank()) {
+                if (context != null) {
                     BookingSecurityHelper.recordFailedAttempt(context, requestId)
                 }
                 _uiState.value = InstantUiState.Error(err)

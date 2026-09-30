@@ -148,10 +148,12 @@ enum class ChatParticipantType {
     val activeVoiceCall: StateFlow<Pair<String, String>?> = _activeVoiceCall.asStateFlow()
     private var colorSchemeListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var userColorsListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var cardSettingsListener: com.google.firebase.firestore.ListenerRegistration? = null
 
 fun loadCardSettings() {
         try {
-            db.collection("settings").document("card_settings")
+            cardSettingsListener?.remove()
+            cardSettingsListener = db.collection("settings").document("card_settings")
                 ?.addSnapshotListener { snapshot, error ->
                     if (error != null) return@addSnapshotListener
                     if (snapshot != null && snapshot.exists()) {
@@ -161,7 +163,9 @@ fun loadCardSettings() {
                         }
                     }
                 }
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsViewModel", "Error loading card settings", e)
+        }
     }
 
 fun updateTheme(themeId: String) {
@@ -1318,48 +1322,31 @@ fun wipeSelectedDatabaseData(password: String, selectedCollections: List<String>
 fun wipeAllMockAndTemporaryData() {
         viewModelScope.launch {
             try {
-                // 1. Delete all notifications
-                db.collection("notifications").get().addOnSuccessListener { snapshot ->
-                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
+                val mockPrefixes = listOf("mock_", "test_", "demo_", "temp_", "sample_")
+                fun isMockDoc(doc: com.google.firebase.firestore.DocumentSnapshot): Boolean {
+                    val idLower = doc.id.lowercase()
+                    val isFlagged = doc.getBoolean("isMock") == true ||
+                        doc.getBoolean("isTest") == true ||
+                        doc.getBoolean("isTemporary") == true
+                    val hasPrefix = mockPrefixes.any { idLower.startsWith(it) }
+                    return isFlagged || hasPrefix
                 }
-                // 2. Delete all chat channels (messages)
-                db.collection("chat_channels").get().addOnSuccessListener { snapshot ->
-                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
-                }
-                // 3. Delete all mainViewModel.adminViewModel.reports
-                db.collection("reports").get().addOnSuccessListener { snapshot ->
-                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
-                }
-                // 4. Delete all mainViewModel.bookingViewModel.bookings
-                db.collection("bookings").get().addOnSuccessListener { snapshot ->
-                    snapshot?.documents?.forEach { doc -> doc.reference.delete() }
-                }
-                // 5. Delete all providers except "p_amin", and set "p_amin" to official details
-                db.collection("providers").get().addOnSuccessListener { snapshot ->
-                    snapshot?.documents?.forEach { doc ->
-                        if (doc.id != "p_amin") {
-                            doc.reference.delete()
+
+                for (col in listOf("notifications", "chat_channels", "reports", "bookings", "providers")) {
+                    db.collection(col).whereEqualTo("isMock", true).get().addOnSuccessListener { snapshot ->
+                        snapshot?.documents?.forEach { doc ->
+                            if (isMockDoc(doc)) doc.reference.delete()
                         }
                     }
-                    val aminProvider = com.example.data.ProviderEntity(
-                        id = "p_amin",
-                        name = "امين الغرباني",
-                        phone = "777703195",
-                        area = "صنعاء - منطقة الدائري جوار مدرسة أسماء للبنات",
-                        localNeighborhood = "منطقة الدائري جوار مدرسة أسماء للبنات",
-                        cityId = "ye_san",
-                        categoryId = "c_elec",
-                        profession = "صيانة وشبكات متكاملة",
-                        specialization = "خدمات تقنية وفنية معتمدة",
-                        isAvailable = true,
-                        subscriptionStatus = "APPROVED",
-                        isVerified = true,
-                        rating = 5.0f
-                    )
-                    db.collection("providers").document("p_amin").set(aminProvider)
+                    db.collection(col).whereEqualTo("isTest", true).get().addOnSuccessListener { snapshot ->
+                        snapshot?.documents?.forEach { doc ->
+                            if (isMockDoc(doc)) doc.reference.delete()
+                        }
+                    }
                 }
-                mainViewModel.triggerNotification("🧹 تم تنظيف وحذف كافة البيانات والرسائل والإشعارات والفنيين والتقييمات الوهمية بنجاح!")
+                mainViewModel.triggerNotification("🧹 تم تنظيف البيانات التجريبية والوهمية فقط مع الحفاظ الكامل على جميع بيانات وفنيي الإنتاج!")
             } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Error wiping mock data", e)
                 mainViewModel.triggerNotification("❌ حدث خطأ أثناء عملية التنظيف")
             }
         }
@@ -1369,18 +1356,13 @@ fun autoCleanupData(daysToKeep: Int = 30) {
         viewModelScope.launch {
             try {
                 val cutoffTime = System.currentTimeMillis() - (daysToKeep * 24L * 60 * 60 * 1000)
-                db.collection("bookings").get().addOnSuccessListener { snapshot ->
-                    snapshot?.documents?.forEach { doc ->
-                        // Standard delete or date filter if available
-                    }
-                }
-
                 db.collection("notifications").whereLessThan("timestamp", cutoffTime).get()
                     .addOnSuccessListener { snapshot ->
                         snapshot?.documents?.forEach { doc -> doc.reference.delete() }
                     }
-
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Error in autoCleanupData", e)
+            }
         }
     }
 
@@ -1390,7 +1372,9 @@ fun scheduleAutoCleanup(days: Int = 30) {
                 kotlinx.coroutines.delay(24 * 60 * 60 * 1000L)
                 try {
                     autoCleanupData(days)
-                } catch (e: Exception) {}
+                } catch (e: Exception) {
+                    android.util.Log.e("SettingsViewModel", "Error in scheduleAutoCleanup", e)
+                }
             }
         }
     }
@@ -1410,6 +1394,7 @@ fun scheduleAutoCleanup(days: Int = 30) {
                 }
                 onComplete?.invoke(success)
             } catch (e: Exception) {
+                android.util.Log.e("SettingsViewModel", "Error in triggerManualSync", e)
                 onComplete?.invoke(false)
             }
         }
@@ -1420,7 +1405,7 @@ fun scheduleAutoCleanup(days: Int = 30) {
             com.example.utils.ConflictResolver(context).resolveConflict(conflict, resolution)
             triggerToast("✅ تم حل التعارض بنجاح")
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("SettingsViewModel", "Error resolving conflict", e)
         }
     }
 
@@ -1429,8 +1414,14 @@ fun scheduleAutoCleanup(days: Int = 30) {
             com.example.utils.OfflineQueueManager(context).retryFailedRequests()
             triggerToast("🚀 جاري إعادة إرسال العمليات المتبقية...")
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("SettingsViewModel", "Error retrying offline queue", e)
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        cardSettingsListener?.remove()
+        colorSchemeListener?.remove()
+        userColorsListener?.remove()
+    }
 }

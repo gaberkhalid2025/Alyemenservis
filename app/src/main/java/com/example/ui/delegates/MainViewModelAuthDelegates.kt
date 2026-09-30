@@ -334,6 +334,7 @@ fun MainViewModel.requestPasswordReset(
     phone: String,
     name: String,
     accountType: String,
+    channel: String = "IN_APP_CHAT",
     onResult: (Boolean) -> Unit
 ) {
     accountRecoveryHelper.requestPasswordReset(
@@ -343,7 +344,8 @@ fun MainViewModel.requestPasswordReset(
         accountType = accountType,
         onPasswordWaitingPhoneSet = { setPasswordRecoveryWaitingPhone(it) },
         triggerNotification = { triggerNotification(it) },
-        onResult = onResult
+        onResult = onResult,
+        channel = channel
     )
 }
 
@@ -428,8 +430,15 @@ fun MainViewModel.setUserSessionDetails(context: Context, name: String, phone: S
     authViewModel.setUserSessionDetails(context, name, phone, residence)
 }
 
-fun MainViewModel.registerGuestUser(context: Context, name: String, phone: String, residence: String, password: String = "") {
-    authViewModel.registerGuestUser(context, name, phone, residence, password)
+fun MainViewModel.registerGuestUser(
+    context: Context,
+    name: String,
+    phone: String,
+    residence: String,
+    password: String = "",
+    confirmPassword: String = password
+) {
+    authViewModel.registerGuestUser(context, name, phone, residence, password, confirmPassword)
 }
 
 fun MainViewModel.toggleFavorite(id: String) {

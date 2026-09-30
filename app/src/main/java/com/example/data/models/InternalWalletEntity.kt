@@ -25,5 +25,6 @@ data class WalletTransactionEntity(
     val balanceAfter: Double = 0.0,
     val note: String = "",
     val performByAdmin: Boolean = true,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val adminName: String = ""
 )

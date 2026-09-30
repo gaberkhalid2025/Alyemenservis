@@ -284,7 +284,7 @@ class AccountRecoveryHelper(
                         }
                     }
 
-                    // التحقق الاحتياطي من طلبات استعادة كلمة المرور المعتمدة (RESOLVED / APPROVED) في حال تم التعيين من قبل الإدارة
+                    // التحقق الاحتياطي من طلبات استعادة كلمة المرور المعتمدة (RESOLVED / APPROVED / ACCEPTED) في حال تم التعيين من قبل الإدارة
                     for (resetCol in listOf("password_recovery_requests", "password_resets")) {
                         val resetDoc = runCatching {
                             com.google.android.gms.tasks.Tasks.await(
@@ -292,7 +292,7 @@ class AccountRecoveryHelper(
                             )
                         }.getOrNull()
                         val status = resetDoc?.getString("status")?.uppercase()?.trim().orEmpty()
-                        if (resetDoc != null && resetDoc.exists() && status in listOf("RESOLVED", "APPROVED")) {
+                        if (resetDoc != null && resetDoc.exists() && status in listOf("RESOLVED", "APPROVED", "ACCEPTED")) {
                             val resetHash = resetDoc.getString("passwordHash")?.trim().orEmpty()
                                 .ifBlank { resetDoc.getString("tempPassword")?.trim().orEmpty() }
                             val rawNewPass = resetDoc.getString("newPassword")?.trim().orEmpty()
@@ -313,7 +313,8 @@ class AccountRecoveryHelper(
                                 } else {
                                     com.example.utils.PasswordHasher.hash(trimmedInput)
                                 }
-                                // مزامنة التجزئة الجديدة مع المجموعات الأساسية ومسح كلمة المرور المؤقتة المعروضة
+                                // مزامنة التجزئة الجديدة مع المجموعات الأساسية ومسح كلمة المرور المؤقتة المعروضة بعد التأكد من نجاح التحديث
+                                var updatedAny = false
                                 for (col in primaryCols) {
                                     for (ph in phoneVariants) {
                                         runCatching {
@@ -321,9 +322,17 @@ class AccountRecoveryHelper(
                                                 db.collection(col).whereEqualTo("phone", ph).get()
                                             )
                                             for (d in s.documents) {
-                                                d.reference.update(mapOf("password" to "", "passwordHash" to finalHash))
+                                                com.google.android.gms.tasks.Tasks.await(
+                                                    d.reference.update(mapOf("password" to "", "passwordHash" to finalHash))
+                                                )
+                                                updatedAny = true
                                             }
                                         }
+                                    }
+                                }
+                                if (updatedAny) {
+                                    runCatching {
+                                        resetDoc.reference.update("newPassword", "")
                                     }
                                 }
                                 return@withContext true
@@ -346,7 +355,8 @@ class AccountRecoveryHelper(
         accountType: String,
         onPasswordWaitingPhoneSet: (String) -> Unit,
         triggerNotification: (String) -> Unit,
-        onResult: (Boolean) -> Unit
+        onResult: (Boolean) -> Unit,
+        channel: String = "IN_APP_CHAT"
     ) {
         val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone).filter { it.isDigit() }
         if (cleanPhone.isBlank() || cleanPhone.length < 7) {
@@ -355,6 +365,7 @@ class AccountRecoveryHelper(
         }
         val safeName = name.trim().ifBlank { "مستخدم ($cleanPhone)" }
         val safeType = accountType.trim().ifBlank { "USER" }
+        val safeChannel = channel.trim().ifBlank { "IN_APP_CHAT" }
         val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
         val now = System.currentTimeMillis()
         val reqData = mapOf(
@@ -363,13 +374,14 @@ class AccountRecoveryHelper(
             "phone" to cleanPhone,
             "name" to safeName,
             "accountType" to safeType,
+            "channel" to safeChannel,
             "status" to "PENDING",
             "createdAt" to now,
             "requestedAt" to now,
             "timestamp" to now,
             "newPassword" to "",
             "passwordHash" to "",
-            "adminNotes" to ""
+            "adminNotes" to "القناة: $safeChannel"
         )
         db.collection("password_recovery_requests").document(cleanPhone).set(reqData).addOnSuccessListener {
             runCatching {
@@ -378,6 +390,7 @@ class AccountRecoveryHelper(
                         "id" to cleanPhone,
                         "uid" to currentUid,
                         "phone" to cleanPhone,
+                        "channel" to safeChannel,
                         "status" to "PENDING",
                         "newPassword" to "",
                         "passwordHash" to "",
@@ -393,7 +406,7 @@ class AccountRecoveryHelper(
             val adminNotif = NotificationEntity(
                 id = "PWD_NOTIF_$cleanPhone",
                 title = "🔑 طلب استعادة كلمة مرور ($safeName)",
-                message = "قدم $safeName ($safeType) ذو الرقم $cleanPhone طلباً لاستعادة وتعيين كلمة المرور.",
+                message = "قدم $safeName ($safeType) ذو الرقم $cleanPhone طلباً لاستعادة وتعيين كلمة المرور عبر قناة ($safeChannel).",
                 targetType = "SUPERVISOR",
                 targetValue = "ALL",
                 timestamp = now,
@@ -401,11 +414,11 @@ class AccountRecoveryHelper(
             )
             try { if (adminNotif.isValid()) db.collection("notifications").document(adminNotif.id).set(adminNotif) } catch (e: Exception) {}
             
-            // Log in activity_logs
+            // Log in activity_logs (بدون أي كلمة مرور أو هاش صريح)
             val logId = db.collection("activity_logs").document().id
             val log = com.example.data.ActivityLogEntity(
                 id = logId,
-                action = "🔑 طلب استعادة كلمة مرور للحساب: $safeName ($cleanPhone - $safeType)",
+                action = "🔑 طلب استعادة كلمة مرور للحساب: $safeName ($cleanPhone - $safeType) عبر القناة: $safeChannel",
                 timestamp = now
             )
             db.collection("activity_logs").document(logId).set(log)
@@ -455,7 +468,7 @@ class AccountRecoveryHelper(
                                 mapOf(
                                     "id" to cleanPhone,
                                     "phone" to cleanPhone,
-                                    "status" to "APPROVED",
+                                    "status" to "RESOLVED",
                                     "newPassword" to encryptedDisplayPassword,
                                     "tempPassword" to hashedPassword,
                                     "passwordHash" to hashedPassword,
