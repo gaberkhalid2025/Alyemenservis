@@ -1,10 +1,8 @@
 package com.example.ui.components
 
 import androidx.compose.runtime.*
-import com.example.ui.*
 import com.example.data.StoreEntity
 import com.example.ui.MainViewModel
-import com.example.StoreListItemCard
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -15,7 +13,7 @@ fun StoreListItemCard(
     viewModel: MainViewModel,
     onChatClick: (() -> Unit)? = null
 ) {
-    StoreListItemCard(
+    com.example.StoreListItemCard(
         store = store,
         themeColors = themeColors,
         onClick = onClick,

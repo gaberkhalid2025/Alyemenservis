@@ -77,9 +77,9 @@ class StatusRepositoryImpl(
                         id = doc.id,
                         name = doc.getString("fullName") ?: doc.getString("name") ?: "",
                         phone = doc.getString("phone") ?: "",
-                        categoryId = doc.getString("professionCategory") ?: doc.getString("category") ?: "",
-                        area = doc.getString("city") ?: "",
-                        localNeighborhood = doc.getString("localNeighborhood") ?: "",
+                        categoryId = doc.getString("categoryId") ?: doc.getString("professionCategory") ?: doc.getString("category") ?: "",
+                        area = doc.getString("city") ?: doc.getString("area") ?: "",
+                        localNeighborhood = doc.getString("localNeighborhood") ?: doc.getString("neighborhood") ?: "",
                         status = doc.getString("status") ?: "PENDING",
                         reason = doc.getString("reason") ?: ""
                     )
@@ -239,10 +239,13 @@ class StatusRepositoryImpl(
                 requestDoc.getString("fullName") ?: requestDoc.getString("name") ?: ""
             }.trim()
             val resolvedCategory = request.categoryId.ifBlank {
-                requestDoc.getString("professionCategory") ?: requestDoc.getString("category") ?: ""
+                requestDoc.getString("categoryId") ?: requestDoc.getString("professionCategory") ?: requestDoc.getString("category") ?: ""
             }.trim()
             val resolvedArea = request.area.ifBlank {
                 requestDoc.getString("city") ?: requestDoc.getString("area") ?: ""
+            }.trim()
+            val resolvedNeighborhood = request.localNeighborhood.ifBlank {
+                requestDoc.getString("localNeighborhood") ?: requestDoc.getString("neighborhood") ?: ""
             }.trim()
             val now = System.currentTimeMillis()
 
@@ -273,6 +276,7 @@ class StatusRepositoryImpl(
                         "passwordHash" to passwordHash,
                         "categoryId" to resolvedCategory,
                         "area" to resolvedArea,
+                        "localNeighborhood" to resolvedNeighborhood,
                         "isAvailable" to true,
                         "subscriptionStatus" to "APPROVED",
                         "rating" to 5.0f,
@@ -291,14 +295,17 @@ class StatusRepositoryImpl(
                     val storeData = mapOf(
                         "id" to reqId,
                         "ownerId" to ownerId,
-                        "name" to (requestDoc.getString("businessName") ?: resolvedName),
+                        "name" to (requestDoc.getString("businessName")?.takeIf { it.isNotBlank() } ?: resolvedName),
                         "ownerName" to resolvedName,
                         "phone" to cleanPhone,
                         "password" to "",
                         "passwordHash" to passwordHash,
                         "category" to resolvedCategory,
+                        "categoryId" to resolvedCategory,
                         "sectionId" to sectionId,
                         "city" to resolvedArea,
+                        "cityId" to resolvedArea,
+                        "localNeighborhood" to resolvedNeighborhood,
                         "isActive" to true,
                         "isApproved" to true,
                         "type" to resolvedRole,
@@ -311,13 +318,16 @@ class StatusRepositoryImpl(
                     val propData = mapOf(
                         "id" to reqId,
                         "ownerId" to ownerId,
-                        "title" to (requestDoc.getString("propertyTitle") ?: resolvedName),
+                        "title" to (requestDoc.getString("propertyTitle")?.takeIf { it.isNotBlank() } ?: resolvedName),
                         "ownerName" to resolvedName,
                         "phone" to cleanPhone,
                         "password" to "",
                         "passwordHash" to passwordHash,
                         "category" to resolvedCategory,
+                        "categoryId" to resolvedCategory,
                         "city" to resolvedArea,
+                        "cityId" to resolvedArea,
+                        "localNeighborhood" to resolvedNeighborhood,
                         "isActive" to true,
                         "isApproved" to true,
                         "createdAt" to now
@@ -326,7 +336,7 @@ class StatusRepositoryImpl(
                 }
                 "JOB" -> {
                     val jobRef = firestore.collection("jobs").document(reqId)
-                    val jobTitle = requestDoc.getString("jobTitle") ?: resolvedName
+                    val jobTitle = requestDoc.getString("jobTitle")?.takeIf { it.isNotBlank() } ?: resolvedName
                     val salaryRange = requestDoc.getString("salaryRange") ?: ""
                     val requirements = requestDoc.getString("jobRequirements") ?: ""
                     val jobData = mapOf(
@@ -334,12 +344,14 @@ class StatusRepositoryImpl(
                         "ownerId" to ownerId,
                         "title" to jobTitle,
                         "jobTitle" to jobTitle,
-                        "companyName" to (requestDoc.getString("companyName") ?: resolvedName),
+                        "companyName" to (requestDoc.getString("companyName")?.takeIf { it.isNotBlank() } ?: resolvedName),
                         "salary" to salaryRange,
                         "salaryRange" to salaryRange,
                         "requirements" to requirements,
                         "phone" to cleanPhone,
                         "city" to resolvedArea,
+                        "cityId" to resolvedArea,
+                        "address" to resolvedNeighborhood,
                         "isActive" to true,
                         "isApproved" to true,
                         "createdAt" to now

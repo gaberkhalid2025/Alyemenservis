@@ -78,6 +78,10 @@ class AppPreferenceHelper {
     }
 
     fun setJoinRequestPhone(context: Context, phone: String) {
+        if (phone.isBlank()) {
+            getYemenServicePrefs(context).edit().remove(KEY_JOIN_REQUEST_PHONE).apply()
+            return
+        }
         val encrypted = "enc::" + com.example.utils.SecurityCryptoUtils.encrypt(phone)
         getYemenServicePrefs(context).edit().putString(KEY_JOIN_REQUEST_PHONE, encrypted).apply()
     }
@@ -91,12 +95,16 @@ class AppPreferenceHelper {
         val stored = getYemenServicePrefs(context).getString(KEY_PASSWORD_RECOVERY_WAITING_PHONE, "") ?: ""
         if (stored.startsWith("enc::")) {
             val decrypted = com.example.utils.SecurityCryptoUtils.decrypt(stored.substring(5))
-            return if (decrypted.isNotBlank() && decrypted != stored.substring(5)) decrypted else stored
+            return if (decrypted.isNotBlank() && decrypted != stored.substring(5)) decrypted else ""
         }
         return stored
     }
 
     fun setPasswordRecoveryWaitingPhone(context: Context, phone: String) {
+        if (phone.isBlank()) {
+            getYemenServicePrefs(context).edit().remove(KEY_PASSWORD_RECOVERY_WAITING_PHONE).apply()
+            return
+        }
         val encrypted = "enc::" + com.example.utils.SecurityCryptoUtils.encrypt(phone)
         getYemenServicePrefs(context).edit().putString(KEY_PASSWORD_RECOVERY_WAITING_PHONE, encrypted).apply()
     }
@@ -112,18 +120,19 @@ class AppPreferenceHelper {
 
     // --- Notifications Read Status ---
     fun getReadNotificationIds(context: Context): Set<String> {
-        return getAppPrefs(context).getStringSet(KEY_READ_NOTIFICATIONS, emptySet()) ?: emptySet()
+        return getAppPrefs(context).getStringSet(KEY_READ_NOTIFICATIONS, emptySet())?.toSet() ?: emptySet()
     }
 
     fun markNotificationAsRead(context: Context, notifId: String, currentRead: MutableSet<String>): Set<String> {
         val updated = currentRead.toMutableSet().apply { add(notifId) }
-        getAppPrefs(context).edit().putStringSet(KEY_READ_NOTIFICATIONS, updated).apply()
+        getAppPrefs(context).edit().putStringSet(KEY_READ_NOTIFICATIONS, HashSet(updated)).apply()
         return updated
     }
 
     fun markAllNotificationsAsRead(context: Context, allIds: Set<String>): Set<String> {
-        getAppPrefs(context).edit().putStringSet(KEY_READ_NOTIFICATIONS, allIds).apply()
-        return allIds
+        val copy = HashSet(allIds)
+        getAppPrefs(context).edit().putStringSet(KEY_READ_NOTIFICATIONS, copy).apply()
+        return copy
     }
 
     /**

@@ -260,7 +260,7 @@ class AssistantViewModel : ViewModel() {
                 val pNameNorm = normalizeArabic(p.name)
                 val pProfNorm = normalizeArabic(p.profession)
                 val pSpecNorm = normalizeArabic(p.specialization)
-                pNameNorm.contains(qNormalized) || pProfNorm.contains(qNormalized) || pSpecNorm.contains(qNormalized) || qNormalized.contains(pProfNorm) ||
+                pNameNorm.contains(qNormalized) || (pProfNorm.isNotBlank() && pProfNorm.contains(qNormalized)) || (pSpecNorm.isNotBlank() && pSpecNorm.contains(qNormalized)) || (pProfNorm.isNotBlank() && qNormalized.contains(pProfNorm)) ||
                     (qNormalized.contains("سباك") && (pProfNorm.contains("سباك") || pSpecNorm.contains("سباك")))
             }.take(3)
             matchedEntities.addAll(provs)

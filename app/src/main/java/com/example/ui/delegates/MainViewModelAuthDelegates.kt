@@ -95,18 +95,28 @@ fun MainViewModel.changeAdminCredentials(newPass: String, newOwnerPass: String =
 }
 
 fun MainViewModel.authenticateAdmin(role: String) {
+    if (role == "SUPERVISOR" && authViewModel._currentSupervisorPermissions.value.isEmpty() && adminViewModel._supervisorPermissions.value.isNotEmpty()) {
+        authViewModel._currentSupervisorPermissions.value = adminViewModel._supervisorPermissions.value
+    }
     authViewModel.authenticateAdmin(role)
     adminViewModel._adminRole.value = role
     if (role == "OWNER") {
         adminViewModel._supervisorPermissions.value = listOf("ALL")
+    } else if (role == "SUPERVISOR" && adminViewModel._supervisorPermissions.value.isEmpty()) {
+        adminViewModel._supervisorPermissions.value = authViewModel._currentSupervisorPermissions.value
     }
 }
 
 fun MainViewModel.authenticateAdmin(context: Context, role: String, remember: Boolean) {
+    if (role == "SUPERVISOR" && authViewModel._currentSupervisorPermissions.value.isEmpty() && adminViewModel._supervisorPermissions.value.isNotEmpty()) {
+        authViewModel._currentSupervisorPermissions.value = adminViewModel._supervisorPermissions.value
+    }
     authViewModel.authenticateAdmin(context, role, remember)
     adminViewModel._adminRole.value = role
     if (role == "OWNER") {
         adminViewModel._supervisorPermissions.value = listOf("ALL")
+    } else if (role == "SUPERVISOR" && adminViewModel._supervisorPermissions.value.isEmpty()) {
+        adminViewModel._supervisorPermissions.value = authViewModel._currentSupervisorPermissions.value
     }
     // 🎯 إزالة saved_admin_role غير المشفر
 }
@@ -387,7 +397,11 @@ fun MainViewModel.restoreGuestUser(context: Context, phone: String, password: St
 fun MainViewModel.loginUserDirectly(context: Context, phone: String, password: String) = authViewModel.loginUserDirectly(context, phone, password)
 fun MainViewModel.showBackdoorDialog() = authViewModel.showBackdoorDialog()
 fun MainViewModel.dismissBackdoorDialog() = authViewModel.dismissBackdoorDialog()
-fun MainViewModel.setSupervisorSession(sup: SupervisorEntity) = authViewModel.setSupervisorSession(sup)
+fun MainViewModel.setSupervisorSession(sup: SupervisorEntity) {
+    authViewModel.setSupervisorSession(sup)
+    adminViewModel._adminRole.value = "SUPERVISOR"
+    adminViewModel._supervisorPermissions.value = sup.permissions
+}
 fun MainViewModel.hasAdminPermission(permissionKey: String): Boolean = authViewModel.hasAdminPermission(permissionKey)
 fun MainViewModel.updateSupervisorPermissions(id: String, permissions: List<String>) = authViewModel.updateSupervisorPermissions(id, permissions)
 fun MainViewModel.removeSupervisor(id: String) = authViewModel.removeSupervisor(id)

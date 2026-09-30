@@ -68,7 +68,7 @@ object ScheduleManager {
             val available = !isBreak && !isBooked
             val reason = when {
                 isBreak -> "استراحة وصلاة 🕌"
-                isBooked -> "محجوز مسبقاً 🔒"
+                isBooked -> "محجوز مسبقاً"
                 else -> null
             }
 

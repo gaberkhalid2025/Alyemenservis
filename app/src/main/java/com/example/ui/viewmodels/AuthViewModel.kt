@@ -115,10 +115,21 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val sp = context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
         
         val rawId = sp.getString("user_id", "guest") ?: "guest"
-        var savedId = if (rawId != "guest" && rawId.isNotEmpty()) com.example.utils.SecurityCryptoUtils.decrypt(rawId).ifBlank { rawId } else rawId
-        val savedName = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_name", "") ?: "")
-        val savedPhone = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_phone", "") ?: "")
-        val savedResidence = com.example.utils.SecurityCryptoUtils.decrypt(sp.getString("user_residence", "") ?: "")
+        var savedId = if (rawId != "guest" && rawId.isNotEmpty()) com.example.utils.SecurityCryptoUtils.decrypt(rawId).ifBlank {
+            if (!rawId.startsWith("gcm:") && !rawId.startsWith("gcmx:") && !rawId.startsWith("enc::")) rawId else ""
+        } else rawId
+        val rawName = sp.getString("user_name", "") ?: ""
+        val savedName = com.example.utils.SecurityCryptoUtils.decrypt(rawName).ifBlank {
+            if (!rawName.startsWith("gcm:") && !rawName.startsWith("gcmx:") && !rawName.startsWith("enc::")) rawName else ""
+        }
+        val rawPhone = sp.getString("user_phone", "") ?: ""
+        val savedPhone = com.example.utils.SecurityCryptoUtils.decrypt(rawPhone).ifBlank {
+            if (!rawPhone.startsWith("gcm:") && !rawPhone.startsWith("gcmx:") && !rawPhone.startsWith("enc::")) rawPhone else ""
+        }
+        val rawResidence = sp.getString("user_residence", "") ?: ""
+        val savedResidence = com.example.utils.SecurityCryptoUtils.decrypt(rawResidence).ifBlank {
+            if (!rawResidence.startsWith("gcm:") && !rawResidence.startsWith("gcmx:") && !rawResidence.startsWith("enc::")) rawResidence else ""
+        }
 
         if (savedId == "guest" || savedId.isEmpty()) {
             if (savedPhone.isNotEmpty()) {
@@ -146,7 +157,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val rawJoinPhone = sp.getString("join_request_phone", "") ?: ""
         val savedJoinPhone = if (rawJoinPhone.isNotBlank()) {
             com.example.utils.SecurityCryptoUtils.decrypt(rawJoinPhone).ifBlank {
-                if (!rawJoinPhone.startsWith("gcm:") && !rawJoinPhone.startsWith("enc::")) rawJoinPhone else ""
+                if (!rawJoinPhone.startsWith("gcm:") && !rawJoinPhone.startsWith("gcmx:") && !rawJoinPhone.startsWith("enc::")) rawJoinPhone else ""
             }
         } else ""
         _joinRequestPhone.value = savedJoinPhone
@@ -154,7 +165,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         val rawWaitingPhone = sp.getString("password_recovery_waiting_phone", "") ?: ""
         if (rawWaitingPhone.isNotBlank()) {
             val decryptedWaiting = com.example.utils.SecurityCryptoUtils.decrypt(rawWaitingPhone).ifBlank {
-                if (!rawWaitingPhone.startsWith("gcm:") && !rawWaitingPhone.startsWith("enc::")) rawWaitingPhone else ""
+                if (!rawWaitingPhone.startsWith("gcm:") && !rawWaitingPhone.startsWith("gcmx:") && !rawWaitingPhone.startsWith("enc::")) rawWaitingPhone else ""
             }
             if (decryptedWaiting.isNotBlank()) {
                 _passwordRecoveryWaitingPhone.value = decryptedWaiting
@@ -476,6 +487,8 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         }
     }
 
+    internal var currentSupervisorId: String = ""
+
     fun authenticateAdmin(role: String) {
         _adminRole.value = role
         if (role == "OWNER") {
@@ -491,12 +504,24 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         }
         try {
             val secureStorage = com.example.utils.SecureStorage(context)
+            val existingSession = secureStorage.getAdminSession()
+            if (role == "SUPERVISOR" && _currentSupervisorPermissions.value.isEmpty() && existingSession?.role == "SUPERVISOR" && existingSession.permissions.isNotEmpty()) {
+                _currentSupervisorPermissions.value = existingSession.permissions
+            }
             if (remember) {
                 val perms = if (role == "OWNER") listOf("ALL") else _currentSupervisorPermissions.value
+                val resolvedUid = if (role == "SUPERVISOR") {
+                    currentSupervisorId.ifBlank {
+                        existingSession?.uid?.takeIf { it.isNotBlank() && !it.startsWith("supervisor_") }
+                            ?: "${role.lowercase()}_${System.currentTimeMillis()}"
+                    }
+                } else {
+                    "${role.lowercase()}_${System.currentTimeMillis()}"
+                }
                 secureStorage.saveAdminSession(
                     com.example.utils.AdminSession(
-                        uid = "${role.lowercase()}_${System.currentTimeMillis()}",
-                        email = role,
+                        uid = resolvedUid,
+                        email = existingSession?.email?.takeIf { it.isNotBlank() } ?: role,
                         loginTime = System.currentTimeMillis(),
                         refreshToken = "${role}_SESSION",
                         role = role,
@@ -513,6 +538,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     fun logout(context: Context) {
         _adminRole.value = "GUEST"
         _currentSupervisorPermissions.value = emptyList()
+        currentSupervisorId = ""
         try {
             com.example.utils.SecureStorage(context).clearAdminSession()
         } catch (_: Exception) {}
@@ -555,6 +581,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun setSupervisorSession(sup: SupervisorEntity) {
+        currentSupervisorId = sup.id
         _adminRole.value = "SUPERVISOR"
         _currentSupervisorPermissions.value = sup.permissions
     }
@@ -773,13 +800,27 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                     "newPassword" to "",
                     "passwordHash" to "",
                     "adminNotes" to "",
-                    "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                    "timestamp" to currentTime
                 )
                 
                 db.collection("password_recovery_requests")
                     .document(cleanPhone)
                     .set(requestData, com.google.firebase.firestore.SetOptions.merge())
                     .await()
+
+                runCatching {
+                    db.collection("password_resets").document(cleanPhone).set(
+                        mapOf(
+                            "uid" to currentUid,
+                            "phone" to cleanPhone,
+                            "status" to "PENDING",
+                            "newPassword" to "",
+                            "passwordHash" to "",
+                            "createdAt" to currentTime
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    )
+                }
 
                 val notifDocId = "PWD_RESET_NOTIF_$cleanPhone"
                 val adminNotif = mapOf(

@@ -153,9 +153,8 @@ open class BookingViewModel @Inject constructor(
                         onResult(true)
                     }
                     .addOnFailureListener { e ->
-                        _bookings.value = _bookings.value + finalized
                         onFailure(e)
-                        onResult(true)
+                        onResult(false)
                     }
             },
             onSuccess = { triggerToast("✅ تم إنشاء الحجز بنجاح") },
@@ -353,6 +352,8 @@ open class BookingViewModel @Inject constructor(
             providerId = providerId,
             providerName = providerName,
             providerPhone = effectiveProviderPhone,
+            date = dateString,
+            time = timeString,
             dateString = dateString,
             timeString = timeString,
             status = "PENDING",
@@ -450,6 +451,7 @@ open class BookingViewModel @Inject constructor(
             if (b != null) {
                 val updated = b.copy(status = newStatus, rejectionReason = rejectionReason)
                 db.collection("bookings").document(bookingId).set(updated)
+                _bookings.value = _bookings.value.map { if (it.id == bookingId) updated else it }
                 
                 // Automatically trigger getOrCreateChannel with relatedEntityId & relatedEntityType = "BOOKING" upon acceptance/approval
                 if (newStatus == "APPROVED" || newStatus == "ACCEPTED" || newStatus == "IN_PROGRESS") {

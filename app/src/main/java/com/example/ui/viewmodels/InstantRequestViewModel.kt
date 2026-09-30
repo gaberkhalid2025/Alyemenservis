@@ -462,20 +462,23 @@ class InstantRequestViewModel @Inject constructor(
         }
 
         _uiState.value = InstantUiState.Loading
-        if (context != null) {
-            BookingSecurityHelper.resetAttempts(context, requestId)
-        }
 
         repository.cancelInstantRequest(
             requestId = requestId,
             userPin = userPin,
             cancelReason = cancelReason,
             onSuccess = {
+                if (context != null) {
+                    BookingSecurityHelper.resetAttempts(context, requestId)
+                }
                 _uiState.value = InstantUiState.Success("تم إلغاء الطلب الفوري بنجاح")
                 triggerNotification?.invoke("🚫 تم إلغاء الطلب الفوري بنجاح.")
                 onResult(true, "تم إلغاء الطلب بنجاح")
             },
             onError = { err ->
+                if (context != null && userPin.isNotBlank()) {
+                    BookingSecurityHelper.recordFailedAttempt(context, requestId)
+                }
                 _uiState.value = InstantUiState.Error(err)
                 triggerNotification?.invoke("❌ خطأ: $err")
                 onResult(false, err)

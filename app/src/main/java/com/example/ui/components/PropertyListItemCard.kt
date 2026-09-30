@@ -1,10 +1,8 @@
 package com.example.ui.components
 
 import androidx.compose.runtime.*
-import com.example.ui.*
 import com.example.data.PropertyEntity
 import com.example.ui.MainViewModel
-import com.example.PropertyListItemCard
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -15,11 +13,10 @@ fun PropertyListItemCard(
     viewModel: MainViewModel,
     onChatClick: (() -> Unit)? = null
 ) {
-    PropertyListItemCard(
-        property = property,
+    com.example.PropertyListItemCard(
+        prop = property,
         themeColors = themeColors,
         onClick = onClick,
-        viewModel = viewModel,
-        onChatClick = onChatClick
+        viewModel = viewModel
     )
 }

@@ -28,8 +28,10 @@ class JobManagementViewModel @Inject constructor(
     var onTriggerNotification: ((String) -> Unit)? = null
 
     fun saveJob(job: JobEntity) {
+        val targetId = job.id.ifBlank { java.util.UUID.randomUUID().toString() }
+        val finalJob = if (job.id.isBlank()) job.copy(id = targetId) else job
         viewModelScope.launch {
-            crud.saveEntity("jobs", job.id, job,
+            crud.saveEntity("jobs", targetId, finalJob,
                 onSuccess = { onTriggerNotification?.invoke("✅ تم حفظ الوظيفة بنجاح") },
                 onError = { onTriggerNotification?.invoke("❌ فشل حفظ الوظيفة: ${it.message}") }
             )
@@ -92,8 +94,10 @@ class JobManagementViewModel @Inject constructor(
     }
 
     fun submitJobApplication(application: JobApplicationEntity) {
+        val targetId = application.id.ifBlank { java.util.UUID.randomUUID().toString() }
+        val finalApp = if (application.id.isBlank()) application.copy(id = targetId) else application
         viewModelScope.launch {
-            crud.saveEntity("job_applications", application.id, application,
+            crud.saveEntity("job_applications", targetId, finalApp,
                 onSuccess = { onTriggerNotification?.invoke("📨 تم تقديم طلب التوظيف بنجاح") },
                 onError = { onTriggerNotification?.invoke("❌ فشل التقديم: ${it.message}") }
             )

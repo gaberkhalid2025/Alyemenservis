@@ -73,7 +73,7 @@ fun PasswordResetWaitingScreen(
             targetPhoneFromVm
         } else {
             val fromHelper = viewModel.preferenceHelper.getPasswordRecoveryWaitingPhone(context)
-            if (fromHelper.startsWith("gcm:") || fromHelper.startsWith("enc::")) {
+            if (fromHelper.startsWith("gcm:") || fromHelper.startsWith("gcmx:") || fromHelper.startsWith("enc::")) {
                 com.example.utils.SecurityCryptoUtils.decrypt(fromHelper)
             } else {
                 fromHelper

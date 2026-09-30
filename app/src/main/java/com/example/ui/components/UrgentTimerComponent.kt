@@ -63,16 +63,21 @@ fun UrgentTimerComponent(
         (timeLeftMs.toFloat() / totalDurationMillis.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
-    val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
-    val alphaAnim by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isCritical) 0.3f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "CriticalBlink"
-    )
+    val alphaAnim = if (isCritical) {
+        val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
+        val anim by infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.3f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 500, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "CriticalBlink"
+        )
+        anim
+    } else {
+        1f
+    }
 
     val targetColor = when {
         isExpired -> Color(0xFF757575)

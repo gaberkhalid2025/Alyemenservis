@@ -60,12 +60,7 @@ object HolidayManager {
                 set(Calendar.DAY_OF_MONTH, day)
             }
 
-            // 1. فحص يوم الجمعة (Friday)
-            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) {
-                return Pair(true, "يوم الجمعة (عطلة أسبوعية) 🕌")
-            }
-
-            // 2. فحص العطلات الرسمية الثابتة والديناميكية
+            // 1. فحص العطلات الرسمية الثابتة والديناميكية
             val allHolidays = fixedHolidays + firestoreHolidays
             val monthDay = String.format(Locale.US, "%02d-%02d", cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
             if (allHolidays.containsKey(monthDay)) {
@@ -75,12 +70,17 @@ object HolidayManager {
                 return Pair(true, allHolidays[dateString])
             }
 
-            // 3. فحص إجازات الفني الخاصة
+            // 2. فحص إجازات الفني الخاصة
             if (providerId != null) {
                 val providerDays = customProviderHolidays[providerId]
                 if (providerDays?.contains(dateString) == true) {
-                    return Pair(true, "إجازة شخصية لمقدم الخدمة 🏖️")
+                    return Pair(true, "إجازة خاصة لمقدم الخدمة 🏖️")
                 }
+            }
+
+            // 3. فحص يوم الجمعة (Friday)
+            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY) {
+                return Pair(true, "يوم الجمعة (عطلة أسبوعية) 🕌")
             }
 
             return Pair(false, null)

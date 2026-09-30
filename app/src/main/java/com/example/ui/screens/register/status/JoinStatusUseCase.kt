@@ -197,8 +197,9 @@ class JoinStatusUseCase {
             val isProperty = cat == "PROPERTY" || cat.contains("PROPERTY") || prof == "PROPERTY_OWNER" ||
                     custom.contains("عقار") || custom.contains("شقة") || custom.contains("أرض") || pName.contains("عقار")
 
-            val isJob = cat == "JOB" || cat.contains("JOB") || prof == "JOB_POSTER" ||
-                    custom.contains("وظيفة") || custom.contains("توظيف") || custom.contains("شاغر")
+            val isJob = (cat == "JOB" || (cat.contains("JOB") && cat != "JOB_SEEKER") || prof == "JOB_POSTER" ||
+                    custom.contains("وظيفة") || custom.contains("توظيف") || custom.contains("شاغر")) &&
+                    cat != "JOB_SEEKER" && prof != "JOB_SEEKER"
 
             val isStore = cat == "STORE" || cat.contains("STORE") || prof == "STORE_OWNER" ||
                     custom.contains("متجر") || custom.contains("محل") || custom.contains("معرض") || custom.contains("سوق") ||

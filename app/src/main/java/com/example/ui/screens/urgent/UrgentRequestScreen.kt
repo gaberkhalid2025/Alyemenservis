@@ -76,6 +76,15 @@ fun UrgentRequestScreen(
     var isUploadingImage by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
 
+    // ⏳ حماية زمنية (30 ثانية) لحالات الإرسال والرفع لتجنب تعليق واجهة المستخدم (القاعدة 7)
+    LaunchedEffect(isSubmitting, isUploadingImage) {
+        if (isSubmitting || isUploadingImage) {
+            kotlinx.coroutines.delay(30_000L)
+            isSubmitting = false
+            isUploadingImage = false
+        }
+    }
+
     val photoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
     ) { uri: android.net.Uri? ->

@@ -37,23 +37,28 @@ fun VoiceSearchDialog(
 
     var isListening by remember { mutableStateOf(true) }
     var recognizedText by remember { mutableStateOf("جاري الاستماع...") }
+    var hasValidResult by remember { mutableStateOf(false) }
 
     val startRealListening = remember {
         {
             isListening = true
+            hasValidResult = false
             recognizedText = "جاري الاستماع..."
             val hearHandler = com.example.VoiceManager.onHear
             if (hearHandler != null) {
                 hearHandler.invoke { spokenText ->
                     if (spokenText.isNotBlank()) {
                         recognizedText = spokenText.trim()
+                        hasValidResult = true
                     } else {
                         recognizedText = "لم يتم التقاط صوت واضح، اضغط على الميكروفون للمحاولة مجدداً"
+                        hasValidResult = false
                     }
                     isListening = false
                 }
             } else {
                 recognizedText = "يرجى التحدث أو اختيار أحد الاقتراحات السريعة أدناه"
+                hasValidResult = false
                 isListening = false
             }
         }
@@ -63,7 +68,7 @@ fun VoiceSearchDialog(
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.25f,
+        targetValue = if (isListening) 1.25f else 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -90,7 +95,11 @@ fun VoiceSearchDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = if (isListening) "تحدث الآن للبحث..." else "تم التقاط الصوت بنجاح",
+                    text = when {
+                        isListening -> "تحدث الآن للبحث..."
+                        hasValidResult -> "تم التقاط الصوت بنجاح"
+                        else -> "تعذر التقاط الصوت"
+                    },
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -112,12 +121,12 @@ fun VoiceSearchDialog(
 
                     Surface(
                         shape = CircleShape,
-                        color = if (isListening) Color(0xFF00E5FF) else Color(0xFF10B981),
+                        color = if (isListening) Color(0xFF00E5FF) else if (hasValidResult) Color(0xFF10B981) else Color(0xFFF59E0B),
                         modifier = Modifier.size(60.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = if (isListening) "🎙️" else "✅",
+                                text = if (isListening) "🎙️" else if (hasValidResult) "✅" else "🔄",
                                 fontSize = 26.sp
                             )
                         }
@@ -150,6 +159,7 @@ fun VoiceSearchDialog(
                             color = Color(0xFF1E293B),
                             modifier = Modifier.clickable {
                                 recognizedText = suggestion
+                                hasValidResult = true
                                 isListening = false
                             }
                         ) {
@@ -167,11 +177,12 @@ fun VoiceSearchDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (recognizedText.isNotBlank() && recognizedText != "جاري الاستماع...") {
+                    if (hasValidResult && recognizedText.isNotBlank()) {
                         onSpeechResult(recognizedText)
                     }
                     onDismiss()
                 },
+                enabled = hasValidResult && recognizedText.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color(0xFF0F172A))
             ) {
                 Text("تأكيد البحث")

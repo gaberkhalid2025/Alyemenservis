@@ -10,5 +10,7 @@ data class CategoryEntity(
     val order: Int = 0,
     val isPinned: Boolean = false,
     val parentId: String = "",
-    val isMainCategory: Boolean = true
+    val isMainCategory: Boolean = true,
+    val nameEn: String = "",
+    val description: String = ""
 )

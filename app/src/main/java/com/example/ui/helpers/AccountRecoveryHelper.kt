@@ -296,7 +296,7 @@ class AccountRecoveryHelper(
                             val resetHash = resetDoc.getString("passwordHash")?.trim().orEmpty()
                                 .ifBlank { resetDoc.getString("tempPassword")?.trim().orEmpty() }
                             val rawNewPass = resetDoc.getString("newPassword")?.trim().orEmpty()
-                            val decryptedNewPass = if (rawNewPass.startsWith("gcm:") || rawNewPass.startsWith("enc::")) {
+                            val decryptedNewPass = if (rawNewPass.startsWith("gcm:") || rawNewPass.startsWith("gcmx:") || rawNewPass.startsWith("enc::")) {
                                 com.example.utils.SecurityCryptoUtils.decryptCrossDevice(rawNewPass)
                             } else if (!com.example.utils.SecureHasher.isValidHash(rawNewPass)) {
                                 rawNewPass

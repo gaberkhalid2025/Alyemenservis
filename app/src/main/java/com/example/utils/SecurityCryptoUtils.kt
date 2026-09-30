@@ -212,9 +212,10 @@ object SecurityCryptoUtils {
     fun decryptCrossDevice(encryptedText: String?): String {
         if (encryptedText.isNullOrEmpty()) return ""
         val normalizedInput = encryptedText.trim().removePrefix("enc::").trim()
-        if (normalizedInput.startsWith("gcm:")) {
+        if (normalizedInput.startsWith("gcm:") || normalizedInput.startsWith("gcmx:")) {
             return try {
-                val decodedBytes = base64Decode(normalizedInput.removePrefix("gcm:"))
+                val rawBase64 = normalizedInput.removePrefix("gcmx:").removePrefix("gcm:")
+                val decodedBytes = base64Decode(rawBase64)
                 if (decodedBytes.size <= GCM_IV_LENGTH) return ""
                 val iv = decodedBytes.copyOfRange(0, GCM_IV_LENGTH)
                 val encrypted = decodedBytes.copyOfRange(GCM_IV_LENGTH, decodedBytes.size)
@@ -244,8 +245,9 @@ object SecurityCryptoUtils {
         val normalizedInput = encryptedText.trim().removePrefix("enc::").trim()
         if (normalizedInput.isEmpty()) return ""
         return try {
-            if (normalizedInput.startsWith("gcm:")) {
-                val decodedBytes = base64Decode(normalizedInput.removePrefix("gcm:"))
+            if (normalizedInput.startsWith("gcm:") || normalizedInput.startsWith("gcmx:")) {
+                val rawBase64 = normalizedInput.removePrefix("gcmx:").removePrefix("gcm:")
+                val decodedBytes = base64Decode(rawBase64)
                 if (decodedBytes.size <= GCM_IV_LENGTH) return ""
                 val iv = decodedBytes.copyOfRange(0, GCM_IV_LENGTH)
                 val encrypted = decodedBytes.copyOfRange(GCM_IV_LENGTH, decodedBytes.size)

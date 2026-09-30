@@ -3379,9 +3379,14 @@ fun exportJobApplicantsCsv(context: android.content.Context) {
                             m["id"] = doc.id
                             m
                         }.sortedByDescending {
-                            (it["timestamp"] as? Number)?.toLong()
-                                ?: (it["createdAt"] as? Number)?.toLong()
-                                ?: 0L
+                            val rawTs = it["timestamp"] ?: it["requestedAt"] ?: it["createdAt"]
+                            when (rawTs) {
+                                is Number -> rawTs.toLong()
+                                is com.google.firebase.Timestamp -> rawTs.toDate().time
+                                else -> (it["requestedAt"] as? Number)?.toLong()
+                                    ?: (it["createdAt"] as? Number)?.toLong()
+                                    ?: 0L
+                            }
                         }
                         _passwordRecoveryRequests.value = requests
                     } catch (e: Throwable) {

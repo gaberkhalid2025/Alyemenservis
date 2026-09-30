@@ -195,9 +195,9 @@ class ServicesListScreenUiTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("services_list_container").assertIsDisplayed()
         composeTestRule.onNodeWithTag("service_card_srv_1").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("service_title_srv_1").assertTextEquals("خدمة تركيب الطاقة الشمسية")
+        composeTestRule.onNodeWithTag("service_title_srv_1", useUnmergedTree = true).assertTextEquals("خدمة تركيب الطاقة الشمسية")
         composeTestRule.onNodeWithTag("service_card_srv_2").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("service_title_srv_2").assertTextEquals("صيانة شبكات وتمديدات مياه")
+        composeTestRule.onNodeWithTag("service_title_srv_2", useUnmergedTree = true).assertTextEquals("صيانة شبكات وتمديدات مياه")
     }
 
     // ==========================================

@@ -91,11 +91,13 @@ class RegistrationHelper(
 
         scope.launch {
             try {
-                // Async duplicate check in join_requests
-                db.collection("join_requests").whereEqualTo("phone", cleanPhone).get().addOnSuccessListener { qs ->
-                    if (!qs.isEmpty) {
-                        triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة لرقم الهاتف هذا")
-                    }
+                // Synchronous check in join_requests
+                val qs = com.google.android.gms.tasks.Tasks.await(
+                    db.collection("join_requests").whereEqualTo("phone", cleanPhone).get()
+                )
+                if (!qs.isEmpty) {
+                    triggerNotification("❌ يوجد طلب انضمام مسجل بالفعل قيد المراجعة لرقم الهاتف هذا")
+                    return@launch
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -154,7 +156,7 @@ class RegistrationHelper(
             val newRequest = PendingProviderEntity(
                 id = requestDocId,
                 name = name,
-                phone = phone,
+                phone = cleanPhone,
                 categoryId = catId,
                 area = area,
                 localNeighborhood = neighborhood,
@@ -173,7 +175,7 @@ class RegistrationHelper(
                 "id" to requestDocId,
                 "uid" to currentAuthUid,
                 "name" to name,
-                "phone" to phone,
+                "phone" to cleanPhone,
                 "categoryId" to catId,
                 "area" to area,
                 "localNeighborhood" to neighborhood,
@@ -183,6 +185,7 @@ class RegistrationHelper(
                 "workPhotosBase64" to finalWorkPhotos,
                 "customCategoryName" to customCategoryName,
                 "password" to securedPasswordHash,
+                "passwordHash" to securedPasswordHash,
                 "productAttachmentsJson" to productAttachmentsJson,
                 "profession" to requestProfession,
                 "providerType" to requestProfession
@@ -282,8 +285,8 @@ class RegistrationHelper(
                 }
 
             onPendingAdded(newRequest)
-            preferenceHelper.setJoinRequestPhone(context, phone)
-            onJoinRequestPhoneUpdated(phone)
+            preferenceHelper.setJoinRequestPhone(context, cleanPhone)
+            onJoinRequestPhoneUpdated(cleanPhone)
 
             val userEntityLabel = when (requestType) {
                 "STORE" -> "متجر / محل تجاري"
@@ -379,7 +382,8 @@ class RegistrationHelper(
         phone: String,
         onPhoneUpdated: (String) -> Unit
     ) {
-        preferenceHelper.setJoinRequestPhone(context, phone)
-        onPhoneUpdated(phone)
+        val cleanPhone = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(phone)
+        preferenceHelper.setJoinRequestPhone(context, cleanPhone)
+        onPhoneUpdated(cleanPhone)
     }
 }

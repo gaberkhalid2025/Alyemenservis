@@ -2,47 +2,95 @@ package com.example.auth
 
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
-import com.google.firebase.FirebaseException
 import com.google.firebase.FirebaseNetworkException
-import com.google.firebase.auth.*
-import io.mockk.*
+import com.google.firebase.auth.AuthResult
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import java.lang.reflect.Proxy
 
 /**
  * 🔐 UserAuthIntegrationTest
  * Comprehensive integration test verifying the full user authentication flow
- * (registration, login, logout, and network error handling) using Firebase Authentication and MockK.
+ * (registration, login, logout, and network error handling) using Tasks and Firebase Auth exceptions.
  */
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
 class UserAuthIntegrationTest {
 
-    private lateinit var mockFirebaseAuth: FirebaseAuth
-    private lateinit var mockFirebaseUser: FirebaseUser
-    private lateinit var mockAuthResult: AuthResult
+    data class TestAuthUser(
+        val uid: String,
+        val email: String,
+        val phoneNumber: String
+    )
+
+    private class FakeAuthSessionManager {
+        var currentUser: TestAuthUser? = null
+        var createCalls = 0
+        var signInCalls = 0
+        var signOutCalls = 0
+        var nextCreateTask: Task<AuthResult>? = null
+        var nextSignInTask: Task<AuthResult>? = null
+
+        fun createUserWithEmailAndPassword(
+            @Suppress("UNUSED_PARAMETER") email: String,
+            @Suppress("UNUSED_PARAMETER") password: String
+        ): Task<AuthResult> {
+            createCalls++
+            val task = nextCreateTask ?: Tasks.forException(IllegalStateException("Not configured"))
+            if (task.isSuccessful) {
+                currentUser = TestAuthUser(
+                    uid = "user_test_uid_9988",
+                    email = "user@yemen.services.com",
+                    phoneNumber = "+967770000000"
+                )
+            }
+            return task
+        }
+
+        fun signInWithEmailAndPassword(
+            @Suppress("UNUSED_PARAMETER") email: String,
+            @Suppress("UNUSED_PARAMETER") password: String
+        ): Task<AuthResult> {
+            signInCalls++
+            val task = nextSignInTask ?: Tasks.forException(IllegalStateException("Not configured"))
+            if (task.isSuccessful) {
+                currentUser = TestAuthUser(
+                    uid = "user_test_uid_9988",
+                    email = "user@yemen.services.com",
+                    phoneNumber = "+967770000000"
+                )
+            }
+            return task
+        }
+
+        fun signOut() {
+            signOutCalls++
+            currentUser = null
+        }
+    }
+
+    private lateinit var authManager: FakeAuthSessionManager
+    private lateinit var fakeAuthResult: AuthResult
 
     @Before
     fun setUp() {
-        mockFirebaseAuth = mockk(relaxed = true)
-        mockFirebaseUser = mockk(relaxed = true)
-        mockAuthResult = mockk(relaxed = true)
-
-        every { mockAuthResult.user } returns mockFirebaseUser
-        every { mockFirebaseUser.uid } returns "user_test_uid_9988"
-        every { mockFirebaseUser.email } returns "user@yemen.services.com"
-        every { mockFirebaseUser.phoneNumber } returns "+967770000000"
-    }
-
-    @After
-    fun tearDown() {
-        clearAllMocks()
+        authManager = FakeAuthSessionManager()
+        fakeAuthResult = Proxy.newProxyInstance(
+            AuthResult::class.java.classLoader,
+            arrayOf(AuthResult::class.java)
+        ) { _, method, _ ->
+            when (method.name) {
+                "getUser" -> null
+                "toString" -> "FakeAuthResult"
+                "hashCode" -> 0
+                "equals" -> false
+                else -> null
+            }
+        } as AuthResult
     }
 
     // ==========================================
@@ -54,17 +102,14 @@ class UserAuthIntegrationTest {
         val email = "newuser@example.com"
         val password = "StrongPassword@2026"
 
-        val task: Task<AuthResult> = Tasks.forResult(mockAuthResult)
-        every { mockFirebaseAuth.createUserWithEmailAndPassword(email, password) } returns task
-        every { mockFirebaseAuth.currentUser } returns mockFirebaseUser
+        authManager.nextCreateTask = Tasks.forResult(fakeAuthResult)
 
-        val resultTask = mockFirebaseAuth.createUserWithEmailAndPassword(email, password)
+        val resultTask = authManager.createUserWithEmailAndPassword(email, password)
         assertTrue(resultTask.isSuccessful)
-        assertNotNull(resultTask.result?.user)
-        assertEquals("user_test_uid_9988", resultTask.result?.user?.uid)
-        assertEquals("user@yemen.services.com", resultTask.result?.user?.email)
-
-        verify(exactly = 1) { mockFirebaseAuth.createUserWithEmailAndPassword(email, password) }
+        assertNotNull(authManager.currentUser)
+        assertEquals("user_test_uid_9988", authManager.currentUser?.uid)
+        assertEquals("user@yemen.services.com", authManager.currentUser?.email)
+        assertEquals(1, authManager.createCalls)
     }
 
     @Test
@@ -72,11 +117,13 @@ class UserAuthIntegrationTest {
         val email = "existing@example.com"
         val password = "StrongPassword@2026"
 
-        val collisionException = FirebaseAuthUserCollisionException("ERROR_EMAIL_ALREADY_IN_USE", "The email address is already in use by another account.")
-        val failedTask: Task<AuthResult> = Tasks.forException(collisionException)
-        every { mockFirebaseAuth.createUserWithEmailAndPassword(email, password) } returns failedTask
+        val collisionException = FirebaseAuthUserCollisionException(
+            "ERROR_EMAIL_ALREADY_IN_USE",
+            "The email address is already in use by another account."
+        )
+        authManager.nextCreateTask = Tasks.forException(collisionException)
 
-        val resultTask = mockFirebaseAuth.createUserWithEmailAndPassword(email, password)
+        val resultTask = authManager.createUserWithEmailAndPassword(email, password)
         assertFalse(resultTask.isSuccessful)
         assertNotNull(resultTask.exception)
         assertTrue(resultTask.exception is FirebaseAuthUserCollisionException)
@@ -88,11 +135,14 @@ class UserAuthIntegrationTest {
         val email = "weakpass@example.com"
         val weakPassword = "123"
 
-        val weakPassException = FirebaseAuthWeakPasswordException("ERROR_WEAK_PASSWORD", "Password should be at least 6 characters", "123")
-        val failedTask: Task<AuthResult> = Tasks.forException(weakPassException)
-        every { mockFirebaseAuth.createUserWithEmailAndPassword(email, weakPassword) } returns failedTask
+        val weakPassException = FirebaseAuthWeakPasswordException(
+            "ERROR_WEAK_PASSWORD",
+            "Password should be at least 6 characters",
+            "123"
+        )
+        authManager.nextCreateTask = Tasks.forException(weakPassException)
 
-        val resultTask = mockFirebaseAuth.createUserWithEmailAndPassword(email, weakPassword)
+        val resultTask = authManager.createUserWithEmailAndPassword(email, weakPassword)
         assertFalse(resultTask.isSuccessful)
         assertTrue(resultTask.exception is FirebaseAuthWeakPasswordException)
     }
@@ -106,17 +156,14 @@ class UserAuthIntegrationTest {
         val email = "user@yemen.services.com"
         val password = "ValidPassword123"
 
-        val successTask: Task<AuthResult> = Tasks.forResult(mockAuthResult)
-        every { mockFirebaseAuth.signInWithEmailAndPassword(email, password) } returns successTask
-        every { mockFirebaseAuth.currentUser } returns mockFirebaseUser
+        authManager.nextSignInTask = Tasks.forResult(fakeAuthResult)
 
-        val resultTask = mockFirebaseAuth.signInWithEmailAndPassword(email, password)
+        val resultTask = authManager.signInWithEmailAndPassword(email, password)
         assertTrue(resultTask.isSuccessful)
-        val loggedInUser = resultTask.result?.user
+        val loggedInUser = authManager.currentUser
         assertNotNull(loggedInUser)
         assertEquals("user_test_uid_9988", loggedInUser?.uid)
-
-        verify(exactly = 1) { mockFirebaseAuth.signInWithEmailAndPassword(email, password) }
+        assertEquals(1, authManager.signInCalls)
     }
 
     @Test
@@ -124,11 +171,13 @@ class UserAuthIntegrationTest {
         val email = "user@yemen.services.com"
         val wrongPassword = "WrongPassword999"
 
-        val invalidCredentialsException = FirebaseAuthInvalidCredentialsException("ERROR_WRONG_PASSWORD", "The password is invalid.")
-        val failedTask: Task<AuthResult> = Tasks.forException(invalidCredentialsException)
-        every { mockFirebaseAuth.signInWithEmailAndPassword(email, wrongPassword) } returns failedTask
+        val invalidCredentialsException = FirebaseAuthInvalidCredentialsException(
+            "ERROR_WRONG_PASSWORD",
+            "The password is invalid."
+        )
+        authManager.nextSignInTask = Tasks.forException(invalidCredentialsException)
 
-        val resultTask = mockFirebaseAuth.signInWithEmailAndPassword(email, wrongPassword)
+        val resultTask = authManager.signInWithEmailAndPassword(email, wrongPassword)
         assertFalse(resultTask.isSuccessful)
         assertTrue(resultTask.exception is FirebaseAuthInvalidCredentialsException)
         assertEquals("The password is invalid.", resultTask.exception?.message)
@@ -139,11 +188,13 @@ class UserAuthIntegrationTest {
         val email = "nonexistent@example.com"
         val password = "SomePassword123"
 
-        val invalidUserException = FirebaseAuthInvalidUserException("ERROR_USER_NOT_FOUND", "There is no user record corresponding to this identifier.")
-        val failedTask: Task<AuthResult> = Tasks.forException(invalidUserException)
-        every { mockFirebaseAuth.signInWithEmailAndPassword(email, password) } returns failedTask
+        val invalidUserException = FirebaseAuthInvalidUserException(
+            "ERROR_USER_NOT_FOUND",
+            "There is no user record corresponding to this identifier."
+        )
+        authManager.nextSignInTask = Tasks.forException(invalidUserException)
 
-        val resultTask = mockFirebaseAuth.signInWithEmailAndPassword(email, password)
+        val resultTask = authManager.signInWithEmailAndPassword(email, password)
         assertFalse(resultTask.isSuccessful)
         assertTrue(resultTask.exception is FirebaseAuthInvalidUserException)
     }
@@ -154,13 +205,10 @@ class UserAuthIntegrationTest {
 
     @Test
     fun `test user sign out flow resets current user`() {
-        every { mockFirebaseAuth.signOut() } answers {
-            every { mockFirebaseAuth.currentUser } returns null
-        }
-
-        mockFirebaseAuth.signOut()
-        assertNull(mockFirebaseAuth.currentUser)
-        verify(exactly = 1) { mockFirebaseAuth.signOut() }
+        authManager.currentUser = TestAuthUser("user_test_uid_9988", "user@yemen.services.com", "+967770000000")
+        authManager.signOut()
+        assertNull(authManager.currentUser)
+        assertEquals(1, authManager.signOutCalls)
     }
 
     @Test
@@ -169,10 +217,9 @@ class UserAuthIntegrationTest {
         val password = "ValidPassword123"
 
         val networkException = FirebaseNetworkException("A network error has occurred.")
-        val failedTask: Task<AuthResult> = Tasks.forException(networkException)
-        every { mockFirebaseAuth.signInWithEmailAndPassword(email, password) } returns failedTask
+        authManager.nextSignInTask = Tasks.forException(networkException)
 
-        val resultTask = mockFirebaseAuth.signInWithEmailAndPassword(email, password)
+        val resultTask = authManager.signInWithEmailAndPassword(email, password)
         assertFalse(resultTask.isSuccessful)
         assertTrue(resultTask.exception is FirebaseNetworkException)
         assertTrue(resultTask.exception?.message?.contains("network error") == true)

@@ -258,7 +258,9 @@ open class HomeViewModel @Inject constructor(
         val extraCat = CategoryEntity(
             id = nextId,
             name = nameAr,
+            nameEn = nameEn,
             icon = icon,
+            description = description,
             order = _categories.value.size + 1,
             parentId = parentId,
             isMainCategory = isMainCategory

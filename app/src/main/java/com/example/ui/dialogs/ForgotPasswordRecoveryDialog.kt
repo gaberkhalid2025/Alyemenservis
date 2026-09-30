@@ -64,7 +64,7 @@ fun ForgotPasswordRecoveryDialog(
     LaunchedEffect(recoveryStatus) {
         if (recoveryStatus.status.isNotBlank()) {
             resetStatus = recoveryStatus.status
-            if (resetStatus == "APPROVED") {
+            if (resetStatus == "APPROVED" || resetStatus == "RESOLVED") {
                 tempPassword = recoveryStatus.tempPassword
                 sharedPrefs.edit().clear().apply()
             } else if (resetStatus == "REJECTED" || resetStatus == "TIMEOUT") {
@@ -198,7 +198,12 @@ fun ForgotPasswordRecoveryDialog(
 
                                 when (selectedChannel) {
                                     "WHATSAPP" -> {
-                                        val adminPhone = "967777000000"
+                                        val rawSupport = viewModel.settings.value.supportWhatsapp.trim().ifBlank { "967777000000" }
+                                        val adminPhone = when {
+                                            rawSupport.startsWith("967") || rawSupport.startsWith("+967") -> rawSupport.removePrefix("+")
+                                            rawSupport.length == 9 -> "967$rawSupport"
+                                            else -> "967777000000"
+                                        }
                                         val msg = "مرحباً إدارة دليل خدمات اليمن، أود استعادة كلمة المرور لرقمي المسجل: $cleanPhone"
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$adminPhone?text=${Uri.encode(msg)}"))
                                         context.startActivity(intent)
@@ -303,7 +308,7 @@ fun ForgotPasswordRecoveryDialog(
                                     lineHeight = 16.sp
                                 )
                             }
-                            "APPROVED" -> {
+                            "APPROVED", "RESOLVED" -> {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(48.dp))
                                 Text(
                                     text = "🎉 تم قبول طلبك بنجاح!",
