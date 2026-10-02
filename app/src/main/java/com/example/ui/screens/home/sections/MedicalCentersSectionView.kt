@@ -59,8 +59,13 @@ fun MedicalCentersSectionView(
         if (selectedSubCategory == "الكل") medicalList
         else {
             val key = selectedSubCategory.substringAfter(" ").trim()
-            medicalList.filter { 
-                it.name.contains(key) || it.description.contains(key) || it.categoryId.contains(key)
+            val keywords = key.split(" ").filter { it.length > 2 }
+            medicalList.filter { store ->
+                keywords.any { k -> 
+                    store.name.contains(k, ignoreCase = true) || 
+                    store.description.contains(k, ignoreCase = true) || 
+                    store.categoryId.contains(k, ignoreCase = true)
+                }
             }
         }
     }

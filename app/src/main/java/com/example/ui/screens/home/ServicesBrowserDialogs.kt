@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
@@ -306,7 +307,8 @@ fun JobQuickDetailsDialog(
     job: JobEntity,
     context: Context,
     themeColors: VisualThemePalette,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onApply: () -> Unit = {}
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -342,6 +344,19 @@ fun JobQuickDetailsDialog(
 
                 Button(
                     onClick = {
+                        onApply()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("التقديم على هذه الوظيفة 📩", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                }
+
+                Button(
+                    onClick = {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${job.phone}"))
                         context.startActivity(intent)
                     },
@@ -351,7 +366,7 @@ fun JobQuickDetailsDialog(
                 ) {
                     Icon(Icons.Default.Phone, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("التواصل والتقديم (${job.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                    Text("اتصال مباشر (${job.phone})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
                 }
             }
         }

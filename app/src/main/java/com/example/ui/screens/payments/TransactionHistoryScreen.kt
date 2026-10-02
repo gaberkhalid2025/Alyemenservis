@@ -57,6 +57,7 @@ fun TransactionHistoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedTypeFilter by viewModel.typeFilter.collectAsState()
     val selectedStatusFilter by viewModel.statusFilter.collectAsState()
+    val filteredTransactions by viewModel.filteredTransactions.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
 
     var showDepositDialog by remember { mutableStateOf(false) }
@@ -77,8 +78,17 @@ fun TransactionHistoryScreen(
                     IconButton(onClick = {
                         if (uiState is TransactionHistoryUiState.Success) {
                             val successState = uiState as TransactionHistoryUiState.Success
-                            val report = "تقرير المعاملات المالية\nالرصيد: ${numberFormat.format(successState.balance)} ريال\nإجمالي الإيداعات: ${numberFormat.format(successState.totalDeposits)} ريال\nإجمالي السحوبات: ${numberFormat.format(successState.totalWithdrawals)} ريال"
-                            Toast.makeText(context, "تم تصدير التقرير المالي بنجاح", Toast.LENGTH_LONG).show()
+                            val result = com.example.utils.ReportExporter.exportTransactionsToCsv(
+                                context = context,
+                                accountName = currentUserId,
+                                transactions = successState.transactions
+                            )
+                            result.onSuccess { file ->
+                                com.example.utils.ReportExporter.shareExportedFile(context, file, "سجل المعاملات المالية")
+                                Toast.makeText(context, "تم تصدير التقرير المالي بنجاح", Toast.LENGTH_SHORT).show()
+                            }.onFailure { e ->
+                                Toast.makeText(context, "فشل تصدير التقرير: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
                         }
                     }) {
                         Icon(Icons.Default.Share, contentDescription = "تصدير التقرير", tint = Color(0xFF00668B))
@@ -108,31 +118,6 @@ fun TransactionHistoryScreen(
                     }
                 }
                 is TransactionHistoryUiState.Success -> {
-                    val filteredTransactions = remember(state.transactions, searchQuery, selectedTypeFilter, selectedStatusFilter) {
-                        state.transactions.filter { tx ->
-                            val matchesType = when (selectedTypeFilter) {
-                                "DEPOSIT" -> tx.type == "DEPOSIT"
-                                "WITHDRAWAL" -> tx.type == "WITHDRAWAL"
-                                "PAYMENT" -> tx.type == "PAYMENT"
-                                "TRANSFER" -> tx.type == "TRANSFER"
-                                "REFUND" -> tx.type == "REFUND"
-                                else -> true
-                            }
-                            val matchesStatus = when (selectedStatusFilter) {
-                                "COMPLETED" -> tx.status == "COMPLETED"
-                                "PENDING" -> tx.status == "PENDING"
-                                "FAILED" -> tx.status == "FAILED"
-                                "CANCELLED" -> tx.status == "CANCELLED"
-                                else -> true
-                            }
-                            val matchesSearch = searchQuery.isBlank() ||
-                                    tx.id.contains(searchQuery, ignoreCase = true) ||
-                                    tx.note.contains(searchQuery, ignoreCase = true)
-
-                            matchesType && matchesStatus && matchesSearch
-                        }
-                    }
-
                     Column(modifier = Modifier.fillMaxSize()) {
                         // Card with balance & statistics
                         Card(

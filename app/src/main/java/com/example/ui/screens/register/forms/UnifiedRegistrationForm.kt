@@ -69,20 +69,20 @@ fun UnifiedRegistrationForm(
     // التحكم في إظهار كلمات المرور
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-    var agreedToTerms by remember { mutableStateOf(true) }
+    var agreedToTerms by remember { mutableStateOf(false) }
 
     // حالات التنبيه والأخطاء
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) imageUri = uri.toString()
     }
 
     val idCardPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) idCardUri = uri.toString()
     }
@@ -91,25 +91,28 @@ fun UnifiedRegistrationForm(
     var expandedCity by remember { mutableStateOf(false) }
 
     // التحقق من صحة الحقول الإجبارية
-    val isFormValid = remember(
-        normalizedRole, fullName, phone, password, confirmPassword, city, address,
-        specialization, experienceYears, entityName, workingHours, agreedToTerms
-    ) {
-        val cleanPass = password.trim()
-        val passValid = cleanPass.length >= 7 && cleanPass.any { it.isLetter() } && cleanPass.any { it.isDigit() } && cleanPass == confirmPassword.trim()
-        val phoneValid = phone.trim().length >= 9
-        val commonValid = fullName.trim().isNotBlank() && phoneValid && passValid && city.isNotBlank() && address.trim().isNotBlank() && agreedToTerms
+    val isFormValid by remember(fullName, phone, password, confirmPassword, city, address, agreedToTerms, specialization, experienceYears, entityName, workingHours, normalizedRole) {
+        derivedStateOf {
+            val cleanPass = password.trim()
+            val passValid = cleanPass.length >= 7 && cleanPass.any { it.isLetter() } && cleanPass.any { it.isDigit() } && cleanPass == confirmPassword.trim()
+            
+            val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
+            val yemenPhoneRegex = Regex("^(77|73|71|70|78)\\d{7}$")
+            val phoneValid = cleanPhone.length == 9 && yemenPhoneRegex.matches(cleanPhone)
+            
+            val commonValid = fullName.trim().isNotBlank() && phoneValid && passValid && city.isNotBlank() && address.trim().isNotBlank() && agreedToTerms
 
-        when (normalizedRole) {
-            "CLIENT" -> commonValid
-            "PROVIDER", "TECHNICIAN" -> commonValid && specialization.trim().isNotBlank() && experienceYears.trim().isNotBlank()
-            "JOB_SEEKER" -> commonValid && specialization.trim().isNotBlank() && experienceYears.trim().isNotBlank()
-            "STORE" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-            "RESTAURANT" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank() && workingHours.trim().isNotBlank()
-            "MEDICAL" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-            "PROPERTY" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-            "JOB", "JOB_POSTER" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
-            else -> commonValid
+            when (normalizedRole) {
+                "CLIENT" -> commonValid
+                "PROVIDER", "TECHNICIAN" -> commonValid && specialization.trim().isNotBlank() && experienceYears.trim().isNotBlank()
+                "JOB_SEEKER" -> commonValid && specialization.trim().isNotBlank() && experienceYears.trim().isNotBlank()
+                "STORE" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
+                "RESTAURANT" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank() && workingHours.trim().isNotBlank()
+                "MEDICAL" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
+                "PROPERTY" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
+                "JOB", "JOB_POSTER" -> commonValid && entityName.trim().isNotBlank() && specialization.trim().isNotBlank()
+                else -> commonValid
+            }
         }
     }
 
@@ -223,7 +226,7 @@ fun UnifiedRegistrationForm(
                             }
                         }
                         Button(
-                            onClick = { imagePickerLauncher.launch("image/*") },
+                            onClick = { imagePickerLauncher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.Black),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
@@ -489,7 +492,7 @@ fun UnifiedRegistrationForm(
                             Text(if (idCardUri.isNotBlank()) "تم إرفاق المستند بنجاح ✅" else "لزيادة موثوقية حسابك وتسريع الاعتماد", fontSize = 10.sp, color = Color.Gray)
                         }
                         Button(
-                            onClick = { idCardPickerLauncher.launch("image/*") },
+                            onClick = { idCardPickerLauncher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.Black),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
@@ -520,11 +523,16 @@ fun UnifiedRegistrationForm(
             // 🚀 زر الإرسال
             Button(
                 onClick = {
-                    val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+                    val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
+                    val yemenPhoneRegex = Regex("^(77|73|71|70|78)\\d{7}$")
                     val cleanPass = password.trim()
-
-                    if (fullName.isBlank() || cleanPhone.length < 9) {
-                        errorMessage = "يرجى تعبئة الاسم ورقم الهاتف بشكل صحيح"
+                    
+                    if (fullName.isBlank()) {
+                        errorMessage = "يرجى تعبئة الاسم الرباعي"
+                        return@Button
+                    }
+                    if (cleanPhone.length != 9 || !yemenPhoneRegex.matches(cleanPhone)) {
+                        errorMessage = "رقم الهاتف غير صحيح. يجب أن يتكون من 9 أرقام ويبدأ بـ (77, 73, 71, 70)"
                         return@Button
                     }
                     if (cleanPass.length < 7 || !cleanPass.any { it.isLetter() } || !cleanPass.any { it.isDigit() }) {
@@ -559,6 +567,7 @@ fun UnifiedRegistrationForm(
                     )
 
                     onRegistrationSuccess(resultData)
+                    // لا نضع isSubmitting = false مباشرة لتجنب الوميض، الشاشة ستختفي بسبب تغيير الحالة في الأب
                 },
                 enabled = isFormValid && !isSubmitting,
                 shape = RoundedCornerShape(10.dp),

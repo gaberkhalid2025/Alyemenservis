@@ -52,7 +52,7 @@ fun UserNotificationsContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    val notifViewModel = remember(viewModel) { NotificationViewModel(viewModel) }
+    val notifViewModel = viewModel.notificationViewModel
 
     // Flow Collections via NotificationViewModel
     val allNotifications by notifViewModel.notifications.collectAsState()

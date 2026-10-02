@@ -159,6 +159,14 @@ fun MainViewModel.markAllNotificationsAsRead(context: Context) {
     _readNotificationIds.value = allIds
 }
 
+fun MainViewModel.markNotificationsAsRead(context: Context, ids: Set<String>) {
+    val current = _readNotificationIds.value.toMutableSet()
+    if (current.addAll(ids)) {
+        preferenceHelper.markAllNotificationsAsRead(context, current)
+        _readNotificationIds.value = current
+    }
+}
+
 fun MainViewModel.deleteNotification(notifId: String) {
     viewModelScope.launch { notificationRepository.deleteNotification(notifId) }
     _notifications.value = _notifications.value.filter { it.id != notifId }

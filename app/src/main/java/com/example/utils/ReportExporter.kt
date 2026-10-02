@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import com.example.data.models.InstantRequestEntity
+import com.example.data.models.Transaction
 import com.example.utils.DateFormatter
 import java.io.File
 import java.io.FileWriter
@@ -79,6 +80,59 @@ object ReportExporter {
 
                 items.forEach { (item, amount) ->
                     writer.write("\"$item\",\"$amount\"\n")
+                }
+            }
+
+            Result.success(file)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun exportTransactionsToCsv(
+        context: Context,
+        accountName: String,
+        transactions: List<Transaction>
+    ): Result<File> {
+        return try {
+            val exportDir = File(context.cacheDir, "exports")
+            if (!exportDir.exists()) exportDir.mkdirs()
+
+            val timeStamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyyMMdd_HHmmss")
+            val file = File(exportDir, "Transactions_${accountName}_$timeStamp.csv")
+
+            file.bufferedWriter(Charsets.UTF_8).use { writer ->
+                writer.write("\uFEFF") // UTF-8 BOM
+                writer.write("سجل العمليات المالية للحساب: $accountName\n")
+                writer.write("رمز العملية,النوع,المبلغ,العملة,الحالة,الملاحظات,التاريخ\n")
+
+                transactions.forEach { tx ->
+                    val dateFormatted = DateFormatter.formatDateTime(tx.timestamp)
+                    val typeAr = when (tx.type.uppercase()) {
+                        "DEPOSIT" -> "إيداع"
+                        "WITHDRAWAL" -> "سحب"
+                        "TRANSFER" -> "تحويل"
+                        "PAYMENT" -> "دفع"
+                        "REFUND" -> "استرداد"
+                        else -> tx.type
+                    }
+                    val statusAr = when (tx.status.uppercase()) {
+                        "COMPLETED" -> "مكتملة"
+                        "PENDING" -> "قيد الانتظار"
+                        "FAILED" -> "فشلت"
+                        "CANCELLED" -> "ملغاة"
+                        else -> tx.status
+                    }
+                    val line = listOf(
+                        "\"${tx.id}\"",
+                        "\"$typeAr\"",
+                        "\"${tx.amount}\"",
+                        "\"${tx.currency}\"",
+                        "\"$statusAr\"",
+                        "\"${tx.note}\"",
+                        "\"$dateFormatted\""
+                    ).joinToString(",")
+                    writer.write(line + "\n")
                 }
             }
 

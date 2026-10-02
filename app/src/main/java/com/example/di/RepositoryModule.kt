@@ -203,4 +203,12 @@ object RepositoryModule {
     ): RealtimeSyncRepository {
         return RealtimeSyncRepository(context)
     }
+
+    @Provides
+    @Singleton
+    fun provideWalletManager(
+        @ApplicationContext context: Context
+    ): com.example.utils.WalletManager {
+        return com.example.utils.WalletManager(context)
+    }
 }

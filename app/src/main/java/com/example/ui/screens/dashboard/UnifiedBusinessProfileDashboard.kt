@@ -32,14 +32,22 @@ fun UnifiedBusinessProfileDashboard(
     val properties by viewModel.properties.collectAsState()
 
     val cleanId = providerId.trim().replace(" ", "").replace("+", "")
-    val activeProvider = remember(providers, providerId) {
+    val activeProvider = remember(providers, providerId, cleanId) {
         providers.find { it.id == providerId || it.phone.trim().replace(" ", "").replace("+", "") == cleanId }
     }
-    val activeStore = remember(stores, providerId) {
-        stores.find { it.id == providerId || it.ownerId == providerId || it.phone.trim().replace(" ", "").replace("+", "") == cleanId || it.ownerId.trim().replace(" ", "").replace("+", "") == cleanId }
+    val activeStore = remember(stores, providerId, cleanId) {
+        stores.find { s ->
+            s.id == providerId || s.ownerId == providerId || 
+            s.phone.trim().replace(" ", "").replace("+", "") == cleanId || 
+            s.ownerId.trim().replace(" ", "").replace("+", "") == cleanId 
+        }
     }
-    val activeProperty = remember(properties, providerId) {
-        properties.find { it.id == providerId || it.phone.trim().replace(" ", "").replace("+", "") == cleanId || it.ownerId.trim().replace(" ", "").replace("+", "") == cleanId }
+    val activeProperty = remember(properties, providerId, cleanId) {
+        properties.find { p ->
+            p.id == providerId || 
+            p.phone.trim().replace(" ", "").replace("+", "") == cleanId || 
+            p.ownerId.trim().replace(" ", "").replace("+", "") == cleanId 
+        }
     }
 
     when (accountType) {

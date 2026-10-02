@@ -115,7 +115,7 @@ fun RegistrationImagePicker(
 
     // Gallery Picker
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxImages)
     ) { uris ->
         if (uris.isNotEmpty()) {
             if (imagesUris.size >= maxImages) {
@@ -309,7 +309,7 @@ fun RegistrationImagePicker(
                     OutlinedButton(
                         onClick = {
                             showSourceDialog = false
-                            galleryLauncher.launch("image/*")
+                            galleryLauncher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {

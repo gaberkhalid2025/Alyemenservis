@@ -37,6 +37,7 @@ object NotificationAudienceFilter {
                 notif.targetRoles.any { r ->
                     when (r.uppercase()) {
                         "TECHNICIAN", "PROVIDER" -> isProvider
+                        "STORE", "RESTAURANT", "MEDICAL", "REAL_ESTATE", "PROPERTY" -> isProvider
                         "USER" -> isRegistered
                         else -> false
                     }

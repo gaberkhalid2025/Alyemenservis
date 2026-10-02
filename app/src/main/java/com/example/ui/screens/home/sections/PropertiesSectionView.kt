@@ -58,8 +58,14 @@ fun PropertiesSectionView(
         if (selectedSubCategory == "الكل") activeProperties
         else {
             val key = selectedSubCategory.substringAfter(" ").trim()
-            activeProperties.filter { 
-                it.title.contains(key) || it.propertyType.contains(key) || it.type.contains(key)
+            val keywords = key.split(" ").filter { it.length > 2 }
+            activeProperties.filter { prop ->
+                keywords.any { k ->
+                    prop.title.contains(k, ignoreCase = true) || 
+                    prop.propertyType.contains(k, ignoreCase = true) || 
+                    prop.type.contains(k, ignoreCase = true) ||
+                    prop.description.contains(k, ignoreCase = true)
+                }
             }
         }
     }

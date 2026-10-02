@@ -44,24 +44,28 @@ fun RestaurantsSectionView(
             it.isRestaurantOrCafe() && !it.isDeleted && (it.isApproved || it.ownerId == currentUserId || isAdminUser)
         }
     }
-    var selectedSubCategory by remember { mutableStateOf("الكل") }
+    data class SubCategoryItem(val label: String, val key: String?, val icon: String = "")
 
     val subCategories = listOf(
-        "الكل",
-        "🍖 مطاعم ومأكولات شعبية",
-        "☕ كافيهات ومقاهي",
-        "🍕 وجبات سريعة وبرجر",
-        "🍰 حلويات ومخابز",
-        "🧃 عصائر وبوفيهات",
-        "🍣 مأكولات بحرية"
+        SubCategoryItem("الكل", null, "🔍"),
+        SubCategoryItem("مطاعم وشعبي", "مطاعم", "🍖"),
+        SubCategoryItem("كافيهات ومقاهي", "كافيه", "☕"),
+        SubCategoryItem("وجبات سريعة", "وجبات", "🍕"),
+        SubCategoryItem("حلويات ومخابز", "حلويات", "🍰"),
+        SubCategoryItem("عصائر وبوفيهات", "عصائر", "🧃"),
+        SubCategoryItem("مأكولات بحرية", "بحرية", "🍣")
     )
+    
+    var selectedSubCat by remember { mutableStateOf(subCategories[0]) }
 
-    val filteredList = remember(restaurantsList, selectedSubCategory) {
-        if (selectedSubCategory == "الكل") restaurantsList
+    val filteredList = remember(restaurantsList, selectedSubCat) {
+        val key = selectedSubCat.key
+        if (key == null) restaurantsList
         else {
-            val key = selectedSubCategory.substringAfter(" ").trim()
             restaurantsList.filter { 
-                it.name.contains(key) || it.description.contains(key) || it.categoryId.contains(key)
+                it.name.contains(key, ignoreCase = true) || 
+                it.description.contains(key, ignoreCase = true) || 
+                it.categoryId.contains(key, ignoreCase = true)
             }
         }
     }
@@ -97,15 +101,15 @@ fun RestaurantsSectionView(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             subCategories.forEach { subCat ->
-                val isSelected = selectedSubCategory == subCat
+                val isSelected = selectedSubCat == subCat
                 Surface(
-                    onClick = { selectedSubCategory = subCat },
+                    onClick = { selectedSubCat = subCat },
                     shape = RoundedCornerShape(16.dp),
                     color = if (isSelected) themeColors.accent else Color(0xFF1E293B),
                     border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.White.copy(alpha = 0.1f))
                 ) {
                     Text(
-                        subCat,
+                        text = "${subCat.icon} ${subCat.label}",
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isSelected) Color.Black else Color.White,

@@ -8,6 +8,9 @@ import com.example.utils.WalletManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -41,6 +44,36 @@ class TransactionHistoryViewModel(
     private val _statusFilter = MutableStateFlow("ALL")
     val statusFilter: StateFlow<String> = _statusFilter.asStateFlow()
 
+    private val _allTransactions = MutableStateFlow<List<Transaction>>(emptyList())
+    private val _balance = MutableStateFlow(0.0)
+
+    val filteredTransactions: StateFlow<List<Transaction>> = combine(
+        _allTransactions, _searchQuery, _typeFilter, _statusFilter
+    ) { transactions, query, type, status ->
+        transactions.filter { tx ->
+            val matchesType = when (type) {
+                "DEPOSIT" -> tx.type == "DEPOSIT"
+                "WITHDRAWAL" -> tx.type == "WITHDRAWAL"
+                "PAYMENT" -> tx.type == "PAYMENT"
+                "TRANSFER" -> tx.type == "TRANSFER"
+                "REFUND" -> tx.type == "REFUND"
+                else -> true
+            }
+            val matchesStatus = when (status) {
+                "COMPLETED" -> tx.status == "COMPLETED"
+                "PENDING" -> tx.status == "PENDING"
+                "FAILED" -> tx.status == "FAILED"
+                "CANCELLED" -> tx.status == "CANCELLED"
+                else -> true
+            }
+            val matchesSearch = query.isBlank() ||
+                    tx.id.contains(query, ignoreCase = true) ||
+                    tx.note.contains(query, ignoreCase = true)
+
+            matchesType && matchesStatus && matchesSearch
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _uiState = MutableStateFlow<TransactionHistoryUiState>(TransactionHistoryUiState.Loading)
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
@@ -56,6 +89,9 @@ class TransactionHistoryViewModel(
             try {
                 val balance = walletManager.getBalance(walletId)
                 val allTx = walletManager.getTransactions(walletId)
+
+                _balance.value = balance
+                _allTransactions.value = allTx
 
                 val totalDep = allTx.filter { it.type == "DEPOSIT" && it.status == "COMPLETED" }.sumOf { it.amount }
                 val totalWith = allTx.filter { (it.type == "WITHDRAWAL" || it.type == "PAYMENT") && it.status == "COMPLETED" }.sumOf { it.amount }

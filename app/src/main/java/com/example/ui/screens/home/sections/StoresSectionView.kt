@@ -44,24 +44,28 @@ fun StoresSectionView(
             it.isCommercialStore() && !it.isDeleted && (it.isApproved || it.ownerId == currentUserId || isAdminUser)
         }
     }
-    var selectedSubCategory by remember { mutableStateOf("الكل") }
+    data class SubCategoryItem(val label: String, val key: String?, val icon: String = "")
 
     val subCategories = listOf(
-        "الكل",
-        "👔 ملابس وأزياء",
-        "📱 إلكترونيات وهواتف",
-        "📺 أجهزة منزلية",
-        "🛒 سوبرماركت ومواد",
-        "💄 عطور وتجميل",
-        "🚗 قطع غيار ومستلزمات"
+        SubCategoryItem("الكل", null, "🔍"),
+        SubCategoryItem("ملابس وأزياء", "ملابس", "👔"),
+        SubCategoryItem("إلكترونيات وهواتف", "إلكترونيات", "📱"),
+        SubCategoryItem("أجهزة منزلية", "أجهزة", "📺"),
+        SubCategoryItem("سوبرماركت ومواد", "سوبرماركت", "🛒"),
+        SubCategoryItem("عطور وتجميل", "عطور", "💄"),
+        SubCategoryItem("قطع غيار ومستلزمات", "قطع غيار", "🚗")
     )
+    
+    var selectedSubCat by remember { mutableStateOf(subCategories[0]) }
 
-    val filteredList = remember(commercialStores, selectedSubCategory) {
-        if (selectedSubCategory == "الكل") commercialStores
+    val filteredList = remember(commercialStores, selectedSubCat) {
+        val key = selectedSubCat.key
+        if (key == null) commercialStores
         else {
-            val key = selectedSubCategory.substringAfter(" ").trim()
             commercialStores.filter { 
-                it.name.contains(key) || it.description.contains(key) || it.categoryId.contains(key)
+                it.name.contains(key, ignoreCase = true) || 
+                it.description.contains(key, ignoreCase = true) || 
+                it.categoryId.contains(key, ignoreCase = true)
             }
         }
     }
@@ -89,7 +93,6 @@ fun StoresSectionView(
             }
         }
 
-        // Subcategories row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -97,15 +100,15 @@ fun StoresSectionView(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             subCategories.forEach { subCat ->
-                val isSelected = selectedSubCategory == subCat
+                val isSelected = selectedSubCat == subCat
                 Surface(
-                    onClick = { selectedSubCategory = subCat },
+                    onClick = { selectedSubCat = subCat },
                     shape = RoundedCornerShape(16.dp),
-                    color = if (isSelected) themeColors.accent else Color(0xFF1E293B),
+                    color = if (isSelected) themeColors.accent else themeColors.surface,
                     border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.White.copy(alpha = 0.1f))
                 ) {
                     Text(
-                        subCat,
+                        "${subCat.icon} ${subCat.label}",
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isSelected) Color.Black else Color.White,

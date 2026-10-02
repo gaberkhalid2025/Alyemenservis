@@ -40,19 +40,29 @@ import kotlinx.coroutines.tasks.await
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 private fun getSecurePrefs(context: Context): android.content.SharedPreferences {
-    return try {
+    val prefsName = "yemen_service_secure_prefs"
+    fun createEncrypted(): android.content.SharedPreferences {
         val masterKey = androidx.security.crypto.MasterKey.Builder(context)
             .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
             .build()
-        androidx.security.crypto.EncryptedSharedPreferences.create(
+        return androidx.security.crypto.EncryptedSharedPreferences.create(
             context,
-            "yemen_service_secure_prefs",
+            prefsName,
             masterKey,
             androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
+    }
+
+    return try {
+        createEncrypted()
     } catch (e: Exception) {
-        context.getSharedPreferences("yemen_service_prefs", Context.MODE_PRIVATE)
+        // Retry once after clearing if corrupted, or throw clear exception
+        try {
+            createEncrypted()
+        } catch (e2: Exception) {
+            throw SecurityException("❌ خطأ أمني حرج: تعذر إنشاء مساحة تخزين آمنة. يرجى إعادة تشغيل التطبيق أو مسح البيانات.")
+        }
     }
 }
 
@@ -89,7 +99,11 @@ fun PasswordResetWaitingScreen(
     var isSubmittingLogin by remember { mutableStateOf(false) }
     var enteredPassword by rememberSaveable { mutableStateOf("") }
     var passwordError by remember { mutableStateOf<String?>(null) }
-    val secureSp = remember(context) { getSecurePrefs(context) }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    val secureSp = remember(context) { 
+        try { getSecurePrefs(context) } catch(e: Exception) { null }
+    }
     val settingsState by viewModel.settings.collectAsState()
     val isResolved = status == "RESOLVED" || status == "APPROVED"
 
@@ -98,6 +112,14 @@ fun PasswordResetWaitingScreen(
         if (isSubmittingLogin) {
             kotlinx.coroutines.delay(30_000L)
             isSubmittingLogin = false
+        }
+    }
+
+    // ⏱️ مؤقت إخفاء كلمة المرور (10 ثوانٍ)
+    LaunchedEffect(isPasswordVisible) {
+        if (isPasswordVisible) {
+            kotlinx.coroutines.delay(10_000L)
+            isPasswordVisible = false
         }
     }
 
@@ -226,22 +248,31 @@ fun PasswordResetWaitingScreen(
                                     Column {
                                         Text("كلمة المرور الجديدة:", fontSize = 10.sp, color = Color.Gray)
                                         Text(
-                                            text = newPassword,
+                                            text = if (isPasswordVisible) newPassword else "••••••••",
                                             fontSize = 18.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
-                                            letterSpacing = 1.sp
+                                            letterSpacing = if (isPasswordVisible) 1.sp else 4.sp
                                         )
                                     }
-                                    IconButton(
-                                        onClick = {
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = ClipData.newPlainText("New Password", newPassword)
-                                            clipboard.setPrimaryClip(clip)
-                                            Toast.makeText(context, "📋 تم نسخ كلمة المرور!", Toast.LENGTH_SHORT).show()
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                                            Icon(
+                                                imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = "إظهار",
+                                                tint = themeColors.accent
+                                            )
                                         }
-                                    ) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = themeColors.accent)
+                                        IconButton(
+                                            onClick = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                val clip = ClipData.newPlainText("New Password", newPassword)
+                                                clipboard.setPrimaryClip(clip)
+                                                Toast.makeText(context, "📋 تم نسخ كلمة المرور!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        ) {
+                                            Icon(Icons.Default.ContentCopy, contentDescription = "نسخ", tint = themeColors.accent)
+                                        }
                                     }
                                 }
                             }
@@ -309,11 +340,11 @@ fun PasswordResetWaitingScreen(
                                             .remove("password_recovery_waiting_phone")
                                             .apply()
 
-                                        secureSp.edit()
-                                            .putBoolean("is_account_logged_in", true)
-                                            .putString("user_account_type", resolvedType)
-                                            .putString("logged_account_id", resolvedAccountId)
-                                            .apply()
+                                        secureSp?.edit()
+                                            ?.putBoolean("is_account_logged_in", true)
+                                            ?.putString("user_account_type", resolvedType)
+                                            ?.putString("logged_account_id", resolvedAccountId)
+                                            ?.apply()
 
                                         viewModel.setPasswordRecoveryWaitingPhone("")
 

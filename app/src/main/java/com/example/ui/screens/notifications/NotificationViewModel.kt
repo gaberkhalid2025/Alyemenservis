@@ -57,10 +57,7 @@ class NotificationViewModel(
     fun markAllAsRead(context: Context, notificationsList: List<NotificationEntity>) {
         val idsToMark = notificationsList.map { it.id }.filter { it.isNotBlank() }.toSet()
         if (idsToMark.isNotEmpty()) {
-            val currentRead = mainViewModel.readNotificationIds.value.toMutableSet()
-            currentRead.addAll(idsToMark)
-            mainViewModel.preferenceHelper.markAllNotificationsAsRead(context, currentRead)
-            mainViewModel._readNotificationIds.value = currentRead
+            mainViewModel.markNotificationsAsRead(context, idsToMark)
         }
     }
 
@@ -92,9 +89,10 @@ class NotificationViewModel(
     ): List<NotificationEntity> {
         val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
         val cleanUserId = uid.trim()
-        val provPhone = mainViewModel.selectedProvider?.phone?.trim()?.replace(" ", "")?.replace("+", "") ?: ""
-        val provId = mainViewModel.selectedProvider?.id ?: ""
         val isAdmin = role == "OWNER" || role == "SUPER_ADMIN" || role == "ADMIN" || role == "SUPERVISOR"
+        val isProv = isProviderUser
+        val isReg = cleanPhone.isNotEmpty() || cleanUserId.isNotEmpty()
+        val currentRes = currentUserResidence.value
         val seenKeys = mutableSetOf<String>()
 
         return allList.filter { notif ->
@@ -103,63 +101,15 @@ class NotificationViewModel(
             val dKey = if (notif.dedupKey.isNotBlank()) notif.dedupKey else "${notif.notificationType}_${notif.title}_${notif.timestamp / (30 * 1000L)}"
             if (!seenKeys.add(dKey) && notif.id.isBlank()) return@filter false
 
-            val isSensitive = notif.title.contains("كلمة مرور") || notif.message.contains("كلمة المرور") || 
-                              notif.title.contains("استعادة") || notif.title.contains("رمز التحقق")
-            if (isSensitive) {
-                val isMyTarget = (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone)) ||
-                                 (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId)) ||
-                                 (provPhone.isNotEmpty() && notif.targetValue.contains(provPhone)) ||
-                                 (provId.isNotEmpty() && notif.targetValue.contains(provId))
-                if (!isAdmin && !isMyTarget) return@filter false
-            }
-
-            if (isAdmin) return@filter true
-
-            val isRegistered = cleanPhone.isNotEmpty() || cleanUserId.isNotEmpty()
-            if (!isRegistered && notif.targetAudience != "ALL") return@filter false
-
-            when (notif.targetAudience.uppercase()) {
-                "ADMIN_ONLY" -> false
-                "ALL_REGISTERED_USERS" -> isRegistered
-                "SPECIFIC_ROLES", "ROLE" -> {
-                    val isProv = isProviderUser
-                    notif.targetRoles.any { r ->
-                        when (r.uppercase()) {
-                            "TECHNICIAN", "PROVIDER" -> isProv
-                            "STORE" -> isProv && mainViewModel.selectedStore != null
-                            "MEDICAL" -> isProv && mainViewModel.selectedStore?.sectionId?.contains("medical") == true
-                            "RESTAURANT" -> isProv && mainViewModel.selectedStore?.sectionId?.contains("restaurant") == true
-                            "REAL_ESTATE" -> isProv && mainViewModel.selectedProperty != null
-                            "USER" -> isRegistered
-                            else -> false
-                        }
-                    }
-                }
-                "SPECIFIC_USERS", "SPECIFIC_USER" -> {
-                    (cleanPhone.isNotEmpty() && (notif.targetValue.contains(cleanPhone) || notif.targetUserIds.contains(cleanPhone))) ||
-                    (cleanUserId.isNotEmpty() && notif.targetUserIds.contains(cleanUserId)) ||
-                    (provPhone.isNotEmpty() && notif.targetValue.contains(provPhone)) ||
-                    (provId.isNotEmpty() && notif.targetValue.contains(provId))
-                }
-                "REGION" -> {
-                    val currentRes = currentUserResidence.value
-                    notif.targetValue.isEmpty() || currentRes.contains(notif.targetValue)
-                }
-                "CATEGORY" -> true
-                "ALL" -> {
-                    when (notif.targetType) {
-                        "ALL" -> notif.targetAudience != "ADMIN_ONLY"
-                        "USER" -> notif.targetValue.isEmpty() || (cleanPhone.isNotEmpty() && notif.targetValue.contains(cleanPhone))
-                        "PROVIDER" -> (cleanPhone.isNotEmpty() && (notif.targetValue.contains(cleanPhone) || notif.targetUserIds.contains(cleanPhone))) ||
-                                      (cleanUserId.isNotEmpty() && (notif.targetValue.contains(cleanUserId) || notif.targetUserIds.contains(cleanUserId))) ||
-                                      (provPhone.isNotEmpty() && (notif.targetValue.contains(provPhone) || notif.targetUserIds.contains(provPhone))) ||
-                                      (provId.isNotEmpty() && (notif.targetValue.contains(provId) || notif.targetUserIds.contains(provId)))
-                        "SUPERVISOR", "ADMIN_ONLY" -> false
-                        else -> true
-                    }
-                }
-                else -> false
-            }
+            NotificationAudienceFilter.isAudienceMatched(
+                notif = notif,
+                cleanPhone = cleanPhone,
+                cleanUserId = cleanUserId,
+                isAdmin = isAdmin,
+                isRegistered = isReg,
+                isProvider = isProv,
+                currentResidence = currentRes
+            )
         }.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}" } }
     }
 

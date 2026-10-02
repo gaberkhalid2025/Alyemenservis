@@ -36,13 +36,23 @@ fun NotificationItemCard(
     modifier: Modifier = Modifier
 ) {
     val (iconText, badgeColor) = when {
-        notification.notificationType == "BOOKING" || notification.title.contains("حجز") -> "📅" to Color(0xFF3B82F6)
-        notification.notificationType == "MESSAGE" || notification.title.contains("دردشة") || notification.title.contains("رسالة") -> "💬" to Color(0xFF06B6D4)
-        notification.notificationType == "SPECIAL_OFFER" || notification.title.contains("عرض") -> "🔥" to Color(0xFFF59E0B)
+        // Priority 1: Direct Type Match
+        notification.notificationType == "BOOKING" -> "📅" to Color(0xFF3B82F6)
+        notification.notificationType == "MESSAGE" -> "💬" to Color(0xFF06B6D4)
+        notification.notificationType == "SPECIAL_OFFER" -> "🔥" to Color(0xFFF59E0B)
+        notification.notificationType == "ADMIN" || notification.notificationType == "SYSTEM" -> "🛡️" to Color(0xFFFFD700)
+        notification.notificationType == "JOIN_REQUEST" -> "👷" to Color(0xFF8B5CF6)
+        notification.notificationType == "JOIN_APPROVED" || notification.notificationType == "REGISTRATION_APPROVED" -> "🎉" to Color(0xFF10B981)
+        notification.notificationType == "JOIN_REJECTED" -> "❌" to Color(0xFFEF4444)
+
+        // Priority 2: Title/Message Content Fallback (Heuristics)
+        notification.title.contains("حجز") || notification.message.contains("حجز") -> "📅" to Color(0xFF3B82F6)
+        notification.title.contains("دردشة") || notification.title.contains("رسالة") -> "💬" to Color(0xFF06B6D4)
+        notification.title.contains("عرض") -> "🔥" to Color(0xFFF59E0B)
         notification.title.contains("طلب") || notification.title.contains("انضمام") -> "👷" to Color(0xFF8B5CF6)
         notification.title.contains("تفعيل") || notification.title.contains("قبول") -> "🎉" to Color(0xFF10B981)
         notification.title.contains("رفض") || notification.title.contains("إلغاء") -> "❌" to Color(0xFFEF4444)
-        notification.notificationType == "ADMIN" -> "🛡️" to Color(0xFFFFD700)
+        
         else -> "🔔" to themeColors.accent
     }
 

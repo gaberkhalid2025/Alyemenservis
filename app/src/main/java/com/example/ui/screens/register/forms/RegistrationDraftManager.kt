@@ -10,19 +10,29 @@ import androidx.security.crypto.MasterKey
  * Manager for auto-saving and restoring registration drafts securely using EncryptedSharedPreferences.
  */
 class RegistrationDraftManager(context: Context) {
-    private val prefs: SharedPreferences = try {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            "RegistrationDraftsSecure",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (e: Exception) {
-        context.getSharedPreferences("RegistrationDrafts", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = run {
+        val prefsName = "RegistrationDraftsSecure"
+        fun createEncrypted(): SharedPreferences {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            return EncryptedSharedPreferences.create(
+                context,
+                prefsName,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        }
+        try {
+            createEncrypted()
+        } catch (e: Exception) {
+            try {
+                createEncrypted()
+            } catch (e2: Exception) {
+                throw SecurityException("❌ خطأ أمني حرج: تعذر إنشاء مساحة تخزين آمنة للمسودات. يرجى مسح بيانات التطبيق.")
+            }
+        }
     }
 
     fun saveDraft(role: String, data: Map<String, String>) {

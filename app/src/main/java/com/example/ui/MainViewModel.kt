@@ -32,6 +32,7 @@ class MainViewModel @Inject constructor(
     val instantRequestViewModel: com.example.ui.viewmodels.InstantRequestViewModel,
     val chatRepo: com.example.data.repositories.ChatRepository,
     val appState: com.example.ui.helpers.AppState,
+    val walletManager: com.example.utils.WalletManager,
     val storeManagementViewModel: com.example.ui.viewmodels.StoreManagementViewModel = com.example.ui.viewmodels.StoreManagementViewModel(appState),
     val propertyManagementViewModel: com.example.ui.viewmodels.PropertyManagementViewModel = com.example.ui.viewmodels.PropertyManagementViewModel(appState),
     val jobManagementViewModel: com.example.ui.viewmodels.JobManagementViewModel = com.example.ui.viewmodels.JobManagementViewModel(appState),
@@ -562,4 +563,23 @@ class MainViewModel @Inject constructor(
     ) {
         authViewModel.requestPasswordRecovery(phone, name, accountType)
     }
+
+    /**
+     * 🔍 البحث الشامل في كافة الفئات (Server-Side)
+     * لحل مشكلة عنق الزجاجة عند كبر حجم البيانات
+     */
+    suspend fun searchAll(query: String): Map<String, List<Any>> {
+        val providers = realtimeSyncHelper.searchProviders(query)
+        val stores = realtimeSyncHelper.searchStores(query)
+        val properties = realtimeSyncHelper.searchProperties(query)
+        val jobs = realtimeSyncHelper.searchJobs(query)
+        
+        return mapOf(
+            "providers" to providers,
+            "stores" to stores,
+            "properties" to properties,
+            "jobs" to jobs
+        )
+    }
+
 }

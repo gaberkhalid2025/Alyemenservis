@@ -61,8 +61,10 @@ class JoinStatusUseCase {
                     AppPreferenceHelper.normalizePhoneNumber(it.phone) == cleanPhone) && !it.isDeleted
         }
         if (matchingStore != null && (matchingStore.isActive || matchingStore.isApproved)) {
-            val isRest = matchingStore.sectionId.contains("restaurant", ignoreCase = true) || matchingStore.name.contains("مطعم") || matchingStore.name.contains("كافيه")
-            val isMed = matchingStore.sectionId.contains("medical", ignoreCase = true) || matchingStore.name.contains("عيادة") || matchingStore.name.contains("مركز") || matchingStore.name.contains("طبي")
+            val sec = matchingStore.sectionId.lowercase()
+            val name = matchingStore.name
+            val isRest = sec == "restaurants" || sec.startsWith("restaurant") || name.contains("مطعم") || name.contains("كافيه")
+            val isMed = sec == "medical" || sec.startsWith("medical") || name.contains("عيادة") || name.contains("مركز") || name.contains("طبي")
             val businessType = if (isRest) "restaurants" else if (isMed) "medical" else "stores"
             return JoinStatus.ActiveStore(matchingStore, businessType)
         }
@@ -114,12 +116,12 @@ class JoinStatusUseCase {
             val prof = matchingPending.profession.uppercase()
             val pName = matchingPending.name
 
-            val isRestaurant = cat == "RESTAURANT" || custom.contains("مطعم") || pName.contains("مطعم")
-            val isMedical = cat == "MEDICAL" || custom.contains("طبي") || pName.contains("عيادة")
-            val isProperty = cat == "PROPERTY" || prof == "PROPERTY_OWNER"
-            val isJob = cat == "JOB" || prof == "JOB_POSTER"
-            val isStore = cat == "STORE" || prof == "STORE_OWNER"
-            val isClient = cat == "CLIENT" || prof == "CLIENT"
+            val isRestaurant = cat == "RESTAURANT" || cat.startsWith("RESTAURANT_") || custom.contains("مطعم") || pName.contains("مطعم")
+            val isMedical = cat == "MEDICAL" || cat.startsWith("MEDICAL_") || custom.contains("طبي") || pName.contains("عيادة")
+            val isProperty = cat == "PROPERTY" || cat.startsWith("PROPERTY_") || prof == "PROPERTY_OWNER"
+            val isJob = (cat == "JOB" || cat.startsWith("JOB_")) && cat != "JOB_SEEKER" || prof == "JOB_POSTER"
+            val isStore = cat == "STORE" || cat.startsWith("STORE_") || prof == "STORE_OWNER"
+            val isClient = cat == "CLIENT" || cat.startsWith("CLIENT_") || prof == "CLIENT"
 
             return when {
                 isRestaurant -> JoinStatus.ActiveStore(
@@ -168,8 +170,8 @@ class JoinStatusUseCase {
             val sec = matchingStore.sectionId.lowercase()
             val cat = matchingStore.categoryId.lowercase()
             return when {
-                sec == "restaurants" || cat.contains("مطعم") || cat.contains("كافيه") || cat.contains("restaurant") -> JoinStatus.PendingRestaurant(matchingStore)
-                sec == "medical" || cat.contains("طبي") || cat.contains("عياد") || cat.contains("صيدل") || cat.contains("medical") -> JoinStatus.PendingMedical(matchingStore)
+                sec == "restaurants" || sec.startsWith("restaurant") || cat.contains("مطعم") || cat.contains("كافيه") -> JoinStatus.PendingRestaurant(matchingStore)
+                sec == "medical" || sec.startsWith("medical") || cat.contains("طبي") || cat.contains("عياد") || cat.contains("صيدل") -> JoinStatus.PendingMedical(matchingStore)
                 else -> JoinStatus.PendingStore(matchingStore)
             }
         }
@@ -189,25 +191,25 @@ class JoinStatusUseCase {
             val prof = matchingPending.profession.uppercase()
             val pName = matchingPending.name
 
-            val isRestaurant = cat == "RESTAURANT" || cat.contains("RESTAURANT") ||
+            val isRestaurant = cat == "RESTAURANT" || cat.startsWith("RESTAURANT_") ||
                     custom.contains("مطعم") || custom.contains("كافيه") || pName.contains("مطعم") || pName.contains("كافيه")
 
-            val isMedical = cat == "MEDICAL" || cat.contains("MEDICAL") ||
+            val isMedical = cat == "MEDICAL" || cat.startsWith("MEDICAL_") ||
                     custom.contains("طبي") || custom.contains("عياد") || custom.contains("صيدل") || custom.contains("مستشفى") ||
                     pName.contains("طبي") || pName.contains("عيادة") || pName.contains("مستشفى") || pName.contains("صيدلية")
 
-            val isProperty = cat == "PROPERTY" || cat.contains("PROPERTY") || prof == "PROPERTY_OWNER" ||
+            val isProperty = cat == "PROPERTY" || cat.startsWith("PROPERTY_") || prof == "PROPERTY_OWNER" ||
                     custom.contains("عقار") || custom.contains("شقة") || custom.contains("أرض") || pName.contains("عقار")
 
-            val isJob = (cat == "JOB" || (cat.contains("JOB") && cat != "JOB_SEEKER") || prof == "JOB_POSTER" ||
+            val isJob = (cat == "JOB" || (cat.startsWith("JOB_") && cat != "JOB_SEEKER") || prof == "JOB_POSTER" ||
                     custom.contains("وظيفة") || custom.contains("توظيف") || custom.contains("شاغر")) &&
                     cat != "JOB_SEEKER" && prof != "JOB_SEEKER"
 
-            val isStore = cat == "STORE" || cat.contains("STORE") || prof == "STORE_OWNER" ||
+            val isStore = cat == "STORE" || cat.startsWith("STORE_") || prof == "STORE_OWNER" ||
                     custom.contains("متجر") || custom.contains("محل") || custom.contains("معرض") || custom.contains("سوق") ||
                     pName.contains("متجر") || pName.contains("محل")
 
-            val isClient = cat == "CLIENT" || cat.contains("CLIENT") || prof == "CLIENT" || custom.contains("عميل")
+            val isClient = cat == "CLIENT" || cat.startsWith("CLIENT_") || prof == "CLIENT" || custom.contains("عميل")
 
             return when {
                 isClient -> {

@@ -7,6 +7,8 @@ import com.example.ui.*
 import com.example.data.BannerEntity
 import com.example.data.CategoryEntity
 import com.example.data.ProviderEntity
+import com.example.data.StoreEntity
+import com.example.data.PropertyEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +30,12 @@ open class HomeViewModel @Inject constructor(
 
     internal val _filteredProviders = MutableStateFlow<List<ProviderEntity>>(emptyList())
     val filteredProviders: StateFlow<List<ProviderEntity>> = _filteredProviders.asStateFlow()
+
+    internal val _filteredStores = MutableStateFlow<List<StoreEntity>>(emptyList())
+    val filteredStores: StateFlow<List<StoreEntity>> = _filteredStores.asStateFlow()
+
+    internal val _filteredProperties = MutableStateFlow<List<PropertyEntity>>(emptyList())
+    val filteredProperties: StateFlow<List<PropertyEntity>> = _filteredProperties.asStateFlow()
 
     internal val _banners get() = appState._banners
     val banners: StateFlow<List<BannerEntity>> = _banners.asStateFlow()
@@ -148,6 +156,37 @@ open class HomeViewModel @Inject constructor(
                 it.phone.contains(query)
             }
         }
+        _filteredProviders.value = filtered.take(100)
+
+        // Store and Property filtering
+        val allStores = appState._stores.value
+        val allProperties = appState._properties.value
+        val allProducts = appState._products.value
+
+        if (query.isEmpty()) {
+            _filteredStores.value = emptyList<StoreEntity>()
+            _filteredProperties.value = emptyList<PropertyEntity>()
+        } else {
+            val matchedStoreIds = allProducts.filter { 
+                it.name.lowercase().contains(query) || it.description.lowercase().contains(query) 
+            }.map { it.storeId }.toSet()
+
+            _filteredStores.value = allStores.filter { s ->
+                s.name.lowercase().contains(query) ||
+                s.phone.contains(query) ||
+                s.categoryId.lowercase().contains(query) ||
+                matchedStoreIds.contains(s.id)
+            }.take(50)
+
+            _filteredProperties.value = allProperties.filter { p ->
+                p.title.lowercase().contains(query) ||
+                p.phone.contains(query) ||
+                p.cityId.lowercase().contains(query) ||
+                p.localNeighborhood.lowercase().contains(query) ||
+                p.propertyType.lowercase().contains(query)
+            }.take(50)
+        }
+
         if (vipOnly) {
             filtered = filtered.filter { it.isVip || it.subscriptionStatus == "APPROVED" || it.subscriptionStatus == "ACCEPTED" }
         }
@@ -188,8 +227,9 @@ open class HomeViewModel @Inject constructor(
             }
         }
 
-        cachedFilteredResults[cacheKey] = filtered
-        _filteredProviders.value = filtered
+        val finalResult = filtered.take(100)
+        cachedFilteredResults[cacheKey] = finalResult
+        _filteredProviders.value = finalResult
     }
 
     fun setActiveBrowserTab(tabName: String) {

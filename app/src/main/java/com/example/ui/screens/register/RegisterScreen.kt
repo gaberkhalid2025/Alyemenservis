@@ -241,7 +241,7 @@ fun RegisterScreen(
         }
 
         // حفظ الهاتف وتحديث الواجهة لتتحول مباشرة إلى شاشة الانتظار
-        val cleanPhone = phone.trim().replace(" ", "").replace("+", "")
+        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(phone)
         val sp = context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
         sp.edit().apply {
             putString("join_request_phone", cleanPhone)

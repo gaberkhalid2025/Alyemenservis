@@ -52,57 +52,82 @@ fun UnifiedGlobalSearchScreen(
     val jobs by viewModel.jobs.collectAsState()
     val products by viewModel.products.collectAsState()
 
-    // Simple debounce logic (500ms)
+    // Server-side search results
+    var serverProviders by remember { mutableStateOf<List<ProviderEntity>>(emptyList()) }
+    var serverStores by remember { mutableStateOf<List<StoreEntity>>(emptyList()) }
+    var serverProperties by remember { mutableStateOf<List<PropertyEntity>>(emptyList()) }
+    var serverJobs by remember { mutableStateOf<List<JobEntity>>(emptyList()) }
+    var isSearchingServer by remember { mutableStateOf(false) }
+
+    // Simple debounce logic (400ms)
     LaunchedEffect(searchQuery) {
-        delay(300)
+        delay(400)
         debouncedQuery = searchQuery.trim()
         if (debouncedQuery.length >= 2) {
             AnalyticsEventsHelper.logSearchPerformed(context, debouncedQuery)
+            
+            // Trigger Server Search
+            isSearchingServer = true
+            val searchResults = viewModel.searchAll(debouncedQuery)
+            serverProviders = searchResults["providers"]?.filterIsInstance<ProviderEntity>() ?: emptyList()
+            serverStores = searchResults["stores"]?.filterIsInstance<StoreEntity>() ?: emptyList()
+            serverProperties = searchResults["properties"]?.filterIsInstance<PropertyEntity>() ?: emptyList()
+            serverJobs = searchResults["jobs"]?.filterIsInstance<JobEntity>() ?: emptyList()
+            isSearchingServer = false
+        } else {
+            serverProviders = emptyList()
+            serverStores = emptyList()
+            serverProperties = emptyList()
+            serverJobs = emptyList()
         }
     }
 
-    // Filtered results based on debounced query (local filtering to minimize Firestore reads)
-    val filteredProviders = remember(debouncedQuery, providers) {
+    // Filtered results based on debounced query (local filtering + server results)
+    val filteredProviders = remember(debouncedQuery, providers, serverProviders) {
         if (debouncedQuery.isBlank()) emptyList() else {
-            providers.filter {
+            val local = providers.filter {
                 it.name.contains(debouncedQuery, ignoreCase = true) ||
                 it.profession.contains(debouncedQuery, ignoreCase = true) ||
                 it.specialization.contains(debouncedQuery, ignoreCase = true) ||
                 it.phone.contains(debouncedQuery)
             }
+            (local + serverProviders).distinctBy { it.id }.take(30)
         }
     }
 
-    val filteredStores = remember(debouncedQuery, stores) {
+    val filteredStores = remember(debouncedQuery, stores, serverStores) {
         if (debouncedQuery.isBlank()) emptyList() else {
-            stores.filter {
+            val local = stores.filter {
                 it.name.contains(debouncedQuery, ignoreCase = true) ||
                 it.description.contains(debouncedQuery, ignoreCase = true) ||
                 it.localNeighborhood.contains(debouncedQuery, ignoreCase = true) ||
                 it.phone.contains(debouncedQuery)
             }
+            (local + serverStores).distinctBy { it.id }.take(30)
         }
     }
 
-    val filteredProperties = remember(debouncedQuery, properties) {
+    val filteredProperties = remember(debouncedQuery, properties, serverProperties) {
         if (debouncedQuery.isBlank()) emptyList() else {
-            properties.filter {
+            val local = properties.filter {
                 it.title.contains(debouncedQuery, ignoreCase = true) ||
                 it.description.contains(debouncedQuery, ignoreCase = true) ||
                 it.localNeighborhood.contains(debouncedQuery, ignoreCase = true) ||
                 it.propertyType.contains(debouncedQuery, ignoreCase = true)
             }
+            (local + serverProperties).distinctBy { it.id }.take(30)
         }
     }
 
-    val filteredJobs = remember(debouncedQuery, jobs) {
+    val filteredJobs = remember(debouncedQuery, jobs, serverJobs) {
         if (debouncedQuery.isBlank()) emptyList() else {
-            jobs.filter {
+            val local = jobs.filter {
                 it.title.contains(debouncedQuery, ignoreCase = true) ||
                 it.description.contains(debouncedQuery, ignoreCase = true) ||
                 it.companyName.contains(debouncedQuery, ignoreCase = true) ||
                 it.requirements.contains(debouncedQuery, ignoreCase = true)
             }
+            (local + serverJobs).distinctBy { it.id }.take(30)
         }
     }
 
@@ -112,7 +137,7 @@ fun UnifiedGlobalSearchScreen(
                 it.name.contains(debouncedQuery, ignoreCase = true) ||
                 it.description.contains(debouncedQuery, ignoreCase = true) ||
                 it.category.contains(debouncedQuery, ignoreCase = true)
-            }
+            }.take(30)
         }
     }
 
@@ -169,6 +194,14 @@ fun UnifiedGlobalSearchScreen(
                 shape = RoundedCornerShape(24.dp),
                 singleLine = true,
                 modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (isSearchingServer) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(2.dp),
+                color = themeColors.accent,
+                trackColor = Color.Transparent
             )
         }
 

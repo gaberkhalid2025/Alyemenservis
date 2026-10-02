@@ -69,6 +69,9 @@ fun ServicesBrowserLayout(
     val settingsState by viewModel.settings.collectAsState()
     val paymentWallets by viewModel.paymentWallets.collectAsState()
 
+    val filteredStores by viewModel.homeViewModel.filteredStores.collectAsState()
+    val filteredProperties by viewModel.homeViewModel.filteredProperties.collectAsState()
+
     var showFiltersPanel by remember { mutableStateOf(false) }
     var selectedStoreForDetails by remember { mutableStateOf<StoreEntity?>(null) }
     var selectedPropertyForDetails by remember { mutableStateOf<PropertyEntity?>(null) }
@@ -252,31 +255,6 @@ fun ServicesBrowserLayout(
                     )
                 }
                 else -> {
-                    val searchLower = searchQuery.trim().lowercase()
-                    val matchedStoreIds = if (searchLower.isNotEmpty()) {
-                        products.filter { it.name.lowercase().contains(searchLower) || it.description.lowercase().contains(searchLower) }
-                            .map { it.storeId }.toSet()
-                    } else emptySet()
-                    
-                    val displayStores = if (searchLower.isNotEmpty()) {
-                        stores.filter { store ->
-                            store.name.lowercase().contains(searchLower) ||
-                            store.phone.contains(searchLower) ||
-                            store.categoryId.lowercase().contains(searchLower) ||
-                            matchedStoreIds.contains(store.id)
-                        }
-                    } else emptyList()
-                    
-                    val displayProperties = if (searchLower.isNotEmpty()) {
-                        properties.filter { prop ->
-                            prop.title.lowercase().contains(searchLower) ||
-                            prop.phone.contains(searchLower) ||
-                            prop.cityId.lowercase().contains(searchLower) ||
-                            prop.localNeighborhood.lowercase().contains(searchLower) ||
-                            prop.propertyType.lowercase().contains(searchLower)
-                        }
-                    } else emptyList()
-
                     val effectiveDisplayProviders = if (searchQuery.isBlank() && 
                         (selectedCategory.isNullOrBlank() || selectedCategory == "ALL" || selectedCategory == "الكل")) {
                         allProviders
@@ -288,8 +266,8 @@ fun ServicesBrowserLayout(
                         viewModel = viewModel,
                         themeColors = themeColors,
                         displayProviders = effectiveDisplayProviders,
-                        displayStores = displayStores,
-                        displayProperties = displayProperties,
+                        displayStores = filteredStores,
+                        displayProperties = filteredProperties,
                         isProvidersLoading = isProvidersLoading,
                         categories = categories,
                         selectedCategoryId = selectedCategory,
@@ -351,12 +329,28 @@ fun ServicesBrowserLayout(
         )
     }
 
+    var showJobApplicationForJob by remember { mutableStateOf<JobEntity?>(null) }
+
     selectedJobForDetails?.let { job ->
         JobQuickDetailsDialog(
             job = job,
             context = context,
             themeColors = themeColors,
-            onDismiss = { selectedJobForDetails = null }
+            onDismiss = { selectedJobForDetails = null },
+            onApply = {
+                val targetJob = job
+                selectedJobForDetails = null
+                showJobApplicationForJob = targetJob
+            }
+        )
+    }
+
+    showJobApplicationForJob?.let { job ->
+        com.example.ui.dialogs.JobApplicationDialog(
+            viewModel = viewModel,
+            themeColors = themeColors,
+            jobTitle = job.title,
+            onDismiss = { showJobApplicationForJob = null }
         )
     }
 

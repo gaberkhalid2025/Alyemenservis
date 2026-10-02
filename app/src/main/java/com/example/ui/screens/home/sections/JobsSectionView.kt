@@ -33,37 +33,31 @@ fun JobsSectionView(
 ) {
     val jobsList by viewModel.jobs.collectAsState()
     val activeJobs = remember(jobsList) { jobsList.filter { !it.isDeleted && (it.isApproved || it.isActive) } }
-    var selectedSubCategory by remember { mutableStateOf("الكل") }
+    data class SubCategoryItem(val label: String, val key: String?, val icon: String = "")
 
     val subCategories = listOf(
-        "الكل",
-        "📊 وظائف إدارية",
-        "💻 هندسة وتقنية",
-        "📢 تسويق ومبيعات",
-        "👨‍🏫 تدريس وتعليم",
-        "🛡️ حراسة وخدمات",
-        "🛠️ مهن وحرف"
+        SubCategoryItem("الكل", null, "🔍"),
+        SubCategoryItem("وظائف إدارية", "إدارية", "📊"),
+        SubCategoryItem("هندسة وتقنية", "تقنية", "💻"),
+        SubCategoryItem("تسويق ومبيعات", "تسويق", "📢"),
+        SubCategoryItem("تدريس وتعليم", "تعليم", "👨‍🏫"),
+        SubCategoryItem("حراسة وخدمات", "خدمات", "🛡️"),
+        SubCategoryItem("مهن وحرف", "مهن", "🛠️")
     )
+    
+    var selectedSubCat by remember { mutableStateOf(subCategories[0]) }
 
-    val filteredList = remember(activeJobs, selectedSubCategory) {
-        if (selectedSubCategory == "الكل") activeJobs
+    val filteredList = remember(activeJobs, selectedSubCat) {
+        val key = selectedSubCat.key
+        if (key == null) activeJobs
         else {
-            val key = selectedSubCategory.substringAfter(" ").trim()
             activeJobs.filter { 
-                it.title.contains(key) || it.companyName.contains(key) || it.jobType.contains(key)
+                it.title.contains(key, ignoreCase = true) || 
+                it.companyName.contains(key, ignoreCase = true) || 
+                it.jobType.contains(key, ignoreCase = true) ||
+                it.description.contains(key, ignoreCase = true)
             }
         }
-    }
-
-    var showJobApplicationDialog by remember { mutableStateOf<JobEntity?>(null) }
-
-    showJobApplicationDialog?.let { targetJob ->
-        com.example.ui.dialogs.JobApplicationDialog(
-            viewModel = viewModel,
-            themeColors = themeColors,
-            jobTitle = targetJob.title,
-            onDismiss = { showJobApplicationDialog = null }
-        )
     }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -89,7 +83,6 @@ fun JobsSectionView(
             }
         }
 
-        // Subcategories row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -97,15 +90,15 @@ fun JobsSectionView(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             subCategories.forEach { subCat ->
-                val isSelected = selectedSubCategory == subCat
+                val isSelected = selectedSubCat == subCat
                 Surface(
-                    onClick = { selectedSubCategory = subCat },
+                    onClick = { selectedSubCat = subCat },
                     shape = RoundedCornerShape(16.dp),
-                    color = if (isSelected) themeColors.accent else Color(0xFF1E293B),
+                    color = if (isSelected) themeColors.accent else themeColors.surface,
                     border = BorderStroke(1.dp, if (isSelected) themeColors.accent else Color.White.copy(alpha = 0.1f))
                 ) {
                     Text(
-                        subCat,
+                        "${subCat.icon} ${subCat.label}",
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isSelected) Color.Black else Color.White,
@@ -123,8 +116,7 @@ fun JobsSectionView(
             filteredList.forEach { job ->
                 Card(
                     onClick = { 
-                        showJobApplicationDialog = job
-                        onJobClick(job) 
+                        onJobClick(job)
                     },
                     colors = CardDefaults.cardColors(containerColor = themeColors.surface),
                     shape = RoundedCornerShape(12.dp),

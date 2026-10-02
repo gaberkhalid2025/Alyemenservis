@@ -37,7 +37,7 @@ fun NotificationsScreen(
     onNotificationClick: (NotificationEntity) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val notifViewModel = remember(viewModel) { NotificationViewModel(viewModel) }
+    val notifViewModel = viewModel.notificationViewModel
 
     val allNotifications by notifViewModel.notifications.collectAsState()
     val readIds by notifViewModel.readNotificationIds.collectAsState()

@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FirebaseFirestore
 
 data class SimplifiedRegistrationState(
     val imageUri: String = "",
@@ -94,10 +97,13 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
             else -> null
         }
         
+        val cleanPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(s.phone)
+        val yemenPhoneRegex = Regex("^(77|73|71|70|78)\\d{7}$")
+        
         var hasError = false
         var newState = s.copy(
             entityNameError = if (s.entityName.isBlank()) "يرجى كتابة الاسم الرباعي" else null,
-            phoneError = if (s.phone.trim().length < 9) "رقم الهاتف غير صحيح (9 أرقام على الأقل)" else null,
+            phoneError = if (cleanPhone.length != 9 || !yemenPhoneRegex.matches(cleanPhone)) "رقم الهاتف غير صحيح (9 أرقام تبدأ بـ 77، 73، 71، 70)" else null,
             passwordError = passErr,
             confirmPasswordError = if (s.password != s.confirmPassword) "كلمة المرور غير متطابقة" else null
         )
@@ -120,17 +126,28 @@ class SimplifiedRegistrationViewModel(application: Application) : AndroidViewMod
             _state.value = _state.value.copy(isLoading = true)
             val data = mapOf(
                 "role" to currentRole,
-                "entityName" to _state.value.entityName,
+                "fullName" to _state.value.entityName,
                 "managerName" to _state.value.managerName,
-                "phone" to _state.value.phone,
+                "phone" to cleanPhone,
                 "city" to _state.value.city,
                 "specialization" to _state.value.specialization,
                 "imageUri" to _state.value.imageUri,
-                "password" to _state.value.password
+                "password" to _state.value.password,
+                "status" to "PENDING",
+                "createdAt" to Timestamp.now(),
+                "type" to currentRole
             )
-            draftManager.clearDraft(currentRole)
-            _state.value = _state.value.copy(isLoading = false, successMessage = "تم التسجيل بنجاح")
-            onSuccess(data)
+            
+            try {
+                FirebaseFirestore.getInstance().collection("join_requests").document(cleanPhone).set(data).await()
+                
+                draftManager.clearDraft(currentRole)
+                _state.value = _state.value.copy(isLoading = false, successMessage = "تم إرسال طلب التسجيل بنجاح للأدمن")
+                onSuccess(data.mapValues { it.value.toString() })
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(isLoading = false, successMessage = null)
+                e.printStackTrace()
+            }
         }
     }
 }

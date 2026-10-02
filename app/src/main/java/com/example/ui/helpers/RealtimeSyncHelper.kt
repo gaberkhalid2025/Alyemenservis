@@ -931,4 +931,96 @@ class RealtimeSyncHelper(private val db: FirebaseFirestore) {
             emptyList()
         }
     }
+
+    // ============================================
+    // 🔍 Server-Side Search Methods (Addressing Scalability)
+    // ============================================
+
+    suspend fun searchProviders(query: String, limit: Long = 30): List<ProviderEntity> {
+        return try {
+            val q = query.trim()
+            if (q.isEmpty()) return emptyList()
+            
+            // Search by name prefix
+            val results = db.collection("providers")
+                .whereGreaterThanOrEqualTo("name", q)
+                .whereLessThanOrEqualTo("name", q + "\uf8ff")
+                .limit(limit)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(ProviderEntity::class.java)?.copy(id = it.id) }
+                .filter { !it.isDeleted && !it.isBlocked }
+            
+            if (results.isEmpty()) {
+                db.collection("providers")
+                    .whereEqualTo("phone", q)
+                    .limit(limit)
+                    .get()
+                    .await()
+                    .documents
+                    .mapNotNull { it.toObject(ProviderEntity::class.java)?.copy(id = it.id) }
+                    .filter { !it.isDeleted && !it.isBlocked }
+            } else results
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun searchStores(query: String, limit: Long = 30): List<StoreEntity> {
+        return try {
+            val q = query.trim()
+            if (q.isEmpty()) return emptyList()
+            
+            db.collection("stores")
+                .whereGreaterThanOrEqualTo("name", q)
+                .whereLessThanOrEqualTo("name", q + "\uf8ff")
+                .limit(limit)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(StoreEntity::class.java)?.copy(id = it.id) }
+                .filter { !it.isDeleted && it.isApproved && it.isActive && !it.isBlocked }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun searchProperties(query: String, limit: Long = 30): List<PropertyEntity> {
+        return try {
+            val q = query.trim()
+            if (q.isEmpty()) return emptyList()
+            
+            db.collection("properties")
+                .whereGreaterThanOrEqualTo("title", q)
+                .whereLessThanOrEqualTo("title", q + "\uf8ff")
+                .limit(limit)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(PropertyEntity::class.java)?.copy(id = it.id) }
+                .filter { !it.isDeleted && it.isApproved && it.isActive && !it.isBlocked }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun searchJobs(query: String, limit: Long = 30): List<JobEntity> {
+        return try {
+            val q = query.trim()
+            if (q.isEmpty()) return emptyList()
+            
+            db.collection("jobs")
+                .whereGreaterThanOrEqualTo("title", q)
+                .whereLessThanOrEqualTo("title", q + "\uf8ff")
+                .limit(limit)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(JobEntity::class.java)?.copy(id = it.id) }
+                .filter { !it.isDeleted && (it.isApproved || it.isActive) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 }
