@@ -528,6 +528,13 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     internal var currentSupervisorId: String = ""
 
+    fun setAdminRole(role: String) {
+        _adminRole.value = role
+        if (role == "OWNER") {
+            _currentSupervisorPermissions.value = listOf("ALL")
+        }
+    }
+
     fun authenticateAdmin(role: String) {
         _adminRole.value = role
         if (role == "OWNER") {

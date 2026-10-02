@@ -266,8 +266,8 @@ fun RealLeafletMapView(
                         }
 
                         loadDataWithBaseURL(
-                            "https://local.map/",
-                            getSelfContainedMapHtml(safeLat, safeLng),
+                            "https://mt1.google.com/",
+                            getSelfContainedMapHtml(ctx, safeLat, safeLng),
                             "text/html",
                             "UTF-8",
                             null
@@ -319,17 +319,22 @@ private fun markersToJson(markers: List<MapMarker>): String {
     }
 }
 
-private fun getSelfContainedMapHtml(lat: Double, lng: Double): String {
+private fun getSelfContainedMapHtml(context: Context? = null, lat: Double = 15.3694, lng: Double = 44.1910): String {
     val safeLat = if (lat == 0.0 || lat.isNaN()) 15.3694 else lat
     val safeLng = if (lng == 0.0 || lng.isNaN()) 44.1910 else lng
+
+    if (context != null) {
+        val cached = MapAssetMemoryCache.getOrLoadSync(context)
+        if (cached.isNotBlank()) {
+            return cached.replace("15.3694", safeLat.toString()).replace("44.1910", safeLng.toString())
+        }
+    }
 
     return """
         <!DOCTYPE html>
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <style>
                 html, body, #map { height: 100%; margin: 0; background: #0F172A; }
             </style>
@@ -337,33 +342,8 @@ private fun getSelfContainedMapHtml(lat: Double, lng: Double): String {
         <body>
             <div id="map"></div>
             <script>
-                var map = L.map('map').setView([$safeLat, $safeLng], 13);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    attribution: '© OpenStreetMap',
-                    maxZoom: 19
-                }).addTo(map);
-
-                var markersLayer = L.layerGroup().addTo(map);
-                window.updateMapMarkers = function(markers) {
-                    if (!markersLayer) return;
-                    markersLayer.clearLayers();
-                    if (Array.isArray(markers)) {
-                        markers.forEach(function(m) {
-                            if (m.lat && m.lng) {
-                                L.circleMarker([m.lat, m.lng], {
-                                    radius: 8,
-                                    fillColor: '#00E5FF',
-                                    color: '#FFFFFF',
-                                    weight: 2,
-                                    fillOpacity: 0.9
-                                }).bindPopup(m.name || '').addTo(markersLayer);
-                            }
-                        });
-                    }
-                };
-                window.updateMapCenter = function(lat, lng) {
-                    map.setView([lat, lng], map.getZoom());
-                };
+                window.updateMapMarkers = function(markers) {};
+                window.updateMapCenter = function(lat, lng) {};
             </script>
         </body>
         </html>
@@ -781,7 +761,7 @@ fun RealLeafletMapView(
                         }, "AndroidBridge")
 
                         loadDataWithBaseURL(
-                            "https://tile.openstreetmap.org/",
+                            "https://mt1.google.com/",
                             readyHtml,
                             "text/html",
                             "UTF-8",

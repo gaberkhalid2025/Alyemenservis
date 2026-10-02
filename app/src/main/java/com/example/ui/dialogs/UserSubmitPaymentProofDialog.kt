@@ -107,6 +107,8 @@ fun UserSubmitPaymentProofDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     var selectedWallet by remember(paymentWallets) { 
         mutableStateOf(paymentWallets.firstOrNull { it.status == "active" && it.isVisibleToUsers && (it.walletType == "DEPOSIT" || it.walletType == "BOTH") } ?: paymentWallets.firstOrNull { it.status == "active" }) 
     }
@@ -128,8 +130,34 @@ fun UserSubmitPaymentProofDialog(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            photoInput = uri.toString()
-            viewModel.triggerNotification("📸 تم اختيار صورة الإثبات من المعرض بنجاح!")
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val bitmap = context.contentResolver.openInputStream(uri)?.use {
+                        android.graphics.BitmapFactory.decodeStream(it)
+                    }
+                    if (bitmap != null) {
+                        val compressedBytes = com.example.utils.FirebaseStorageUploader.compressBitmapToBytes(
+                            bitmap = bitmap,
+                            maxDimension = 800,
+                            maxSizeBytes = 300 * 1024L
+                        )
+                        val tempFile = java.io.File(context.cacheDir, "proof_${System.currentTimeMillis()}.webp")
+                        java.io.FileOutputStream(tempFile).use { it.write(compressedBytes) }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            photoInput = android.net.Uri.fromFile(tempFile).toString()
+                            viewModel.triggerNotification("📸 تم اختيار وضغط صورة الإثبات بنجاح!")
+                        }
+                    } else {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            photoInput = uri.toString()
+                        }
+                    }
+                } catch (e: Exception) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        photoInput = uri.toString()
+                    }
+                }
+            }
         }
     }
 

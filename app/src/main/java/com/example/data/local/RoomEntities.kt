@@ -138,8 +138,11 @@ fun BookingRoomEntity.toEntity(): com.example.data.BookingEntity {
     tableName = "instant_requests",
     indices = [
         Index(value = ["userId"]),
+        Index(value = ["userPhone"]),
+        Index(value = ["userCity"]),
         Index(value = ["status"]),
         Index(value = ["createdAt"]),
+        Index(value = ["expiresAt"]),
         Index(value = ["requestCode"])
     ]
 )

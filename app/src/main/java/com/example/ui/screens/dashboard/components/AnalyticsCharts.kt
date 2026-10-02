@@ -31,13 +31,15 @@ import java.util.Locale
 fun AnalyticsCharts(
     themeColors: VisualThemePalette,
     businessName: String = "حساب الأعمال",
+    stats: com.example.domain.entities.DashboardStatsEntity? = null,
+    totalRevenueYer: Double = 0.0,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var timePeriod by remember { mutableStateOf("أسبوعي") } // أسبوعي / شهري / سنوي
     var selectedCurrency by remember { mutableStateOf("YER") } // YER, SAR, USD
 
-    val baseIncomeYer = 0.0 // stats.totalRevenueYer when available
+    val baseIncomeYer = if (totalRevenueYer > 0.0) totalRevenueYer else (stats?.totalRevenueYer ?: 0.0)
     val numberFormat = remember { DecimalFormat("#,###.##", DecimalFormatSymbols(Locale.US)) }
 
     val (convertedIncome, currencySymbol) = remember(selectedCurrency, baseIncomeYer) {

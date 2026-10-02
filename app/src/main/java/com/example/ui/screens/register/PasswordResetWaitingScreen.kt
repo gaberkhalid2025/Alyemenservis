@@ -318,11 +318,11 @@ fun PasswordResetWaitingScreen(
                                         viewModel.setPasswordRecoveryWaitingPhone("")
 
                                         if (viewModel.adminRole.value !in listOf("OWNER", "ADMIN", "SUPERVISOR")) {
-                                            viewModel.authViewModel._adminRole.value = when (resolvedType) {
+                                            viewModel.authViewModel.setAdminRole(when (resolvedType) {
                                                 "PROVIDER" -> "PROVIDER"
                                                 "STORE", "RESTAURANT", "MEDICAL" -> "STORE_OWNER"
                                                 else -> "GUEST"
-                                            }
+                                            })
                                         }
 
                                         val targetDest = if (match?.provider != null) {

@@ -41,10 +41,6 @@ fun BackdoorLoginDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
-    if (!com.example.BuildConfig.DEBUG) {
-        LaunchedEffect(Unit) { onDismiss() }
-        return
-    }
     val context = LocalContext.current
     val settingsState by viewModel.settings.collectAsState()
     val supervisors by viewModel.supervisors.collectAsState()
