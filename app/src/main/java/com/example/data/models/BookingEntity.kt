@@ -94,9 +94,11 @@ data class BookingEntity(
     val secretPin: String = "",
     val technicianId: String = "",
     val technicianName: String = "",
-    val providerPhoto: String = "",
-    val customerId: String = clientId.ifBlank { customerPhone.ifBlank { clientPhone } }
+    val providerPhoto: String = ""
 ) {
+    val customerId: String
+        get() = clientId.ifBlank { customerPhone.ifBlank { clientPhone } }
+
     val effectiveCustomerName: String
         get() = customerName.ifBlank { fullName.ifBlank { clientName.ifBlank { userName.ifBlank { "العميل" } } } }
 

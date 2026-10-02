@@ -56,7 +56,9 @@ abstract class AppDatabase : RoomDatabase() {
             for (sql in statements) {
                 try {
                     db.execSQL(sql)
-                } catch (_: Throwable) {}
+                } catch (e: Exception) {
+                    android.util.Log.e("AppDatabase", "Index creation failed: $sql", e)
+                }
             }
         }
 
@@ -87,8 +89,6 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                .fallbackToDestructiveMigration()
-                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance
                 instance

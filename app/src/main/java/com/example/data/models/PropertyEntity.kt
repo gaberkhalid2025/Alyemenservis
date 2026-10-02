@@ -29,7 +29,6 @@ data class PropertyEntity(
     val deletedAt: Long? = null,
     val paymentEnabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
-    @get:com.google.firebase.firestore.Exclude
     val passwordHash: String = "", // Secure salted PBKDF2 hash of the password
     val pdfFileUri: String = "",
     // TODO: Migrate to FirebaseStorageUploader
@@ -46,5 +45,6 @@ data class PropertyEntity(
     override val isBlocked: Boolean = false,
     override val blockReason: String = ""
 ) : com.example.data.models.SupervisedEntity {
+    @get:com.google.firebase.firestore.Exclude
     val password: String get() = passwordHash
 }

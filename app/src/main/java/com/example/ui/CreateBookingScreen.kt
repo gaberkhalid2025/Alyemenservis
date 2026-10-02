@@ -526,6 +526,8 @@ fun CreateBookingScreen(
                         return@Button
                     }
 
+                    // NOTE: Currently synchronous. If async operation is added later,
+                    // wrap in viewModelScope.launch { ... } and move isSubmitting = false inside finally.
                     isSubmitting = true
                     val randomCode = (1000..9999).random()
                     val bookingNumber = "BK-${System.currentTimeMillis().toString().takeLast(6)}-$randomCode"

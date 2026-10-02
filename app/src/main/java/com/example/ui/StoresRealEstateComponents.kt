@@ -49,6 +49,19 @@ import com.example.data.*
 import com.example.ui.MainViewModel
 import com.example.ui.components.ReviewInput
 
+/**
+ * Centralized Yemeni phone validator.
+ * Used by: StoreCreateEditDialog, PropertyCreateEditDialog, CreateBookingScreen (via BookingValidation).
+ * Kept private to this file to avoid cross-module coupling.
+ */
+private fun isValidYemeniPhone(phone: String): Boolean {
+    val clean = phone.trim().replace(" ", "").replace("+", "")
+    return clean.length == 9 &&
+        (clean.startsWith("77") || clean.startsWith("73") ||
+         clean.startsWith("71") || clean.startsWith("70") ||
+         clean.startsWith("78"))
+}
+
 @Composable
 fun rememberBase64Bitmap(base64Str: String): ImageBitmap? {
     return remember(base64Str) {

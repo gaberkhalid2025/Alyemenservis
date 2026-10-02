@@ -11,6 +11,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -513,5 +514,12 @@ class ChatLocalDataSource(
         } catch (e: Exception) {
             android.util.Log.e("ChatLocalDataSource", "Error in pruneStaleCache: ${e.message}", e)
         }
+    }
+
+    /**
+     * Cleans up the coroutine scope when the data source is no longer required.
+     */
+    fun close() {
+        dataSourceScope.cancel()
     }
 }

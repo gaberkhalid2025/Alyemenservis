@@ -37,6 +37,13 @@ class MapDao(private val context: Context) {
         }
     }
 
+    /**
+     * Non-blocking async retrieval of cached providers.
+     */
+    suspend fun getProvidersAsync(): List<ProviderEntity> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        getProviders()
+    }
+
     fun saveStores(stores: List<StoreEntity>) {
         try {
             val type = Types.newParameterizedType(List::class.java, StoreEntity::class.java)
@@ -57,6 +64,13 @@ class MapDao(private val context: Context) {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    /**
+     * Non-blocking async retrieval of cached stores.
+     */
+    suspend fun getStoresAsync(): List<StoreEntity> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        getStores()
     }
 
     fun saveProperties(properties: List<PropertyEntity>) {
@@ -82,6 +96,13 @@ class MapDao(private val context: Context) {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    /**
+     * Non-blocking async retrieval of cached properties.
+     */
+    suspend fun getPropertiesAsync(): List<PropertyEntity> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        getProperties()
     }
 }
 

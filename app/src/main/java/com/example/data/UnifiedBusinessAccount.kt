@@ -4,6 +4,7 @@ import com.example.utils.*
 import androidx.annotation.Keep
 import com.example.utils.EntityIdGenerator
 
+// @Deprecated: Kept for backward compatibility across modules. Refactor usages to com.example.data.models.ChatChannel.
 typealias ChatChannelEntity = com.example.data.models.ChatChannel
 
 @Keep

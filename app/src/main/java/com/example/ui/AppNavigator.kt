@@ -318,6 +318,8 @@ fun AppNavigator(
                 }
             }
 
+            // ⚠️ SECURITY NOTICE: Backdoor dialog for debugging only.
+            // Must be disabled in production builds via BuildConfig.DEBUG check.
             val showBackdoorDialog by viewModel.showBackdoorDialog.collectAsState()
             if (showBackdoorDialog) {
                 BackdoorLoginDialog(

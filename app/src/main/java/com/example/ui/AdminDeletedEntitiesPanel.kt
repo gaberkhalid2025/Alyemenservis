@@ -33,7 +33,10 @@ fun AdminDeletedEntitiesPanel(
     themeColors: VisualThemePalette
 ) {
     val adminRole by viewModel.adminRole.collectAsState()
-    if (adminRole != "OWNER" && adminRole != "ADMIN") return
+    if (adminRole != "OWNER" && adminRole != "ADMIN") {
+        // UI-only guard, does NOT affect admin privileges or ViewModel logic
+        return
+    }
 
     val context = LocalContext.current
     var selectedCategory by remember { mutableStateOf("STORES") } // STORES, PROVIDERS, PROPERTIES, JOBS

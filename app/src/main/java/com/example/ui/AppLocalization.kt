@@ -314,6 +314,9 @@ fun LocalizationProvider(
             fun getDyn(key: String, fallback: String): String {
                 return dynamicMap["${langCode}_$key"] ?: dynamicMap[key] ?: fallback
             }
+            // NOTE: Manual mapping chosen over reflection for Compose performance.
+            // Reflection in remember{} blocks causes unnecessary recompositions.
+            // If adding new strings, add them to AppStrings + both ArStrings/EnStrings + this copy block.
             baseStrings.copy(
                 home = getDyn("home", baseStrings.home),
                 maps = getDyn("maps", baseStrings.maps),

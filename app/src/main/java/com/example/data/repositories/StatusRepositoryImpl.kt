@@ -188,7 +188,8 @@ class StatusRepositoryImpl(
 
     override fun getNotifications(): Flow<List<NotificationEntity>> = callbackFlow {
         val listener = firestore.collection(AppConstants.COL_NOTIFICATIONS)
-            .limit(100)
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(50)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(emptyList())

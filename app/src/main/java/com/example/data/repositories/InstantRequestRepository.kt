@@ -114,6 +114,7 @@ class InstantRequestRepository(private val context: Context? = null) {
                         null
                     }
                 }
+                _requests.value = list
                 trySend(list)
             }
 
@@ -333,11 +334,15 @@ class InstantRequestRepository(private val context: Context? = null) {
                     return@addOnSuccessListener
                 }
 
-                if (userPin.isNotBlank()) {
-                    val expectedPass = request.effectivePinHash
+                val expectedPass = request.effectivePinHash
+                if (expectedPass.isNotBlank()) {
+                    if (userPin.isBlank()) {
+                        onError("يرجى إدخال رمز PIN لإلغاء الطلب")
+                        return@addOnSuccessListener
+                    }
                     val isValid = com.example.utils.SecureHasher.verifyPin(userPin, expectedPass) ||
                             BookingSecurityHelper.verifyPassword(userPin, expectedPass)
-                    if (expectedPass.isNotBlank() && !isValid) {
+                    if (!isValid) {
                         onError("رمز PIN للإلغاء غير صحيح")
                         return@addOnSuccessListener
                     }

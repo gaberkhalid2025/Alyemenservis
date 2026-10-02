@@ -79,6 +79,8 @@ class MainViewModel @Inject constructor(
     }
     internal val _screenBackStack = MutableStateFlow<List<String>>(listOf("USER_BROWSE"))
     val screenBackStack: StateFlow<List<String>> = _screenBackStack.asStateFlow()
+    // INTENTIONAL: Delegating properties for unified access across ViewModels.
+    // Do not convert to StateFlow - would break existing collectAsState() calls.
     val _currentUserId get() = authViewModel._currentUserId
     val currentUserId get() = authViewModel.currentUserId
     val _currentUserName get() = authViewModel._currentUserName
@@ -202,6 +204,9 @@ class MainViewModel @Inject constructor(
     val currentScreen: StateFlow<String> = _currentScreen.asStateFlow()
     internal val _navigationStack = mutableListOf<String>()
     
+    // NOTE: These are intentionally plain variables, not StateFlow.
+    // They are read synchronously in AppNavigator during navigation.
+    // Do NOT convert to StateFlow without refactoring all call sites.
     var selectedProvider: com.example.data.ProviderEntity? = null
     var selectedStore: com.example.data.StoreEntity? = null
     var selectedProperty: com.example.data.PropertyEntity? = null

@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 /**
@@ -87,19 +89,23 @@ class BookingRepository(
         }
     }
 
+    private val cacheMutex = kotlinx.coroutines.sync.Mutex()
+
     private fun saveToCache(list: List<BookingEntity>) {
         _cachedBookings.value = list
         try {
             val bookingDao = com.example.data.local.AppDatabase.getInstance(context).bookingDao()
             val roomList = list.map { it.toRoomEntity() }
             repositoryScope.launch {
-                try {
-                    bookingDao.deleteAllBookings()
-                    if (roomList.isNotEmpty()) {
-                        bookingDao.insertBookings(roomList)
+                cacheMutex.withLock {
+                    try {
+                        bookingDao.deleteAllBookings()
+                        if (roomList.isNotEmpty()) {
+                            bookingDao.insertBookings(roomList)
+                        }
+                    } catch (e: Exception) {
+                        Log.e("BookingRepository", "Error persisting bookings to Room", e)
                     }
-                } catch (e: Exception) {
-                    Log.e("BookingRepository", "Error persisting bookings to Room", e)
                 }
             }
         } catch (e: Exception) {
@@ -235,15 +241,8 @@ class BookingRepository(
             saveToCache(current)
             AnalyticsEventsHelper.logBookingCreated(context, docId, finalBooking.serviceType.ifBlank { finalBooking.category }, finalBooking.totalAmount)
 
-            // Sync to Firestore atomically using runTransaction
-            firestore.runTransaction { transaction ->
-                val docRef = firestore.collection(com.example.utils.AppConstants.COL_BOOKINGS).document(docId)
-                val snapshot = transaction.get(docRef)
-                if (snapshot.exists()) {
-                    throw IllegalStateException("الحجز برقم $docId موجود مسبقاً")
-                }
-                transaction.set(docRef, finalBooking)
-            }
+            // Sync to Firestore directly with .set() to save read costs
+            firestore.collection(AppConstants.COL_BOOKINGS).document(docId).set(finalBooking)
                 .addOnSuccessListener {
                     // Write Notification payloads to "notifications" collection
                     val userNotifId = UUID.randomUUID().toString()

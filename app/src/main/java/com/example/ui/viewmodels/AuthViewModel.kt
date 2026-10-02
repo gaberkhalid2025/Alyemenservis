@@ -88,6 +88,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     private var clickCount = 0
     private var lastBackdoorClickTime = 0L
+    @Volatile
     private var cachedAppContext: Context? = null
 
     fun getOrGenerateUserId(): String {
@@ -439,11 +440,10 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
         viewModelScope.launch {
             try {
                 var matchedDoc: com.google.firebase.firestore.DocumentSnapshot? = null
-                var fallbackDoc: com.google.firebase.firestore.DocumentSnapshot? = null
                 for (col in listOf("registered_users", "users")) {
                     for (ph in phoneVariants) {
                         val snap = runCatching {
-                            db.collection(col).whereEqualTo("phone", ph).get().await()
+                            db.collection(col).whereEqualTo("phone", ph).limit(1).get().await()
                         }.getOrNull()
                         val docs = snap?.documents.orEmpty().toMutableList()
                         runCatching {
@@ -453,7 +453,6 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                             }
                         }
                         for (doc in docs) {
-                            if (fallbackDoc == null) fallbackDoc = doc
                             val hasCredential = !doc.getString("passwordHash").isNullOrBlank() || !doc.getString("password").isNullOrBlank()
                             if (hasCredential) {
                                 matchedDoc = doc
@@ -464,7 +463,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
                     }
                     if (matchedDoc != null) break
                 }
-                val targetDoc = matchedDoc ?: fallbackDoc
+                val targetDoc = matchedDoc
 
                 if (targetDoc != null) {
                     val storedHash = targetDoc.getString("passwordHash")?.trim().orEmpty()

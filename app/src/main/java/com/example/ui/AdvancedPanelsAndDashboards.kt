@@ -207,7 +207,14 @@ fun AdvancedAnalyticsDashboardComposable(
                                 }
                                 context.startActivity(android.content.Intent.createChooser(sendIntent, "مشاركة تقرير الأداء"))
                             } catch (e: Exception) {
-                                Toast.makeText(context, "تم تجهيز التقرير الطباعي الموثق بنجاح!", Toast.LENGTH_LONG).show()
+                                // Fallback: copy report text to clipboard if sharing intent fails
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Report", summary))
+                                Toast.makeText(
+                                    context,
+                                    "تعذر فتح تطبيقات المشاركة. تم نسخ ملخص التقرير إلى الحافظة.",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),

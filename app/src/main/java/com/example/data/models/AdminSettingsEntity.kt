@@ -276,6 +276,7 @@ data class AdminSettingsEntity(
     val bookingPasswordLength: Int = 4,
     val enableUniqueBookingNumber: Boolean = true,
     val bookingNumberPrefix: String = "BK",
+    // ⚠️ مكرر للتوافقية: استخدم advancePaymentPercent للحسابات. advancePaymentPercentage للتوافقية مع الشاشات القديمة.
     val advancePaymentPercentage: Int = 30,
     val enableProgressTracking: Boolean = true,
 
@@ -288,6 +289,7 @@ data class AdminSettingsEntity(
     val allowBookingWithoutDeposit: Boolean = true,
 
     // Voice Call In-App System Controls
+    // ملاحظة أمنية: عند التعارض، disableVoiceCalls يتفوق على voiceCallsEnabled
     val voiceCallsEnabled: Boolean = true,
     val voiceCallsAllowedCategories: String = "",
     val voiceCallsAllowedProviders: String = "",

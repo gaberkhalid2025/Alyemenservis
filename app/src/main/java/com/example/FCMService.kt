@@ -165,11 +165,9 @@ class FCMService : FirebaseMessagingService() {
             sp.edit().putString("fcm_token_backup", token).apply()
         } catch (_: Exception) {}
         
-        // 🔄 الخطوة 2: مزامنة مع Firestore باستخدام serviceScope المدار لمنع تسريب الخيوط و Race Condition (M-11)
+        // 🔄 الخطوة 2: مزامنة مع Firestore باستخدام serviceScope المدار لمنع تسريب الخيوط
         serviceScope.launch {
             try {
-                kotlinx.coroutines.delay(1000) // تأخير آمن غير معطل للخيوط لضمان تهيئة Firebase
-                
                 // التحقق من تهيئة Firebase
                 if (FirebaseApp.getApps(this@FCMService).isEmpty()) {
                     try {
@@ -300,14 +298,15 @@ class FCMService : FirebaseMessagingService() {
                     android.util.Log.w("FCMService", "SHA-256 token hashing skipped: ${hashEx.message}")
                 }
 
-                // 2. تحديث registered_users بشكل مستقل (فقط إذا كان المستند موجوداً ومع التحقق الكامل H-04)
-                db.collection("registered_users").document(userId)
-                    .update("fcmToken", token)
+                // 2. تحديث registered_users باستخدام cleanPhone أو userId مع SetOptions.merge لتفادي فشل التحديث
+                val targetUserDocId = if (cleanPhone.isNotBlank() && cleanPhone.length >= 7) cleanPhone else userId
+                db.collection("registered_users").document(targetUserDocId)
+                    .set(mapOf("fcmToken" to token), SetOptions.merge())
                     .addOnFailureListener { e ->
-                        android.util.Log.w("FCMService", "Skipped registered_users token update (document might not exist): ${e.message}")
+                        android.util.Log.w("FCMService", "Skipped registered_users token update: ${e.message}")
                     }
                     .addOnSuccessListener {
-                        android.util.Log.d("FCMService", "registered_users token updated successfully.")
+                        android.util.Log.d("FCMService", "registered_users token updated successfully ($targetUserDocId).")
                     }
 
                 // 3. تحديث providers, stores, properties بشكل مستقل لكل مجموعة (مع دعم المعرفات القياسية المسبوقة بـ prov_ / store_ / prop_)

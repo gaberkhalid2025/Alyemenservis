@@ -13,6 +13,11 @@ object ScreenRoutes {
         return currentScreen != AppScreens.CHAT_DIRECT && currentScreen != AppScreens.MAP_VIEW && currentScreen != AppScreens.SMART_ASSISTANT
     }
 
+    fun isRegistrationForm(screen: String): Boolean =
+        screen in setOf("REGISTER_FORM", "JOIN_REQUEST_STATUS", "LOGIN", "REGISTER")
+
+    fun isFormOpen(dialogAction: String?): Boolean = dialogAction != null
+
     fun isRegistrationOrFormOpen(
         currentScreen: String,
         showGuestRegisterDialogForAction: String? = null,
