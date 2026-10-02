@@ -203,7 +203,7 @@ object BookingUtils {
             💰 *المبلغ:* $amount
             📌 *الحالة:* ${booking.status}
             ━━━━━━━━━━━━━━━━━━━━━━
-            🔒 *رمز التحقق الأمني:* ${if (booking.bookingPassword.isNotBlank()) booking.bookingPassword else "تم إرساله في إشعار الحجز (مشفر ومحمي)"}
+            🔒 *رمز التحقق الأمني:* ${if (booking.pinCode.isNotBlank() && !booking.pinCode.contains(":")) booking.pinCode else "تم إرساله في إشعار الحجز (مشفر ومحمي)"}
             📱 تم الحجز عبر تطبيق دليل خدمات اليمن
         """.trimIndent()
     }

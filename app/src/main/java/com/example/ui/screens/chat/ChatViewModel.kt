@@ -250,7 +250,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun editMessage(channelId: String, messageId: String, newText: String) {
-        editManager.editMessage(channelId, messageId, newText,
+        editManager.editMessage(channelId, messageId, newText, currentUserId = activeUserId,
             onError = { viewModelScope.launch { _eventFlow.emit(ChatEvent.ShowError(it)) } }
         )
     }

@@ -77,7 +77,7 @@ class BookingTestRunner(private val context: Context) {
                 providerPhone = testProviderPhone,
                 status = "PENDING",
                 bookingNumber = bookingNumber1,
-                bookingPassword = hashedPin,
+                pinCode = hashedPin,
                 secretPin = hashedPin,
                 date = "2026-09-30",
                 time = "10:00 ص",

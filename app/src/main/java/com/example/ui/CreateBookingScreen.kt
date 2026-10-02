@@ -547,7 +547,6 @@ fun CreateBookingScreen(
                         timeString = selectedTime,
                         time = selectedTime,
                         serviceDetails = serviceDetails.trim(),
-                        bookingPassword = "",
                         pinCode = com.example.utils.SecureHasher.hashPin(bookingPassword.trim()),
                         status = "PENDING",
                         createdAt = System.currentTimeMillis()

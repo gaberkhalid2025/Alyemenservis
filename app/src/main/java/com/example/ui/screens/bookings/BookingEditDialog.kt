@@ -298,7 +298,7 @@ fun BookingEditDialog(
                                     errorMessage = "تم قفل الحجز مؤقتاً بسبب 3 محاولات غير صحيحة. يرجى الانتظار."
                                     return@Button
                                 }
-                                val targetPin = (booking.pinCode.ifBlank { booking.bookingPassword }).trim()
+                                val targetPin = booking.pinCode.trim()
                                 if (targetPin.isNotBlank()) {
                                     val isPinValid = com.example.utils.SecureHasher.verifyPin(passwordInput.trim(), targetPin) ||
                                             BookingSecurityHelper.verifyPassword(passwordInput.trim(), targetPin)

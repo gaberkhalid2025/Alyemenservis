@@ -138,7 +138,7 @@ object SecureAdminStorage {
     ): Boolean {
         val cleanEmail = email.trim()
         val cleanPass = password.trim()
-        if (cleanEmail.isEmpty() || cleanPass.isEmpty()) return false
+        if (cleanEmail.isEmpty() || cleanPass.isEmpty() || SecureHasher.isHashFormat(cleanPass)) return false
 
         val prefs = getSecurePrefs(context) ?: return false
         
@@ -158,9 +158,11 @@ object SecureAdminStorage {
                     val emailMatches = constantTimeEquals(storedEmail, emailLowerHash) ||
                             constantTimeEquals(storedEmail, emailExactHash) ||
                             storedEmail.equals(cleanEmail, ignoreCase = true)
-                    val passMatches = constantTimeEquals(storedPass, passHash) ||
+                    val passMatches = (!constantTimeEquals(storedPass, cleanPass)) && (
+                            constantTimeEquals(storedPass, passHash) ||
                             SecureHasher.verifyPassword(cleanPass, storedPass) ||
                             SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedPass)
+                    )
                     emailMatches && passMatches
                 }
                 "ADMIN" -> {
@@ -169,9 +171,11 @@ object SecureAdminStorage {
                     val emailMatches = constantTimeEquals(storedEmail, emailLowerHash) ||
                             constantTimeEquals(storedEmail, emailExactHash) ||
                             storedEmail.equals(cleanEmail, ignoreCase = true)
-                    val passMatches = constantTimeEquals(storedPass, passHash) ||
+                    val passMatches = (!constantTimeEquals(storedPass, cleanPass)) && (
+                            constantTimeEquals(storedPass, passHash) ||
                             SecureHasher.verifyPassword(cleanPass, storedPass) ||
                             SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedPass)
+                    )
                     emailMatches && passMatches
                 }
                 else -> false
@@ -187,20 +191,20 @@ object SecureAdminStorage {
      */
     fun verifyStoredPasswordOnly(context: Context, password: String): Boolean {
         val cleanPass = password.trim()
-        if (cleanPass.isEmpty()) return false
+        if (cleanPass.isEmpty() || SecureHasher.isHashFormat(cleanPass)) return false
         val prefs = getSecurePrefs(context) ?: return false
         if (!prefs.getBoolean(KEY_VAULT_INITIALIZED, false)) return false
         return try {
             val passHash = hashValue(cleanPass, SALT_PREFIX + "pass")
             val storedOwnerPass = prefs.getString(KEY_OWNER_HASH, null)?.takeIf { it.isNotBlank() }
-            if (storedOwnerPass != null) {
+            if (storedOwnerPass != null && !constantTimeEquals(storedOwnerPass, cleanPass)) {
                 val ownerMatches = constantTimeEquals(storedOwnerPass, passHash) ||
                         SecureHasher.verifyPassword(cleanPass, storedOwnerPass) ||
                         SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedOwnerPass)
                 if (ownerMatches) return true
             }
             val storedAdminPass = prefs.getString(KEY_ADMIN_HASH, null)?.takeIf { it.isNotBlank() }
-            if (storedAdminPass != null) {
+            if (storedAdminPass != null && !constantTimeEquals(storedAdminPass, cleanPass)) {
                 val adminMatches = constantTimeEquals(storedAdminPass, passHash) ||
                         SecureHasher.verifyPassword(cleanPass, storedAdminPass) ||
                         SecurityCryptoUtils.verifyAdminPassword(cleanPass, storedAdminPass)
@@ -225,8 +229,9 @@ object SecureAdminStorage {
         if (inputPassword.isBlank() || storedPassOrHash.isBlank()) return false
         val cleanInput = inputPassword.trim()
         val cleanStored = storedPassOrHash.trim()
+        if (SecureHasher.isHashFormat(cleanInput)) return false
 
-        val isAlreadyHashed = SecureHasher.isValidHash(cleanStored)
+        val isAlreadyHashed = SecureHasher.isHashFormat(cleanStored) || fieldName.endsWith("Hash", ignoreCase = true)
         val isLegacyPlainMatch = !isAlreadyHashed && constantTimeEquals(cleanInput, cleanStored)
         val isValid = isLegacyPlainMatch ||
                 SecureHasher.verifyPassword(cleanInput, cleanStored) ||

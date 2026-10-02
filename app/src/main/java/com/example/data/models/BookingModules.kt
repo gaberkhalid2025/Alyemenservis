@@ -43,7 +43,6 @@ data class BookingSchedule(
 @Keep
 data class BookingSecurity(
     val pinCode: String = "",
-    val secretPin: String = "",
     val rejectionReason: String = ""
 )
 
@@ -75,8 +74,7 @@ fun BookingEntity.toSchedule() = BookingSchedule(
 )
 
 fun BookingEntity.toSecurity() = BookingSecurity(
-    pinCode = pinCode.ifBlank { secretPin },
-    secretPin = secretPin.ifBlank { pinCode },
+    pinCode = pinCode,
     rejectionReason = rejectionReason
 )
 
@@ -107,6 +105,5 @@ fun createBookingFromModules(
     timeString = schedule.time,
     scheduledAt = schedule.scheduledAt,
     pinCode = security.pinCode,
-    secretPin = security.secretPin,
     rejectionReason = security.rejectionReason
 )

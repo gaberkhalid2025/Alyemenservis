@@ -119,6 +119,9 @@ class PaymentGatewayIntegration(@Suppress("UNUSED_PARAMETER") context: Context? 
         if (cleanTxId.isBlank()) {
             return Result.failure(IllegalArgumentException("رقم المعاملة المالية مطلوب."))
         }
+        val payment = activeTransactions[cleanTxId]
+            ?: return Result.failure(IllegalArgumentException("لم يتم العثور على المعاملة المالية أو أنها غير صالحة: $cleanTxId"))
+
         val enabled = isPaymentEnabledFromBuild && (settings?.isPaymentEnabled == true)
         if (!enabled) {
             return Result.failure(
@@ -127,8 +130,7 @@ class PaymentGatewayIntegration(@Suppress("UNUSED_PARAMETER") context: Context? 
         }
 
         return try {
-            val payment = activeTransactions[cleanTxId]
-            if (payment != null && payment.amount.isFinite() && payment.amount > 0.0) {
+            if (payment.amount.isFinite() && payment.amount > 0.0) {
                 val verification = PaymentVerification(
                     transactionId = cleanTxId,
                     isValid = true,

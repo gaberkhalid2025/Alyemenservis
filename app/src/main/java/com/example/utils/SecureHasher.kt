@@ -81,9 +81,8 @@ object SecureHasher {
         val trimmedInput = password.trim()
         val trimmedStored = storedHash.trim()
 
-        // 🎯 أمان: لا نقبل النص الصريح أبداً.
-        // إذا كانت القيمة المخزنة لا تحتوي على الفاصل ":" → رفض.
-        if (!trimmedStored.contains(":")) {
+        // 🎯 أمان: لا نقبل النص الصريح أبداً ولا نقبل إدخال الهاش المسروق ككلمة مرور.
+        if (!trimmedStored.contains(":") || trimmedInput == trimmedStored || isHashFormat(trimmedInput)) {
             return false
         }
 
@@ -120,9 +119,8 @@ object SecureHasher {
         val trimmedInput = pin.trim()
         val trimmedStored = storedHash.trim()
 
-        // 🎯 أمان: لا نقبل النص الصريح أبداً للـ PIN.
-        // إذا كانت القيمة المخزنة لا تحتوي على الفاصل ":" → رفض.
-        if (!trimmedStored.contains(":")) {
+        // 🎯 أمان: لا نقبل النص الصريح أبداً للـ PIN ولا نقبل الهاش المسروق.
+        if (!trimmedStored.contains(":") || trimmedInput == trimmedStored || isHashFormat(trimmedInput)) {
             return false
         }
 
@@ -153,5 +151,18 @@ object SecureHasher {
         } catch (e: Throwable) {
             false
         }
+    }
+
+    /**
+     * يتحقق مما إذا كانت السلسلة المدخلة تبدو كـ Hash مشفر (PBKDF2 أو BCrypt أو SHA-256 Hex) لمنع هجمات Pass-the-Hash
+     */
+    fun isHashFormat(candidate: String): Boolean {
+        val trimmed = candidate.trim()
+        if (trimmed.isEmpty()) return false
+        if (isValidHash(trimmed)) return true
+        if (trimmed.startsWith("$2a$") || trimmed.startsWith("$2b$") || trimmed.startsWith("$2y$")) return true
+        if (trimmed.startsWith("pbkdf2:")) return true
+        if (trimmed.length == 64 && trimmed.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return true
+        return false
     }
 }

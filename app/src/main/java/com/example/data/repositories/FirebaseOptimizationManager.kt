@@ -44,52 +44,30 @@ object FirebaseOptimizationManager {
     }
 
     /**
-     * Compress bitmap to target WebP format (< 150KB)
+     * Compress bitmap to target WebP byte array (< 150KB) via FirebaseStorageUploader
      */
-    suspend fun compressImageToWebP(bitmap: Bitmap, maxSizeBytes: Long = 150 * 1024L): String = withContext(Dispatchers.IO) {
-        var quality = 80
-        val outputStream = ByteArrayOutputStream()
-        
-        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Bitmap.CompressFormat.WEBP_LOSSY
-        } else {
-            @Suppress("DEPRECATION")
-            Bitmap.CompressFormat.WEBP
-        }
-
-        bitmap.compress(format, quality, outputStream)
-        
-        while (outputStream.size() > maxSizeBytes && quality > 20) {
-            outputStream.reset()
-            quality -= 15
-            bitmap.compress(format, quality, outputStream)
-        }
-
-        val byteArray = outputStream.toByteArray()
-        Base64.encodeToString(byteArray, Base64.NO_WRAP)
+    suspend fun compressImageToWebPBytes(bitmap: Bitmap, maxSizeBytes: Long = 150 * 1024L): ByteArray = withContext(Dispatchers.IO) {
+        com.example.utils.FirebaseStorageUploader.compressBitmapToBytes(
+            bitmap = bitmap,
+            maxDimension = 800,
+            maxSizeBytes = maxSizeBytes
+        )
     }
 
     /**
-     * Compress Base64 image string if needed to keep under 150KB WebP
+     * Upload bitmap directly to Firebase Storage via FirebaseStorageUploader
      */
-    suspend fun compressBase64IfNeeded(base64Str: String): String = withContext(Dispatchers.IO) {
-        if (base64Str.isBlank() || base64Str.startsWith("http")) return@withContext base64Str
-        try {
-            val cleanStr = if (base64Str.contains(",")) base64Str.substringAfter(",") else base64Str
-            val bytes = Base64.decode(cleanStr, Base64.DEFAULT)
-            if (bytes.size > 150 * 1024) { // Larger than 150KB
-                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@withContext base64Str
-                try {
-                    compressImageToWebP(bitmap)
-                } finally {
-                    bitmap.recycle()
-                }
-            } else {
-                base64Str
-            }
-        } catch (e: Exception) {
-            base64Str
-        }
+    suspend fun uploadOptimizedBitmap(
+        bitmap: Bitmap,
+        storagePath: String,
+        maxSizeBytes: Long = 150 * 1024L
+    ): Result<String> = withContext(Dispatchers.IO) {
+        com.example.utils.FirebaseStorageUploader.uploadBitmap(
+            bitmap = bitmap,
+            storagePath = storagePath,
+            maxDimension = 800,
+            maxSizeBytes = maxSizeBytes
+        )
     }
 
     /**

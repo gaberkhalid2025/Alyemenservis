@@ -178,7 +178,6 @@ class InstantRequestViewModel @Inject constructor(
             id = reqId,
             requestCode = code,
             rawPin = safePin,
-            secretPin = safePin,
             cancellationPassword = safePin,
             userId = if (userId.isNotBlank()) userId else userPhone,
             userName = userName.ifBlank { "عميل" },

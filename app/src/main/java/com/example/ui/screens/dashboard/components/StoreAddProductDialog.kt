@@ -22,8 +22,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.example.data.ProductEntity
 import com.example.ui.MainViewModel
-import com.example.utils.convertUriToBase64
+import com.example.utils.FirebaseStorageUploader
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
@@ -37,16 +38,24 @@ fun StoreAddProductDialog(
     context: Context = LocalContext.current,
     onDismiss: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     var prodName by remember { mutableStateOf("") }
     var prodDesc by remember { mutableStateOf("") }
     var prodPrice by remember { mutableStateOf("") }
-    var prodImageBase64 by remember { mutableStateOf("") }
+    var prodImageUrl by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val prodUriPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { prodImageBase64 = convertUriToBase64(context, it) }
+        uri?.let { selectedUri ->
+            scope.launch {
+                val productId = UUID.randomUUID().toString()
+                val path = FirebaseStorageUploader.getStoreProductPath(storeId, productId)
+                val uploadRes = FirebaseStorageUploader.uploadImageUri(context, selectedUri, path)
+                prodImageUrl = uploadRes.getOrElse { selectedUri.toString() }
+            }
+        }
     }
 
     AlertDialog(
@@ -104,18 +113,9 @@ fun StoreAddProductDialog(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("🖼️ صورة المنتج:", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
 
-                val pBitmap = remember(prodImageBase64) {
-                    if (prodImageBase64.isNotEmpty()) {
-                        try {
-                            val bytes = android.util.Base64.decode(prodImageBase64, android.util.Base64.DEFAULT)
-                            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                        } catch(e: Exception) { null }
-                    } else null
-                }
-
-                if (pBitmap != null) {
-                    Image(
-                        bitmap = pBitmap,
+                if (prodImageUrl.isNotBlank()) {
+                    coil.compose.AsyncImage(
+                        model = prodImageUrl,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp).clip(RoundedCornerShape(6.dp)).align(Alignment.CenterHorizontally),
                         contentScale = ContentScale.Crop
@@ -148,7 +148,7 @@ fun StoreAddProductDialog(
                             name = prodName.trim(),
                             description = prodDesc.trim(),
                             price = dPrice,
-                            imageUrl = prodImageBase64
+                            imageUrl = prodImageUrl
                         )
                         viewModel.saveProduct(newProduct)
                         onDismiss()

@@ -92,8 +92,17 @@ interface BookingDao {
     @Query("UPDATE bookings SET status = :status, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateBookingStatus(id: String, status: String, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("SELECT * FROM bookings ORDER BY createdAt DESC")
+    fun getAllBookings(): Flow<List<BookingRoomEntity>>
+
+    @Query("SELECT * FROM bookings ORDER BY createdAt DESC")
+    suspend fun getAllBookingsList(): List<BookingRoomEntity>
+
     @Query("DELETE FROM bookings WHERE id = :id")
     suspend fun deleteBooking(id: String)
+
+    @Query("DELETE FROM bookings")
+    suspend fun deleteAllBookings()
 }
 
 @Dao

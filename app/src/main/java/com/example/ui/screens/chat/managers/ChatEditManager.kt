@@ -24,12 +24,13 @@ class ChatEditManager(
         channelId: String,
         messageId: String,
         newText: String,
+        currentUserId: String = "",
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         scope.launch {
             try {
-                val res = repository.editMessage(channelId, messageId, newText)
+                val res = repository.editMessage(channelId, messageId, newText, currentUserId)
                 when (res) {
                     is AppResult.Success -> onSuccess()
                     is AppResult.Error -> onError(res.error.messageArabic)

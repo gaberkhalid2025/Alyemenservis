@@ -141,7 +141,13 @@ class FakeChatRepository : IChatRepository {
     override suspend fun markChannelAsRead(channelId: String, currentUserId: String): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun setTyping(channelId: String, userId: String, isTyping: Boolean): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun toggleBlockUser(channelId: String, userIdToBlock: String, isBlocked: Boolean): AppResult<Unit> = AppResult.Success(Unit)
-    override suspend fun editMessage(channelId: String, messageId: String, newText: String): AppResult<Unit> = AppResult.Success(Unit)
+    override suspend fun editMessage(channelId: String, messageId: String, newText: String, currentUserId: String): AppResult<Unit> {
+        val msg = messages.find { it.id == messageId && it.channelId == channelId }
+        if (msg != null && currentUserId.isNotBlank() && msg.senderId != currentUserId) {
+            return AppResult.Error(AppError.ValidationError("senderId", "غير مصرح لك بتعديل هذه الرسالة (ليست من إرسالك)"))
+        }
+        return AppResult.Success(Unit)
+    }
     override suspend fun deleteMessage(channelId: String, messageId: String, forEveryone: Boolean, currentUserId: String): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun toggleReaction(channelId: String, messageId: String, userId: String, emoji: String): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun deleteChannel(channelId: String): AppResult<Unit> = AppResult.Success(Unit)

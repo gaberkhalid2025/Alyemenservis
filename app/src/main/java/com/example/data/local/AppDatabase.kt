@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         InstantRequestRoomEntity::class,
         RequestOfferRoomEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -49,6 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "yemen_services_room_db"
                 )
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance
                 instance

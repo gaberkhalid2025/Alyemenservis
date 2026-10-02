@@ -336,13 +336,13 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                                     Text("⏱️ ${req.urgencyTime}", fontSize = 11.sp, color = themeColors.accent, fontWeight = FontWeight.Bold)
                                 }
 
-                                if (req.secretPin.isNotBlank()) {
+                                if (req.rawPin.isNotBlank()) {
                                     Surface(
                                         color = Color(0xFF1E293B),
                                         shape = RoundedCornerShape(6.dp)
                                     ) {
                                         Text(
-                                            text = "🔑 الرمز السري (PIN): ${req.secretPin}",
+                                            text = "🔑 الرمز السري (PIN): ${req.rawPin}",
                                             fontSize = 10.5.sp,
                                             color = Color(0xFFFDE047),
                                             fontWeight = FontWeight.Bold,
@@ -381,7 +381,7 @@ fun OrdersScreenLayout(viewModel: MainViewModel, themeColors: VisualThemePalette
                                     if (req.status != "COMPLETED" && req.status != "CANCELLED") {
                                         OutlinedButton(
                                             onClick = {
-                                                viewModel.cancelInstantRequest(req.id, req.secretPin)
+                                                viewModel.cancelInstantRequest(req.id, req.rawPin)
                                                 Toast.makeText(context, "🗑️ تم إلغاء الطلب بنجاح", Toast.LENGTH_SHORT).show()
                                             },
                                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),

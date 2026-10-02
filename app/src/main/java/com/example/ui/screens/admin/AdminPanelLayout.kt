@@ -1750,14 +1750,19 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                     }
                                 }
 
+                                val galleryScope = rememberCoroutineScope()
                                 val galleryLauncher = rememberLauncherForActivityResult(
                                     contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
                                 ) { uri: android.net.Uri? ->
-                                    uri?.let {
-                                        val base64Str = convertUriToBase64(context, it)
-                                        if (base64Str.isNotEmpty()) {
-                                            manualPhotoUrl = base64Str
-                                            Toast.makeText(context, "✅ تم اختيار الصورة وتحويلها بنجاح!", Toast.LENGTH_SHORT).show()
+                                    uri?.let { selectedUri ->
+                                        galleryScope.launch {
+                                            val path = com.example.utils.FirebaseStorageUploader.getProviderProfilePath(java.util.UUID.randomUUID().toString())
+                                            val uploadedUrl = com.example.utils.FirebaseStorageUploader.uploadImageUri(context, selectedUri, path)
+                                                .getOrElse { selectedUri.toString() }
+                                            if (uploadedUrl.isNotEmpty()) {
+                                                manualPhotoUrl = uploadedUrl
+                                                Toast.makeText(context, "✅ تم اختيار الصورة ورفعها بنجاح!", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     }
                                 }
@@ -7890,7 +7895,7 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
         var editCustTime by rememberSaveable(booking.id) { mutableStateOf(booking.timeString) }
         var editCustStatus by rememberSaveable(booking.id) { mutableStateOf(booking.status) }
         var editCustPassword by rememberSaveable(booking.id) { 
-            mutableStateOf(if (booking.bookingPassword.isNotBlank()) booking.bookingPassword else if (booking.pinCode.isNotBlank()) "••••" else "1234") 
+            mutableStateOf(if (booking.pinCode.isNotBlank()) "••••" else "1234") 
         }
 
         Dialog(onDismissRequest = { editingBookingObj = null }) {
@@ -8019,7 +8024,6 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                         dateString = editCustDate.trim(),
                                         timeString = editCustTime.trim(),
                                         status = editCustStatus,
-                                        bookingPassword = "",
                                         pinCode = if (editCustPassword.trim() == "••••" || editCustPassword.trim().contains(":")) booking.pinCode else if (editCustPassword.trim().isNotBlank()) com.example.utils.SecureHasher.hashPin(editCustPassword.trim()) else booking.pinCode
                                     )
                                     viewModel.updateBooking(updatedB)

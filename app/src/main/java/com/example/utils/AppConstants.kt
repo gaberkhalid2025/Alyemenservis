@@ -22,6 +22,8 @@ object AppConstants {
     const val NEARBY_THRESHOLD_METERS = 5000.0
     
     // Firestore Collections
+    const val COL_SETTINGS = "settings"
+    const val DOC_GLOBAL_SETTINGS = "global_settings"
     const val COL_PROVIDERS = "providers"
     const val COL_STORES = "stores"
     const val COL_PROPERTIES = "properties"
@@ -36,4 +38,14 @@ object AppConstants {
     const val COL_REVIEWS = "reviews"
     const val COL_RATINGS = "ratings"
     const val COL_PRODUCTS = "products"
+    const val COL_ADMIN_USERS = "admin_users"
+    const val COL_SUPERVISORS = "supervisors"
+    const val COL_INTERNAL_WALLETS = "internal_wallets"
+    const val COLLECTION_INTERNAL_WALLETS = "internal_wallets"
+    const val COL_PAYMENTS = "payments"
+    const val COL_OFFERS = "offers"
+    const val COL_CHAT_CHANNELS = "chat_channels"
+    const val COL_FCM_TOKENS = "fcm_tokens"
+    const val COL_ACTIVITY_LOGS = "activity_logs"
+    const val COL_PASSWORD_RECOVERY = "password_recovery_requests"
 }

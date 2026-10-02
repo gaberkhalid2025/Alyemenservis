@@ -29,8 +29,6 @@ data class RatingEntity(
     val isReported: Boolean = false,
     val reportReason: String = ""
 ) {
-    val providerId: String get() = targetId
-
     fun toReviewEntity(): com.example.domain.entities.RatingReviewEntity {
         return com.example.domain.entities.RatingReviewEntity(
             id = id,
@@ -40,18 +38,6 @@ data class RatingEntity(
             rating = rating.toDouble(),
             comment = comment,
             dateTimestamp = timestamp
-        )
-    }
-
-    fun toReview(): Review {
-        return Review(
-            id = id,
-            shopId = targetId,
-            userId = userId,
-            userName = userName,
-            rating = rating.toInt(),
-            text = comment,
-            timestamp = timestamp
         )
     }
 }

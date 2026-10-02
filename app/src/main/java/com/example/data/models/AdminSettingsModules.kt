@@ -76,6 +76,7 @@ data class SupportSettings(
     val supportEmail: String = "",
     val adminUsername: String = "",
     val ownerEmail: String = "",
+    @Deprecated("Use SecureAdminStorage / ownerPasswordHash instead")
     @get:com.google.firebase.firestore.Exclude
     val ownerPassword: String = ""
 )

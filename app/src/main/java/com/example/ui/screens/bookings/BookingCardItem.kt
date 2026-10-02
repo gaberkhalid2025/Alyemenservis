@@ -47,12 +47,17 @@ fun BookingCardItem(
     var verifiedPlainPin by remember { mutableStateOf("") }
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    val isUserTheClient = remember(booking, currentUserId) {
+    val isUserTheClient = remember(booking, currentUserId, isAdmin) {
         val normalizedCurrentUser = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(currentUserId)
         val normalizedClientPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(booking.clientPhone)
         val normalizedCustomerPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(booking.customerPhone)
-        !isAdmin && (booking.clientId == currentUserId || normalizedClientPhone == normalizedCurrentUser || normalizedCustomerPhone == normalizedCurrentUser || !isProvider)
+        !isAdmin && currentUserId.isNotBlank() && (
+            booking.customerId == currentUserId ||
+            booking.clientId == currentUserId ||
+            (normalizedCurrentUser.isNotBlank() && (normalizedClientPhone == normalizedCurrentUser || normalizedCustomerPhone == normalizedCurrentUser))
+        )
     }
+    val canViewSensitivePin = isUserTheClient || isAdmin
 
     val canModifyOrCancel = BookingUtils.canModifyOrCancelBooking(
         scheduledAtTimestamp = booking.scheduledAt,
@@ -237,9 +242,9 @@ fun BookingCardItem(
                 }
             }
 
-            // Password / PIN Display (Masked toggle)
-            val pass = booking.bookingPassword.ifBlank { booking.pinCode }
-            if (pass.isNotBlank() && !isTerminalState) {
+            // Password / PIN Display (Masked toggle - strictly visible only to booking owner or admin)
+            val pass = booking.effectivePin
+            if (pass.isNotBlank() && !isTerminalState && canViewSensitivePin) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Color(0xFF0F172A),
@@ -260,14 +265,8 @@ fun BookingCardItem(
                                 color = Color(0xFF94A3B8)
                             )
                             Text(
-                                text = if (isPasswordVisible) {
-                                    verifiedPlainPin.ifBlank {
-                                        if (booking.bookingPassword.isNotBlank() && !booking.bookingPassword.contains(":")) {
-                                            booking.bookingPassword
-                                        } else {
-                                            "••••"
-                                        }
-                                    }
+                                text = if (isPasswordVisible && verifiedPlainPin.isNotBlank()) {
+                                    verifiedPlainPin
                                 } else {
                                     "••••"
                                 },
@@ -330,7 +329,7 @@ fun BookingCardItem(
                     confirmButton = {
                         Button(
                             onClick = {
-                                val targetHash = booking.pinCode.ifBlank { booking.bookingPassword }
+                                val targetHash = booking.effectivePin
                                 val isVerified = com.example.utils.SecureHasher.verifyPin(enteredPinText, targetHash)
                                 if (isVerified) {
                                     verifiedPlainPin = enteredPinText

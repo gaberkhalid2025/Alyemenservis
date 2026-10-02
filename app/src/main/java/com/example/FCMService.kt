@@ -193,9 +193,23 @@ class FCMService : FirebaseMessagingService() {
                 val rawUserId = sp.getString("user_id", "") ?: ""
                 val localUserId = if (rawUserId.isNotEmpty() && rawUserId != "guest") {
                     if (rawUserId.startsWith("gcm:")) {
-                        try { SecurityCryptoUtils.decrypt(rawUserId) } catch (e: Exception) { "" }
+                        try {
+                            val dec = SecurityCryptoUtils.decrypt(rawUserId)
+                            if (dec.isEmpty() || dec.startsWith("gcm:")) {
+                                android.util.Log.e("FCMService", "Failed to decrypt user_id from SharedPreferences")
+                                ""
+                            } else dec
+                        } catch (e: Exception) {
+                            android.util.Log.e("FCMService", "Exception decrypting user_id", e)
+                            ""
+                        }
                     } else {
-                        try { SecurityCryptoUtils.decrypt(rawUserId).ifEmpty { rawUserId } } catch (e: Exception) { rawUserId }
+                        try {
+                            SecurityCryptoUtils.decrypt(rawUserId).ifEmpty { rawUserId }
+                        } catch (e: Exception) {
+                            android.util.Log.e("FCMService", "Failed to decrypt legacy user_id", e)
+                            ""
+                        }
                     }
                 } else rawUserId
 
@@ -208,9 +222,23 @@ class FCMService : FirebaseMessagingService() {
                 val rawPhone = sp.getString("user_phone", "") ?: ""
                 val phone = if (rawPhone.isNotEmpty()) {
                     if (rawPhone.startsWith("gcm:")) {
-                        try { SecurityCryptoUtils.decrypt(rawPhone) } catch (e: Exception) { "" }
+                        try {
+                            val dec = SecurityCryptoUtils.decrypt(rawPhone)
+                            if (dec.isEmpty() || dec.startsWith("gcm:")) {
+                                android.util.Log.e("FCMService", "Failed to decrypt user_phone from SharedPreferences")
+                                ""
+                            } else dec
+                        } catch (e: Exception) {
+                            android.util.Log.e("FCMService", "Exception decrypting user_phone", e)
+                            ""
+                        }
                     } else {
-                        try { SecurityCryptoUtils.decrypt(rawPhone).ifEmpty { rawPhone } } catch (e: Exception) { rawPhone }
+                        try {
+                            SecurityCryptoUtils.decrypt(rawPhone).ifEmpty { rawPhone }
+                        } catch (e: Exception) {
+                            android.util.Log.e("FCMService", "Failed to decrypt legacy user_phone", e)
+                            ""
+                        }
                     }
                 } else ""
                 val cleanPhone = AppPreferenceHelper.normalizePhoneNumber(phone.trim())
@@ -218,7 +246,16 @@ class FCMService : FirebaseMessagingService() {
                 val rawRole = sp.getString("user_role", "") ?: ""
                 val resolvedRole = if (rawRole.isNotEmpty()) {
                     if (rawRole.startsWith("gcm:")) {
-                        try { SecurityCryptoUtils.decrypt(rawRole).ifBlank { "CLIENT" } } catch (e: Exception) { "CLIENT" }
+                        try {
+                            val dec = SecurityCryptoUtils.decrypt(rawRole)
+                            if (dec.isBlank() || dec.startsWith("gcm:")) {
+                                android.util.Log.e("FCMService", "Failed to decrypt user_role from SharedPreferences")
+                                "CLIENT"
+                            } else dec
+                        } catch (e: Exception) {
+                            android.util.Log.e("FCMService", "Exception decrypting user_role", e)
+                            "CLIENT"
+                        }
                     } else {
                         rawRole.ifBlank { "CLIENT" }
                     }

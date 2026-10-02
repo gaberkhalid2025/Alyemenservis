@@ -1,72 +1,72 @@
 package com.example.data
 
-import androidx.annotation.Keep
+import com.example.utils.AppConstants
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-@Keep
-@Deprecated("استخدم RatingEntity كنموذج موحد للتقييمات", ReplaceWith("RatingEntity"))
-data class Review(
-    val id: String = java.util.UUID.randomUUID().toString(),
-    val shopId: String = "",
-    val userId: String = "",
-    val userName: String = "",
-    val rating: Int = 5,
-    val text: String = "",
-    val timestamp: Long = System.currentTimeMillis()
-) {
-    fun toRatingEntity(): RatingEntity = RatingEntity(
-        id = id,
-        targetId = shopId,
-        targetType = "STORE",
-        userId = userId,
-        userName = userName,
-        rating = rating.toFloat(),
-        comment = text,
-        timestamp = timestamp
-    )
-}
-
 object DataManager {
     private val firestore = FirebaseFirestore.getInstance()
 
+    /**
+     * Mapper converting a Firestore document (including legacy Review fields if present) into the unified RatingEntity.
+     */
+    fun mapDocumentToRatingEntity(doc: DocumentSnapshot): RatingEntity? {
+        return try {
+            val entity = doc.toObject(RatingEntity::class.java)?.copy(id = doc.id)
+            if (entity != null) {
+                val resolvedTargetId = entity.targetId.ifBlank { doc.getString("shopId") ?: doc.getString("providerId") ?: "" }
+                val resolvedComment = entity.comment.ifBlank { doc.getString("text") ?: "" }
+                entity.copy(
+                    targetId = resolvedTargetId,
+                    comment = resolvedComment
+                )
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun submitReview(
-        shopId: String, 
-        review: Review, 
-        onSuccess: () -> Unit = {}, 
+        shopId: String,
+        ratingEntity: RatingEntity,
+        onSuccess: () -> Unit = {},
         onFailure: (Exception) -> Unit = {}
     ) {
-        val reviewDocument = review.copy(shopId = shopId)
-        firestore.collection("reviews")
-            .document(reviewDocument.id)
-            .set(reviewDocument)
+        val docId = ratingEntity.id.ifBlank { java.util.UUID.randomUUID().toString() }
+        val normalized = ratingEntity.copy(
+            id = docId,
+            targetId = shopId.ifBlank { ratingEntity.targetId },
+            targetType = ratingEntity.targetType.ifBlank { "STORE" }
+        )
+        firestore.collection(AppConstants.COL_RATINGS)
+            .document(docId)
+            .set(normalized)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onFailure(it) }
     }
 
-    fun getReviews(shopId: String): Flow<List<Review>> = callbackFlow {
-        val listener = firestore.collection("reviews")
-            .whereEqualTo("shopId", shopId)
+    fun getRatingReviews(shopId: String): Flow<List<RatingEntity>> = callbackFlow {
+        val listener = firestore.collection(AppConstants.COL_RATINGS)
+            .whereEqualTo("targetId", shopId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    // Fail gracefully
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
                     val reviewsList = snapshot.documents.mapNotNull { doc ->
-                        try {
-                            doc.toObject(Review::class.java)?.copy(id = doc.id)
-                        } catch (e: Exception) {
-                            null
-                        }
+                        mapDocumentToRatingEntity(doc)
                     }.sortedByDescending { it.timestamp }
                     trySend(reviewsList)
                 }
             }
         awaitClose { listener.remove() }
     }
+
+    fun getReviews(shopId: String): Flow<List<RatingEntity>> = getRatingReviews(shopId)
 }

@@ -104,11 +104,10 @@ open class BookingViewModel @Inject constructor(
         }
         val bId = booking.id.ifEmpty { java.util.UUID.randomUUID().toString() }
         val bNum = booking.bookingNumber.ifEmpty { "YEM-${(10000..99999).random()}" }
-        val bPass = booking.bookingPassword.ifEmpty { "${(1000..9999).random()}" }
+        val bPass = "${(1000..9999).random()}"
         val finalized = booking.copy(
             id = bId,
             bookingNumber = bNum,
-            bookingPassword = "",
             pinCode = if (booking.pinCode.isNotBlank()) booking.pinCode else com.example.utils.SecureHasher.hashPin(bPass),
             createdAt = if (booking.createdAt == 0L) System.currentTimeMillis() else booking.createdAt,
             updatedAt = System.currentTimeMillis()
@@ -180,7 +179,6 @@ open class BookingViewModel @Inject constructor(
                 date = dateStr,
                 dateString = dateStr,
                 bookingNumber = bNum,
-                bookingPassword = "",
                 pinCode = com.example.utils.SecureHasher.hashPin(bPass),
                 isRecurring = true,
                 createdAt = System.currentTimeMillis(),
@@ -358,7 +356,6 @@ open class BookingViewModel @Inject constructor(
             timeString = timeString,
             status = "PENDING",
             bookingNumber = finalBookingNumber,
-            bookingPassword = "",
             pinCode = if (pinCode.isNotBlank()) pinCode else com.example.utils.SecureHasher.hashPin(generatedPass),
             totalAmount = finalPrice,
             createdAt = System.currentTimeMillis(),

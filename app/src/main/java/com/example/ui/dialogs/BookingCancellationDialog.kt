@@ -262,7 +262,7 @@ fun BookingCancellationDialog(
                             }
 
                             if (userRole == "CLIENT") {
-                                val expectedTarget = if (booking.pinCode.isNotBlank()) booking.pinCode else booking.bookingPassword
+                                val expectedTarget = booking.pinCode
                                 val isValid = com.example.security.BookingSecurityHelper.verifyPassword(passwordInput.trim(), expectedTarget)
                                 if (!isValid) {
                                     val remaining = com.example.security.BookingSecurityHelper.recordFailedAttempt(context, booking.id)

@@ -1,34 +1,33 @@
 package com.example.data
 
-import java.util.concurrent.ConcurrentHashMap
+import android.content.Context
+import com.example.data.local.AppDatabase
+import com.example.data.local.toEntity
+import com.example.data.local.toRoomEntity
 
 /**
  * 🗄️ BookingCache
- * ذاكرة مؤقتة لطلبات الحجوزات (تم تفضيل Room Database كمصدر محلي رئيسي)
+ * تم إزالة الكاش المؤقت في الذاكرة (ConcurrentHashMap) والاعتماد حصرياً على Room Database (AppDatabase) كمصدر محلي وحيد للحجوزات.
  */
-@Deprecated("تم اعتماد Room Database (BookingDao) كمصدر محلي وحيد ودائم للحجوزات")
-class BookingCache {
-    private val cache = ConcurrentHashMap<String, Pair<Long, List<BookingEntity>>>()
-    private val TTL = 5 * 60 * 1000L // 5 دقائق
+@Deprecated("Use Room AppDatabase (bookingDao) directly as the single local source of truth for bookings")
+class BookingCache(private val context: Context? = null) {
 
-    fun getBookings(key: String): List<BookingEntity>? {
-        val (timestamp, bookings) = cache[key] ?: return null
-        if (System.currentTimeMillis() - timestamp > TTL) {
-            cache.remove(key)
-            return null
-        }
-        return bookings
+    suspend fun getBookingsFromRoom(): List<BookingEntity> {
+        val ctx = context ?: return emptyList()
+        return AppDatabase.getInstance(ctx).bookingDao().getAllBookingsList().map { it.toEntity() }
     }
 
-    fun putBookings(key: String, bookings: List<BookingEntity>) {
-        cache[key] = System.currentTimeMillis() to bookings
+    suspend fun putBookingsToRoom(bookings: List<BookingEntity>) {
+        val ctx = context ?: return
+        val dao = AppDatabase.getInstance(ctx).bookingDao()
+        dao.deleteAllBookings()
+        if (bookings.isNotEmpty()) {
+            dao.insertBookings(bookings.map { it.toRoomEntity() })
+        }
     }
 
-    fun invalidate(key: String? = null) {
-        if (key != null) {
-            cache.remove(key)
-        } else {
-            cache.clear()
-        }
+    suspend fun invalidateRoom() {
+        val ctx = context ?: return
+        AppDatabase.getInstance(ctx).bookingDao().deleteAllBookings()
     }
 }

@@ -61,14 +61,14 @@ class FlowsIntegrationUnitTest {
             providerId = "provider_123",
             providerName = "مهندس علي",
             bookingNumber = "BK-2026-001",
-            bookingPassword = "654321",
+            pinCode = "654321",
             status = "PENDING"
         )
 
         assertEquals("PENDING", booking.status)
         assertEquals("771234567", booking.customerPhone)
         assertEquals("BK-2026-001", booking.bookingNumber)
-        assertTrue(booking.bookingPassword.length >= 4)
+        assertTrue(booking.pinCode.length >= 4)
     }
 
     @Test

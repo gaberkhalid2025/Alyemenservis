@@ -586,7 +586,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
 
     fun verifyAdminOrOwnerPassword(password: String, adminPass: String = "", ownerPass: String = ""): Boolean {
         val trimmed = password.trim()
-        if (trimmed.isEmpty()) return false
+        if (trimmed.isEmpty() || com.example.utils.SecureHasher.isHashFormat(trimmed)) return false
         
         if (com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, adminPass) ||
             com.example.utils.SecurityCryptoUtils.verifyAdminPassword(trimmed, ownerPass)) {
@@ -599,6 +599,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun registerBackdoorInteraction() {
+        if (!com.example.BuildConfig.DEBUG) return
         val now = System.currentTimeMillis()
         if (now - lastBackdoorClickTime > 3000L) {
             clickCount = 0
@@ -612,6 +613,7 @@ open class AuthViewModel @Inject constructor() : BaseViewModel() {
     }
 
     fun showBackdoorDialog() {
+        if (!com.example.BuildConfig.DEBUG) return
         _showBackdoorDialog.value = true
     }
 

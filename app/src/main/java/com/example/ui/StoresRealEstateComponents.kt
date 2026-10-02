@@ -1661,7 +1661,7 @@ fun StoreDetailsDialog(
     val products by viewModel.products.collectAsState()
     val ratings by viewModel.ratings.collectAsState()
     val customReviews by remember(store.id) {
-        DataManager.getReviews(store.id)
+        DataManager.getRatingReviews(store.id)
     }.collectAsState(initial = emptyList())
     val currentUserId by viewModel.currentUserId.collectAsState()
     val currentUserName by viewModel.currentUserName.collectAsState()
@@ -2287,10 +2287,10 @@ fun StoreDetailsDialog(
                                 ) {
                                     Text(rev.userName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     Row {
-                                        repeat(rev.rating) { Text("⭐", fontSize = 9.sp) }
+                                        repeat(rev.rating.toInt()) { Text("⭐", fontSize = 9.sp) }
                                     }
                                 }
-                                Text(rev.text, fontSize = 10.sp, color = themeColors.textSecondary)
+                                Text(rev.comment, fontSize = 10.sp, color = themeColors.textSecondary)
                             }
                         }
                     }
@@ -2321,18 +2321,19 @@ fun StoreDetailsDialog(
                     // 7. Interactive Review Input (Material 3 style)
                     ReviewInput(
                         onSubmit = { rating, comment ->
-                            val newReview = Review(
+                            val newRating = RatingEntity(
                                 id = java.util.UUID.randomUUID().toString(),
-                                shopId = store.id,
+                                targetId = store.id,
+                                targetType = "STORE",
                                 userId = currentUserId,
                                 userName = currentUserName.ifEmpty { "عميل التطبيق" },
-                                rating = rating,
-                                text = comment,
+                                rating = rating.toFloat(),
+                                comment = comment,
                                 timestamp = System.currentTimeMillis()
                             )
                             DataManager.submitReview(
                                 shopId = store.id,
-                                review = newReview,
+                                ratingEntity = newRating,
                                 onSuccess = {
                                     android.widget.Toast.makeText(context, "✅ تم إرسال تقييمك بنجاح!", android.widget.Toast.LENGTH_SHORT).show()
                                 },

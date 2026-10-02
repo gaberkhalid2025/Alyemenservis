@@ -2160,6 +2160,16 @@ fun confirmPayment(
     }
 
 fun verifyPayment(paymentId: String, isVerified: Boolean, note: String, adminName: String) {
+        val cleanId = paymentId.trim()
+        if (cleanId.isBlank()) {
+            mainViewModel.triggerNotification("❌ معرف الدفعة غير صالح")
+            return
+        }
+        val existingPayment = _payments.value.find { it.id == cleanId }
+        if (existingPayment == null && _payments.value.isNotEmpty()) {
+            mainViewModel.triggerNotification("❌ لم يتم العثور على معاملة الدفع المطلوبة: $cleanId")
+            return
+        }
         val status = if (isVerified) "COMPLETED" else "FAILED"
         val verificationStatus = if (isVerified) "VERIFIED" else "REJECTED"
         
@@ -2176,7 +2186,7 @@ fun verifyPayment(paymentId: String, isVerified: Boolean, note: String, adminNam
             updates["paidAt"] = System.currentTimeMillis()
         }
         
-        db.collection("payments").document(paymentId).update(updates).addOnSuccessListener {
+        db.collection("payments").document(cleanId).update(updates).addOnSuccessListener {
             mainViewModel.triggerNotification(if (isVerified) "✅ تم قبول وتأكيد عملية الدفع بنجاح!" else "❌ تم رفض عملية الدفع.")
             
             db.collection("payments").document(paymentId).get().addOnSuccessListener { snapshot ->
@@ -3051,7 +3061,11 @@ fun restoreEntity(entityType: String, entityId: String) {
         }
     }
 
-fun hardDeleteEntity(entityType: String, entityId: String) {
+fun hardDeleteEntity(entityType: String, entityId: String, reason: String = "") {
+        val cleanReason = reason.trim()
+        if (cleanReason.isNotBlank()) {
+            logAdminActivity("🗑️ حذف نهائي للسجل ($entityType: $entityId) | السبب: $cleanReason")
+        }
         when (entityType.uppercase()) {
             "PROVIDER" -> removeProviderPermanently(entityId)
             "STORE", "RESTAURANT", "MEDICAL" -> deleteStorePermanently(entityId)

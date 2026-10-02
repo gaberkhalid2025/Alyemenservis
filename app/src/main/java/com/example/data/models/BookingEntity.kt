@@ -41,9 +41,6 @@ data class BookingEntity(
     val fullAddress: String = "",
     val bookingCode: String = "",
     val bookingNumber: String = "",      // BK-YYMMDDHHMMSS-XXXX
-    @Deprecated("تم استبدالها بـ pinCode المشفرة", ReplaceWith("pinCode"))
-    @get:com.google.firebase.firestore.Exclude
-    val bookingPassword: String = "",    // 4-digit code (legacy plaintext)
     val clientId: String = "",
     @Deprecated("استخدم customerName بدلاً منها", ReplaceWith("customerName"))
     val clientName: String = "",
@@ -97,7 +94,8 @@ data class BookingEntity(
     val secretPin: String = "",
     val technicianId: String = "",
     val technicianName: String = "",
-    val providerPhoto: String = ""
+    val providerPhoto: String = "",
+    val customerId: String = clientId.ifBlank { customerPhone.ifBlank { clientPhone } }
 ) {
     val effectiveCustomerName: String
         get() = customerName.ifBlank { fullName.ifBlank { clientName.ifBlank { userName.ifBlank { "العميل" } } } }
@@ -114,6 +112,10 @@ data class BookingEntity(
     val effectiveTime: String
         get() = time.ifBlank { timeString }
 
+    @Suppress("DEPRECATION")
     val effectivePin: String
-        get() = pinCode.ifBlank { secretPin.ifBlank { bookingPassword } }
+        get() = pinCode.ifBlank { secretPin }
+
+    val effectivePinCode: String
+        get() = effectivePin
 }

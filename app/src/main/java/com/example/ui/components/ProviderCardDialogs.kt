@@ -62,7 +62,7 @@ fun ProviderDetailsDialog(
 
     val allRatingsState = viewModel.ratings.collectAsState()
     val providerRatings = remember(allRatingsState.value, provider.id) {
-        allRatingsState.value.filter { it.targetId == provider.id || it.providerId == provider.id }
+        allRatingsState.value.filter { it.targetId == provider.id }
     }
 
     Dialog(
@@ -687,7 +687,7 @@ fun ProviderReviewsListDialog(
     val context = LocalContext.current
     val allRatingsState = viewModel.ratings.collectAsState()
     val providerRatings = remember(allRatingsState.value, provider.id) {
-        allRatingsState.value.filter { it.targetId == provider.id || it.providerId == provider.id }
+        allRatingsState.value.filter { it.targetId == provider.id }
     }
 
     var selectedRating by remember { mutableStateOf(5) }

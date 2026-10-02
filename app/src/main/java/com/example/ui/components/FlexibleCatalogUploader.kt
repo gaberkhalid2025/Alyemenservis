@@ -26,8 +26,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.utils.FirebaseStorageUploader
 import com.example.utils.VisualThemePalette
-import com.example.utils.convertUriToBase64
+import kotlinx.coroutines.launch
+import java.util.UUID
 
 @Composable
 fun FlexibleCatalogUploader(
@@ -42,6 +44,7 @@ fun FlexibleCatalogUploader(
     onExternalLinkChange: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var activeUploadTab by remember { mutableStateOf(0) } // 0: Excel/CSV, 1: PDF, 2: Images, 3: External Link
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -62,10 +65,19 @@ fun FlexibleCatalogUploader(
                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                 return@let
             }
-            val base64 = com.example.utils.convertGenericUriToBase64(context, it)
-            onExcelFileChange(fileName, base64)
-            errorMessage = null
-            Toast.makeText(context, "✅ تم اختيار جدول البيانات: $fileName", Toast.LENGTH_SHORT).show()
+            scope.launch {
+                val bytes = context.contentResolver.openInputStream(it)?.use { s -> s.readBytes() }
+                val uploadedUrl = if (bytes != null) {
+                    FirebaseStorageUploader.uploadBytesToStorage(
+                        bytes = bytes,
+                        storagePath = "catalogs/excel/${UUID.randomUUID().toString().take(8)}_$fileName",
+                        mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ).getOrElse { it.toString() }
+                } else it.toString()
+                onExcelFileChange(fileName, uploadedUrl)
+                errorMessage = null
+                Toast.makeText(context, "✅ تم اختيار جدول البيانات: $fileName", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -92,10 +104,19 @@ fun FlexibleCatalogUploader(
                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                 return@let
             }
-            val base64 = com.example.utils.convertGenericUriToBase64(context, it)
-            onPdfFileChange(fileName, base64)
-            errorMessage = null
-            Toast.makeText(context, "✅ تم اختيار كتالوج PDF: $fileName", Toast.LENGTH_SHORT).show()
+            scope.launch {
+                val bytes = context.contentResolver.openInputStream(it)?.use { s -> s.readBytes() }
+                val uploadedUrl = if (bytes != null) {
+                    FirebaseStorageUploader.uploadBytesToStorage(
+                        bytes = bytes,
+                        storagePath = "catalogs/pdf/${UUID.randomUUID().toString().take(8)}_$fileName",
+                        mimeType = "application/pdf"
+                    ).getOrElse { it.toString() }
+                } else it.toString()
+                onPdfFileChange(fileName, uploadedUrl)
+                errorMessage = null
+                Toast.makeText(context, "✅ تم اختيار كتالوج PDF: $fileName", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -103,11 +124,16 @@ fun FlexibleCatalogUploader(
     val imagesPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
-        val compressed = uris.map { uri ->
-            convertUriToBase64(context, uri)
-        }.filter { it.isNotEmpty() }
-        onImagesListChange((imagesList + compressed).take(10))
-        Toast.makeText(context, "✅ تم ضغط وإضافة ${compressed.size} صور خفيفة للكتالوج", Toast.LENGTH_SHORT).show()
+        scope.launch {
+            val uploadedUrls = uris.mapIndexedNotNull { index, uri ->
+                val path = "catalogs/images/img_${index}_${UUID.randomUUID().toString().take(8)}.webp"
+                FirebaseStorageUploader.uploadImageUri(context, uri, path)
+                    .getOrElse { uri.toString() }
+                    .takeIf { it.isNotEmpty() }
+            }
+            onImagesListChange((imagesList + uploadedUrls).take(10))
+            Toast.makeText(context, "✅ تم ضغط ورفع ${uploadedUrls.size} صور خفيفة للكتالوج", Toast.LENGTH_SHORT).show()
+        }
     }
 
     Card(

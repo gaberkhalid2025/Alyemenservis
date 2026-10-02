@@ -333,55 +333,9 @@ fun getDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double 
     return calculateDistanceInMeters(lat1, lon1, lat2, lon2) / 1000.0
 }
 
-@Deprecated("Use FirebaseStorageUploader")
-fun convertUriToBase64(context: Context, uri: Uri): String {
-    return try {
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { inputStream ->
-            BitmapFactory.decodeStream(inputStream, null, options)
-        } ?: return uri.toString()
-
-        val reqWidth = 1024
-        val reqHeight = 1024
-        var inSampleSize = 1
-        if (options.outHeight > reqHeight || options.outWidth > reqWidth) {
-            val halfHeight = options.outHeight / 2
-            val halfWidth = options.outWidth / 2
-            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
-                inSampleSize *= 2
-            }
-        }
-
-        val finalOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
-        val decodedBitmap = context.contentResolver.openInputStream(uri)?.use { nextInputStream ->
-            BitmapFactory.decodeStream(nextInputStream, null, finalOptions)
-        }
-
-        if (decodedBitmap != null) {
-            val scaledBitmap = if (decodedBitmap.width > reqWidth || decodedBitmap.height > reqHeight) {
-                val ratio = Math.min(reqWidth.toFloat() / decodedBitmap.width, reqHeight.toFloat() / decodedBitmap.height)
-                Bitmap.createScaledBitmap(
-                    decodedBitmap,
-                    (decodedBitmap.width * ratio).toInt().coerceAtLeast(1),
-                    (decodedBitmap.height * ratio).toInt().coerceAtLeast(1),
-                    true
-                )
-            } else {
-                decodedBitmap
-            }
-
-            val outputStream = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, outputStream)
-            if (scaledBitmap !== decodedBitmap) {
-                scaledBitmap.recycle()
-            }
-            decodedBitmap.recycle()
-            val bytes = outputStream.toByteArray()
-            Base64.encodeToString(bytes, Base64.NO_WRAP)
-        } else uri.toString()
-    } catch (e: Exception) {
-        uri.toString()
-    }
+@Deprecated("Use FirebaseStorageUploader.uploadImageUri instead")
+fun convertUriToBase64(@Suppress("UNUSED_PARAMETER") context: Context, uri: Uri): String {
+    return uri.toString()
 }
 
 fun Color.luminance(): Float {

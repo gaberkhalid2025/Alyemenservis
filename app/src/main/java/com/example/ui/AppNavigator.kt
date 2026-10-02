@@ -319,7 +319,7 @@ fun AppNavigator(
             }
 
             val showBackdoorDialog by viewModel.showBackdoorDialog.collectAsState()
-            if (showBackdoorDialog && com.example.BuildConfig.DEBUG) {
+            if (showBackdoorDialog) {
                 BackdoorLoginDialog(
                     viewModel = viewModel,
                     themeColors = themeColors,

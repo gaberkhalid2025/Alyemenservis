@@ -488,7 +488,6 @@ fun BookingFormScreen(
                         id = java.util.UUID.randomUUID().toString(),
                         bookingCode = generatedCode,
                         bookingNumber = generatedCode,
-                        bookingPassword = "",
                         pinCode = com.example.utils.SecureHasher.hashPin(generatedPass),
                         fullName = fullName.trim(),
                         customerName = fullName.trim(),

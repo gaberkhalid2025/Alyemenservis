@@ -3,7 +3,6 @@ package com.example.data.repositories
 import android.content.Context
 import android.util.Log
 import com.example.data.BookingEntity
-import com.example.data.BookingCache
 import com.example.data.LocalAppCacheManager
 import com.example.security.BookingSecurityHelper
 import com.example.utils.AnalyticsEventsHelper
@@ -16,6 +15,7 @@ import com.google.firebase.firestore.Query
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import com.example.data.local.toEntity
 import com.example.data.local.toRoomEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,8 +37,7 @@ import java.util.UUID
  */
 class BookingRepository(
     private val context: Context,
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val memoryCache: BookingCache = BookingCache()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) : IBookingRepository {
 
     private val repositoryScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
@@ -50,58 +49,61 @@ class BookingRepository(
     override val cachedBookings: StateFlow<List<BookingEntity>> = _cachedBookings.asStateFlow()
 
     init {
-        loadFromCache()
+        repositoryScope.launch {
+            loadFromCacheAsync()
+        }
+    }
+
+    private suspend fun loadFromCacheAsync(): List<BookingEntity> {
+        return try {
+            val bookingDao = com.example.data.local.AppDatabase.getInstance(context).bookingDao()
+            val list = bookingDao.getAllBookingsList().map { it.toEntity() }
+            val now = System.currentTimeMillis()
+            val normalizedList = list.map { booking ->
+                if (booking.isLocked && booking.lockedUntil != null && now > booking.lockedUntil) {
+                    booking.copy(isLocked = false, lockedUntil = null)
+                } else {
+                    booking
+                }
+            }
+            if (normalizedList.isNotEmpty()) {
+                _cachedBookings.value = normalizedList
+            }
+            normalizedList
+        } catch (e: Exception) {
+            Log.e("BookingRepository", "Error reading Room cache", e)
+            _cachedBookings.value
+        }
     }
 
     private fun loadFromCache(): List<BookingEntity> {
-        return try {
-            val raw = cacheManager.getBookingsCacheRaw()
-            if (raw.isNotBlank() && raw != "[]") {
-                val type = Types.newParameterizedType(List::class.java, BookingEntity::class.java)
-                val adapter = moshi.adapter<List<BookingEntity>>(type)
-                val list = adapter.fromJson(raw) ?: emptyList()
-                
-                // فحص انتهاء مدة قفل الحجوزات محلياً بدون الكتابة في Firestore أثناء القراءة
-                // (تتم الكتابة الفعلية في الخلفية عبر UnlockExpiredBookingsWorker)
-                val now = System.currentTimeMillis()
-                val normalizedList = list.map { booking ->
-                    if (booking.isLocked && booking.lockedUntil != null && now > booking.lockedUntil) {
-                        booking.copy(isLocked = false, lockedUntil = null)
-                    } else {
-                        booking
-                    }
-                }
-
-                _cachedBookings.value = normalizedList
-                normalizedList
+        val now = System.currentTimeMillis()
+        return _cachedBookings.value.map { booking ->
+            if (booking.isLocked && booking.lockedUntil != null && now > booking.lockedUntil) {
+                booking.copy(isLocked = false, lockedUntil = null)
             } else {
-                emptyList()
+                booking
             }
-        } catch (e: Exception) {
-            Log.e("BookingRepository", "Error reading local cache", e)
-            emptyList()
         }
     }
 
     private fun saveToCache(list: List<BookingEntity>) {
+        _cachedBookings.value = list
         try {
-            val type = Types.newParameterizedType(List::class.java, BookingEntity::class.java)
-            val adapter = moshi.adapter<List<BookingEntity>>(type)
-            val json = adapter.toJson(list)
-            cacheManager.saveBookingsCache(json)
-            _cachedBookings.value = list
-
-            try {
-                val bookingDao = com.example.data.local.AppDatabase.getInstance(context).bookingDao()
-                val roomList = list.map { it.toRoomEntity() }
-                repositoryScope.launch {
-                    bookingDao.insertBookings(roomList)
+            val bookingDao = com.example.data.local.AppDatabase.getInstance(context).bookingDao()
+            val roomList = list.map { it.toRoomEntity() }
+            repositoryScope.launch {
+                try {
+                    bookingDao.deleteAllBookings()
+                    if (roomList.isNotEmpty()) {
+                        bookingDao.insertBookings(roomList)
+                    }
+                } catch (e: Exception) {
+                    Log.e("BookingRepository", "Error persisting bookings to Room", e)
                 }
-            } catch (e: Exception) {
-                // Room fallback
             }
         } catch (e: Exception) {
-            Log.e("BookingRepository", "Error saving local cache", e)
+            Log.e("BookingRepository", "Error accessing Room database", e)
         }
     }
 
@@ -129,13 +131,6 @@ class BookingRepository(
         pageLimit: Long
     ): Flow<List<BookingEntity>> = callbackFlow {
         val safeLimit = pageLimit.coerceIn(1L, 500L)
-        val cacheKey = if (userId.isNotBlank()) "${if (isProvider) "provider" else "user"}_$userId" else "all_bookings"
-        val inMemory = memoryCache.getBookings(cacheKey)
-        if (inMemory != null && inMemory.isNotEmpty()) {
-            trySend(inMemory)
-        }
-        // Emit cache immediately for instant offline rendering
-        val local = loadFromCache()
         val cleanUser = com.example.domain.usecases.ValidatePhoneUseCase.normalizePhone(userId).ifBlank { userId.trim() }
         fun filterLocal(items: List<BookingEntity>): List<BookingEntity> {
             return if (userId.isNotBlank()) {
@@ -152,6 +147,8 @@ class BookingRepository(
             } else items
         }
 
+        // Emit Room cache immediately for instant offline rendering
+        val local = loadFromCache().ifEmpty { loadFromCacheAsync() }
         if (local.isNotEmpty()) {
             trySend(filterLocal(local))
         }
@@ -180,7 +177,6 @@ class BookingRepository(
                         null
                     }
                 }
-                memoryCache.putBookings(cacheKey, list)
                 if (userId.isBlank()) {
                     saveToCache(list)
                 } else {
@@ -225,7 +221,6 @@ class BookingRepository(
                 id = docId,
                 bookingNumber = finalCode,
                 bookingCode = finalCode,
-                bookingPassword = "", // Deprecated plaintext usage
                 pinCode = hashedPin,
                 scheduledAt = scheduledTs,
                 status = if (booking.status.isBlank()) "PENDING" else booking.status,
@@ -423,7 +418,7 @@ class BookingRepository(
         }
 
         // 3. Verify Password / PIN
-        val expectedTarget = if (booking.pinCode.isNotBlank()) booking.pinCode else booking.bookingPassword
+        val expectedTarget = booking.effectivePinCode
         val isVerified = BookingSecurityHelper.verifyPassword(inputPinOrPassword, expectedTarget)
 
         if (!isVerified) {
@@ -543,42 +538,33 @@ class BookingRepository(
     }
 
     /**
-     * Direct cancellation of a booking by ID.
+     * Direct cancellation of a booking by ID (Deprecated: enforces security checks via cancelBookingWithSecurity).
      */
+    @Deprecated(
+        "Use cancelBookingWithSecurity to enforce 8-hour rule and PIN verification",
+        ReplaceWith("cancelBookingWithSecurity(booking, inputPinOrPassword, cancellationReason, cancelledBy, onSuccess, onError)")
+    )
     fun cancelBooking(
         bookingId: String,
         cancellationReason: String = "إلغاء من قبل المستخدم",
         cancelledBy: String = "USER",
+        inputPinOrPassword: String = "",
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        val now = System.currentTimeMillis()
-        val updates = mapOf(
-            "status" to "CANCELLED",
-            "cancellationReason" to cancellationReason,
-            "cancelledAt" to now,
-            "cancelledBy" to cancelledBy,
-            "updatedAt" to now
-        )
-        val previousBookings = _cachedBookings.value
-        val current = previousBookings.map {
-            if (it.id == bookingId) it.copy(
-                status = com.example.utils.BookingStatus.CANCELLED.code,
-                cancellationReason = cancellationReason,
-                cancelledAt = now,
-                cancelledBy = cancelledBy,
-                updatedAt = now
-            ) else it
+        val booking = _cachedBookings.value.find { it.id == bookingId }
+        if (booking == null) {
+            onError("لم يتم العثور على الحجز المطلوب")
+            return
         }
-        saveToCache(current)
-
-        firestore.collection(AppConstants.COL_BOOKINGS).document(bookingId)
-            .update(updates)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener {
-                saveToCache(previousBookings)
-                onError(it.localizedMessage ?: "فشل إلغاء الحجز")
-            }
+        cancelBookingWithSecurity(
+            booking = booking,
+            inputPinOrPassword = inputPinOrPassword,
+            cancellationReason = cancellationReason,
+            cancelledBy = cancelledBy,
+            onSuccess = onSuccess,
+            onError = onError
+        )
     }
 
     /**
@@ -607,7 +593,7 @@ class BookingRepository(
             return
         }
 
-        val expectedTarget = if (existingBooking.pinCode.isNotBlank()) existingBooking.pinCode else existingBooking.bookingPassword
+        val expectedTarget = existingBooking.effectivePinCode
         val isVerified = BookingSecurityHelper.verifyPassword(inputPin, expectedTarget)
 
         if (!isVerified) {
@@ -632,7 +618,6 @@ class BookingRepository(
         val itemToSave = updatedBooking.copy(
             scheduledAt = recomputedScheduledAt,
             pinCode = resolvedPinHash,
-            bookingPassword = "",
             updatedAt = System.currentTimeMillis()
         )
         val previousBookings = _cachedBookings.value

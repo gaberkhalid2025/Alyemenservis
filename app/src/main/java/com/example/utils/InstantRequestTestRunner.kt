@@ -69,7 +69,6 @@ class InstantRequestTestRunner(private val context: Context) {
                 id = reqId1,
                 requestCode = reqCode1,
                 pinHash = hashedPin,
-                secretPin = hashedPin,
                 cancellationPassword = hashedPin,
                 userId = testUserId,
                 userName = "عميل اختبار عاجل",

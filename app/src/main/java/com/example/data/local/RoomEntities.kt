@@ -97,7 +97,7 @@ fun com.example.data.BookingEntity.toRoomEntity(): BookingRoomEntity {
         dateString = date.ifBlank { dateString },
         timeString = time.ifBlank { timeString },
         status = status,
-        pinCode = pinCode.ifBlank { secretPin },
+        pinCode = pinCode,
         bookingNumber = bookingNumber.ifBlank { bookingCode },
         totalAmount = totalAmount,
         advancePayment = advancePayment,

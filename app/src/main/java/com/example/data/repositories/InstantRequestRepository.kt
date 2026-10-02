@@ -47,7 +47,7 @@ class InstantRequestRepository(private val context: Context? = null) {
         try {
             val docId = if (request.id.isNotBlank()) request.id else firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document().id
             val requestCode = if (request.requestCode.isNotBlank()) request.requestCode else "URG-${Random.nextInt(100000, 999999)}"
-            val inputRawPin = request.rawPin.ifBlank { request.secretPin }
+            val inputRawPin = request.rawPin
             val rawPin = if (inputRawPin.isNotBlank()) inputRawPin else "${Random.nextInt(1000, 9999)}"
             val pin = if (rawPin.startsWith("$2a$") || rawPin.startsWith("$2b$") || rawPin.contains(":")) {
                 rawPin
@@ -68,7 +68,6 @@ class InstantRequestRepository(private val context: Context? = null) {
                 requestCode = requestCode,
                 pinHash = pin,
                 rawPin = rawPin,
-                secretPin = pin,
                 cancellationPassword = cancelPass,
                 status = if (request.status.isBlank()) "WAITING_FOR_OFFERS" else request.status,
                 createdAt = if (request.createdAt > 0) request.createdAt else now,
@@ -335,7 +334,7 @@ class InstantRequestRepository(private val context: Context? = null) {
                 }
 
                 if (userPin.isNotBlank()) {
-                    val expectedPass = request.cancellationPassword.ifBlank { request.secretPin }
+                    val expectedPass = request.effectivePinHash
                     val isValid = com.example.utils.SecureHasher.verifyPin(userPin, expectedPass) ||
                             BookingSecurityHelper.verifyPassword(userPin, expectedPass)
                     if (expectedPass.isNotBlank() && !isValid) {

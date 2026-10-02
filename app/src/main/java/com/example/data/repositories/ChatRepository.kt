@@ -557,14 +557,31 @@ class ChatRepository(
     override suspend fun editMessage(
         channelId: String,
         messageId: String,
-        newText: String
+        newText: String,
+        currentUserId: String
     ): AppResult<Unit> = withContext(Dispatchers.IO) {
         if (channelId.isBlank() || messageId.isBlank() || newText.isBlank()) return@withContext AppResult.Success(Unit)
         try {
+            val resolvedUserId = currentUserId.trim().ifBlank {
+                try {
+                    com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                } catch (_: Exception) {
+                    ""
+                }
+            }
+            if (resolvedUserId.isBlank()) {
+                return@withContext AppResult.Error(AppError.ValidationError("currentUserId", "غير مصرح بتعديل الرسالة بدون معرف المستخدم"))
+            }
             val msgRef = channelsCollection.document(channelId).collection("messages").document(messageId)
+            val snapshot = msgRef.get().await()
+            val message = snapshot.toObject(ChatMessage::class.java)
+            if (message == null || message.senderId != resolvedUserId) {
+                return@withContext AppResult.Error(AppError.ValidationError("senderId", "غير مصرح لك بتعديل هذه الرسالة (ليست من إرسالك)"))
+            }
+            val encryptedText = com.example.utils.ChatCryptoManager.encrypt(newText.trim())
             msgRef.update(
                 mapOf(
-                    "message" to newText.trim(),
+                    "message" to encryptedText,
                     "isEdited" to true,
                     "editTimestamp" to System.currentTimeMillis()
                 )

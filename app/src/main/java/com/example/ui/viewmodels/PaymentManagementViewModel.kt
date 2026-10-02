@@ -195,9 +195,19 @@ class PaymentManagementViewModel @Inject constructor(
     }
 
     fun verifyPayment(paymentId: String, isVerified: Boolean, note: String, adminName: String) {
+        val cleanId = paymentId.trim()
+        if (cleanId.isBlank()) {
+            onTriggerNotification?.invoke("❌ معرف الدفعة غير صالح")
+            return
+        }
+        val existingPayment = _payments.value.find { it.id == cleanId }
+        if (existingPayment == null) {
+            onTriggerNotification?.invoke("❌ لم يتم العثور على معاملة الدفع المطلوبة: $cleanId")
+            return
+        }
         val status = if (isVerified) "VERIFIED" else "REJECTED"
         viewModelScope.launch {
-            crud.updateFields("payments", paymentId, mapOf(
+            crud.updateFields("payments", cleanId, mapOf(
                 "status" to status,
                 "adminNote" to note,
                 "verifiedBy" to adminName,

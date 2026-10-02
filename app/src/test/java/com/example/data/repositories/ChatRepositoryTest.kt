@@ -109,8 +109,26 @@ class ChatRepositoryTest {
 
     @Test
     fun `test editMessage - succeeds`() = runTest {
-        val result = repository.editMessage("c1", "msg_1", "رسالة معدلة")
+        val result = repository.editMessage("c1", "msg_1", "رسالة معدلة", currentUserId = "u1")
         assertTrue(result is AppResult.Success)
+    }
+
+    @Test
+    fun `test editMessage - fails when currentUserId is not message senderId`() = runTest {
+        val sentRes = repository.sendMessage(
+            channelId = "c1",
+            senderId = "u1",
+            senderName = "User 1",
+            messageText = "الرسالة الأصلية",
+            mediaType = MediaType.TEXT,
+            mediaUrl = "",
+            replyToId = null,
+            replyToText = null,
+            attachment = null
+        )
+        val sentMsg = (sentRes as AppResult.Success).data
+        val editRes = repository.editMessage("c1", sentMsg.id, "محاولة اختراق", currentUserId = "u_attacker")
+        assertTrue(editRes is AppResult.Error)
     }
 
     @Test

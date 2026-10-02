@@ -40,13 +40,11 @@ class LocalAppCacheManager @Inject constructor(
         return prefs.getString("KEY_STORES_CACHE", "[]") ?: "[]"
     }
 
-    // 3. Save & Load Cached Bookings
-    fun saveBookingsCache(rawJsonString: String) {
-        prefs.edit().putString("KEY_BOOKINGS_CACHE", rawJsonString).putLong("KEY_BOOKINGS_TIME", System.currentTimeMillis()).apply()
-    }
-
-    fun getBookingsCacheRaw(): String {
-        return prefs.getString("KEY_BOOKINGS_CACHE", "[]") ?: "[]"
+    // 3. Bookings Cache -> Delegated exclusively to Room Database (AppDatabase.bookingDao())
+    init {
+        if (prefs.contains("KEY_BOOKINGS_CACHE") || prefs.contains("KEY_BOOKINGS_TIME")) {
+            prefs.edit().remove("KEY_BOOKINGS_CACHE").remove("KEY_BOOKINGS_TIME").apply()
+        }
     }
 
     fun saveOffersCache(rawJsonString: String) {
@@ -120,7 +118,6 @@ class LocalAppCacheManager @Inject constructor(
         val cachePairs = listOf(
             "KEY_PROVIDERS_CACHE" to "KEY_PROVIDERS_TIME",
             "KEY_STORES_CACHE" to "KEY_STORES_TIME",
-            "KEY_BOOKINGS_CACHE" to "KEY_BOOKINGS_TIME",
             "KEY_OFFERS_CACHE" to "KEY_OFFERS_TIME",
             "KEY_CATEGORIES_CACHE" to "KEY_CATEGORIES_TIME"
         )

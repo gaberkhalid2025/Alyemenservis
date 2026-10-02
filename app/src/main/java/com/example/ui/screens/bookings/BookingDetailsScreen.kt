@@ -40,6 +40,7 @@ import com.example.utils.BookingStateMachine
 fun BookingDetailsScreen(
     booking: BookingEntity,
     userRole: String = "CLIENT", // "CLIENT", "PROVIDER", "ADMIN"
+    currentUserId: String = "",
     onBack: () -> Unit,
     onNavigateToChat: (recipientId: String, recipientName: String) -> Unit = { _, _ -> },
     onNavigateToStatusTracking: (BookingEntity) -> Unit = {},
@@ -48,6 +49,37 @@ fun BookingDetailsScreen(
     onDeleteBooking: ((bookingId: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val resolvedUserId = remember(currentUserId, context) {
+        currentUserId.ifBlank {
+            try {
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                    ?: context.getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                        .getString("user_phone", "") ?: ""
+            } catch (_: Exception) {
+                ""
+            }
+        }
+    }
+    val isAdmin = userRole == "ADMIN" || userRole == "OWNER"
+    val isBookingOwner = remember(booking, resolvedUserId) {
+        val normCurrent = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(resolvedUserId)
+        val normCustomerPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(booking.effectiveCustomerPhone)
+        resolvedUserId.isNotBlank() && (
+            booking.customerId == resolvedUserId ||
+            booking.clientId == resolvedUserId ||
+            (normCurrent.isNotBlank() && normCustomerPhone == normCurrent)
+        )
+    }
+    val isAssignedProvider = remember(booking, resolvedUserId, userRole) {
+        val normCurrent = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(resolvedUserId)
+        val normProvPhone = com.example.ui.helpers.AppPreferenceHelper.normalizePhoneNumber(booking.providerPhone)
+        userRole == "PROVIDER" && resolvedUserId.isNotBlank() && (
+            booking.providerId == resolvedUserId ||
+            (normCurrent.isNotBlank() && normProvPhone == normCurrent)
+        )
+    }
+    val canViewSensitiveCustomerData = (booking.customerId == resolvedUserId && resolvedUserId.isNotBlank()) || isBookingOwner || isAdmin
+
     var showCancelDialog by remember { mutableStateOf(false) }
     var showPasswordVisible by remember { mutableStateOf(false) }
     var showPinVerifyDialog by remember { mutableStateOf(false) }
@@ -191,9 +223,9 @@ fun BookingDetailsScreen(
                 }
             }
 
-            // Secret Password Card (Visible to Client & Admin only)
-            if (userRole == "CLIENT" || userRole == "ADMIN") {
-                val hasSecret = booking.bookingPassword.isNotBlank() || booking.pinCode.isNotBlank()
+            // Secret Password Card (Visible to authorized Customer & Admin only: booking.customerId == currentUserId || isAdmin)
+            if (canViewSensitiveCustomerData) {
+                val hasSecret = booking.effectivePin.isNotBlank()
                 if (hasSecret) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -240,14 +272,8 @@ fun BookingDetailsScreen(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = if (showPasswordVisible) {
-                                    verifiedPlainPin.ifBlank {
-                                        if (booking.bookingPassword.isNotBlank() && !booking.bookingPassword.contains(":")) {
-                                            booking.bookingPassword
-                                        } else {
-                                            "••••"
-                                        }
-                                    }
+                                text = if (showPasswordVisible && verifiedPlainPin.isNotBlank()) {
+                                    verifiedPlainPin
                                 } else {
                                     "••••"
                                 },
@@ -262,7 +288,7 @@ fun BookingDetailsScreen(
             }
 
             // Secure PIN Verification Dialog in Details
-            if (showPinVerifyDialog) {
+            if (showPinVerifyDialog && canViewSensitiveCustomerData) {
                 AlertDialog(
                     onDismissRequest = { showPinVerifyDialog = false },
                     title = { Text("🔒 تحقق من رمز الأمان (PIN)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
@@ -285,7 +311,7 @@ fun BookingDetailsScreen(
                     confirmButton = {
                         Button(
                             onClick = {
-                                val targetHash = booking.pinCode.ifBlank { booking.bookingPassword }
+                                val targetHash = booking.effectivePin
                                 val isVerified = com.example.utils.SecureHasher.verifyPin(enteredPinText, targetHash)
                                 if (isVerified) {
                                     verifiedPlainPin = enteredPinText
@@ -309,8 +335,8 @@ fun BookingDetailsScreen(
                 )
             }
 
-            // Client Info Card (Visible to Provider & Admin)
-            if (userRole == "PROVIDER" || userRole == "ADMIN") {
+            // Client Info Card (Visible to Assigned Provider & Admin)
+            if (isAssignedProvider || isAdmin) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
@@ -331,8 +357,8 @@ fun BookingDetailsScreen(
                 }
             }
 
-            // Provider Info Card (Visible to Client & Admin)
-            if (userRole == "CLIENT" || userRole == "ADMIN") {
+            // Provider Info Card (Visible to authorized Customer & Admin)
+            if (canViewSensitiveCustomerData) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
@@ -374,7 +400,7 @@ fun BookingDetailsScreen(
             }
 
             // Payment Information Card
-            if (userRole == "CLIENT" || userRole == "ADMIN") {
+            if (canViewSensitiveCustomerData) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),

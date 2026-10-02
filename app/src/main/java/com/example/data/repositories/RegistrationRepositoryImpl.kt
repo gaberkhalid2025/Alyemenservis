@@ -52,7 +52,14 @@ class RegistrationRepositoryImpl(
         val userDeferred = async {
             runCatching {
                 firestore.collection("users").document(cleanPhone).get().await().exists() ||
-                    firestore.collection("users").document("u_$cleanPhone").get().await().exists()
+                    firestore.collection("users").document("u_$cleanPhone").get().await().exists() ||
+                    firestore.collection("registered_users").document(cleanPhone).get().await().exists() ||
+                    !firestore.collection("registered_users")
+                        .whereEqualTo("phone", cleanPhone)
+                        .limit(1)
+                        .get()
+                        .await()
+                        .isEmpty
             }.getOrDefault(false)
         }
 
@@ -161,6 +168,17 @@ class RegistrationRepositoryImpl(
     override suspend fun registerClient(client: RegistrationEntity.Client): Result<String> {
         return try {
             val cleanPhone = ValidatePhoneUseCase.normalizePhone(client.phone)
+            if (cleanPhone.isBlank() || cleanPhone.length < 7) {
+                return Result.failure(IllegalArgumentException("رقم الهاتف غير صالح"))
+            }
+            val cleanPassword = client.rawPassword.trim()
+            if (cleanPassword.isBlank()) {
+                return Result.failure(IllegalArgumentException("لا يمكن التسجيل بدون كلمة مرور صريحة"))
+            }
+            val policyCheck = com.example.utils.SecurityCryptoUtils.validatePasswordPolicy(cleanPassword)
+            if (!policyCheck.first) {
+                return Result.failure(IllegalArgumentException(policyCheck.second ?: "كلمة المرور ضعيفة"))
+            }
             if (checkExistingPendingRequest(cleanPhone)) {
                 return Result.failure(Exception("يوجد طلب تسجيل أو حساب مسجل بالفعل لرقم الهاتف هذا"))
             }

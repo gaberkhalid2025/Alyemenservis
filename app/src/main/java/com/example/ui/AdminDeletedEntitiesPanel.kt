@@ -32,6 +32,9 @@ fun AdminDeletedEntitiesPanel(
     viewModel: MainViewModel,
     themeColors: VisualThemePalette
 ) {
+    val adminRole by viewModel.adminRole.collectAsState()
+    if (adminRole != "OWNER" && adminRole != "ADMIN") return
+
     val context = LocalContext.current
     var selectedCategory by remember { mutableStateOf("STORES") } // STORES, PROVIDERS, PROPERTIES, JOBS
     var showPermanentDeleteConfirmDialog by remember { mutableStateOf<Triple<String, String, String>?>(null) } // id, type, name
@@ -108,10 +111,12 @@ fun AdminDeletedEntitiesPanel(
                                 subtitle = "الهاتف: ${store.phone} • الحي: ${store.localNeighborhood}",
                                 deletedAt = store.deletedAt ?: store.createdAt,
                                 onRestore = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     viewModel.restoreStore(store.id)
                                     Toast.makeText(context, "🔄 تم استعادة المحل (${store.name}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(store.id, "STORE", store.name)
                                 }
@@ -129,10 +134,12 @@ fun AdminDeletedEntitiesPanel(
                                 subtitle = "الهاتف: ${provider.phone} • المهنة: ${provider.profession}",
                                 deletedAt = provider.deletedAt ?: provider.createdAt,
                                 onRestore = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     viewModel.restoreProvider(provider.id)
                                     Toast.makeText(context, "🔄 تم استعادة حساب الفني (${provider.name}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(provider.id, "PROVIDER", provider.name)
                                 }
@@ -150,10 +157,12 @@ fun AdminDeletedEntitiesPanel(
                                 subtitle = "السعر: ${prop.price} YER • المنطقة: ${prop.localNeighborhood}",
                                 deletedAt = prop.deletedAt ?: prop.createdAt,
                                 onRestore = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     viewModel.restoreProperty(prop.id)
                                     Toast.makeText(context, "🔄 تم استعادة العقار (${prop.title}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(prop.id, "PROPERTY", prop.title)
                                 }
@@ -171,10 +180,12 @@ fun AdminDeletedEntitiesPanel(
                                 subtitle = "الجهة: ${job.companyName} • الراتب: ${job.salary}",
                                 deletedAt = job.createdAt,
                                 onRestore = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     viewModel.restoreJob(job.id)
                                     Toast.makeText(context, "🔄 تم استعادة الإعلان الوظيفي (${job.title}) بنجاح!", Toast.LENGTH_SHORT).show()
                                 },
                                 onPermanentDelete = {
+                                    if (adminRole != "OWNER" && adminRole != "ADMIN") return@DeletedItemRow
                                     deleteReasonInput = ""
                                     showPermanentDeleteConfirmDialog = Triple(job.id, "JOB", job.title)
                                 }
@@ -214,13 +225,16 @@ fun AdminDeletedEntitiesPanel(
             confirmButton = {
                 Button(
                     onClick = {
+                        if (adminRole != "OWNER" && adminRole != "ADMIN") return@Button
                         if (deleteReasonInput.isNotBlank()) {
+                            val cleanReason = deleteReasonInput.trim()
                             when (entityType) {
-                                "STORE" -> viewModel.deleteStore(entityId)
-                                "PROVIDER" -> viewModel.removeProvider(entityId)
+                                "STORE" -> viewModel.deleteStorePermanently(entityId)
+                                "PROVIDER" -> viewModel.removeProviderPermanently(entityId)
                                 "PROPERTY" -> viewModel.deletePropertyPermanently(entityId)
-                                "JOB" -> viewModel.deleteJob(entityId)
+                                "JOB" -> viewModel.deleteJobPermanently(entityId)
                             }
+                            viewModel.logAdminActivity("حذف نهائي للسجل ($entityName - $entityType - $entityId) | السبب: $cleanReason")
                             Toast.makeText(context, "🗑️ تم الحذف النهائي للسجل ($entityName)", Toast.LENGTH_SHORT).show()
                             showPermanentDeleteConfirmDialog = null
                             deleteReasonInput = ""

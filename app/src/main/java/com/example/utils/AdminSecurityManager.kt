@@ -13,6 +13,29 @@ object AdminSecurityManager {
      * يتحقق من صحة بيانات الدخول (المالك، المدير، أو المشرف)
      * باستخدام التشفير الآمن والتحقق السحابي عبر Cloud Functions / Firestore
      */
+    /**
+     * يتحقق من Claims حساب Firebase Auth ويعيد الدور الإداري الموثق فقط إذا كانت الصلاحية ممنوحة صراحة.
+     * الحسابات العادية التي لا تملك صلاحيات إدارية مُعرَّفة تعيد null دائماً.
+     */
+    fun resolveRoleFromFirebaseClaims(claims: Map<String, Any?>?): String? {
+        if (claims.isNullOrEmpty()) return null
+        val roleClaim = claims["role"]?.toString()?.uppercase()?.trim()
+        val isOwnerClaim = claims["isSuperAdmin"] == true ||
+                claims["superAdmin"] == true ||
+                claims["isOwner"] == true ||
+                claims["owner"] == true ||
+                roleClaim in listOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
+        if (isOwnerClaim) return "OWNER"
+
+        val isAdminClaim = claims["isAdmin"] == true ||
+                claims["admin"] == true ||
+                roleClaim == "ADMIN"
+        if (isAdminClaim) return "ADMIN"
+
+        if (roleClaim == "SUPERVISOR") return "SUPERVISOR"
+        return null
+    }
+
     suspend fun verifyCredentials(
         username: String,
         passwordAttempt: String,
@@ -24,6 +47,8 @@ object AdminSecurityManager {
         val trimmedUser = username.trim()
         val trimmedPass = passwordAttempt.trim()
         if (trimmedUser.isBlank() || trimmedPass.isBlank()) return null
+        // منع استخدام تجزئة (Hash) مسروقة ككلمة مرور
+        if (SecureHasher.isHashFormat(trimmedPass)) return null
 
         var fallbackAuthRole: String? = null
 
@@ -34,63 +59,50 @@ object AdminSecurityManager {
                 val authResult = auth.signInWithEmailAndPassword(trimmedUser, trimmedPass).await()
                 val user = authResult.user
                 if (user != null) {
-                    // بمجرد نجاح مصادقة Firebase Auth، نضع الفحوصات الإضافية في try-catch داخلي
-                    // حتى لا يتسبب خطأ PERMISSION_DENIED من Firestore في إلغاء تسجيل الدخول الناجح
                     try {
                         val tokenResult = user.getIdToken(true).await()
-                        val claims = tokenResult.claims
-
-                        val isOwnerClaim = claims["isSuperAdmin"] == true ||
-                                claims["isOwner"] == true ||
-                                claims["role"]?.toString()?.uppercase() in listOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")
-                        val isAdminClaim = claims["isAdmin"] == true ||
-                                claims["admin"] == true ||
-                                claims["role"]?.toString()?.uppercase() == "ADMIN"
-
-                        if (isOwnerClaim) return "OWNER"
-                        if (isAdminClaim) {
+                        val resolvedClaimRole = resolveRoleFromFirebaseClaims(tokenResult.claims)
+                        if (resolvedClaimRole == "OWNER") return "OWNER"
+                        if (resolvedClaimRole == "ADMIN") {
                             if (preferredRole != "OWNER") return "ADMIN"
                             fallbackAuthRole = "ADMIN"
+                        }
+                        if (resolvedClaimRole == "SUPERVISOR") {
+                            fallbackAuthRole = "SUPERVISOR"
                         }
                     } catch (_: Exception) {}
 
                     try {
                         val db = FirebaseFirestore.getInstance()
                         val adminDoc = db.collection("admin_users").document(user.uid).get().await()
-                        if (adminDoc.exists()) {
-                            val role = adminDoc.getString("role")?.uppercase() ?: "ADMIN"
-                            return if (role == "OWNER" || role == "SUPER_ADMIN" || role == "MAIN_ADMIN") "OWNER" else "ADMIN"
+                        if (adminDoc.exists() && (adminDoc.getBoolean("isActive") ?: true)) {
+                            val role = adminDoc.getString("role")?.uppercase()?.trim() ?: ""
+                            if (role in listOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")) return "OWNER"
+                            if (role == "ADMIN") return "ADMIN"
+                            if (role == "SUPERVISOR") return "SUPERVISOR"
                         }
                     } catch (_: Exception) {}
 
                     try {
                         val db = FirebaseFirestore.getInstance()
                         val adminDoc = db.collection("admins").document(user.uid).get().await()
-                        if (adminDoc.exists()) {
-                            val role = adminDoc.getString("role")?.uppercase() ?: "ADMIN"
-                            return if (role == "OWNER" || role == "SUPER_ADMIN" || role == "MAIN_ADMIN") "OWNER" else "ADMIN"
+                        if (adminDoc.exists() && (adminDoc.getBoolean("isActive") ?: true)) {
+                            val role = adminDoc.getString("role")?.uppercase()?.trim() ?: ""
+                            if (role in listOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN")) return "OWNER"
+                            if (role == "ADMIN") return "ADMIN"
+                            if (role == "SUPERVISOR") return "SUPERVISOR"
                         }
                     } catch (_: Exception) {}
 
-                    // 🎯 Claims تُضبط مرة واحدة من Console عبر initializeAdminClaims
-                    // لا حاجة لاستدعاء Cloud Function من التطبيق.
-                    // نقرأ Claims من ID Token مباشرة.
                     val tokenClaims = try { user.getIdToken(false).await().claims } catch (_: Exception) { emptyMap() }
-                    val isOwner = tokenClaims["role"]?.toString()?.uppercase() in listOf("OWNER", "SUPER_ADMIN", "MAIN_ADMIN") ||
-                            tokenClaims["isOwner"] == true ||
-                            tokenClaims["isSuperAdmin"] == true
-
-                    val isAdmin = tokenClaims["role"]?.toString()?.uppercase() == "ADMIN" ||
-                            tokenClaims["isAdmin"] == true ||
-                            tokenClaims["admin"] == true
-
-                    if (isOwner) return "OWNER"
-                    if (isAdmin) {
+                    val cachedClaimRole = resolveRoleFromFirebaseClaims(tokenClaims)
+                    if (cachedClaimRole == "OWNER") return "OWNER"
+                    if (cachedClaimRole == "ADMIN") {
                         if (preferredRole != "OWNER") return "ADMIN"
                         fallbackAuthRole = "ADMIN"
                     }
 
-                    // إذا لا Claims، نكمل للطبقات 2-6 كما هو.
+                    // إذا لا توجد Claims إدارية صريحة، لا يُمنح الحساب العادي أي صلاحية إدارية تلقائياً، ونكمل للطبقات التالية.
                 }
             }
         } catch (_: Exception) {
@@ -186,14 +198,15 @@ object AdminSecurityManager {
                 val data = result.data as? Map<*, *>
                 if (data != null && data["success"] == true) {
                     val isSuperAdmin = data["isSuperAdmin"] == true
+                    val isAdminData = data["isAdmin"] == true || (data["role"] as? String)?.equals("ADMIN", ignoreCase = true) == true
                     val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
                     val token = try { user?.getIdToken(false)?.await() } catch (_: Exception) { null }
-                    val claims = token?.claims
-                    val hasOwnerClaim = claims?.get("isSuperAdmin") == true || claims?.get("isOwner") == true
+                    val resolvedClaimRole = resolveRoleFromFirebaseClaims(token?.claims)
                     return when {
-                        isSuperAdmin || hasOwnerClaim -> "OWNER"
-                        claims?.get("isAdmin") == true -> "ADMIN"
-                        else -> "ADMIN"
+                        isSuperAdmin || resolvedClaimRole == "OWNER" -> "OWNER"
+                        isAdminData || resolvedClaimRole == "ADMIN" -> "ADMIN"
+                        resolvedClaimRole == "SUPERVISOR" -> "SUPERVISOR"
+                        else -> null
                     }
                 }
             }
