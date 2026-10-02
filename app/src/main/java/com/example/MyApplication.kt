@@ -60,7 +60,7 @@ class MyApplication : Application() {
                         PlayIntegrityAppCheckProviderFactory.getInstance()
                     )
                 }
-            } catch (appCheckEx: Exception) {
+            } catch (appCheckEx: Throwable) {
                 Log.w("MyApplication", "⚠️ AppCheck initialization note: ${appCheckEx.message}")
             }
 
@@ -82,7 +82,7 @@ class MyApplication : Application() {
             } catch (authEx: Throwable) {
                 Log.w("AnonymousAuth", "⚠️ Auth init skipped: ${authEx.message}")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Firebase initialization failed: ${e.message}")
             e.printStackTrace()
         }
@@ -96,11 +96,11 @@ class MyApplication : Application() {
                 .build()
             firestore.firestoreSettings = settings
             Log.d("MyApplication", "✅ FirebaseFirestore settings initialized successfully")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // تجاهل بأمان — قد تكون إعدادات Firestore مهيأة مسبقاً
             try {
                 Log.w("MyApplication", "⚠️ Firestore settings already initialized: ${e.message}")
-            } catch (e2: Exception) {
+            } catch (e2: Throwable) {
                 e2.printStackTrace()
             }
         }
@@ -109,7 +109,7 @@ class MyApplication : Application() {
         try {
             firebaseAnalytics = FirebaseAnalytics.getInstance(this)
             Log.d("MyApplication", "✅ FirebaseAnalytics initialized successfully")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("MyApplication", "❌ FirebaseAnalytics initialization failed: ${e.message}")
             e.printStackTrace()
         }
@@ -121,21 +121,21 @@ class MyApplication : Application() {
         try {
             com.example.utils.NotificationChannels.createAll(this)
             Log.d("MyApplication", "✅ Unified notification channels created successfully")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Failed to create notification channels: ${e.message}")
         }
 
         try {
             com.example.utils.NotificationHelper.createNotificationChannels(this)
             Log.d("MyApplication", "✅ Admin notification channels created successfully")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Failed to create admin notification channels: ${e.message}")
         }
 
         try {
             com.example.utils.ChatNotificationHelper.createNotificationChannels(this)
             Log.d("MyApplication", "✅ Chat notification channels created successfully")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Failed to create chat notification channels: ${e.message}")
         }
 
@@ -143,7 +143,7 @@ class MyApplication : Application() {
         try {
             com.example.sync.PeriodicSyncScheduler(this).schedulePeriodicSync()
             Log.d("MyApplication", "✅ Background periodic sync scheduled successfully")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Failed to schedule periodic sync: ${e.message}")
         }
     }
@@ -155,29 +155,32 @@ class MyApplication : Application() {
      * 3. حفظ حالة التهيئة لمنع المحاولات المتكررة الفاشلة
      */
     private fun initializeCrashlyticsSafely() {
-        // التحقق من عدم التهيئة مسبقاً
         if (isCrashlyticsReady) {
             Log.d("MyApplication", "✅ Crashlytics already initialized")
             return
         }
 
         try {
-            val crashlytics = FirebaseCrashlytics.getInstance()
-            // 🚨 M-10: التحقق من موافقة المستخدم الإحصائية والتشخيصية للامتثال لسياسات الخصوصية
-            val prefs = getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
-            val isConsentGranted = prefs.getBoolean("user_diagnostics_consent", true)
-            crashlytics.setCrashlyticsCollectionEnabled(isConsentGranted)
-            isCrashlyticsReady = true
-            Log.d("MyApplication", "✅ Firebase Crashlytics initialized successfully (Immediate, Consent=$isConsentGranted)")
-            
-            try {
-                crashlytics.log("Crashlytics initialized successfully")
-            } catch (e: Exception) { /* تجاهل */ }
-            
-        } catch (e: Exception) {
-            Log.e("MyApplication", "❌ Firebase Crashlytics initialization failed: ${e.message}")
-            // محاولة بديلة
-            tryAlternativeCrashlyticsInit()
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    val crashlytics = FirebaseCrashlytics.getInstance()
+                    // 🚨 M-10: التحقق من موافقة المستخدم الإحصائية والتشخيصية للامتثال لسياسات الخصوصية
+                    val prefs = getSharedPreferences("yemen_service_prefs", android.content.Context.MODE_PRIVATE)
+                    val isConsentGranted = prefs.getBoolean("user_diagnostics_consent", true)
+                    crashlytics.setCrashlyticsCollectionEnabled(isConsentGranted)
+                    isCrashlyticsReady = true
+                    Log.d("MyApplication", "✅ Firebase Crashlytics initialized successfully (Consent=$isConsentGranted)")
+
+                    try {
+                        crashlytics.log("Crashlytics initialized successfully")
+                    } catch (_: Throwable) { /* تجاهل */ }
+                } catch (e: Throwable) {
+                    Log.e("MyApplication", "❌ Firebase Crashlytics initialization failed: ${e.message}")
+                    tryAlternativeCrashlyticsInit()
+                }
+            }, 3000)
+        } catch (e: Throwable) {
+            Log.e("MyApplication", "❌ Failed to schedule Crashlytics init: ${e.message}")
         }
     }
 
@@ -190,7 +193,7 @@ class MyApplication : Application() {
             crashlytics.setCrashlyticsCollectionEnabled(true)
             isCrashlyticsReady = true
             Log.d("MyApplication", "✅ Firebase Crashlytics initialized (alternative method)")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("MyApplication", "❌ Firebase Crashlytics alternative initialization failed: ${e.message}")
             // التطبيق يستمر في العمل بدون Crashlytics
         }
@@ -203,14 +206,14 @@ class MyApplication : Application() {
         if (isCrashlyticsReady) {
             try {
                 FirebaseCrashlytics.getInstance().recordException(throwable)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e("MyApplication", "Failed to record exception: ${e.message}")
             }
         } else {
             try {
                 FirebaseCrashlytics.getInstance().recordException(throwable)
                 isCrashlyticsReady = true
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e("MyApplication", "Crashlytics not ready: ${throwable.message}")
             }
         }

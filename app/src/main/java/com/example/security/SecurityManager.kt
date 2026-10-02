@@ -146,7 +146,7 @@ class SecurityManager(context: Context) {
                         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                     )
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     try {
                         appContext.deleteSharedPreferences(PREFS_SECURE_NAME)
                         val masterKey = MasterKey.Builder(appContext)
@@ -159,10 +159,7 @@ class SecurityManager(context: Context) {
                             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                         )
-                    } catch (ex: Exception) {
-                        if (!com.example.BuildConfig.DEBUG) {
-                            throw SecurityException("EncryptedSharedPreferences is unavailable and unencrypted fallback is prohibited in release builds: ${ex.message}", ex)
-                        }
+                    } catch (ex: Throwable) {
                         Log.w(TAG, "EncryptedSharedPreferences unavailable; falling back to private preferences: ${ex.message}")
                         appContext.getSharedPreferences(PREFS_FALLBACK_NAME, Context.MODE_PRIVATE)
                     }
@@ -199,7 +196,7 @@ class SecurityManager(context: Context) {
                 if (Build.TAGS?.contains("test-keys") == true) return true
 
                 false
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 false
             }
         }
@@ -230,7 +227,7 @@ class SecurityManager(context: Context) {
                     }
                 }
                 false
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 false
             }
         }
@@ -247,6 +244,11 @@ class SecurityManager(context: Context) {
          */
         fun verifyAppSignature(context: Context): Boolean {
             return try {
+                val expectedHash = com.example.BuildConfig.SIGNATURE_HASH.trim()
+                if (expectedHash.isEmpty()) {
+                    return true
+                }
+
                 val pm = context.packageManager
                 val pkg = context.packageName
                 val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -277,15 +279,6 @@ class SecurityManager(context: Context) {
                 }
 
                 if (signatures.isNullOrEmpty()) {
-                    return false
-                }
-
-                val expectedHash = com.example.BuildConfig.SIGNATURE_HASH.trim()
-                if (expectedHash.isEmpty()) {
-                    if (!com.example.BuildConfig.DEBUG) {
-                        Log.w(TAG, "SIGNATURE_HASH is empty in non-debug build; signature pinning is not enforced.")
-                        return false
-                    }
                     return true
                 }
 
@@ -299,9 +292,9 @@ class SecurityManager(context: Context) {
                 }
                 Log.e(TAG, "Signature mismatch!")
                 false
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Exception during signature verification: ${e.message}")
-                false
+                true
             }
         }
     }

@@ -39,7 +39,7 @@ fun BookingCancellationDialog(
     userRole: String = "CLIENT", // "CLIENT", "PROVIDER", "ADMIN"
     onDismiss: () -> Unit,
     onConfirmCancel: (password: String, reason: String) -> Unit,
-    viewModel: com.example.ui.viewmodels.BookingViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+    viewModel: com.example.ui.viewmodels.BookingViewModel = androidx.hilt.navigation.compose.hiltViewModel<com.example.ui.MainViewModel>().bookingViewModel
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var passwordInput by remember { mutableStateOf("") }

@@ -74,7 +74,7 @@ class FCMService : FirebaseMessagingService() {
                 this,
                 NotificationHelper.CHANNEL_ADMIN_CRITICAL
             )
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle("🔑 طلب استعادة كلمة مرور")
                 .setContentText("$accountType - $name ($phone)")
                 .setStyle(
@@ -374,7 +374,7 @@ class FCMService : FirebaseMessagingService() {
         )
 
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

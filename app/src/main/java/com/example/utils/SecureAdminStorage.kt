@@ -50,9 +50,26 @@ object SecureAdminStorage {
                 migrateLegacyPrefs(appContext, encryptedPrefs)
                 cachedEncryptedPrefs = encryptedPrefs
                 encryptedPrefs
-            } catch (e: Exception) {
-                android.util.Log.e("SecureAdminStorage", "Failed to init secure storage", e)
-                null
+            } catch (e: Throwable) {
+                try {
+                    val appContext = context.applicationContext ?: context
+                    appContext.deleteSharedPreferences(PREFS_NAME)
+                    val masterKey = MasterKey.Builder(appContext)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build()
+                    val recreated = EncryptedSharedPreferences.create(
+                        appContext,
+                        PREFS_NAME,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    ) as EncryptedSharedPreferences
+                    cachedEncryptedPrefs = recreated
+                    recreated
+                } catch (ex: Throwable) {
+                    android.util.Log.e("SecureAdminStorage", "Failed to init secure storage", ex)
+                    null
+                }
             }
         }
     }

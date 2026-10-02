@@ -45,37 +45,6 @@ class MainViewModel @Inject constructor(
     val registrationHelper by lazy { com.example.ui.helpers.RegistrationHelper(db, auth, preferenceHelper) }
     val accountRecoveryHelper by lazy { com.example.ui.helpers.AccountRecoveryHelper(db, preferenceHelper) }
 
-    init {
-        viewModelScope.launch {
-            authViewModel.adminRole.collect { role ->
-                if (adminViewModel._adminRole.value != role) {
-                    adminViewModel._adminRole.value = role
-                }
-            }
-        }
-        viewModelScope.launch {
-            adminViewModel.adminRole.collect { role ->
-                if (authViewModel._adminRole.value != role) {
-                    authViewModel._adminRole.value = role
-                }
-            }
-        }
-        viewModelScope.launch {
-            authViewModel.currentSupervisorPermissions.collect { perms ->
-                if (adminViewModel.supervisorPermissions.value != perms) {
-                    adminViewModel._supervisorPermissions.value = perms
-                }
-            }
-        }
-        viewModelScope.launch {
-            appState._supervisors.collect { sups ->
-                if (authViewModel._supervisors.value != sups) {
-                    authViewModel._supervisors.value = sups
-                }
-            }
-        }
-    }
-
     override fun onCleared() {
         super.onCleared()
         try {
@@ -109,7 +78,6 @@ class MainViewModel @Inject constructor(
     }
     internal val _screenBackStack = MutableStateFlow<List<String>>(listOf("USER_BROWSE"))
     val screenBackStack: StateFlow<List<String>> = _screenBackStack.asStateFlow()
-    val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)
     val _currentUserId get() = authViewModel._currentUserId
     val currentUserId get() = authViewModel.currentUserId
     val _currentUserName get() = authViewModel._currentUserName
@@ -286,9 +254,43 @@ class MainViewModel @Inject constructor(
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
     internal val _maxKmRadius get() = appState._maxKmRadius
     val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
+    var lastNotifMsg: String = ""
+    var lastNotifTime: Long = 0L
+    val triggerRestoreAccountDialog = MutableStateFlow(false)
+    var targetChatChannelId by mutableStateOf<String?>(null)
+    val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)
+
     init {
         _stores.value = getDefaultStoresList()
         _properties.value = getDefaultPropertiesList()
+        viewModelScope.launch {
+            authViewModel.adminRole.collect { role ->
+                if (adminViewModel._adminRole.value != role) {
+                    adminViewModel._adminRole.value = role
+                }
+            }
+        }
+        viewModelScope.launch {
+            adminViewModel.adminRole.collect { role ->
+                if (authViewModel._adminRole.value != role) {
+                    authViewModel._adminRole.value = role
+                }
+            }
+        }
+        viewModelScope.launch {
+            authViewModel.currentSupervisorPermissions.collect { perms ->
+                if (adminViewModel.supervisorPermissions.value != perms) {
+                    adminViewModel._supervisorPermissions.value = perms
+                }
+            }
+        }
+        viewModelScope.launch {
+            appState._supervisors.collect { sups ->
+                if (authViewModel._supervisors.value != sups) {
+                    authViewModel._supervisors.value = sups
+                }
+            }
+        }
     }
     private fun checkAndTriggerFavoriteOffersNotifications() {
     }
@@ -530,10 +532,6 @@ class MainViewModel @Inject constructor(
     }
     override fun getAuthEmailForPhone(phone: String): String = authViewModel.getAuthEmailForPhone(phone)
 
-    var lastNotifMsg: String = ""
-    var lastNotifTime: Long = 0L
-    val triggerRestoreAccountDialog = MutableStateFlow(false)
-    var targetChatChannelId by mutableStateOf<String?>(null)
     data class RestoreAccountMatch(
         val type: String,
         val name: String,

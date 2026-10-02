@@ -43,7 +43,7 @@ class SecureStorage(
             isUsingEncryptedPrefs = true
             migrateFromPlainSharedPreferences(encryptedPrefs)
             encryptedPrefs
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             try {
                 context.deleteSharedPreferences("secure_admin_prefs")
                 val masterKey = MasterKey.Builder(context)
@@ -58,7 +58,7 @@ class SecureStorage(
                 )
                 isUsingEncryptedPrefs = true
                 recreatedPrefs
-            } catch (ex: Exception) {
+            } catch (ex: Throwable) {
                 isUsingEncryptedPrefs = false
                 context.getSharedPreferences("secure_admin_prefs_vault_enc", Context.MODE_PRIVATE)
             }

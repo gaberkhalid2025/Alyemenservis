@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         InstantRequestRoomEntity::class,
         RequestOfferRoomEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -26,18 +26,55 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        private fun ensureAllIndices(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+            val statements = listOf(
+                "CREATE INDEX IF NOT EXISTS `index_chat_channels_clientPhone` ON `chat_channels` (`clientPhone`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_channels_providerPhone` ON `chat_channels` (`providerPhone`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_channels_lastMessageTime` ON `chat_channels` (`lastMessageTime`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_channels_unreadCount` ON `chat_channels` (`unreadCount`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_messages_channelId` ON `chat_messages` (`channelId`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_messages_timestamp` ON `chat_messages` (`timestamp`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_messages_senderId` ON `chat_messages` (`senderId`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_messages_channelId_timestamp` ON `chat_messages` (`channelId`, `timestamp`)",
+                "CREATE INDEX IF NOT EXISTS `index_chat_messages_isRead` ON `chat_messages` (`isRead`)",
+                "CREATE INDEX IF NOT EXISTS `index_bookings_customerPhone` ON `bookings` (`customerPhone`)",
+                "CREATE INDEX IF NOT EXISTS `index_bookings_providerId` ON `bookings` (`providerId`)",
+                "CREATE INDEX IF NOT EXISTS `index_bookings_status` ON `bookings` (`status`)",
+                "CREATE INDEX IF NOT EXISTS `index_bookings_timestamp` ON `bookings` (`timestamp`)",
+                "CREATE INDEX IF NOT EXISTS `index_bookings_customerPhone_status` ON `bookings` (`customerPhone`, `status`)",
+                "CREATE INDEX IF NOT EXISTS `index_bookings_providerId_status` ON `bookings` (`providerId`, `status`)",
+                "CREATE INDEX IF NOT EXISTS `index_instant_requests_clientPhone` ON `instant_requests` (`clientPhone`)",
+                "CREATE INDEX IF NOT EXISTS `index_instant_requests_status` ON `instant_requests` (`status`)",
+                "CREATE INDEX IF NOT EXISTS `index_instant_requests_timestamp` ON `instant_requests` (`timestamp`)",
+                "CREATE INDEX IF NOT EXISTS `index_instant_requests_category` ON `instant_requests` (`category`)",
+                "CREATE INDEX IF NOT EXISTS `index_instant_requests_status_timestamp` ON `instant_requests` (`status`, `timestamp`)",
+                "CREATE INDEX IF NOT EXISTS `index_request_offers_requestId` ON `request_offers` (`requestId`)",
+                "CREATE INDEX IF NOT EXISTS `index_request_offers_providerPhone` ON `request_offers` (`providerPhone`)",
+                "CREATE INDEX IF NOT EXISTS `index_request_offers_status` ON `request_offers` (`status`)",
+                "CREATE INDEX IF NOT EXISTS `index_request_offers_requestId_status` ON `request_offers` (`requestId`, `status`)"
+            )
+            for (sql in statements) {
+                try {
+                    db.execSQL(sql)
+                } catch (_: Throwable) {}
+            }
+        }
+
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                // Explicit non-destructive migration path: ensure indices for fast local queries
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_messages_channelId` ON `chat_messages` (`channelId`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookings_status` ON `bookings` (`status`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_instant_requests_status` ON `instant_requests` (`status`)")
+                ensureAllIndices(db)
             }
         }
 
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_request_offers_requestId` ON `request_offers` (`requestId`)")
+                ensureAllIndices(db)
+            }
+        }
+
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                ensureAllIndices(db)
             }
         }
 
@@ -48,7 +85,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "yemen_services_room_db"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .fallbackToDestructiveMigration()
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

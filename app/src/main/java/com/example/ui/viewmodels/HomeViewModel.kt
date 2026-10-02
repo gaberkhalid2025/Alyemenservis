@@ -62,6 +62,21 @@ open class HomeViewModel @Inject constructor(
     internal val _maxKmRadius get() = appState._maxKmRadius
     val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
 
+    // ==========================================
+    // 🗺️ Map & Location Utilities (Transferred from MapViewModel)
+    // ==========================================
+    internal val _userLatitude = MutableStateFlow(15.3694) // Default Sana'a
+    val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
+
+    internal val _userLongitude = MutableStateFlow(44.1910)
+    val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
+
+    internal val _selectedCityName = MutableStateFlow("صنعاء")
+    val selectedCityName: StateFlow<String> = _selectedCityName.asStateFlow()
+
+    internal val _isManualLocationMode = MutableStateFlow(false)
+    val isManualLocationMode: StateFlow<Boolean> = _isManualLocationMode.asStateFlow()
+
     private val cachedFilteredResults = mutableMapOf<String, List<ProviderEntity>>()
 
     init {
@@ -296,18 +311,6 @@ open class HomeViewModel @Inject constructor(
     // ==========================================
     // 🗺️ Map & Location Utilities (Transferred from MapViewModel)
     // ==========================================
-    internal val _userLatitude = MutableStateFlow(15.3694) // Default Sana'a
-    val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
-
-    internal val _userLongitude = MutableStateFlow(44.1910)
-    val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
-
-    internal val _selectedCityName = MutableStateFlow("صنعاء")
-    val selectedCityName: StateFlow<String> = _selectedCityName.asStateFlow()
-
-    internal val _isManualLocationMode = MutableStateFlow(false)
-    val isManualLocationMode: StateFlow<Boolean> = _isManualLocationMode.asStateFlow()
-
     fun updateUserLocation(lat: Double, lng: Double) {
         if (lat != 0.0 && lng != 0.0) {
             _userLatitude.value = lat
