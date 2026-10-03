@@ -328,6 +328,24 @@ fun SmartAssistantDialogView(
                                 } catch (e: Exception) {
                                     coroutineScope.launch { snackbarHostState.showSnackbar("تعذر معالجة الطلب: ${e.localizedMessage}") }
                                 }
+                            },
+                            onMicClick = {
+                                try {
+                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-YE")
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدث باسم الخدمة أو الفني أو المشكلة...")
+                                    }
+                                    speechLauncher.launch(intent)
+                                } catch (e: Exception) {
+                                    try {
+                                        VoiceManager.onHear?.invoke { spoken ->
+                                            if (spoken.isNotEmpty()) {
+                                                assistantViewModel.updateTypedText(spoken)
+                                            }
+                                        }
+                                    } catch (_: Exception) {}
+                                }
                             }
                         )
                     }

@@ -11,6 +11,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +35,7 @@ import com.example.utils.VisualThemePalette
  * 💬 AssistantMessageItem
  * Message card rendering user and assistant text, action buttons, TTS button, and suggested provider cards.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AssistantMessageItem(
     msg: AssistantMessage,
@@ -41,6 +46,9 @@ fun AssistantMessageItem(
     onChatOpen: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    var reactionState by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Boolean?>(null) }
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -75,48 +83,116 @@ fun AssistantMessageItem(
                         HorizontalDivider(color = themeColors.border)
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        Row(
+                        // Upgraded Interactive Buttons Row under every reply
+                        androidx.compose.foundation.layout.FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            // 1. Request Now
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFFEF4444).copy(alpha = 0.2f))
-                                    .border(0.8.dp, Color(0xFFEF4444), RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFEF4444).copy(alpha = 0.15f))
+                                    .border(0.8.dp, Color(0xFFEF4444).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
                                     .clickable { onRequestQuickService() }
                                     .padding(horizontal = 6.dp, vertical = 3.dp)
                             ) {
-                                Text("⚡ اطلب الآن", fontSize = 9.sp, color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                                Text("⚡ اطلب الآن", fontSize = 8.5.sp, color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
                             }
 
+                            // 2. Show on Map
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF10B981).copy(alpha = 0.2f))
-                                    .border(0.8.dp, Color(0xFF10B981), RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF10B981).copy(alpha = 0.15f))
+                                    .border(0.8.dp, Color(0xFF10B981).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
                                     .clickable { onNavigateToMap() }
                                     .padding(horizontal = 6.dp, vertical = 3.dp)
                             ) {
-                                Text("📍 الخريطة", fontSize = 9.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                                Text("📍 الخريطة", fontSize = 8.5.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                             }
 
-                            Spacer(modifier = Modifier.weight(1f))
+                            // 3. Direct Chat
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF3B82F6).copy(alpha = 0.15f))
+                                    .border(0.8.dp, Color(0xFF3B82F6).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        val firstEntityId = msg.matchedEntities.orEmpty()
+                                            .filterNotNull()
+                                            .firstOrNull()?.let { ent ->
+                                                when (ent) {
+                                                    is ProviderEntity -> ent.id
+                                                    is StoreEntity -> ent.id
+                                                    is PropertyEntity -> ent.id
+                                                    else -> null
+                                                }
+                                            }
+                                        if (firstEntityId != null) {
+                                            onChatOpen(firstEntityId)
+                                        } else {
+                                            onChatOpen("support_channel_id")
+                                        }
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text("💬 دردش", fontSize = 8.5.sp, color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold)
+                            }
 
+                            // 4. Copy Reply Text
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF8B5CF6).copy(alpha = 0.15f))
+                                    .border(0.8.dp, Color(0xFF8B5CF6).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        try {
+                                            clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(msg.text))
+                                        } catch (_: Exception) {}
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text("📋 نسخ", fontSize = 8.5.sp, color = Color(0xFF8B5CF6), fontWeight = FontWeight.Bold)
+                            }
+
+                            // 5. Thumbs Up
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (reactionState == true) Color(0xFF10B981).copy(alpha = 0.35f) else Color(0xFF334155).copy(alpha = 0.15f))
+                                    .clickable { reactionState = if (reactionState == true) null else true }
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text("👍", fontSize = 9.sp)
+                            }
+
+                            // 6. Thumbs Down
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (reactionState == false) Color(0xFFEF4444).copy(alpha = 0.35f) else Color(0xFF334155).copy(alpha = 0.15f))
+                                    .clickable { reactionState = if (reactionState == false) null else false }
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Text("👎", fontSize = 9.sp)
+                            }
+
+                            // 7. TTS Voice Audio Play Button
                             IconButton(
                                 onClick = {
                                     try {
                                         VoiceManager.onSpeak?.invoke(msg.text)
                                     } catch (_: Exception) {}
                                 },
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = "استماع",
-                                    tint = themeColors.textSecondary,
-                                    modifier = Modifier.size(14.dp)
+                                    tint = themeColors.accent,
+                                    modifier = Modifier.size(13.dp)
                                 )
                             }
                         }

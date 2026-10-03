@@ -74,7 +74,11 @@ class AssistantViewModel : ViewModel() {
         if (prompt.isBlank() || _isGenerating.value) return
 
         val userMsg = AssistantMessage(text = prompt.trim(), isUser = true)
-        _chatHistory.value = _chatHistory.value + userMsg
+        var updatedHistory = _chatHistory.value + userMsg
+        if (updatedHistory.size > 75) {
+            updatedHistory = updatedHistory.takeLast(75)
+        }
+        _chatHistory.value = updatedHistory
         _typedText.value = ""
         _isGenerating.value = true
 
@@ -98,7 +102,11 @@ class AssistantViewModel : ViewModel() {
                 }
 
                 withContext(Dispatchers.Main) {
-                    _chatHistory.value = _chatHistory.value + responseMsg
+                    var updatedHistoryWithResp = _chatHistory.value + responseMsg
+                    if (updatedHistoryWithResp.size > 75) {
+                        updatedHistoryWithResp = updatedHistoryWithResp.takeLast(75)
+                    }
+                    _chatHistory.value = updatedHistoryWithResp
                     _isGenerating.value = false
                     if (settings.allowTextToSpeechAssistant) {
                         onSpeechSpeak?.invoke(responseMsg.text)
@@ -317,26 +325,38 @@ class AssistantViewModel : ViewModel() {
         }
 
         val textResult = when {
-            qNormalized.contains("مرحبا") || qNormalized.contains("السلام") || qNormalized.contains("هلا") -> {
-                "أهلاً وسهلاً بك في دليل خدمات اليمن 🇾🇪! أنا مساعدك الذكي لمساعدتك في الوصول لأفضل الفنيين والخدمات."
+            qNormalized.contains("مرحبا") || qNormalized.contains("السلام") || qNormalized.contains("هلا") || qNormalized.contains("صباح") || qNormalized.contains("مساء") -> {
+                "أهلاً وسهلاً بك في دليل خدمات اليمن 🇾🇪! أنا مساعدك الذكي المدمج لمساعدتك في الوصول لأفضل الفنيين، المحلات، العيادات، والمطاعم في ثوانٍ معدودة. كيف يمكنني مساعدتك اليوم؟"
             }
             isSupportContact -> {
-                "📱 للتواصل المباشر مع الدعم الفني:\n- هاتف: *${settings.supportPhone}*\n- واتساب: *${settings.supportWhatsapp}*"
+                "📱 للتواصل المباشر والآمن مع الدعم الفني للدليل:\n- هاتف الإدارة: *${settings.supportPhone}*\n- واتساب الدعم الفني المباشر: *${settings.supportWhatsapp}*\nنحن هنا لخدمتك على مدار الساعة!"
             }
             isJoinRequest -> {
-                "📝 للانضمام كفني أو متجر في الدليل، استخدم شاشة 'طلب الانضمام' في القائمة الرئيسية."
+                "📝 للانضمام كفني محترف أو صاحب متجر/خدمة في الدليل وعرض خدماتك مجاناً، يرجى فتح القائمة الجانبية للتطبيق واختيار 'طلب الانضمام كفني' وتعبئة البيانات!"
             }
-            isPriceInfo -> {
-                "💰 استخدام تطبيق دليل خدمات اليمن مجاني تماماً، وأسعار المعاينة والصيانة تبدأ من 3,000 ريال يمني حسب التخصص."
+            isPriceInfo || qNormalized.contains("سعر سباك") || qNormalized.contains("تكلفه") -> {
+                "💰 استخدام تطبيق دليل خدمات اليمن مجاني تماماً للبحث وتصفح الفنيين والمحلات. أسعار المعاينة والصيانة تبدأ من 3,000 ريال يمني وتحدد التكلفة الإجمالية للعمل بالتراضي المباشر بينك وبين مقدم الخدمة بكل شفافية."
             }
-            isMapFeature -> {
-                "🗺️ يمكنك النقر على 'خريطة الخدمات' لعرض التغطية الجغرافية والفنيين الأقرب لك."
+            isMapFeature || qNormalized.contains("رادار") -> {
+                "🗺️ يمكنك النقر على 'خريطة الخدمات' أو 'الرادار التفاعلي' لعرض مواقع مقدمي الخدمات القريبين منك جغرافياً في حيك ومحافظتك دون أي حاجة للإنترنت!"
+            }
+            qNormalized.contains("عدن") || qNormalized.contains("صنعاء") || qNormalized.contains("تعز") || qNormalized.contains("حضرموت") || qNormalized.contains("الحديده") || qNormalized.contains("اب") || qNormalized.contains("مارب") || qNormalized.contains("ذمار") -> {
+                "🇾🇪 دليل خدمات اليمن يغطي جميع المحافظات والمناطق اليمنية الرئيسية (صنعاء، عدن، تعز، حضرموت، إب، الحديدة، مأرب، ذمار، وغيرها) لتسهيل العثور على أقرب فني ومحل معتمد في منطقتك السكنية!"
+            }
+            qNormalized.contains("طوارئ") || qNormalized.contains("اسعاف") || qNormalized.contains("دفاع") || qNormalized.contains("حريق") || qNormalized.contains("شرطه") -> {
+                "🚨 أرقام الطوارئ العامة الهامة في اليمن:\n- الدفاع المدني والإطفاء: *191*\n- طوارئ الكهرباء: *195*\n- طوارئ المياه والصرف الصحي: *192*\n- إسعاف الهلال الأحمر والنجدة: *199*\n\nيرجى التواصل المباشر مع هذه الجهات الرسمية فوراً في حالات الطوارئ الحيوية!"
+            }
+            qNormalized.contains("دفع") || qNormalized.contains("كاش") || qNormalized.contains("فلوس") || qNormalized.contains("محفظه") -> {
+                "💳 يتيح تطبيقنا الدفع نقداً (كاش) مباشرة للفني، أو عبر المحافظ الإلكترونية اليمنية المعتمدة (مثل حاسب، جوال بي، كاش، الكريمي، وغيرها) بالتنسيق المباشر مع مقدم الخدمة."
+            }
+            qNormalized.contains("تقييم") || qNormalized.contains("شكوى") || qNormalized.contains("شكاوى") || qNormalized.contains("سيء") -> {
+                "⭐ نحن نهتم بجودة الخدمات جداً! يمكنك تقييم الفني بنجوم وتوضيح تجربتك بعد إتمام الطلب مباشرة من شاشة الحجوزات، وإذا واجهتك أي مشكلة تواصل معنا فوراً عبر زر الدعم الفني وسنتعامل مع الشكوى بحسم!"
             }
             isProviderSearch -> {
-                "🔧 طلبك واضح! يمكنك استعراض قسم الفنيين المختصين أو الضغط على '⚡ اطلب خدمتك الآن' لإرسال طلب فوري لأقرب فني معتمد."
+                "🔧 طلبك واضح! يمكنك تصفح قسم الفنيين المختصين في التطبيق أو الضغط على زر '⚡ اطلب الآن' لإرسال طلب فوري وسريع لأقرب فني معتمد في حارتك."
             }
             else -> {
-                "عذراً، لم أتمكن من فهم استفسارك بدقة (\"$prompt\"). يمكنك كتابة اسم الخدمة المطلوبة بوضوح مثل: (أحتاج سباك، كهربائي، صيانة غسالة، مطعم، عقار) أو الضغط على '⚡ اطلب خدمتك الآن'."
+                "عذراً، لم أتمكن من فهم استفسارك بدقة (\"$prompt\"). يمكنك كتابة اسم المهنة أو الخدمة المطلوبة بوضوح مثل: (أحتاج سباك، كهربائي، صيانة غسالة، مطعم، عقار، دكتور) أو الضغط على زر '⚡ اطلب الآن' لإرسال طلب فوري."
             }
         }
         return Pair(textResult, emptyList())

@@ -16,10 +16,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.utils.VisualThemePalette
+import com.example.utils.ChatIcons
 
 /**
  * ✏️ AssistantInputBar
- * Bottom text field and send button.
+ * Bottom text field, microphone trigger, and send button.
  */
 @Composable
 fun AssistantInputBar(
@@ -28,6 +29,7 @@ fun AssistantInputBar(
     themeColors: VisualThemePalette,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onMicClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -42,6 +44,22 @@ fun AssistantInputBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Direct Microphone button inside the bar
+            IconButton(
+                onClick = onMicClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(themeColors.background)
+            ) {
+                Icon(
+                    imageVector = ChatIcons.Mic,
+                    contentDescription = "تسجيل صوتي",
+                    tint = themeColors.accent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
             OutlinedTextField(
                 value = typedText,
                 onValueChange = onTextChanged,
