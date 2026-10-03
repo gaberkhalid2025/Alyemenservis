@@ -136,6 +136,9 @@ fun TransactionHistoryScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    val gatewayIntegration = remember { com.example.utils.PaymentGatewayIntegration(context) }
+                                    val isGatewayActive = remember(context) { gatewayIntegration.isAnyRealGatewayActive(context) }
+
                                     Column {
                                         Text("الرصيد الحالي بالمحفظة", color = Color(0xFFE0F2FE), fontSize = 13.sp)
                                         Spacer(modifier = Modifier.height(4.dp))
@@ -148,6 +151,28 @@ fun TransactionHistoryScreen(
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text("ريال يمني", fontSize = 14.sp, color = Color(0xFFBAE6FD), modifier = Modifier.padding(bottom = 4.dp))
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isGatewayActive) Color(0xFF10B981).copy(alpha = 0.22f) else Color(0xFFF59E0B).copy(alpha = 0.22f))
+                                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isGatewayActive) Color(0xFF10B981) else Color(0xFFF59E0B))
+                                            )
+                                            Text(
+                                                text = if (isGatewayActive) "متصل ببوابة الدفع الحقيقية ✓" else "وضع المحفظة المحلية (تجريبي) ⚠",
+                                                fontSize = 9.5.sp,
+                                                color = if (isGatewayActive) Color(0xFFA7F3D0) else Color(0xFFFED7AA),
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
                                     }
 

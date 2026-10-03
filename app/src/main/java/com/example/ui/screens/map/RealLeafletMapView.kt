@@ -196,7 +196,8 @@ fun RealLeafletMapView(
                 onError()
                 return@LaunchedEffect
             }
-            delay(3000L)
+            // Strict 2.8-second timeout: if Leaflet fails or is slow -> instantly return to Radar
+            delay(2800L)
             if (!webViewLoaded) {
                 isRadarMode = true
                 hasError = true
@@ -401,7 +402,7 @@ fun RealLeafletMapView(
         }
     }
 
-    // مهلة زمنية صارمة 3 ثوانٍ (3000ms) -> fallback فوري للرادار + إظهار MapErrorOverlay
+    // مهلة زمنية صارمة 2.8 ثانية (2800ms) -> fallback فوري للرادار + إظهار MapErrorOverlay
     LaunchedEffect(retryCount, isOnline) {
         if (!isOnline) {
             useOfflineInteractiveFallback = true
@@ -409,7 +410,7 @@ fun RealLeafletMapView(
             onMapLoadFailed?.invoke()
             return@LaunchedEffect
         }
-        delay(3000L)
+        delay(2800L)
         if (!isMapReady || !isTilesLoaded) {
             useOfflineInteractiveFallback = true
             isMapError = true

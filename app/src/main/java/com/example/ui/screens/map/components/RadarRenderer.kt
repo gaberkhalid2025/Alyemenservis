@@ -241,6 +241,16 @@ fun RadarRenderer(
         label = "pulse_radius_2"
     )
 
+    val pulseRadius3 by infiniteTransition.animateFloat(
+        initialValue = 0.05f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(pulseCycleDurationMs, delayMillis = 1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse_radius_3"
+    )
+
     var zoomScale by remember { mutableFloatStateOf(1.0f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
 
@@ -259,6 +269,7 @@ fun RadarRenderer(
         }
         val pulse1Stroke = remember { Stroke(width = 2.2f) }
         val pulse2Stroke = remember { Stroke(width = 1.8f) }
+        val pulse3Stroke = remember { Stroke(width = 1.2f) }
         val bgGradientColors = remember {
             listOf(Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF020617))
         }
@@ -286,6 +297,9 @@ fun RadarRenderer(
         }
         val alpha2 by remember {
             derivedStateOf { ((1.0f - pulseRadius2) * 0.28f).coerceIn(0f, 1f) }
+        }
+        val alpha3 by remember {
+            derivedStateOf { ((1.0f - pulseRadius3) * 0.18f).coerceIn(0f, 1f) }
         }
         val sweepEndOffset by remember(centerX, centerY, maxRadius) {
             derivedStateOf {
@@ -398,15 +412,30 @@ fun RadarRenderer(
                 center = centerOffset,
                 style = pulse2Stroke
             )
-
-            // 5. خط المسح الدوار
-            drawLine(
-                color = pulseColor.copy(alpha = 0.75f),
-                start = centerOffset,
-                end = sweepEndOffset,
-                strokeWidth = 2.5.dp.toPx(),
-                cap = StrokeCap.Round
+            drawCircle(
+                color = pulseColor.copy(alpha = alpha3),
+                radius = (maxRadius * pulseRadius3).coerceAtLeast(1f),
+                center = centerOffset,
+                style = pulse3Stroke
             )
+
+            // 5. خط المسح الدوار مع توهج وخلفية متلاشية غامرة (Trail Motion-Blur Glow)
+            for (i in 0..5) {
+                val angleOffset = i * 2.0f
+                val trailAlpha = (0.75f - (i * 0.12f)).coerceAtLeast(0.02f)
+                val trailRad = Math.toRadians((sweepAngle - angleOffset).toDouble())
+                val trailEnd = Offset(
+                    x = (centerX + maxRadius * cos(trailRad)).toFloat(),
+                    y = (centerY + maxRadius * sin(trailRad)).toFloat()
+                )
+                drawLine(
+                    color = pulseColor.copy(alpha = trailAlpha),
+                    start = centerOffset,
+                    end = trailEnd,
+                    strokeWidth = (2.5.dp.toPx() * (1f - (i * 0.15f))).coerceAtLeast(1f),
+                    cap = StrokeCap.Round
+                )
+            }
 
             // 6. الخريطة الحرارية (إذا كانت مفعلة)
             if (isHeatmapActive && weightedPoints.isNotEmpty()) {
@@ -429,6 +458,21 @@ fun RadarRenderer(
                     val item = cluster.items.first()
                     val emoji = MarkerRenderer.getEmojiForType(item.type)
                     val color = MarkerRenderer.getColorForType(item.type)
+
+                    // هالة خارجية وتوهج ناعم نابض غامر للعناصر المحددة (Soft Breathing selection glow)
+                    if (isSelected) {
+                        drawCircle(
+                            color = color.copy(alpha = 0.22f * (1f - pulseRadius)),
+                            radius = 35.dp.toPx() * pulseRadius * zoomScale.coerceAtMost(1.8f),
+                            center = center
+                        )
+                        drawCircle(
+                            color = color.copy(alpha = 0.35f),
+                            radius = 28.dp.toPx() * zoomScale.coerceAtMost(1.8f),
+                            center = center,
+                            style = Stroke(width = 1.5.dp.toPx())
+                        )
+                    }
 
                     // هالة خارجية
                     drawCircle(
