@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -35,10 +36,14 @@ import com.example.data.models.MessageStatus
 import com.example.ui.screens.chat.components.ChatBubbleItem
 import com.example.ui.screens.chat.components.ChatHeaderBar
 import com.example.ui.screens.chat.components.ChatInputBar
+import com.example.ui.screens.chat.components.ChatMediaGalleryDialog
 import com.example.ui.screens.chat.components.TypingIndicator
 import com.example.utils.AudioPlayerManager
 import com.example.utils.DateFormatter
 import com.example.utils.VisualThemePalette
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -85,6 +90,7 @@ fun ChatScreen(
     var selectedMessageForAction by remember { mutableStateOf<ChatMessage?>(null) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var showDeleteChannelDialog by remember { mutableStateOf(false) }
+    var showMediaGallery by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -162,10 +168,22 @@ fun ChatScreen(
         }
     }
 
-    // Stop active audio on screen exit
+    // Stop active audio on screen exit and attach consecutive voice playback
     DisposableEffect(Unit) {
         onDispose {
             AudioPlayerManager.stop()
+            AudioPlayerManager.onAudioFinished = null
+        }
+    }
+
+    LaunchedEffect(messages) {
+        AudioPlayerManager.onAudioFinished = { completedId ->
+            val audioMsgs = messages.filter { it.mediaType == MediaType.AUDIO && it.mediaUrl.isNotBlank() }
+            val idx = audioMsgs.indexOfFirst { it.id == completedId }
+            if (idx in 0 until audioMsgs.size - 1) {
+                val nextMsg = audioMsgs[idx + 1]
+                AudioPlayerManager.play(nextMsg.id, nextMsg.mediaUrl, context)
+            }
         }
     }
 
@@ -231,8 +249,60 @@ fun ChatScreen(
                     onDeleteChannelClick = {
                         showDeleteChannelDialog = true
                     },
+                    onMediaGalleryClick = {
+                        showMediaGallery = true
+                    },
                     themeColors = themeColors
                 )
+
+                // Pinned Message Banner
+                val pinnedMessage = remember(messages) { messages.findLast { it.isPinned } }
+                if (pinnedMessage != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF1E293B))
+                            .border(1.dp, Color(0xFFFFD54F).copy(alpha = 0.25f))
+                            .clickable {
+                                val idx = filteredMessages.indexOfFirst { it.id == pinnedMessage.id }
+                                if (idx >= 0) {
+                                    scope.launch { listState.animateScrollToItem(idx) }
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📌", fontSize = 13.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = "رسالة مثبتة",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFD54F)
+                                )
+                                Text(
+                                    text = pinnedMessage.message.ifBlank { "مرفق وسائط" },
+                                    fontSize = 12.sp,
+                                    color = Color.LightGray,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { chatViewModel.togglePinMessage(pinnedMessage.id, false) },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "إلغاء التثبيت", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
 
                 AnimatedVisibility(visible = isSearchOpen) {
                     Row(
@@ -320,6 +390,7 @@ fun ChatScreen(
                                 isMe = isMe,
                                 onReplyClick = { chatViewModel.setReplyingTo(msg) },
                                 onLongClick = { selectedMessageForAction = msg },
+                                onReactionClick = { emoji -> chatViewModel.toggleReaction(msg.id, emoji) },
                                 onRetryClick = { chatViewModel.resendMessage(msg.id) },
                                 themeColors = themeColors
                             )
@@ -385,6 +456,16 @@ fun ChatScreen(
                             mediaUrl = mediaUrl
                         )
                     },
+                    onSendAudioMessage = { text, mediaUrl, waveform ->
+                        chatViewModel.sendMessage(
+                            senderId = currentUserId,
+                            senderName = currentUserName,
+                            text = text,
+                            mediaType = MediaType.AUDIO,
+                            mediaUrl = mediaUrl,
+                            audioWaveform = waveform
+                        )
+                    },
                     onEditMessage = { messageId, newText ->
                         chatViewModel.editMessage(messageId, newText)
                         editingMessage = null
@@ -413,6 +494,38 @@ fun ChatScreen(
             title = { Text("خيارات الرسالة", fontSize = 14.sp, color = themeColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Quick Reaction Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF0F172A), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("❤️", "👍", "😂", "😮", "😢", "🙏").forEach { emoji ->
+                            Text(
+                                text = emoji,
+                                fontSize = 22.sp,
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        chatViewModel.toggleReaction(targetMsg.id, emoji)
+                                        selectedMessageForAction = null
+                                    }
+                                    .padding(4.dp)
+                            )
+                        }
+                    }
+
+                    // Pin / Unpin
+                    TextButton(onClick = {
+                        chatViewModel.togglePinMessage(targetMsg.id, !targetMsg.isPinned)
+                        selectedMessageForAction = null
+                    }) {
+                        Text(if (targetMsg.isPinned) "📌 إلغاء تثبيت الرسالة" else "📌 تثبيت الرسالة", color = Color(0xFFFFD54F), fontSize = 13.sp)
+                    }
+
                     if (isMe && targetMsg.mediaType == MediaType.TEXT) {
                         TextButton(onClick = {
                             editingMessage = targetMsg
@@ -473,6 +586,15 @@ fun ChatScreen(
                 }
             },
             containerColor = themeColors.surface
+        )
+    }
+
+    // Media Gallery Dialog
+    if (showMediaGallery) {
+        ChatMediaGalleryDialog(
+            messages = messages,
+            onDismiss = { showMediaGallery = false },
+            themeColors = themeColors
         )
     }
 }

@@ -36,6 +36,8 @@ object AudioPlayerManager {
 
     private var lastContext: Context? = null
 
+    var onAudioFinished: ((completedMessageId: String) -> Unit)? = null
+
     fun play(messageId: String, audioSource: String, context: Context) {
         lastContext = context.applicationContext
         if (_currentPlayingId.value == messageId && _isPlaying.value) {
@@ -67,7 +69,7 @@ object AudioPlayerManager {
                     audioSource
                 }
                 val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
-                val tempFile = File(context.cacheDir, "temp_voice_play.mp3")
+                val tempFile = File(context.cacheDir, "temp_voice_play.m4a")
                 FileOutputStream(tempFile).use { it.write(decodedBytes) }
                 player.setDataSource(tempFile.absolutePath)
             } else if (audioSource.startsWith("http://") || audioSource.startsWith("https://")) {
@@ -80,7 +82,7 @@ object AudioPlayerManager {
                     player.setDataSource(localFile.absolutePath)
                 } else {
                     val decodedBytes = Base64.decode(audioSource, Base64.DEFAULT)
-                    val tempFile = File(context.cacheDir, "temp_voice_play.mp3")
+                    val tempFile = File(context.cacheDir, "temp_voice_play.m4a")
                     FileOutputStream(tempFile).use { it.write(decodedBytes) }
                     player.setDataSource(tempFile.absolutePath)
                 }
@@ -95,7 +97,11 @@ object AudioPlayerManager {
             _playbackProgress.value = 0f
 
             player.setOnCompletionListener {
+                val finishedId = _currentPlayingId.value
                 stop()
+                if (finishedId != null) {
+                    onAudioFinished?.invoke(finishedId)
+                }
             }
 
             player.setOnErrorListener { _, what, extra ->

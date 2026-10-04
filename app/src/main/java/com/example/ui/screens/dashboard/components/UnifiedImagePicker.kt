@@ -1,9 +1,9 @@
 package com.example.ui.screens.dashboard.components
 
 import android.net.Uri
-import com.example.ui.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -20,11 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
+import com.example.utils.FirebaseStorageUploader
+import android.widget.Toast
 import kotlinx.coroutines.launch
 
 @Composable
 fun UnifiedImagePicker(
     currentImageUrl: String,
+    storagePath: String = "uploads/${System.currentTimeMillis()}_item.webp",
     label: String = "اختيار صورة",
     themeColors: VisualThemePalette,
     onImageSelected: (String) -> Unit
@@ -34,19 +37,19 @@ fun UnifiedImagePicker(
     var isUploading by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
             coroutineScope.launch {
                 isUploading = true
-                val path = "products/${System.currentTimeMillis()}_item.webp"
-                val result = com.example.utils.FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
+                val path = storagePath.ifEmpty { "products/${System.currentTimeMillis()}_item.webp" }
+                val result = FirebaseStorageUploader.uploadImageToStorage(context, uri, path)
                 isUploading = false
                 result.onSuccess { url ->
                     onImageSelected(url)
-                    android.widget.Toast.makeText(context, "تم رفع صورة العنصر بنجاح ✅", android.widget.Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "تم رفع صورة العنصر بنجاح ✅", Toast.LENGTH_SHORT).show()
                 }.onFailure { err ->
-                    android.widget.Toast.makeText(context, "فشل رفع الصورة: ${err.message ?: "خطأ في الاتصال"}", android.widget.Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "فشل رفع الصورة: ${err.message ?: "خطأ في الاتصال"}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -102,7 +105,7 @@ fun UnifiedImagePicker(
                 }
 
                 Button(
-                    onClick = { imagePickerLauncher.launch("image/*") },
+                    onClick = { imagePickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                     shape = RoundedCornerShape(8.dp),
                     enabled = !isUploading

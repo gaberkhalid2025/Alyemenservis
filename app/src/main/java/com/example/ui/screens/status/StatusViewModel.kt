@@ -1,8 +1,8 @@
 package com.example.ui.screens.status
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.ui.*
 import androidx.lifecycle.viewModelScope
 import com.example.data.BookingEntity
 import com.example.data.NotificationEntity
@@ -12,6 +12,7 @@ import com.example.data.repositories.IStatusRepository
 import com.example.data.repositories.SystemStatusMetrics
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,6 +29,7 @@ import kotlinx.coroutines.sync.withLock
 /**
  * 📊 StatusUiState
  */
+@Immutable
 data class StatusUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -98,57 +100,59 @@ class StatusViewModel(
                 loadDataJob = viewModelScope.launch {
                     _uiState.value = _uiState.value.copy(isLoading = _uiState.value.metrics.providersCount == 0 && !_uiState.value.isRefreshing)
 
-                    launch {
-                        statusRepository.getSystemMetricsFlow()
-                            .catch { e ->
-                                _uiState.value = _uiState.value.copy(
-                                    isLoading = false,
-                                    errorMessage = e.localizedMessage ?: "خطأ في تحميل مؤشرات النظام"
-                                )
-                            }
-                            .collect { metrics ->
-                                _uiState.value = _uiState.value.copy(metrics = metrics, isLoading = false)
-                            }
-                    }
+                    coroutineScope {
+                        launch {
+                            statusRepository.getSystemMetricsFlow()
+                                .catch { e ->
+                                    _uiState.value = _uiState.value.copy(
+                                        isLoading = false,
+                                        errorMessage = e.localizedMessage ?: "خطأ في تحميل مؤشرات النظام"
+                                    )
+                                }
+                                .collect { metrics ->
+                                    _uiState.value = _uiState.value.copy(metrics = metrics, isLoading = false)
+                                }
+                        }
 
-                    launch {
-                        statusRepository.getPendingJoinRequestsFlow()
-                            .catch { e ->
-                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
-                            }
-                            .collect { requests ->
-                                _uiState.value = _uiState.value.copy(pendingJoinRequests = requests, isLoading = false)
-                            }
-                    }
+                        launch {
+                            statusRepository.getPendingJoinRequestsFlow()
+                                .catch { e ->
+                                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                                }
+                                .collect { requests ->
+                                    _uiState.value = _uiState.value.copy(pendingJoinRequests = requests, isLoading = false)
+                                }
+                        }
 
-                    launch {
-                        statusRepository.getSystemBookingsFlow()
-                            .catch { e ->
-                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
-                            }
-                            .collect { bookings ->
-                                _uiState.value = _uiState.value.copy(systemBookings = bookings, isLoading = false)
-                            }
-                    }
+                        launch {
+                            statusRepository.getSystemBookingsFlow()
+                                .catch { e ->
+                                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                                }
+                                .collect { bookings ->
+                                    _uiState.value = _uiState.value.copy(systemBookings = bookings, isLoading = false)
+                                }
+                        }
 
-                    launch {
-                        statusRepository.getInstantRequestsFlow()
-                            .catch { e ->
-                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
-                            }
-                            .collect { instantReqs ->
-                                _uiState.value = _uiState.value.copy(instantRequests = instantReqs, isLoading = false)
-                            }
-                    }
+                        launch {
+                            statusRepository.getInstantRequestsFlow()
+                                .catch { e ->
+                                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                                }
+                                .collect { instantReqs ->
+                                    _uiState.value = _uiState.value.copy(instantRequests = instantReqs, isLoading = false)
+                                }
+                        }
 
-                    launch {
-                        statusRepository.getNotificationsFlow()
-                            .catch { e ->
-                                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
-                            }
-                            .collect { notifs ->
-                                _uiState.value = _uiState.value.copy(notifications = notifs, isLoading = false)
-                            }
+                        launch {
+                            statusRepository.getNotificationsFlow()
+                                .catch { e ->
+                                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.localizedMessage)
+                                }
+                                .collect { notifs ->
+                                    _uiState.value = _uiState.value.copy(notifications = notifs, isLoading = false)
+                                }
+                        }
                     }
                 }
             }

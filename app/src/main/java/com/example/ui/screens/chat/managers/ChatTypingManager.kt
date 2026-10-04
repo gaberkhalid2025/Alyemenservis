@@ -36,12 +36,19 @@ class ChatTypingManager(
         _isTypingOther.value = isTyping
     }
 
+    private var lastTypingSentTime = 0L
+
     fun onUserTyping(channelId: String, senderId: String, text: String) {
-        sendTypingStatus(channelId, senderId, true)
+        val now = System.currentTimeMillis()
+        if (now - lastTypingSentTime > 2500L) {
+            lastTypingSentTime = now
+            sendTypingStatus(channelId, senderId, true)
+        }
         typingJob?.cancel()
         typingJob = scope.launch {
             delay(3000)
             sendTypingStatus(channelId, senderId, false)
+            lastTypingSentTime = 0L
         }
     }
 

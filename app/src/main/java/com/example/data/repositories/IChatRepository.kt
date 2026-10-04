@@ -52,7 +52,8 @@ interface IChatRepository {
         mediaUrl: String = "",
         replyToId: String? = null,
         replyToText: String? = null,
-        attachment: ChatAttachment? = null
+        attachment: ChatAttachment? = null,
+        audioWaveform: List<Int> = emptyList()
     ): AppResult<ChatMessage>
 
     /**
@@ -89,6 +90,11 @@ interface IChatRepository {
      * إضافة أو إزالة تفاعل على الرسالة (Reaction)
      */
     suspend fun toggleReaction(channelId: String, messageId: String, userId: String, emoji: String): AppResult<Unit>
+
+    /**
+     * تثبيت أو إلغاء تثبيت الرسالة
+     */
+    suspend fun togglePinMessage(channelId: String, messageId: String, isPinned: Boolean): AppResult<Unit>
 
     /**
      * حذف قناة المحادثة

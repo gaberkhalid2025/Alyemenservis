@@ -1,7 +1,6 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.example.ui.screens.home
-import com.example.ui.*
 
 import android.content.Context
 import androidx.compose.foundation.*
@@ -17,17 +16,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.data.*
-import com.example.ui.MainViewModel
+import com.example.ui.*
 import com.example.ui.components.AdminCustomBannerView
 import com.example.ui.components.BannerSliderView
 import com.example.utils.VisualThemePalette
 
 import com.example.data.repositories.*
-import com.example.StoreCreateEditDialog
-import com.example.ui.screens.dashboard.viewmodels.ServicesBrowserViewModel
 import com.example.ui.screens.home.sections.*
+import com.example.*
+import com.example.ui.dialogs.JobApplicationDialog
+import com.example.VoiceManager
 
 /**
  * 🏠 ServicesBrowserLayout - الشاشة الرئيسية لتصفح الخدمات والمتاجر باليمن
@@ -46,9 +45,6 @@ fun ServicesBrowserLayout(
     val context = LocalContext.current
     val appContext = context.applicationContext
 
-    val browserViewModel: ServicesBrowserViewModel = hiltViewModel()
-
-    val browserUiState by browserViewModel.uiState.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val allProviders by viewModel.providers.collectAsState()
     val filteredProviders by viewModel.filteredProviders.collectAsState()
@@ -76,10 +72,11 @@ fun ServicesBrowserLayout(
     var selectedStoreForDetails by remember { mutableStateOf<StoreEntity?>(null) }
     var selectedPropertyForDetails by remember { mutableStateOf<PropertyEntity?>(null) }
     var selectedJobForDetails by remember { mutableStateOf<JobEntity?>(null) }
+    var showJobApplicationForJob by remember { mutableStateOf<JobEntity?>(null) }
     var payingBookingObj by remember { mutableStateOf<BookingEntity?>(null) }
+    var showCreateStoreModalSection by remember { mutableStateOf<String?>(null) }
     var providersLimit by remember { mutableStateOf(10) }
     val activeTabName by viewModel.activeBrowserTab.collectAsState()
-    var showCreateStoreModalSection by remember { mutableStateOf<String?>(null) }
 
     val activeTabs = remember(settingsState) {
         val list = mutableListOf("الرئيسية")
@@ -93,9 +90,8 @@ fun ServicesBrowserLayout(
     }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (activeTabName == "الرئيسية") {
@@ -133,7 +129,7 @@ fun ServicesBrowserLayout(
                         onFilterClick = { showFiltersPanel = true },
                         isSpeechSearchEnabled = settingsState.isSpeechSearchEnabled,
                         onVoiceClick = {
-                            com.example.VoiceManager.onHear?.invoke { heardText ->
+                            VoiceManager.onHear?.invoke { heardText ->
                                 viewModel.updateSearchQuery(heardText)
                                 viewModel.navigateToScreen(AppScreens.UNIFIED_SEARCH)
                             }
@@ -329,8 +325,6 @@ fun ServicesBrowserLayout(
         )
     }
 
-    var showJobApplicationForJob by remember { mutableStateOf<JobEntity?>(null) }
-
     selectedJobForDetails?.let { job ->
         JobQuickDetailsDialog(
             job = job,
@@ -346,7 +340,7 @@ fun ServicesBrowserLayout(
     }
 
     showJobApplicationForJob?.let { job ->
-        com.example.ui.dialogs.JobApplicationDialog(
+        JobApplicationDialog(
             viewModel = viewModel,
             themeColors = themeColors,
             jobTitle = job.title,

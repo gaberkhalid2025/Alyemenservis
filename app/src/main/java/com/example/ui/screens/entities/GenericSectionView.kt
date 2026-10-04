@@ -1,7 +1,6 @@
 package com.example.ui.screens.entities
 
 import androidx.compose.foundation.BorderStroke
-import com.example.ui.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -315,11 +314,11 @@ fun RetryableErrorContent(
     var isAutoRetrying by remember { mutableStateOf(false) }
     
     LaunchedEffect(retryCount) {
-        if (retryCount < maxRetries && retryCount > 0) {
+        if (retryCount in 1..maxRetries) {
             kotlinx.coroutines.delay(3000L)
             isAutoRetrying = true
             onRetry()
-            retryCount++
+            isAutoRetrying = false
         }
     }
     
@@ -355,8 +354,7 @@ fun RetryableErrorContent(
             
             Button(
                 onClick = {
-                    retryCount = 0
-                    isAutoRetrying = false
+                    if (retryCount < maxRetries) retryCount++ else retryCount = 1
                     onRetry()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),

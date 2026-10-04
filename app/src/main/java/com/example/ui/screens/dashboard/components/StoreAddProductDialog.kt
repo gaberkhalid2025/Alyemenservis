@@ -1,10 +1,10 @@
 package com.example.ui.screens.dashboard.components
 
 import android.content.Context
-import com.example.ui.*
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.example.data.ProductEntity
-import com.example.ui.MainViewModel
+import com.example.ui.*
 import com.example.utils.FirebaseStorageUploader
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.launch
@@ -46,7 +46,7 @@ fun StoreAddProductDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val prodUriPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         uri?.let { selectedUri ->
             scope.launch {
@@ -123,7 +123,7 @@ fun StoreAddProductDialog(
                 }
 
                 Button(
-                    onClick = { prodUriPicker.launch("image/*") },
+                    onClick = { prodUriPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                     modifier = Modifier.fillMaxWidth()
                 ) {

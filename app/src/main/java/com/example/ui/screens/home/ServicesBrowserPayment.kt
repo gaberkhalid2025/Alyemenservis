@@ -5,7 +5,6 @@ import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
-import com.example.ui.*
 import com.example.ui.components.SmartAsyncImage
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -17,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,8 +26,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.BookingEntity
 import com.example.data.PaymentWalletEntity
-import com.example.ui.MainViewModel
+import com.example.ui.*
 import com.example.utils.VisualThemePalette
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 💳 ServicesBrowserPayment - نافذة السداد والدفع الإلكتروني لخدمات دليل اليمن
@@ -42,9 +45,10 @@ fun ServicesBrowserPaymentDialog(
     context: Context,
     onDismiss: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     var selectedWallet by remember { mutableStateOf(wallets.firstOrNull()) }
-    var transferNumber by remember { mutableStateOf("") }
-    var senderName by remember { mutableStateOf("") }
+    var transferNumber by rememberSaveable { mutableStateOf("") }
+    var senderName by rememberSaveable { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     var transferPhotoBase64 by remember { mutableStateOf("") }
 
@@ -52,15 +56,21 @@ fun ServicesBrowserPaymentDialog(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
             if (uri != null) {
-                try {
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val bytes = inputStream?.readBytes()
-                    if (bytes != null) {
-                        transferPhotoBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                        Toast.makeText(context, "📸 تم إرفاق صورة الإشعار بنجاح!", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    val base64 = withContext(Dispatchers.IO) {
+                        try {
+                            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            if (bytes != null && bytes.size < 2_000_000) {
+                                Base64.encodeToString(bytes, Base64.NO_WRAP)
+                            } else ""
+                        } catch (_: Exception) { "" }
                     }
-                } catch (e: Exception) {
-                    Toast.makeText(context, "❌ فشل تحميل الصورة: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    if (base64.isNotBlank()) {
+                        transferPhotoBase64 = base64
+                        Toast.makeText(context, "📸 تم إرفاق صورة الإشعار بنجاح!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "❌ فشل تحميل الصورة أو حجمها كبير", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
@@ -271,25 +281,32 @@ fun ServicesBrowserPaymentDialog(
                             return@Button
                         }
                         isSubmitting = true
-                        val amount = if (booking.totalAmount > 0) booking.totalAmount else 5000.0
-                        viewModel.createPayment(
-                            userId = booking.clientId.ifBlank { booking.customerPhone },
-                            providerId = booking.providerId,
-                            amount = amount,
-                            method = "mobileWallet",
-                            bookingId = booking.id,
-                            isLinkedToBooking = true,
-                            bookingServiceType = booking.serviceType,
-                            walletProvider = selectedWallet?.accountName ?: "محفظة جوال",
-                            walletNumber = selectedWallet?.walletNumber ?: "",
-                            walletAccountName = senderName,
-                            transferId = transferNumber,
-                            transferPhoto = transferPhotoBase64,
-                            status = "PROCESSING"
-                        )
-                        isSubmitting = false
-                        Toast.makeText(context, "✅ تم إرسال إشعار السداد بنجاح وهو قيد التأكيد!", Toast.LENGTH_LONG).show()
-                        onDismiss()
+                        scope.launch {
+                            try {
+                                val amount = if (booking.totalAmount > 0) booking.totalAmount else 5000.0
+                                viewModel.createPayment(
+                                    userId = booking.clientId.ifBlank { booking.customerPhone },
+                                    providerId = booking.providerId,
+                                    amount = amount,
+                                    method = "mobileWallet",
+                                    bookingId = booking.id,
+                                    isLinkedToBooking = true,
+                                    bookingServiceType = booking.serviceType,
+                                    walletProvider = selectedWallet?.accountName ?: "محفظة جوال",
+                                    walletNumber = selectedWallet?.walletNumber ?: "",
+                                    walletAccountName = senderName,
+                                    transferId = transferNumber,
+                                    transferPhoto = transferPhotoBase64,
+                                    status = "PROCESSING"
+                                )
+                                Toast.makeText(context, "✅ تم إرسال إشعار السداد بنجاح وهو قيد التأكيد!", Toast.LENGTH_LONG).show()
+                                onDismiss()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "❌ فشل إرسال السداد: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                            } finally {
+                                isSubmitting = false
+                            }
+                        }
                     },
                     enabled = !isSubmitting,
                     colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),

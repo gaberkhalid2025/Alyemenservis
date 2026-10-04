@@ -2,7 +2,7 @@
 <resources>
 
     <!-- APP INFO -->
-    <string name="app_name">Yemen Services Directory</string>
+    <!-- [FIX-CRITICAL] تم إزالة app_name المكرر — القيمة في strings.xml الأساسي -->
     <string name="app_description">The comprehensive app for services, bookings, technicians, stores, and properties in Yemen</string>
     <string name="app_version_format">Version %1$s</string>
 

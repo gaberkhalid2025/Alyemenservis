@@ -1,9 +1,9 @@
 package com.example.ui.screens.map.utils
 
 /**
-import com.example.ui.*
  * 🏙️ CityAliases
  * Map of Yemeni cities and governorates to their aliases, area names, and system codes.
+ * Used by MapScreenFilters for resilient city matching across all Yemeni governorates.
  */
 object CityAliases {
     val ALIASES: Map<String, List<String>> = mapOf(

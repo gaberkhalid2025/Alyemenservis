@@ -340,7 +340,8 @@ class ChatRepository(
         mediaUrl: String,
         replyToId: String?,
         replyToText: String?,
-        attachment: ChatAttachment?
+        attachment: ChatAttachment?,
+        audioWaveform: List<Int>
     ): AppResult<ChatMessage> = sendMessageInternal(
         channelId = channelId,
         senderId = senderId,
@@ -351,6 +352,7 @@ class ChatRepository(
         replyToId = replyToId,
         replyToText = replyToText,
         attachment = attachment,
+        audioWaveform = audioWaveform,
         existingMessageId = null,
         existingTimestamp = null
     )
@@ -365,6 +367,7 @@ class ChatRepository(
         replyToId: String?,
         replyToText: String?,
         attachment: ChatAttachment?,
+        audioWaveform: List<Int> = emptyList(),
         existingMessageId: String? = null,
         existingTimestamp: Long? = null
     ): AppResult<ChatMessage> = withContext(Dispatchers.IO) {
@@ -389,7 +392,8 @@ class ChatRepository(
             replyToText = replyToText,
             status = MessageStatus.SENDING,
             timestamp = now,
-            syncStatus = SyncStatus.PENDING_UPLOAD
+            syncStatus = SyncStatus.PENDING_UPLOAD,
+            audioWaveform = audioWaveform
         )
 
         try {
@@ -499,9 +503,10 @@ class ChatRepository(
                 // If field doesn't exist yet, ignore
             }
 
-            // Update status of incoming messages to READ (query unread only)
+            // Update status of incoming messages to READ (query unread only with batch limit)
             val unreadSnapshot = channelRef.collection("messages")
                 .whereEqualTo("isRead", false)
+                .limit(30)
                 .get().await()
             val unreadDocs = unreadSnapshot.documents.filter { doc ->
                 val senderId = doc.getString("senderId") ?: ""
@@ -645,6 +650,28 @@ class ChatRepository(
             }
 
             msgRef.update("reactions.$cleanUserId", newValue).await()
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Error(AppError.NetworkError(e))
+        }
+    }
+
+    override suspend fun togglePinMessage(
+        channelId: String,
+        messageId: String,
+        isPinned: Boolean
+    ): AppResult<Unit> = withContext(Dispatchers.IO) {
+        val cleanChannelId = channelId.trim()
+        val cleanMessageId = messageId.trim()
+        if (cleanChannelId.isBlank() || cleanMessageId.isBlank()) return@withContext AppResult.Success(Unit)
+        try {
+            val msgRef = channelsCollection.document(cleanChannelId).collection("messages").document(cleanMessageId)
+            msgRef.update("isPinned", isPinned).await()
+            val cachedList = local?.getMessages(cleanChannelId)
+            if (cachedList != null) {
+                val updated = cachedList.map { if (it.id == cleanMessageId) it.copy(isPinned = isPinned) else it }
+                local?.saveMessages(cleanChannelId, updated)
+            }
             AppResult.Success(Unit)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))

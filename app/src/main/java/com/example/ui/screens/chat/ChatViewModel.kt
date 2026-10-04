@@ -162,7 +162,8 @@ class ChatViewModel @Inject constructor(
         text: String,
         mediaType: MediaType = MediaType.TEXT,
         mediaUrl: String = "",
-        attachment: ChatAttachment? = null
+        attachment: ChatAttachment? = null,
+        audioWaveform: List<Int> = emptyList()
     ) {
         val channel = _currentChannel.value ?: return
         if (text.isBlank() && mediaUrl.isBlank() && attachment == null) return
@@ -179,6 +180,7 @@ class ChatViewModel @Inject constructor(
             mediaUrl = mediaUrl,
             replyTo = replyTo,
             attachment = attachment,
+            audioWaveform = audioWaveform,
             onSuccess = { sentMsg ->
                 viewModelScope.launch {
                     _eventFlow.emit(ChatEvent.MessageSent(sentMsg.id))
@@ -190,6 +192,28 @@ class ChatViewModel @Inject constructor(
                 }
             }
         )
+    }
+
+    fun toggleReaction(messageId: String, emoji: String) {
+        val channel = _currentChannel.value ?: return
+        viewModelScope.launch {
+            try {
+                repository.toggleReaction(channel.id, messageId, activeUserId, emoji)
+            } catch (e: Exception) {
+                _eventFlow.emit(ChatEvent.ShowError("تعذر تحديث التفاعل"))
+            }
+        }
+    }
+
+    fun togglePinMessage(messageId: String, isPinned: Boolean) {
+        val channel = _currentChannel.value ?: return
+        viewModelScope.launch {
+            try {
+                repository.togglePinMessage(channel.id, messageId, isPinned)
+            } catch (e: Exception) {
+                _eventFlow.emit(ChatEvent.ShowError("تعذر تحديث حالة التثبيت"))
+            }
+        }
     }
 
     fun updateMessageStatus(messageId: String, status: MessageStatus) {

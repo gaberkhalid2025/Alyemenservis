@@ -1,7 +1,9 @@
 package com.example.ui.screens.urgent
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.animation.*
-import com.example.ui.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,8 +34,6 @@ import kotlinx.coroutines.launch
 import com.example.ui.screens.urgent.components.UrgentFormFields
 
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.draw.clip
 import coil.compose.AsyncImage
 import com.example.utils.FirebaseStorageUploader
@@ -64,15 +65,15 @@ fun UrgentRequestScreen(
     var customerName by remember(currentUserName, currentUserPhone) { 
         mutableStateOf(currentUserName.ifEmpty { if (currentUserPhone.isNotEmpty()) "عميل ($currentUserPhone)" else "" }) 
     }
-    var selectedDepartment by remember { mutableStateOf("خدمات وفنيين") }
-    var selectedCategory by remember { mutableStateOf(UrgentConstants.getSubCategories("خدمات وفنيين").first()) }
-    var serviceTitle by remember { mutableStateOf("") }
-    var serviceDetails by remember { mutableStateOf("") }
-    var selectedCity by remember { mutableStateOf("صنعاء") }
-    var selectedArea by remember { mutableStateOf("") }
-    var pinCode by remember { mutableStateOf("") }
+    var selectedDepartment by rememberSaveable { mutableStateOf("خدمات وفنيين") }
+    var selectedCategory by rememberSaveable { mutableStateOf(UrgentConstants.getSubCategories("خدمات وفنيين").first()) }
+    var serviceTitle by rememberSaveable { mutableStateOf("") }
+    var serviceDetails by rememberSaveable { mutableStateOf("") }
+    var selectedCity by rememberSaveable { mutableStateOf("صنعاء") }
+    var selectedArea by rememberSaveable { mutableStateOf("") }
+    var pinCode by rememberSaveable { mutableStateOf("") }
     var isPinVisible by remember { mutableStateOf(false) }
-    var attachedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var attachedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isUploadingImage by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
 
@@ -85,9 +86,9 @@ fun UrgentRequestScreen(
         }
     }
 
-    val photoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
-    ) { uri: android.net.Uri? ->
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
         if (uri != null) {
             attachedImageUri = uri
         }
@@ -97,6 +98,7 @@ fun UrgentRequestScreen(
     var createdPinCode by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var expandedCategoryDropdown by remember { mutableStateOf(false) }
+    var expandedDeptDropdown by remember { mutableStateOf(false) }
 
     val subCategories = remember(selectedDepartment) {
         UrgentConstants.getSubCategories(selectedDepartment)
@@ -176,7 +178,6 @@ fun UrgentRequestScreen(
             )
 
             // اختيار القسم الرئيسي والفرعي (فنيين، محلات وتجارة، مطاعم، مراكز طبية، عقارات)
-            var expandedDeptDropdown by remember { mutableStateOf(false) }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(modifier = Modifier.weight(1f)) {
                     OutlinedTextField(
@@ -448,7 +449,24 @@ fun UrgentRequestScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("تم تعميم طلبك على الفنيين المتاحين فوراً.")
                     Text("رمز الطلب: ${createdRequestCode ?: "URG-XXXX"}", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
-                    Text("رمز PIN السري (للإلغاء والتحكم): ${createdPinCode ?: pinCode}", fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "رمز PIN السري: ${if (isPinVisible) (createdPinCode ?: pinCode) else "••••"}",
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                        IconButton(onClick = { isPinVisible = !isPinVisible }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                imageVector = if (isPinVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (isPinVisible) "إخفاء الرمز" else "إظهار الرمز",
+                                tint = Color(0xFF64748B)
+                            )
+                        }
+                    }
                     Text("⏳ ستبدأ العروض بالظهور خلال 30 دقيقة عبر قائمة الطلبات العاجلة.", fontSize = 13.sp)
                 }
             },

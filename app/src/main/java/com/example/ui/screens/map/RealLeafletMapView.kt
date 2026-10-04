@@ -531,12 +531,17 @@ fun RealLeafletMapView(
     }
 
     LaunchedEffect(targetLat, targetLng, markersJsonArray, webViewInstance) {
-        webViewInstance?.let { webView ->
-            val updateScript = """
-                if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }
-                if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }
-            """.trimIndent()
-            webView.evaluateJavascript(updateScript, null)
+        // [FIX-SAFE] حماية من IllegalStateException بعد destroy
+        try {
+            webViewInstance?.let { webView ->
+                val updateScript = """
+                    if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }
+                    if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }
+                """.trimIndent()
+                webView.evaluateJavascript(updateScript, null)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("RealLeafletMapView", "WebView update skipped (may be destroyed): ${e.message}")
         }
     }
 
@@ -772,15 +777,25 @@ fun RealLeafletMapView(
                     }
                 },
                 update = { webView ->
-                    webViewInstance = webView
+                    // [FIX-SAFE] حماية
+                    try {
+                        webViewInstance = webView
+                    } catch (e: Exception) {
+                        android.util.Log.w("RealLeafletMapView", "WebView update assignment skipped: ${e.message}")
+                    }
                 }
             )
         }
 
         LaunchedEffect(zoomScale, webViewInstance) {
-            webViewInstance?.let { webView ->
-                val zoomLevel = (14 + (zoomScale - 1.0f) * 2).coerceIn(6f, 19f).toInt()
-                webView.evaluateJavascript("if (map) { map.setZoom($zoomLevel); }", null)
+            // [FIX-SAFE] حماية من IllegalStateException بعد destroy
+            try {
+                webViewInstance?.let { webView ->
+                    val zoomLevel = (14 + (zoomScale - 1.0f) * 2).coerceIn(6f, 19f).toInt()
+                    webView.evaluateJavascript("if (map) { map.setZoom($zoomLevel); }", null)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("RealLeafletMapView", "Zoom update skipped: ${e.message}")
             }
         }
 

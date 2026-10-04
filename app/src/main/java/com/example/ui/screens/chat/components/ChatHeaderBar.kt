@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -38,6 +39,7 @@ fun ChatHeaderBar(
     relatedEntityType: String? = null,
     onBackClick: () -> Unit,
     onSearchToggle: () -> Unit,
+    onMediaGalleryClick: () -> Unit = {},
     onBlockClick: () -> Unit,
     onDeleteChannelClick: () -> Unit,
     themeColors: VisualThemePalette? = null
@@ -155,6 +157,15 @@ fun ChatHeaderBar(
                     onDismissRequest = { showMenu = false },
                     modifier = Modifier.background(surfaceColor)
                 ) {
+                    DropdownMenuItem(
+                        text = { Text("معرض الوسائط 🖼️", color = textPrimary, fontSize = 13.sp) },
+                        onClick = {
+                            showMenu = false
+                            onMediaGalleryClick()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = accentColor) }
+                    )
+                    HorizontalDivider(color = borderColor)
                     DropdownMenuItem(
                         text = { Text("حظر المستخدم", color = Color(0xFFFF8A80), fontSize = 13.sp) },
                         onClick = {

@@ -301,7 +301,8 @@ fun RadarRenderer(
         val alpha3 by remember {
             derivedStateOf { ((1.0f - pulseRadius3) * 0.18f).coerceIn(0f, 1f) }
         }
-        val sweepEndOffset by remember(centerX, centerY, maxRadius) {
+        // [FIX-SAFE] إضافة sweepAngle إلى keys
+        val sweepEndOffset by remember(centerX, centerY, maxRadius, sweepAngle) {
             derivedStateOf {
                 val rad = Math.toRadians(sweepAngle.toDouble())
                 Offset(

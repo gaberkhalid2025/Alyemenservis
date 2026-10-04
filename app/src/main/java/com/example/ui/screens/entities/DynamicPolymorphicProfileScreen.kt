@@ -1,7 +1,6 @@
 package com.example.ui.screens.entities
 
 import android.content.Intent
-import com.example.ui.*
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -26,7 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.ui.MainViewModel
+import com.example.ui.*
 import com.example.ui.components.SmartAsyncImage
 import com.example.ui.helpers.AppPreferenceHelper
 import com.example.utils.VisualThemePalette
@@ -66,7 +65,7 @@ fun DynamicPolymorphicProfileScreen(
     val adminRole by viewModel.adminRole.collectAsState()
 
     // Determine Entity Type dynamically
-    val entityType = remember(provider, store, property, job) {
+    val entityType = remember(provider, store, property, job, categories) {
         when {
             provider != null -> {
                 val catName = categories.find { it.id == provider.categoryId }?.name?.lowercase() ?: ""
@@ -118,7 +117,8 @@ fun DynamicPolymorphicProfileScreen(
     }
 
     // Ownership logic: check if logged-in user is the owner
-    val isOwner = remember(currentUserId, currentUserPhone, provider, store, property, adminRole) {
+    val joinPhoneState by viewModel.joinRequestPhone.collectAsState()
+    val isOwner = remember(currentUserId, currentUserPhone, provider, store, property, adminRole, joinPhoneState) {
         val phoneClean = AppPreferenceHelper.normalizePhoneNumber(currentUserPhone)
         val uidClean = currentUserId.trim()
         val provPhone = AppPreferenceHelper.normalizePhoneNumber(provider?.phone ?: "")
@@ -126,7 +126,7 @@ fun DynamicPolymorphicProfileScreen(
         val storeOwner = store?.ownerId?.trim() ?: ""
         val propPhone = AppPreferenceHelper.normalizePhoneNumber(property?.phone ?: "")
         val propOwner = property?.ownerId?.trim() ?: ""
-        val joinPhone = AppPreferenceHelper.normalizePhoneNumber(viewModel.joinRequestPhone.value)
+        val joinPhone = AppPreferenceHelper.normalizePhoneNumber(joinPhoneState)
         val isAdmin = adminRole != "GUEST"
 
         val provId = provider?.id?.trim() ?: ""

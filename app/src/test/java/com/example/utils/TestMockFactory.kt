@@ -125,13 +125,15 @@ class FakeChatRepository : IChatRepository {
         mediaUrl: String,
         replyToId: String?,
         replyToText: String?,
-        attachment: ChatAttachment?
+        attachment: ChatAttachment?,
+        audioWaveform: List<Int>
     ): AppResult<ChatMessage> {
         val msg = ChatMessage(
             id = "msg_${messages.size + 1}",
             channelId = channelId,
             senderId = senderId,
-            message = messageText
+            message = messageText,
+            audioWaveform = audioWaveform
         )
         messages.add(msg)
         return AppResult.Success(msg)
@@ -150,6 +152,13 @@ class FakeChatRepository : IChatRepository {
     }
     override suspend fun deleteMessage(channelId: String, messageId: String, forEveryone: Boolean, currentUserId: String): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun toggleReaction(channelId: String, messageId: String, userId: String, emoji: String): AppResult<Unit> = AppResult.Success(Unit)
+    override suspend fun togglePinMessage(channelId: String, messageId: String, isPinned: Boolean): AppResult<Unit> {
+        val idx = messages.indexOfFirst { it.id == messageId }
+        if (idx != -1) {
+            messages[idx] = messages[idx].copy(isPinned = isPinned)
+        }
+        return AppResult.Success(Unit)
+    }
     override suspend fun deleteChannel(channelId: String): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun deleteAllChannels(channelsList: List<ChatChannel>): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun setUserPresence(userId: String, isOnline: Boolean): AppResult<Unit> = AppResult.Success(Unit)

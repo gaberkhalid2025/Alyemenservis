@@ -1,9 +1,9 @@
 package com.example.ui.screens.chat.components
 
 import android.content.Intent
-import com.example.ui.*
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,8 +21,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -36,8 +39,6 @@ import com.example.data.models.MessageStatus
 import com.example.utils.AudioPlayerManager
 import com.example.utils.ChatIcons
 import com.example.utils.DateFormatter
-import java.util.*
-
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -46,6 +47,7 @@ fun ChatBubbleItem(
     isMe: Boolean,
     onReplyClick: () -> Unit,
     onLongClick: () -> Unit,
+    onReactionClick: ((emoji: String) -> Unit)? = null,
     onRetryClick: ((String) -> Unit)? = null,
     themeColors: VisualThemePalette? = null
 ) {
@@ -70,18 +72,17 @@ fun ChatBubbleItem(
     }
 
     val textColor = textPrimaryColor
-    // ✨ م2-ج3: استخدام DateFormatter
     val formattedTime = DateFormatter.formatTime(message.timestamp)
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 280.dp)
+                .widthIn(max = 290.dp)
                 .clip(
                     RoundedCornerShape(
                         topStart = 16.dp,
@@ -121,6 +122,23 @@ fun ChatBubbleItem(
                 )
             }
 
+            // Pinned indicator
+            if (message.isPinned) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp)
+                ) {
+                    Text(
+                        text = "📌 مثبتة",
+                        fontSize = 10.sp,
+                        color = Color(0xFFFFD54F),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             // Replying quote preview
             if (!message.replyToText.isNullOrBlank()) {
                 Surface(
@@ -129,6 +147,7 @@ fun ChatBubbleItem(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 6.dp)
+                        .clickable { onReplyClick() }
                 ) {
                     Row(
                         modifier = Modifier.padding(6.dp),
@@ -156,15 +175,20 @@ fun ChatBubbleItem(
             when (message.mediaType) {
                 MediaType.IMAGE -> {
                     if (message.mediaUrl.isNotBlank()) {
-                        AsyncImage(
-                            model = message.mediaUrl,
-                            contentDescription = "صورة مرفقة",
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp)
-                                .clip(RoundedCornerShape(10.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.Black.copy(alpha = 0.2f))
+                        ) {
+                            AsyncImage(
+                                model = message.mediaUrl,
+                                contentDescription = "صورة مرفقة",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                     }
                 }
@@ -175,11 +199,29 @@ fun ChatBubbleItem(
                     val liveProgress by AudioPlayerManager.playbackProgress.collectAsState()
                     val isThisAudioActive = currentPlayingId == message.id && isAudioPlaying
 
+                    // Amplitudes for waveform visualization
+                    val defaultWaveform = remember {
+                        listOf(25, 45, 60, 30, 75, 90, 65, 40, 80, 50, 70, 95, 85, 60, 45, 75, 90, 55, 35, 65, 80, 50, 30, 60)
+                    }
+                    val waveformBars = remember(message.audioWaveform) {
+                        if (message.audioWaveform.isNotEmpty()) {
+                            val raw = message.audioWaveform
+                            if (raw.size >= 24) raw.take(24)
+                            else {
+                                val padded = raw.toMutableList()
+                                while (padded.size < 24) padded.add(40)
+                                padded
+                            }
+                        } else {
+                            defaultWaveform
+                        }
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
@@ -194,8 +236,8 @@ fun ChatBubbleItem(
                                 }
                             },
                             modifier = Modifier
-                                .size(34.dp)
-                                .background(if (isThisAudioActive) Color(0xFF10B981) else Color.White.copy(alpha = 0.18f), CircleShape)
+                                .size(36.dp)
+                                .background(if (isThisAudioActive) Color(0xFF10B981) else Color.White.copy(alpha = 0.2f), CircleShape)
                         ) {
                             Icon(
                                 imageVector = if (isThisAudioActive) ChatIcons.Pause else Icons.Default.PlayArrow,
@@ -204,23 +246,50 @@ fun ChatBubbleItem(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+
                         Spacer(modifier = Modifier.width(8.dp))
+
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = message.message.ifBlank { "تسجيل صوتي 🎤" },
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            LinearProgressIndicator(
-                                progress = { if (currentPlayingId == message.id) liveProgress else 0f },
+                            // Waveform bars
+                            val progress = if (currentPlayingId == message.id) liveProgress else 0f
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(3.dp)
-                                    .clip(RoundedCornerShape(2.dp)),
-                                color = if (isThisAudioActive) Color(0xFF10B981) else Color(0xFF64FFDA),
-                                trackColor = Color.White.copy(alpha = 0.2f),
+                                    .height(24.dp)
+                            ) {
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val barWidth = 3.dp.toPx()
+                                    val barSpacing = 2.5.dp.toPx()
+                                    val totalWidth = waveformBars.size * (barWidth + barSpacing)
+                                    val startX = (size.width - totalWidth).coerceAtLeast(0f) / 2f
+
+                                    waveformBars.forEachIndexed { index, amp ->
+                                        val barHeight = ((amp / 100f) * size.height).coerceAtLeast(4.dp.toPx())
+                                        val x = startX + index * (barWidth + barSpacing)
+                                        val y = (size.height - barHeight) / 2f
+                                        val barProgressFraction = index.toFloat() / waveformBars.size.toFloat()
+                                        val barColor = if (barProgressFraction <= progress) {
+                                            if (isThisAudioActive) Color(0xFF10B981) else Color(0xFF38BDF8)
+                                        } else {
+                                            Color.White.copy(alpha = 0.3f)
+                                        }
+                                        drawRoundRect(
+                                            color = barColor,
+                                            topLeft = Offset(x, y),
+                                            size = Size(barWidth, barHeight),
+                                            cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = message.message.ifBlank { "تسجيل صوتي 🎤" },
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Normal
                             )
                         }
                     }
@@ -315,7 +384,7 @@ fun ChatBubbleItem(
             }
 
             // Message text
-            if (message.message.isNotBlank() && message.mediaType != MediaType.FILE && message.mediaType != MediaType.LOCATION) {
+            if (message.message.isNotBlank() && message.mediaType != MediaType.FILE && message.mediaType != MediaType.LOCATION && message.mediaType != MediaType.AUDIO) {
                 Text(
                     text = message.message,
                     color = textColor,
@@ -419,6 +488,31 @@ fun ChatBubbleItem(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        // Reactions Pill
+        if (message.reactions.isNotEmpty()) {
+            val reactionCounts = remember(message.reactions) {
+                message.reactions.values.groupingBy { it }.eachCount()
+            }
+            Row(
+                modifier = Modifier
+                    .offset(y = (-6).dp)
+                    .padding(horizontal = 6.dp)
+                    .background(Color(0xFF1E293B), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                reactionCounts.forEach { (emoji, count) ->
+                    Text(
+                        text = if (count > 1) "$emoji $count" else emoji,
+                        fontSize = 11.sp,
+                        modifier = Modifier.clickable { onReactionClick?.invoke(emoji) }
+                    )
                 }
             }
         }

@@ -39,31 +39,49 @@ class ChatMessagesManager(
         mediaUrl: String = "",
         replyTo: ChatMessage? = null,
         attachment: ChatAttachment? = null,
+        audioWaveform: List<Int> = emptyList(),
         onSuccess: (ChatMessage) -> Unit,
         onError: (String) -> Unit
     ) {
         scope.launch {
             _isSending.value = true
-            try {
-                val result = repository.sendMessage(
-                    channelId = channelId,
-                    senderId = senderId,
-                    senderName = senderName,
-                    messageText = text,
-                    mediaType = mediaType,
-                    mediaUrl = mediaUrl,
-                    replyToId = replyTo?.id,
-                    replyToText = replyTo?.message,
-                    attachment = attachment
-                )
-                _isSending.value = false
-                when (result) {
-                    is AppResult.Success -> onSuccess(result.data)
-                    is AppResult.Error -> onError(result.error.messageArabic)
+            var attempt = 0
+            var finalResult: AppResult<ChatMessage>? = null
+            while (attempt < 3) {
+                attempt++
+                try {
+                    val result = repository.sendMessage(
+                        channelId = channelId,
+                        senderId = senderId,
+                        senderName = senderName,
+                        messageText = text,
+                        mediaType = mediaType,
+                        mediaUrl = mediaUrl,
+                        replyToId = replyTo?.id,
+                        replyToText = replyTo?.message,
+                        attachment = attachment,
+                        audioWaveform = audioWaveform
+                    )
+                    finalResult = result
+                    if (result is AppResult.Success) {
+                        break
+                    } else if (attempt < 3) {
+                        kotlinx.coroutines.delay((attempt * 800L))
+                    }
+                } catch (e: Exception) {
+                    if (attempt >= 3) {
+                        _isSending.value = false
+                        onError(e.message ?: "حدث خطأ أثناء الإرسال")
+                        return@launch
+                    }
+                    kotlinx.coroutines.delay((attempt * 800L))
                 }
-            } catch (e: Exception) {
-                _isSending.value = false
-                onError(e.message ?: "حدث خطأ أثناء الإرسال")
+            }
+            _isSending.value = false
+            when (finalResult) {
+                is AppResult.Success -> onSuccess(finalResult.data)
+                is AppResult.Error -> onError(finalResult.error.messageArabic)
+                null -> onError("فشل إرسال الرسالة بعد عدة محاولات")
             }
         }
     }

@@ -1,8 +1,10 @@
 package com.example.ui.screens.entities
 
 import android.content.Context
-import com.example.ui.*
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -23,8 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.*
-import com.example.ui.MainViewModel
-import com.example.ui.AppScreens
+import com.example.ui.*
 import com.example.utils.VisualThemePalette
 
 @Composable
@@ -365,8 +366,8 @@ fun ProfileOwnerAdminControlBar(
                 var isUploadingCover by remember { mutableStateOf(false) }
                 val coroutineScope = rememberCoroutineScope()
 
-                val avatarPicker = androidx.activity.compose.rememberLauncherForActivityResult(
-                    contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                val avatarPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia()
                 ) { uri: android.net.Uri? ->
                     if (uri != null) {
                         coroutineScope.launch {
@@ -384,8 +385,8 @@ fun ProfileOwnerAdminControlBar(
                     }
                 }
 
-                val coverPicker = androidx.activity.compose.rememberLauncherForActivityResult(
-                    contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                val coverPicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia()
                 ) { uri: android.net.Uri? ->
                     if (uri != null) {
                         coroutineScope.launch {
@@ -416,7 +417,7 @@ fun ProfileOwnerAdminControlBar(
                             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                         )
                         Button(
-                            onClick = { avatarPicker.launch("image/*") },
+                            onClick = { avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             enabled = !isUploadingAvatar,
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                             shape = RoundedCornerShape(8.dp),
@@ -440,7 +441,7 @@ fun ProfileOwnerAdminControlBar(
                             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                         )
                         Button(
-                            onClick = { coverPicker.launch("image/*") },
+                            onClick = { coverPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             enabled = !isUploadingCover,
                             colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
                             shape = RoundedCornerShape(8.dp),
@@ -688,9 +689,18 @@ fun ProfileOwnerAdminControlBar(
                                         description = prodDesc,
                                         imageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"
                                     )
-                                    viewModel.db.collection("products").document(newProduct.id).set(newProduct)
-                                    Toast.makeText(context, "📦 تم إضافة الصنف بنجاح!", Toast.LENGTH_SHORT).show()
-                                    showAddProductDialog = false
+                                    try {
+                                        viewModel.db.collection("products").document(newProduct.id).set(newProduct)
+                                            .addOnSuccessListener {
+                                                Toast.makeText(context, "📦 تم إضافة الصنف بنجاح!", Toast.LENGTH_SHORT).show()
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Toast.makeText(context, "فشل حفظ الصنف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        showAddProductDialog = false
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "حدث خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    }
                                 } else {
                                     Toast.makeText(context, "يرجى كتابة اسم الصنف", Toast.LENGTH_SHORT).show()
                                 }
@@ -718,10 +728,19 @@ fun ProfileOwnerAdminControlBar(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.db.collection(collectionName).document(entityId).update("isDeleted", true)
-                        Toast.makeText(context, "🗑️ تم حذف النشاط وإخفاؤه بنجاح", Toast.LENGTH_LONG).show()
-                        showDeleteConfirmDialog = false
-                        viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                        try {
+                            viewModel.db.collection(collectionName).document(entityId).update("isDeleted", true)
+                                .addOnSuccessListener {
+                                    Toast.makeText(context, "🗑️ تم حذف النشاط وإخفاؤه بنجاح", Toast.LENGTH_LONG).show()
+                                    viewModel.navigateToScreen(AppScreens.USER_BROWSE)
+                                }
+                                .addOnFailureListener { e ->
+                                    Toast.makeText(context, "فشل حذف النشاط: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                }
+                            showDeleteConfirmDialog = false
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "حدث خطأ: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                 ) {

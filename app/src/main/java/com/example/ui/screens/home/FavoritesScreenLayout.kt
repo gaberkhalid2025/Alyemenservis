@@ -1,7 +1,6 @@
 package com.example.ui.screens.home
 
 import android.content.Intent
-import com.example.ui.*
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -31,7 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
-import com.example.ui.MainViewModel
+import com.example.ui.*
 import com.example.ui.components.SmartAsyncImage
 import com.example.utils.VisualThemePalette
 

@@ -257,7 +257,9 @@ data class ChatMessage(
     val fileType: String = "",
     val forwardedFrom: String = "",
     val readAt: Long = 0L,
-    val syncStatus: SyncStatus = SyncStatus.SYNCED
+    val syncStatus: SyncStatus = SyncStatus.SYNCED,
+    val audioWaveform: List<Int> = emptyList(),
+    val isPinned: Boolean = false
 ) : Serializable {
 
     fun toCanonicalMessage(chId: String = channelId): ChatMessage {
