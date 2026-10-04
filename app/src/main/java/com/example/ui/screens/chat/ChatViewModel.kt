@@ -141,8 +141,8 @@ class ChatViewModel @Inject constructor(
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
             repository.getChannelMessages(channelId, currentUserId, limit = currentLimit).collect { msgs ->
-                // FIXED: Limit messages stored in memory to maximum 200 items
-                val cappedMsgs = if (msgs.size > 200) msgs.takeLast(200) else msgs
+                // FIXED: Limit messages stored in memory to maximum 150 items
+                val cappedMsgs = if (msgs.size > 150) msgs.takeLast(150) else msgs
                 messagesManager.updateMessagesList(cappedMsgs)
                 markAsRead(channelId, currentUserId)
             }
@@ -151,8 +151,8 @@ class ChatViewModel @Inject constructor(
 
     fun loadMoreMessages() {
         val channel = _currentChannel.value ?: return
-        if (currentLimit >= 200) return
-        currentLimit = (currentLimit + 25).coerceAtMost(200)
+        if (currentLimit >= 150) return
+        currentLimit = (currentLimit + 25).coerceAtMost(150)
         listenToMessages(channel.id, activeUserId)
     }
 
@@ -260,7 +260,7 @@ class ChatViewModel @Inject constructor(
 
     fun markAsRead(channelId: String, currentUserId: String) {
         val now = System.currentTimeMillis()
-        if (channelId == lastMarkAsReadChannelId && (now - lastMarkAsReadTime) < 3000L) {
+        if (channelId == lastMarkAsReadChannelId && (now - lastMarkAsReadTime) < 5000L) {
             return
         }
         lastMarkAsReadChannelId = channelId

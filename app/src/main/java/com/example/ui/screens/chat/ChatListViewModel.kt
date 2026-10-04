@@ -31,8 +31,16 @@ class ChatListViewModel @Inject constructor(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private var channelsJob: Job? = null
+    private var lastLoadTime = 0L
+    private val CACHE_TTL_MS = 30_000L
 
-    fun loadUserChannels(currentUserId: String) {
+    fun loadUserChannels(currentUserId: String, forceRefresh: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && now - lastLoadTime < CACHE_TTL_MS && _channels.value.isNotEmpty()) {
+            _isLoading.value = false
+            return
+        }
+        lastLoadTime = now
         channelsJob?.cancel()
         _isLoading.value = true
         channelsJob = viewModelScope.launch {

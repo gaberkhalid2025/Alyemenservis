@@ -31,18 +31,19 @@ fun BookingsScreenLayout(
     val currentUserName by viewModel.currentUserName.collectAsState()
     val adminRole by viewModel.adminRole.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val joinRequestPhone by viewModel.joinRequestPhone.collectAsState()
 
     var isCreatingNewBooking by remember { mutableStateOf(false) }
 
     val isAdmin = adminRole != "GUEST" && adminRole != "SUPERVISOR"
 
     // Filter relevant bookings for the user or admin
-    val relevantBookings = remember(bookings, currentUserPhone, currentUserId, isAdmin) {
+    val relevantBookings = remember(bookings, currentUserPhone, currentUserId, isAdmin, joinRequestPhone) {
         if (isAdmin) {
             bookings.sortedByDescending { it.createdAt }
         } else {
             val phoneClean = currentUserPhone.filter { it.isDigit() }.takeLast(9)
-            val joinPhoneClean = viewModel.joinRequestPhone.value.filter { it.isDigit() }.takeLast(9)
+            val joinPhoneClean = joinRequestPhone.filter { it.isDigit() }.takeLast(9)
             val uid = currentUserId.trim()
             bookings.filter { bk ->
                 val bClientP = bk.clientPhone.filter { it.isDigit() }.takeLast(9)

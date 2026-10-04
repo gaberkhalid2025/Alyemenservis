@@ -77,14 +77,20 @@ class TransactionHistoryViewModel(
     private val _uiState = MutableStateFlow<TransactionHistoryUiState>(TransactionHistoryUiState.Loading)
     val uiState: StateFlow<TransactionHistoryUiState> = _uiState.asStateFlow()
 
+    private var lastRefreshTime = 0L
+    private val CACHE_TTL_MS = 15_000L
+
     init {
-        refreshData()
+        refreshData(forceRefresh = true)
     }
 
     /**
      * Refreshes wallet balances and logs.
      */
-    fun refreshData() {
+    fun refreshData(forceRefresh: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh && now - lastRefreshTime < CACHE_TTL_MS && _allTransactions.value.isNotEmpty()) return
+        lastRefreshTime = now
         viewModelScope.launch {
             try {
                 val balance = walletManager.getBalance(walletId)
@@ -127,7 +133,7 @@ class TransactionHistoryViewModel(
         viewModelScope.launch {
             val result = walletManager.deposit(walletId, amount, "YER", note)
             if (result.isSuccess) {
-                refreshData()
+                refreshData(forceRefresh = true)
             }
         }
     }
@@ -139,7 +145,7 @@ class TransactionHistoryViewModel(
         viewModelScope.launch {
             val result = walletManager.withdraw(walletId, amount, "YER", note)
             if (result.isSuccess) {
-                refreshData()
+                refreshData(forceRefresh = true)
             }
         }
     }

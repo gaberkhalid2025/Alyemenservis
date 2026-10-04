@@ -71,7 +71,7 @@ object ChatValidationUtils {
     }
 
     /**
-     * تطبيق ضغط شديد للصور (800x800) وجودة 70% لتقليل استهلاك Firebase Storage
+     * تطبيق ضغط شديد للصور (600x600) وجودة 60% لتقليل استهلاك Firebase Storage
      */
     fun compressImage(context: Context, uri: Uri): ByteArray {
         return try {
@@ -81,9 +81,9 @@ object ChatValidationUtils {
 
             if (bitmap == null) return byteArrayOf()
 
-            // أقصى أبعاد مسموحة 800x800
-            val maxWidth = 800
-            val maxHeight = 800
+            // أقصى أبعاد مسموحة 600x600
+            val maxWidth = 600
+            val maxHeight = 600
             val scaledBitmap = if (bitmap.width > maxWidth || bitmap.height > maxHeight) {
                 val scale = minOf(maxWidth.toFloat() / bitmap.width, maxHeight.toFloat() / bitmap.height)
                 Bitmap.createScaledBitmap(
@@ -97,8 +97,8 @@ object ChatValidationUtils {
             }
 
             val outputStream = ByteArrayOutputStream()
-            // جودة 70% كافية جداً للمعاينة في الشات مع حجم ملف صغير جداً (بالكيلوبايت)
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+            // جودة 60% كافية جداً للمعاينة في الشات مع حجم ملف صغير جداً (بالكيلوبايت)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
             val result = outputStream.toByteArray()
             
             android.util.Log.d("ChatValidation", "Final compressed size: ${result.size / 1024} KB")

@@ -55,7 +55,7 @@ fun AboutContentRenderer(
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl))
                 context.startActivity(intent)
             } catch (e: Exception) {
-                // Ignore
+                android.util.Log.w("AboutContentRenderer", "Failed to open URL: $url", e)
             }
         }
     }
@@ -67,7 +67,7 @@ fun AboutContentRenderer(
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            // Ignore
+            android.util.Log.w("AboutContentRenderer", "Failed to open WhatsApp: $phone", e)
         }
     }
 
@@ -77,7 +77,7 @@ fun AboutContentRenderer(
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            // Ignore
+            android.util.Log.w("AboutContentRenderer", "Failed to open Dialer: $phone", e)
         }
     }
 
@@ -87,7 +87,7 @@ fun AboutContentRenderer(
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            // Ignore
+            android.util.Log.w("AboutContentRenderer", "Failed to open Email: $email", e)
         }
     }
 

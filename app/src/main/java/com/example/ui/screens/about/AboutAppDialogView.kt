@@ -37,11 +37,11 @@ fun AboutAppDialogView(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        androidx.activity.compose.BackHandler(enabled = true, onBack = onDismiss)
         Surface(
             color = themeColors.background,
             modifier = Modifier.fillMaxSize()
         ) {
-            androidx.activity.compose.BackHandler(enabled = true, onBack = onDismiss)
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {

@@ -31,7 +31,7 @@ class ChatAttachmentManager(private val context: Context) {
 
         // 2. معالجة البيانات وضغط الصور (أهم خطوة لتوفير Firebase Spark Plan)
         val finalData = if (isImage) {
-            // ضغط الصورة فوراً (800x800 جودة 70%)
+            // ضغط الصورة فوراً (600x600 جودة 60%)
             ChatValidationUtils.compressImage(context, uri)
         } else {
             // قراءة الملف الصوتي كما هو
