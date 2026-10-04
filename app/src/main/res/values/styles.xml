@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- ⚠️ ملاحظة: هذه الـ styles غير مستخدمة حالياً (المشروع Compose 100%)
+         احتُفظ بها كمرجع عند الحاجة إلى XML Layouts مستقبلاً -->
+
     <!-- Base Widgets inheriting from android:Widget -->
     <style name="Widget_Yemen" parent="android:Widget" />
 

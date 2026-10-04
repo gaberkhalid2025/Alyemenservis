@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.*
 /**
  * 🗺️ MapScreenViewModel
  * Specialized ViewModel handling map entities, filtering, and Radar-First state.
+ *
+ * ⚠️ ملاحظة: هذا الـ ViewModel غير مستخدم حالياً.
+ * MapScreen يستخدم MapScreenState (Compose-only).
+ * يمكن تفعيله لاحقاً للاستفادة من Hilt Injection و StateFlow.
  */
 class MapScreenViewModel : ViewModel() {
 

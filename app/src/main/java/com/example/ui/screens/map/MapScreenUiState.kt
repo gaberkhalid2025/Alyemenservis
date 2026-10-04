@@ -9,6 +9,10 @@ import com.example.ui.screens.map.components.MarkerRenderer
 /**
  * 🗺️ MapScreenUiState
  * Comprehensive UI State model for Map and Radar screens.
+ *
+ * ⚠️ ملاحظة: هذا الملف جاهز للاستخدام المستقبلي عند الانتقال إلى MVI + ViewModel pattern.
+ * حالياً، الحالة تُدار عبر MapScreenState (Compose-only state).
+ * يمكن تفعيله لاحقاً عند توفر Hilt Injection.
  */
 sealed class MapScreenUiState {
     object Loading : MapScreenUiState()

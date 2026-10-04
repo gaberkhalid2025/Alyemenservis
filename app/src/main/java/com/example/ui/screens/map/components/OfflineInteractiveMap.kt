@@ -31,70 +31,10 @@ import androidx.compose.ui.unit.sp
 import com.example.data.PropertyEntity
 import com.example.data.ProviderEntity
 import com.example.data.StoreEntity
-import com.example.ui.screens.map.MapMarker
 import com.example.utils.getPropertyCoords
 import com.example.utils.getProviderCoords
 import com.example.utils.getStoreCoords
 import kotlin.math.*
-
-/**
- * 🗺️ OfflineInteractiveMap
- * الخريطة الافتراضية 100% Offline – لا تعتمد على شبكة
- */
-@Composable
-fun OfflineInteractiveMap(
-    markers: List<MapMarker>,
-    centerLat: Double = 15.3694,
-    centerLng: Double = 44.1910,
-    onMarkerClick: (MapMarker) -> Unit = {},
-    onSwitchToOnline: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Box(modifier = modifier.fillMaxSize()) {
-        RadarRenderer(
-            markers = markers,
-            centerLat = if (centerLat == 0.0 || centerLat.isNaN()) 15.3694 else centerLat,
-            centerLng = if (centerLng == 0.0 || centerLng.isNaN()) 44.1910 else centerLng,
-            onMarkerClick = onMarkerClick,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // شارة "وضع الرادار المحلي"
-        Surface(
-            color = Color(0xFF0F172A).copy(alpha = 0.85f),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text("🛰️", fontSize = 14.sp)
-                Text(
-                    text = "رادار الخدمات المحلي (أوفلاين)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF00E5FF)
-                )
-            }
-        }
-
-        // زر التبديل إلى الخريطة الكاملة (اختياري)
-        Button(
-            onClick = onSwitchToOnline,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
-        ) {
-            Text("تبديل إلى الخريطة الكاملة (Leaflet)", color = Color.White, fontSize = 12.sp)
-        }
-    }
-}
 
 /**
  * 🗺️ OfflineInteractiveMap (Full Entity Overload)

@@ -35,33 +35,6 @@ import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
 import kotlinx.coroutines.launch
 
-/**
- * 🗺️ MapScreenContent – يجبر الوضع على الرادار أولاً (MapMarker Overload)
- */
-@Composable
-fun MapScreenContent(
-    markers: List<MapMarker>,
-    centerLat: Double = 15.3694,
-    centerLng: Double = 44.1910,
-    onMarkerClick: (MapMarker) -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    // الحالة الابتدائية دائماً رادار
-    var isRadarMode by remember { mutableStateOf(true) }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        RealLeafletMapView(
-            markers = markers,
-            centerLat = centerLat,
-            centerLng = centerLng,
-            forceRadar = isRadarMode,
-            onMapReady = { /* نجح التحميل */ },
-            onError = { isRadarMode = true },
-            onMarkerClick = onMarkerClick,
-            modifier = Modifier.fillMaxSize()
-        )
-    }
-}
 
 /**
  * 🗺️ MapScreenContent

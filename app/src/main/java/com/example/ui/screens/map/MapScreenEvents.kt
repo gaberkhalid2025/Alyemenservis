@@ -8,6 +8,8 @@ import com.example.data.StoreEntity
 /**
  * 🗺️ MapScreenEvents
  * User events occurring on the Map and Radar interface.
+ *
+ * ⚠️ ملاحظة: هذا الملف جاهز للاستخدام المستقبلي عند الانتقال إلى MVI + ViewModel pattern.
  */
 sealed class MapScreenEvents {
     data class OnEntitySelected(val entity: Any?) : MapScreenEvents()
