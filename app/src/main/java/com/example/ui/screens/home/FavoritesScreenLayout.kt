@@ -8,6 +8,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,118 +82,122 @@ fun FavoritesScreenLayout(
         "العقارات (${favoriteProperties.size}) 🏢" to 4
     )
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(themeColors.background)
-            .padding(12.dp),
+            .background(themeColors.background),
+        contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // 1. Header Banner Card (شريط المفضلة العلوي الفاخر)
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(4.dp, RoundedCornerShape(16.dp))
-        ) {
-            Row(
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .shadow(4.dp, RoundedCornerShape(16.dp))
             ) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .shadow(6.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .shadow(6.dp, CircleShape)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
+                                    )
                                 )
+                                .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "المفضلة",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
                             )
-                            .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
-                        contentAlignment = Alignment.Center
+                        }
+
+                        Column {
+                            Text(
+                                text = "قائمة المفضلة والعروض الحصرية ❤️",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "إدارة المفضلة وتلقي إشعارات التخفيضات داخل التطبيق فورياً",
+                                fontSize = 11.sp,
+                                color = Color.LightGray
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(Color.White.copy(alpha = 0.08f), CircleShape)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Favorite,
-                            contentDescription = "المفضلة",
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "رجوع",
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
-
-                    Column {
-                        Text(
-                            text = "قائمة المفضلة والعروض الحصرية ❤️",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "إدارة المفضلة وتلقي إشعارات التخفيضات داخل التطبيق فورياً",
-                            fontSize = 11.sp,
-                            color = Color.LightGray
-                        )
-                    }
-                }
-
-                IconButton(
-                    onClick = onBackClick,
-                    modifier = Modifier
-                        .size(34.dp)
-                        .background(Color.White.copy(alpha = 0.08f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "رجوع",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
                 }
             }
         }
 
         // 2. Horizontal Scrollable Filter Chips (أزرار تصفية الأقسام)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            categories.forEach { (title, idx) ->
-                val isSelected = selectedCategoryIndex == idx
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            if (isSelected) themeColors.accent
-                            else themeColors.surface
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                categories.forEach { (title, idx) ->
+                    val isSelected = selectedCategoryIndex == idx
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                if (isSelected) themeColors.accent
+                                else themeColors.surface
+                            )
+                            .clickable { selectedCategoryIndex = idx }
+                            .border(
+                                1.dp,
+                                if (isSelected) Color.White.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.3f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = title,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.Black else Color.White
                         )
-                        .clickable { selectedCategoryIndex = idx }
-                        .border(
-                            1.dp,
-                            if (isSelected) Color.White.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.3f),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = title,
-                        fontSize = 11.5.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.Black else Color.White
-                    )
+                    }
                 }
             }
         }
@@ -213,75 +219,79 @@ fun FavoritesScreenLayout(
         }
 
         if (isProvidersLoading && totalCount == 0) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(40.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CircularProgressIndicator(color = themeColors.accent, modifier = Modifier.size(36.dp))
-                    Text("جاري مزامنة قائمتك المفضلة...", color = Color.Gray, fontSize = 12.sp)
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator(color = themeColors.accent, modifier = Modifier.size(36.dp))
+                        Text("جاري مزامنة قائمتك المفضلة...", color = Color.Gray, fontSize = 12.sp)
+                    }
                 }
             }
         } else if (!hasAnyItems) {
             // Empty State Card (مطابقة لتصميم الصورة تماماً)
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-                border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.25f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp)
-            ) {
-                Column(
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = themeColors.surface),
+                    border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.25f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .padding(vertical = 12.dp)
                 ) {
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .size(72.dp)
-                            .shadow(8.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(Color(0xFFEF4444).copy(alpha = 0.15f))
-                            .border(1.5.dp, Color(0xFFEF4444).copy(alpha = 0.4f), CircleShape),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text("❤️", fontSize = 34.sp)
-                    }
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .shadow(8.dp, CircleShape)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEF4444).copy(alpha = 0.15f))
+                                .border(1.5.dp, Color(0xFFEF4444).copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("❤️", fontSize = 34.sp)
+                        }
 
-                    Text(
-                        text = "قائمة المفضلة فارغة حالياً 💔",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-
-                    Text(
-                        text = "تصفح المتاجر والمطاعم والخدمات واضغط على زر القلب ❤️ في أي صفحة للوصول إليها بسرعة من هنا، وسنرسل لك إشعارات داخل التطبيق فور إضافة عروض جديدة!",
-                        fontSize = 12.sp,
-                        color = Color.LightGray,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 18.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-
-                    Button(
-                        onClick = onBackClick,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 11.dp),
-                        modifier = Modifier.padding(top = 6.dp)
-                    ) {
                         Text(
-                            text = "تصفح المتاجر والخدمات الآن 🚀",
-                            fontSize = 12.5.sp,
+                            text = "قائمة المفضلة فارغة حالياً 💔",
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = Color.White
                         )
+
+                        Text(
+                            text = "تصفح المتاجر والمطاعم والخدمات واضغط على زر القلب ❤️ في أي صفحة للوصول إليها بسرعة من هنا، وسنرسل لك إشعارات داخل التطبيق فور إضافة عروض جديدة!",
+                            fontSize = 12.sp,
+                            color = Color.LightGray,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+
+                        Button(
+                            onClick = onBackClick,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 11.dp),
+                            modifier = Modifier.padding(top = 6.dp)
+                        ) {
+                            Text(
+                                text = "تصفح المتاجر والخدمات الآن 🚀",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        }
                     }
                 }
             }
@@ -289,13 +299,15 @@ fun FavoritesScreenLayout(
             // List of Favorited Items
             if (showAll || showProviders) {
                 if (favoriteProviders.isNotEmpty()) {
-                    Text(
-                        text = "🔧 الفنيون ومقدمو الخدمات (${favoriteProviders.size})",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = themeColors.accent
-                    )
-                    favoriteProviders.forEach { provider ->
+                    item {
+                        Text(
+                            text = "🔧 الفنيون ومقدمو الخدمات (${favoriteProviders.size})",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = themeColors.accent
+                        )
+                    }
+                    items(favoriteProviders, key = { "fav_prov_${it.id}" }) { provider ->
                         FavoriteProviderCard(
                             provider = provider,
                             themeColors = themeColors,
@@ -319,13 +331,15 @@ fun FavoritesScreenLayout(
             if (showAll || showStores || showOffers) {
                 val targetStores = if (showOffers) favoriteOffers else favoriteStores
                 if (targetStores.isNotEmpty()) {
-                    Text(
-                        text = "🛍️ المتاجر والمطاعم (${targetStores.size})",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF34D399)
-                    )
-                    targetStores.forEach { store ->
+                    item {
+                        Text(
+                            text = "🛍️ المتاجر والمطاعم (${targetStores.size})",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF34D399)
+                        )
+                    }
+                    items(targetStores, key = { "fav_store_${it.id}" }) { store ->
                         FavoriteStoreCard(
                             store = store,
                             themeColors = themeColors,
@@ -348,13 +362,15 @@ fun FavoritesScreenLayout(
 
             if (showAll || showProperties) {
                 if (favoriteProperties.isNotEmpty()) {
-                    Text(
-                        text = "🏢 العقارات والأراضي (${favoriteProperties.size})",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFA78BFA)
-                    )
-                    favoriteProperties.forEach { property ->
+                    item {
+                        Text(
+                            text = "🏢 العقارات والأراضي (${favoriteProperties.size})",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFA78BFA)
+                        )
+                    }
+                    items(favoriteProperties, key = { "fav_prop_${it.id}" }) { property ->
                         FavoritePropertyCard(
                             property = property,
                             themeColors = themeColors,
@@ -415,7 +431,7 @@ fun FavoriteProviderCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(3.dp))
-                    Text(String.format("%.1f", provider.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format(java.util.Locale.US, "%.1f", provider.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("📍 ${provider.localNeighborhood.ifEmpty { provider.area }}", color = Color.Gray, fontSize = 10.sp)
                 }
@@ -479,7 +495,7 @@ fun FavoriteStoreCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(3.dp))
-                    Text(String.format("%.1f", store.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format(java.util.Locale.US, "%.1f", store.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("📍 ${store.localNeighborhood.ifEmpty { store.cityId }}", color = Color.Gray, fontSize = 10.sp)
                 }
@@ -545,7 +561,7 @@ fun FavoritePropertyCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(3.dp))
-                    Text(String.format("%.1f", property.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format(java.util.Locale.US, "%.1f", property.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("📍 ${property.localNeighborhood.ifEmpty { property.cityId }}", color = Color.Gray, fontSize = 10.sp)
                 }

@@ -35,14 +35,19 @@ class MedicalDashboardViewModel @Inject constructor(
     private val _eventFlow = MutableSharedFlow<DashboardEvent>()
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
+    private var doctorsJob: kotlinx.coroutines.Job? = null
+
     fun initialize(id: String) {
         if (ownerId == id) return
         ownerId = id
         loadDashboardData()
-        viewModelScope.launch {
-            medicalRepository.getDoctors(ownerId).collect {
-                _doctors.value = it
-            }
+        doctorsJob?.cancel()
+        doctorsJob = viewModelScope.launch {
+            medicalRepository.getDoctors(ownerId)
+                .catch { /* silent */ }
+                .collect {
+                    _doctors.value = it
+                }
         }
     }
 
@@ -133,7 +138,15 @@ class MedicalDashboardViewModel @Inject constructor(
             )
             productsRepository.addProduct(service).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الخدمة الطبية 💊"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل إضافة الخدمة"))
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        doctorsJob?.cancel()
+        doctorsJob = null
     }
 }

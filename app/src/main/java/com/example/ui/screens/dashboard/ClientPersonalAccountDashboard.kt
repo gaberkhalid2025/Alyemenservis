@@ -45,7 +45,6 @@ fun ClientPersonalAccountDashboard(
     onShowRegistrationFormsAnyway: () -> Unit,
     onNavigateToSupportChat: () -> Unit = { viewModel.navigateTo("CHAT_SUPPORT") }
 ) {
-    var showRestoreDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -186,13 +185,5 @@ fun ClientPersonalAccountDashboard(
                 Text("🚪 تسجيل الخروج", color = Color.Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
-    }
-
-    if (showRestoreDialog) {
-        RestoreAccountBottomSheet(
-            onDismissRequest = { showRestoreDialog = false },
-            viewModel = viewModel,
-            themeColors = themeColors
-        )
     }
 }

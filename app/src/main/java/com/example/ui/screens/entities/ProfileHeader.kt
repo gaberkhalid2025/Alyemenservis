@@ -135,7 +135,7 @@ fun ProfileHeader(
                         ) {
                             Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(String.format("%.1f", ratingValue), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(String.format(java.util.Locale.US, "%.1f", ratingValue), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Text(" ($reviewsCount)", color = Color.LightGray, fontSize = 10.sp)
                         }
                     }
@@ -150,7 +150,7 @@ fun ProfileHeader(
 
                 // Owner Business Statistics Section
                 if (isOwner) {
-                    Divider(color = themeColors.accent.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(color = themeColors.accent.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 4.dp))
                     Text(
                         text = "📊 إحصائيات الأداء (خاصة بك كمالك):",
                         fontSize = 12.sp,

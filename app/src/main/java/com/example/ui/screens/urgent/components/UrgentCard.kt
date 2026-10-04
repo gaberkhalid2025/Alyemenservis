@@ -34,7 +34,8 @@ fun UrgentCard(
     modifier: Modifier = Modifier,
     now: Long = System.currentTimeMillis()
 ) {
-    val remainingMinutes = (((request.expiresAt - now) / 1000) / 60).coerceAtLeast(0)
+    val remainingMinutes = if (request.expiresAt <= 0) 30
+        else (((request.expiresAt - now) / 1000) / 60).coerceAtLeast(0)
     val isCritical = remainingMinutes < 5
     val isUrgent = remainingMinutes < 10
 

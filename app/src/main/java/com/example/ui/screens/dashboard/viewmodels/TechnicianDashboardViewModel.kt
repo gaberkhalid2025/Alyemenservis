@@ -103,6 +103,8 @@ class TechnicianDashboardViewModel(
         viewModelScope.launch {
             productsRepository.deleteProduct(id).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تم حذف الخدمة بنجاح 🗑️"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل حذف الخدمة"))
             }
         }
     }

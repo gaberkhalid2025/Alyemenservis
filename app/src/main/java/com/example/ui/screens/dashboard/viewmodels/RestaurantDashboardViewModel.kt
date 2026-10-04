@@ -83,6 +83,8 @@ class RestaurantDashboardViewModel(
             )
             productsRepository.addProduct(meal).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة الوجبة لقائمة الطعام 🍽️"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل إضافة الوجبة"))
             }
         }
     }
@@ -91,6 +93,8 @@ class RestaurantDashboardViewModel(
         viewModelScope.launch {
             productsRepository.deleteProduct(id).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تم حذف الوجبة 🗑️"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل حذف الوجبة"))
             }
         }
     }

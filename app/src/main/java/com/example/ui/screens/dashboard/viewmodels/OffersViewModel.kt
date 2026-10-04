@@ -4,9 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.SpecialOfferEntity
 import com.example.data.repositories.OffersRepository
+import com.example.ui.screens.dashboard.DashboardEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,6 +28,9 @@ class OffersViewModel @Inject constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _eventFlow = MutableSharedFlow<DashboardEvent>()
+    val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
     init {
         loadOffers()
@@ -45,8 +52,12 @@ class OffersViewModel @Inject constructor(
     fun addOffer(offer: SpecialOfferEntity) {
         viewModelScope.launch {
             repository.addOffer(offer)
-                .onSuccess { loadOffers() }
+                .onSuccess {
+                    loadOffers()
+                    _eventFlow.emit(DashboardEvent.ShowToast("تمت إضافة العرض بنجاح ✅"))
+                }
                 .onFailure { e ->
+                    _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل إضافة العرض"))
                     _error.value = e.localizedMessage ?: "فشل إضافة العرض"
                 }
         }
@@ -55,8 +66,12 @@ class OffersViewModel @Inject constructor(
     fun updateOffer(offer: SpecialOfferEntity) {
         viewModelScope.launch {
             repository.updateOffer(offer)
-                .onSuccess { loadOffers() }
+                .onSuccess {
+                    loadOffers()
+                    _eventFlow.emit(DashboardEvent.ShowToast("تم تحديث العرض بنجاح ✅"))
+                }
                 .onFailure { e ->
+                    _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل تحديث العرض"))
                     _error.value = e.localizedMessage ?: "فشل تحديث العرض"
                 }
         }
@@ -65,8 +80,12 @@ class OffersViewModel @Inject constructor(
     fun deleteOffer(offerId: String) {
         viewModelScope.launch {
             repository.deleteOffer(offerId)
-                .onSuccess { loadOffers() }
+                .onSuccess {
+                    loadOffers()
+                    _eventFlow.emit(DashboardEvent.ShowToast("تم حذف العرض بنجاح 🗑️"))
+                }
                 .onFailure { e ->
+                    _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل حذف العرض"))
                     _error.value = e.localizedMessage ?: "فشل حذف العرض"
                 }
         }

@@ -140,7 +140,12 @@ fun ServicesSearchBar(
                     onClick = onVoiceClick,
                     modifier = Modifier.size(30.dp)
                 ) {
-                    Text("🎙️", fontSize = 13.sp)
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "بحث صوتي",
+                        tint = themeColors.accent,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
         }
@@ -201,7 +206,7 @@ fun ServicesFilterBottomSheet(
                 }
             }
 
-            Divider(color = Color.White.copy(alpha = 0.15f))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
             OutlinedTextField(
                 value = phoneOrNameFilter,
@@ -321,7 +326,7 @@ fun ServicesFilterBottomSheet(
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = neighborFilter,
-                        onValueChange = onNeighborFilterChange,
+                        onValueChange = { if (it.length <= 50) onNeighborFilterChange(it) },
                         placeholder = { Text("مثال: حدة، الحصبة...", fontSize = 11.sp, color = themeColors.textSecondary) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(

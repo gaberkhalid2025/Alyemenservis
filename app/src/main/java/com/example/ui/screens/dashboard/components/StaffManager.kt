@@ -37,14 +37,7 @@ fun StaffManager(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var staffList by remember {
-        mutableStateOf<List<StaffMember>>(emptyList())
-    }
-
-    val staffState by viewModel.staff.collectAsState()
-    LaunchedEffect(staffState) {
-        staffList = staffState
-    }
+    val staffList by viewModel.staff.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }

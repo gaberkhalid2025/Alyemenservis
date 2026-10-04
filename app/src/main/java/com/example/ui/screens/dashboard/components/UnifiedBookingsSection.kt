@@ -109,6 +109,10 @@ fun UnifiedBookingsSection(
                 Text(text = "سبب الرفض: $rejectionReason", fontSize = 11.sp, color = Color(0xFFEF4444))
             }
 
+            val isPending = status == com.example.utils.BookingStatus.PENDING.code
+            val isAccepted = status == "APPROVED" || status == com.example.utils.BookingStatus.ACCEPTED.code
+            val isInProgress = status == com.example.utils.BookingStatus.IN_PROGRESS.code
+
             // Action Buttons Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -116,7 +120,7 @@ fun UnifiedBookingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
-                if (status == com.example.utils.BookingStatus.PENDING.code) {
+                if (isPending) {
                     if (onAcceptClick != null) {
                         Button(
                             onClick = onAcceptClick,
@@ -140,7 +144,7 @@ fun UnifiedBookingsSection(
                 }
 
                 // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
-                if (status == "APPROVED" || status == com.example.utils.BookingStatus.ACCEPTED.code) {
+                if (isAccepted) {
                     if (onStartProgressClick != null) {
                         Button(
                             onClick = onStartProgressClick,
@@ -154,7 +158,7 @@ fun UnifiedBookingsSection(
                 }
 
                 // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
-                if (status == com.example.utils.BookingStatus.IN_PROGRESS.code || status == "APPROVED" || status == com.example.utils.BookingStatus.ACCEPTED.code) {
+                if (isInProgress || isAccepted) {
                     if (onCompleteClick != null) {
                         Button(
                             onClick = onCompleteClick,
@@ -170,7 +174,7 @@ fun UnifiedBookingsSection(
                 // Custom order status options for stores / restaurants / medical
                 if (onUpdateOrderStatus != null) {
                     // ✨ م2: استخدام الـ Enums الموحدة بدلاً من السلاسل النصية الخام
-                    if (status == com.example.utils.BookingStatus.PENDING.code) {
+                    if (isPending) {
                         Button(
                             onClick = { onUpdateOrderStatus("IN_PREPARATION") },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),

@@ -33,14 +33,19 @@ class JobPosterDashboardViewModel @Inject constructor(
     private val _eventFlow = MutableSharedFlow<DashboardEvent>()
     val eventFlow: SharedFlow<DashboardEvent> = _eventFlow.asSharedFlow()
 
+    private var jobsJob: kotlinx.coroutines.Job? = null
+
     fun initialize(id: String) {
         if (ownerId == id) return
         ownerId = id
         loadDashboardData()
-        viewModelScope.launch {
-            jobRepository.getJobs(ownerId).collect {
-                _jobs.value = it
-            }
+        jobsJob?.cancel()
+        jobsJob = viewModelScope.launch {
+            jobRepository.getJobs(ownerId)
+                .catch { /* silent */ }
+                .collect {
+                    _jobs.value = it
+                }
         }
     }
 
@@ -112,5 +117,11 @@ class JobPosterDashboardViewModel @Inject constructor(
                 _eventFlow.emit(DashboardEvent.ShowToast("حدث خطأ أثناء الحذف"))
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        jobsJob?.cancel()
+        jobsJob = null
     }
 }

@@ -32,14 +32,7 @@ fun LoyaltyManager(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var programs by remember {
-        mutableStateOf<List<LoyaltyProgram>>(emptyList())
-    }
-
-    val loyaltyState by viewModel.loyaltyPrograms.collectAsState()
-    LaunchedEffect(loyaltyState) {
-        programs = loyaltyState
-    }
+    val programs by viewModel.loyaltyPrograms.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var programName by remember { mutableStateOf("") }

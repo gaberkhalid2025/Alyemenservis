@@ -21,11 +21,12 @@ import java.util.UUID
 
 @Composable
 fun AdvancedReviewsManagementCard(
+    reviews: List<ReviewUiModel> = emptyList(),
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var reviews by remember {
-        mutableStateOf<List<ReviewUiModel>>(emptyList())
+    var displayReviews by remember(reviews) {
+        mutableStateOf(reviews)
     }
 
     Card(
@@ -38,7 +39,7 @@ fun AdvancedReviewsManagementCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn(modifier = Modifier.height(200.dp).fillMaxWidth()) {
-                items(reviews) { review ->
+                items(displayReviews) { review ->
                     var replyInput by remember { mutableStateOf(review.replyText) }
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -67,7 +68,7 @@ fun AdvancedReviewsManagementCard(
                                     )
                                     Button(
                                         onClick = {
-                                            reviews = reviews.map { if (it.id == review.id) it.copy(replyText = replyInput) else it }
+                                            displayReviews = displayReviews.map { if (it.id == review.id) it.copy(replyText = replyInput) else it }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = themeColors.primary),
                                         modifier = Modifier.height(48.dp)

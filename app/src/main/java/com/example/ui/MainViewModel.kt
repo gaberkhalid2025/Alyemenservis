@@ -103,6 +103,10 @@ class MainViewModel @Inject constructor(
     val providers get() = homeViewModel.providers
     val _filteredProviders get() = homeViewModel._filteredProviders
     val filteredProviders get() = homeViewModel.filteredProviders
+    val _filteredStores get() = homeViewModel._filteredStores
+    val filteredStores: StateFlow<List<StoreEntity>> get() = homeViewModel.filteredStores
+    val _filteredProperties get() = homeViewModel._filteredProperties
+    val filteredProperties: StateFlow<List<PropertyEntity>> get() = homeViewModel.filteredProperties
     val _banners get() = homeViewModel._banners
     val banners get() = homeViewModel.banners
     val activeBrowserTab get() = homeViewModel.activeBrowserTab

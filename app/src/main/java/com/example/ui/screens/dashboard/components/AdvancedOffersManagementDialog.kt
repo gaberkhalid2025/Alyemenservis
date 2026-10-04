@@ -26,18 +26,11 @@ fun AdvancedOffersManagementDialog(
     themeColors: VisualThemePalette,
     onDismiss: () -> Unit
 ) {
-    var offers by remember {
-        mutableStateOf<List<SpecialOfferEntity>>(emptyList())
-    }
+    val offers by viewModel.specialOffers.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }
     var newDiscount by remember { mutableStateOf("10") }
     var newDuration by remember { mutableStateOf("7") }
-
-    val offersState by viewModel.specialOffers.collectAsState()
-    LaunchedEffect(offersState) {
-        offers = offersState
-    }
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -112,7 +105,7 @@ fun AdvancedOffersManagementDialog(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            LazyColumn(modifier = Modifier.height(250.dp).fillMaxWidth()) {
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                 items(offers, key = { it.id }) { offer ->
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),

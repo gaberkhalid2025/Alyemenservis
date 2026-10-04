@@ -48,22 +48,35 @@ class FavoritesViewModel(
 
     fun toggleFavorite(item: FavoriteItemEntity) {
         viewModelScope.launch {
-            val currentList = _uiState.value.favorites.toMutableList()
-            val isFav = favoritesRepository.isFavorite(userId, item.targetId) || currentList.any { it.targetId == item.targetId }
-            if (isFav) {
-                currentList.removeAll { it.targetId == item.targetId }
-                _uiState.value = _uiState.value.copy(favorites = currentList)
-                favoritesRepository.removeFavorite(userId, item.targetId).onSuccess {
-                    _eventFlow.emit(DashboardEvent.ShowToast("تمت الإزالة من المفضلة"))
-                }
+            // 1. احفظ الحالة السابقة للـ rollback
+            val previousList = _uiState.value.favorites.toList()
+            val isFav = previousList.any { it.targetId == item.targetId }
+
+            // 2. Optimistic update — غيّر UI فوراً
+            val newList = if (isFav) {
+                previousList.filter { it.targetId != item.targetId }
             } else {
-                if (!currentList.any { it.targetId == item.targetId }) {
-                    currentList.add(0, item.copy(userId = userId))
-                    _uiState.value = _uiState.value.copy(favorites = currentList)
-                }
-                favoritesRepository.addFavorite(item.copy(userId = userId)).onSuccess {
-                    _eventFlow.emit(DashboardEvent.ShowToast("تمت الإضافة للمفضلة"))
-                }
+                listOf(item.copy(userId = userId)) + previousList
+            }
+            _uiState.value = _uiState.value.copy(favorites = newList)
+
+            // 3. نفّذ العملية الفعلية
+            val result = if (isFav) {
+                favoritesRepository.removeFavorite(userId, item.targetId)
+            } else {
+                favoritesRepository.addFavorite(item.copy(userId = userId))
+            }
+
+            // 4. على النجاح → رسالة نجاح
+            //    على الفشل → rollback + رسالة خطأ
+            result.onSuccess {
+                _eventFlow.emit(DashboardEvent.ShowToast(
+                    if (isFav) "تمت الإزالة من المفضلة" else "تمت الإضافة للمفضلة"
+                ))
+            }.onFailure { e ->
+                // rollback
+                _uiState.value = _uiState.value.copy(favorites = previousList)
+                _eventFlow.emit(DashboardEvent.ShowToast("فشل العملية: ${e.localizedMessage ?: "خطأ غير معروف"}"))
             }
         }
     }

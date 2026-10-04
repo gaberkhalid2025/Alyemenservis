@@ -33,14 +33,7 @@ fun OffersManager(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var offers by remember {
-        mutableStateOf<List<SpecialOfferEntity>>(emptyList())
-    }
-
-    val offersState by viewModel.specialOffers.collectAsState()
-    LaunchedEffect(offersState) {
-        offers = offersState
-    }
+    val offers by viewModel.specialOffers.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }

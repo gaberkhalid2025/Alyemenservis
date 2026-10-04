@@ -37,14 +37,7 @@ fun CouponManager(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var coupons by remember {
-        mutableStateOf<List<SpecialOfferEntity>>(emptyList())
-    }
-
-    val couponsState by viewModel.coupons.collectAsState()
-    LaunchedEffect(couponsState) {
-        coupons = couponsState
-    }
+    val coupons by viewModel.coupons.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var code by remember { mutableStateOf("") }

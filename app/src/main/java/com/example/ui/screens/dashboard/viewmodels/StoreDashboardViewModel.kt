@@ -94,6 +94,8 @@ class StoreDashboardViewModel(
         viewModelScope.launch {
             productsRepository.deleteProduct(id).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تم حذف المنتج 🗑️"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل حذف المنتج"))
             }
         }
     }

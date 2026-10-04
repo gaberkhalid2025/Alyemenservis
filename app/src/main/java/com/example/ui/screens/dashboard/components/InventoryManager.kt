@@ -37,14 +37,7 @@ fun InventoryManager(
     themeColors: VisualThemePalette,
     modifier: Modifier = Modifier
 ) {
-    var inventoryList by remember {
-        mutableStateOf<List<InventoryItem>>(emptyList())
-    }
-
-    val inventoryState by viewModel.inventory.collectAsState()
-    LaunchedEffect(inventoryState) {
-        inventoryList = inventoryState
-    }
+    val inventoryList by viewModel.inventory.collectAsState()
 
     var showAddItemDialog by remember { mutableStateOf(false) }
     var newItemName by remember { mutableStateOf("") }

@@ -80,6 +80,8 @@ class PropertyDashboardViewModel(
             )
             productsRepository.addProduct(prop).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تم إدراج العقار بنجاح 🏠"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل إدراج العقار"))
             }
         }
     }
@@ -88,6 +90,8 @@ class PropertyDashboardViewModel(
         viewModelScope.launch {
             productsRepository.deleteProduct(id).onSuccess {
                 _eventFlow.emit(DashboardEvent.ShowToast("تم حذف العقار 🗑️"))
+            }.onFailure { e ->
+                _eventFlow.emit(DashboardEvent.ShowToast(e.localizedMessage ?: "فشل حذف العقار"))
             }
         }
     }

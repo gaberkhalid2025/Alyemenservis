@@ -65,16 +65,14 @@ fun ServicesBrowserLayout(
     val settingsState by viewModel.settings.collectAsState()
     val paymentWallets by viewModel.paymentWallets.collectAsState()
 
-    val filteredStores by viewModel.homeViewModel.filteredStores.collectAsState()
-    val filteredProperties by viewModel.homeViewModel.filteredProperties.collectAsState()
+    val filteredStores by viewModel.filteredStores.collectAsState()
+    val filteredProperties by viewModel.filteredProperties.collectAsState()
 
     var showFiltersPanel by remember { mutableStateOf(false) }
     var selectedStoreForDetails by remember { mutableStateOf<StoreEntity?>(null) }
     var selectedPropertyForDetails by remember { mutableStateOf<PropertyEntity?>(null) }
     var selectedJobForDetails by remember { mutableStateOf<JobEntity?>(null) }
     var showJobApplicationForJob by remember { mutableStateOf<JobEntity?>(null) }
-    var payingBookingObj by remember { mutableStateOf<BookingEntity?>(null) }
-    var showCreateStoreModalSection by remember { mutableStateOf<String?>(null) }
     var providersLimit by remember { mutableStateOf(10) }
     val activeTabName by viewModel.activeBrowserTab.collectAsState()
 
@@ -345,27 +343,6 @@ fun ServicesBrowserLayout(
             themeColors = themeColors,
             jobTitle = job.title,
             onDismiss = { showJobApplicationForJob = null }
-        )
-    }
-
-    payingBookingObj?.let { booking ->
-        ServicesBrowserPaymentDialog(
-            booking = booking,
-            wallets = paymentWallets,
-            viewModel = viewModel,
-            themeColors = themeColors,
-            context = context,
-            onDismiss = { payingBookingObj = null }
-        )
-    }
-
-    showCreateStoreModalSection?.let { secId ->
-        StoreCreateEditDialog(
-            store = null as StoreEntity?,
-            viewModel = viewModel,
-            themeColors = themeColors,
-            sectionId = secId,
-            onDismiss = { showCreateStoreModalSection = null }
         )
     }
 }
