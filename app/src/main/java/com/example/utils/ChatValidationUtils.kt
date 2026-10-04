@@ -8,15 +8,16 @@ import java.io.ByteArrayOutputStream
 
 /**
  * 📦 ChatValidationUtils
- * أدوات التحقق من نوع الملف، الحجم الأقصى (2MB)، وتطبيق الضغط الشديد للأبعاد (800x800) وجودة 60%
- * لتوفير استهلاك باقة Firebase Free Tier وتقليل حجم البيانات.
+ * أدوات التحقق من نوع الملف، الحجم الأقصى (2MB)، وتطبيق الضغط الشديد للأبعاد (800x800) وجودة 70%
+ * لتوفير استهلاك باقة Firebase Free Tier وتقليل حجم البيانات المرفوعة.
  */
 object ChatValidationUtils {
 
-    const val MAX_FILE_SIZE = 15 * 1024 * 1024L // 15 ميجابايت كحد أقصى للملف الخام قبل الضغط
-    const val MAX_TEXT_LENGTH = 500 // الحد الأقصى لطول الرسالة النصية
-    const val MAX_DAILY_UPLOADS = 15 // الحد الأقصى لرفع الصور اليومي لكل مستخدم
+    const val MAX_FILE_SIZE = 2 * 1024 * 1024L // 2MB - الحد الأقصى المسموح للرفع (بعد الضغط للصور أو خام للصوت)
+    const val MAX_TEXT_LENGTH = 1000
+    const val MAX_DAILY_UPLOADS = 25
 
+    // القائمة المحدثة للصيغ المسموح بها لتشمل كافة أنواع التسجيل الصوتي
     val allowedMimeTypes = listOf(
         "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp",
         "audio/mpeg", "audio/mp3", "audio/aac", "audio/amr", "audio/wav", "audio/ogg", "audio/3gpp",
@@ -24,7 +25,7 @@ object ChatValidationUtils {
         "video/mp4", "video/3gpp"
     )
 
-    fun validateFile(uri: Uri, context: Context): ValidationResult {
+    fun validateFile(uri: Uri, context: Context, isImage: Boolean): ValidationResult {
         var mimeType = context.contentResolver.getType(uri)
         if (mimeType.isNullOrBlank()) {
             val extension = android.webkit.MimeTypeMap.getFileExtensionFromUrl(uri.toString())
@@ -32,48 +33,46 @@ object ChatValidationUtils {
                 mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase())
             }
         }
-        android.util.Log.d("ChatValidation", "validateFile: uri=$uri, resolvedMime=$mimeType")
 
-        if (mimeType != null && mimeType !in allowedMimeTypes && !mimeType.startsWith("image/") && !mimeType.startsWith("audio/")) {
-            android.util.Log.w("ChatValidation", "validateFile: Mime rejected: $mimeType")
+        // 1. فحص نوع الملف (MIME Type)
+        val isSupported = mimeType != null && (mimeType in allowedMimeTypes || mimeType.startsWith("image/") || mimeType.startsWith("audio/"))
+        if (!isSupported) {
             return ValidationResult(
                 isValid = false,
-                message = "⚠️ نوع الملف ($mimeType) غير مدعوم. يرجى اختيار صورة أو تسجيل صوتي فقط."
+                message = "⚠️ نوع الملف ($mimeType) غير مدعوم حالياً."
             )
         }
 
+        // 2. فحص الحجم الخام
         val fileSize = try {
-            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use {
-                it.length
-            } ?: 0L
-        } catch (e: Exception) {
-            android.util.Log.w("ChatValidation", "validateFile: Failed to read file length: ${e.message}")
-            0L
-        }
+            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
+        } catch (_: Exception) { 0L }
 
-        android.util.Log.d("ChatValidation", "validateFile: fileSize=$fileSize bytes")
-
-        if (fileSize > MAX_FILE_SIZE) {
+        // للملفات الصوتية: نطبق فحص الـ 2MB فوراً قبل الرفع لتوفير الباندويث
+        if (!isImage && fileSize > MAX_FILE_SIZE) {
             val sizeMb = String.format(java.util.Locale.US, "%.1f", fileSize.toDouble() / (1024 * 1024))
-            android.util.Log.w("ChatValidation", "validateFile: File size exceeded: $sizeMb MB")
             return ValidationResult(
                 isValid = false,
-                message = "⚠️ الملف كبير جداً ($sizeMb ميجابايت). الحد الأقصى المسموح 15 ميجابايت."
+                message = "⚠️ التسجيل الصوتي كبير جداً ($sizeMb MB). الحد الأقصى 2 ميجابايت."
             )
         }
+        
+        // للصور: نتجاوز فحص الحجم الخام هنا لأننا سنقوم بضغطها لاحقاً لتقليل حجمها
 
-        val uploadAllowed = canUploadToday(context)
-        android.util.Log.d("ChatValidation", "validateFile: canUploadToday=$uploadAllowed")
-        if (!uploadAllowed) {
+        // 3. فحص الحصص اليومية
+        if (!canUploadToday(context)) {
             return ValidationResult(
                 isValid = false,
-                message = "⚠️ تجاوزت الحد اليومي المسموح به لرفع الملفات ($MAX_DAILY_UPLOADS وسائط يومياً)."
+                message = "⚠️ تجاوزت الحد اليومي المسموح به لرفع الوسائط."
             )
         }
 
         return ValidationResult(isValid = true, message = "")
     }
 
+    /**
+     * تطبيق ضغط شديد للصور (800x800) وجودة 70% لتقليل استهلاك Firebase Storage
+     */
     fun compressImage(context: Context, uri: Uri): ByteArray {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)
@@ -82,6 +81,7 @@ object ChatValidationUtils {
 
             if (bitmap == null) return byteArrayOf()
 
+            // أقصى أبعاد مسموحة 800x800
             val maxWidth = 800
             val maxHeight = 800
             val scaledBitmap = if (bitmap.width > maxWidth || bitmap.height > maxHeight) {
@@ -97,12 +97,14 @@ object ChatValidationUtils {
             }
 
             val outputStream = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 65, outputStream)
+            // جودة 70% كافية جداً للمعاينة في الشات مع حجم ملف صغير جداً (بالكيلوبايت)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
             val result = outputStream.toByteArray()
-            android.util.Log.d("ChatValidation", "compressImage: raw=${scaledBitmap.byteCount}, compressed=${result.size} bytes")
+            
+            android.util.Log.d("ChatValidation", "Final compressed size: ${result.size / 1024} KB")
             result
         } catch (e: Exception) {
-            android.util.Log.e("ChatValidation", "compressImage failed: ${e.message}", e)
+            android.util.Log.e("ChatValidation", "Compression error", e)
             byteArrayOf()
         }
     }
@@ -110,21 +112,17 @@ object ChatValidationUtils {
     fun generateThumbnail(context: Context, uri: Uri): ByteArray {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
+            val options = BitmapFactory.Options().apply { inSampleSize = 4 }
+            val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
             inputStream?.close()
 
             if (bitmap == null) return byteArrayOf()
 
-            val thumbWidth = 150
-            val thumbHeight = (150f * bitmap.height / bitmap.width.coerceAtLeast(1)).toInt().coerceIn(60, 200)
-            val thumbBitmap = Bitmap.createScaledBitmap(bitmap, thumbWidth, thumbHeight, true)
-
+            val thumbBitmap = Bitmap.createScaledBitmap(bitmap, 150, (150f * bitmap.height / bitmap.width).toInt(), true)
             val outputStream = ByteArrayOutputStream()
-            thumbBitmap.compress(Bitmap.CompressFormat.JPEG, 50, outputStream)
+            thumbBitmap.compress(Bitmap.CompressFormat.JPEG, 40, outputStream)
             outputStream.toByteArray()
-        } catch (_: Exception) {
-            byteArrayOf()
-        }
+        } catch (_: Exception) { byteArrayOf() }
     }
 
     fun canUploadToday(context: Context): Boolean {
@@ -132,9 +130,7 @@ object ChatValidationUtils {
         val todayStr = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
         val lastDate = prefs.getString("last_upload_date", "")
         val count = if (lastDate == todayStr) prefs.getInt("upload_count", 0) else 0
-        val isAllowed = count < MAX_DAILY_UPLOADS
-        android.util.Log.d("ChatValidation", "canUploadToday: today=$todayStr, lastDate=$lastDate, count=$count/$MAX_DAILY_UPLOADS -> allowed=$isAllowed")
-        return isAllowed
+        return count < MAX_DAILY_UPLOADS
     }
 
     fun recordUploadToday(context: Context) {
@@ -146,6 +142,6 @@ object ChatValidationUtils {
             .putString("last_upload_date", todayStr)
             .putInt("upload_count", count + 1)
             .apply()
-        android.util.Log.d("ChatValidation", "recordUploadToday: incremented to ${count + 1} for $todayStr")
     }
 }
+

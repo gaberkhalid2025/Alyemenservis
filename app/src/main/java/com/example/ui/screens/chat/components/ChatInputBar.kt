@@ -154,7 +154,7 @@ fun ChatInputBar(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val validation = ChatValidationUtils.validateFile(uri, context)
+            val validation = ChatValidationUtils.validateFile(uri, context, true)
             if (!validation.isValid) {
                 Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
                 return@rememberLauncherForActivityResult
@@ -169,7 +169,7 @@ fun ChatInputBar(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && pendingCameraUri != null) {
-            val validation = ChatValidationUtils.validateFile(pendingCameraUri!!, context)
+            val validation = ChatValidationUtils.validateFile(pendingCameraUri!!, context, true)
             if (validation.isValid) {
                 previewImageUri = pendingCameraUri
                 imageCaption = ""
@@ -327,7 +327,7 @@ fun ChatInputBar(
                 recordingDuration = 0
                 return
             }
-            val validation = ChatValidationUtils.validateFile(uri, context)
+            val validation = ChatValidationUtils.validateFile(uri, context, false)
             if (!validation.isValid) {
                 Toast.makeText(context, validation.message, Toast.LENGTH_LONG).show()
                 file.delete()
