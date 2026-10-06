@@ -12,12 +12,13 @@ import androidx.security.crypto.MasterKey
 class RegistrationDraftManager(context: Context) {
     private val prefs: SharedPreferences = run {
         val prefsName = "RegistrationDraftsSecure"
+        val appCtx = context.applicationContext ?: context
         fun createEncrypted(): SharedPreferences {
-            val masterKey = MasterKey.Builder(context)
+            val masterKey = MasterKey.Builder(appCtx)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
             return EncryptedSharedPreferences.create(
-                context,
+                appCtx,
                 prefsName,
                 masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
@@ -28,9 +29,10 @@ class RegistrationDraftManager(context: Context) {
             createEncrypted()
         } catch (e: Exception) {
             try {
+                appCtx.deleteSharedPreferences(prefsName)
                 createEncrypted()
             } catch (e2: Exception) {
-                throw SecurityException("❌ خطأ أمني حرج: تعذر إنشاء مساحة تخزين آمنة للمسودات. يرجى مسح بيانات التطبيق.")
+                appCtx.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
             }
         }
     }

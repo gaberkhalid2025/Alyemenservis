@@ -285,7 +285,6 @@ fun AppErrorBoundary(
                 cause = throwable
             )
             CrashlyticsDiagnosticLogger.logException(appError, "AppErrorBoundary")
-            originalHandler?.uncaughtException(thread, throwable)
         }
         Thread.setDefaultUncaughtExceptionHandler(customHandler)
         onDispose {

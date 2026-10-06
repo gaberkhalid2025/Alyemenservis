@@ -36,7 +36,7 @@ class NotificationViewModel(
     val adminRole = mainViewModel.adminRole
     val readNotificationIds = mainViewModel.readNotificationIds
     val currentUserResidence = mainViewModel.currentUserResidence
-    val isProviderUser = mainViewModel.isProviderUser
+    val isProviderUser: Boolean get() = mainViewModel.isProviderUser
 
     fun setActiveTab(tab: String) {
         _activeTab.value = tab

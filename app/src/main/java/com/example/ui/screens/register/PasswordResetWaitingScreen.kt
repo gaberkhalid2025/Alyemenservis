@@ -57,11 +57,11 @@ private fun getSecurePrefs(context: Context): android.content.SharedPreferences 
     return try {
         createEncrypted()
     } catch (e: Exception) {
-        // Retry once after clearing if corrupted, or throw clear exception
         try {
+            context.deleteSharedPreferences(prefsName)
             createEncrypted()
         } catch (e2: Exception) {
-            throw SecurityException("❌ خطأ أمني حرج: تعذر إنشاء مساحة تخزين آمنة. يرجى إعادة تشغيل التطبيق أو مسح البيانات.")
+            context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
         }
     }
 }

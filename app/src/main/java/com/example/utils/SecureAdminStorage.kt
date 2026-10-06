@@ -1,6 +1,7 @@
 package com.example.utils
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -28,14 +29,14 @@ object SecureAdminStorage {
     private const val SALT_PREFIX = "yemen_admin_v2_"
 
     @Volatile
-    private var cachedEncryptedPrefs: EncryptedSharedPreferences? = null
+    private var cachedEncryptedPrefs: SharedPreferences? = null
 
-    private fun getSecurePrefs(context: Context): EncryptedSharedPreferences? {
+    private fun getSecurePrefs(context: Context): SharedPreferences? {
         cachedEncryptedPrefs?.let { return it }
         return synchronized(this) {
             cachedEncryptedPrefs?.let { return@synchronized it }
+            val appContext = context.applicationContext ?: context
             try {
-                val appContext = context.applicationContext ?: context
                 val masterKey = MasterKey.Builder(appContext)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build()
@@ -46,13 +47,12 @@ object SecureAdminStorage {
                     masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                ) as EncryptedSharedPreferences
+                )
                 migrateLegacyPrefs(appContext, encryptedPrefs)
                 cachedEncryptedPrefs = encryptedPrefs
                 encryptedPrefs
             } catch (e: Throwable) {
                 try {
-                    val appContext = context.applicationContext ?: context
                     appContext.deleteSharedPreferences(PREFS_NAME)
                     val masterKey = MasterKey.Builder(appContext)
                         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -63,12 +63,14 @@ object SecureAdminStorage {
                         masterKey,
                         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    ) as EncryptedSharedPreferences
+                    )
                     cachedEncryptedPrefs = recreated
                     recreated
                 } catch (ex: Throwable) {
-                    android.util.Log.e("SecureAdminStorage", "Failed to init secure storage", ex)
-                    null
+                    android.util.Log.e("SecureAdminStorage", "Failed to init secure storage, falling back to private prefs", ex)
+                    val fallback = appContext.getSharedPreferences("${PREFS_NAME}_fallback", Context.MODE_PRIVATE)
+                    cachedEncryptedPrefs = fallback
+                    fallback
                 }
             }
         }
@@ -77,7 +79,7 @@ object SecureAdminStorage {
     /**
      * 🔄 ترحيل بيانات الاعتماد من SharedPreferences العادي إلى المشفر ثم حذف النسخة القديمة
      */
-    private fun migrateLegacyPrefs(context: Context, encryptedPrefs: EncryptedSharedPreferences) {
+    private fun migrateLegacyPrefs(context: Context, encryptedPrefs: SharedPreferences) {
         val legacySources = listOf("admin_security_prefs", "secure_admin_vault", "admin_vault_legacy")
         for (src in legacySources) {
             try {

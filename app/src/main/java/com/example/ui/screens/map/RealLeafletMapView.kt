@@ -175,7 +175,7 @@ fun RealLeafletMapView(
             onMapLoadFailed?.invoke()
             return@LaunchedEffect
         }
-        delay(2800L)
+        delay(4500L)
         if (!isMapReady || !isTilesLoaded) {
             useOfflineInteractiveFallback = true
             isMapError = true

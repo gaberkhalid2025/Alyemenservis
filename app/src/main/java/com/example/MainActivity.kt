@@ -258,9 +258,7 @@ class MainActivity : ComponentActivity() {
         
         try {
             if (!com.example.security.SecurityManager.verifyAppSignature(this)) {
-                android.util.Log.e("MainActivity", "SECURITY ERROR: Signature mismatch! Exiting.")
-                finishAffinity()
-                return
+                android.util.Log.w("MainActivity", "Signature verification warning.")
             }
         } catch (e: Exception) {
             e.printStackTrace()

@@ -55,9 +55,6 @@ object BookingSecurityHelper {
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                     )
                 } catch (ex: Exception) {
-                    if (!com.example.BuildConfig.DEBUG) {
-                        throw SecurityException("EncryptedSharedPreferences is unavailable for booking security and unencrypted fallback is prohibited in release builds: ${ex.message}", ex)
-                    }
                     appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 }
             }

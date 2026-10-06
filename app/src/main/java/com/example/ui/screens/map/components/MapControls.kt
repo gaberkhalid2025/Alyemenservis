@@ -106,7 +106,7 @@ fun MapControls(
                         .size(42.dp)
                         .testTag("map_zoom_out_btn")
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "تصغير", tint = Color.White)
+                    Icon(Icons.Default.Remove, contentDescription = "تصغير", tint = Color.White)
                 }
             }
         }

@@ -185,12 +185,12 @@ fun MapScreenContent(
                                 .navigationBarsPadding()
                                 .padding(bottom = 24.dp)
                         ) {
-                            Text("تبديل إلى الخريطة الكاملة (Leaflet)", color = Color.White, fontSize = 12.sp)
+                            Text("تبديل إلى الخريطة الكاملة", color = Color.White, fontSize = 12.sp)
                         }
                     }
                 }
             } else {
-                RealLeafletMapView(
+                OfflineInteractiveMap(
                     userCoords = Pair(safeUserLat, safeUserLng),
                     nearbyProviders = filteredProviders,
                     nearbyStores = filteredStores,
@@ -207,36 +207,10 @@ fun MapScreenContent(
                     onPropertySelected = { state.selectedEntity = it },
                     onDeselect = { state.selectedEntity = null },
                     onSwitchToRadar = {
-                        state.isRadarMode = true
-                    },
-                    onMapLoadFailed = {
-                        // مهلة 3 ثوانٍ انتهت أو فشل التحميل -> عودة فورية للرادار + إظهار MapErrorOverlay
-                        state.isRadarMode = true
-                        showMapErrorOverlay = true
-                    },
-                    themeColors = themeColors,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            // MapErrorOverlay عند التحويل التلقائي للرادار بعد مهلة الـ 3 ثوانٍ (محاولة واحدة فقط)
-            if (showMapErrorOverlay) {
-                MapErrorOverlay(
-                    retryAvailable = mapRetryCount < 1,
-                    onRetry = if (mapRetryCount < 1) {
-                        {
-                            mapRetryCount++
-                            showMapErrorOverlay = false
-                            state.isRadarMode = false
-                        }
-                    } else null,
-                    onSwitchToRadar = {
                         showMapErrorOverlay = false
                         state.isRadarMode = true
                     },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 115.dp)
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 
