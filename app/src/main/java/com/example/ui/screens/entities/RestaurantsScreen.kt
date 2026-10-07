@@ -173,25 +173,49 @@ fun RestaurantCard(
     var showReviewsDialog by remember { mutableStateOf(false) }
 
     val isVerified = restaurant.isVerified || restaurant.isActive
+    val isVip = restaurant.isVip
     val coverImg = restaurant.coverImage.ifBlank { "" }
     val logoImg = restaurant.logoImage.ifBlank { "" }
 
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, if (isVerified) themeColors.accent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    // 3D Card Container with layered depth and luxury warm/fiery metallic borders
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = themeColors.surface,
+        shadowElevation = if (isVip) 10.dp else 6.dp,
+        tonalElevation = 4.dp,
+        border = BorderStroke(
+            width = if (isVip) 1.5.dp else 1.dp,
+            brush = Brush.linearGradient(
+                colors = when {
+                    isVip -> listOf(Color(0xFFFFDF00), Color(0xFFEA580C), Color(0xFFFFDF00).copy(alpha = 0.4f))
+                    isVerified -> listOf(Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFF59E0B).copy(alpha = 0.3f))
+                    else -> listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.05f))
+                }
+            )
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // 1. Cover Image Section
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.45f)
+                        )
+                    )
+                )
+        ) {
+            // 1. Compact 3D Cover Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(95.dp)
-                    .background(Color(0xFF1E293B))
+                    .height(82.dp)
+                    .background(Color(0xFF0F172A))
             ) {
                 if (coverImg.isNotBlank()) {
                     SmartAsyncImage(
@@ -203,137 +227,156 @@ fun RestaurantCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A)))),
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF451A03), Color(0xFF1E293B), Color(0xFF7C2D12))
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("🍔", fontSize = 34.sp)
+                        Text("🍔", fontSize = 28.sp)
                     }
                 }
 
-                // Dark gradient overlay
+                // 3D Specular top edge highlight
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.Transparent, Color.White.copy(alpha = 0.6f), Color.Transparent)
+                            )
+                        )
+                )
+
+                // Dark multi-stop gradient for text readability
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
-                                startY = 30f
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.35f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.85f)
+                                )
                             )
                         )
                 )
 
-                // Badges in Header
+                // Top badges row (VIP/Verified + Rating)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isVerified || restaurant.isVip) {
+                    if (isVip || isVerified) {
                         Surface(
-                            color = Color.Black.copy(alpha = 0.8f),
+                            color = if (isVip) Color(0xFFB45309).copy(alpha = 0.9f) else Color(0xFFC2410C).copy(alpha = 0.9f),
                             shape = RoundedCornerShape(6.dp),
-                            border = BorderStroke(0.5.dp, themeColors.accent)
+                            shadowElevation = 2.dp,
+                            border = BorderStroke(0.5.dp, if (isVip) Color(0xFFFFD700) else Color(0xFFFB923C))
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (restaurant.isVip) "👑 VIP" else "موثق ✓",
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = themeColors.accent
-                                )
-                            }
+                            Text(
+                                text = if (isVip) "👑 VIP" else "موثق ✓",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
                         }
                     } else {
                         Spacer(modifier = Modifier.width(1.dp))
                     }
 
+                    // Rating Badge
                     Surface(
-                        color = Color.Black.copy(alpha = 0.8f),
+                        color = Color.Black.copy(alpha = 0.75f),
                         shape = RoundedCornerShape(6.dp),
+                        shadowElevation = 2.dp,
+                        border = BorderStroke(0.5.dp, Color(0xFFFFD700).copy(alpha = 0.4f)),
                         modifier = Modifier.clickable { showReviewsDialog = true }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(String.format(java.util.Locale.US, "%.1f", restaurant.rating), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(11.dp))
+                            Spacer(modifier = Modifier.width(2.5.dp))
+                            Text(
+                                text = String.format(java.util.Locale.US, "%.1f", restaurant.rating),
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
                     }
                 }
             }
 
-            // 2. Overlapping Avatar & Content Info
+            // 2. Overlapping 3D Avatar & Info Section
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
+                    .padding(horizontal = 8.dp)
             ) {
-                // Header with Overlapping Avatar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    Box(
+                    // Floating 3D Logo
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF0F172A),
+                        shadowElevation = 6.dp,
+                        border = BorderStroke(2.dp, if (isVip) Color(0xFFFFD700) else Color(0xFFF59E0B)),
                         modifier = Modifier
-                            .offset(y = (-20).dp)
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF0F172A))
-                            .border(2.dp, themeColors.accent, CircleShape),
-                        contentAlignment = Alignment.Center
+                            .offset(y = (-18).dp)
+                            .size(46.dp)
                     ) {
-                        if (logoImg.isNotBlank()) {
-                            SmartAsyncImage(
-                                model = logoImg,
-                                contentDescription = restaurant.name,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Text("🍔", fontSize = 24.sp)
+                        Box(contentAlignment = Alignment.Center) {
+                            if (logoImg.isNotBlank()) {
+                                SmartAsyncImage(
+                                    model = logoImg,
+                                    contentDescription = restaurant.name,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                )
+                            } else {
+                                Text("🍔", fontSize = 20.sp)
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .padding(bottom = 2.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = restaurant.name,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            if (isVerified) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("✔️", fontSize = 11.sp, color = themeColors.accent)
-                            }
-                        }
+                        Text(
+                            text = restaurant.name,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         val descText = restaurant.description.ifBlank { "مطعم ومأكولات مميزة" }
                         Text(
                             text = descText,
-                            fontSize = 10.sp,
-                            color = themeColors.accent,
+                            fontSize = 9.5.sp,
+                            color = Color(0xFFF59E0B),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                // Location & Hours Row
+                // Neighborhood & Hours
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -345,12 +388,12 @@ fun RestaurantCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(12.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(11.dp))
                         Spacer(modifier = Modifier.width(2.dp))
                         val locText = restaurant.localNeighborhood.ifBlank { "اليمن" }
                         Text(
                             text = locText,
-                            fontSize = 9.5.sp,
+                            fontSize = 9.sp,
                             color = Color.LightGray,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -360,50 +403,72 @@ fun RestaurantCard(
                     val hours = restaurant.workingHours.ifBlank { "10:00 ص - 12:00 م" }
                     Text(
                         text = "⏰ $hours",
-                        fontSize = 9.5.sp,
+                        fontSize = 8.5.sp,
                         color = themeColors.textSecondary,
                         maxLines = 1
                     )
                 }
 
-                // 3. Action Buttons Row: [التفاصيل] [التقييمات] [اطلب وجبتك]
+                // 3. Compact 3D Action Buttons: [تفاصيل] [اطلب وجبتك]
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = (-4).dp)
                         .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Button(
-                        onClick = onClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    // Button 1: Details
+                    Surface(
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                        color = themeColors.accent,
+                        shadowElevation = 3.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(29.dp)
+                            .clickable { onClick() }
                     ) {
-                        Text("التفاصيل 📋", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
+                                    )
+                                )
+                        ) {
+                            Text("التفاصيل 📋", fontSize = 9.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = { showReviewsDialog = true },
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.6f)),
+                    // Button 2: Order Meal
+                    Surface(
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        modifier = Modifier.weight(1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                        color = Color(0xFF10B981),
+                        shadowElevation = 3.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(29.dp)
+                            .clickable { onOrderMealClick() }
                     ) {
-                        Text("التقييمات ⭐", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    Button(
-                        onClick = onOrderMealClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1.1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
-                    ) {
-                        Text("اطلب 🍕", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
+                                    )
+                                )
+                        ) {
+                            Text(
+                                text = "اطلب 🍕",
+                                color = Color.White,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

@@ -199,23 +199,47 @@ fun PropertyCard(
     val imageSource = property.images.firstOrNull() ?: ""
     val isRent = property.type == "rent"
     val isVerified = property.isVerified || property.isApproved || property.isVip
+    val isVip = property.isVip
 
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = themeColors.surface),
-        border = BorderStroke(1.dp, if (isVerified) themeColors.accent.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    // 3D Card Container with layered depth and luxury real-estate metallic borders
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = themeColors.surface,
+        shadowElevation = if (isVip) 10.dp else 6.dp,
+        tonalElevation = 4.dp,
+        border = BorderStroke(
+            width = if (isVip) 1.5.dp else 1.dp,
+            brush = Brush.linearGradient(
+                colors = when {
+                    isVip -> listOf(Color(0xFFFFDF00), Color(0xFF7C3AED), Color(0xFFFFDF00).copy(alpha = 0.4f))
+                    isRent -> listOf(Color(0xFF3B82F6), Color(0xFF60A5FA), Color(0xFF3B82F6).copy(alpha = 0.3f))
+                    else -> listOf(Color(0xFF10B981), Color(0xFF34D399), Color(0xFF10B981).copy(alpha = 0.3f))
+                }
+            )
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // 1. Cover Image Section
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.45f)
+                        )
+                    )
+                )
+        ) {
+            // 1. Compact 3D Cover Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(105.dp)
-                    .background(Color(0xFF1E293B))
+                    .height(86.dp)
+                    .background(Color(0xFF0F172A))
             ) {
                 if (imageSource.isNotBlank()) {
                     SmartAsyncImage(
@@ -227,69 +251,98 @@ fun PropertyCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A)))),
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF1E1B4B), Color(0xFF0F172A), Color(0xFF312E81))
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("🏠", fontSize = 34.sp)
+                        Text("🏠", fontSize = 28.sp)
                     }
                 }
 
-                // Gradient overlay
+                // 3D Specular top edge highlight
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.Transparent, Color.White.copy(alpha = 0.6f), Color.Transparent)
+                            )
+                        )
+                )
+
+                // Dark multi-stop gradient for text readability
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
-                                startY = 35f
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.35f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.85f)
+                                )
                             )
                         )
                 )
 
-                // Rent / Sale Badge & Rating Badge
+                // Badges row (Rent/Sale + Rating)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        color = if (isRent) Color(0xFF3B82F6) else Color(0xFF10B981),
-                        shape = RoundedCornerShape(6.dp)
+                        color = if (isRent) Color(0xFF2563EB).copy(alpha = 0.9f) else Color(0xFF059669).copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(6.dp),
+                        shadowElevation = 2.dp,
+                        border = BorderStroke(0.5.dp, if (isRent) Color(0xFF93C5FD) else Color(0xFF6EE7B7))
                     ) {
                         Text(
                             text = if (isRent) "🔑 للإيجار" else "🏷️ للبيع",
-                            fontSize = 9.5.sp,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                         )
                     }
 
+                    // Rating Badge
                     Surface(
-                        color = Color.Black.copy(alpha = 0.8f),
+                        color = Color.Black.copy(alpha = 0.75f),
                         shape = RoundedCornerShape(6.dp),
+                        shadowElevation = 2.dp,
+                        border = BorderStroke(0.5.dp, Color(0xFFFFD700).copy(alpha = 0.4f)),
                         modifier = Modifier.clickable { showReviewsDialog = true }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(12.dp))
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(String.format(java.util.Locale.US, "%.1f", property.rating), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(11.dp))
+                            Spacer(modifier = Modifier.width(2.5.dp))
+                            Text(
+                                text = String.format(java.util.Locale.US, "%.1f", property.rating),
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
                     }
                 }
             }
 
-            // 2. Info Section
+            // 2. Info Section (Compact & Crisp)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 // Title & Price
                 Row(
@@ -299,28 +352,29 @@ fun PropertyCard(
                 ) {
                     Text(
                         text = property.title,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "${property.price.toInt()} ${property.currency}",
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = themeColors.accent
                     )
                 }
 
-                // Type & Description
+                // Type & Neighborhood
                 val typeName = when (property.propertyType) {
                     "apartment" -> "🏢 شقة"
                     "house" -> "🏡 منزل"
                     "villa" -> "🏰 فيلا"
-                    "shop" -> "🏬 محل تجاري"
-                    "land" -> "📐 قطعة أرض"
+                    "shop" -> "🏬 محل"
+                    "land" -> "📐 أرض"
                     else -> "🏠 ${property.propertyType}"
                 }
                 Row(
@@ -330,76 +384,83 @@ fun PropertyCard(
                 ) {
                     Text(
                         text = typeName,
-                        fontSize = 10.sp,
+                        fontSize = 9.5.sp,
                         color = themeColors.accent,
                         maxLines = 1
                     )
-                    if (property.description.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(10.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        val locText = property.localNeighborhood.ifBlank { "اليمن" }
                         Text(
-                            text = property.description,
+                            text = locText,
                             fontSize = 9.sp,
                             color = Color.LightGray,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false).padding(start = 8.dp)
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                // Location
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(12.dp))
-                    Spacer(modifier = Modifier.width(2.dp))
-                    val locText = property.localNeighborhood.ifBlank { "اليمن" }
-                    Text(
-                        text = locText,
-                        fontSize = 9.5.sp,
-                        color = Color.LightGray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // 3. Action Buttons Row: [التفاصيل] [التقييمات] [طلب معاينة]
+                // 3. Compact 3D Action Buttons: [تفاصيل] [معاينة]
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        .padding(top = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Button(
-                        onClick = onClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent),
+                    // Button 1: Details
+                    Surface(
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                        color = themeColors.accent,
+                        shadowElevation = 3.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(29.dp)
+                            .clickable { onClick() }
                     ) {
-                        Text("التفاصيل 📋", fontSize = 10.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
+                                    )
+                                )
+                        ) {
+                            Text("التفاصيل 📋", fontSize = 9.5.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = { showReviewsDialog = true },
-                        border = BorderStroke(1.dp, themeColors.accent.copy(alpha = 0.6f)),
+                    // Button 2: Request Inspection
+                    Surface(
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        modifier = Modifier.weight(1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                        color = Color(0xFF10B981),
+                        shadowElevation = 3.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(29.dp)
+                            .clickable { onRequestInspectionClick() }
                     ) {
-                        Text("التقييمات ⭐", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    Button(
-                        onClick = onRequestInspectionClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1.1f).height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
-                    ) {
-                        Text("معاينة 👁️", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
+                                    )
+                                )
+                        ) {
+                            Text(
+                                text = "معاينة 👁️",
+                                color = Color.White,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

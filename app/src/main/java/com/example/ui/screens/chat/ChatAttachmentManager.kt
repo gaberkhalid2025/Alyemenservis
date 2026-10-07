@@ -49,7 +49,7 @@ class ChatAttachmentManager(private val context: Context) {
         // 3. التحقق النهائي من الحجم (الذي سيرفع فعلياً لـ Firebase)
         if (finalData.size > ChatValidationUtils.MAX_FILE_SIZE) {
             val finalSizeMb = String.format(java.util.Locale.US, "%.1f", finalData.size.toDouble() / (1024 * 1024))
-            return Result.failure(Exception("حجم الملف النهائي ($finalSizeMb MB) يتجاوز الحد المسموح (2MB)."))
+            return Result.failure(Exception("حجم الملف النهائي ($finalSizeMb MB) يتجاوز الحد المسموح (1.5MB)."))
         }
 
         // 4. تنفيذ عملية الرفع

@@ -13,8 +13,8 @@ object ImageUtils {
     fun uriToBase64(
         context: Context,
         uri: Uri,
-        maxWidth: Int = 800,
-        quality: Int = 75
+        maxWidth: Int = 600,
+        quality: Int = 60
     ): String {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return ""
@@ -22,28 +22,37 @@ object ImageUtils {
             inputStream.close()
             if (originalBitmap == null) return ""
 
+            val targetMax = maxWidth.coerceAtMost(600)
+            val finalQuality = quality.coerceAtMost(60)
+
             val ratio = originalBitmap.width.toFloat() / originalBitmap.height.toFloat()
-            val targetWidth = minOf(maxWidth, originalBitmap.width)
-            val targetHeight = (targetWidth / ratio).toInt()
+            val targetWidth = minOf(targetMax, originalBitmap.width)
+            val targetHeight = (targetWidth / ratio).toInt().coerceAtMost(600)
 
             val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, targetWidth, targetHeight, true)
 
             val outputStream = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, finalQuality, outputStream)
 
             if (scaledBitmap != originalBitmap) {
                 if (!originalBitmap.isRecycled) originalBitmap.recycle()
             }
             if (!scaledBitmap.isRecycled) scaledBitmap.recycle()
 
-            Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+            val bytes = outputStream.toByteArray()
+            if (bytes.size > 1.5 * 1024 * 1024) {
+                // Hard cap 1.5MB
+                return ""
+            }
+
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
         } catch (e: Exception) {
             e.printStackTrace()
             ""
         }
     }
 
-    fun uriToCompressedBase64(context: Context, uri: Uri, maxWidth: Int = 800, maxHeight: Int = 800, quality: Int = 75): String {
+    fun uriToCompressedBase64(context: Context, uri: Uri, maxWidth: Int = 600, maxHeight: Int = 600, quality: Int = 60): String {
         return uriToBase64(context, uri, maxWidth, quality)
     }
 

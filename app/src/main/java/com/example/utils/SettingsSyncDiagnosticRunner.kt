@@ -417,7 +417,7 @@ class SettingsSyncDiagnosticRunner(context: Context) {
 
             // 6. الخرائط والبحث الجغرافي
             SettingFieldDiagnostic("isMapFeatureEnabled", "تفعيل الخريطة التفاعلية", "الخرائط والبحث", true, true, true, true, "AdminMapPanel.kt / MapScreen", "WORKING", "يتحكم بتشغيل الخريطة التفاعلية"),
-            SettingFieldDiagnostic("mapDefaultZoom", "مستوى تقريب الخريطة الافتراضي", "الخرائط والبحث", true, true, true, true, "map.html / MapScreen", "WORKING", "يضبط مستوى الـ Zoom الابتدائي"),
+            SettingFieldDiagnostic("mapDefaultZoom", "مستوى تقريب الخريطة الافتراضي", "الخرائط والبحث", true, true, true, true, "OfflineInteractiveMap.kt / MapScreen", "WORKING", "يضبط مستوى الـ Zoom الابتدائي"),
             SettingFieldDiagnostic("maxSearchRadiusKm", "أقصى نطاق بحث جغرافي (كم)", "الخرائط والبحث", true, true, true, true, "SearchAndFilterEngine.kt / LocationService.kt", "WORKING", "يفلتر الفنيين ضمن المسافة المحددة"),
             SettingFieldDiagnostic("isSpeechSearchEnabled", "تفعيل البحث الصوتي الذكي", "الخرائط والبحث", true, true, true, true, "VoiceManager.kt / SearchBar", "WORKING", "يفعل زر الميكروفون في شريط البحث"),
 

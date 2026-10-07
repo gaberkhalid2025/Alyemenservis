@@ -7154,9 +7154,9 @@ private fun AdminPanelLayoutContent(viewModel: MainViewModel, themeColors: Visua
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                val mapProviders = listOf("Leaflet / OSM 🌐", "Google Maps 🗺️", "Mapbox 🛰️")
+                                val mapProviders = listOf("الخريطة المدمجة 🗺️", "خرائط جوجل 📍", "خريطة شوارع اليمن 🌐")
                                 mapProviders.forEach { prov ->
-                                    val isSel = prov.startsWith("Leaflet")
+                                    val isSel = prov.startsWith("الخريطة")
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)

@@ -53,7 +53,7 @@ fun MapFilterBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF0F172A).copy(alpha = 0.95f))
+            .background(Color(0xFF0F172A))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {

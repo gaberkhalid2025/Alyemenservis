@@ -248,7 +248,7 @@ object DeepSystemDiagnosticOrchestrator {
         if (mp != null) {
             val list = mp.steps.mapIndexed { idx, s ->
                 mapSimpleStep(
-                    sysTitle = "9. نظام الخريطة التفاعلية GPS و Leaflet",
+                    sysTitle = "9. نظام الخريطة التفاعلية الأصلية GPS و Compose Map",
                     subCat = "فحص خريطة #${idx + 1}",
                     stepName = s.stepName,
                     desc = s.description,
@@ -257,11 +257,11 @@ object DeepSystemDiagnosticOrchestrator {
                     fileName = "MapTestRunner.kt",
                     lineNumber = 58 + (idx * 12),
                     functionName = "runMapTest()",
-                    probableCause = "نقص أحد ملفات Leaflet في مجلد assets أو بطء في تهيئة الخريطة.",
-                    suggestedFix = "تأكد من وجود ملفات leaflet.js, leaflet.css, map.html في app/src/main/assets."
+                    probableCause = "خلل في تهيئة إحداثيات المدن أو الـ GPS.",
+                    suggestedFix = "التحقق من إحداثيات المدن في OfflineMapManager."
                 )
             }
-            systemMap["9. نظام الخريطة التفاعلية GPS و Leaflet"] = list
+            systemMap["9. نظام الخريطة التفاعلية الأصلية GPS و Compose Map"] = list
         }
 
         // 10. Search

@@ -33,10 +33,25 @@ object OfflineMapManager {
         CityCoordinates("صنعاء", 15.3694, 44.1910, 13),
         CityCoordinates("عدن", 12.7855, 45.0187, 13),
         CityCoordinates("تعز", 13.5789, 44.0219, 13),
-        CityCoordinates("الحديدة", 14.7978, 42.9545, 13),
         CityCoordinates("إب", 13.9667, 44.1667, 13),
+        CityCoordinates("الحديدة", 14.7978, 42.9545, 13),
         CityCoordinates("حضرموت (المكلا)", 14.5417, 49.1242, 13),
-        CityCoordinates("مأرب", 15.4619, 45.3242, 13)
+        CityCoordinates("سيئون", 15.9432, 48.7871, 13),
+        CityCoordinates("مأرب", 15.4619, 45.3242, 13),
+        CityCoordinates("ذمار", 14.5427, 44.4051, 13),
+        CityCoordinates("صعدة", 16.9402, 43.7639, 13),
+        CityCoordinates("حجة", 15.6917, 43.6028, 13),
+        CityCoordinates("عتق (شبوة)", 14.5377, 46.8319, 13),
+        CityCoordinates("الغيضة (المهرة)", 16.2079, 52.1760, 13),
+        CityCoordinates("زنجبار (أبين)", 13.1287, 45.3806, 13),
+        CityCoordinates("الحوطة (لحج)", 13.0583, 44.8822, 13),
+        CityCoordinates("الضالع", 13.6958, 44.7314, 13),
+        CityCoordinates("البيضاء", 13.9852, 45.5727, 13),
+        CityCoordinates("عمران", 15.6594, 43.9439, 13),
+        CityCoordinates("المحويت", 15.4700, 43.5447, 13),
+        CityCoordinates("ريمة", 14.6300, 43.7100, 13),
+        CityCoordinates("الجوف", 16.1400, 44.7700, 13),
+        CityCoordinates("سقطرى", 12.6517, 54.0194, 12)
     )
 
     fun getCityCoordinates(cityName: String): CityCoordinates {

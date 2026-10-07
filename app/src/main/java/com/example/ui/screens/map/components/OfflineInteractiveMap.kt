@@ -314,62 +314,77 @@ fun OfflineInteractiveMap(
             val safeZoom = if (zoomScale.isNaN() || zoomScale.isInfinite() || zoomScale <= 0f) 1.0f else zoomScale
 
             try {
-                // خلفية مضمونة
-                drawRect(Color(0xFF0F172A))
+                // 1. رسم خلفية المدينة وشبكة الشوارع والأحياء والمتنزهات والطرق الرئيسية
+                drawCityRoadGrid(
+                    centerX = safeCX,
+                    centerY = safeCY,
+                    metersPerPx = safeMeters,
+                    widthPx = size.width,
+                    heightPx = size.height,
+                    panOffset = safePan,
+                    zoomScale = safeZoom,
+                    selectedCity = selectedCity
+                )
 
-                // رسم الشبكة
-                val gridSize = 160f * zoomScale.coerceIn(0.5f, 3f)
-                var gy = (panOffset.y % gridSize) - gridSize
-                while (gy < size.height + gridSize) {
-                    drawLine(Color(0xFF1E293B), Offset(0f, gy), Offset(size.width, gy), 1.2f)
-                    gy += gridSize
-                }
-                var gx = (panOffset.x % gridSize) - gridSize
-                while (gx < size.width + gridSize) {
-                    drawLine(Color(0xFF1E293B), Offset(gx, 0f), Offset(gx, size.height), 1.2f)
-                    gx += gridSize
-                }
-
-                // رسم كل الخدمات
+                // 2. أدوات الرسم للنصوص والأيقونات
                 val emojiPaint = android.graphics.Paint().apply {
-                    textSize = 30f
+                    textSize = 28f
                     textAlign = android.graphics.Paint.Align.CENTER
                     isAntiAlias = true
                 }
                 val labelPaint = android.graphics.Paint().apply {
-                    textSize = 21f
+                    textSize = 20f
                     color = android.graphics.Color.WHITE
                     textAlign = android.graphics.Paint.Align.CENTER
                     isFakeBoldText = true
+                    setShadowLayer(4f, 1f, 1f, android.graphics.Color.BLACK)
                 }
 
+                // 3. رسم كل علامات الخدمات والمنشآت
                 screenPoints.forEach { pt ->
                     val pin = Offset(pt.screenX, pt.screenY)
+                    if (pin.x in -50f..(size.width + 50f) && pin.y in -50f..(size.height + 50f)) {
+                        val isSelected = when (val ent = selectedEntity) {
+                            is ProviderEntity -> ent.id == pt.id
+                            is StoreEntity -> ent.id == pt.id
+                            is PropertyEntity -> ent.id == pt.id
+                            else -> false
+                        }
 
-                    // هالة
-                    drawCircle(pt.color.copy(alpha = 0.3f), 22f, pin)
-                    // النقطة
-                    drawCircle(Color(0xFF0F172A), 13f, pin)
-                    drawCircle(pt.color, 13f, pin, style = Stroke(3f))
-                    // الإيموجي
-                    drawContext.canvas.nativeCanvas.drawText(pt.emoji, pin.x, pin.y + 10f, emojiPaint)
+                        // هالة إشعاعية خلف النقطة
+                        if (isSelected) {
+                            drawCircle(pt.color.copy(alpha = 0.5f), 32f, pin)
+                            drawCircle(pt.color, 18f, pin, style = Stroke(4f))
+                        } else {
+                            drawCircle(pt.color.copy(alpha = 0.35f), 22f, pin)
+                        }
 
-                    // الاسم التوضيحي للخدمة تحت الأيقونة
-                    drawContext.canvas.nativeCanvas.drawText(pt.name.take(12), pin.x, pin.y + 36f, labelPaint)
+                        // خلفية النقطة
+                        drawCircle(Color(0xFF0F172A), 15f, pin)
+                        drawCircle(pt.color, 15f, pin, style = Stroke(2.5f))
+
+                        // رمز الخدمة (الإيموجي)
+                        drawContext.canvas.nativeCanvas.drawText(pt.emoji, pin.x, pin.y + 9f, emojiPaint)
+
+                        // اسم المنشأة أو الفني
+                        val shortName = pt.name.take(12)
+                        drawContext.canvas.nativeCanvas.drawText(shortName, pin.x, pin.y + 36f, labelPaint)
+                    }
                 }
 
-                // موقع المستخدم (دائرة مميزة)
+                // 4. موقع المستخدم المباشر
                 val userX = centerX + (((safeUserLng - originLng) * 111320.0 * Math.cos(Math.toRadians(originLat))) / metersPerPx).toFloat()
                 val userY = centerY + (((-(safeUserLat - originLat) * 110540.0) / metersPerPx).toFloat())
 
-                drawCircle(Color(0xFF00E5FF).copy(alpha = 0.4f), 26f, Offset(userX, userY))
-                drawCircle(Color(0xFF00E5FF), 10f, Offset(userX, userY))
-                drawCircle(Color.White, 4f, Offset(userX, userY))
+                if (userX in -100f..(size.width + 100f) && userY in -100f..(size.height + 100f)) {
+                    drawCircle(Color(0xFF00E5FF).copy(alpha = 0.25f), 36f, Offset(userX, userY))
+                    drawCircle(Color(0xFF00E5FF).copy(alpha = 0.5f), 22f, Offset(userX, userY))
+                    drawCircle(Color(0xFF00E5FF), 10f, Offset(userX, userY))
+                    drawCircle(Color.White, 4f, Offset(userX, userY))
+                }
 
             } catch (e: Exception) {
-                // Fail-safe مطلق → لا شاشة سوداء أبداً
                 drawRect(Color(0xFF0F172A))
-                // رسم دائرة مركزية لتأكيد أن الـ Canvas يعمل
                 drawCircle(Color(0xFF00E5FF).copy(alpha = 0.3f), 40f, Offset(size.width/2, size.height/2))
             }
         }

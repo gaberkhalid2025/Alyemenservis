@@ -55,13 +55,20 @@ fun MapScreenContent(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // فرض الوضع الابتدائي رادار دائماً عند فتح الشاشة لمنع أي شاشة سوداء
+    // ضبط أيقونات شريط الحالة العلوي للهاتف لتكون واضحة وناصعة البياض على الخلفية الداكنة
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        androidx.compose.runtime.SideEffect {
+            val window = (view.context as? android.app.Activity)?.window
+            if (window != null) {
+                val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, view)
+                insetsController.isAppearanceLightStatusBars = false
+            }
+        }
+    }
+
     var showMapErrorOverlay by remember { mutableStateOf(false) }
     var mapRetryCount by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(Unit) {
-        state.isRadarMode = true
-    }
 
     androidx.activity.compose.BackHandler(enabled = true) {
         if (state.selectedEntity != null) {
@@ -133,6 +140,7 @@ fun MapScreenContent(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Color(0xFF0F172A),
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
@@ -240,11 +248,12 @@ fun MapScreenContent(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    .background(Color(0xFF0F172A))
                     .statusBarsPadding()
             ) {
                 // Top Bar with Back Button
                 Surface(
-                    color = Color(0xFF0F172A).copy(alpha = 0.95f),
+                    color = Color(0xFF0F172A),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(

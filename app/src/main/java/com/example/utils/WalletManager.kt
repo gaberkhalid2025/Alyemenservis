@@ -432,7 +432,7 @@ class WalletManager(private val context: Context? = null) {
         val listener = firestore.collection("wallet_transactions")
             .whereEqualTo("userId", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
-            .limit(50)
+            .limit(30)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
                     trySend(getTransactions(userId))
