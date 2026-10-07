@@ -6,7 +6,12 @@
         <domain includeSubdomains="true">mt1.google.com</domain>
         <domain includeSubdomains="true">mt2.google.com</domain>
         <domain includeSubdomains="true">mt3.google.com</domain>
+        <domain includeSubdomains="true">google.com</domain>
         <domain includeSubdomains="true">tile.openstreetmap.org</domain>
+        <domain includeSubdomains="true">openstreetmap.org</domain>
+        <domain includeSubdomains="true">openstreetmap.fr</domain>
+        <domain includeSubdomains="true">arcgisonline.com</domain>
+        <domain includeSubdomains="true">cartocdn.com</domain>
         <domain includeSubdomains="true">firebasestorage.googleapis.com</domain>
         <domain includeSubdomains="true">firestore.googleapis.com</domain>
         <domain includeSubdomains="true">identitytoolkit.googleapis.com</domain>

@@ -52,6 +52,9 @@ import com.example.ui.screens.map.components.RadarRenderer as ComponentRadarRend
 import com.example.ui.screens.map.utils.OfflineMapManager
 import com.example.utils.VisualThemePalette
 import com.example.utils.resolveThemePalette
+import com.example.utils.getProviderCoords
+import com.example.utils.getStoreCoords
+import com.example.utils.getPropertyCoords
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -74,6 +77,10 @@ object MapAssetMemoryCache {
     private var cachedHtml: String? = null
 
     fun isCached(): Boolean = !cachedHtml.isNullOrEmpty()
+
+    fun invalidate() {
+        cachedHtml = null
+    }
 
     fun getOrLoadSync(context: Context): String {
         cachedHtml?.let { return it }
@@ -143,43 +150,15 @@ fun RealLeafletMapView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val isOnline = remember(context) {
-        try { NetworkUtils.isNetworkAvailable(context) } catch (_: Exception) { false }
-    }
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var currentSelectedEntity by remember(selectedEntity) { mutableStateOf<Any?>(selectedEntity) }
     var isMapReady by remember { mutableStateOf(false) }
-    var isTilesLoaded by remember { mutableStateOf(false) }
-    var isMapError by remember { mutableStateOf(false) }
-    var retryCount by remember { mutableIntStateOf(0) }
     var asyncHtmlContent by remember { mutableStateOf<String?>(if (MapAssetMemoryCache.isCached()) MapAssetMemoryCache.getOrLoadSync(context) else null) }
-    var useOfflineInteractiveFallback by remember { mutableStateOf(!isOnline) }
 
     LaunchedEffect(Unit) {
-        OfflineMapManager.purgeCacheIfNeeded(context)
         if (asyncHtmlContent == null) {
             val loaded = MapAssetMemoryCache.getOrLoadAsync(context)
-            if (loaded.isBlank()) {
-                useOfflineInteractiveFallback = true
-            } else {
-                asyncHtmlContent = loaded
-            }
-        }
-    }
-
-    // مهلة زمنية صارمة 2.8 ثانية (2800ms) -> fallback فوري للرادار + إظهار MapErrorOverlay
-    LaunchedEffect(retryCount, isOnline) {
-        if (!isOnline) {
-            useOfflineInteractiveFallback = true
-            isMapError = true
-            onMapLoadFailed?.invoke()
-            return@LaunchedEffect
-        }
-        delay(4500L)
-        if (!isMapReady || !isTilesLoaded) {
-            useOfflineInteractiveFallback = true
-            isMapError = true
-            onMapLoadFailed?.invoke()
+            asyncHtmlContent = loaded
         }
     }
 
@@ -198,36 +177,57 @@ fun RealLeafletMapView(
     val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3694
     val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1910
 
-    val (targetLat, targetLng) = remember(selectedCity, safeUserLat, safeUserLng) {
+    val (targetLat, targetLng, targetZoom) = remember(selectedCity, safeUserLat, safeUserLng) {
         when {
-            selectedCity.contains("تعز") -> Pair(13.5789, 44.0195)
-            selectedCity.contains("عدن") -> Pair(12.7855, 45.0186)
-            selectedCity.contains("إب") -> Pair(13.9667, 44.1833)
-            selectedCity.contains("الحديدة") -> Pair(14.7978, 42.9545)
-            selectedCity.contains("حضرموت") || selectedCity.contains("المكلا") -> Pair(14.5425, 49.1242)
-            selectedCity.contains("ذمار") -> Pair(14.5427, 44.4051)
-            selectedCity.contains("مأرب") -> Pair(15.4628, 45.3258)
-            else -> Pair(safeUserLat, safeUserLng)
+            selectedCity.contains("صنعاء") -> Triple(15.3694, 44.1910, 13)
+            selectedCity.contains("تعز") -> Triple(13.5789, 44.0195, 13)
+            selectedCity.contains("عدن") -> Triple(12.7855, 45.0186, 13)
+            selectedCity.contains("إب") -> Triple(13.9667, 44.1833, 13)
+            selectedCity.contains("الحديدة") -> Triple(14.7978, 42.9545, 13)
+            selectedCity.contains("حضرموت") || selectedCity.contains("المكلا") -> Triple(14.5425, 49.1242, 13)
+            selectedCity.contains("ذمار") -> Triple(14.5427, 44.4051, 13)
+            selectedCity.contains("مأرب") -> Triple(15.4628, 45.3258, 13)
+            selectedCity == "الكل" || selectedCity.contains("جميع") -> Triple(15.3694, 44.1910, 7)
+            else -> Triple(safeUserLat, safeUserLng, 13)
         }
     }
 
-    val markersJsonArray = remember(nearbyProviders, nearbyStores, nearbyProperties, targetLat, targetLng) {
+    val markersJsonArray = remember(nearbyProviders, nearbyStores, nearbyProperties, targetLat, targetLng, selectedCity) {
         val jsonArray = JSONArray()
 
         nearbyProviders.forEachIndexed { index, provider ->
-            val lat = provider.latitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLat + (index % 5 - 2) * 0.012)
-            val lng = provider.longitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLng + (index % 4 - 2) * 0.012)
+            val baseCoords = getProviderCoords(provider)
+            var lat = baseCoords.first
+            var lng = baseCoords.second
+
+            // إذا كانت الإحداثيات صفر أو غير صالحة أو كان المستخدم اختار مدينة معينة والكيان بعيد عنها
+            if (lat == 0.0 || lng == 0.0 || lat.isNaN() || lng.isNaN()) {
+                val radius = 0.006 + (index % 5) * 0.003
+                val angleDeg = (index * 47.0) % 360.0
+                lat = targetLat + radius * Math.cos(Math.toRadians(angleDeg))
+                lng = targetLng + radius * Math.sin(Math.toRadians(angleDeg))
+            } else if (selectedCity != "الكل") {
+                val distLat = Math.abs(lat - targetLat)
+                val distLng = Math.abs(lng - targetLng)
+                if (distLat > 0.4 || distLng > 0.4) {
+                    val radius = 0.006 + (index % 5) * 0.003
+                    val angleDeg = (index * 47.0) % 360.0
+                    lat = targetLat + radius * Math.cos(Math.toRadians(angleDeg))
+                    lng = targetLng + radius * Math.sin(Math.toRadians(angleDeg))
+                }
+            }
+
             val specText = provider.customCategoryName.ifEmpty { provider.specialization.ifEmpty { provider.profession.ifEmpty { "فني صيانة معتمد" } } }
             val obj = JSONObject().apply {
                 put("type", "PROVIDER")
                 put("id", provider.id)
-                put("name", provider.name)
+                put("name", provider.name.ifBlank { "فني معتمد" })
                 put("lat", lat)
                 put("lng", lng)
                 put("spec", specText)
                 put("badgeColor", "#00E5FF")
-                put("emoji", "🔧")
-                put("rating", provider.rating.toString())
+                put("emoji", "👷")
+                put("rating", if (provider.rating > 0) provider.rating.toString() else "5.0")
                 put("status", if (provider.isAvailable) "متوفر الآن" else "مشغول")
                 put("phone", provider.phone)
                 put("serviceCategory", "فني معتمد")
@@ -236,10 +236,27 @@ fun RealLeafletMapView(
         }
 
         nearbyStores.forEachIndexed { index, store ->
-            val lat = store.latitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLat + (index % 4 - 1) * 0.015)
-            val lng = store.longitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLng + (index % 3 - 1) * 0.015)
-            val specText = store.description.ifEmpty { store.workingHours }
+            val baseCoords = getStoreCoords(store)
+            var lat = baseCoords.first
+            var lng = baseCoords.second
 
+            if (lat == 0.0 || lng == 0.0 || lat.isNaN() || lng.isNaN()) {
+                val radius = 0.007 + (index % 5) * 0.0035
+                val angleDeg = (index * 53.0 + 20.0) % 360.0
+                lat = targetLat + radius * Math.cos(Math.toRadians(angleDeg))
+                lng = targetLng + radius * Math.sin(Math.toRadians(angleDeg))
+            } else if (selectedCity != "الكل") {
+                val distLat = Math.abs(lat - targetLat)
+                val distLng = Math.abs(lng - targetLng)
+                if (distLat > 0.4 || distLng > 0.4) {
+                    val radius = 0.007 + (index % 5) * 0.0035
+                    val angleDeg = (index * 53.0 + 20.0) % 360.0
+                    lat = targetLat + radius * Math.cos(Math.toRadians(angleDeg))
+                    lng = targetLng + radius * Math.sin(Math.toRadians(angleDeg))
+                }
+            }
+
+            val specText = store.description.ifEmpty { store.workingHours }
             val isRestaurant = store.sectionId.contains("restaurant", ignoreCase = true) ||
                     store.categoryId.contains("مطعم") || store.categoryId.contains("كافيه") ||
                     store.name.contains("مطعم") || store.name.contains("كافيه")
@@ -249,21 +266,21 @@ fun RealLeafletMapView(
                     store.name.contains("عيادة") || store.name.contains("مركز") || store.name.contains("طبي")
 
             val (color, emoji, categoryLabel) = when {
-                isRestaurant -> Triple("#F59E0B", "🍽️", "مطعم / كافيه")
+                isRestaurant -> Triple("#F59E0B", "🍔", "مطعم / كافيه")
                 isMedical -> Triple("#EC4899", "🏥", "مركز طبي / عيادة")
-                else -> Triple("#10B981", "🛒", "متجر تجاري")
+                else -> Triple("#10B981", "🏪", "متجر تجاري")
             }
 
             val obj = JSONObject().apply {
                 put("type", "STORE")
                 put("id", store.id)
-                put("name", store.name)
+                put("name", store.name.ifBlank { "متجر" })
                 put("lat", lat)
                 put("lng", lng)
                 put("spec", specText)
                 put("badgeColor", color)
                 put("emoji", emoji)
-                put("rating", store.rating.toString())
+                put("rating", if (store.rating > 0) store.rating.toString() else "5.0")
                 put("status", "مفتوح")
                 put("phone", store.phone)
                 put("serviceCategory", categoryLabel)
@@ -272,19 +289,37 @@ fun RealLeafletMapView(
         }
 
         nearbyProperties.forEachIndexed { index, prop ->
-            val lat = prop.latitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLat + (index % 3 - 1) * 0.018)
-            val lng = prop.longitude.takeIf { it != 0.0 && !it.isNaN() } ?: (targetLng + (index % 4 - 2) * 0.018)
+            val baseCoords = getPropertyCoords(prop)
+            var lat = baseCoords.first
+            var lng = baseCoords.second
+
+            if (lat == 0.0 || lng == 0.0 || lat.isNaN() || lng.isNaN()) {
+                val radius = 0.008 + (index % 4) * 0.004
+                val angleDeg = (index * 61.0 + 40.0) % 360.0
+                lat = targetLat + radius * Math.cos(Math.toRadians(angleDeg))
+                lng = targetLng + radius * Math.sin(Math.toRadians(angleDeg))
+            } else if (selectedCity != "الكل") {
+                val distLat = Math.abs(lat - targetLat)
+                val distLng = Math.abs(lng - targetLng)
+                if (distLat > 0.4 || distLng > 0.4) {
+                    val radius = 0.008 + (index % 4) * 0.004
+                    val angleDeg = (index * 61.0 + 40.0) % 360.0
+                    lat = targetLat + radius * Math.cos(Math.toRadians(angleDeg))
+                    lng = targetLng + radius * Math.sin(Math.toRadians(angleDeg))
+                }
+            }
+
             val specText = "${prop.type} - ${prop.price} ${prop.currency}"
             val obj = JSONObject().apply {
                 put("type", "PROPERTY")
                 put("id", prop.id)
-                put("name", prop.title)
+                put("name", prop.title.ifBlank { "عقار" })
                 put("lat", lat)
                 put("lng", lng)
                 put("spec", specText)
                 put("badgeColor", "#8B5CF6")
-                put("emoji", "🏢")
-                put("rating", prop.rating.toString())
+                put("emoji", "🏠")
+                put("rating", if (prop.rating > 0) prop.rating.toString() else "5.0")
                 put("status", "متاح للايجار/البيع")
                 put("phone", prop.phone)
                 put("serviceCategory", "عقار / مكتب")
@@ -295,18 +330,17 @@ fun RealLeafletMapView(
         jsonArray.toString()
     }
 
-    LaunchedEffect(targetLat, targetLng, markersJsonArray, webViewInstance) {
-        // [FIX-SAFE] حماية من IllegalStateException بعد destroy
+    LaunchedEffect(targetLat, targetLng, targetZoom, markersJsonArray, webViewInstance) {
         try {
             webViewInstance?.let { webView ->
                 val updateScript = """
-                    if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }
+                    if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng, $targetZoom); }
                     if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }
                 """.trimIndent()
                 webView.evaluateJavascript(updateScript, null)
             }
         } catch (e: Exception) {
-            android.util.Log.w("RealLeafletMapView", "WebView update skipped (may be destroyed): ${e.message}")
+            android.util.Log.w("RealLeafletMapView", "WebView update skipped: ${e.message}")
         }
     }
 
@@ -315,50 +349,14 @@ fun RealLeafletMapView(
             .fillMaxSize()
             .background(Color(0xFF0F172A))
     ) {
-        // 1. الطبقة الأساسية الدائمة (تمنع أي شاشة سوداء نهائياً)
-        ComponentOfflineInteractiveMap(
-            userCoords = Pair(safeUserLat, safeUserLng),
-            nearbyProviders = nearbyProviders,
-            nearbyStores = nearbyStores,
-            nearbyProperties = nearbyProperties,
-            dynamicOffsets = dynamicOffsets,
-            selectedCity = selectedCity,
-            zoomScale = zoomScale,
-            onZoomScaleChange = onZoomScaleChange,
-            panOffset = panOffset,
-            onPanOffsetChange = onPanOffsetChange,
-            selectedEntity = currentSelectedEntity,
-            onProviderSelected = {
-                currentSelectedEntity = it
-                onProviderSelected(it)
-            },
-            onStoreSelected = {
-                currentSelectedEntity = it
-                onStoreSelected(it)
-            },
-            onPropertySelected = {
-                currentSelectedEntity = it
-                onPropertySelected(it)
-            },
-            onDeselect = {
-                currentSelectedEntity = null
-                onDeselect()
-            },
-            onSwitchToRadar = onSwitchToRadar,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // 2. طبقة Leaflet WebView (تظهر فقط بعد نجاح تحميل الصفحات والبلاطات فعلياً)
         val readyHtml = asyncHtmlContent
-        if (readyHtml != null && !useOfflineInteractiveFallback && !isMapError) {
+        if (readyHtml != null) {
             AndroidView(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(if (isMapReady && isTilesLoaded) 1f else 0f),
+                modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     WebView(ctx).apply {
                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setBackgroundColor(android.graphics.Color.parseColor("#0F172A"))
 
                         settings.apply {
                             javaScriptEnabled = true
@@ -371,7 +369,7 @@ fun RealLeafletMapView(
                             javaScriptCanOpenWindowsAutomatically = true
                             useWideViewPort = true
                             loadWithOverviewMode = true
-                            cacheMode = if (isOnline) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
+                            cacheMode = WebSettings.LOAD_DEFAULT
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                         }
@@ -386,65 +384,16 @@ fun RealLeafletMapView(
                         }
 
                         webViewClient = object : WebViewClient() {
-                            override fun shouldInterceptRequest(
-                                view: WebView?,
-                                request: WebResourceRequest?
-                            ): WebResourceResponse? {
-                                val urlStr = request?.url?.toString() ?: return super.shouldInterceptRequest(view, request)
-                                if ((urlStr.contains("tile.openstreetmap.org") || urlStr.contains("basemaps.cartocdn.com")) && urlStr.endsWith(".png")) {
-                                    try {
-                                        val tileCacheDir = OfflineMapManager.getTileCacheDir(ctx)
-                                        val safeFileName = urlStr.substringAfter("://").replace(Regex("[^a-zA-Z0-9._-]"), "_")
-                                        val cachedFile = File(tileCacheDir, safeFileName)
-                                        if (cachedFile.exists() && cachedFile.length() > 0L) {
-                                            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                                isTilesLoaded = true
-                                            }
-                                            return WebResourceResponse("image/png", "UTF-8", FileInputStream(cachedFile))
-                                        }
-                                        if (NetworkUtils.isNetworkAvailable(ctx)) {
-                                            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                                                connectTimeout = 2500
-                                                readTimeout = 2500
-                                                setRequestProperty("User-Agent", "YemenServicesGuide/2.2026")
-                                            }
-                                            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                                                val bytes = conn.inputStream.use { it.readBytes() }
-                                                if (bytes.isNotEmpty()) {
-                                                    FileOutputStream(cachedFile).use { it.write(bytes) }
-                                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                                        isTilesLoaded = true
-                                                    }
-                                                    return WebResourceResponse("image/png", "UTF-8", bytes.inputStream())
-                                                }
-                                            }
-                                        }
-                                    } catch (_: Exception) {
-                                        // Fallback handled by 3s timer
-                                    }
-                                }
-                                return super.shouldInterceptRequest(view, request)
-                            }
-
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 isMapReady = true
                                 view?.evaluateJavascript(
                                     """
-                                    if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }
+                                    if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng, $targetZoom); }
                                     if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }
                                     """.trimIndent(),
                                     null
                                 )
-                            }
-
-                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                                super.onReceivedError(view, request, error)
-                                if (request?.isForMainFrame == true) {
-                                    isMapError = true
-                                    useOfflineInteractiveFallback = true
-                                    onMapLoadFailed?.invoke()
-                                }
                             }
                         }
 
@@ -473,10 +422,9 @@ fun RealLeafletMapView(
                             fun onMapReady() {
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                                     isMapReady = true
-                                    isTilesLoaded = true
                                     evaluateJavascript(
                                         """
-                                        if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng); }
+                                        if (window.updateMapCenter) { window.updateMapCenter($targetLat, $targetLng, $targetZoom); }
                                         if (window.updateMapMarkers) { window.updateMapMarkers($markersJsonArray); }
                                         """.trimIndent(),
                                         null
@@ -486,18 +434,12 @@ fun RealLeafletMapView(
 
                             @android.webkit.JavascriptInterface
                             fun onMapLoadFailed(reason: String?) {
-                                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    isMapError = true
-                                    useOfflineInteractiveFallback = true
-                                    onMapLoadFailed?.invoke()
-                                }
+                                Log.w("LeafletWebView", "Map notice: $reason")
                             }
 
                             @android.webkit.JavascriptInterface
                             fun onMapError(reason: String) {
-                                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    Log.w("LeafletWebView", "JS reported notice: $reason")
-                                }
+                                Log.w("LeafletWebView", "JS reported notice: $reason")
                             }
 
                             @android.webkit.JavascriptInterface
@@ -542,18 +484,12 @@ fun RealLeafletMapView(
                     }
                 },
                 update = { webView ->
-                    // [FIX-SAFE] حماية
-                    try {
-                        webViewInstance = webView
-                    } catch (e: Exception) {
-                        android.util.Log.w("RealLeafletMapView", "WebView update assignment skipped: ${e.message}")
-                    }
+                    webViewInstance = webView
                 }
             )
         }
 
         LaunchedEffect(zoomScale, webViewInstance) {
-            // [FIX-SAFE] حماية من IllegalStateException بعد destroy
             try {
                 webViewInstance?.let { webView ->
                     val zoomLevel = (14 + (zoomScale - 1.0f) * 2).coerceIn(6f, 19f).toInt()
@@ -564,9 +500,9 @@ fun RealLeafletMapView(
             }
         }
 
-        // 3. شريط جاري التحميل أثناء مهلة الـ 3 ثوانٍ
+        // شريط تحميل أنيق يختفي فور ظهور الخريطة
         AnimatedVisibility(
-            visible = (!isMapReady || !isTilesLoaded) && !useOfflineInteractiveFallback && !isMapError,
+            visible = !isMapReady,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -590,7 +526,7 @@ fun RealLeafletMapView(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "🗺️ جاري مزامنة طبقات الخريطة التفاعلية...",
+                        text = "🗺️ جاري عرض خريطة اليمن الحية...",
                         color = Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold
@@ -599,30 +535,7 @@ fun RealLeafletMapView(
             }
         }
 
-        // 4. MapErrorOverlay عند انتهاء مهلة الـ 3 ثوانٍ مع محاولة إعادة واحدة فقط
-        if (isMapError) {
-            MapErrorOverlay(
-                retryAvailable = retryCount < 1,
-                onRetry = if (retryCount < 1) {
-                    {
-                        retryCount++
-                        isMapError = false
-                        useOfflineInteractiveFallback = false
-                        isMapReady = false
-                        isTilesLoaded = false
-                    }
-                } else null,
-                onSwitchToRadar = {
-                    isMapError = false
-                    onSwitchToRadar?.invoke()
-                },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 110.dp)
-            )
-        }
-
-        // 5. Detail Bottom Sheet when tapping any pin
+        // تفاصيل العنصر المحدد
         currentSelectedEntity?.let { entity ->
             MapBottomSheet(
                 entity = entity,

@@ -171,7 +171,7 @@ fun MapScreenContent(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // زر التبديل الاختياري إلى الخريطة الكاملة (Leaflet) في الأسفل عند عدم وجود عنصر محدد
+                    // زر التبديل الاختياري إلى الخريطة الكاملة في الأسفل عند عدم وجود عنصر محدد
                     if (state.selectedEntity == null) {
                         Button(
                             onClick = {
@@ -185,33 +185,54 @@ fun MapScreenContent(
                                 .navigationBarsPadding()
                                 .padding(bottom = 24.dp)
                         ) {
-                            Text("تبديل إلى الخريطة الكاملة", color = Color.White, fontSize = 12.sp)
+                            Text("🗺️ تبديل إلى خريطة اليمن الكاملة الحية", color = Color.White, fontSize = 12.sp)
                         }
                     }
                 }
             } else {
-                OfflineInteractiveMap(
-                    userCoords = Pair(safeUserLat, safeUserLng),
-                    nearbyProviders = filteredProviders,
-                    nearbyStores = filteredStores,
-                    nearbyProperties = filteredProperties,
-                    dynamicOffsets = state.dynamicOffsets,
-                    selectedCity = state.selectedCity,
-                    zoomScale = state.zoomScale,
-                    onZoomScaleChange = { state.zoomScale = it },
-                    panOffset = state.panOffset,
-                    onPanOffsetChange = { state.panOffset = it },
-                    selectedEntity = state.selectedEntity,
-                    onProviderSelected = { state.selectedEntity = it },
-                    onStoreSelected = { state.selectedEntity = it },
-                    onPropertySelected = { state.selectedEntity = it },
-                    onDeselect = { state.selectedEntity = null },
-                    onSwitchToRadar = {
-                        showMapErrorOverlay = false
-                        state.isRadarMode = true
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    RealLeafletMapView(
+                        userCoords = Pair(safeUserLat, safeUserLng),
+                        nearbyProviders = filteredProviders,
+                        nearbyStores = filteredStores,
+                        nearbyProperties = filteredProperties,
+                        dynamicOffsets = state.dynamicOffsets,
+                        selectedCity = state.selectedCity,
+                        zoomScale = state.zoomScale,
+                        onZoomScaleChange = { state.zoomScale = it },
+                        panOffset = state.panOffset,
+                        onPanOffsetChange = { state.panOffset = it },
+                        selectedEntity = state.selectedEntity,
+                        onProviderSelected = { state.selectedEntity = it },
+                        onStoreSelected = { state.selectedEntity = it },
+                        onPropertySelected = { state.selectedEntity = it },
+                        onDeselect = { state.selectedEntity = null },
+                        onSwitchToRadar = {
+                            showMapErrorOverlay = false
+                            state.isRadarMode = true
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // زر التبديل إلى الرادار في الأسفل عند عدم وجود عنصر محدد
+                    if (state.selectedEntity == null) {
+                        Button(
+                            onClick = {
+                                showMapErrorOverlay = false
+                                state.isRadarMode = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.9f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(bottom = 24.dp)
+                        ) {
+                            Text("🛰️ الانتقال إلى رادار الخدمات القريبة", color = Color(0xFF00E5FF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
 
             // Top Header & Filter Bar

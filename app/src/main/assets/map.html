@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>دليل خدمات اليمن - الخريطة المباشرة</title>
+    <title>خريطة دليل اليمن التفاعلية المباشرة</title>
     
     <!-- Local Leaflet and MarkerCluster CSS -->
     <link rel="stylesheet" href="leaflet.css" />
@@ -19,7 +19,7 @@
         html, body {
             height: 100%;
             width: 100%;
-            background: #0F172A;
+            background: #E8ECE9; /* لون خريطة طبيعي مريح بدلاً من الشاشة السوداء */
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow: hidden;
             position: relative;
@@ -29,27 +29,107 @@
             height: 100%;
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: #0F172A;
-            background-image: 
-                linear-gradient(rgba(0, 229, 255, 0.07) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 229, 255, 0.07) 1px, transparent 1px);
-            background-size: 36px 36px;
+            background: #E8ECE9;
         }
         
         .leaflet-container { 
             width: 100%; 
             height: 100%; 
-            background: #0F172A linear-gradient(rgba(0, 229, 255, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 255, 0.07) 1px, transparent 1px) !important; 
-            background-size: 36px 36px !important;
+            background: #E8ECE9 !important; 
             font-family: inherit; 
         }
         .leaflet-pane { z-index: 400; }
         .leaflet-tile-pane { z-index: 200; }
         .leaflet-marker-pane { z-index: 600; }
         .leaflet-popup-pane { z-index: 700; }
-        .leaflet-tile-container img { 
-            filter: brightness(0.96) contrast(1.05); 
+        
+        /* أزرار التحكم العائمة في الخريطة */
+        .map-floating-controls {
+            position: absolute;
+            bottom: 24px;
+            left: 14px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
+        .map-ctrl-btn {
+            width: 44px;
+            height: 44px;
+            background: #0F172A;
+            color: #FFFFFF;
+            border: 1.5px solid #00E5FF;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+            cursor: pointer;
+            transition: transform 0.15s, background 0.15s;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .map-ctrl-btn:active {
+            transform: scale(0.92);
+            background: #1E293B;
+        }
+        
+        /* زر تبديل طبقات الخريطة في أعلى اليسار */
+        .layer-selector-container {
+            position: absolute;
+            top: 68px;
+            left: 14px;
+            z-index: 1000;
+        }
+        .layer-menu-btn {
+            background: #0F172A;
+            color: #00E5FF;
+            border: 1.5px solid #00E5FF;
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .layer-dropdown {
+            display: none;
+            position: absolute;
+            top: 42px;
+            left: 0;
+            background: #0F172A;
+            border: 1.5px solid #00E5FF;
+            border-radius: 12px;
+            padding: 6px;
+            min-width: 170px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            flex-direction: column;
+            gap: 4px;
+        }
+        .layer-dropdown.show { display: flex; }
+        .layer-option {
+            background: transparent;
+            color: #FFFFFF;
+            border: none;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 11.5px;
+            font-weight: 600;
+            text-align: right;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .layer-option:active, .layer-option.active {
+            background: rgba(0, 229, 255, 0.2);
+            color: #00E5FF;
+        }
+        
+        /* بطاقة النافذة المنبثقة عند النقر على الدبوس */
         .leaflet-popup-content-wrapper { 
             background: #0F172A !important; 
             color: #FFFFFF !important; 
@@ -155,6 +235,7 @@
             text-align: center; 
         }
         
+        /* دبابيس الخدمات والعناصر */
         .custom-pin { 
             width: 44px; 
             height: 44px; 
@@ -179,74 +260,71 @@
             border-radius: 50%; 
             box-shadow: 0 0 20px #00E5FF; 
             position: absolute; 
-            top: 5px; 
-            left: 5px; 
-            z-index: 2; 
+            top: 5px; left: 5px; 
         }
         .user-pulse { 
-            position: absolute; 
-            width: 46px; 
-            height: 46px; 
-            background: rgba(0, 229, 255, 0.4); 
+            width: 32px; 
+            height: 32px; 
+            background: rgba(0, 229, 255, 0.35); 
             border-radius: 50%; 
-            top: -7px; 
-            left: -7px; 
-            animation: pulseRing 2s infinite ease-out; 
+            position: absolute; 
+            top: 0; left: 0; 
+            animation: pulse-ring 2s infinite cubic-bezier(0.215, 0.61, 0.355, 1); 
         }
-        @keyframes pulseRing { 
-            0% { transform: scale(0.4); opacity: 1; } 
+        @keyframes pulse-ring { 
+            0% { transform: scale(0.6); opacity: 0.9; } 
+            70% { transform: scale(1.6); opacity: 0.1; } 
             100% { transform: scale(1.8); opacity: 0; } 
         }
 
-        /* Fallback HTML Overlay when map fails */
-        #map-fallback-overlay {
-            display: none;
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 9999;
-            background: #0F172A;
-            border: 2px solid #00E5FF;
-            border-radius: 16px;
-            padding: 20px;
-            text-align: center;
+        /* تسميات المدن واليمن على الخريطة الأوفلاين */
+        .yemen-city-label {
+            background: rgba(15, 23, 42, 0.82);
             color: #FFFFFF;
-            width: 88%;
-            max-width: 340px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            border: 1px solid rgba(0, 229, 255, 0.6);
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            text-align: center;
         }
-        #map-fallback-overlay h3 { color: #00E5FF; font-size: 15px; margin-bottom: 8px; }
-        #map-fallback-overlay p { color: #94A3B8; font-size: 12px; margin-bottom: 16px; line-height: 1.5; }
-        .fallback-btn-row { display: flex; gap: 8px; justify-content: center; }
-        .fallback-btn { background: #00E5FF; color: #0F172A; border: none; padding: 9px 14px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; flex: 1; }
-        .fallback-btn-sec { background: rgba(255,255,255,0.1); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.2); padding: 9px 14px; border-radius: 10px; font-weight: bold; font-size: 12px; cursor: pointer; flex: 1; }
     </style>
 </head>
 <body>
-    <div id="map" style="width:100%;height:100%;min-height:100vh;"></div>
+    <div id="map"></div>
     
-    <div id="map-fallback-overlay">
-        <h3>📡 تعذر اتصال الخريطة بالشبكة</h3>
-        <p>قد تكون التغطية ضعيفة. يمكنك استخدام رادار الخدمات التفاعلي لعرض المنشآت القريبة بدون إنترنت.</p>
-        <div class="fallback-btn-row">
-            <button class="fallback-btn" onclick="if(window.AndroidBridge && window.AndroidBridge.switchToRadar) AndroidBridge.switchToRadar();">الانتقال للرادار 📡</button>
-            <button class="fallback-btn-sec" onclick="location.reload();">إعادة المحاولة 🔄</button>
+    <!-- زر تبديل نوع الخريطة -->
+    <div class="layer-selector-container">
+        <button class="layer-menu-btn" onclick="toggleLayerMenu(event)">
+            <span>🗺️ نوع الخريطة</span>
+        </button>
+        <div id="layerDropdown" class="layer-dropdown">
+            <button class="layer-option active" onclick="switchLayer('googleRoads', this)">🗺️ شوارع (Google)</button>
+            <button class="layer-option" onclick="switchLayer('googleSatellite', this)">🛰️ قمر صناعي (Satellite)</button>
+            <button class="layer-option" onclick="switchLayer('esri', this)">🌍 خريطة إيزري (Esri)</button>
+            <button class="layer-option" onclick="switchLayer('carto', this)">🏙️ خريطة كارتو (CartoDB)</button>
+            <button class="layer-option" onclick="switchLayer('osm', this)">🌐 خريطة الشوارع (OSM)</button>
         </div>
     </div>
 
-    <script>
-        // Global JS Error Handler
-        window.onerror = function(message, source, lineno, colno, error) {
-            console.error("Global JS Error: " + message);
-            if (window.AndroidBridge && typeof window.AndroidBridge.onMapError === 'function') {
-                window.AndroidBridge.onMapError("js_error: " + message);
-            }
-            return false;
-        };
+    <!-- أزرار التكبير والتصغير والموقع العائمة -->
+    <div class="map-floating-controls">
+        <button class="map-ctrl-btn" title="تكبير" onclick="if(map) map.zoomIn();">＋</button>
+        <button class="map-ctrl-btn" title="تصغير" onclick="if(map) map.zoomOut();">－</button>
+        <button class="map-ctrl-btn" title="موقعي الحالي" onclick="recenterOnUser();">📍</button>
+        <button class="map-ctrl-btn" title="المدينة المختارة" onclick="recenterOnCity();">🏙️</button>
+    </div>
 
-        // Safe default coordinates (Sana'a center: 15.3694, 44.1910)
+    <script>
+        // Safe default coordinates
         var userLat = 15.3694;
         var userLng = 44.1910;
+        var cityLat = 15.3694;
+        var cityLng = 44.1910;
+        var cityZoom = 13;
+
         function loadBridgeCoords() {
             try {
                 if (window.AndroidBridge) {
@@ -263,15 +341,49 @@
                 console.error("Coordinate retrieval exception: " + e);
             }
         }
+
         var map = null;
         var clusterGroup = null;
+        var userMarker = null;
+        var currentTileLayer = null;
+        var availableLayers = {};
 
-        function showFallbackUI(reason) {
-            console.error("Map initialization failed: " + reason);
-            var overlay = document.getElementById("map-fallback-overlay");
-            if (overlay) overlay.style.display = "block";
-            if (window.AndroidBridge && typeof window.AndroidBridge.onMapLoadFailed === 'function') {
-                window.AndroidBridge.onMapLoadFailed();
+        function toggleLayerMenu(e) {
+            e.stopPropagation();
+            var dropdown = document.getElementById('layerDropdown');
+            if (dropdown) dropdown.classList.toggle('show');
+        }
+
+        document.addEventListener('click', function() {
+            var dropdown = document.getElementById('layerDropdown');
+            if (dropdown) dropdown.classList.remove('show');
+        });
+
+        function switchLayer(layerKey, btnElem) {
+            if (!map || !availableLayers[layerKey]) return;
+            if (currentTileLayer) {
+                map.removeLayer(currentTileLayer);
+            }
+            currentTileLayer = availableLayers[layerKey];
+            currentTileLayer.addTo(map);
+
+            var options = document.querySelectorAll('.layer-option');
+            options.forEach(function(opt) { opt.classList.remove('active'); });
+            if (btnElem) btnElem.classList.add('active');
+
+            var dropdown = document.getElementById('layerDropdown');
+            if (dropdown) dropdown.classList.remove('show');
+        }
+
+        function recenterOnUser() {
+            if (map && !isNaN(userLat) && !isNaN(userLng)) {
+                map.flyTo([userLat, userLng], 15, { animate: true, duration: 0.8 });
+            }
+        }
+
+        function recenterOnCity() {
+            if (map && !isNaN(cityLat) && !isNaN(cityLng)) {
+                map.flyTo([cityLat, cityLng], cityZoom || 13, { animate: true, duration: 0.8 });
             }
         }
 
@@ -295,9 +407,103 @@
             }
         }
 
+        function escapeHtml(str) {
+            return String(str == null ? '' : str).replace(/[&<>"']/g, function(c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        // رسم خريطة اليمن الأساسية المتجهية (Offline Yemen Vector Map)
+        // تضمن ظهور خريطة اليمن ومعالمها ومدنها وشوارعها فوراً حتى بدون أي اتصال إنترنت!
+        function drawYemenBaseVectorMap() {
+            if (!map) return;
+
+            // حدود وخارطة الجمهورية اليمنية الجغرافية الدقيقة
+            var yemenBorders = [
+                // مضيق باب المندب والساحل الغربي للبحر الأحمر
+                [12.60, 43.48], [12.75, 43.40], [13.15, 43.25], [13.35, 43.15],
+                [13.75, 43.05], [14.05, 42.98], [14.35, 42.95], [14.80, 42.94], // الحديدة
+                [15.30, 42.85], [15.80, 42.75], [16.30, 42.78], [16.42, 42.82], // ميدي
+                // الحدود الشمالية (صعدة، الجوف، الربع الخالي)
+                [16.85, 43.15], [17.30, 43.45], [17.50, 44.10], [17.40, 44.60],
+                [17.20, 45.40], [17.00, 46.50], [17.25, 47.50], [17.50, 49.00],
+                [18.00, 50.50], [18.50, 52.00], [19.00, 52.50],
+                // الحدود الشرقية مع عمان
+                [17.30, 52.80], [16.65, 53.11],
+                // ساحل بحر العرب وخليج عدن (المهرة، حضرموت، شبوة، أبين، عدن)
+                [16.20, 52.18], // الغيضة
+                [15.60, 51.50], [15.20, 50.80], [14.80, 50.00],
+                [14.54, 49.12], // المكلا
+                [14.20, 48.50], [14.00, 47.80], [13.80, 47.00], // بلحاف
+                [13.40, 46.00], [13.13, 45.38], // زنجبار - أبين
+                [12.78, 45.02], // عدن
+                [12.70, 44.50], [12.60, 44.00], [12.60, 43.48]  // باب المندب
+            ];
+
+            // مضلع الجمهورية اليمنية
+            L.polygon(yemenBorders, {
+                color: '#0284C7',
+                weight: 2.5,
+                fillColor: '#F8FAFC',
+                fillOpacity: 0.65,
+                dashArray: '4, 4'
+            }).addTo(map);
+
+            // شبكة الطرق والشرايين الرئيسية في اليمن
+            var yemenHighways = [
+                // طريق صنعاء - ذمار - إب - تعز - لحج - عدن
+                [[15.37, 44.19], [14.54, 44.41], [13.97, 44.18], [13.58, 44.02], [13.06, 44.88], [12.78, 45.02]],
+                // طريق صنعاء - مناخة - باجل - الحديدة
+                [[15.37, 44.19], [15.07, 43.74], [14.98, 43.28], [14.80, 42.95]],
+                // طريق صنعاء - مأرب - العبر - حضرموت
+                [[15.37, 44.19], [15.46, 45.33], [16.12, 47.24], [15.94, 48.79], [14.54, 49.12]],
+                // طريق عدن - أبين - شبوة - المكلا
+                [[12.78, 45.02], [13.13, 45.38], [14.00, 47.80], [14.54, 49.12]],
+                // طريق تعز - المخا - الحديدة
+                [[13.58, 44.02], [13.32, 43.25], [14.80, 42.95]]
+            ];
+
+            yemenHighways.forEach(function(hw) {
+                L.polyline(hw, {
+                    color: '#F59E0B',
+                    weight: 2,
+                    opacity: 0.5,
+                    dashArray: '3, 6'
+                }).addTo(map);
+            });
+
+            // قائمة مدن ومحافظات الجمهورية اليمنية بمعالم دقيقة
+            var yemenCities = [
+                { name: '🇾🇪 صنعاء (العاصمة)', lat: 15.3694, lng: 44.1910 },
+                { name: '🌊 عدن', lat: 12.7855, lng: 45.0186 },
+                { name: '🏰 تعز', lat: 13.5789, lng: 44.0195 },
+                { name: '🌿 إب', lat: 13.9667, lng: 44.1833 },
+                { name: '⚓ الحديدة', lat: 14.7978, lng: 42.9545 },
+                { name: '🌴 المكلا', lat: 14.5425, lng: 49.1242 },
+                { name: '🏛️ ذمار', lat: 14.5427, lng: 44.4051 },
+                { name: '🏜️ مأرب', lat: 15.4628, lng: 45.3258 },
+                { name: '🕌 سيئون', lat: 15.9432, lng: 48.7871 },
+                { name: '⛰️ عتق (شبوة)', lat: 14.5377, lng: 46.8319 },
+                { name: '🛡️ صعدة', lat: 16.9402, lng: 43.7639 },
+                { name: '🏔️ حجة', lat: 15.6917, lng: 43.6028 },
+                { name: '🏖️ الغيضة (المهرة)', lat: 16.2079, lng: 52.1760 },
+                { name: '🏝️ سقطرى', lat: 12.4634, lng: 53.8237 }
+            ];
+
+            yemenCities.forEach(function(city) {
+                var labelIcon = L.divIcon({
+                    className: 'yemen-city-label',
+                    html: city.name,
+                    iconSize: null,
+                    iconAnchor: [35, 12]
+                });
+                L.marker([city.lat, city.lng], { icon: labelIcon, interactive: false, zIndexOffset: 200 }).addTo(map);
+            });
+        }
+
         function initMapEngine() {
             if (typeof L === 'undefined') {
-                showFallbackUI("Leaflet script failed to load");
+                console.error("Leaflet library is missing.");
                 return;
             }
 
@@ -306,129 +512,110 @@
                 if (isNaN(userLat) || userLat === 0) userLat = 15.3694;
                 if (isNaN(userLng) || userLng === 0) userLng = 44.1910;
 
+                cityLat = userLat;
+                cityLng = userLng;
+
                 map = L.map('map', { 
                     zoomControl: false, 
                     attributionControl: false,
                     fadeAnimation: true,
-                    zoomAnimation: true
+                    zoomAnimation: true,
+                    minZoom: 5,
+                    maxZoom: 20
                 }).setView([userLat, userLng], 13);
 
-                // High-performance direct tile layers for Yemen region
-                var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    subdomains: ['a', 'b', 'c'],
-                    attribution: '&copy; OpenStreetMap contributors'
+                // رسم الخريطة المتجهية الأساسية لليمن أولاً (تضمن عدم وجود شاشة سوداء إطلاقاً)
+                drawYemenBaseVectorMap();
+
+                // مزودات الخرائط المجانية ذات الأداء العالي غير المحظورة في اليمن:
+                // 1. Google Maps Streets (شوارع باللغة العربية مع كافة المعالم)
+                var googleRoadsLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=ar', {
+                    maxZoom: 20,
+                    minZoom: 5,
+                    subdomains: ['0', '1', '2', '3']
                 });
 
-                var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 19,
-                    subdomains: ['a', 'b', 'c', 'd'],
-                    attribution: 'CartoDB Voyager'
+                // 2. Google Maps Hybrid Satellite (قمر صناعي عالي الدقة مع أسماء الشوارع بالعربية)
+                var googleSatelliteLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar', {
+                    maxZoom: 20,
+                    minZoom: 5,
+                    subdomains: ['0', '1', '2', '3']
                 });
 
+                // 3. Esri World Street Map (مجانية 100%، سريعة ومفتوحة عالمياً)
                 var esriLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
                     maxZoom: 19,
-                    attribution: 'Esri World Street Map'
+                    minZoom: 5
                 });
 
-                // [FIX-LOW] منع الحلقة المفرغة
-                var tileFailureCount = 0;
-                var TILE_FAILURE_LIMIT = 5;
-
-                // Add OpenStreetMap as primary 100% free tile layer
-                osmLayer.addTo(map);
-
-                // Tile error fallbacks
-                osmLayer.on('tileerror', function() {
-                    tileFailureCount++;
-                    if (tileFailureCount >= TILE_FAILURE_LIMIT) {
-                        showFallbackUI("tile_failure_limit_reached");
-                        return;
-                    }
-                    console.warn("OSM tile notice, trying CartoDB fallback...");
-                    if (!map.hasLayer(cartoLayer)) {
-                        cartoLayer.addTo(map);
-                    }
+                // 4. CartoDB Voyager
+                var cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    minZoom: 5,
+                    subdomains: ['a', 'b', 'c', 'd']
                 });
 
-                cartoLayer.on('tileerror', function() {
-                    tileFailureCount++;
-                    if (tileFailureCount >= TILE_FAILURE_LIMIT) {
-                        showFallbackUI("tile_failure_limit_reached");
-                        return;
-                    }
-                    console.warn("CartoDB tile notice, falling back to Esri...");
-                    if (!map.hasLayer(esriLayer)) {
+                // 5. OpenStreetMap
+                var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    minZoom: 5,
+                    subdomains: ['a', 'b', 'c']
+                });
+
+                availableLayers = {
+                    'googleRoads': googleRoadsLayer,
+                    'googleSatellite': googleSatelliteLayer,
+                    'esri': esriLayer,
+                    'carto': cartoLayer,
+                    'osm': osmLayer
+                };
+
+                // تفعيل خريطة شوارع جوجل افتراضياً
+                currentTileLayer = googleRoadsLayer;
+                googleRoadsLayer.addTo(map);
+
+                // انتقال تلقائي سلس في حال تعذر طبقة معينة
+                googleRoadsLayer.on('tileerror', function() {
+                    if (map && map.hasLayer(googleRoadsLayer)) {
+                        map.removeLayer(googleRoadsLayer);
+                        currentTileLayer = esriLayer;
                         esriLayer.addTo(map);
                     }
                 });
 
                 esriLayer.on('tileerror', function() {
-                    tileFailureCount++;
-                    if (tileFailureCount >= TILE_FAILURE_LIMIT) {
-                        showFallbackUI("tile_failure_limit_reached");
-                        return;
-                    }
-                    console.warn("Esri tile notice, falling back to OpenStreetMap...");
-                    if (!map.hasLayer(osmLayer)) {
-                        osmLayer.addTo(map);
-                    }
-                    if (window.AndroidBridge && typeof window.AndroidBridge.onMapError === 'function') {
-                        window.AndroidBridge.onMapError("tile_failed_esri");
+                    if (map && map.hasLayer(esriLayer)) {
+                        map.removeLayer(esriLayer);
+                        currentTileLayer = cartoLayer;
+                        cartoLayer.addTo(map);
                     }
                 });
 
-                // [FIX-CRITICAL] تعريف طبقة جوجل المفقودة
-                var googleLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                    attribution: '&copy; Google Maps'
-                });
-                googleLayer.on('tileerror', function() {
-                    tileFailureCount++;
-                    if (tileFailureCount >= TILE_FAILURE_LIMIT) {
-                        showFallbackUI("tile_failure_limit_reached");
-                        return;
-                    }
-                    console.warn("Google tile notice, falling back to OSM...");
-                    if (!map.hasLayer(osmLayer)) osmLayer.addTo(map);
-                });
-
-                // Layer control for user to switch map styles
-                var baseMaps = {
-                    "خريطة كارتو الشاملة (CartoDB)": cartoLayer,
-                    "خريطة الشوارع العالمية (Esri)": esriLayer,
-                    "خريطة الشوارع المباشرة (OpenStreetMap)": osmLayer,
-                    "خرائط جوجل (Google Maps)": googleLayer
-                };
-                L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
-
+                // موقع المستخدم المباشر
                 var userIcon = L.divIcon({
                     className: 'user-marker-container',
                     html: '<div class="user-pulse"></div><div class="user-marker"></div>',
                     iconSize: [32, 32],
                     iconAnchor: [16, 16]
                 });
-                L.marker([userLat, userLng], {icon: userIcon, zIndexOffset: 1000}).addTo(map)
+                userMarker = L.marker([userLat, userLng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map)
                     .bindPopup("<div class='popup-card'><b style='color:#00E5FF;'>📍 موقعك الحالي المباشر</b><br/><span style='font-size:11px;color:#94A3B8;'>نقطة ارتكاز البحث وحساب المسافات</span></div>");
 
+                // مجموعة تجميع النقاط الذكية
                 clusterGroup = (typeof L.markerClusterGroup === 'function') ? L.markerClusterGroup({
                     chunkedLoading: true,
-                    maxClusterRadius: 40,
+                    maxClusterRadius: 35,
                     spiderfyOnMaxZoom: true,
                     showCoverageOnHover: false
                 }) : L.layerGroup();
 
-                // [FIX-LOW] حماية من XSS
-                function escapeHtml(str) {
-                    return String(str == null ? '' : str).replace(/[&<>"']/g, function(c) {
-                        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-                    });
-                }
+                map.addLayer(clusterGroup);
 
+                // تحديث علامات ومقدمي الخدمات
                 window.updateMapMarkers = function(rawMarkers) {
-                    if (!map) return;
+                    if (!map || !clusterGroup) return;
                     if (!Array.isArray(rawMarkers)) return;
+                    
                     clusterGroup.clearLayers();
 
                     rawMarkers.forEach(function(item) {
@@ -443,7 +630,7 @@
                             iconAnchor: [22, 22]
                         });
 
-                        var m = L.marker([item.lat, item.lng], {icon: customIcon});
+                        var m = L.marker([item.lat, item.lng], { icon: customIcon });
 
                         var approxBadge = item.isApprox ? '<div class="popup-approx-badge">📍 موقع تقريبي</div>' : '';
                         var callBtnHtml = item.phone ? '<a href="tel:' + item.phone + '" class="btn-call">📞 اتصال</a>' : '';
@@ -471,18 +658,20 @@
                         clusterGroup.addLayer(m);
                     });
 
-                    map.addLayer(clusterGroup);
-                    console.log("Leaflet map markers updated: " + rawMarkers.length);
+                    console.log("Leaflet markers loaded successfully: " + rawMarkers.length);
                 };
 
-                window.updateMapCenter = function(lat, lng) {
+                // تحديث مركز الخريطة والتكبير
+                window.updateMapCenter = function(lat, lng, zoom) {
                     if (map && !isNaN(lat) && !isNaN(lng)) {
-                        userLat = lat;
-                        userLng = lng;
-                        map.setView([lat, lng], map.getZoom() || 14);
+                        cityLat = lat;
+                        cityLng = lng;
+                        cityZoom = (zoom && !isNaN(zoom)) ? zoom : 13;
+                        map.flyTo([lat, lng], cityZoom, { animate: true, duration: 0.8 });
                     }
                 };
 
+                // جلب الدبابيس الأولية
                 var initialMarkers = [];
                 try {
                     if (window.AndroidBridge && typeof window.AndroidBridge.getMarkersJson === 'function') {
@@ -492,33 +681,30 @@
                         }
                     }
                 } catch(e) {
-                    console.error("Markers retrieval failed: " + e);
+                    console.error("Markers initial load error: " + e);
                 }
                 if (initialMarkers && Array.isArray(initialMarkers) && initialMarkers.length > 0) {
                     window.updateMapMarkers(initialMarkers);
                 }
 
-                // Signal onMapReady immediately once map instance and layers are set
+                // إعلام التطبيق بجاهزية الخريطة
                 if (window.AndroidBridge && typeof window.AndroidBridge.onMapReady === 'function') {
                     try {
                         window.AndroidBridge.onMapReady();
                     } catch(e) {
-                        console.error("onMapReady bridge call failed: " + e);
+                        console.error("onMapReady bridge notice: " + e);
                     }
                 }
 
-                // Trigger map resize invalidate to prevent blank canvas glitches in WebView
                 setTimeout(function() {
-                    if (map) {
-                        map.invalidateSize();
-                    }
+                    if (map) map.invalidateSize();
                 }, 300);
+
             } catch(e) {
-                showFallbackUI("Map init error: " + e.message);
+                console.error("Map initialization exception: " + e.message);
             }
         }
 
-        // Initialize when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initMapEngine);
         } else {
