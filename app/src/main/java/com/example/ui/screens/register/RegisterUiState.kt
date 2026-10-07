@@ -1,7 +1,6 @@
 package com.example.ui.screens.register
 
 /**
-import com.example.ui.*
  * 🎨 Unified UiState for Registration Flow
  */
 data class RegisterUiState(

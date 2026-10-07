@@ -120,7 +120,10 @@ fun StatusChatDialog(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             reverseLayout = true
                         ) {
-                            items(chatChannel.messages.reversed()) { msg ->
+                            items(
+                                items = chatChannel.messages.reversed(),
+                                key = { it.id.ifEmpty { "${it.timestamp}_${it.senderId}" } }
+                            ) { msg ->
                                 val isMe = msg.senderId == currentUserId
                                 val alignment = if (isMe) Alignment.End else Alignment.Start
                                 val bubbleBg = if (isMe) themeColors.accent else Color.Gray.copy(alpha = 0.3f)
