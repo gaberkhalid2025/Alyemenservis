@@ -215,9 +215,15 @@ fun ForgotPasswordRecoveryDialog(
                                         isSubmitted = true
                                     }
                                     else -> {
-                                        // Open unified in-app support chat channel
+                                        // Open unified in-app support chat channel for password recovery
                                         viewModel.sendMessageInChat("مرحباً، أطلب استعادة كلمة المرور لرقم الحساب المسجل: $cleanPhone. $noteInput")
-                                        viewModel.openSupportChat()
+                                        viewModel.openDirectChat(
+                                            targetUserId = com.example.data.repositories.ChatRepository.SUPPORT_ADMIN_ID,
+                                            targetUserName = com.example.data.repositories.ChatRepository.SUPPORT_ADMIN_NAME,
+                                            targetUserPhoto = "",
+                                            relatedEntityId = cleanPhone,
+                                            relatedEntityType = "PASSWORD_RECOVERY"
+                                        )
                                         onDismiss()
                                         isSubmitted = true
                                     }

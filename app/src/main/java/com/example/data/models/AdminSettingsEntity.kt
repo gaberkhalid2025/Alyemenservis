@@ -298,7 +298,8 @@ data class AdminSettingsEntity(
     val voiceCallsDisabledAnnouncement: String = "",
     val appLanguage: String = "ar",
     val hideTopHeaderBar: Boolean = false,
-    val customAppName: String = ""
+    val customAppName: String = "",
+    val showClientIdentityToProviders: Boolean = true
 )
 
 @Keep

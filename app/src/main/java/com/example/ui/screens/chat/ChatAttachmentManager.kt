@@ -23,57 +23,66 @@ class ChatAttachmentManager(private val context: Context) {
         val isImage = type == "image"
         android.util.Log.d("ChatAttachmentManager", "uploadAttachment: channelId=$channelId, type=$type, isImage=$isImage")
 
-        // 1. التحقق من صلاحية الملف والنوع والحصص اليومية (مع تجاوز حجم الصورة الخام)
+        // 1. التحقق من نوع الملف والصلاحيات والحصص اليومية
         val validation = ChatValidationUtils.validateFile(uri, context, isImage)
         if (!validation.isValid) {
             return Result.failure(Exception(validation.message))
         }
 
-        // 2. معالجة البيانات وضغط الصور (أهم خطوة لتوفير Firebase Spark Plan)
-        val finalData = if (isImage) {
-            // ضغط الصورة فوراً (600x600 جودة 60%)
-            ChatValidationUtils.compressImage(context, uri)
-        } else {
-            // قراءة الملف الصوتي كما هو
+        // 2. معالجة البيانات وضغط الصور في خلفية النظام (Dispatchers.IO)
+        val finalData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (isImage) {
+                ChatValidationUtils.compressImage(context, uri)
+            } else {
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf()
+                } catch (e: Exception) {
+                    byteArrayOf()
+                }
+            }
+        }
+
+        // 3. التحقق النهائي من الحجم بعد عملية الضغط
+        val processedValidation = ChatValidationUtils.validateProcessedData(finalData, isImage)
+        if (!processedValidation.isValid) {
+            return Result.failure(Exception(processedValidation.message))
+        }
+
+        // 4. تنفيذ عملية الرفع إلى Firebase Storage
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf()
+                val extension = if (isImage) "jpg" else {
+                    val uriStr = uri.toString().lowercase()
+                    val mime = context.contentResolver.getType(uri)?.lowercase()
+                    when {
+                        uriStr.endsWith(".m4a") || mime == "audio/m4a" || mime == "audio/x-m4a" -> "m4a"
+                        uriStr.endsWith(".mp3") || mime == "audio/mpeg" || mime == "audio/mp3" -> "mp3"
+                        uriStr.endsWith(".ogg") || mime == "audio/ogg" -> "ogg"
+                        uriStr.endsWith(".wav") || mime == "audio/wav" -> "wav"
+                        uriStr.endsWith(".mp4") || mime == "audio/mp4" -> "m4a"
+                        else -> {
+                            val extFromMime = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
+                            if (extFromMime.isNullOrBlank() || extFromMime == "bin") "m4a" else extFromMime
+                        }
+                    }
+                }
+                
+                val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
+                val ref = storageRef.child("chats/$channelId/$type/$fileName")
+
+                android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase...")
+                ref.putBytes(finalData).await()
+                
+                val url = ref.downloadUrl.await().toString()
+                
+                // تسجيل استهلاك الحصة اليومية بعد نجاح الرفع
+                ChatValidationUtils.recordUploadToday(context)
+                
+                Result.success(url)
             } catch (e: Exception) {
-                byteArrayOf()
+                android.util.Log.e("ChatAttachmentManager", "Firebase Upload Error", e)
+                Result.failure(e)
             }
-        }
-
-        if (finalData.isEmpty()) {
-            return Result.failure(Exception("تعذر معالجة بيانات الملف."))
-        }
-
-        // 3. التحقق النهائي من الحجم (الذي سيرفع فعلياً لـ Firebase)
-        if (finalData.size > ChatValidationUtils.MAX_FILE_SIZE) {
-            val finalSizeMb = String.format(java.util.Locale.US, "%.1f", finalData.size.toDouble() / (1024 * 1024))
-            return Result.failure(Exception("حجم الملف النهائي ($finalSizeMb MB) يتجاوز الحد المسموح (1.5MB)."))
-        }
-
-        // 4. تنفيذ عملية الرفع
-        return try {
-            val extension = if (isImage) "jpg" else {
-                val mime = context.contentResolver.getType(uri)
-                android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin"
-            }
-            
-            val fileName = "${UUID.randomUUID()}_${System.currentTimeMillis()}.$extension"
-            val ref = storageRef.child("chats/$channelId/$type/$fileName")
-
-            android.util.Log.d("ChatAttachmentManager", "Uploading ${finalData.size / 1024} KB to Firebase...")
-            ref.putBytes(finalData).await()
-            
-            val url = ref.downloadUrl.await().toString()
-            
-            // تسجيل استهلاك الحصة اليومية بعد نجاح الرفع
-            ChatValidationUtils.recordUploadToday(context)
-            
-            Result.success(url)
-        } catch (e: Exception) {
-            android.util.Log.e("ChatAttachmentManager", "Firebase Upload Error", e)
-            Result.failure(e)
         }
     }
 }

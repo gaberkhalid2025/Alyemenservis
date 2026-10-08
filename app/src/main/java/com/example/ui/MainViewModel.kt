@@ -266,8 +266,29 @@ class MainViewModel @Inject constructor(
     val maxKmRadius: StateFlow<Int> = _maxKmRadius.asStateFlow()
     var lastNotifMsg: String = ""
     var lastNotifTime: Long = 0L
-    val triggerRestoreAccountDialog = MutableStateFlow(false)
     var targetChatChannelId by mutableStateOf<String?>(null)
+    var targetChatUserId by mutableStateOf<String?>(null)
+    var targetChatUserName by mutableStateOf<String?>(null)
+    var targetChatUserPhoto by mutableStateOf<String?>(null)
+    var targetChatRelatedEntityId by mutableStateOf<String?>(null)
+    var targetChatRelatedEntityType by mutableStateOf<String?>(null)
+    val triggerRestoreAccountDialog = MutableStateFlow<Boolean>(false)
+
+    fun openDirectChat(
+        targetUserId: String,
+        targetUserName: String,
+        targetUserPhoto: String = "",
+        relatedEntityId: String? = null,
+        relatedEntityType: String? = null
+    ) {
+        targetChatChannelId = null
+        targetChatUserId = targetUserId
+        targetChatUserName = targetUserName
+        targetChatUserPhoto = targetUserPhoto
+        targetChatRelatedEntityId = relatedEntityId
+        targetChatRelatedEntityType = relatedEntityType
+        navigateToScreen(AppScreens.CHAT_DIRECT)
+    }
     val notificationViewModel = com.example.ui.screens.notifications.NotificationViewModel(this)
 
     init {

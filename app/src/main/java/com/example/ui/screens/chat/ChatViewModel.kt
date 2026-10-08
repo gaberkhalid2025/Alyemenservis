@@ -79,7 +79,9 @@ class ChatViewModel @Inject constructor(
         currentUserId: String,
         currentUserName: String = "المستخدم",
         fallbackTargetUserId: String? = null,
-        fallbackUserName: String? = null
+        fallbackUserName: String? = null,
+        relatedEntityId: String? = null,
+        relatedEntityType: String? = null
     ) {
         viewModelScope.launch {
             val channelResult = repository.getChannelById(channelId)
@@ -87,8 +89,10 @@ class ChatViewModel @Inject constructor(
             if (channel != null) {
                 openChannel(channel, currentUserId)
             } else {
-                val targetId = fallbackTargetUserId ?: channelId
-                val targetName = fallbackUserName ?: "المستخدم"
+                val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY"
+                val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
+                val targetId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else (fallbackTargetUserId ?: channelId)
+                val targetName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else (fallbackUserName ?: "مقدم الخدمة")
                 val res = repository.getOrCreateChannel(
                     currentUserId = currentUserId,
                     currentUserName = currentUserName,
@@ -96,9 +100,9 @@ class ChatViewModel @Inject constructor(
                     otherUserId = targetId,
                     otherUserName = targetName,
                     otherUserPhoto = "",
-                    type = ChannelType.PRIVATE,
-                    relatedEntityId = null,
-                    relatedEntityType = null
+                    type = channelType,
+                    relatedEntityId = relatedEntityId,
+                    relatedEntityType = relatedEntityType
                 )
                 when (res) {
                     is AppResult.Success -> openChannel(res.data, currentUserId)
@@ -119,14 +123,19 @@ class ChatViewModel @Inject constructor(
         relatedEntityType: String? = null
     ) {
         viewModelScope.launch {
+            val isPasswordRecovery = relatedEntityType == "PASSWORD_RECOVERY"
+            val channelType = if (isPasswordRecovery) ChannelType.SUPPORT else ChannelType.PRIVATE
+            val finalOtherId = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_ID else otherUserId.trim()
+            val finalOtherName = if (isPasswordRecovery) ChatRepository.SUPPORT_ADMIN_NAME else otherUserName.trim().ifBlank { "مقدم الخدمة" }
+
             val channelResult = repository.getOrCreateChannel(
                 currentUserId = currentUserId,
                 currentUserName = currentUserName,
                 currentUserPhoto = currentUserPhoto,
-                otherUserId = otherUserId,
-                otherUserName = otherUserName,
+                otherUserId = finalOtherId,
+                otherUserName = finalOtherName,
                 otherUserPhoto = otherUserPhoto,
-                type = ChannelType.PRIVATE,
+                type = channelType,
                 relatedEntityId = relatedEntityId,
                 relatedEntityType = relatedEntityType
             )

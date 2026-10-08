@@ -109,6 +109,17 @@ object ChatValidationUtils {
         }
     }
 
+    fun validateProcessedData(data: ByteArray, isImage: Boolean): ValidationResult {
+        if (data.isEmpty()) {
+            return ValidationResult(isValid = false, message = "تعذر معالجة بيانات الملف.")
+        }
+        if (data.size > MAX_FILE_SIZE) {
+            val sizeMb = String.format(java.util.Locale.US, "%.1f", data.size.toDouble() / (1024 * 1024))
+            return ValidationResult(isValid = false, message = "⚠️ حجم الملف ($sizeMb MB) يتجاوز الحد المسموح (1.5MB).")
+        }
+        return ValidationResult(isValid = true, message = "")
+    }
+
     fun generateThumbnail(context: Context, uri: Uri): ByteArray {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)

@@ -59,6 +59,7 @@ fun ChatScreen(
     targetUserPhoto: String? = null,
     relatedEntityId: String? = null,
     relatedEntityType: String? = null,
+    showClientIdentityToProviders: Boolean = true,
     themeColors: VisualThemePalette,
     chatViewModel: ChatViewModel = hiltViewModel(),
     onBackClick: () -> Unit
@@ -190,8 +191,23 @@ fun ChatScreen(
     val otherUserId = remember(activeChannel, currentUserId, targetUserId) {
         activeChannel?.participants?.firstOrNull { it != currentUserId } ?: targetUserId ?: ""
     }
-    val otherUserName = remember(activeChannel, otherUserId, targetUserName) {
-        activeChannel?.participantNames?.get(otherUserId) ?: targetUserName ?: "مستخدم"
+    val otherUserName = remember(activeChannel, otherUserId, targetUserName, showClientIdentityToProviders) {
+        val rawName = activeChannel?.participantNames?.get(otherUserId) 
+            ?: targetUserName 
+            ?: activeChannel?.title?.takeIf { it.isNotBlank() } 
+            ?: "محادثة"
+        
+        // If client identity is hidden from providers and current user is the provider/owner
+        if (!showClientIdentityToProviders && (activeChannel?.relatedEntityType == "PROVIDER" || relatedEntityType == "PROVIDER" || activeChannel?.type == com.example.data.models.ChannelType.PROVIDER)) {
+            val isCurrentViewerProvider = currentUserId == (activeChannel?.relatedEntityId ?: relatedEntityId) || currentUserId.startsWith("provider_")
+            if (isCurrentViewerProvider) {
+                "العميل"
+            } else {
+                rawName
+            }
+        } else {
+            rawName
+        }
     }
     val otherUserPhoto = remember(activeChannel, otherUserId, targetUserPhoto) {
         activeChannel?.participantPhotos?.get(otherUserId) ?: targetUserPhoto ?: ""

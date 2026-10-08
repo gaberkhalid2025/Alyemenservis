@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -370,30 +371,44 @@ private fun ChannelItemCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // User Photo
-            if (otherPhoto.isNotBlank()) {
-                AsyncImage(
-                    model = otherPhoto,
-                    contentDescription = otherName,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
+            // User Photo with presence badge
+            Box(modifier = Modifier.size(52.dp)) {
+                if (otherPhoto.isNotBlank()) {
+                    AsyncImage(
+                        model = otherPhoto,
+                        contentDescription = otherName,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(listOf(themeColors.primary, themeColors.accent)),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = otherName.take(1).ifBlank { "👤" },
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // Active / Online indicator
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(themeColors.primary, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = otherName.take(1).ifBlank { "👤" },
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                        .size(13.dp)
+                        .background(Color(0xFF00E676), CircleShape)
+                        .border(2.dp, themeColors.surface, CircleShape)
+                        .align(Alignment.BottomEnd)
+                )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -405,8 +420,8 @@ private fun ChannelItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = otherName,
-                        fontSize = 14.sp,
+                        text = otherName.ifBlank { "محادثة" },
+                        fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = themeColors.textPrimary,
                         maxLines = 1,
@@ -421,16 +436,28 @@ private fun ChannelItemCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                val previewText = remember(channel.lastMessage) {
+                    val raw = channel.lastMessage.trim()
+                    when {
+                        raw.isBlank() -> "بدء محادثة جديدة ✨"
+                        raw.startsWith("[صوت]") || raw.contains("تسجيل") || raw.endsWith(".m4a") || raw.endsWith(".mp3") -> "🎤 تسجيل صوتي"
+                        raw.startsWith("[صورة]") || raw.contains("صورة") || raw.endsWith(".jpg") || raw.endsWith(".png") -> "📷 صورة"
+                        raw.startsWith("[موقع]") || raw.contains("موقع") -> "📍 موقع جغرافي"
+                        raw.startsWith("[ملف]") -> "📎 ملف مرفق"
+                        else -> raw
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = channel.lastMessage.ifBlank { "بدء محادثة جديدة" },
-                        fontSize = 12.sp,
+                        text = previewText,
+                        fontSize = 12.5.sp,
                         color = if (unreadCount > 0) themeColors.textPrimary else themeColors.textSecondary,
-                        fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = if (unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -442,14 +469,17 @@ private fun ChannelItemCard(
                     ) {
                         if (unreadCount > 0) {
                             Surface(
-                                color = themeColors.primary,
+                                color = Color(0xFFEF4444),
                                 shape = CircleShape,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                ) {
                                     Text(
                                         text = if (unreadCount > 99) "99+" else unreadCount.toString(),
-                                        fontSize = 10.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
                                     )

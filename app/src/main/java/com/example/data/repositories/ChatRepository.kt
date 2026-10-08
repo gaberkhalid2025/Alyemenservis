@@ -38,6 +38,13 @@ class ChatRepository(
 
     private val channelsCollection = firestore.collection("chat_channels")
     private val presenceCollection = firestore.collection("user_presence")
+    private val realtimeDb: com.google.firebase.database.FirebaseDatabase? by lazy {
+        try {
+            com.google.firebase.database.FirebaseDatabase.getInstance()
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     companion object {
         const val SUPPORT_ADMIN_ID = "ADMIN"
@@ -276,57 +283,63 @@ class ChatRepository(
             return@callbackFlow
         }
 
-        // 1. Emit local cache immediately
+        // 1. Emit local cache immediately from Room / SQLite
         val cached = local?.getMessages(channelId) ?: emptyList()
         val visibleCached = cached.filter { !it.isHiddenFor(currentUserId) }
         trySend(visibleCached)
 
-        // 2. Real-time Firebase Listener with limit to reduce read quota
+        val lastLocalTimestamp = cached.maxOfOrNull { it.timestamp } ?: 0L
+
+        // 2. Real-time Firebase Listener with Delta Sync optimization (Spark Plan Saver)
         val messagesRef = channelsCollection.document(channelId).collection("messages")
-        val listener = messagesRef
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .limitToLast(limit.coerceAtLeast(10).toLong())
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ChatRepository", "Messages listener error: ${error.message}")
-                    return@addSnapshotListener
-                }
+        val query = if (lastLocalTimestamp > 0L) {
+            messagesRef.whereGreaterThan("timestamp", lastLocalTimestamp).orderBy("timestamp", Query.Direction.ASCENDING)
+        } else {
+            messagesRef.orderBy("timestamp", Query.Direction.ASCENDING).limitToLast(limit.coerceAtLeast(25).toLong())
+        }
 
-                val remoteMessages = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(ChatMessage::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
-
-                launch(Dispatchers.IO) {
-                    // Conflict Resolution: merge local pending messages with remote messages
-                    val currentLocal = local?.getMessages(channelId) ?: emptyList()
-                    val pendingLocal = currentLocal.filter { it.status == MessageStatus.PENDING || it.status == MessageStatus.SENDING }
-
-                    val mergedMap = LinkedHashMap<String, ChatMessage>()
-                    // Add remote confirmed
-                    for (remote in remoteMessages) {
-                        mergedMap[remote.id] = remote
-                    }
-                    // Retain pending that haven't landed in remote yet
-                    for (pending in pendingLocal) {
-                        if (!mergedMap.containsKey(pending.id)) {
-                            mergedMap[pending.id] = pending
-                        }
-                    }
-
-                    val mergedList = mergedMap.values.sortedBy { it.timestamp }
-                    local?.saveMessages(channelId, mergedList)
-                    local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
-
-                    val visible = mergedList.filter { !it.isHiddenFor(currentUserId) }
-                    trySend(visible)
-                }
+        val listener = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                Log.e("ChatRepository", "Messages listener error: ${error.message}")
+                return@addSnapshotListener
             }
+
+            val remoteMessages = snapshot?.documents?.mapNotNull { doc ->
+                doc.toObject(ChatMessage::class.java)?.copy(id = doc.id)
+            } ?: emptyList()
+
+            launch(Dispatchers.IO) {
+                val currentLocal = local?.getMessages(channelId) ?: emptyList()
+                val pendingLocal = currentLocal.filter { it.status == MessageStatus.PENDING || it.status == MessageStatus.SENDING }
+
+                val mergedMap = LinkedHashMap<String, ChatMessage>()
+                for (localMsg in currentLocal) {
+                    mergedMap[localMsg.id] = localMsg
+                }
+                for (remote in remoteMessages) {
+                    mergedMap[remote.id] = remote
+                }
+                for (pending in pendingLocal) {
+                    if (!mergedMap.containsKey(pending.id)) {
+                        mergedMap[pending.id] = pending
+                    }
+                }
+
+                // Bound memory & storage to at most 150 messages
+                val mergedList = mergedMap.values.sortedBy { it.timestamp }.takeLast(150)
+                local?.saveMessages(channelId, mergedList)
+                local?.setLastSyncTimestamp(channelId, System.currentTimeMillis())
+
+                val visible = mergedList.filter { !it.isHiddenFor(currentUserId) }
+                trySend(visible)
+            }
+        }
 
         awaitClose {
             try {
                 listener.remove()
             } catch (e: Exception) {
-                // تجاهل
+                // Ignore cleanup error
             }
         }
     }.flowOn(Dispatchers.IO)
@@ -537,7 +550,16 @@ class ChatRepository(
     override suspend fun setTyping(channelId: String, userId: String, isTyping: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
         if (channelId.isBlank() || userId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
-            channelsCollection.document(channelId).update("isTyping.$userId", isTyping).await()
+            try {
+                realtimeDb?.getReference("typing/$channelId/$userId")?.let { ref ->
+                    ref.setValue(isTyping)
+                    if (isTyping) {
+                        ref.onDisconnect().setValue(false)
+                    }
+                }
+            } catch (e: Exception) {
+                channelsCollection.document(channelId).update("isTyping.$userId", isTyping)
+            }
             AppResult.Success(Unit)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))
@@ -731,13 +753,37 @@ class ChatRepository(
     override suspend fun setUserPresence(userId: String, isOnline: Boolean): AppResult<Unit> = withContext(Dispatchers.IO) {
         if (userId.isBlank()) return@withContext AppResult.Success(Unit)
         try {
+            val now = System.currentTimeMillis()
             val presence = UserPresence(
                 userId = userId,
                 isOnline = isOnline,
-                lastSeen = System.currentTimeMillis()
+                lastSeen = now
             )
             local?.saveUserPresence(presence)
-            presenceCollection.document(userId).set(presence, SetOptions.merge()).await()
+
+            // 1. Primary: Realtime Database with onDisconnect support (Zero Spark Plan Firestore write quota)
+            try {
+                realtimeDb?.getReference("presence/$userId")?.let { ref ->
+                    val data = mapOf(
+                        "userId" to userId,
+                        "isOnline" to isOnline,
+                        "lastSeen" to now
+                    )
+                    ref.setValue(data)
+                    if (isOnline) {
+                        ref.child("isOnline").onDisconnect().setValue(false)
+                        ref.child("lastSeen").onDisconnect().setValue(com.google.firebase.database.ServerValue.TIMESTAMP)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatRepository", "Realtime DB presence error: ${e.message}")
+            }
+
+            // 2. Sync to Firestore presence document
+            try {
+                presenceCollection.document(userId).set(presence, SetOptions.merge())
+            } catch (_: Exception) {}
+
             AppResult.Success(Unit)
         } catch (e: Exception) {
             AppResult.Error(AppError.NetworkError(e))
@@ -751,7 +797,7 @@ class ChatRepository(
             return@callbackFlow
         }
 
-        // Local cache emission first (tied to callbackFlow scope)
+        // Local cache emission first
         val localJob = local?.observeUserPresence(userId)?.let { localFlow ->
             launch(Dispatchers.IO) {
                 localFlow.collect { cached ->
@@ -760,23 +806,53 @@ class ChatRepository(
             }
         }
 
-        val listener = presenceCollection.document(userId).addSnapshotListener { snapshot, _ ->
-            val presence = snapshot?.toObject(UserPresence::class.java)
-            if (presence != null) {
-                launch(Dispatchers.IO) {
-                    local?.saveUserPresence(presence)
+        var rtdbListener: com.google.firebase.database.ValueEventListener? = null
+        val rtdbRef = try { realtimeDb?.getReference("presence/$userId") } catch (_: Exception) { null }
+        var firestoreListener: ListenerRegistration? = null
+
+        if (rtdbRef != null) {
+            rtdbListener = object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    val isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false
+                    val lastSeen = snapshot.child("lastSeen").getValue(Long::class.java) ?: 0L
+                    val presence = UserPresence(userId = userId, isOnline = isOnline, lastSeen = lastSeen)
+                    launch(Dispatchers.IO) {
+                        local?.saveUserPresence(presence)
+                    }
+                    trySend(presence)
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    if (firestoreListener == null) {
+                        firestoreListener = presenceCollection.document(userId).addSnapshotListener { snap, _ ->
+                            val p = snap?.toObject(UserPresence::class.java)
+                            if (p != null) {
+                                launch(Dispatchers.IO) { local?.saveUserPresence(p) }
+                            }
+                            trySend(p)
+                        }
+                    }
                 }
             }
-            trySend(presence)
+            rtdbRef.addValueEventListener(rtdbListener)
+        } else {
+            firestoreListener = presenceCollection.document(userId).addSnapshotListener { snap, _ ->
+                val p = snap?.toObject(UserPresence::class.java)
+                if (p != null) {
+                    launch(Dispatchers.IO) { local?.saveUserPresence(p) }
+                }
+                trySend(p)
+            }
         }
 
         awaitClose {
             try {
                 localJob?.cancel()
-                listener.remove()
-            } catch (e: Exception) {
-                // تجاهل
-            }
+                if (rtdbRef != null && rtdbListener != null) {
+                    rtdbRef.removeEventListener(rtdbListener)
+                }
+                firestoreListener?.remove()
+            } catch (_: Exception) {}
         }
     }.flowOn(Dispatchers.IO)
 
@@ -787,19 +863,42 @@ class ChatRepository(
             return@callbackFlow
         }
 
-        val listener = channelsCollection.document(channelId).addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                trySend(false)
-                return@addSnapshotListener
+        var rtdbListener: com.google.firebase.database.ValueEventListener? = null
+        val rtdbRef = try { realtimeDb?.getReference("typing/$channelId/$userId") } catch (_: Exception) { null }
+        var firestoreListener: ListenerRegistration? = null
+
+        if (rtdbRef != null) {
+            rtdbListener = object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    val isTyping = snapshot.getValue(Boolean::class.java) ?: false
+                    trySend(isTyping)
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    if (firestoreListener == null) {
+                        firestoreListener = channelsCollection.document(channelId).addSnapshotListener { snap, _ ->
+                            val isTypingMap = snap?.get("isTyping") as? Map<*, *>
+                            val isTyping = (isTypingMap?.get(userId) as? Boolean) ?: false
+                            trySend(isTyping)
+                        }
+                    }
+                }
             }
-            val isTypingMap = snapshot?.get("isTyping") as? Map<*, *>
-            val isTyping = (isTypingMap?.get(userId) as? Boolean) ?: false
-            trySend(isTyping)
+            rtdbRef.addValueEventListener(rtdbListener)
+        } else {
+            firestoreListener = channelsCollection.document(channelId).addSnapshotListener { snap, _ ->
+                val isTypingMap = snap?.get("isTyping") as? Map<*, *>
+                val isTyping = (isTypingMap?.get(userId) as? Boolean) ?: false
+                trySend(isTyping)
+            }
         }
 
         awaitClose {
             try {
-                listener.remove()
+                if (rtdbRef != null && rtdbListener != null) {
+                    rtdbRef.removeEventListener(rtdbListener)
+                }
+                firestoreListener?.remove()
             } catch (_: Exception) {}
         }
     }.flowOn(Dispatchers.IO)
