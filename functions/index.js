@@ -630,10 +630,34 @@ exports.deleteChatChannel = functions.https.onCall(async (data, context) => {
     }
     try {
         const channelRef = db.collection('chat_channels').doc(channelId);
+        const channelDoc = await channelRef.get();
+        if (!channelDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'المحادثة غير موجودة.');
+        }
+        const channelData = channelDoc.data() || {};
+        const participants = Array.isArray(channelData.participants) ? channelData.participants : [];
+        const ownerId = channelData.ownerId || '';
+        const currentUid = context.auth.uid;
+        const isStaff = context.auth.token && (
+            context.auth.token.admin === true ||
+            context.auth.token.isAdmin === true ||
+            context.auth.token.isOwner === true ||
+            ['admin', 'owner', 'super_admin'].includes((context.auth.token.role || '').toLowerCase())
+        );
+        if (!isStaff && !participants.includes(currentUid) && ownerId !== currentUid) {
+            throw new functions.https.HttpsError('permission-denied', 'غير مصرح لك بحذف هذه المحادثة.');
+        }
+        await db.collection('audit_logs').add({
+            action: 'CHAT_CHANNEL_DELETED',
+            channelId: channelId,
+            deletedBy: currentUid,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
         await db.recursiveDelete(channelRef);
         return { success: true, channelId };
     } catch (error) {
-        console.error(`Error in recursiveDelete for channel ${channelId}:`, error);
+        if (error instanceof functions.https.HttpsError) throw error;
+        console.error(`Error in deleteChatChannel for channel ${channelId}:`, error);
         throw new functions.https.HttpsError('internal', 'تعذر حذف المحادثة.');
     }
 });

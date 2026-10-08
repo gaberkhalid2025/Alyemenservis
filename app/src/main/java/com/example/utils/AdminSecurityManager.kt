@@ -8,6 +8,7 @@ import com.example.data.models.AdminRole
 
 object AdminSecurityManager {
 
+    // TODO: مراجعة وإعادة هيكلة إدارة الصلاحيات الإدارية في مرحلة لاحقة دون كسر التوافقية
     /**
      * // ✨ إصلاح المرحلة 1.5: التحقق الآمن عبر Cloud Functions و Firebase Auth
      * يتحقق من صحة بيانات الدخول (المالك، المدير، أو المشرف)

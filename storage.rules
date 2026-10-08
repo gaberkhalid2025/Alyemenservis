@@ -145,8 +145,7 @@ service firebase.storage {
 
     // 8. الحظر الافتراضي لأي مسار آخر غير مصرح به (Deny by default)
     match /{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if false;
+      allow read, write: if false;
     }
   }
 }

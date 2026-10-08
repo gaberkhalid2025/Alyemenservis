@@ -11,6 +11,7 @@ import kotlinx.coroutines.tasks.await
  * ⚠️ Sensitive keys (banking, payment) must be stored in Cloud Functions Secrets, not Firestore.
  * This unified repository abstracts API key management and allows transitioning
  * to secure serverless secret storage seamlessly in the future.
+ * TODO: نقل جميع المفاتيح الحساسة وبوابات الدفع إلى خوادم Cloud Functions و Google Cloud Secret Manager بالكامل
  */
 @Keep
 data class ApiKeysEntity(

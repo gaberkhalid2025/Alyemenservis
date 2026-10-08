@@ -5,8 +5,18 @@ package com.example.utils
  */
 object PasswordHasher {
     fun generateSalt(): ByteArray = SecureHasher.generateSalt()
-    fun hashPassword(password: String, salt: ByteArray = generateSalt()): String = SecureHasher.hashPassword(password, salt)
-    fun hash(password: String): String = SecureHasher.hashPassword(password)
-    fun createSaltedHash(password: String): String = SecureHasher.hashPassword(password)
+    fun isValidHash(hash: String): Boolean = SecureHasher.isValidHash(hash)
+    fun hashPassword(password: String, salt: ByteArray = generateSalt()): String {
+        if (SecureHasher.isValidHash(password)) return password
+        return SecureHasher.hashPassword(password, salt)
+    }
+    fun hash(password: String): String {
+        if (SecureHasher.isValidHash(password)) return password
+        return SecureHasher.hashPassword(password)
+    }
+    fun createSaltedHash(password: String): String {
+        if (SecureHasher.isValidHash(password)) return password
+        return SecureHasher.hashPassword(password)
+    }
     fun verifyPassword(password: String, storedHash: String): Boolean = SecureHasher.verifyPassword(password, storedHash)
 }

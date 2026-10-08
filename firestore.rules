@@ -30,7 +30,9 @@ service cloud.firestore {
       allow read: if true;
       allow create, delete: if isStaff();
       allow update: if isSignedIn()
-                  && (resource.data.ownerId == request.auth.uid
+                  && (resource.data.phone == request.auth.uid
+                      || resource.data.id == request.auth.uid
+                      || (('ownerId' in resource.data) && resource.data.ownerId == request.auth.uid)
                       || isStaff());
     }
     match /properties/{d} {
@@ -40,9 +42,13 @@ service cloud.firestore {
                   && (resource.data.ownerId == request.auth.uid
                       || isStaff());
     }
-    match /products/{d} {
+    match /products/{productId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && (
+        isStaff() ||
+        request.resource.data.ownerId == request.auth.uid ||
+        request.resource.data.storeId == request.auth.uid
+      );
       allow update, delete: if isSignedIn()
                   && (resource.data.storeId == request.auth.uid
                       || resource.data.ownerId == request.auth.uid
@@ -144,8 +150,20 @@ service cloud.firestore {
     }
 
     // 7. الحجوزات والطلبات والمواعيد والمحافظ والإشعارات
-    match /bookings/{d} {
-      allow read, write: if isSignedIn();
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn() && (
+        isStaff() ||
+        resource.data.clientId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid ||
+        resource.data.customerPhone == request.auth.uid ||
+        resource.data.providerPhone == request.auth.uid
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        isStaff() ||
+        resource.data.clientId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid
+      );
     }
     match /instant_requests/{d} {
       allow read, write: if isSignedIn();
@@ -156,11 +174,33 @@ service cloud.firestore {
     match /service_requests/{d} {
       allow read, write: if isSignedIn();
     }
-    match /orders/{d} {
-      allow read, write: if isSignedIn();
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (
+        isStaff() ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.customerPhone == request.auth.uid ||
+        resource.data.storeId == request.auth.uid
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        isStaff() ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.storeId == request.auth.uid
+      );
     }
-    match /store_orders/{d} {
-      allow read, write: if isSignedIn();
+    match /store_orders/{orderId} {
+      allow read: if isSignedIn() && (
+        isStaff() ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.customerPhone == request.auth.uid ||
+        resource.data.storeId == request.auth.uid
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        isStaff() ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.storeId == request.auth.uid
+      );
     }
     match /appointments/{d} {
       allow read, write: if isSignedIn();
@@ -168,8 +208,15 @@ service cloud.firestore {
     match /medical_appointments/{d} {
       allow read, write: if isSignedIn();
     }
-    match /notifications/{d} {
-      allow read, write: if isSignedIn();
+    match /notifications/{notifId} {
+      allow read: if isSignedIn();
+      allow create: if isStaff();
+      allow update: if isSignedIn() && (
+        isStaff() || resource.data.targetValue == request.auth.uid
+      );
+      allow delete: if isStaff() || (
+        isSignedIn() && resource.data.targetValue == request.auth.uid
+      );
     }
     match /payments/{d} {
       allow read, create: if isSignedIn();
@@ -179,8 +226,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isStaff() || (isSignedIn() && d == request.auth.uid);
     }
-    match /wallet_transactions/{d} {
-      allow read, create: if isSignedIn();
+    match /wallet_transactions/{txId} {
+      allow read: if isSignedIn() && (
+        isStaff() ||
+        resource.data.walletId == request.auth.uid ||
+        resource.data.userId == request.auth.uid
+      );
+      allow create: if isSignedIn();
       allow update, delete: if isStaff();
     }
     match /transactions/{d} {
@@ -190,9 +242,24 @@ service cloud.firestore {
 
     // 8. المحادثات والرسائل والتواجد
     match /chat_channels/{channelId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        isStaff() || request.auth.uid in resource.data.participants
+      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isStaff() || request.auth.uid in resource.data.participants
+      );
+      allow delete: if isStaff();
+      
       match /messages/{msgId} {
-        allow read, write: if isSignedIn();
+        allow read: if isSignedIn() && (
+          isStaff() ||
+          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
+        );
+        allow create: if isSignedIn() && (
+          request.auth.uid in get(/databases/$(db)/documents/chat_channels/$(channelId)).data.participants
+        );
+        allow update, delete: if isStaff();
       }
     }
     match /chat_rooms/{roomId} {
@@ -208,9 +275,6 @@ service cloud.firestore {
           request.auth.uid in get(/databases/$(db)/documents/chats/$(chatId)).data.participants || isStaff()
         );
       }
-    }
-    match /messages/{d} {
-      allow read, write: if isSignedIn();
     }
     match /presence/{d} {
       allow read, write: if isSignedIn();
