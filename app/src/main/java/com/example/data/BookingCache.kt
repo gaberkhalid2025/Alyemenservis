@@ -20,10 +20,7 @@ class BookingCache(private val context: Context? = null) {
     suspend fun putBookingsToRoom(bookings: List<BookingEntity>) {
         val ctx = context ?: return
         val dao = AppDatabase.getInstance(ctx).bookingDao()
-        dao.deleteAllBookings()
-        if (bookings.isNotEmpty()) {
-            dao.insertBookings(bookings.map { it.toRoomEntity() })
-        }
+        dao.replaceAllBookings(bookings.map { it.toRoomEntity() })
     }
 
     suspend fun invalidateRoom() {

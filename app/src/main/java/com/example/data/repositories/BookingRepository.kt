@@ -99,10 +99,7 @@ class BookingRepository(
             repositoryScope.launch {
                 cacheMutex.withLock {
                     try {
-                        bookingDao.deleteAllBookings()
-                        if (roomList.isNotEmpty()) {
-                            bookingDao.insertBookings(roomList)
-                        }
+                        bookingDao.replaceAllBookings(roomList)
                     } catch (e: Exception) {
                         Log.e("BookingRepository", "Error persisting bookings to Room", e)
                     }

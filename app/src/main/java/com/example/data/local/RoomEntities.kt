@@ -185,3 +185,72 @@ data class RequestOfferRoomEntity(
     val status: String,
     val createdAt: Long
 )
+
+fun InstantRequestEntity.toRoomEntity(): InstantRequestRoomEntity {
+    return InstantRequestRoomEntity(
+        id = id,
+        requestCode = requestCode,
+        secretPin = effectivePinHash,
+        userId = userId,
+        userName = userName,
+        userPhone = userPhone,
+        userCity = userCity,
+        serviceTitle = serviceTitle.ifBlank { categoryName },
+        description = description,
+        status = status,
+        acceptedPrice = acceptedPrice,
+        createdAt = createdAt,
+        expiresAt = expiresAt,
+        offersCount = offersCount
+    )
+}
+
+fun InstantRequestRoomEntity.toEntity(): InstantRequestEntity {
+    return InstantRequestEntity(
+        id = id,
+        requestCode = requestCode,
+        pinHash = secretPin,
+        userId = userId,
+        userName = userName,
+        userPhone = userPhone,
+        userCity = userCity,
+        serviceTitle = serviceTitle,
+        description = description,
+        status = status,
+        acceptedPrice = acceptedPrice,
+        createdAt = createdAt,
+        expiresAt = expiresAt,
+        offersCount = offersCount
+    )
+}
+
+fun RequestOfferEntity.toRoomEntity(): RequestOfferRoomEntity {
+    return RequestOfferRoomEntity(
+        id = id,
+        requestId = requestId,
+        requestCode = requestCode,
+        technicianId = technicianId,
+        technicianName = technicianName,
+        technicianPhone = technicianPhone,
+        price = price,
+        estimatedArrivalTime = estimatedArrivalTime,
+        status = status,
+        createdAt = createdAt
+    )
+}
+
+fun RequestOfferRoomEntity.toEntity(): RequestOfferEntity {
+    return RequestOfferEntity(
+        id = id,
+        requestId = requestId,
+        requestCode = requestCode,
+        technicianId = technicianId,
+        technicianName = technicianName,
+        technicianPhone = technicianPhone,
+        price = price,
+        estimatedArrivalTime = estimatedArrivalTime,
+        status = status,
+        createdAt = createdAt
+    )
+}
+

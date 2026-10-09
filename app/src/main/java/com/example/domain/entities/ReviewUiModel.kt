@@ -13,5 +13,5 @@ data class ReviewUiModel(
     val authorName: String = "",
     val rating: Int = 5,
     val comment: String = "",
-    var replyText: String = ""
+    val replyText: String = ""
 )

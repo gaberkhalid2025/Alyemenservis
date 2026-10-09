@@ -2,12 +2,15 @@ package com.example.data.repositories
 
 import android.content.Context
 import android.util.Log
+import com.example.data.local.toEntity
+import com.example.data.local.toRoomEntity
 import com.example.data.models.InstantRequestEntity
 import com.example.data.models.RequestOfferEntity
 import com.example.security.BookingSecurityHelper
 import com.example.utils.AnalyticsEventsHelper
 import com.example.utils.AppConstants
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineScope
@@ -82,6 +85,14 @@ class InstantRequestRepository(private val context: Context? = null) {
                     current.removeAll { it.id == docId }
                     current.add(0, newEntity)
                     _requests.value = current
+                    context?.let { ctx ->
+                        repositoryScope.launch {
+                            try {
+                                com.example.data.local.AppDatabase.getInstance(ctx).requestDao()
+                                    .insertRequest(newEntity.toRoomEntity())
+                            } catch (_: Exception) {}
+                        }
+                    }
                     AnalyticsEventsHelper.logUrgentRequestCreated(context, docId, newEntity.categoryName.ifBlank { newEntity.serviceTitle })
                     onSuccess(newEntity)
                 }
@@ -98,6 +109,19 @@ class InstantRequestRepository(private val context: Context? = null) {
      * 2. تدفق حي لطلبات مستخدم معين (العميل)
      */
     fun getUserInstantRequests(userId: String): Flow<List<InstantRequestEntity>> = callbackFlow {
+        // Emit offline Room cache immediately
+        context?.let { ctx ->
+            repositoryScope.launch {
+                try {
+                    val local = com.example.data.local.AppDatabase.getInstance(ctx)
+                        .requestDao().getRequestsListForUser(userId).map { it.toEntity() }
+                    if (local.isNotEmpty()) {
+                        trySend(local)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
         val listener: ListenerRegistration = firestore.collection(AppConstants.COL_INSTANT_REQUESTS)
             .whereEqualTo("userId", userId)
             .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -116,6 +140,14 @@ class InstantRequestRepository(private val context: Context? = null) {
                     }
                 }
                 _requests.value = list
+                context?.let { ctx ->
+                    repositoryScope.launch {
+                        try {
+                            com.example.data.local.AppDatabase.getInstance(ctx).requestDao()
+                                .insertRequests(list.map { it.toRoomEntity() })
+                        } catch (_: Exception) {}
+                    }
+                }
                 trySend(list)
             }
 
@@ -214,11 +246,30 @@ class InstantRequestRepository(private val context: Context? = null) {
 
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(requestRef)
+            if (!snapshot.exists()) {
+                throw FirebaseFirestoreException("الطلب الفوري غير موجود", FirebaseFirestoreException.Code.NOT_FOUND)
+            }
+            val status = snapshot.getString("status") ?: "WAITING_FOR_OFFERS"
+            val expiresAt = snapshot.getLong("expiresAt") ?: 0L
+            if (status != "WAITING_FOR_OFFERS") {
+                throw FirebaseFirestoreException("لا يمكن تقديم عرض على طلب بحالة: $status", FirebaseFirestoreException.Code.ABORTED)
+            }
+            if (expiresAt > 0L && expiresAt <= System.currentTimeMillis()) {
+                throw FirebaseFirestoreException("عذراً، انتهت صلاحية هذا الطلب الفوري", FirebaseFirestoreException.Code.ABORTED)
+            }
             val currentOffers = snapshot.getLong("offersCount") ?: 0L
             transaction.set(offerRef, finalOffer)
             transaction.set(topLevelOfferRef, finalOffer)
             transaction.update(requestRef, "offersCount", currentOffers + 1)
         }.addOnSuccessListener {
+            context?.let { ctx ->
+                repositoryScope.launch {
+                    try {
+                        com.example.data.local.AppDatabase.getInstance(ctx).offerDao()
+                            .insertOffer(finalOffer.toRoomEntity())
+                    } catch (_: Exception) {}
+                }
+            }
             AnalyticsEventsHelper.logOfferSubmitted(context, offer.requestId, offer.technicianId, offer.price)
             onSuccess()
         }.addOnFailureListener {

@@ -12,6 +12,10 @@ class GetJoinStatusUseCase @Inject constructor(
     private val repository: IRegistrationRepository
 ) {
     operator fun invoke(phone: String): Flow<JoinStatusEntity?> {
-        return repository.getJoinStatusFlow(ValidatePhoneUseCase.normalizePhone(phone))
+        val normalized = ValidatePhoneUseCase.normalizePhone(phone).trim()
+        if (normalized.isBlank()) {
+            return kotlinx.coroutines.flow.flowOf(null)
+        }
+        return repository.getJoinStatusFlow(normalized)
     }
 }

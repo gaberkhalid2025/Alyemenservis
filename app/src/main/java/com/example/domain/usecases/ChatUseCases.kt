@@ -12,13 +12,22 @@ import javax.inject.Inject
 
 class GetChannelsUseCase @Inject constructor(private val repository: IChatRepository) {
     operator fun invoke(userId: String): Flow<List<ChatChannel>> {
-        return repository.getUserChannels(userId.trim())
+        val cleanUserId = userId.trim()
+        if (cleanUserId.isBlank()) {
+            return kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+        return repository.getUserChannels(cleanUserId)
     }
 }
 
 class GetMessagesUseCase @Inject constructor(private val repository: IChatRepository) {
     operator fun invoke(channelId: String, currentUserId: String, limit: Int = 50): Flow<List<ChatMessage>> {
-        return repository.getChannelMessages(channelId.trim(), currentUserId.trim(), limit.coerceAtLeast(1))
+        val cleanChannelId = channelId.trim()
+        val cleanUserId = currentUserId.trim()
+        if (cleanChannelId.isBlank() || cleanUserId.isBlank()) {
+            return kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+        return repository.getChannelMessages(cleanChannelId, cleanUserId, limit.coerceAtLeast(1))
     }
 }
 

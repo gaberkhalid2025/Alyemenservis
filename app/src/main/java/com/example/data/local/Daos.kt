@@ -70,6 +70,24 @@ interface ChatDao {
         insertChannel(channel)
         insertMessages(messages)
     }
+
+    @Transaction
+    suspend fun replaceMessagesForChannel(channelId: String, messages: List<ChatMessageRoomEntity>) {
+        deleteMessagesByChannel(channelId)
+        if (messages.isNotEmpty()) {
+            insertMessages(messages)
+        }
+    }
+
+    @Transaction
+    suspend fun replaceAllChannelsAtomic(channels: List<ChatChannelRoomEntity>) {
+        val existingIds = getAllChannelsList().map { it.id }.toSet()
+        val newIds = channels.map { it.id }.toSet()
+        insertChannels(channels)
+        for (removedId in (existingIds - newIds)) {
+            deleteChannel(removedId)
+        }
+    }
 }
 
 @Dao
@@ -103,6 +121,14 @@ interface BookingDao {
 
     @Query("DELETE FROM bookings")
     suspend fun deleteAllBookings()
+
+    @Transaction
+    suspend fun replaceAllBookings(bookings: List<BookingRoomEntity>) {
+        deleteAllBookings()
+        if (bookings.isNotEmpty()) {
+            insertBookings(bookings)
+        }
+    }
 }
 
 @Dao
@@ -112,6 +138,9 @@ interface RequestDao {
 
     @Query("SELECT * FROM instant_requests WHERE userId = :userId ORDER BY createdAt DESC")
     fun getRequestsForUser(userId: String): Flow<List<InstantRequestRoomEntity>>
+
+    @Query("SELECT * FROM instant_requests WHERE userId = :userId ORDER BY createdAt DESC")
+    suspend fun getRequestsListForUser(userId: String): List<InstantRequestRoomEntity>
 
     @Query("SELECT * FROM instant_requests WHERE id = :id")
     suspend fun getRequestById(id: String): InstantRequestRoomEntity?

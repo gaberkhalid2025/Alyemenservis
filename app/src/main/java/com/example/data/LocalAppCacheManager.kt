@@ -71,6 +71,24 @@ class LocalAppCacheManager @Inject constructor(
         return prefs.getString("KEY_CATEGORIES_CACHE", "[]") ?: "[]"
     }
 
+    // 4.1 Save & Load Cached Jobs
+    fun saveJobsCache(ownerId: String, rawJsonString: String) {
+        prefs.edit().putString("KEY_JOBS_CACHE_$ownerId", rawJsonString).apply()
+    }
+
+    fun getJobsCacheRaw(ownerId: String): String {
+        return prefs.getString("KEY_JOBS_CACHE_$ownerId", "[]") ?: "[]"
+    }
+
+    // 4.2 Save & Load Cached Doctors
+    fun saveDoctorsCache(ownerId: String, rawJsonString: String) {
+        prefs.edit().putString("KEY_DOCTORS_CACHE_$ownerId", rawJsonString).apply()
+    }
+
+    fun getDoctorsCacheRaw(ownerId: String): String {
+        return prefs.getString("KEY_DOCTORS_CACHE_$ownerId", "[]") ?: "[]"
+    }
+
     // 5. Offline Queue Operations (When user creates booking or sends message offline)
     data class OfflineSyncAction(
         val id: String = java.util.UUID.randomUUID().toString(),

@@ -3,6 +3,9 @@ package com.example.data.repositories
 import com.example.data.LocalAppCacheManager
 import com.example.domain.entities.DoctorItem
 import com.google.firebase.firestore.FirebaseFirestore
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -11,14 +14,41 @@ import javax.inject.Inject
 
 class MedicalRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
-    cacheManager: LocalAppCacheManager
+    private val cacheManager: LocalAppCacheManager
 ) {
+    private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+    private val listAdapter = moshi.adapter<List<DoctorItem>>(
+        Types.newParameterizedType(List::class.java, DoctorItem::class.java)
+    )
+
+    private fun getCachedDoctors(ownerId: String): List<DoctorItem> {
+        return try {
+            val raw = cacheManager.getDoctorsCacheRaw(ownerId)
+            if (raw.isNotBlank() && raw != "[]") {
+                listAdapter.fromJson(raw) ?: emptyList()
+            } else emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveCachedDoctors(ownerId: String, doctors: List<DoctorItem>) {
+        try {
+            cacheManager.saveDoctorsCache(ownerId, listAdapter.toJson(doctors))
+        } catch (_: Exception) {}
+    }
+
     fun getDoctors(ownerId: String): Flow<List<DoctorItem>> = callbackFlow {
+        val cached = getCachedDoctors(ownerId)
+        if (cached.isNotEmpty()) {
+            trySend(cached)
+        }
+
         val listener = firestore.collection("doctors")
             .whereEqualTo("ownerId", ownerId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) {
-                    trySend(emptyList())
+                    trySend(getCachedDoctors(ownerId))
                     return@addSnapshotListener
                 }
                 val list = snapshot.documents.mapNotNull { doc ->
@@ -29,6 +59,7 @@ class MedicalRepository @Inject constructor(
                         workingHours = doc.getString("workingHours") ?: ""
                     )
                 }
+                saveCachedDoctors(ownerId, list)
                 trySend(list)
             }
         awaitClose { listener.remove() }

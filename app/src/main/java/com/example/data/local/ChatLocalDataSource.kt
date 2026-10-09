@@ -134,12 +134,7 @@ class ChatLocalDataSource(
                     updatedAt = ch.updatedAt
                 )
             }
-            val existingIds = chatDao.getAllChannelsList().map { it.id }.toSet()
-            val newIds = roomChannels.map { it.id }.toSet()
-            chatDao.insertChannels(roomChannels)
-            for (removedId in (existingIds - newIds)) {
-                chatDao.deleteChannel(removedId)
-            }
+            chatDao.replaceAllChannelsAtomic(roomChannels)
         } catch (e: Exception) {
             android.util.Log.e("ChatLocalDataSource", "Error in saveChannels: ${e.message}", e)
         }
@@ -257,8 +252,7 @@ class ChatLocalDataSource(
                     syncStatus = msg.syncStatus.name
                 )
             }
-            chatDao.deleteMessagesByChannel(channelId)
-            chatDao.insertMessages(roomMessages)
+            chatDao.replaceMessagesForChannel(channelId, roomMessages)
         } catch (e: Exception) {
             android.util.Log.e("ChatLocalDataSource", "Error in saveMessages: ${e.message}", e)
         }
@@ -502,6 +496,7 @@ class ChatLocalDataSource(
                     if (!activeChannelIds.contains(channelId) && (now - lastSync > MAX_CACHE_AGE_MILLIS)) {
                         editor.remove(key)
                         editor.remove(KEY_PREFIX_MESSAGES + channelId)
+                        messagesMemoryCache.remove(channelId)
                         modified = true
                     }
                 }

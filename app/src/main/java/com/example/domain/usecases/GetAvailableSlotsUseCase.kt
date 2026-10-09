@@ -44,6 +44,10 @@ class GetAvailableSlotsUseCase @Inject constructor() {
         val cleanDate = normalizeDateString(selectedDateString)
         val cleanProviderId = providerId.trim()
 
+        if (cleanDate.isBlank()) {
+            return emptyList()
+        }
+
         val matchingBookingsOnDate = existingBookings.filter { booking ->
             val bProvider = booking.providerId.ifBlank { booking.technicianId }.trim()
             val bDate = normalizeDateString(booking.date.ifBlank { booking.dateString })

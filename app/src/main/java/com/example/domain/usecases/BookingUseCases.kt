@@ -7,7 +7,11 @@ import javax.inject.Inject
 
 class GetBookingsUseCase @Inject constructor(private val repository: BookingRepository) {
     operator fun invoke(userId: String, isProvider: Boolean = false): Flow<List<BookingEntity>> {
-        return repository.getBookingsFlow(userId.trim(), isProvider)
+        val cleanUserId = userId.trim()
+        if (cleanUserId.isBlank()) {
+            return kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+        return repository.getBookingsFlow(cleanUserId, isProvider)
     }
 }
 
