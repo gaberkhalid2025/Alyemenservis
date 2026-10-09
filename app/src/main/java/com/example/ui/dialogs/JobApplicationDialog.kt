@@ -103,7 +103,7 @@ fun JobApplicationDialog(
                     }
                 }
 
-                Divider(color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
                 if (!isJobsEnabled) {
                     // Disabled by Admin via Firestore

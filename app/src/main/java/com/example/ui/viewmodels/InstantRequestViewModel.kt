@@ -248,6 +248,7 @@ class InstantRequestViewModel @Inject constructor(
                 // 1. الحصول على الفنيين القريبين من الفايرستور
                 val snapshot = firestore.collection("providers")
                     .whereEqualTo("cityId", request.userCity)
+                    .limit(100)
                     .get()
                     .await()
                 

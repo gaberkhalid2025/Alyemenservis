@@ -697,7 +697,7 @@ private fun Step2LocationAndDetails(
             )
         )
 
-        Divider(color = Color.White.copy(alpha = 0.1f))
+        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
         Text(
             text = "📝 تفاصيل ما تحتاجه بدقة:",
@@ -895,7 +895,7 @@ private fun Step3ContactAndSubmit(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("ملخص طلبك قبل الإطلاق:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = themeColors.accent)
                 }
-                Divider(color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                 Text("🏷️ القسم: $selectedSpecialty", fontSize = 11.sp, color = Color.White)
                 Text("📍 الموقع: $selectedCity ${if (neighborhood.isNotBlank()) "($neighborhood)" else ""}", fontSize = 11.sp, color = Color.White)
                 Text("📝 عنوان الطلب: ${serviceTitle.ifBlank { "طلب خدمة" }}", fontSize = 11.sp, color = Color.White)

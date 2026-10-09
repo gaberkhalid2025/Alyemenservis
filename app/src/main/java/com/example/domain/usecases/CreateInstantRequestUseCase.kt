@@ -48,6 +48,7 @@ class CreateInstantRequestUseCase @Inject constructor(
                         }
                     )
                 } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     if (cont.isActive) cont.resume(AppResult.Error(AppError.UnknownError(e.localizedMessage ?: "فشل إنشاء الطلب العاجل", e)))
                 }
             }

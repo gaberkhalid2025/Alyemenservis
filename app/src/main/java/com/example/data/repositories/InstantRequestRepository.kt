@@ -46,9 +46,10 @@ class InstantRequestRepository(private val context: Context? = null) {
     ) {
         try {
             val docId = if (request.id.isNotBlank()) request.id else firestore.collection(AppConstants.COL_INSTANT_REQUESTS).document().id
-            val requestCode = if (request.requestCode.isNotBlank()) request.requestCode else "URG-${Random.nextInt(100000, 999999)}"
+            val secureRandom = java.security.SecureRandom()
+            val requestCode = if (request.requestCode.isNotBlank()) request.requestCode else "URG-${100000 + secureRandom.nextInt(900000)}"
             val inputRawPin = request.rawPin
-            val rawPin = if (inputRawPin.isNotBlank()) inputRawPin else "${Random.nextInt(1000, 9999)}"
+            val rawPin = if (inputRawPin.isNotBlank()) inputRawPin else "${1000 + secureRandom.nextInt(9000)}"
             val pin = if (rawPin.startsWith("$2a$") || rawPin.startsWith("$2b$") || rawPin.contains(":")) {
                 rawPin
             } else {

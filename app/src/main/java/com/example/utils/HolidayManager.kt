@@ -12,8 +12,8 @@ import java.util.TimeZone
  */
 object HolidayManager {
 
-    private val customProviderHolidays = mutableMapOf<String, MutableSet<String>>() // providerId -> Set of "yyyy-MM-dd"
-    private var firestoreHolidays = mutableMapOf<String, String>()
+    private val customProviderHolidays = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CopyOnWriteArraySet<String>>() // providerId -> Set of "yyyy-MM-dd"
+    private val firestoreHolidays = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     // Official Fixed & Common Yemeni Holidays
     private val fixedHolidays = mapOf(
@@ -49,7 +49,8 @@ object HolidayManager {
     fun isDateHoliday(dateString: String, providerId: String? = null): Pair<Boolean, String?> {
         try {
             // ✨ م2: تحليل التاريخ بشكل آمن وبدون SimpleDateFormat
-            val parts = dateString.split("-")
+            val cleanDate = dateString.trim().replace("/", "-")
+            val parts = cleanDate.split("-")
             if (parts.size != 3) return Pair(false, null)
             val year = parts[0].toIntOrNull() ?: return Pair(false, null)
             val month = parts[1].toIntOrNull() ?: return Pair(false, null)
@@ -66,14 +67,14 @@ object HolidayManager {
             if (allHolidays.containsKey(monthDay)) {
                 return Pair(true, allHolidays[monthDay])
             }
-            if (allHolidays.containsKey(dateString)) {
-                return Pair(true, allHolidays[dateString])
+            if (allHolidays.containsKey(cleanDate)) {
+                return Pair(true, allHolidays[cleanDate])
             }
 
             // 2. فحص إجازات الفني الخاصة
             if (providerId != null) {
                 val providerDays = customProviderHolidays[providerId]
-                if (providerDays?.contains(dateString) == true) {
+                if (providerDays?.contains(cleanDate) == true) {
                     return Pair(true, "إجازة خاصة لمقدم الخدمة 🏖️")
                 }
             }
@@ -93,15 +94,17 @@ object HolidayManager {
      * إضافة يوم إجازة خاص بمزود خدمة
      */
     fun addProviderHoliday(providerId: String, dateString: String) {
-        val set = customProviderHolidays.getOrPut(providerId) { mutableSetOf() }
-        set.add(dateString)
+        val cleanDate = dateString.trim().replace("/", "-")
+        val set = customProviderHolidays.getOrPut(providerId) { java.util.concurrent.CopyOnWriteArraySet() }
+        set.add(cleanDate)
     }
 
     /**
      * إزالة يوم إجازة خاص بمزود خدمة
      */
     fun removeProviderHoliday(providerId: String, dateString: String) {
-        customProviderHolidays[providerId]?.remove(dateString)
+        val cleanDate = dateString.trim().replace("/", "-")
+        customProviderHolidays[providerId]?.remove(cleanDate)
     }
 
     /**

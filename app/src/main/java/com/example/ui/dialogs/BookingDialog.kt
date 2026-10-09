@@ -59,8 +59,8 @@ fun BookingDialog(
         android.app.DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
-                val monthFormatted = String.format("%02d", month + 1)
-                val dayFormatted = String.format("%02d", dayOfMonth)
+                val monthFormatted = String.format(java.util.Locale.US, "%02d", month + 1)
+                val dayFormatted = String.format(java.util.Locale.US, "%02d", dayOfMonth)
                 bookingDateInput = "$year-$monthFormatted-$dayFormatted"
             },
             currentCalendar.get(java.util.Calendar.YEAR),
@@ -75,7 +75,7 @@ fun BookingDialog(
             { _, hourOfDay, minute ->
                 val amPm = if (hourOfDay < 12) "ص" else "م"
                 val hour = if (hourOfDay % 12 == 0) 12 else hourOfDay % 12
-                val formattedMin = String.format("%02d", minute)
+                val formattedMin = String.format(java.util.Locale.US, "%02d", minute)
                 bookingTimeInput = "$hour:$formattedMin $amPm"
             },
             currentCalendar.get(java.util.Calendar.HOUR_OF_DAY),

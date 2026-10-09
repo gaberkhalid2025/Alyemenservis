@@ -240,11 +240,16 @@ class OfflineQueueManager @Inject constructor(
                 req.id
             }
 
+            val chId = req.data["channelId"] as? String
+            val docRef = if (req.type == "MESSAGE" && !chId.isNullOrBlank()) {
+                db.collection("chat_channels").document(chId).collection("messages").document(targetDoc)
+            } else {
+                db.collection(collection).document(targetDoc)
+            }
+
             withTimeoutOrNull(8000L) {
                 suspendCancellableCoroutine { continuation ->
-                    db.collection(collection)
-                        .document(targetDoc)
-                        .set(req.data, com.google.firebase.firestore.SetOptions.merge())
+                    docRef.set(req.data, com.google.firebase.firestore.SetOptions.merge())
                         .addOnSuccessListener {
                             if (continuation.isActive) continuation.resume(true)
                         }

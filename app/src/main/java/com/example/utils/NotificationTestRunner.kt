@@ -35,7 +35,7 @@ class NotificationTestRunner(private val context: Context) {
         onComplete: (NotificationFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<NotificationStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): NotificationStepReport {
             val step = NotificationStepReport(name, desc)

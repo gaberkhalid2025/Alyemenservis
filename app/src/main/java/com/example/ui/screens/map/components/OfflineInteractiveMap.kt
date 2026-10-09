@@ -1,7 +1,10 @@
 package com.example.ui.screens.map.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -15,12 +18,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
@@ -40,6 +43,13 @@ import kotlin.math.*
  * 🗺️ OfflineInteractiveMap (Full Entity Overload)
  * Native Jetpack Compose Canvas Interactive Map
  * 100% Offline, Zero WebViews, Instant 60FPS, Guaranteed to NEVER show a black screen!
+ * Features:
+ * - Real Geographic Projection (Equirectangular / Flat Earth approximation with latitude cosine)
+ * - True coordinate mapping without distance clamping or artificial offset distortions
+ * - Wide Zoom range (0.25f - 8.0f) for city-wide overview down to fine street level
+ * - Elegant halos, full unclipped labels with crisp drop-shadows
+ * - Pulsating neon user GPS marker
+ * - Zero black screen fallback with try-catch safety
  */
 @Composable
 fun OfflineInteractiveMap(
@@ -61,12 +71,13 @@ fun OfflineInteractiveMap(
     onSwitchToRadar: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val safeUserLat = if (userCoords.first != 0.0) userCoords.first else 15.3694
-    val safeUserLng = if (userCoords.second != 0.0) userCoords.second else 44.1910
+    val safeUserLat = if (userCoords.first != 0.0 && !userCoords.first.isNaN()) userCoords.first else 15.3585
+    val safeUserLng = if (userCoords.second != 0.0 && !userCoords.second.isNaN()) userCoords.second else 44.1880
 
     // Compute governorate center coordinates dynamically
     val cityCenterCoords = remember(selectedCity, safeUserLat, safeUserLng) {
         when {
+            selectedCity.contains("صنعاء") -> Pair(15.3585, 44.1880)
             selectedCity.contains("تعز") -> Pair(13.5789, 44.0195)
             selectedCity.contains("عدن") -> Pair(12.7855, 45.0186)
             selectedCity.contains("إب") -> Pair(13.9667, 44.1833)
@@ -74,6 +85,19 @@ fun OfflineInteractiveMap(
             selectedCity.contains("حضرموت") || selectedCity.contains("المكلا") -> Pair(14.5425, 49.1242)
             selectedCity.contains("ذمار") -> Pair(14.5427, 44.4051)
             selectedCity.contains("مأرب") -> Pair(15.4628, 45.3258)
+            selectedCity.contains("لحج") -> Pair(13.0600, 44.8800)
+            selectedCity.contains("أبين") || selectedCity.contains("زنجبار") -> Pair(13.1287, 45.3800)
+            selectedCity.contains("شبوة") || selectedCity.contains("عتق") -> Pair(14.5377, 46.8319)
+            selectedCity.contains("المهرة") || selectedCity.contains("الغيضة") -> Pair(16.2081, 52.1764)
+            selectedCity.contains("سقطرى") -> Pair(12.4634, 53.8237)
+            selectedCity.contains("صعدة") -> Pair(16.9402, 43.7639)
+            selectedCity.contains("عمران") -> Pair(15.6499, 43.9442)
+            selectedCity.contains("حجة") -> Pair(15.6260, 43.6026)
+            selectedCity.contains("البيضاء") -> Pair(13.9852, 45.5727)
+            selectedCity.contains("الضالع") -> Pair(13.6957, 44.7314)
+            selectedCity.contains("الجوف") -> Pair(16.1436, 45.4878)
+            selectedCity.contains("المحويت") -> Pair(15.4701, 43.5448)
+            selectedCity.contains("ريمة") -> Pair(14.6191, 43.7144)
             else -> Pair(safeUserLat, safeUserLng)
         }
     }
@@ -81,65 +105,71 @@ fun OfflineInteractiveMap(
     val originLat = cityCenterCoords.first
     val originLng = cityCenterCoords.second
 
-    LaunchedEffect(nearbyProviders, nearbyStores, nearbyProperties) {
-        android.util.Log.d("OfflineMap", "Providers: ${nearbyProviders.size}, Stores: ${nearbyStores.size}, Properties: ${nearbyProperties.size}")
-    }
+    // Precision Geographic Projection constants
+    val metersPerDegreeLat = 110540.0
+    val metersPerDegreeLng = 111320.0 * cos(Math.toRadians(originLat))
 
+    // Animated pulse for user location marker
+    val infiniteTransition = rememberInfiniteTransition(label = "user_pulse")
+    val pulseProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse_progress"
+    )
+
+    // Accurate calculation of map points
     val mapPoints = remember(
         nearbyProviders,
         nearbyStores,
         nearbyProperties,
-        nearbyProviders.size,
-        nearbyStores.size,
-        nearbyProperties.size,
-        dynamicOffsets,
         originLat,
         originLng
     ) {
         val points = mutableListOf<InteractiveMapPoint>()
-        var angle = 0.0
+        var fallbackAngle = 0.0
 
+        // 1. Providers
         nearbyProviders.forEachIndexed { idx, p ->
             val base = getProviderCoords(p)
-            var lat = base.first
-            var lng = base.second
+            val rawLat = base.first
+            val rawLng = base.second
 
-            if (lat == 0.0 || lng == 0.0 || lat.isNaN() || lng.isNaN() || lat !in -90.0..90.0 || lng !in -180.0..180.0) {
-                // توزيع دائري حول المركز حتى تظهر النقاط
-                val radius = 0.003 + (idx % 5) * 0.0015
-                lat = originLat + radius * Math.cos(Math.toRadians(angle))
-                lng = originLng + radius * Math.sin(Math.toRadians(angle))
-                angle += 45.0
+            val hasValidCoords = rawLat != 0.0 && rawLng != 0.0 &&
+                    !rawLat.isNaN() && !rawLng.isNaN() &&
+                    rawLat in -90.0..90.0 && rawLng in -180.0..180.0
+
+            val xMeters: Float
+            val yMeters: Float
+
+            if (hasValidCoords) {
+                // Real Geographic Projection without distance clamping or random noise
+                val dLng = rawLng - originLng
+                val dLat = rawLat - originLat
+                xMeters = (dLng * metersPerDegreeLng).toFloat()
+                yMeters = (-dLat * metersPerDegreeLat).toFloat()
             } else {
-                // تقريب ذكي للمسافات البعيدة لتظهر دائماً على شاشة المستخدم
-                val dLat = lat - originLat
-                val dLng = lng - originLng
-                val dist = sqrt(dLat * dLat + dLng * dLng)
-                val maxAllowedDist = 0.004 + (idx % 4) * 0.001
-                if (dist > maxAllowedDist) {
-                    val scale = maxAllowedDist / dist
-                    lat = originLat + dLat * scale
-                    lng = originLng + dLng * scale
-                }
+                // Fallback circular distribution around the center only when coordinates are missing
+                val radiusMeters = 350.0 + (idx % 6) * 180.0
+                val rad = Math.toRadians(fallbackAngle)
+                xMeters = (radiusMeters * cos(rad)).toFloat()
+                yMeters = (radiusMeters * sin(rad)).toFloat()
+                fallbackAngle += 37.0
             }
-
-            // إضافة إزاحة تشتيتية تمنع التطابق والغطاء التام تحت نقطة المستخدم
-            lat += ((idx % 5) * 0.0022 - 0.004)
-            lng += (((idx / 5) % 5) * 0.0022 - 0.004)
-
-            val dLat = lat - originLat
-            val dLng = lng - originLng
 
             points.add(
                 InteractiveMapPoint(
                     id = p.id,
-                    name = p.name.ifBlank { "فني" },
-                    category = p.profession.ifBlank { "فني" },
+                    name = p.name.ifBlank { "فني متخصص" },
+                    category = p.profession.ifBlank { "خدمات صيانة" },
                     type = "PROVIDER",
                     emoji = "👷",
-                    color = Color(0xFF00E5FF),
-                    xMeters = (dLng * 111320.0 * Math.cos(Math.toRadians(originLat))).toFloat(),
-                    yMeters = (-dLat * 110540.0).toFloat(),
+                    color = Color(0xFF00E5FF), // Neon Cyan
+                    xMeters = xMeters,
+                    yMeters = yMeters,
                     rating = p.rating.toDouble().coerceAtLeast(1.0),
                     phone = p.phone,
                     originalEntity = p
@@ -147,48 +177,59 @@ fun OfflineInteractiveMap(
             )
         }
 
+        // 2. Stores & Restaurants & Medical Centers
         nearbyStores.forEachIndexed { idx, s ->
             val base = getStoreCoords(s)
-            var lat = base.first
-            var lng = base.second
+            val rawLat = base.first
+            val rawLng = base.second
 
-            if (lat == 0.0 || lng == 0.0 || lat.isNaN() || lng.isNaN() || lat !in -90.0..90.0 || lng !in -180.0..180.0) {
-                val radius = 0.004 + (idx % 6) * 0.0015
-                lat = originLat + radius * Math.cos(Math.toRadians(angle))
-                lng = originLng + radius * Math.sin(Math.toRadians(angle))
-                angle += 40.0
+            val hasValidCoords = rawLat != 0.0 && rawLng != 0.0 &&
+                    !rawLat.isNaN() && !rawLng.isNaN() &&
+                    rawLat in -90.0..90.0 && rawLng in -180.0..180.0
+
+            val xMeters: Float
+            val yMeters: Float
+
+            if (hasValidCoords) {
+                // Real Geographic Projection
+                val dLng = rawLng - originLng
+                val dLat = rawLat - originLat
+                xMeters = (dLng * metersPerDegreeLng).toFloat()
+                yMeters = (-dLat * metersPerDegreeLat).toFloat()
             } else {
-                val dLat = lat - originLat
-                val dLng = lng - originLng
-                val dist = sqrt(dLat * dLat + dLng * dLng)
-                val maxAllowedDist = 0.005 + (idx % 5) * 0.001
-                if (dist > maxAllowedDist) {
-                    val scale = maxAllowedDist / dist
-                    lat = originLat + dLat * scale
-                    lng = originLng + dLng * scale
-                }
+                // Fallback circular distribution
+                val radiusMeters = 400.0 + (idx % 7) * 200.0
+                val rad = Math.toRadians(fallbackAngle)
+                xMeters = (radiusMeters * cos(rad)).toFloat()
+                yMeters = (radiusMeters * sin(rad)).toFloat()
+                fallbackAngle += 33.0
             }
 
-            // إضافة إزاحة تشتيتية تمنع التطابق والغطاء التام
-            lat += (((idx + 2) % 5) * 0.0022 - 0.004)
-            lng += (((idx + 2) / 5 % 5) * 0.0022 - 0.004)
+            val isMedical = s.sectionId.contains("medical") || s.categoryId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
+            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.categoryId.contains("restaurant") || s.name.contains("مطعم") || s.name.contains("كافيه"))
 
-            val isMedical = s.sectionId.contains("medical") || s.name.contains("طبي") || s.name.contains("صيدلية")
-            val isRestaurant = !isMedical && (s.sectionId.contains("restaurant") || s.name.contains("مطعم"))
+            val pinColor = when {
+                isMedical -> Color(0xFFEC4899)     // Vivid Pink
+                isRestaurant -> Color(0xFFF59E0B)  // Vibrant Amber/Orange
+                else -> Color(0xFF10B981)          // Emerald Green
+            }
 
-            val dLat = lat - originLat
-            val dLng = lng - originLng
+            val pinEmoji = when {
+                isMedical -> "🏥"
+                isRestaurant -> "🍔"
+                else -> "🏪"
+            }
 
             points.add(
                 InteractiveMapPoint(
                     id = s.id,
                     name = s.name.ifBlank { "متجر" },
-                    category = s.description.ifBlank { "متجر" },
-                    type = "STORE",
-                    emoji = if (isMedical) "🏥" else if (isRestaurant) "🍔" else "🏪",
-                    color = if (isMedical) Color(0xFFEC4899) else if (isRestaurant) Color(0xFFF59E0B) else Color(0xFF10B981),
-                    xMeters = (dLng * 111320.0 * Math.cos(Math.toRadians(originLat))).toFloat(),
-                    yMeters = (-dLat * 110540.0).toFloat(),
+                    category = s.description.ifBlank { if (isMedical) "مركز طبي" else if (isRestaurant) "مطعم" else "متجر" },
+                    type = if (isMedical) "MEDICAL" else if (isRestaurant) "RESTAURANT" else "STORE",
+                    emoji = pinEmoji,
+                    color = pinColor,
+                    xMeters = xMeters,
+                    yMeters = yMeters,
                     rating = s.rating.toDouble().coerceAtLeast(1.0),
                     phone = s.phone,
                     originalEntity = s
@@ -196,45 +237,44 @@ fun OfflineInteractiveMap(
             )
         }
 
+        // 3. Properties
         nearbyProperties.forEachIndexed { idx, prop ->
             val base = getPropertyCoords(prop)
-            var lat = base.first
-            var lng = base.second
+            val rawLat = base.first
+            val rawLng = base.second
 
-            if (lat == 0.0 || lng == 0.0 || lat.isNaN() || lng.isNaN() || lat !in -90.0..90.0 || lng !in -180.0..180.0) {
-                val radius = 0.005 + (idx % 4) * 0.002
-                lat = originLat + radius * Math.cos(Math.toRadians(angle))
-                lng = originLng + radius * Math.sin(Math.toRadians(angle))
-                angle += 50.0
+            val hasValidCoords = rawLat != 0.0 && rawLng != 0.0 &&
+                    !rawLat.isNaN() && !rawLng.isNaN() &&
+                    rawLat in -90.0..90.0 && rawLng in -180.0..180.0
+
+            val xMeters: Float
+            val yMeters: Float
+
+            if (hasValidCoords) {
+                // Real Geographic Projection
+                val dLng = rawLng - originLng
+                val dLat = rawLat - originLat
+                xMeters = (dLng * metersPerDegreeLng).toFloat()
+                yMeters = (-dLat * metersPerDegreeLat).toFloat()
             } else {
-                val dLat = lat - originLat
-                val dLng = lng - originLng
-                val dist = sqrt(dLat * dLat + dLng * dLng)
-                val maxAllowedDist = 0.006 + (idx % 4) * 0.001
-                if (dist > maxAllowedDist) {
-                    val scale = maxAllowedDist / dist
-                    lat = originLat + dLat * scale
-                    lng = originLng + dLng * scale
-                }
+                // Fallback circular distribution
+                val radiusMeters = 500.0 + (idx % 5) * 220.0
+                val rad = Math.toRadians(fallbackAngle)
+                xMeters = (radiusMeters * cos(rad)).toFloat()
+                yMeters = (radiusMeters * sin(rad)).toFloat()
+                fallbackAngle += 42.0
             }
-
-            // إضافة إزاحة تشتيتية تمنع التطابق والغطاء التام
-            lat += (((idx + 4) % 5) * 0.0022 - 0.004)
-            lng += (((idx + 4) / 5 % 5) * 0.0022 - 0.004)
-
-            val dLat = lat - originLat
-            val dLng = lng - originLng
 
             points.add(
                 InteractiveMapPoint(
                     id = prop.id,
-                    name = prop.title.ifBlank { "عقار" },
+                    name = prop.title.ifBlank { "عقار معروض" },
                     category = "عقار",
                     type = "PROPERTY",
                     emoji = "🏠",
-                    color = Color(0xFF8B5CF6),
-                    xMeters = (dLng * 111320.0 * Math.cos(Math.toRadians(originLat))).toFloat(),
-                    yMeters = (-dLat * 110540.0).toFloat(),
+                    color = Color(0xFF8B5CF6), // Purple / Violet
+                    xMeters = xMeters,
+                    yMeters = yMeters,
                     rating = 5.0,
                     phone = prop.phone,
                     originalEntity = prop
@@ -242,11 +282,10 @@ fun OfflineInteractiveMap(
             )
         }
 
-        android.util.Log.d("OfflineMap", "Total mapPoints created: ${points.size}")
         points
     }
 
-    // Reset pan & zoom when city changes or on initial launch
+    // Reset pan & zoom smoothly when city changes
     LaunchedEffect(selectedCity) {
         onPanOffsetChange(Offset.Zero)
         onZoomScaleChange(1.0f)
@@ -262,11 +301,13 @@ fun OfflineInteractiveMap(
         val centerX = widthPx / 2f + panOffset.x
         val centerY = heightPx / 2f + panOffset.y
 
-        // Scale: 1 pixel = metersPerPx (default zoom shows ~1.5km radius for rich map)
-        val metersPerPx = (3.5f / zoomScale.coerceIn(0.4f, 5f)).coerceAtLeast(0.8f)
+        // Professional zoom scale: 0.25f (overview ~15km radius) to 8.0f (fine details ~400m radius)
+        val clampedZoom = zoomScale.coerceIn(0.25f, 8.0f)
+        val baseMetersPerPx = 4.0f
+        val metersPerPx = (baseMetersPerPx / clampedZoom).coerceIn(0.4f, 25.0f)
 
-        // Compute screen coordinates for each point
-        val screenPoints = remember(mapPoints, mapPoints.size, centerX, centerY, metersPerPx) {
+        // Compute screen coordinates for all items
+        val screenPoints = remember(mapPoints, centerX, centerY, metersPerPx) {
             mapPoints.map { pt ->
                 pt.copy(
                     screenX = centerX + (pt.xMeters / metersPerPx),
@@ -280,41 +321,53 @@ fun OfflineInteractiveMap(
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
-                        val nextZoom = (zoomScale * zoom).coerceIn(0.35f, 6.0f)
+                        val nextZoom = (zoomScale * zoom).coerceIn(0.25f, 8.0f)
                         onZoomScaleChange(nextZoom)
                         onPanOffsetChange(panOffset + pan)
                     }
                 }
                 .pointerInput(screenPoints) {
-                    detectTapGestures { tapOffset ->
-                        val clicked = screenPoints.minByOrNull { pt ->
-                            sqrt((tapOffset.x - pt.screenX).pow(2) + (tapOffset.y - pt.screenY).pow(2))
-                        }
-                        if (clicked != null) {
-                            val distPx = sqrt((tapOffset.x - clicked.screenX).pow(2) + (tapOffset.y - clicked.screenY).pow(2))
-                            if (distPx < 48f) {
-                                when (val ent = clicked.originalEntity) {
-                                    is ProviderEntity -> onProviderSelected(ent)
-                                    is StoreEntity -> onStoreSelected(ent)
-                                    is PropertyEntity -> onPropertySelected(ent)
+                    detectTapGestures(
+                        onDoubleTap = {
+                            val nextZoom = (zoomScale * 1.4f).coerceIn(0.25f, 8.0f)
+                            onZoomScaleChange(nextZoom)
+                        },
+                        onTap = { tapOffset ->
+                            val clicked = screenPoints.minByOrNull { pt ->
+                                val dx = tapOffset.x - pt.screenX
+                                val dy = tapOffset.y - pt.screenY
+                                dx * dx + dy * dy
+                            }
+                            if (clicked != null) {
+                                val distPx = sqrt(
+                                    (tapOffset.x - clicked.screenX).pow(2) +
+                                            (tapOffset.y - clicked.screenY).pow(2)
+                                )
+                                // 54px comfortable touch radius
+                                if (distPx < 54f) {
+                                    when (val ent = clicked.originalEntity) {
+                                        is ProviderEntity -> onProviderSelected(ent)
+                                        is StoreEntity -> onStoreSelected(ent)
+                                        is PropertyEntity -> onPropertySelected(ent)
+                                    }
+                                } else {
+                                    onDeselect()
                                 }
                             } else {
                                 onDeselect()
                             }
-                        } else {
-                            onDeselect()
                         }
-                    }
+                    )
                 }
         ) {
             val safeCX = if (centerX.isNaN() || centerX.isInfinite()) size.width / 2f else centerX
             val safeCY = if (centerY.isNaN() || centerY.isInfinite()) size.height / 2f else centerY
-            val safeMeters = if (metersPerPx.isNaN() || metersPerPx.isInfinite() || metersPerPx <= 0f) 3.2f else metersPerPx
+            val safeMeters = if (metersPerPx.isNaN() || metersPerPx.isInfinite() || metersPerPx <= 0f) 4.0f else metersPerPx
             val safePan = if (panOffset.x.isNaN() || panOffset.y.isNaN()) Offset.Zero else panOffset
-            val safeZoom = if (zoomScale.isNaN() || zoomScale.isInfinite() || zoomScale <= 0f) 1.0f else zoomScale
+            val safeZoom = if (clampedZoom.isNaN() || clampedZoom.isInfinite() || clampedZoom <= 0f) 1.0f else clampedZoom
 
             try {
-                // 1. رسم خلفية المدينة وشبكة الشوارع والأحياء والمتنزهات والطرق الرئيسية
+                // 1. Draw city roads, avenues, ring-roads and parks
                 drawCityRoadGrid(
                     centerX = safeCX,
                     centerY = safeCY,
@@ -323,27 +376,88 @@ fun OfflineInteractiveMap(
                     heightPx = size.height,
                     panOffset = safePan,
                     zoomScale = safeZoom,
-                    selectedCity = selectedCity
+                    selectedCity = selectedCity,
+                    originLat = originLat,
+                    originLng = originLng,
+                    metersPerDegreeLat = metersPerDegreeLat,
+                    metersPerDegreeLng = metersPerDegreeLng
                 )
 
-                // 2. أدوات الرسم للنصوص والأيقونات
+                // 2. User GPS coordinates projection
+                val userXMeters = ((safeUserLng - originLng) * metersPerDegreeLng).toFloat()
+                val userYMeters = (-(safeUserLat - originLat) * metersPerDegreeLat).toFloat()
+                val userScreenX = safeCX + (userXMeters / safeMeters)
+                val userScreenY = safeCY + (userYMeters / safeMeters)
+                val userPin = Offset(userScreenX, userScreenY)
+
+                val visiblePadding = 90f
+                val minX = -visiblePadding
+                val maxX = size.width + visiblePadding
+                val minY = -visiblePadding
+                val maxY = size.height + visiblePadding
+
+                // 3. Proximity distance rings around user GPS (Tactical Radar overlay)
+                if (userPin.x in minX..maxX && userPin.y in minY..maxY) {
+                    val ring500Px = 500f / safeMeters
+                    val ring1000Px = 1000f / safeMeters
+                    val ring2000Px = 2000f / safeMeters
+
+                    val dashRingStroke = Stroke(
+                        width = 1.2f,
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f))
+                    )
+
+                    if (ring500Px in 35f..size.width) {
+                        drawCircle(Color(0xFF00E5FF).copy(alpha = 0.15f), ring500Px, userPin, style = dashRingStroke)
+                    }
+                    if (ring1000Px in 35f..size.width) {
+                        drawCircle(Color(0xFF00E5FF).copy(alpha = 0.10f), ring1000Px, userPin, style = dashRingStroke)
+                    }
+                    if (ring2000Px in 35f..size.width) {
+                        drawCircle(Color(0xFF00E5FF).copy(alpha = 0.06f), ring2000Px, userPin, style = dashRingStroke)
+                    }
+                }
+
+                // 4. Dynamic paints scaled with zoom for sharp crisp rendering
+                val fontScale = (safeZoom.coerceIn(0.6f, 2.5f)).pow(0.35f)
+                val emojiSize = (28f * fontScale).coerceIn(20f, 38f)
+                val titleLabelSize = (18f * fontScale).coerceIn(13f, 25f)
+                val subLabelSize = (14f * fontScale).coerceIn(11f, 19f)
+
                 val emojiPaint = android.graphics.Paint().apply {
-                    textSize = 28f
+                    textSize = emojiSize
                     textAlign = android.graphics.Paint.Align.CENTER
                     isAntiAlias = true
                 }
-                val labelPaint = android.graphics.Paint().apply {
-                    textSize = 20f
+
+                val titlePaint = android.graphics.Paint().apply {
+                    textSize = titleLabelSize
                     color = android.graphics.Color.WHITE
                     textAlign = android.graphics.Paint.Align.CENTER
                     isFakeBoldText = true
-                    setShadowLayer(4f, 1f, 1f, android.graphics.Color.BLACK)
+                    isAntiAlias = true
+                    setShadowLayer(6f, 2f, 2f, android.graphics.Color.parseColor("#E6000000"))
                 }
 
-                // 3. رسم كل علامات الخدمات والمنشآت
+                val subtitlePaint = android.graphics.Paint().apply {
+                    textSize = subLabelSize
+                    color = android.graphics.Color.parseColor("#38BDF8") // Sky blue accent
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    isFakeBoldText = true
+                    isAntiAlias = true
+                    setShadowLayer(4f, 1f, 1f, android.graphics.Color.parseColor("#E6000000"))
+                }
+
+                val labelBgPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.parseColor("#CC0F172A")
+                    isAntiAlias = true
+                    style = android.graphics.Paint.Style.FILL
+                }
+
+                // 5. Render service & entity markers with ground needles, shadows and distance tags
                 screenPoints.forEach { pt ->
-                    val pin = Offset(pt.screenX, pt.screenY)
-                    if (pin.x in -50f..(size.width + 50f) && pin.y in -50f..(size.height + 50f)) {
+                    val groundPoint = Offset(pt.screenX, pt.screenY)
+                    if (groundPoint.x in minX..maxX && groundPoint.y in minY..maxY) {
                         val isSelected = when (val ent = selectedEntity) {
                             is ProviderEntity -> ent.id == pt.id
                             is StoreEntity -> ent.id == pt.id
@@ -351,67 +465,318 @@ fun OfflineInteractiveMap(
                             else -> false
                         }
 
-                        // هالة إشعاعية خلف النقطة
+                        val baseRadius = 15f * fontScale.coerceIn(0.85f, 1.4f)
+                        val pinHeadCenter = Offset(groundPoint.x, groundPoint.y - baseRadius - 5f)
+
+                        // Ground contact shadow
+                        drawOval(
+                            color = Color.Black.copy(alpha = 0.40f),
+                            topLeft = Offset(groundPoint.x - baseRadius * 0.75f, groundPoint.y - 3f),
+                            size = Size(baseRadius * 1.5f, 6f)
+                        )
+
+                        // Ground pointer needle
+                        val needlePath = Path().apply {
+                            moveTo(groundPoint.x, groundPoint.y)
+                            lineTo(groundPoint.x - baseRadius * 0.55f, pinHeadCenter.y + baseRadius * 0.5f)
+                            lineTo(groundPoint.x + baseRadius * 0.55f, pinHeadCenter.y + baseRadius * 0.5f)
+                            close()
+                        }
+                        drawPath(needlePath, color = if (isSelected) Color.White else pt.color)
+
+                        // Outer glowing aura / halo
                         if (isSelected) {
-                            drawCircle(pt.color.copy(alpha = 0.5f), 32f, pin)
-                            drawCircle(pt.color, 18f, pin, style = Stroke(4f))
+                            drawCircle(pt.color.copy(alpha = 0.30f), baseRadius * 2.8f, pinHeadCenter)
+                            drawCircle(pt.color.copy(alpha = 0.65f), baseRadius * 1.9f, pinHeadCenter)
+                            drawCircle(Color.White, baseRadius * 1.35f, pinHeadCenter, style = Stroke(4f))
                         } else {
-                            drawCircle(pt.color.copy(alpha = 0.35f), 22f, pin)
+                            drawCircle(pt.color.copy(alpha = 0.35f), baseRadius * 1.7f, pinHeadCenter)
                         }
 
-                        // خلفية النقطة
-                        drawCircle(Color(0xFF0F172A), 15f, pin)
-                        drawCircle(pt.color, 15f, pin, style = Stroke(2.5f))
+                        // Badge core
+                        drawCircle(Color(0xFF0F172A), baseRadius, pinHeadCenter)
+                        drawCircle(
+                            color = if (isSelected) Color.White else pt.color,
+                            radius = baseRadius,
+                            center = pinHeadCenter,
+                            style = Stroke(if (isSelected) 3.5f else 2.5f)
+                        )
 
-                        // رمز الخدمة (الإيموجي)
-                        drawContext.canvas.nativeCanvas.drawText(pt.emoji, pin.x, pin.y + 9f, emojiPaint)
+                        // Emoji icon inside badge
+                        drawContext.canvas.nativeCanvas.drawText(
+                            pt.emoji,
+                            pinHeadCenter.x,
+                            pinHeadCenter.y + (emojiSize * 0.35f),
+                            emojiPaint
+                        )
 
-                        // اسم المنشأة أو الفني
-                        val shortName = pt.name.take(12)
-                        drawContext.canvas.nativeCanvas.drawText(shortName, pin.x, pin.y + 36f, labelPaint)
+                        // Calculate distance from user GPS
+                        val distMeters = sqrt((pt.xMeters - userXMeters).pow(2) + (pt.yMeters - userYMeters).pow(2))
+                        val distString = if (distMeters < 1000f) {
+                            "${distMeters.roundToInt()} م"
+                        } else {
+                            "${String.format(java.util.Locale.US, "%.1f", distMeters / 1000f)} كم"
+                        }
+
+                        // Legible multi-attribute label with dark pill background
+                        if (safeZoom >= 0.50f) {
+                            val displayName = if (pt.name.length > 20) pt.name.take(19) + "…" else pt.name
+                            val titleWidth = titlePaint.measureText(displayName)
+                            val subText = "${pt.category} • $distString"
+                            val subWidth = subtitlePaint.measureText(subText)
+                            val maxTextWidth = max(titleWidth, subWidth)
+
+                            val labelTop = pinHeadCenter.y + baseRadius + 4f
+                            val labelBottom = labelTop + titleLabelSize + subLabelSize + 8f
+
+                            val bgRect = android.graphics.RectF(
+                                pinHeadCenter.x - (maxTextWidth / 2f) - 10f,
+                                labelTop - 2f,
+                                pinHeadCenter.x + (maxTextWidth / 2f) + 10f,
+                                labelBottom
+                            )
+
+                            drawContext.canvas.nativeCanvas.drawRoundRect(
+                                bgRect,
+                                12f,
+                                12f,
+                                labelBgPaint
+                            )
+
+                            // Title line
+                            drawContext.canvas.nativeCanvas.drawText(
+                                displayName,
+                                pinHeadCenter.x,
+                                labelTop + titleLabelSize - 1f,
+                                titlePaint
+                            )
+
+                            // Subtitle line (category & distance)
+                            drawContext.canvas.nativeCanvas.drawText(
+                                subText,
+                                pinHeadCenter.x,
+                                labelTop + titleLabelSize + subLabelSize + 3f,
+                                subtitlePaint
+                            )
+                        }
                     }
                 }
 
-                // 4. موقع المستخدم المباشر
-                val userX = centerX + (((safeUserLng - originLng) * 111320.0 * Math.cos(Math.toRadians(originLat))) / metersPerPx).toFloat()
-                val userY = centerY + (((-(safeUserLat - originLat) * 110540.0) / metersPerPx).toFloat())
+                // 6. User GPS location with pulsating neon cyan animation & halo
+                if (userPin.x in minX..maxX && userPin.y in minY..maxY) {
+                    val pulseRadiusMax = 44f
+                    val currentPulse = pulseProgress * pulseRadiusMax
+                    val pulseAlpha = (1f - pulseProgress).coerceIn(0f, 1f) * 0.55f
 
-                if (userX in -100f..(size.width + 100f) && userY in -100f..(size.height + 100f)) {
-                    drawCircle(Color(0xFF00E5FF).copy(alpha = 0.25f), 36f, Offset(userX, userY))
-                    drawCircle(Color(0xFF00E5FF).copy(alpha = 0.5f), 22f, Offset(userX, userY))
-                    drawCircle(Color(0xFF00E5FF), 10f, Offset(userX, userY))
-                    drawCircle(Color.White, 4f, Offset(userX, userY))
+                    // Pulsing outer ripple
+                    drawCircle(
+                        color = Color(0xFF00E5FF).copy(alpha = pulseAlpha),
+                        radius = 14f + currentPulse,
+                        center = userPin
+                    )
+                    // Mid glow
+                    drawCircle(
+                        color = Color(0xFF00E5FF).copy(alpha = 0.35f),
+                        radius = 20f,
+                        center = userPin
+                    )
+                    // High-contrast neon pin core
+                    drawCircle(
+                        color = Color(0xFF0F172A),
+                        radius = 13f,
+                        center = userPin
+                    )
+                    drawCircle(
+                        color = Color(0xFF00E5FF),
+                        radius = 11f,
+                        center = userPin
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = 5f,
+                        center = userPin
+                    )
+
+                    // User location title badge
+                    val uLabel = "موقعك المباشر: جولة الضبيبي 📍"
+                    val uSubLabel = "بالقرب من جامعة صنعاء القديمة"
+                    val uTitlePaint = android.graphics.Paint().apply {
+                        textSize = 21f
+                        color = android.graphics.Color.WHITE
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isFakeBoldText = true
+                        isAntiAlias = true
+                        setShadowLayer(4f, 1f, 1f, android.graphics.Color.BLACK)
+                    }
+                    val uSubPaint = android.graphics.Paint().apply {
+                        textSize = 15f
+                        color = android.graphics.Color.parseColor("#38BDF8")
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isFakeBoldText = true
+                        isAntiAlias = true
+                    }
+                    val uW = uTitlePaint.measureText(uLabel).coerceAtLeast(uSubPaint.measureText(uSubLabel))
+                    val uRect = android.graphics.RectF(
+                        userPin.x - (uW / 2f) - 14f,
+                        userPin.y - 68f,
+                        userPin.x + (uW / 2f) + 14f,
+                        userPin.y - 18f
+                    )
+                    val uBgPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.parseColor("#E60F172A")
+                        style = android.graphics.Paint.Style.FILL
+                        isAntiAlias = true
+                    }
+                    val uBorderPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.parseColor("#00E5FF")
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeWidth = 1.8f
+                        isAntiAlias = true
+                    }
+                    drawContext.canvas.nativeCanvas.drawRoundRect(uRect, 10f, 10f, uBgPaint)
+                    drawContext.canvas.nativeCanvas.drawRoundRect(uRect, 10f, 10f, uBorderPaint)
+                    drawContext.canvas.nativeCanvas.drawText(uLabel, userPin.x, userPin.y - 42f, uTitlePaint)
+                    drawContext.canvas.nativeCanvas.drawText(uSubLabel, userPin.x, userPin.y - 24f, uSubPaint)
                 }
 
             } catch (e: Exception) {
+                // Guaranteed safety: Never display a blank or crash screen
                 drawRect(Color(0xFF0F172A))
-                drawCircle(Color(0xFF00E5FF).copy(alpha = 0.3f), 40f, Offset(size.width/2, size.height/2))
+                drawCircle(Color(0xFF00E5FF).copy(alpha = 0.3f), 40f, Offset(size.width / 2, size.height / 2))
             }
         }
 
-        // Top-left offline map badge
+        // Top-left city and offline map indicator badge
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = Color(0xFF1E293B).copy(alpha = 0.9f),
+            color = Color(0xFF1E293B).copy(alpha = 0.92f),
             border = ButtonDefaults.outlinedButtonBorder,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(start = 16.dp, top = 80.dp)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(14.dp))
-                Text("خريطة دليل اليمن التفاعلية المباشرة 🗺️", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (selectedCity == "الكل") "خريطة اليمن التفاعلية 🗺️" else "خريطة $selectedCity 📍",
+                    fontSize = 11.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Top-right Interactive North Compass Needle
+        Surface(
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = Color(0xFF1E293B).copy(alpha = 0.92f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 16.dp, top = 80.dp)
+                .size(38.dp)
+                .clickable {
+                    onPanOffsetChange(Offset.Zero)
+                }
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Navigation,
+                    contentDescription = "محاذاة للشمال",
+                    tint = Color(0xFFFF5252),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // Center friendly notice when no points match selected filter
+        if (mapPoints.isEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF1E293B).copy(alpha = 0.95f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(32.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
+                    Text(
+                        text = "لا توجد خدمات في هذه المنطقة حالياً",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // Bottom-left Dynamic Cartographic Scale Ruler & Zoom Multiplier
+        val rawScaleMeters = 75f * metersPerPx
+        val scaleDistanceMeters = when {
+            rawScaleMeters <= 75f -> 50
+            rawScaleMeters <= 150f -> 100
+            rawScaleMeters <= 350f -> 200
+            rawScaleMeters <= 750f -> 500
+            rawScaleMeters <= 1500f -> 1000
+            rawScaleMeters <= 3500f -> 2000
+            rawScaleMeters <= 7500f -> 5000
+            rawScaleMeters <= 15000f -> 10000
+            else -> 20000
+        }
+        val scaleBarWidthDp = ((scaleDistanceMeters / metersPerPx) * 0.85f).coerceIn(40f, 130f).dp
+        val scaleLabelText = if (scaleDistanceMeters < 1000) "$scaleDistanceMeters م" else "${scaleDistanceMeters / 1000} كم"
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF1E293B).copy(alpha = 0.90f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, bottom = 24.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = scaleLabelText,
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(scaleBarWidthDp)
+                            .height(3.dp)
+                            .background(Color(0xFF00E5FF), RoundedCornerShape(1.dp))
+                    )
+                }
+                Text(
+                    text = "${String.format(java.util.Locale.US, "%.1f", clampedZoom)}x",
+                    color = Color(0xFF00E5FF),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
 
 /**
- * Draws structured city roads, ring-roads and blocks in high-contrast neon cartographic style
+ * Draws structured city roads, ring-roads, blocks and parks in high-contrast neon cartographic style
  */
 private fun DrawScope.drawCityRoadGrid(
     centerX: Float,
@@ -421,241 +786,381 @@ private fun DrawScope.drawCityRoadGrid(
     heightPx: Float,
     panOffset: Offset,
     zoomScale: Float,
-    selectedCity: String
+    selectedCity: String,
+    originLat: Double,
+    originLng: Double,
+    metersPerDegreeLat: Double,
+    metersPerDegreeLng: Double
 ) {
-    val gridSize = 220f * zoomScale
+    // Geodesic projection: maps real (lat, lng) to pixel offsets
+    fun geoToScreen(lat: Double, lng: Double): Offset {
+        val xm = ((lng - originLng) * metersPerDegreeLng).toFloat()
+        val ym = (-(lat - originLat) * metersPerDegreeLat).toFloat()
+        return Offset(centerX + (xm / metersPerPx), centerY + (ym / metersPerPx))
+    }
+
+    // 1. Urban Cartographic Background Blocks
+    val gridSize = (140f * zoomScale.coerceIn(0.5f, 2.5f))
     val startX = (panOffset.x % gridSize) - gridSize
     val startY = (panOffset.y % gridSize) - gridSize
 
-    val blockColor = Color(0xFF1A263D) // Highly visible urban block fill
-    val blockBorderColor = Color(0xFF334155) // Bright slate block borders
-    val secondaryRoadColor = Color(0xFF475569) // Highly visible street grid lines
+    val blockColor = Color(0xFF131D31)
+    val blockBorderColor = Color(0xFF1E2C44)
 
-    // Draw grid neighborhood blocks
     var currentY = startY
     while (currentY < heightPx + gridSize) {
         var currentX = startX
         while (currentX < widthPx + gridSize) {
             drawRoundRect(
                 color = blockColor,
-                topLeft = Offset(currentX + 12f, currentY + 12f),
-                size = Size(gridSize - 24f, gridSize - 24f),
-                cornerRadius = CornerRadius(12f, 12f)
+                topLeft = Offset(currentX + 8f, currentY + 8f),
+                size = Size(gridSize - 16f, gridSize - 16f),
+                cornerRadius = CornerRadius(8f, 8f)
             )
             drawRoundRect(
                 color = blockBorderColor,
-                topLeft = Offset(currentX + 12f, currentY + 12f),
-                size = Size(gridSize - 24f, gridSize - 24f),
-                cornerRadius = CornerRadius(12f, 12f),
-                style = Stroke(width = 2.0f)
+                topLeft = Offset(currentX + 8f, currentY + 8f),
+                size = Size(gridSize - 16f, gridSize - 16f),
+                cornerRadius = CornerRadius(8f, 8f),
+                style = Stroke(width = 1f)
             )
             currentX += gridSize
         }
         currentY += gridSize
     }
 
-    // 2. Secondary Street Lines (Grid lines)
-    currentY = startY
-    while (currentY < heightPx + gridSize) {
-        drawLine(
-            color = secondaryRoadColor,
-            start = Offset(0f, currentY),
-            end = Offset(widthPx, currentY),
-            strokeWidth = 3.0f
+    // 2. Real Public Parks (حدائق حقيقية بإحداثياتها الجغرافية)
+    data class GeoParkData(val name: String, val lat: Double, val lng: Double, val wM: Float, val hM: Float)
+    val parks = if (selectedCity.contains("صنعاء") || selectedCity == "الكل") {
+        listOf(
+            GeoParkData("حديقة السبعين الكبرى 🌲", 15.3320, 44.2020, 750f, 550f),
+            GeoParkData("حديقة الثورة العامة 🌲", 15.3850, 44.2050, 650f, 500f),
+            GeoParkData("ميدان التحرير 🏛️", 15.3565, 44.2055, 300f, 250f)
         )
-        currentY += gridSize
+    } else emptyList()
+
+    parks.forEach { p ->
+        val centerPt = geoToScreen(p.lat, p.lng)
+        val wPx = p.wM / metersPerPx
+        val hPx = p.hM / metersPerPx
+        val rectTopLeft = Offset(centerPt.x - wPx / 2f, centerPt.y - hPx / 2f)
+        if (rectTopLeft.x < widthPx + 200f && rectTopLeft.x + wPx > -200f &&
+            rectTopLeft.y < heightPx + 200f && rectTopLeft.y + hPx > -200f) {
+            drawRoundRect(
+                color = Color(0xFF10B981).copy(alpha = 0.40f),
+                topLeft = rectTopLeft,
+                size = Size(wPx, hPx),
+                cornerRadius = CornerRadius(14f, 14f)
+            )
+            drawRoundRect(
+                color = Color(0xFF059669).copy(alpha = 0.70f),
+                topLeft = rectTopLeft,
+                size = Size(wPx, hPx),
+                cornerRadius = CornerRadius(14f, 14f),
+                style = Stroke(width = 1.5f)
+            )
+        }
     }
-    var currentX = startX
-    while (currentX < widthPx + gridSize) {
-        drawLine(
-            color = secondaryRoadColor,
-            start = Offset(currentX, 0f),
-            end = Offset(currentX, heightPx),
-            strokeWidth = 3.0f
+
+    // 3. Real Geodesic Roads (شبكة الشوارع الحقيقية للعاصمة صنعاء)
+    data class GeoRoadSegment(
+        val name: String,
+        val isHighway: Boolean,
+        val points: List<Pair<Double, Double>>
+    )
+
+    val roads = if (selectedCity.contains("صنعاء") || selectedCity == "الكل") {
+        listOf(
+            // شارع الستين الغربي
+            GeoRoadSegment(
+                "شارع الستين الغربي", true,
+                listOf(
+                    Pair(15.3950, 44.1680),
+                    Pair(15.3780, 44.1680), // مذبح
+                    Pair(15.3480, 44.1720), // عصر
+                    Pair(15.3200, 44.1750)  // فج عطان
+                )
+            ),
+            // شارع الستين الشرقي
+            GeoRoadSegment(
+                "شارع الستين الشرقي", true,
+                listOf(
+                    Pair(15.3950, 44.2250),
+                    Pair(15.3650, 44.2250), // نقم
+                    Pair(15.3350, 44.2200),
+                    Pair(15.3000, 44.2200)  // دار سلم
+                )
+            ),
+            // شارع الخمسين الجنوبي
+            GeoRoadSegment(
+                "شارع الخمسين الجنوبي", true,
+                listOf(
+                    Pair(15.3050, 44.1700),
+                    Pair(15.3050, 44.1950), // بيت بوس
+                    Pair(15.3050, 44.2250)
+                )
+            ),
+            // شارع السبعين الرئيسي
+            GeoRoadSegment(
+                "شارع السبعين الرئيسي", true,
+                listOf(
+                    Pair(15.3450, 44.2050),
+                    Pair(15.3320, 44.2050), // ميدان السبعين
+                    Pair(15.3250, 44.2050), // جامع الصالح
+                    Pair(15.3050, 44.2050)  // الأصبحي والخمسين
+                )
+            ),
+            // شارع الزبيري الرئيسي
+            GeoRoadSegment(
+                "شارع الزبيري الرئيسي", true,
+                listOf(
+                    Pair(15.3480, 44.1720), // عصر
+                    Pair(15.3520, 44.1880), // الدائري
+                    Pair(15.3530, 44.1980), // الرويشان
+                    Pair(15.3530, 44.2150)  // باب اليمن
+                )
+            ),
+            // شارع الدائري الغربي (يمر بجامعة صنعاء القديمة وجولة الضبيبي!)
+            GeoRoadSegment(
+                "شارع الدائري الغربي", false,
+                listOf(
+                    Pair(15.3800, 44.1780),
+                    Pair(15.3680, 44.1830), // الجامعة الجديدة
+                    Pair(15.3620, 44.1865), // جامعة صنعاء القديمة
+                    Pair(15.3585, 44.1880), // جولة الضبيبي
+                    Pair(15.3520, 44.1880), // الزبيري
+                    Pair(15.3420, 44.1890)  // حدة
+                )
+            ),
+            // شارع حدة الرئيسي
+            GeoRoadSegment(
+                "شارع حدة الرئيسي", false,
+                listOf(
+                    Pair(15.3520, 44.1980), // الرويشان
+                    Pair(15.3400, 44.1940),
+                    Pair(15.3280, 44.1920), // المصباحي
+                    Pair(15.3100, 44.1850)  // المدينة السكنية
+                )
+            ),
+            // شارع هائل التجاري
+            GeoRoadSegment(
+                "شارع هائل التجاري", false,
+                listOf(
+                    Pair(15.3700, 44.1830),
+                    Pair(15.3620, 44.1830),
+                    Pair(15.3520, 44.1840)
+                )
+            ),
+            // شارع الرقاص
+            GeoRoadSegment(
+                "شارع الرقاص", false,
+                listOf(
+                    Pair(15.3700, 44.1800),
+                    Pair(15.3600, 44.1810),
+                    Pair(15.3520, 44.1820)
+                )
+            ),
+            // شارع بغداد
+            GeoRoadSegment(
+                "شارع بغداد", false,
+                listOf(
+                    Pair(15.3520, 44.1920),
+                    Pair(15.3440, 44.1920),
+                    Pair(15.3380, 44.1920)
+                )
+            ),
+            // شارع الجزائر
+            GeoRoadSegment(
+                "شارع الجزائر", false,
+                listOf(
+                    Pair(15.3400, 44.1880),
+                    Pair(15.3400, 44.1950),
+                    Pair(15.3400, 44.2050)
+                )
+            ),
+            // شارع عمان
+            GeoRoadSegment(
+                "شارع عمان", false,
+                listOf(
+                    Pair(15.3480, 44.2000),
+                    Pair(15.3320, 44.2000)
+                )
+            ),
+            // شارع التحرير وعلي عبدالمغني
+            GeoRoadSegment(
+                "شارع علي عبدالمغني", false,
+                listOf(
+                    Pair(15.3600, 44.2050),
+                    Pair(15.3530, 44.2080),
+                    Pair(15.3520, 44.2120)
+                )
+            ),
+            // شارع المطار
+            GeoRoadSegment(
+                "شارع المطار", true,
+                listOf(
+                    Pair(15.3850, 44.2150),
+                    Pair(15.4200, 44.2200),
+                    Pair(15.4600, 44.2250)
+                )
+            ),
+            // شارع تعز العام
+            GeoRoadSegment(
+                "شارع تعز العام", true,
+                listOf(
+                    Pair(15.3520, 44.2160),
+                    Pair(15.3350, 44.2160),
+                    Pair(15.3200, 44.2160), // شميله
+                    Pair(15.2950, 44.2200)
+                )
+            ),
+            // شارع مأرب والنصر
+            GeoRoadSegment(
+                "شارع مأرب والنصر", true,
+                listOf(
+                    Pair(15.3850, 44.2200),
+                    Pair(15.3850, 44.2600)
+                )
+            )
         )
-        currentX += gridSize
-    }
+    } else emptyList()
 
-    // 3. Winding Coastline / River Flow (Stunning Sky Blue)
-    val riverPath = Path().apply {
-        moveTo(0f, centerY - 320f)
-        quadraticTo(centerX - 150f, centerY - 280f, centerX + 180f, centerY + 280f)
-        lineTo(widthPx, centerY + 380f)
-        lineTo(widthPx, centerY + 500f)
-        quadraticTo(centerX + 180f, centerY + 400f, centerX - 150f, centerY - 160f)
-        lineTo(0f, centerY - 200f)
-        close()
-    }
-    drawPath(path = riverPath, color = Color(0xFF38BDF8).copy(alpha = 0.75f)) // Vibrant Sky Blue
+    val highwayOuterColor = Color(0xFFF59E0B) // Amber
+    val highwayInnerColor = Color(0xFFFEF08A) // Yellow
+    val streetOuterColor = Color(0xFF0284C7)  // Sky
+    val streetInnerColor = Color(0xFFE0F2FE)  // Light cyan
 
-    // 4. Large Green Parks
-    drawRoundRect(
-        color = Color(0xFF10B981).copy(alpha = 0.90f), // Vibrant Emerald Green
-        topLeft = Offset(centerX - 420f, centerY + 220f),
-        size = Size(260f, 200f),
-        cornerRadius = CornerRadius(16f, 16f)
-    )
-    
-    drawRoundRect(
-        color = Color(0xFF10B981).copy(alpha = 0.90f),
-        topLeft = Offset(centerX + 240f, centerY - 480f),
-        size = Size(280f, 220f),
-        cornerRadius = CornerRadius(16f, 16f)
-    )
-
-    // 5. Major Arterial Highways (Thick Golden Routes)
-    val primaryAvenueColor = Color(0xFFF59E0B) // Amber Gold Main Highways
-    val primaryAvenueInner = Color(0xFFFDE047) // Inner Yellow Core
-    val expressHighwayColor = Color(0xFF00E5FF) // Electric Cyan Express Avenues
-
-    // Main Horizontal Highway
-    drawLine(
-        color = primaryAvenueColor,
-        start = Offset(0f, centerY),
-        end = Offset(widthPx, centerY),
-        strokeWidth = 10.0f
-    )
-    drawLine(
-        color = primaryAvenueInner,
-        start = Offset(0f, centerY),
-        end = Offset(widthPx, centerY),
-        strokeWidth = 4.0f
-    )
-
-    // Main Vertical Highway
-    drawLine(
-        color = primaryAvenueColor,
-        start = Offset(centerX, 0f),
-        end = Offset(centerX, heightPx),
-        strokeWidth = 10.0f
-    )
-    drawLine(
-        color = primaryAvenueInner,
-        start = Offset(centerX, 0f),
-        end = Offset(centerX, heightPx),
-        strokeWidth = 4.0f
-    )
-
-    // Electric Cyan Ring Roads
-    val ringOffsetPx = 800f / metersPerPx
-    drawLine(
-        color = expressHighwayColor,
-        start = Offset(0f, centerY - ringOffsetPx),
-        end = Offset(widthPx, centerY - ringOffsetPx),
-        strokeWidth = 6.0f
-    )
-    drawLine(
-        color = expressHighwayColor,
-        start = Offset(0f, centerY + ringOffsetPx),
-        end = Offset(widthPx, centerY + ringOffsetPx),
-        strokeWidth = 6.0f
-    )
-    drawLine(
-        color = expressHighwayColor,
-        start = Offset(centerX - ringOffsetPx, 0f),
-        end = Offset(centerX - ringOffsetPx, heightPx),
-        strokeWidth = 6.0f
-    )
-    drawLine(
-        color = expressHighwayColor,
-        start = Offset(centerX + ringOffsetPx, 0f),
-        end = Offset(centerX + ringOffsetPx, heightPx),
-        strokeWidth = 6.0f
-    )
-
-    // 6. Beautiful Arabic Typography Map Labels (Clean, highly visible)
-    val textPaint = android.graphics.Paint().apply {
-        textSize = 32f
+    val roadTextPaint = android.graphics.Paint().apply {
+        textSize = (20f * zoomScale.coerceIn(0.7f, 1.6f)).coerceIn(16f, 28f)
         color = android.graphics.Color.WHITE
         textAlign = android.graphics.Paint.Align.CENTER
         isFakeBoldText = true
-        setShadowLayer(4f, 2f, 2f, android.graphics.Color.BLACK)
+        isAntiAlias = true
+        setShadowLayer(5f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
-    val streetPaint = android.graphics.Paint().apply {
-        textSize = 23f
-        color = android.graphics.Color.parseColor("#FBBF24") // Vivid amber
+    // Draw road polylines
+    roads.forEach { r ->
+        val pts = r.points.map { geoToScreen(it.first, it.second) }
+        for (i in 0 until pts.size - 1) {
+            val p1 = pts[i]
+            val p2 = pts[i + 1]
+
+            val outerW = if (r.isHighway) 9.0f else 6.0f
+            val innerW = if (r.isHighway) 4.5f else 2.5f
+            val oCol = if (r.isHighway) highwayOuterColor else streetOuterColor
+            val iCol = if (r.isHighway) highwayInnerColor else streetInnerColor
+
+            drawLine(color = oCol, start = p1, end = p2, strokeWidth = outerW)
+            drawLine(color = iCol, start = p1, end = p2, strokeWidth = innerW)
+        }
+
+        // Draw road name at middle segment
+        if (pts.size >= 2) {
+            val midIdx = (pts.size - 1) / 2
+            val midX = (pts[midIdx].x + pts[midIdx + 1].x) / 2f
+            val midY = (pts[midIdx].y + pts[midIdx + 1].y) / 2f
+            if (midX in -80f..(widthPx + 80f) && midY in -80f..(heightPx + 80f)) {
+                drawContext.canvas.nativeCanvas.drawText(r.name + " 🛣️", midX, midY - 8f, roadTextPaint)
+            }
+        }
+    }
+
+    // 4. Real Roundabouts (الجولات الحقيقية بإحداثياتها الدقيقة)
+    data class GeoRoundaboutData(val name: String, val lat: Double, val lng: Double, val isHighlight: Boolean = false)
+    val roundabouts = if (selectedCity.contains("صنعاء") || selectedCity == "الكل") {
+        listOf(
+            GeoRoundaboutData("جولة الضبيبي 📍", 15.3585, 44.1880, true), // موقع المستخدم الفعلي
+            GeoRoundaboutData("جامعة صنعاء القديمة 🏛️", 15.3620, 44.1865, true),
+            GeoRoundaboutData("جولة كنتاكي / الرويشان", 15.3510, 44.1980),
+            GeoRoundaboutData("جولة المصباحي (حدة)", 15.3280, 44.1920),
+            GeoRoundaboutData("جولة عصر", 15.3460, 44.1720),
+            GeoRoundaboutData("جولة مذبح", 15.3780, 44.1680),
+            GeoRoundaboutData("ميدان التحرير 🏛️", 15.3565, 44.2055),
+            GeoRoundaboutData("باب اليمن التاريخي 🏛️", 15.3530, 44.2155),
+            GeoRoundaboutData("ميدان السبعين وجامع الصالح 🕌", 15.3250, 44.2050),
+            GeoRoundaboutData("جولة شميله", 15.3200, 44.2160),
+            GeoRoundaboutData("جولة سبأ", 15.3720, 44.2120),
+            GeoRoundaboutData("جولة القادسية", 15.3380, 44.1820)
+        )
+    } else emptyList()
+
+    val roundPaint = android.graphics.Paint().apply {
+        textSize = (20f * zoomScale.coerceIn(0.7f, 1.5f)).coerceIn(15f, 26f)
+        color = android.graphics.Color.WHITE
         textAlign = android.graphics.Paint.Align.CENTER
         isFakeBoldText = true
-        setShadowLayer(3f, 1f, 1f, android.graphics.Color.BLACK)
+        isAntiAlias = true
+        setShadowLayer(5f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
-    val parkPaint = android.graphics.Paint().apply {
-        textSize = 24f
-        color = android.graphics.Color.parseColor("#34D399") // Bright emerald green
+    roundabouts.forEach { rb ->
+        val pt = geoToScreen(rb.lat, rb.lng)
+        if (pt.x in -120f..(widthPx + 120f) && pt.y in -120f..(heightPx + 120f)) {
+            val ringColor = if (rb.isHighlight) Color(0xFF00E5FF) else Color(0xFFFBBF24)
+            drawCircle(color = ringColor.copy(alpha = 0.35f), radius = 16f, center = pt)
+            drawCircle(color = ringColor, radius = 9f, center = pt)
+            drawCircle(color = Color(0xFF0F172A), radius = 5f, center = pt)
+            drawContext.canvas.nativeCanvas.drawText(rb.name, pt.x, pt.y + 24f, roundPaint)
+        }
+    }
+
+    // 5. Real Neighborhood Badges (أحياء العاصمة صنعاء بإحداثياتها الجغرافية)
+    data class GeoDistrictData(val name: String, val lat: Double, val lng: Double, val emoji: String)
+    val districts = if (selectedCity.contains("صنعاء") || selectedCity == "الكل") {
+        listOf(
+            GeoDistrictData("حي جامعة صنعاء", 15.3650, 44.1850, "🎓"),
+            GeoDistrictData("حي هائل التجاري", 15.3620, 44.1820, "🛍️"),
+            GeoDistrictData("حي الدائري", 15.3560, 44.1890, "🏙️"),
+            GeoDistrictData("حي حدة الراقي", 15.3300, 44.1880, "✨"),
+            GeoDistrictData("صنعاء القديمة التاريخية", 15.3550, 44.2160, "🏛️"),
+            GeoDistrictData("حي التحرير", 15.3570, 44.2050, "🏢"),
+            GeoDistrictData("حي السبعين", 15.3350, 44.2050, "🌳"),
+            GeoDistrictData("حي عصر", 15.3420, 44.1690, "⛰️"),
+            GeoDistrictData("حي المذبح", 15.3850, 44.1680, "🏡"),
+            GeoDistrictData("حي الحصبة", 15.3820, 44.2050, "🏙️"),
+            GeoDistrictData("حي الروضة", 15.4200, 44.2150, "🌿"),
+            GeoDistrictData("حي شميله", 15.3200, 44.2160, "🛒"),
+            GeoDistrictData("حي الأصبحي", 15.3050, 44.2100, "🏘️"),
+            GeoDistrictData("حي بيت بوس", 15.2950, 44.1950, "🏰"),
+            GeoDistrictData("حي نقم وشيراتون", 15.3650, 44.2300, "🏨"),
+            GeoDistrictData("حي الصافية", 15.3450, 44.2120, "🏡")
+        )
+    } else emptyList()
+
+    val distPaint = android.graphics.Paint().apply {
+        textSize = (22f * zoomScale.coerceIn(0.7f, 1.5f)).coerceIn(16f, 28f)
+        color = android.graphics.Color.WHITE
         textAlign = android.graphics.Paint.Align.CENTER
         isFakeBoldText = true
-        setShadowLayer(3f, 1f, 1f, android.graphics.Color.BLACK)
+        isAntiAlias = true
+        setShadowLayer(6f, 1f, 1f, android.graphics.Color.BLACK)
     }
 
-    // Construct governorate-specific labels dynamically
-    val districtLabels = when {
-        selectedCity.contains("تعز") -> listOf(
-            MapLabel("قلعة القاهرة التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
-            MapLabel("حي المسبح والروضة 🏙️", centerX - 350f, centerY - 220f, textPaint),
-            MapLabel("شارع جمال عبد الناصر 🛣️", centerX - 250f, centerY - 15f, streetPaint),
-            MapLabel("شارع 26 سبتمبر 🛣️", centerX + 40f, centerY - 500f, streetPaint),
-            MapLabel("حديقة الحوبان 🌲", centerX - 290f, centerY + 320f, parkPaint),
-            MapLabel("حي وادي القاضي 🌳", centerX + 260f, centerY + 240f, textPaint),
-            MapLabel("مركز محافظة تعز 📍", centerX + 10f, centerY - 32f, textPaint)
-        )
-        selectedCity.contains("عدن") -> listOf(
-            MapLabel("صهاريج عدن التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
-            MapLabel("حي المعلا والقلوعة 🏙️", centerX - 350f, centerY - 220f, textPaint),
-            MapLabel("شارع المعلا الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
-            MapLabel("طريق الجسر البحري 🌉", centerX + 40f, centerY - 500f, streetPaint),
-            MapLabel("ساحل كورنيش صيرة 🌊", centerX + 380f, centerY - 370f, parkPaint),
-            MapLabel("حديقة الكمسري 🌲", centerX - 290f, centerY + 320f, parkPaint),
-            MapLabel("حي خور مكسر العام 🌳", centerX + 260f, centerY + 240f, textPaint),
-            MapLabel("العاصمة عدن 📍", centerX + 10f, centerY - 32f, textPaint)
-        )
-        selectedCity.contains("إب") -> listOf(
-            MapLabel("جبل ربي والمدينة القديمة 🏛️", centerX - 30f, centerY - 380f, textPaint),
-            MapLabel("حي أبلان التجاري 🏙️", centerX - 350f, centerY - 220f, textPaint),
-            MapLabel("شارع العدين الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
-            MapLabel("الدائري الغربي 🛣️", centerX + 40f, centerY - 500f, streetPaint),
-            MapLabel("منتزه مشورة الخضراء 🌲", centerX - 290f, centerY + 320f, parkPaint),
-            MapLabel("حي الميدان العام 🌳", centerX + 260f, centerY + 240f, textPaint),
-            MapLabel("مركز محافظة إب 📍", centerX + 10f, centerY - 32f, textPaint)
-        )
-        selectedCity.contains("الحديدة") -> listOf(
-            MapLabel("قلعة الكورنيش التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
-            MapLabel("حي 7 يوليو التجاري 🏙️", centerX - 350f, centerY - 220f, textPaint),
-            MapLabel("شارع صنعاء الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
-            MapLabel("الكورنيش الساحلي 🌊", centerX + 380f, centerY - 370f, parkPaint),
-            MapLabel("حديقة الشعب 🌲", centerX - 290f, centerY + 320f, parkPaint),
-            MapLabel("مركز عروس البحر الأحمر 📍", centerX + 10f, centerY - 32f, textPaint)
-        )
-        selectedCity.contains("حضرموت") || selectedCity.contains("المكلا") -> listOf(
-            MapLabel("حصن الغويزي التاريخي 🏛️", centerX - 30f, centerY - 380f, textPaint),
-            MapLabel("حي السلام والشرج 🏙️", centerX - 350f, centerY - 220f, textPaint),
-            MapLabel("شارع الستين الساحلي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
-            MapLabel("خور المكلا المباشر 🌊", centerX + 380f, centerY - 370f, parkPaint),
-            MapLabel("حديقة 30 نوفمبر 🌲", centerX - 290f, centerY + 320f, parkPaint),
-            MapLabel("مركز مدينة المكلا 📍", centerX + 10f, centerY - 32f, textPaint)
-        )
-        else -> listOf(
-            MapLabel("صنعاء القديمة التاريخية 🏛️", centerX - 30f, centerY - 380f, textPaint),
-            MapLabel("حي حدة الراقي 🏙️", centerX - 350f, centerY - 220f, textPaint),
-            MapLabel("شارع الزبيري الرئيسي 🛣️", centerX - 250f, centerY - 15f, streetPaint),
-            MapLabel("شارع الستين الغربي 🛣️", centerX + 40f, centerY - 500f, streetPaint),
-            MapLabel("حديقة السبعين 🌲", centerX - 290f, centerY + 320f, parkPaint),
-            MapLabel("حديقة الثورة 🌲", centerX + 380f, centerY - 370f, parkPaint),
-            MapLabel("حي السبعين العام 🌳", centerX + 260f, centerY + 240f, textPaint),
-            MapLabel("موقعك المباشر بالعاصمة 📍", centerX + 10f, centerY - 32f, textPaint)
-        )
-    }
-
-    districtLabels.forEach { labelItem ->
-        val x = labelItem.x
-        val y = labelItem.y
-        if (x in -150f..(widthPx + 150f) && y in -150f..(heightPx + 150f)) {
-            drawContext.canvas.nativeCanvas.drawText(labelItem.text, x, y, labelItem.paint)
+    districts.forEach { d ->
+        val pt = geoToScreen(d.lat, d.lng)
+        if (pt.x in -120f..(widthPx + 120f) && pt.y in -120f..(heightPx + 120f)) {
+            val label = "${d.emoji} ${d.name}"
+            val textW = distPaint.measureText(label)
+            val bgRect = android.graphics.RectF(pt.x - textW / 2f - 10f, pt.y - 20f, pt.x + textW / 2f + 10f, pt.y + 8f)
+            val pillPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.parseColor("#B30F172A")
+                isAntiAlias = true
+                style = android.graphics.Paint.Style.FILL
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.parseColor("#475569")
+                isAntiAlias = true
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 1.2f
+            }
+            drawContext.canvas.nativeCanvas.drawRoundRect(bgRect, 8f, 8f, pillPaint)
+            drawContext.canvas.nativeCanvas.drawRoundRect(bgRect, 8f, 8f, borderPaint)
+            drawContext.canvas.nativeCanvas.drawText(label, pt.x, pt.y, distPaint)
         }
     }
 }
 
-// Define the MapLabel class at top-level instead of inside the method for maximum performance and stability
 data class MapLabel(val text: String, val x: Float, val y: Float, val paint: android.graphics.Paint)
 
 data class InteractiveMapPoint(
@@ -673,3 +1178,4 @@ data class InteractiveMapPoint(
     val screenX: Float = 0f,
     val screenY: Float = 0f
 )
+

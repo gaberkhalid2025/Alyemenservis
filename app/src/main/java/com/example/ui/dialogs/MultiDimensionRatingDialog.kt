@@ -132,7 +132,7 @@ fun MultiDimensionRatingDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("المتوسط الإجمالي:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("⭐ ${String.format("%.1f", overallRating)} / 5.0", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFB300))
+                        Text("⭐ ${String.format(java.util.Locale.US, "%.1f", overallRating)} / 5.0", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFB300))
                     }
 
                     OutlinedTextField(
@@ -174,7 +174,7 @@ fun MultiDimensionRatingDialog(
                                 if (bookingId.isNotEmpty()) {
                                     val bk = viewModel.bookings.value.find { it.id == bookingId }
                                     val status = bk?.status?.uppercase() ?: ""
-                                    if (bk != null && status != "COMPLETED" && status != "FINISHED") {
+                                    if (bk != null && status != "COMPLETED") {
                                         Toast.makeText(context, "لا يمكن التقييم إلا بعد اكتمال الخدمة", Toast.LENGTH_SHORT).show()
                                     } else {
                                         doSubmit()

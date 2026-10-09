@@ -61,6 +61,11 @@ object LevenshteinMatcher {
         val q = query.lowercase().trim()
         val t = target.lowercase().trim()
 
+        if (searchCache.size > 500) {
+            val now = System.currentTimeMillis()
+            searchCache.entries.removeIf { now - it.value.first > CACHE_TTL }
+        }
+
         val cacheKey = "$q::$t::$maxDistance"
         val cached = searchCache[cacheKey]
         if (cached != null && System.currentTimeMillis() - cached.first < CACHE_TTL) {

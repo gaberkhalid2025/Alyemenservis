@@ -98,7 +98,7 @@ fun CreateBookingScreen(
     var showCityDropdown by remember { mutableStateOf(false) }
     var showServiceDropdown by remember { mutableStateOf(false) }
 
-    val yemeniCities = listOf("صنعاء", "عدن", "تعز", "إب", "حضرموت", "الحديدة", "ذمار", "مأرب")
+    val yemeniCities = com.example.domain.YemenCities.list
 
     val bookingDepartments = listOf(
         "خدمات وفنيين",

@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -49,7 +50,12 @@ fun EntityActionButtons(
                     colors = CheckboxDefaults.colors(checkedColor = Color(0xFFF59E0B)),
                     modifier = Modifier.size(32.dp)
                 )
-                Text("VIP ⭐", fontSize = 10.sp, color = Color.White)
+                Text(
+                    "VIP ⭐",
+                    fontSize = 10.sp,
+                    color = Color.White,
+                    modifier = Modifier.clickable { onToggleVip() }
+                )
                 Spacer(Modifier.width(4.dp))
             }
             
@@ -60,7 +66,12 @@ fun EntityActionButtons(
                     colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6)),
                     modifier = Modifier.size(32.dp)
                 )
-                Text("موثق ✅", fontSize = 10.sp, color = Color.White)
+                Text(
+                    "موثق ✅",
+                    fontSize = 10.sp,
+                    color = Color.White,
+                    modifier = Modifier.clickable { onToggleVerified() }
+                )
             }
         }
         

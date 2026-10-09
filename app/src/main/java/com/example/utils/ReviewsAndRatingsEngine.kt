@@ -18,7 +18,7 @@ object ReviewsAndRatingsEngine {
     private val db = FirebaseFirestore.getInstance()
 
     // Local In-Memory Cache to minimize Firestore reads on Free Tier
-    private val reviewsCache = mutableMapOf<String, List<RatingEntity>>()
+    private val reviewsCache = java.util.concurrent.ConcurrentHashMap<String, List<RatingEntity>>()
 
     // 1. Multi-Dimensional Rating Criteria Model
     data class MultiDimensionalRating(

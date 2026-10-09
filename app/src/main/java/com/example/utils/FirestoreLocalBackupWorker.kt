@@ -41,7 +41,7 @@ class FirestoreLocalBackupWorker(
             // TODO: تطبيق التصفح بالصفحات (Pagination) بدلاً من جلب المجموعة كاملة دفعة واحدة لتفادي استهلاك الذاكرة مع نمو البيانات
             for (colName in collectionsToBackup) {
                 try {
-                    val snapshot = db.collection(colName).get().await()
+                    val snapshot = db.collection(colName).limit(300).get().await()
                     if (!isFirstCol) backupSb.append(",\n")
                     isFirstCol = false
 

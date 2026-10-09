@@ -248,7 +248,7 @@ fun UserSubmitPaymentProofDialog(
                     }
                 }
 
-                Divider(color = Color.White.copy(alpha = 0.05f))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
                 Text("يرجى تعبئة بيانات التحويل بعد إرسال المبلغ المالي:", fontSize = 11.sp, color = Color.LightGray)
 
                 OutlinedTextField(

@@ -74,7 +74,9 @@ fun Luxury3DNavIcon(
     iconStyle: String = "GOLDEN_3D",
     onClick: () -> Unit
 ) {
-    // 30% reduction applied
+    // 0.7f: معامل تصغير نسبي (30% scale reduction) للحفاظ على مساحات أشرطة التنقل
+    // 16f (حد أدنى): يمنع انكماش الأيقونة عن الحجم المرئي الأدنى
+    // 24f (حد أقصى): يمنع تضخم الأيقونة وخروجها عن شريط التنقل السفلي والعلوي
     val actualSize = (iconSizeDp * 0.7f).coerceIn(16f, 24f)
     val sizeDp = actualSize.dp
     Column(

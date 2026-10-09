@@ -48,12 +48,12 @@ object ChatValidationUtils {
             context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
         } catch (_: Exception) { 0L }
 
-        // للملفات الصوتية: نطبق فحص الـ 2MB فوراً قبل الرفع لتوفير الباندويث
+        // للملفات الصوتية: نطبق فحص الحجم الأقصى فوراً قبل الرفع لتوفير الباندويث
         if (!isImage && fileSize > MAX_FILE_SIZE) {
             val sizeMb = String.format(java.util.Locale.US, "%.1f", fileSize.toDouble() / (1024 * 1024))
             return ValidationResult(
                 isValid = false,
-                message = "⚠️ التسجيل الصوتي كبير جداً ($sizeMb MB). الحد الأقصى 2 ميجابايت."
+                message = "⚠️ التسجيل الصوتي كبير جداً ($sizeMb MB). الحد الأقصى 1.5 ميجابايت."
             )
         }
         
@@ -71,27 +71,36 @@ object ChatValidationUtils {
     }
 
     /**
-     * تطبيق ضغط شديد للصور (600x600) وجودة 60% لتقليل استهلاك Firebase Storage
+     * تطبيق ضغط شديد للصور (600x600) وجودة 60% لتقليل استهلاك Firebase Storage مع الحماية من OOM
      */
     fun compressImage(context: Context, uri: Uri): ByteArray {
         return try {
-            val inputStream = context.contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            var inputStream = context.contentResolver.openInputStream(uri)
+            BitmapFactory.decodeStream(inputStream, null, boundsOptions)
+            inputStream?.close()
+
+            val maxWidth = 600
+            val maxHeight = 600
+            var sampleSize = 1
+            while (boundsOptions.outWidth / sampleSize > maxWidth * 2 || boundsOptions.outHeight / sampleSize > maxHeight * 2) {
+                sampleSize *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
             inputStream?.close()
 
             if (bitmap == null) return byteArrayOf()
 
-            // أقصى أبعاد مسموحة 600x600
-            val maxWidth = 600
-            val maxHeight = 600
             val scaledBitmap = if (bitmap.width > maxWidth || bitmap.height > maxHeight) {
                 val scale = minOf(maxWidth.toFloat() / bitmap.width, maxHeight.toFloat() / bitmap.height)
-                Bitmap.createScaledBitmap(
-                    bitmap,
-                    (bitmap.width * scale).toInt().coerceAtLeast(1),
-                    (bitmap.height * scale).toInt().coerceAtLeast(1),
-                    true
-                )
+                val newW = (bitmap.width * scale).toInt().coerceAtLeast(1)
+                val newH = (bitmap.height * scale).toInt().coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(bitmap, newW, newH, true)
+                if (scaled != bitmap) bitmap.recycle()
+                scaled
             } else {
                 bitmap
             }
@@ -99,6 +108,7 @@ object ChatValidationUtils {
             val outputStream = ByteArrayOutputStream()
             // جودة 60% كافية جداً للمعاينة في الشات مع حجم ملف صغير جداً (بالكيلوبايت)
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
+            if (!scaledBitmap.isRecycled) scaledBitmap.recycle()
             val result = outputStream.toByteArray()
             
             android.util.Log.d("ChatValidation", "Final compressed size: ${result.size / 1024} KB")
@@ -129,9 +139,12 @@ object ChatValidationUtils {
 
             if (bitmap == null) return byteArrayOf()
 
-            val thumbBitmap = Bitmap.createScaledBitmap(bitmap, 150, (150f * bitmap.height / bitmap.width).toInt(), true)
+            val thumbHeight = if (bitmap.width > 0) (150f * bitmap.height / bitmap.width).toInt().coerceAtLeast(1) else 150
+            val thumbBitmap = Bitmap.createScaledBitmap(bitmap, 150, thumbHeight, true)
             val outputStream = ByteArrayOutputStream()
             thumbBitmap.compress(Bitmap.CompressFormat.JPEG, 40, outputStream)
+            if (thumbBitmap != bitmap) bitmap.recycle()
+            if (!thumbBitmap.isRecycled) thumbBitmap.recycle()
             outputStream.toByteArray()
         } catch (_: Exception) { byteArrayOf() }
     }

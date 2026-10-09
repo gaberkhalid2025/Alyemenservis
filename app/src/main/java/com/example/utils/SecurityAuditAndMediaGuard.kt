@@ -139,12 +139,27 @@ object ChatMediaGuard {
      */
     fun validateAndCompressImage(context: Context, imageUri: Uri): Pair<Boolean, File?> {
         return try {
-            val inputStream = context.contentResolver.openInputStream(imageUri) ?: return Pair(false, null)
-            val originalBitmap = BitmapFactory.decodeStream(inputStream) ?: return Pair(false, null)
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            var inputStream = context.contentResolver.openInputStream(imageUri) ?: return Pair(false, null)
+            BitmapFactory.decodeStream(inputStream, null, boundsOptions)
+            inputStream.close()
+
+            var sampleSize = 1
+            while (boundsOptions.outWidth / sampleSize > 1200 || boundsOptions.outHeight / sampleSize > 1200) {
+                sampleSize *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            inputStream = context.contentResolver.openInputStream(imageUri) ?: return Pair(false, null)
+            val originalBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions) ?: return Pair(false, null)
+            inputStream.close()
 
             val outputStream = ByteArrayOutputStream()
             // Compress with 75% quality JPEG
             originalBitmap.compress(Bitmap.CompressFormat.JPEG, 75, outputStream)
+            if (!originalBitmap.isRecycled) {
+                originalBitmap.recycle()
+            }
             val compressedBytes = outputStream.toByteArray()
 
             if (compressedBytes.size > MAX_IMAGE_SIZE_BYTES) {
@@ -152,10 +167,10 @@ object ChatMediaGuard {
             }
 
             val compressedFile = File(context.cacheCategoryDir(), "compressed_chat_${System.currentTimeMillis()}.jpg")
-            val fileOutputStream = FileOutputStream(compressedFile)
-            fileOutputStream.write(compressedBytes)
-            fileOutputStream.flush()
-            fileOutputStream.close()
+            FileOutputStream(compressedFile).use { fos ->
+                fos.write(compressedBytes)
+                fos.flush()
+            }
 
             Pair(true, compressedFile)
         } catch (e: Exception) {

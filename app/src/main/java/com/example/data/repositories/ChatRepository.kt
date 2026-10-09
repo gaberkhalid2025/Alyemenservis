@@ -914,7 +914,7 @@ class ChatRepository(
             val messagesRef = channelsCollection.document(channelId).collection("messages")
 
             val snapshot = if (lastSync > 0) {
-                messagesRef.whereGreaterThan("timestamp", lastSync).get().await()
+                messagesRef.whereGreaterThan("timestamp", lastSync).limit(100).get().await()
             } else {
                 messagesRef.orderBy("timestamp", Query.Direction.DESCENDING).limit(50).get().await()
             }

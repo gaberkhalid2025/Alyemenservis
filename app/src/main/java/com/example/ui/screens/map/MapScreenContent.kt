@@ -103,6 +103,19 @@ fun MapScreenContent(
         }
     }
 
+    // Auto-request location updates on screen launch to acquire user's real GPS immediately
+    LaunchedEffect(Unit) {
+        val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasFine || hasCoarse) {
+            viewModel.startLocationUpdates()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            )
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             state.clearOffsets()
@@ -333,10 +346,10 @@ fun MapScreenContent(
                     }
                 },
                 onZoomIn = {
-                    state.zoomScale = (state.zoomScale * 1.25f).coerceIn(0.35f, 6.0f)
+                    state.zoomScale = (state.zoomScale * 1.30f).coerceIn(0.25f, 8.0f)
                 },
                 onZoomOut = {
-                    state.zoomScale = (state.zoomScale / 1.25f).coerceIn(0.35f, 6.0f)
+                    state.zoomScale = (state.zoomScale / 1.30f).coerceIn(0.25f, 8.0f)
                 },
                 onRecenterLocation = {
                     val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

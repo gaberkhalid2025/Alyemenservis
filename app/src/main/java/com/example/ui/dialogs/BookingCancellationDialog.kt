@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.BookingEntity
 import com.example.utils.BookingStateMachine
+import kotlinx.coroutines.isActive
 
 /**
  * 🛑 BookingCancellationDialog
@@ -60,7 +61,7 @@ fun BookingCancellationDialog(
     LaunchedEffect(isLockedInitially, attemptsLeft, booking.id) {
         val isLocked = com.example.security.BookingSecurityHelper.isBookingLocked(context, booking.id)
         if (isLocked) {
-            while (true) {
+            while (isActive) {
                 val secs = com.example.security.BookingSecurityHelper.getRemainingLockoutSeconds(context, booking.id)
                 remainingSeconds = secs
                 if (secs <= 0L) {

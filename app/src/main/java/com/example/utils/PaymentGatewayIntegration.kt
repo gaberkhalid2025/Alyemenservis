@@ -116,7 +116,7 @@ class PaymentGatewayIntegration(private val context: Context? = null) {
         val secureConfig = config.copy(
             apiKey = if (config.apiKey.isNotBlank() && !config.apiKey.startsWith("gcm:")) SecurityCryptoUtils.encrypt(config.apiKey) else config.apiKey,
             secret = if (config.secret.isNotBlank() && !config.secret.startsWith("gcm:")) SecurityCryptoUtils.encrypt(config.secret) else config.secret,
-            merchantId = if (config.merchantId.isNotBlank() && !config.merchantId.startsWith("startsWith")) SecurityCryptoUtils.encrypt(config.merchantId) else config.merchantId
+            merchantId = if (config.merchantId.isNotBlank() && !config.merchantId.startsWith("gcm:")) SecurityCryptoUtils.encrypt(config.merchantId) else config.merchantId
         )
 
         list.add(secureConfig)

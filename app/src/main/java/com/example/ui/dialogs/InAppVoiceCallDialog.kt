@@ -22,6 +22,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.utils.VisualThemePalette
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @Composable
 fun InAppVoiceCallDialog(
@@ -49,7 +50,7 @@ fun InAppVoiceCallDialog(
             }
         } else if (callState == "CONNECTED") {
             callSeconds = 0
-            while (callState == "CONNECTED") {
+            while (isActive && callState == "CONNECTED") {
                 delay(1000)
                 callSeconds++
             }

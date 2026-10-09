@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>خريطة دليل خدمات اليمن</title>
+    <link rel="stylesheet" href="leaflet.css" />
+    <link rel="stylesheet" href="MarkerCluster.css" />
+    <link rel="stylesheet" href="MarkerCluster.Default.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            background-color: #0F172A;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", Tahoma, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Marker Badge Design */
+        .custom-pin-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transform: translate(-50%, -100%);
+        }
+        .custom-pin-head {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 19px;
+            color: #ffffff;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+            transition: transform 0.2s ease;
+        }
+        .custom-pin-head:active {
+            transform: scale(1.18);
+        }
+        .custom-pin-arrow {
+            width: 0;
+            height: 0;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 8px solid #ffffff;
+            margin-top: -1px;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+        }
+        .custom-pin-label {
+            background: rgba(15, 23, 42, 0.90);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-top: 3px;
+            white-space: nowrap;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.25);
+            pointer-events: none;
+        }
+
+        /* User GPS Location Marker */
+        .user-pulse-marker {
+            position: relative;
+            width: 22px;
+            height: 22px;
+        }
+        .user-dot {
+            width: 16px;
+            height: 16px;
+            background: #00E5FF;
+            border: 2.5px solid #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            box-shadow: 0 0 10px #00E5FF;
+            z-index: 2;
+        }
+        .user-pulse {
+            width: 36px;
+            height: 36px;
+            background: rgba(0, 229, 255, 0.40);
+            border-radius: 50%;
+            position: absolute;
+            top: -7px;
+            left: -7px;
+            animation: userPulsing 2s infinite ease-out;
+            z-index: 1;
+        }
+        @keyframes userPulsing {
+            0% { transform: scale(0.5); opacity: 0.9; }
+            100% { transform: scale(1.8); opacity: 0; }
+        }
+
+        /* Layer Switcher Pill at Top-Left */
+        .map-layer-switch {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid #334155;
+            border-radius: 20px;
+            padding: 4px;
+            display: flex;
+            gap: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .layer-btn {
+            background: transparent;
+            border: none;
+            color: #94A3B8;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .layer-btn.active {
+            background: #00E5FF;
+            color: #0F172A;
+            box-shadow: 0 2px 6px rgba(0,229,255,0.4);
+        }
+
+        /* Leaflet Controls Customization */
+        .leaflet-control-zoom {
+            display: none !important; /* Managed via Native Compose Buttons */
+        }
+        .leaflet-control-attribution {
+            background: rgba(15, 23, 42, 0.75) !important;
+            color: #94A3B8 !important;
+            font-size: 9px !important;
+            padding: 2px 6px !important;
+        }
+        .leaflet-control-attribution a {
+            color: #38BDF8 !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- Quick Map Type Switcher -->
+    <div class="map-layer-switch">
+        <button id="btnGoogleRoads" class="layer-btn active" onclick="switchLayer('google_roads')">شوارع</button>
+        <button id="btnGoogleSat" class="layer-btn" onclick="switchLayer('google_satellite')">قمر صناعي</button>
+        <button id="btnOSM" class="layer-btn" onclick="switchLayer('osm')">OSM</button>
+    </div>
+
+    <script src="leaflet.js"></script>
+    <script src="leaflet.markercluster.js"></script>
+    <script>
+        var map;
+        var currentTileLayer;
+        var markerClusterGroup;
+        var userMarker = null;
+        var userAccuracyCircle = null;
+        var userLat = 15.3694;
+        var userLng = 44.1910;
+        var activeLayerKey = 'google_roads';
+
+        // Tile Providers (100% Free with Full Yemeni Arabic Street Names)
+        var tileProviders = {
+            // Google Maps Roadmap in Arabic (All streets, neighborhoods, rounds, shops)
+            'google_roads': L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=ar', {
+                subdomains: ['0', '1', '2', '3'],
+                maxZoom: 21,
+                attribution: '© Google Maps'
+            }),
+            // Google Maps Hybrid/Satellite (Satellite imagery with road names in Arabic)
+            'google_satellite': L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ar', {
+                subdomains: ['0', '1', '2', '3'],
+                maxZoom: 21,
+                attribution: '© Google Satellite'
+            }),
+            // OpenStreetMap Standard
+            'osm': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors'
+            })
+        };
+
+        function initMap() {
+            try {
+                // Initialize map centered on Sana'a by default
+                map = L.map('map', {
+                    center: [userLat, userLng],
+                    zoom: 15,
+                    zoomControl: false,
+                    attributionControl: true
+                });
+
+                // Attach default road layer
+                currentTileLayer = tileProviders['google_roads'].addTo(map);
+
+                // Cluster group with custom styling
+                markerClusterGroup = L.markerClusterGroup({
+                    maxClusterRadius: 40,
+                    spiderfyOnMaxZoom: true,
+                    showCoverageOnHover: false,
+                    zoomToBoundsOnClick: true
+                });
+                map.addLayer(markerClusterGroup);
+
+                // Click event on map background
+                map.on('click', function(e) {
+                    if (window.AndroidBridge && window.AndroidBridge.onMapClicked) {
+                        window.AndroidBridge.onMapClicked();
+                    }
+                });
+
+                // Notify native Android
+                if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+                    window.AndroidBridge.onMapReady();
+                }
+            } catch(e) {
+                console.error("Map init error:", e);
+            }
+        }
+
+        function switchLayer(layerKey) {
+            if (!tileProviders[layerKey]) return;
+            if (currentTileLayer) {
+                map.removeLayer(currentTileLayer);
+            }
+            currentTileLayer = tileProviders[layerKey].addTo(map);
+            currentTileLayer.bringToBack();
+            activeLayerKey = layerKey;
+
+            document.getElementById('btnGoogleRoads').className = 'layer-btn' + (layerKey === 'google_roads' ? ' active' : '');
+            document.getElementById('btnGoogleSat').className = 'layer-btn' + (layerKey === 'google_satellite' ? ' active' : '');
+            document.getElementById('btnOSM').className = 'layer-btn' + (layerKey === 'osm' ? ' active' : '');
+        }
+
+        // Called by Android to update User GPS position
+        function updateUserLocation(lat, lng, accuracy, shouldPan) {
+            if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+            userLat = lat;
+            userLng = lng;
+
+            var userIcon = L.divIcon({
+                className: '',
+                html: '<div class="user-pulse-marker"><div class="user-pulse"></div><div class="user-dot"></div></div>',
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+            });
+
+            if (!userMarker) {
+                userMarker = L.marker([lat, lng], {
+                    icon: userIcon,
+                    zIndexOffset: 1000
+                }).addTo(map);
+            } else {
+                userMarker.setLatLng([lat, lng]);
+            }
+
+            if (accuracy && accuracy > 0 && accuracy < 3000) {
+                if (!userAccuracyCircle) {
+                    userAccuracyCircle = L.circle([lat, lng], {
+                        radius: accuracy,
+                        color: '#00E5FF',
+                        weight: 1,
+                        fillColor: '#00E5FF',
+                        fillOpacity: 0.10
+                    }).addTo(map);
+                } else {
+                    userAccuracyCircle.setLatLng([lat, lng]);
+                    userAccuracyCircle.setRadius(accuracy);
+                }
+            }
+
+            if (shouldPan && map) {
+                map.panTo([lat, lng], { animate: true });
+            }
+        }
+
+        // Called by Android with structured JSON string of entities
+        function setMarkers(markersJsonStr) {
+            try {
+                if (!markerClusterGroup) return;
+                markerClusterGroup.clearLayers();
+
+                var items = (typeof markersJsonStr === 'string') ? JSON.parse(markersJsonStr) : markersJsonStr;
+                if (!items || !items.length) return;
+
+                items.forEach(function(item) {
+                    if (!item.lat || !item.lng || item.lat === 0.0 || item.lng === 0.0) return;
+
+                    var pinBg = item.badgeColor || '#00E5FF';
+                    var emoji = item.emoji || '📍';
+                    var displayName = item.name || '';
+                    if (displayName.length > 18) {
+                        displayName = displayName.substring(0, 17) + '…';
+                    }
+
+                    var iconHtml = '<div class="custom-pin-container">' +
+                        '<div class="custom-pin-head" style="background-color: ' + pinBg + ';">' + emoji + '</div>' +
+                        '<div class="custom-pin-arrow" style="border-top-color: ' + pinBg + ';"></div>' +
+                        (displayName ? '<div class="custom-pin-label">' + displayName + '</div>' : '') +
+                        '</div>';
+
+                    var customIcon = L.divIcon({
+                        className: '',
+                        html: iconHtml,
+                        iconSize: [40, 60],
+                        iconAnchor: [20, 50]
+                    });
+
+                    var marker = L.marker([item.lat, item.lng], { icon: customIcon });
+
+                    marker.on('click', function(e) {
+                        L.DomEvent.stopPropagation(e);
+                        if (window.AndroidBridge && window.AndroidBridge.onMarkerClicked) {
+                            window.AndroidBridge.onMarkerClicked(item.id, item.type);
+                        }
+                    });
+
+                    markerClusterGroup.addLayer(marker);
+                });
+            } catch(e) {
+                console.error("Error setting markers:", e);
+            }
+        }
+
+        // Center on selected City
+        function setCity(cityName, lat, lng, zoomLevel) {
+            if (map && lat && lng) {
+                map.setView([lat, lng], zoomLevel || 14, { animate: true });
+            }
+        }
+
+        // Zoom Controls
+        function zoomIn() {
+            if (map) map.zoomIn();
+        }
+
+        function zoomOut() {
+            if (map) map.zoomOut();
+        }
+
+        // Recenter on user GPS
+        function recenterUser() {
+            if (map && userLat && userLng) {
+                map.setView([userLat, userLng], 16, { animate: true });
+            }
+        }
+
+        // Launch on window load
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>

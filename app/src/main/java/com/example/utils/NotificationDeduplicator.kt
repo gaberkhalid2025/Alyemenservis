@@ -99,14 +99,21 @@ class NotificationDeduplicator(private val context: Context) {
             val timestamps = getNotificationTimestamps().toMutableMap()
             val sentList = getSentNotifications().toMutableList()
 
-            val toRemove = timestamps.filter { it.value < cutoff }.keys
+            val toRemove = timestamps.filter { it.value < cutoff }.keys.toSet()
             for (key in toRemove) {
                 timestamps.remove(key)
-                sentList.remove(key)
+            }
+            sentList.removeAll(toRemove)
+
+            // Cap at 500 recent items to conserve SharedPreferences storage
+            val finalSentList = if (sentList.size > 500) {
+                sentList.takeLast(500)
+            } else {
+                sentList
             }
 
             saveNotificationTimestamps(timestamps)
-            saveSentNotifications(sentList)
+            saveSentNotifications(finalSentList)
             Log.d(TAG, "Cleaned ${toRemove.size} old notifications older than $daysToKeep days")
         } catch (e: Exception) {
             Log.e(TAG, "Error cleaning old notifications", e)

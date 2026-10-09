@@ -23,32 +23,53 @@ object ImageCompressor {
         quality: Int = 75
     ): File? = withContext(Dispatchers.IO) {
         try {
-            val inputStream = context.contentResolver.openInputStream(imageUri) ?: return@withContext null
-            val originalBitmap = BitmapFactory.decodeStream(inputStream)
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            var inputStream = context.contentResolver.openInputStream(imageUri) ?: return@withContext null
+            BitmapFactory.decodeStream(inputStream, null, boundsOptions)
+            inputStream.close()
+
+            val origWidth = boundsOptions.outWidth
+            val origHeight = boundsOptions.outHeight
+            if (origWidth <= 0 || origHeight <= 0) return@withContext null
+
+            var sampleSize = 1
+            while (origWidth / sampleSize > maxDimension * 2 || origHeight / sampleSize > maxDimension * 2) {
+                sampleSize *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            inputStream = context.contentResolver.openInputStream(imageUri) ?: return@withContext null
+            val originalBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
             inputStream.close()
 
             if (originalBitmap == null) return@withContext null
 
             val width = originalBitmap.width
             val height = originalBitmap.height
-            val ratio = width.toFloat() / height.toFloat()
+            val ratio = width.toFloat() / height.toFloat().coerceAtLeast(1f)
 
             val targetWidth: Int
             val targetHeight: Int
             if (width > height) {
                 targetWidth = maxDimension
-                targetHeight = (maxDimension / ratio).toInt()
+                targetHeight = (maxDimension / ratio).toInt().coerceAtLeast(1)
             } else {
                 targetHeight = maxDimension
-                targetWidth = (maxDimension * ratio).toInt()
+                targetWidth = (maxDimension * ratio).toInt().coerceAtLeast(1)
             }
 
             val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, targetWidth, targetHeight, true)
             val thumbFile = File(context.cacheDir, "thumb_${System.currentTimeMillis()}.jpg")
-            val outputStream = FileOutputStream(thumbFile)
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-            outputStream.flush()
-            outputStream.close()
+            FileOutputStream(thumbFile).use { outputStream ->
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+                outputStream.flush()
+            }
+            if (scaledBitmap != originalBitmap) {
+                originalBitmap.recycle()
+            }
+            if (!scaledBitmap.isRecycled) {
+                scaledBitmap.recycle()
+            }
 
             thumbFile
         } catch (e: Exception) {
@@ -89,10 +110,13 @@ object ImageCompressor {
             if (decodedBitmap == null) return@withContext null
 
             val compressedFile = File(context.cacheDir, "compressed_${System.currentTimeMillis()}.jpg")
-            val outputStream = FileOutputStream(compressedFile)
-            decodedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-            outputStream.flush()
-            outputStream.close()
+            FileOutputStream(compressedFile).use { outputStream ->
+                decodedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+                outputStream.flush()
+            }
+            if (!decodedBitmap.isRecycled) {
+                decodedBitmap.recycle()
+            }
 
             compressedFile
         } catch (e: Exception) {

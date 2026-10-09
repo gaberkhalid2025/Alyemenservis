@@ -47,7 +47,7 @@ object DateFormatter {
         "HH:mm", LOCALE_AR
     )
     
-    private val formatterCache = mutableMapOf<String, DateTimeFormatter>()
+    private val formatterCache = java.util.concurrent.ConcurrentHashMap<String, DateTimeFormatter>()
     
     private fun getOrCreateFormatter(pattern: String, locale: Locale = LOCALE_AR): DateTimeFormatter {
         val cacheKey = "$pattern-${locale.toLanguageTag()}"

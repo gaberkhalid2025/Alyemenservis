@@ -401,7 +401,7 @@ fun RatingDisplay(
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(Icons.Default.Star, contentDescription = "تقييم", tint = Color(0xFFF59E0B), modifier = Modifier.size(14.dp))
-        Text(String.format("%.1f", rating), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(String.format(java.util.Locale.US, "%.1f", rating), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
         if (reviewCount > 0) {
             Text("($reviewCount)", fontSize = 10.sp, color = Color(0xFF94A3B8))
         }

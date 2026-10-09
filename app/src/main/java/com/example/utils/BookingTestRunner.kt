@@ -37,7 +37,7 @@ class BookingTestRunner(private val context: Context) {
         onComplete: (BookingFullReport) -> Unit
     ) {
         val stepsList = mutableListOf<BookingStepReport>()
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val timestamp = DateFormatter.formatCustom(System.currentTimeMillis(), "yyyy-MM-dd HH:mm")
 
         fun addStep(name: String, desc: String): BookingStepReport {
             val step = BookingStepReport(name, desc)
@@ -62,7 +62,7 @@ class BookingTestRunner(private val context: Context) {
             // Step 1: Create a new booking
             onProgress("📅 خطوة 1: جاري إنشاء حجز جديد لـ $testClientPhone مع الفني $testProviderPhone...")
             val bookingId1 = "test_booking_" + System.currentTimeMillis()
-            val bookingNumber1 = "BK-" + SimpleDateFormat("yyMMddHHmmss", Locale.US).format(Date()) + "-TEST"
+            val bookingNumber1 = "BK-" + DateFormatter.formatCustom(System.currentTimeMillis(), "yyMMddHHmmss") + "-TEST"
             val rawPin = "1234"
             val hashedPin = SecureHasher.hashPin(rawPin) // Or standard hash
 
